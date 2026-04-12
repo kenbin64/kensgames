@@ -19,7 +19,13 @@ class EmailService {
     this.emailFrom = process.env.EMAIL_FROM || 'noreply@kensgames.com';
     this.recoveryLinkBase = process.env.RECOVERY_LINK_BASE || 'http://localhost:3000/reset-password';
 
-    if (this.isDevMode) {
+    // Skip email entirely if SMTP creds are unconfigured placeholders
+    this.disabled = !this.smtpUser || !this.smtpPass
+      || this.smtpUser.includes('your-email') || this.smtpPass.includes('your-app');
+
+    if (this.disabled) {
+      console.log('📧 Email Service DISABLED — SMTP credentials not configured');
+    } else if (this.isDevMode) {
       console.log('📧 Email Service in DEV mode - emails logged to console');
     } else {
       this.initializeTransporter();
@@ -30,7 +36,7 @@ class EmailService {
    * Initialize Nodemailer transporter for production
    */
   initializeTransporter() {
-    if (this.isDevMode) return;
+    if (this.isDevMode || this.disabled) return;
 
     try {
       this.transporter = nodemailer.createTransport({
@@ -293,6 +299,11 @@ class EmailService {
    * Logs to console in dev mode, sends via SMTP in production
    */
   async sendEmail(mailOptions) {
+    if (this.disabled) {
+      console.log('📧 [DISABLED] Skipping email to:', mailOptions.to, '| Subject:', mailOptions.subject);
+      return { success: true, messageId: 'disabled', info: 'Email service not configured' };
+    }
+
     if (this.isDevMode) {
       console.log('📧 [DEV MODE] Email would be sent:');
       console.log('   From:', mailOptions.from);

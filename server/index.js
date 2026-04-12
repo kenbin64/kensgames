@@ -160,8 +160,8 @@ app.post('/api/auth/register', async (req, res) => {
       passwordHash: passwordHash,
       displayName: username,
       avatar: avatar || '🎮',
-      status: 'pending', // Not active until email verified
-      emailVerified: false,
+      status: 'active',
+      emailVerified: true,
       verificationCodeHash: verificationCodeHash,
       verificationCodeExpiry: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
       isAdmin: false,
@@ -174,23 +174,19 @@ app.post('/api/auth/register', async (req, res) => {
 
     writeUserToManifold(username, userData);
 
-    // Send verification email
+    // Send verification email (non-blocking — don't await)
     if (email) {
-      try {
-        await emailService.sendVerificationEmail(email, username, verificationCode);
-      } catch (emailError) {
-        console.error('Verification email failed:', emailError);
-        // Don't fail registration if email fails
-      }
+      emailService.sendVerificationEmail(email, username, verificationCode)
+        .catch(emailError => console.error('Verification email failed:', emailError));
     }
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful! Check your email for verification code.',
+      message: 'Account created! You can now sign in.',
       userId: userCoord.userId,
       username: username,
       email: email,
-      requiresEmailVerification: true
+      requiresEmailVerification: false
     });
   } catch (error) {
     console.error('Register error:', error);
