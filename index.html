@@ -4,17 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KensGames Portal - Manifold Gaming Universe</title>
+    <title>KensGames — World Class Arcade Portal</title>
     <meta name="description"
-        content="KensGames - Revolutionary gaming portal powered by manifold mathematics. Play BrickBreaker3D, Space Combat, FastTrack with unified login.">
+        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D and Alien Space Attack. Powered by a geometry-driven game engine unlike anything else.">
 
     <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="/fasttrack/assets/images/icon-192.png">
-    <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
+    <link rel="stylesheet" href="/lib/fonts/fonts.css">
 
     <style>
         :root {
-            /* 80s Arcade Neon Palette */
             --neon-cyan: #00FFFF;
             --neon-pink: #FF00FF;
             --neon-yellow: #FFE800;
@@ -22,12 +21,14 @@
             --neon-purple: #9900FF;
             --neon-green: #00FF41;
             --bg-dark: #04040C;
-            --bg-card: rgba(4, 4, 20, 0.92);
+            --bg-card: rgba(4, 4, 20, 0.94);
             --text: #E0E0FF;
             --text-muted: #8888AA;
-            --glow-cyan: 0 0 8px #00FFFF, 0 0 20px #00FFFF, 0 0 40px #00FFFF;
-            --glow-pink: 0 0 8px #FF00FF, 0 0 20px #FF00FF, 0 0 40px #FF00FF;
-            --glow-yellow: 0 0 8px #FFE800, 0 0 20px #FFE800, 0 0 40px #FFE800;
+            --glow-cyan: 0 0 8px #00FFFF, 0 0 24px #00FFFF, 0 0 48px #00FFFF;
+            --glow-pink: 0 0 8px #FF00FF, 0 0 24px #FF00FF, 0 0 48px #FF00FF;
+            --glow-yellow: 0 0 8px #FFE800, 0 0 24px #FFE800, 0 0 48px #FFE800;
+            --glow-green: 0 0 8px #00FF41, 0 0 24px #00FF41;
+            --font-arcade: 'Orbitron', monospace;
         }
 
         * {
@@ -36,7 +37,8 @@
             box-sizing: border-box;
         }
 
-        html, body {
+        html,
+        body {
             width: 100%;
             overflow-x: hidden;
         }
@@ -60,7 +62,7 @@
                     rgba(0, 0, 0, 0.04) 4px);
         }
 
-        body > * {
+        body>* {
             position: relative;
             z-index: 2;
         }
@@ -411,17 +413,21 @@
             .hero h1 {
                 font-size: 40px;
             }
+
             .games-grid {
                 grid-template-columns: 1fr;
             }
+
             .manifold-content {
                 grid-template-columns: 1fr;
                 gap: 40px;
             }
+
             nav {
                 flex-direction: column;
                 align-items: center;
             }
+
             .section-title {
                 font-size: 32px;
             }
@@ -432,6 +438,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -443,143 +450,427 @@
             animation-fill-mode: both;
         }
 
-        .game-card:nth-child(1) { animation-delay: 0.1s; }
-        .game-card:nth-child(2) { animation-delay: 0.2s; }
-        .game-card:nth-child(3) { animation-delay: 0.3s; }
+        .game-card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .game-card:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .game-card:nth-child(3) {
+            animation-delay: 0.3s;
+        }
     </style>
 </head>
 
 <body>
+    <canvas id="gyroid-bg"></canvas>
+    <div id="tron-grid"></div>
     <div id="scanlines"></div>
+    <div class="arcade-symbols" id="arcade-symbols"></div>
 
     <header>
         <nav>
-            <div class="logo">🎮 KENSGAMES</div>
-            <div class="nav-buttons">
-                <button class="btn-guest" onclick="playAsGuest()">👤 GUEST</button>
-                <button class="btn-login" onclick="goToLogin()">🔐 LOGIN</button>
+            <div class="logo">KEN<span>S</span>GAMES</div>
+            <ul class="nav-links">
+                <li><a href="#games">Games</a></li>
+                <li><a href="#engine">The Engine</a></li>
+                <li><a href="#upcoming">Coming Soon</a></li>
+                <li><a href="/lounge.html">Lounge</a></li>
+                <li><a href="/discover.html">Discover</a></li>
+            </ul>
+            <div class="nav-auth">
+                <button class="btn-ghost" onclick="openModal('forgot')">Forgot?</button>
+                <button class="btn-register" onclick="openModal('register')">JOIN FREE</button>
+                <button class="btn-login" onclick="openModal('login')">SIGN IN</button>
             </div>
         </nav>
     </header>
 
     <section class="hero">
-        <div class="hero-content">
-            <h1>KENSGAMES</h1>
-            <p>⚡ Manifold-Powered Gaming Universe ⚡</p>
-            <p>Experience next-generation multiplayer games built on revolutionary mathematical architecture.</p>
-            <div class="hero-buttons">
-                <button class="btn-play btn-large" onclick="goToLogin()">🎮 PLAY NOW</button>
-                <button class="btn-guest btn-large" onclick="playAsGuest()">👤 GUEST MODE</button>
-            </div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-top: 20px;">Create an account to track stats, earn medallions, and compete globally</p>
+        <div class="hero-eyebrow">&#9655; Insert Coin To Continue &#9655;</div>
+        <h1>KENS<span class="accent">GAMES</span></h1>
+        <div class="hero-sub">World Class Arcade Portal &mdash; Est. 2026</div>
+        <p>A new breed of arcade gaming where every game, every score, and every player exists in a unified geometric
+            space. No ads. No pay-to-win. Just pure skill.</p>
+        <div class="hero-cta">
+            <button class="btn-play" onclick="openModal('register')">&#9654; PLAY NOW</button>
+            <button class="btn-ghost btn-play"
+                style="background:transparent;color:var(--neon-cyan);border-color:var(--neon-cyan);box-shadow:var(--glow-cyan)"
+                onclick="playAsGuest()">GUEST MODE</button>
         </div>
+        <div class="hero-note">Free account &nbsp;&#9632;&nbsp; Global leaderboards &nbsp;&#9632;&nbsp; Cross-game
+            achievements &nbsp;&#9632;&nbsp; No credit card</div>
     </section>
 
-    <section class="games-section">
-        <h2 class="section-title">🎮 FEATURED GAMES</h2>
+    <div class="benchmarks">
+        <div class="benchmarks-inner">
+            <div class="bench-item"><span class="bench-value">60</span><span class="bench-label">FPS Locked</span></div>
+            <div class="bench-item"><span class="bench-value">&lt;80ms</span><span class="bench-label">Response
+                    Time</span></div>
+            <div class="bench-item"><span class="bench-value">4</span><span class="bench-label">Player
+                    Multiplayer</span></div>
+            <div class="bench-item"><span class="bench-value">0</span><span class="bench-label">Ads Ever</span></div>
+            <div class="bench-item"><span class="bench-value">&#8734;</span><span
+                    class="bench-label">Replayability</span></div>
+            <div class="bench-item"><span class="bench-value">3</span><span class="bench-label">Live Games</span></div>
+        </div>
+    </div>
 
+    <section class="page-section" id="games">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; Now Playing &#9632;</div>
+            <h2 class="section-title">Featured Games</h2>
+        </div>
         <div class="games-grid">
+
             <div class="game-card">
-                <div class="game-image">
-                    <img src="/fasttrack/assets/images/art/breakout.png" alt="BrickBreaker3D">
+                <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
+                    <div class="img-placeholder">
+                        <div class="ph-icon" style="color:var(--neon-green)">
+                            &#9646;&#9646;&#9646;&#9644;&#9645;&#9646;&#9646;&#9646;</div>
+                        <div class="ph-text">Gameplay Screenshot</div>
+                    </div>
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
                     <div>
-                        <div class="game-title">BRICKBREAKER3D</div>
-                        <div class="game-description">
-                            Classic brick-breaker reimagined in stunning 3D. Break through waves of bricks, master power-ups, and climb the global leaderboard.
+                        <div class="game-title">FastTrack</div>
+                        <div class="game-meta">
+                            <span class="game-tag">2&ndash;4 Players</span>
+                            <span class="game-tag">Strategy</span>
+                            <span class="game-tag">Board Game</span>
                         </div>
+                        <div class="game-description">A lightning-fast multiplayer board game where strategy meets
+                            speed. Race your pieces across a dynamic board, block opponents, and play your hand right.
+                            Features 5-Card Draw variant for high-stakes rounds. Skill always wins.</div>
                     </div>
-                    <button class="game-button" onclick="goToGame('/brickbreaker3d-manifold/')">PLAY →</button>
+                    <button class="btn-green" onclick="goToGame('/fasttrack/')">PLAY FASTTRACK &#9654;</button>
                 </div>
             </div>
 
             <div class="game-card">
-                <div class="game-image" style="background: linear-gradient(135deg, #1a3a52 0%, #0a1a2f 100%);">
-                    <div style="font-size: 120px; text-align: center; width: 100%; filter: drop-shadow(0 0 20px currentColor); color: var(--neon-cyan);">🚀</div>
+                <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#0a0518);">
+                    <div class="img-placeholder">
+                        <div class="ph-icon" style="color:var(--neon-pink)">
+                            &#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;</div>
+                        <div class="ph-text">Gameplay Screenshot</div>
+                    </div>
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
                     <div>
-                        <div class="game-title">SPACE COMBAT</div>
-                        <div class="game-description">
-                            Engage in intense multiplayer space warfare. Pilot advanced spacecraft, outsmart opponents, and become the galactic champion.
+                        <div class="game-title">BrickBreaker 3D</div>
+                        <div class="game-meta">
+                            <span class="game-tag">Solo</span>
+                            <span class="game-tag">Multiplayer</span>
+                            <span class="game-tag">Arcade</span>
                         </div>
+                        <div class="game-description">The classic reimagined in full 3D. Walls of bricks stretch into
+                            depth &mdash; your ball curves through space. Power-ups warp physics. Global leaderboard
+                            tracks every point. Solo or head-to-head: who clears the board fastest?</div>
                     </div>
-                    <button class="game-button" onclick="goToGame('/space-combat-manifold/')">PLAY →</button>
+                    <button class="btn-green" onclick="goToGame('/brickbreaker3d/')">PLAY BRICKBREAKER &#9654;</button>
                 </div>
             </div>
 
             <div class="game-card">
-                <div class="game-image" style="background: linear-gradient(135deg, #2d5a1a 0%, #1a3a0f 100%);">
-                    <div style="font-size: 120px; text-align: center; width: 100%; filter: drop-shadow(0 0 20px currentColor); color: var(--neon-green);">🏎️</div>
+                <div class="game-image" style="background:linear-gradient(135deg,#0a1a2d,#020814);">
+                    <div class="img-placeholder">
+                        <div class="ph-icon" style="color:var(--neon-cyan)">
+                            &#9650;&#9660;&#9650;&#9660;&#9650;&#9660;&#9650;&#9660;</div>
+                        <div class="ph-text">Gameplay Screenshot</div>
+                    </div>
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
                     <div>
-                        <div class="game-title">FASTTRACK</div>
-                        <div class="game-description">
-                            Multiplayer racing at breakneck speeds. Challenge friends, master dynamic tracks, and dominate real-time competitions.
+                        <div class="game-title">Alien Space Attack</div>
+                        <div class="game-meta">
+                            <span class="game-tag">First Person</span>
+                            <span class="game-tag">Space Combat</span>
+                            <span class="game-tag">3D</span>
                         </div>
+                        <div class="game-description">Strap in. First-person deep-space combat rendered in real-time 3D.
+                            Waves of alien formations advance with tactical intelligence. Dodge, strafe, and blast your
+                            way to the top of the galactic kill board.</div>
                     </div>
-                    <button class="game-button" onclick="goToGame('/fasttrack-manifold/')">PLAY →</button>
+                    <button class="btn-green" onclick="goToGame('/starfighter/')">PLAY ALIEN ATTACK &#9654;</button>
                 </div>
             </div>
+
         </div>
     </section>
 
-    <section class="manifold-section">
-        <div class="manifold-content">
-            <div class="manifold-text">
-                <h2>⚙️ MANIFOLD TECHNOLOGY</h2>
-                <p>KensGames is built on a revolutionary mathematical foundation called <strong>manifold geometry</strong>. This cutting-edge architecture transforms how multiplayer games handle data, synchronization, and player interactions.</p>
-
-                <ul class="manifold-features">
-                    <li><strong>Single Source of Truth</strong> — All game data lives on mathematical coordinates</li>
-                    <li><strong>Zero Code Duplication</strong> — Games share reusable substrates across the platform</li>
-                    <li><strong>Instant Synchronization</strong> — Real-time player data across all games</li>
-                    <li><strong>Scalable Architecture</strong> — Handles millions of players without bottlenecks</li>
-                    <li><strong>Fair Matchmaking</strong> — Based on mathematical precision and player metrics</li>
+    <section class="engine-section" id="engine">
+        <div class="engine-inner">
+            <div class="engine-text">
+                <h2>&#9881; The Engine</h2>
+                <p>KensGames runs on a game engine built from first principles &mdash; not a commercial framework. Every
+                    game on this portal shares a common geometric foundation that makes them faster, fairer, and more
+                    responsive than anything built the traditional way.</p>
+                <p>The architecture treats every game event &mdash; a move, a shot, a score &mdash; as a point in a
+                    unified dimensional space. This isn&rsquo;t a marketing claim. It&rsquo;s how the code actually
+                    works.</p>
+                <ul class="engine-features">
+                    <li><strong>Single source of truth</strong> &mdash; all games share one data model. No sync
+                        conflicts, ever.</li>
+                    <li><strong>Zero code duplication</strong> &mdash; physics, audio, multiplayer, AI all live in
+                        shared substrates.</li>
+                    <li><strong>Geometry-native matchmaking</strong> &mdash; players matched by proximity in
+                        skill-space, not arbitrary buckets.</li>
+                    <li><strong>Real-time everything</strong> &mdash; leaderboards, presence, scores update live across
+                        all games simultaneously.</li>
+                    <li><strong>Browser-native</strong> &mdash; no installs. WebGL2 running at full GPU speed in your
+                        browser.</li>
                 </ul>
             </div>
-
-            <div class="manifold-diagram">
-                <div class="manifold-diagram-icon">📐</div>
-                <p>MANIFOLD COORDINATE SYSTEM</p>
-                <p style="font-size: 24px; color: var(--neon-cyan); text-shadow: var(--glow-cyan); margin: 15px 0;">z = x · y</p>
-                <p>Mathematical multi-dimensional data storage & retrieval</p>
+            <div class="engine-visual">
+                <div class="engine-stat"><span class="engine-stat-icon">&#9651;</span><span
+                        class="engine-stat-label">Rendering Engine</span><span class="engine-stat-value">WebGL2 +
+                        GLSL</span></div>
+                <div class="engine-stat"><span class="engine-stat-icon">&#9670;</span><span class="engine-stat-label">3D
+                        Framework</span><span class="engine-stat-value">Three.js r163</span></div>
+                <div class="engine-stat"><span class="engine-stat-icon">&#9632;</span><span
+                        class="engine-stat-label">Shared Substrates</span><span class="engine-stat-value">9 Universal
+                        Modules</span></div>
+                <div class="engine-stat"><span class="engine-stat-icon">&#9675;</span><span
+                        class="engine-stat-label">Multiplayer Protocol</span><span class="engine-stat-value">WebSocket
+                        Real-time</span></div>
+                <div class="engine-stat"><span class="engine-stat-icon">&#9733;</span><span
+                        class="engine-stat-label">Background Renderer</span><span class="engine-stat-value">Ray-Marched
+                        Surface</span></div>
+                <div class="engine-stat" style="border-left-color:var(--neon-purple)"><span
+                        class="engine-stat-icon">&#8734;</span><span class="engine-stat-label">The Theory</span><span
+                        class="engine-stat-value" style="color:var(--neon-purple)">Deep dive &#8594;</span></div>
             </div>
         </div>
     </section>
 
+    <section class="page-section" id="upcoming">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; Insert Next Quarter &#9632;</div>
+            <h2 class="section-title">Coming Soon</h2>
+        </div>
+        <div class="upcoming-grid">
+            <div class="upcoming-card">
+                <div class="upcoming-title">Geometry Wars 2D</div>
+                <div class="upcoming-desc">Twin-stick chaos where the arena itself shifts and folds. Every wave changes
+                    the rules of the space you fight in.</div>
+                <div class="upcoming-eta">&#9660; Q3 2026</div>
+            </div>
+            <div class="upcoming-card">
+                <div class="upcoming-title">Manifold Racer</div>
+                <div class="upcoming-desc">Tracks that curve through impossible geometry. The fastest line isn&rsquo;t
+                    always straight.</div>
+                <div class="upcoming-eta">&#9660; Q3 2026</div>
+            </div>
+            <div class="upcoming-card">
+                <div class="upcoming-title">Grid Dungeon</div>
+                <div class="upcoming-desc">Turn-based dungeon crawler with infinite procedural maps generated by the
+                    same engine powering every KensGames title.</div>
+                <div class="upcoming-eta">&#9660; Q4 2026</div>
+            </div>
+            <div class="upcoming-card">
+                <div class="upcoming-title">Surface Siege</div>
+                <div class="upcoming-desc">Real-time strategy where territory expands and contracts across a living
+                    mathematical landscape.</div>
+                <div class="upcoming-eta">&#9660; Q4 2026</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="modal-overlay" id="auth-modal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal()">&#10005;</button>
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchTab('login')">Sign In</button>
+                <button class="modal-tab" onclick="switchTab('register')">Join Free</button>
+                <button class="modal-tab" onclick="switchTab('forgot')">Forgot Password</button>
+            </div>
+            <div class="modal-panel active" id="panel-login">
+                <h3>Sign In</h3>
+                <div class="modal-sub">Welcome back, player. Your stats await.</div>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group"><label>Email or Username</label><input type="text" id="login-user"
+                            placeholder="player@kensgames.com" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="login-pass"
+                            placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required></div>
+                    <button type="submit" class="form-submit">&#9654; SIGN IN</button>
+                    <div class="form-msg" id="login-msg"></div>
+                </form>
+                <div style="margin-top:20px;border-top:1px solid rgba(0,255,255,0.1);padding-top:20px">
+                    <button class="btn-ghost" style="width:100%;margin-bottom:8px"
+                        onclick="oauthLogin('google')">Continue with Google</button>
+                    <button class="btn-ghost" style="width:100%;" onclick="oauthLogin('discord')">Continue with
+                        Discord</button>
+                </div>
+                <div class="form-footer">No account? <a onclick="switchTab('register')">Join free</a> &nbsp;|&nbsp; <a
+                        onclick="switchTab('forgot')">Forgot password?</a></div>
+            </div>
+            <div class="modal-panel" id="panel-register">
+                <h3>Join Free</h3>
+                <div class="modal-sub">Create your player profile. Zero cost, forever.</div>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group"><label>Username</label><input type="text" id="reg-username"
+                            placeholder="ArcadeHero99" required minlength="3"></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="reg-email"
+                            placeholder="you@email.com" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="reg-pass"
+                            placeholder="Min 8 characters" required minlength="8"></div>
+                    <button type="submit" class="form-submit"
+                        style="background:var(--neon-pink);box-shadow:var(--glow-pink)">&#9654; CREATE ACCOUNT</button>
+                    <div class="form-msg" id="reg-msg"></div>
+                </form>
+                <div class="form-footer">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
+            </div>
+            <div class="modal-panel" id="panel-forgot">
+                <h3>Reset Password</h3>
+                <div class="modal-sub">Enter your email and we will send a reset link.</div>
+                <form onsubmit="handleForgot(event)">
+                    <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email"
+                            placeholder="you@email.com" required></div>
+                    <button type="submit" class="form-submit"
+                        style="background:var(--neon-purple);border-color:var(--neon-purple);box-shadow:var(--glow-pink)">&#9654;
+                        SEND RESET LINK</button>
+                    <div class="form-msg" id="forgot-msg"></div>
+                </form>
+                <div class="form-footer"><a onclick="switchTab('login')">&#8592; Back to Sign In</a></div>
+            </div>
+        </div>
+    </div>
+
     <footer>
-        <p style="color: var(--neon-cyan); text-shadow: var(--glow-cyan); font-weight: bold;">🎮 KENSGAMES © 2026</p>
-        <p>A Manifold-Powered Gaming Portal</p>
-        <p style="margin-top: 15px; font-size: 12px;">Login to access: Leaderboards • Guilds • Tournaments • Medallion Status • Player Profiles</p>
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="logo">KEN<span>S</span>GAMES</span>
+                <p>A world-class arcade portal powered by a geometry-driven engine built from scratch. No ads. No
+                    pay-to-win. Just games.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Games</h4>
+                <ul>
+                    <li><a href="/fasttrack/">FastTrack</a></li>
+                    <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
+                    <li><a href="/starfighter/">Alien Space Attack</a></li>
+                    <li><a href="/lounge.html">Multiplayer Lounge</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Portal</h4>
+                <ul>
+                    <li><a href="/discover.html">Discover</a></li>
+                    <li><a href="#engine">The Engine</a></li>
+                    <li><a href="#upcoming">Coming Soon</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="footer-copy"><span>KensGames</span> &copy; 2026 &mdash; All rights reserved</div>
+            <div class="footer-copy">No ads &nbsp;&#9632;&nbsp; No tracking &nbsp;&#9632;&nbsp; No pay-to-win</div>
+        </div>
     </footer>
 
+    <script src="/gyroid.js"></script>
     <script>
-        function goToLogin() {
-            window.location.href = '/login';
+        // Floating 80s arcade symbols
+        const SYMBOLS = ['\u25b2','\u25c6','\u25a0','\u25cf','\u25b6','\u25c0','\u2605','\u25c8','\u2b21','\u25bc','\u25c9','\u2b22'];
+        const container = document.getElementById('arcade-symbols');
+        for (let i = 0; i < 22; i++) {
+            const s = document.createElement('div');
+            s.className = 'sym';
+            s.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+            s.style.left = Math.random() * 100 + 'vw';
+            s.style.animationDuration = (18 + Math.random() * 28) + 's';
+            s.style.animationDelay Math.random() * 30) + 's';
+            s.style.fontSize = (16 + Math.random() * 30) + 'px';
+            s.style.color = ['#00FFFF','#FF00FF','#FFE800','#00FF41'][Math.floor(Math.random()*4)];
+            container.appendChild(s);
         }
 
+        function openModal(tab) {
+            document.getElementById('auth-modal').classList.add('open');
+            switchTab(tab || 'login');
+        }
+        function closeModal() {
+            document.getElementById('auth-modal').classList.remove('open');
+        }
+        document.getElementById('auth-modal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+        function switchTab(tab) {
+            const tabs = ['login','register','forgot'];
+            document.querySelectorAll('.modal-tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === tab));
+            document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + tab).classList.add('active');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const msg = document.getElementById('login-msg');
+            msg.textContent = 'Authenticating...'; msg.className = 'form-msg';
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ username: document.getElementById('login-user').value, password: document.getElementById('login-pass').value })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('user_token', data.token);
+                    localStorage.setItem('username', data.username || data.user?.username);
+                    msg.textContent = 'Welcome back!'; msg.className = 'form-msg ok';
+                    setTimeout(() => { closeModal(); window.location.href = '/lobby'; }, 800);
+                } else {
+                    msg.textContent = data.message || 'Invalid credentials'; msg.className = 'form-msg err';
+                }
+            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const msg = document.getElementById('reg-msg');
+            msg.textContent = 'Creating account...'; msg.className = 'form-msg';
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ username: document.getElementById('reg-username').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.textContent = 'Account created! Check your email to verify.'; msg.className = 'form-msg ok';
+                    setTimeout(() => switchTab('login'), 2500);
+                } else {
+                    msg.textContent = data.message || 'Registration failed'; msg.className = 'form-msg err';
+                }
+            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
+        }
+
+        async function handleForgot(e) {
+            e.preventDefault();
+            const msg = document.getElementById('forgot-msg');
+            msg.textContent = 'Sending reset link...'; msg.className = 'form-msg';
+            try {
+                const res = await fetch('/api/auth/forgot-password', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ email: document.getElementById('forgot-email').value })
+                });
+                const data = await res.json();
+                msg.textContent = res.ok ? 'Reset link sent - check your inbox' : (data.message || 'Error');
+                msg.className = 'form-msg ' + (res.ok ? 'ok' : 'err');
+            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
+        }
+
+        function oauthLogin(provider) { window.location.href = '/api/auth/' + provider; }
         function playAsGuest() {
             localStorage.setItem('user_token', 'guest-' + Date.now());
-            localStorage.setItem('username', 'Guest Player');
-            localStorage.setItem('display_name', 'Guest');
+            localStorage.setItem('username', 'Guest');
             window.location.href = '/lobby';
         }
-
-        function goToGame(gamePath) {
-            const token = localStorage.getItem('user_token');
-            if (token) {
-                window.location.href = gamePath;
-            } else {
-                window.location.href = '/login?redirect=' + encodeURIComponent(gamePath);
-            }
-        }
-
-        window.addEventListener('load', () => {
-            const token = localStorage.getItem('user_token');
-        });
+        function goToGame(path) { window.location.href = path; }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+        const urlParam = new URLSearchParams(location.search).get('modal');
+        if (urlParam) openModal(urlParam);
     </script>
 </body>
 
