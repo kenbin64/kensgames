@@ -20,13 +20,39 @@ const SF3D = (function () {
 
     // ── GLB model cache: loaded once, cloned per entity ──
     const glbModels = {};    // { modelName: THREE.Group }
-    const GLB_PATHS = {
-        enemy: 'assets/models/AlienEnemyFighter.glb',
-        'alien-baseship': 'assets/models/AlienMotherShip.glb',
-        baseship: 'assets/models/HumanSpaceBattleShip.glb',
-        ally: 'assets/models/HumanFriendlStarFighter.glb',
-        station: 'assets/models/HumanSpaceStationWithAritificalGravity.glb',
-        earth: 'assets/models/Earth.glb',
+    // LOD levels: [{ path, distance }] — distance is the camera distance at which
+    // Three.js switches FROM this level to the next (coarser) one.
+    const GLB_LOD = {
+        enemy: [
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 150 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 500 },
+        ],
+        ally: [
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 150 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 500 },
+        ],
+        'alien-baseship': [
+            { path: 'assets/models/optimized/AlienMotherShip_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 400 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 1200 },
+        ],
+        baseship: [
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 400 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 1200 },
+        ],
+        station: [
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 500 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 1500 },
+        ],
+        earth: [
+            { path: 'assets/models/optimized/Earth_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Earth_lod1.glb', distance: 2000 },
+            { path: 'assets/models/optimized/Earth_lod2.glb', distance: 5000 },
+        ],
     };
     // Scale factors so models fit their gameplay radius
     const GLB_SCALES = {
@@ -179,22 +205,50 @@ const SF3D = (function () {
         fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
         scene.add(fillLight);
 
-        // ── Visible Sun — glowing sphere far away ──
+        // ── Visible Sun — bright, layered corona, animated ──
         const sunGroup = new THREE.Group();
-        const sunCoreGeo = new THREE.SphereGeometry(800, 32, 32);
-        const sunCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+        sunGroup.name = 'sun-group';
+
+        // Inner core — blindingly bright white-yellow
+        const sunCoreGeo = new THREE.SphereGeometry(800, 48, 48);
+        const sunCoreMat = new THREE.MeshBasicMaterial({ color: 0xfffff0 });
         sunGroup.add(new THREE.Mesh(sunCoreGeo, sunCoreMat));
-        for (let i = 1; i <= 4; i++) {
-            const coronaGeo = new THREE.SphereGeometry(800 + i * 200, 16, 16);
+
+        // Inner photosphere glow
+        const photoGeo = new THREE.SphereGeometry(830, 32, 32);
+        const photoMat = new THREE.MeshBasicMaterial({
+            color: 0xffeeaa, transparent: true, opacity: 0.7,
+            blending: THREE.AdditiveBlending, side: THREE.BackSide
+        });
+        sunGroup.add(new THREE.Mesh(photoGeo, photoMat));
+
+        // Multi-layer corona — fades from yellow-white to deep orange/red
+        const coronaColors = [0xffee88, 0xffdd44, 0xffaa22, 0xff8800, 0xff5500, 0xff3300, 0xcc1100];
+        for (let i = 0; i < coronaColors.length; i++) {
+            const r = 850 + i * 250;
+            const coronaGeo = new THREE.SphereGeometry(r, 24, 24);
             const coronaMat = new THREE.MeshBasicMaterial({
-                color: i < 3 ? 0xffdd44 : 0xff6600,
-                transparent: true, opacity: 0.12 / i,
+                color: coronaColors[i],
+                transparent: true, opacity: 0.08 / (1 + i * 0.4),
                 blending: THREE.AdditiveBlending, side: THREE.BackSide
             });
-            sunGroup.add(new THREE.Mesh(coronaGeo, coronaMat));
+            const corona = new THREE.Mesh(coronaGeo, coronaMat);
+            corona.name = 'corona-' + i;
+            sunGroup.add(corona);
         }
-        const sunPLight = new THREE.PointLight(0xfff5e0, 2, 40000);
+
+        // Outermost halo — very large, barely visible
+        const haloGeo = new THREE.SphereGeometry(3500, 16, 16);
+        const haloMat = new THREE.MeshBasicMaterial({
+            color: 0xff6622, transparent: true, opacity: 0.015,
+            blending: THREE.AdditiveBlending, side: THREE.BackSide
+        });
+        sunGroup.add(new THREE.Mesh(haloGeo, haloMat));
+
+        // Sun point light — the actual light source for nearby objects
+        const sunPLight = new THREE.PointLight(0xfff5e0, 3, 50000);
         sunGroup.add(sunPLight);
+
         sunGroup.position.copy(SUN_POS);
         scene.add(sunGroup);
 
@@ -230,45 +284,174 @@ const SF3D = (function () {
         window.addEventListener('resize', onWindowResize, false);
     }
 
-    // ── Preload all GLB models so cloning is instant ──
+    // ── Preload all GLB LOD levels so cloning is instant ──
     function _preloadGLBModels() {
         const loader = new THREE.GLTFLoader();
-        Object.keys(GLB_PATHS).forEach(key => {
-            loader.load(GLB_PATHS[key],
-                function (gltf) {
-                    const model = gltf.scene;
-                    model.traverse(child => {
-                        if (child.isMesh) {
-                            // Ensure proper texture encoding
-                            if (child.material.map) child.material.map.encoding = THREE.sRGBEncoding;
-                        }
-                    });
-                    glbModels[key] = model;
-                    console.log('GLB loaded:', key);
+        Object.entries(GLB_LOD).forEach(([key, levels]) => {
+            const lod = new THREE.LOD();
+            glbModels[key] = lod;
+            let loaded = 0;
+            const levelResults = new Array(levels.length);
 
-                    // Place Earth & Station as scenery immediately when loaded
-                    if (key === 'earth') _placeEarth(model);
-                    if (key === 'station') _placeStation(model);
-                },
-                null,
-                function (err) { console.error('Failed to load GLB:', key, err); }
-            );
+            levels.forEach(({ path, distance }, idx) => {
+                loader.load(path,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        model.traverse(child => {
+                            if (child.isMesh && child.material && child.material.map)
+                                child.material.map.encoding = THREE.sRGBEncoding;
+                        });
+                        levelResults[idx] = { model, distance };
+                        loaded++;
+
+                        if (loaded === levels.length) {
+                            levelResults.sort((a, b) => a.distance - b.distance);
+
+                            // Collect lod0 materials to apply to stripped levels
+                            const lod0Mats = [];
+                            levelResults[0].model.traverse(c => {
+                                if (c.isMesh) lod0Mats.push(c.material);
+                            });
+
+                            levelResults.forEach(({ model, distance }, i) => {
+                                if (i > 0) {
+                                    let mi = 0;
+                                    model.traverse(c => {
+                                        if (c.isMesh && lod0Mats[mi])
+                                            c.material = lod0Mats[mi++];
+                                    });
+                                }
+                                lod.addLevel(model, distance);
+                            });
+
+                            console.log(`GLB LOD ready: ${key} (${levels.length} levels)`);
+                            if (key === 'earth') _placeEarth(lod);
+                            if (key === 'station') _placeStation(lod);
+                        }
+                    },
+                    null,
+                    err => console.error('Failed to load LOD:', path, err)
+                );
+            });
         });
     }
 
-    // ── Place Earth as background scenery ──
+    // ── Clone a LOD model for a new entity ──
+    function _cloneLOD(key) {
+        const src = glbModels[key];
+        if (!src) return null;
+        const lod = new THREE.LOD();
+        src.levels.forEach(({ object, distance }) => {
+            lod.addLevel(object.clone(), distance);
+        });
+        return lod;
+    }
+
+    // ── Place Earth with atmosphere ──
     function _placeEarth(model) {
-        const earth = model.clone();
+        const earthGroup = new THREE.Group();
+        earthGroup.name = 'earth-scenery';
+
+        // The GLB model is the planet surface (LOD clone)
+        const earth = _cloneLOD('earth') || model.clone();
         earth.scale.setScalar(GLB_SCALES.earth);
-        // Place Earth below and to the side — visible from combat area
-        earth.position.set(-4000, -8000, -3000);
-        earth.name = 'earth-scenery';
-        scene.add(earth);
+        earthGroup.add(earth);
+
+        // Compute the visual radius from the GLB scale
+        // GLB models from Meshy are roughly unit-sized (±0.8), so scaled radius:
+        const earthRadius = GLB_SCALES.earth * 0.8;
+
+        // ── Atmosphere shell — soft blue glow around the limb ──
+        const atmosGeo = new THREE.SphereGeometry(earthRadius * 1.02, 64, 64);
+        const atmosMat = new THREE.ShaderMaterial({
+            uniforms: {
+                glowColor: { value: new THREE.Color(0x4488ff) },
+                viewVector: { value: new THREE.Vector3() },
+                sunDirection: { value: new THREE.Vector3(15000, 8000, 6000).normalize() }
+            },
+            vertexShader: [
+                'varying vec3 vNormal;',
+                'varying vec3 vWorldPos;',
+                'void main() {',
+                '  vNormal = normalize(normalMatrix * normal);',
+                '  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;',
+                '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                '}'
+            ].join('\n'),
+            fragmentShader: [
+                'uniform vec3 glowColor;',
+                'uniform vec3 viewVector;',
+                'uniform vec3 sunDirection;',
+                'varying vec3 vNormal;',
+                'varying vec3 vWorldPos;',
+                'void main() {',
+                '  float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.5);',
+                '  float sunFacing = max(0.0, dot(normalize(vNormal), sunDirection));',
+                '  float glow = intensity * (0.3 + 0.7 * sunFacing);',
+                '  gl_FragColor = vec4(glowColor, glow * 0.6);',
+                '}'
+            ].join('\n'),
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false
+        });
+        const atmosphere = new THREE.Mesh(atmosGeo, atmosMat);
+        earthGroup.add(atmosphere);
+
+        // ── Thin bright limb ring — Fresnel edge highlight ──
+        const limbGeo = new THREE.SphereGeometry(earthRadius * 1.01, 64, 64);
+        const limbMat = new THREE.ShaderMaterial({
+            uniforms: {
+                sunDirection: { value: new THREE.Vector3(15000, 8000, 6000).normalize() }
+            },
+            vertexShader: [
+                'varying vec3 vNormal;',
+                'void main() {',
+                '  vNormal = normalize(normalMatrix * normal);',
+                '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                '}'
+            ].join('\n'),
+            fragmentShader: [
+                'uniform vec3 sunDirection;',
+                'varying vec3 vNormal;',
+                'void main() {',
+                '  float rim = 1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0)));',
+                '  float sunFacing = max(0.0, dot(vNormal, sunDirection));',
+                '  float intensity = pow(rim, 4.0) * sunFacing;',
+                '  vec3 col = mix(vec3(0.3, 0.6, 1.0), vec3(0.7, 0.9, 1.0), rim);',
+                '  gl_FragColor = vec4(col, intensity * 0.8);',
+                '}'
+            ].join('\n'),
+            side: THREE.FrontSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false
+        });
+        earthGroup.add(new THREE.Mesh(limbGeo, limbMat));
+
+        // ── Cloud layer — slightly larger, semi-transparent white sphere ──
+        const cloudGeo = new THREE.SphereGeometry(earthRadius * 1.008, 48, 48);
+        const cloudMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.15,
+            roughness: 1.0,
+            metalness: 0.0,
+            depthWrite: false
+        });
+        const clouds = new THREE.Mesh(cloudGeo, cloudMat);
+        clouds.name = 'earth-clouds';
+        earthGroup.add(clouds);
+
+        // Position Earth below and to the side — looming large
+        earthGroup.position.set(-4000, -8000, -3000);
+        scene.add(earthGroup);
     }
 
     // ── Place Space Station as scenery ──
     function _placeStation(model) {
-        const station = model.clone();
+        const station = _cloneLOD('station') || model.clone();
         station.scale.setScalar(GLB_SCALES.station);
         station.position.set(3000, 500, -5000);
         station.name = 'station-scenery';
@@ -797,9 +980,9 @@ const SF3D = (function () {
     function createEntityMesh(type) {
         let mesh;
 
-        // ── Try GLB clone first ──
+        // ── Try GLB LOD clone first ──
         if (glbModels[type]) {
-            mesh = glbModels[type].clone();
+            mesh = _cloneLOD(type);
             mesh.scale.setScalar(GLB_SCALES[type] || 10);
             if (type === 'baseship') mesh.userData.isBaseship = true;
             scene.add(mesh);
@@ -960,13 +1143,30 @@ const SF3D = (function () {
             }
         }
 
-        // Rotate Earth slowly
+        // Rotate Earth slowly, clouds slightly faster
         const earth = scene.getObjectByName('earth-scenery');
-        if (earth) earth.rotation.y += 0.0003;
+        if (earth) {
+            earth.rotation.y += 0.0003;
+            const clouds = earth.getObjectByName('earth-clouds');
+            if (clouds) clouds.rotation.y += 0.0005;
+        }
 
         // Rotate station slowly
         const station = scene.getObjectByName('station-scenery');
         if (station) station.rotation.y += 0.001;
+
+        // Animate sun corona — subtle breathing pulse
+        const sunGrp = scene.getObjectByName('sun-group');
+        if (sunGrp) {
+            const t = performance.now() * 0.001;
+            sunGrp.children.forEach(child => {
+                if (child.name && child.name.startsWith('corona-')) {
+                    const idx = parseInt(child.name.split('-')[1]);
+                    const pulse = 1.0 + Math.sin(t * (0.5 + idx * 0.15) + idx) * 0.04;
+                    child.scale.setScalar(pulse);
+                }
+            });
+        }
 
         renderer.render(scene, camera);
     }

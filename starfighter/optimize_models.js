@@ -14,14 +14,45 @@ const INPUT_DIR = path.join(__dirname, 'assets/models');
 const OUTPUT_DIR = path.join(__dirname, 'assets/models/optimized');
 
 // Target vertex counts per model (aggressive for web)
+// LOD levels per model.
+// lod0 = close up (highest detail)
+// lod1 = medium distance
+// lod2 = far away (lowest detail)
 const TARGETS = {
-  'AlienEnemyFighter.glb': { maxVerts: 8000, scale: 1.0 },
-  'AlienMotherShip.glb': { maxVerts: 15000, scale: 1.0 },
-  'Earth.glb': { maxVerts: 20000, scale: 1.0 },
-  'HumanFriendlStarFighter.glb': { maxVerts: 8000, scale: 1.0 },
-  'HumanSpaceBattleShip.glb': { maxVerts: 15000, scale: 1.0 },
-  'HumanSpaceStationWithAritificalGravity.glb': { maxVerts: 15000, scale: 1.0 },
-  'firstPersonStarFighterCockpit.glb': { maxVerts: 30000, scale: 1.0 },
+  'AlienEnemyFighter.glb': [
+    { suffix: 'lod0', maxVerts: 30000 },
+    { suffix: 'lod1', maxVerts: 8000 },
+    { suffix: 'lod2', maxVerts: 2000 },
+  ],
+  'HumanFriendlStarFighter.glb': [
+    { suffix: 'lod0', maxVerts: 30000 },
+    { suffix: 'lod1', maxVerts: 8000 },
+    { suffix: 'lod2', maxVerts: 2000 },
+  ],
+  'AlienMotherShip.glb': [
+    { suffix: 'lod0', maxVerts: 60000 },
+    { suffix: 'lod1', maxVerts: 20000 },
+    { suffix: 'lod2', maxVerts: 5000 },
+  ],
+  'HumanSpaceBattleShip.glb': [
+    { suffix: 'lod0', maxVerts: 60000 },
+    { suffix: 'lod1', maxVerts: 20000 },
+    { suffix: 'lod2', maxVerts: 5000 },
+  ],
+  'HumanSpaceStationWithAritificalGravity.glb': [
+    { suffix: 'lod0', maxVerts: 60000 },
+    { suffix: 'lod1', maxVerts: 20000 },
+    { suffix: 'lod2', maxVerts: 5000 },
+  ],
+  'Earth.glb': [
+    { suffix: 'lod0', maxVerts: 50000 },
+    { suffix: 'lod1', maxVerts: 20000 },
+    { suffix: 'lod2', maxVerts: 8000 },
+  ],
+  // Cockpit — always at distance 0 (first person), one level only
+  'firstPersonStarFighterCockpit.glb': [
+    { suffix: 'lod0', maxVerts: 120000 },
+  ],
 };
 
 function parseGLB(buffer) {
@@ -178,7 +209,8 @@ function simplifyMesh(positions, normals, uvs, indices, targetCount) {
   };
 }
 
-function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, origIndices) {
+// stripTextures=true → geometry-only GLB (for lod1, lod2). Materials applied at runtime from lod0.
+function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, origIndices, stripTextures = false) {
   // Build new binary buffer with decimated mesh + original images
   const chunks = [];
   const newBufferViews = [];
@@ -243,9 +275,9 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
   const idxPad = (4 - (byteOffset % 4)) % 4;
   if (idxPad) { chunks.push(Buffer.alloc(idxPad)); byteOffset += idxPad; }
 
-  // Images (copy from original binary)
+  // Images — only embed in lod0. lod1/lod2 get geometry only; materials applied from lod0 at runtime.
   const imageBufferViewStart = newBufferViews.length;
-  if (json.images) {
+  if (!stripTextures && json.images) {
     json.images.forEach((img, i) => {
       const origBv = json.bufferViews[img.bufferView];
       const imgData = bin.slice(origBv.byteOffset || 0, (origBv.byteOffset || 0) + origBv.byteLength);
@@ -265,7 +297,7 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
   };
   if (meshData.uvs) newPrim.attributes.TEXCOORD_0 = 1;
   if (meshData.normals) newPrim.attributes.NORMAL = meshData.uvs ? 2 : 1;
-  if (prim.material !== undefined) newPrim.material = prim.material;
+  // material reference added below only when NOT stripping textures
 
   const newJson = {
     asset: { version: '2.0', generator: 'StarfighterOptimizer' },
@@ -278,15 +310,19 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
     buffers: [{ byteLength: byteOffset }],
   };
 
-  if (json.materials) newJson.materials = json.materials;
-  if (json.textures) newJson.textures = json.textures;
-  if (json.images) {
-    newJson.images = json.images.map((img, i) => ({
-      bufferView: imageBufferViewStart + i,
-      mimeType: img.mimeType
-    }));
+  if (!stripTextures) {
+    if (json.materials) newJson.materials = json.materials;
+    if (json.textures) newJson.textures = json.textures;
+    if (json.images) {
+      newJson.images = json.images.map((img, i) => ({
+        bufferView: imageBufferViewStart + i,
+        mimeType: img.mimeType
+      }));
+    }
+    if (json.samplers) newJson.samplers = json.samplers;
+    if (prim.material !== undefined) newPrim.material = prim.material;
   }
-  if (json.samplers) newJson.samplers = json.samplers;
+  // When stripped, mesh has no material — Three.js will copy from lod0 at runtime
 
   // Encode JSON chunk
   let jsonStr = JSON.stringify(newJson);
@@ -320,10 +356,10 @@ async function main() {
   const files = fs.readdirSync(INPUT_DIR).filter(f => f.endsWith('.glb'));
 
   for (const file of files) {
-    const target = TARGETS[file];
-    if (!target) { console.log(`Skipping ${file} (no target config)`); continue; }
+    const lodLevels = TARGETS[file];
+    if (!lodLevels) { console.log(`Skipping ${file} (no target config)`); continue; }
 
-    console.log(`\n=== ${file} ===`);
+    console.log(`\n=== ${file} — ${lodLevels.length} LOD level(s) ===`);
     const buf = fs.readFileSync(path.join(INPUT_DIR, file));
     const { json, bin } = parseGLB(buf);
 
@@ -333,15 +369,20 @@ async function main() {
     const uvs = prim.attributes.TEXCOORD_0 !== undefined ? getAccessorData(json, bin, prim.attributes.TEXCOORD_0) : null;
     const indices = getAccessorData(json, bin, prim.indices);
 
-    console.log(`  Original: ${positions.length / 3} verts, ${indices.length / 3} tris`);
+    const origVerts = positions.length / 3;
+    const origTris = indices.length / 3;
+    console.log(`  Original: ${origVerts.toLocaleString()} verts, ${origTris.toLocaleString()} tris, ${(buf.length / 1024 / 1024).toFixed(1)} MB`);
 
-    const meshData = simplifyMesh(positions, normals, uvs, indices, target.maxVerts);
-
-    const glb = buildGLB(json, bin, meshData, positions, normals, uvs, indices);
-
-    const outPath = path.join(OUTPUT_DIR, file);
-    fs.writeFileSync(outPath, glb);
-    console.log(`  Output: ${(glb.length / 1024 / 1024).toFixed(1)} MB (was ${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+    for (const { suffix, maxVerts } of lodLevels) {
+      const stripTextures = suffix !== 'lod0'; // only lod0 keeps textures
+      const meshData = simplifyMesh(positions, normals, uvs, indices, maxVerts);
+      const glb = buildGLB(json, bin, meshData, positions, normals, uvs, indices, stripTextures);
+      const baseName = file.replace('.glb', '');
+      const outPath = path.join(OUTPUT_DIR, `${baseName}_${suffix}.glb`);
+      fs.writeFileSync(outPath, glb);
+      const pct = Math.round((1 - glb.length / buf.length) * 100);
+      console.log(`  ${suffix}: ${(meshData.positions.length / 3).toLocaleString()} verts | ${(glb.length / 1024 / 1024).toFixed(1)} MB (-${pct}%)`);
+    }
   }
 
   console.log('\n=== Done! ===');
