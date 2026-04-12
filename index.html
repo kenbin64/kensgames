@@ -773,9 +773,10 @@
     </footer>
 
     <script src="/gyroid.js"></script>
+    <script src="/js/substrates/avatar_picker.js"></script>
     <script>
         // Floating 80s arcade symbols
-        const SYMBOLS = ['\u25b2','\u25c6','\u25a0','\u25cf','\u25b6','\u25c0','\u2605','\u25c8','\u2b21','\u25bc','\u25c9','\u2b22'];
+        const SYMBOLS = ['\u25b2', '\u25c6', '\u25a0', '\u25cf', '\u25b6', '\u25c0', '\u2605', '\u25c8', '\u2b21', '\u25bc', '\u25c9', '\u2b22'];
         const container = document.getElementById('arcade-symbols');
         for (let i = 0; i < 22; i++) {
             const s = document.createElement('div');
@@ -785,7 +786,7 @@
             s.style.animationDuration = (18 + Math.random() * 28) + 's';
             s.style.animationDelay Math.random() * 30) + 's';
             s.style.fontSize = (16 + Math.random() * 30) + 'px';
-            s.style.color = ['#00FFFF','#FF00FF','#FFE800','#00FF41'][Math.floor(Math.random()*4)];
+            s.style.color = ['#00FFFF', '#FF00FF', '#FFE800', '#00FF41'][Math.floor(Math.random() * 4)];
             container.appendChild(s);
         }
 
@@ -800,8 +801,8 @@
             if (e.target === e.currentTarget) closeModal();
         });
         function switchTab(tab) {
-            const tabs = ['login','register','forgot'];
-            document.querySelectorAll('.modal-tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === tab));
+            const tabs = ['login', 'register', 'forgot'];
+            document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
             document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
             document.getElementById('panel-' + tab).classList.add('active');
         }
@@ -812,7 +813,7 @@
             msg.textContent = 'Authenticating...'; msg.className = 'form-msg';
             try {
                 const res = await fetch('/api/auth/login', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: document.getElementById('login-user').value, password: document.getElementById('login-pass').value })
                 });
                 const data = await res.json();
@@ -833,7 +834,7 @@
             msg.textContent = 'Creating account...'; msg.className = 'form-msg';
             try {
                 const res = await fetch('/api/auth/register', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: document.getElementById('reg-username').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value })
                 });
                 const data = await res.json();
@@ -852,7 +853,7 @@
             msg.textContent = 'Sending reset link...'; msg.className = 'form-msg';
             try {
                 const res = await fetch('/api/auth/forgot-password', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: document.getElementById('forgot-email').value })
                 });
                 const data = await res.json();
@@ -865,9 +866,17 @@
         function playAsGuest() {
             localStorage.setItem('user_token', 'guest-' + Date.now());
             localStorage.setItem('username', 'Guest');
-            window.location.href = '/lobby';
+            // Require avatar before entering portal
+            if (!AvatarPicker.has()) {
+                AvatarPicker.show(() => { window.location.href = '/lobby'; }, true);
+            } else {
+                window.location.href = '/lobby';
+            }
         }
-        function goToGame(path) { window.location.href = path; }
+        function goToGame(path) {
+            // Avatar required before entering any game lobby
+            AvatarPicker.requireBeforeGame(path);
+        }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
         const urlParam = new URLSearchParams(location.search).get('modal');
         if (urlParam) openModal(urlParam);

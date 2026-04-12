@@ -212,10 +212,10 @@ const Starfighter = (function () {
         }
         if (window.SFInput) SFInput.init(state.player);
 
-        // Show countdown, hide cockpit during launch
+        // Show countdown, cockpit stays visible during launch for immersion
         document.getElementById('ship-panel').style.display = 'none';
         document.getElementById('crosshair').style.display = 'none';
-        if (window.SF3D) SF3D.showCockpit(false);
+        if (window.SF3D) SF3D.showCockpit(true);
         document.getElementById('countdown-display').style.display = 'block';
 
         addComm("Baseship", "Fighter, secure in launch bay. Ready for departure.", "base");

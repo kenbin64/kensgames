@@ -13,10 +13,30 @@ const SF3D = (function () {
     let telemetryCanvas, telemetryCtx, telemetryTexture;
     let radarTexture; // CanvasTexture from radar-canvas
     let cockpitLoaded = false;
-    let cockpitVisible = false; // track desired visibility
+    let cockpitVisible = true; // cockpit always visible — seamless through launch and combat
     let targetLockMesh;
     let launchBayGroup;
     let cameraShakeIntensity = 0;
+
+    // ── GLB model cache: loaded once, cloned per entity ──
+    const glbModels = {};    // { modelName: THREE.Group }
+    const GLB_PATHS = {
+        enemy: 'assets/models/AlienEnemyFighter.glb',
+        'alien-baseship': 'assets/models/AlienMotherShip.glb',
+        baseship: 'assets/models/HumanSpaceBattleShip.glb',
+        ally: 'assets/models/HumanFriendlStarFighter.glb',
+        station: 'assets/models/HumanSpaceStationWithAritificalGravity.glb',
+        earth: 'assets/models/Earth.glb',
+    };
+    // Scale factors so models fit their gameplay radius
+    const GLB_SCALES = {
+        enemy: 18,    // fighters ~radius 10
+        'alien-baseship': 200,   // capital ship ~radius 150
+        baseship: 400,   // human battleship is large
+        ally: 16,
+        station: 300,
+        earth: 3000,  // big planet in background
+    };
 
     // ── Shared starfield vertex data (world-space positions, shared with radar) ──
     const STAR_COUNT = 4000;
@@ -129,10 +149,10 @@ const SF3D = (function () {
 
         // Scene setup
         scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, 0.0001);
+        scene.fog = new THREE.FogExp2(0x000000, 0.00005);
 
         // Camera setup
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
 
         // Renderer setup
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -142,65 +162,63 @@ const SF3D = (function () {
         renderer.toneMappingExposure = 1.0;
         container.appendChild(renderer.domElement);
 
-        // Lighting — Realistic Sun
-        const ambient = new THREE.AmbientLight(0x111122, 0.3);
+        // ── Sun direction — all lighting derives from this ──
+        const SUN_POS = new THREE.Vector3(15000, 8000, 6000);
+
+        // Ambient — very dim base so nothing is pitch black
+        const ambient = new THREE.AmbientLight(0x0a0a18, 0.15);
         scene.add(ambient);
 
-        const sunLight = new THREE.DirectionalLight(0xfff5e0, 3.0);
-        sunLight.position.set(5000, 3000, 2000);
+        // Primary sun directional light — casts strong one-side illumination
+        const sunLight = new THREE.DirectionalLight(0xfff5e0, 3.5);
+        sunLight.position.copy(SUN_POS);
         scene.add(sunLight);
 
-        // Subtle fill light from opposite side
-        const fillLight = new THREE.DirectionalLight(0x334466, 0.4);
-        fillLight.position.set(-3000, -1000, -2000);
+        // Very subtle fill from opposite side (simulates scattered light / nebula)
+        const fillLight = new THREE.DirectionalLight(0x1a1a33, 0.15);
+        fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
         scene.add(fillLight);
 
-        // The Sun — a visible glowing sphere in the distance
+        // ── Visible Sun — glowing sphere far away ──
         const sunGroup = new THREE.Group();
-        const sunCoreGeo = new THREE.SphereGeometry(400, 64, 64);
+        const sunCoreGeo = new THREE.SphereGeometry(800, 32, 32);
         const sunCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
-        const sunCore = new THREE.Mesh(sunCoreGeo, sunCoreMat);
-        sunGroup.add(sunCore);
-
-        // Corona layers
+        sunGroup.add(new THREE.Mesh(sunCoreGeo, sunCoreMat));
         for (let i = 1; i <= 4; i++) {
-            const coronaGeo = new THREE.SphereGeometry(400 + i * 80, 32, 32);
+            const coronaGeo = new THREE.SphereGeometry(800 + i * 200, 16, 16);
             const coronaMat = new THREE.MeshBasicMaterial({
                 color: i < 3 ? 0xffdd44 : 0xff6600,
-                transparent: true,
-                opacity: 0.15 / i,
-                blending: THREE.AdditiveBlending,
-                side: THREE.BackSide
+                transparent: true, opacity: 0.12 / i,
+                blending: THREE.AdditiveBlending, side: THREE.BackSide
             });
-            const corona = new THREE.Mesh(coronaGeo, coronaMat);
-            sunGroup.add(corona);
+            sunGroup.add(new THREE.Mesh(coronaGeo, coronaMat));
         }
-
-        // Sun lens flare point light
-        const sunPLight = new THREE.PointLight(0xfff5e0, 3, 15000);
+        const sunPLight = new THREE.PointLight(0xfff5e0, 2, 40000);
         sunGroup.add(sunPLight);
-
-        sunGroup.position.set(5000, 3000, 2000);
+        sunGroup.position.copy(SUN_POS);
         scene.add(sunGroup);
 
         // Particle system
         _initParticleSystem();
 
-        // Starfield background (attached to camera so it always surrounds the player)
+        // Starfield
         createStarfield();
 
-        // Textured cockpit: GLB 3D model attached to camera
+        // Cockpit GLB
         createCockpit();
 
-        // Cockpit interior lighting (PBR materials need light)
+        // Cockpit interior lighting
         const cockpitLight = new THREE.PointLight(0xccddff, 1.2, 5);
-        cockpitLight.position.set(0, 0.3, 0); // above pilot's head
+        cockpitLight.position.set(0, 0.3, 0);
         camera.add(cockpitLight);
         const cockpitAmbient = new THREE.HemisphereLight(0x4466aa, 0x112233, 0.6);
         camera.add(cockpitAmbient);
 
         // Launch Bay
         createLaunchBay();
+
+        // Preload all GLB models
+        _preloadGLBModels();
 
         // Target Lock Reticle
         const reticleGeo = new THREE.BoxGeometry(20, 20, 20);
@@ -210,6 +228,51 @@ const SF3D = (function () {
         scene.add(targetLockMesh);
 
         window.addEventListener('resize', onWindowResize, false);
+    }
+
+    // ── Preload all GLB models so cloning is instant ──
+    function _preloadGLBModels() {
+        const loader = new THREE.GLTFLoader();
+        Object.keys(GLB_PATHS).forEach(key => {
+            loader.load(GLB_PATHS[key],
+                function (gltf) {
+                    const model = gltf.scene;
+                    model.traverse(child => {
+                        if (child.isMesh) {
+                            // Ensure proper texture encoding
+                            if (child.material.map) child.material.map.encoding = THREE.sRGBEncoding;
+                        }
+                    });
+                    glbModels[key] = model;
+                    console.log('GLB loaded:', key);
+
+                    // Place Earth & Station as scenery immediately when loaded
+                    if (key === 'earth') _placeEarth(model);
+                    if (key === 'station') _placeStation(model);
+                },
+                null,
+                function (err) { console.error('Failed to load GLB:', key, err); }
+            );
+        });
+    }
+
+    // ── Place Earth as background scenery ──
+    function _placeEarth(model) {
+        const earth = model.clone();
+        earth.scale.setScalar(GLB_SCALES.earth);
+        // Place Earth below and to the side — visible from combat area
+        earth.position.set(-4000, -8000, -3000);
+        earth.name = 'earth-scenery';
+        scene.add(earth);
+    }
+
+    // ── Place Space Station as scenery ──
+    function _placeStation(model) {
+        const station = model.clone();
+        station.scale.setScalar(GLB_SCALES.station);
+        station.position.set(3000, 500, -5000);
+        station.name = 'station-scenery';
+        scene.add(station);
     }
 
     function createLaunchBay() {
@@ -456,7 +519,7 @@ const SF3D = (function () {
 
         // Load GLB cockpit model
         const gltfLoader = new THREE.GLTFLoader();
-        gltfLoader.load('assets/models/Meshy_AI_Starfighter_Cockpit_V_0412075340_texture.glb',
+        gltfLoader.load('assets/models/firstPersonStarFighterCockpit.glb',
             function (gltf) {
                 cockpitModel = gltf.scene;
 
@@ -732,227 +795,39 @@ const SF3D = (function () {
     }
 
     function createEntityMesh(type) {
-        let mesh = new THREE.Group();
+        let mesh;
+
+        // ── Try GLB clone first ──
+        if (glbModels[type]) {
+            mesh = glbModels[type].clone();
+            mesh.scale.setScalar(GLB_SCALES[type] || 10);
+            if (type === 'baseship') mesh.userData.isBaseship = true;
+            scene.add(mesh);
+            return mesh;
+        }
+
+        // ── Fallback: simple procedural geometry while GLBs load ──
+        mesh = new THREE.Group();
         const m = _getSharedMats();
 
         if (type === 'enemy') {
-            // ── Alien Fighter: Boomerang — reduced segment counts, no PointLights ──
-            const bodyGeo = new THREE.CylinderGeometry(1.5, 3.5, 18, 12);
-            bodyGeo.rotateX(-Math.PI / 2);
-            bodyGeo.scale(1, 0.4, 1);
-            mesh.add(new THREE.Mesh(bodyGeo, m.alien));
-
-            for (let side = -1; side <= 1; side += 2) {
-                const wingGeo = new THREE.BufferGeometry();
-                const v = new Float32Array([
-                    0, 0, -8, side * 22, 0, 2, side * 18, 0, 8,
-                    0, 0, -8, side * 18, 0, 8, 0, 0, 4,
-                ]);
-                wingGeo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-                wingGeo.computeVertexNormals();
-                mesh.add(new THREE.Mesh(wingGeo, m.alien));
-                const wingBot = new THREE.Mesh(wingGeo, m.alienDark);
-                wingBot.rotation.x = Math.PI;
-                mesh.add(wingBot);
-
-                const plateGeo = new THREE.BoxGeometry(6, 0.8, 4);
-                const plate = new THREE.Mesh(plateGeo, m.alienDark);
-                plate.position.set(side * 12, 0.5, 2);
-                mesh.add(plate);
-
-                const spikeGeo = new THREE.ConeGeometry(0.8, 8, 6);
-                spikeGeo.rotateZ(side * -Math.PI / 2);
-                const spike = new THREE.Mesh(spikeGeo, m.alienSpike);
-                spike.position.set(side * 24, 0, 3);
-                mesh.add(spike);
-
-                const fwdSpikeGeo = new THREE.ConeGeometry(0.5, 6, 6);
-                fwdSpikeGeo.rotateX(-Math.PI / 2);
-                const fwdSpike = new THREE.Mesh(fwdSpikeGeo, m.alienSpike);
-                fwdSpike.position.set(side * 8, 0, -10);
-                mesh.add(fwdSpike);
-
-                // Engine glow — emissive sphere, NO PointLight
-                const engGeo = new THREE.SphereGeometry(1.2, 8, 8);
-                const eng = new THREE.Mesh(engGeo, m.alienGlow);
-                eng.position.set(side * 8, 0, 7);
-                mesh.add(eng);
-            }
-
-            const domeGeo = new THREE.SphereGeometry(2, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-            const dome = new THREE.Mesh(domeGeo, m.alienDome);
-            dome.position.set(0, 1, -4);
-            mesh.add(dome);
-
-            const noseGeo = new THREE.ConeGeometry(0.6, 10, 6);
-            noseGeo.rotateX(-Math.PI / 2);
-            const nose = new THREE.Mesh(noseGeo, m.alienSpike);
-            nose.position.set(0, 0, -14);
-            mesh.add(nose);
-
+            // Placeholder: small green octahedron
+            mesh.add(new THREE.Mesh(new THREE.OctahedronGeometry(8, 0), m.alien));
         } else if (type === 'baseship') {
             mesh.userData.isBaseship = true;
-
-            // ── Main hull: long wedge-shaped body ──
-            const hullGeo = new THREE.BoxGeometry(120, 50, 600, 4, 2, 8);
-            mesh.add(new THREE.Mesh(hullGeo, m.hull));
-
-            const bowGeo = new THREE.CylinderGeometry(10, 65, 200, 16, 4);
-            bowGeo.rotateX(-Math.PI / 2);
-            bowGeo.scale(1, 0.4, 1);
-            const bow = new THREE.Mesh(bowGeo, m.hull);
-            bow.position.set(0, 0, -400);
-            mesh.add(bow);
-
-            const sternGeo = new THREE.BoxGeometry(160, 70, 100, 2, 2, 2);
-            const stern = new THREE.Mesh(sternGeo, m.hull);
-            stern.position.set(0, 0, 300);
-            mesh.add(stern);
-
-            // Bridge
-            const bridgeBase = new THREE.Mesh(new THREE.BoxGeometry(60, 30, 80, 2, 2, 2), m.detail);
-            bridgeBase.position.set(0, 40, -80);
-            mesh.add(bridgeBase);
-            const bridgeTower = new THREE.Mesh(new THREE.BoxGeometry(30, 50, 40), m.detail);
-            bridgeTower.position.set(0, 70, -80);
-            mesh.add(bridgeTower);
-            const bridgeWindow = new THREE.Mesh(new THREE.BoxGeometry(32, 8, 2), m.window);
-            bridgeWindow.position.set(0, 80, -100);
-            mesh.add(bridgeWindow);
-
-            // Antenna
-            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 60, 4), m.detail);
-            mast.position.set(0, 125, -80);
-            mesh.add(mast);
-            const dish = new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.detail);
-            dish.position.set(0, 155, -80);
-            dish.rotation.x = Math.PI;
-            mesh.add(dish);
-
-            // Hull plates (fewer)
-            const plateGeo = new THREE.BoxGeometry(122, 2, 8);
-            for (let z = -250; z <= 200; z += 100) {
-                const plate = new THREE.Mesh(plateGeo, m.dark);
-                plate.position.set(0, 26, z);
-                mesh.add(plate);
-                const plateBot = new THREE.Mesh(plateGeo, m.dark);
-                plateBot.position.set(0, -26, z);
-                mesh.add(plateBot);
-            }
-
-            // Side nacelles — NO PointLights, emissive glow instead
-            for (let side = -1; side <= 1; side += 2) {
-                const strut = new THREE.Mesh(new THREE.BoxGeometry(80, 10, 20), m.hull);
-                strut.position.set(side * 100, -5, 100);
-                mesh.add(strut);
-
-                const nacGeo = new THREE.CylinderGeometry(20, 25, 200, 16, 4);
-                nacGeo.rotateX(Math.PI / 2);
-                const nac = new THREE.Mesh(nacGeo, m.hull);
-                nac.position.set(side * 140, -5, 100);
-                mesh.add(nac);
-
-                // Engine glow — emissive, no PointLight
-                const nacEngGeo = new THREE.CylinderGeometry(20, 20, 10, 16);
-                nacEngGeo.rotateX(Math.PI / 2);
-                const nacEng = new THREE.Mesh(nacEngGeo, m.glowBlue);
-                nacEng.position.set(side * 140, -5, 200);
-                mesh.add(nacEng);
-
-                // Turret domes (one per side instead of three)
-                const turret = new THREE.Mesh(new THREE.SphereGeometry(6, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.detail);
-                turret.position.set(side * 60, 27, 0);
-                mesh.add(turret);
-            }
-
-            // Hangar bay
-            const hangar = new THREE.Mesh(new THREE.BoxGeometry(80, 15, 120, 2, 1, 2), m.dark);
-            hangar.position.set(0, -32, 50);
-            hangar.name = 'baseship-hangar';
-            mesh.add(hangar);
-            const hangarGlow = new THREE.Mesh(new THREE.PlaneGeometry(60, 100), m.hangarGlow);
-            hangarGlow.position.set(0, -40, 50);
-            hangarGlow.rotation.x = Math.PI / 2;
-            hangarGlow.name = 'baseship-hangar-glow';
-            mesh.add(hangarGlow);
-
-            // Engine cluster — emissive, no PointLights (was 15 lights!)
-            const engGeo = new THREE.CylinderGeometry(12, 12, 15, 12);
-            engGeo.rotateX(Math.PI / 2);
-            for (let row = -1; row <= 1; row++) {
-                for (let col = -2; col <= 2; col++) {
-                    const eng = new THREE.Mesh(engGeo, m.glowCyan);
-                    eng.position.set(col * 28, row * 20, 350);
-                    mesh.add(eng);
-                }
-            }
-
+            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(120, 50, 600), m.hull));
         } else if (type === 'alien-baseship') {
-            // ── Alien Capital Ship — reduced segments, no PointLights ──
             mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(80, 1), m.alienCap));
-
-            for (let side = -1; side <= 1; side += 2) {
-                const armGeo = new THREE.BufferGeometry();
-                const av = new Float32Array([
-                    0, 0, -60, side * 250, 0, 20, side * 200, 0, 80,
-                    0, 0, -60, side * 200, 0, 80, 0, 0, 60,
-                ]);
-                armGeo.setAttribute('position', new THREE.BufferAttribute(av, 3));
-                armGeo.computeVertexNormals();
-                mesh.add(new THREE.Mesh(armGeo, m.alienCap));
-                const armBot = new THREE.Mesh(armGeo, m.alienArmor);
-                armBot.rotation.x = Math.PI;
-                mesh.add(armBot);
-
-                // Two ridges per arm instead of three
-                for (let r = 1; r <= 2; r++) {
-                    const ridge = new THREE.Mesh(new THREE.BoxGeometry(15, 8, 20), m.alienArmor);
-                    ridge.position.set(side * r * 80, 5, 10);
-                    mesh.add(ridge);
-                }
-
-                // Two spikes per arm instead of four + four
-                for (let s = 0; s < 2; s++) {
-                    const spike = new THREE.Mesh(new THREE.ConeGeometry(4, 40 - s * 15, 6), m.alienCapSpike);
-                    spike.position.set(side * (60 + s * 80), 20, 10 + s * 15);
-                    mesh.add(spike);
-                }
-
-                const tipGeo = new THREE.ConeGeometry(6, 50, 6);
-                tipGeo.rotateZ(side * -Math.PI / 2);
-                const tip = new THREE.Mesh(tipGeo, m.alienCapSpike);
-                tip.position.set(side * 260, 0, 30);
-                mesh.add(tip);
-
-                // Engine pods — emissive, no PointLight
-                const ePod = new THREE.Mesh(new THREE.SphereGeometry(10, 8, 8), m.alienCapGlow);
-                ePod.position.set(side * 110, 0, 70);
-                mesh.add(ePod);
-            }
-
-            const ramGeo = new THREE.ConeGeometry(8, 80, 6);
-            ramGeo.rotateX(-Math.PI / 2);
-            const ram = new THREE.Mesh(ramGeo, m.alienCapSpike);
-            ram.position.set(0, 0, -100);
-            mesh.add(ram);
-
-            const shield = new THREE.Mesh(new THREE.SphereGeometry(280, 16, 16), m.alienShield);
-            mesh.add(shield);
-
         } else if (type === 'laser') {
-            // Laser bolt — no PointLight
             const geo = new THREE.CylinderGeometry(0.8, 0.8, 20, 6);
             geo.rotateX(Math.PI / 2);
             mesh.add(new THREE.Mesh(geo, m.laserCore));
             const glowGeo = new THREE.CylinderGeometry(1.5, 1.5, 22, 6);
             glowGeo.rotateX(Math.PI / 2);
             mesh.add(new THREE.Mesh(glowGeo, m.laserGlow));
-
         } else if (type === 'torpedo') {
-            // Torpedo — no PointLight
             mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), m.torpCore));
             mesh.add(new THREE.Mesh(new THREE.SphereGeometry(5, 8, 8), m.torpGlow));
-
         } else {
             mesh.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
         }
@@ -1084,6 +959,14 @@ const SF3D = (function () {
                 entityMeshes.delete(id);
             }
         }
+
+        // Rotate Earth slowly
+        const earth = scene.getObjectByName('earth-scenery');
+        if (earth) earth.rotation.y += 0.0003;
+
+        // Rotate station slowly
+        const station = scene.getObjectByName('station-scenery');
+        if (station) station.rotation.y += 0.001;
 
         renderer.render(scene, camera);
     }

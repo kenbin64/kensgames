@@ -1,312 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - KensGames</title>
+  <title>Sign In &mdash; KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    body { display:flex; flex-direction:column; min-height:100vh; }
+    .login-wrap {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      padding:40px 20px;
     }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+    .login-box {
+      width:100%; max-width:420px;
+      background:rgba(4,4,20,.96);
+      border:2px solid var(--nc);
+      box-shadow:var(--gc),inset 0 0 40px rgba(0,255,255,.04);
+      border-radius:6px; padding:44px 36px;
+      animation:fadeUp .4s ease;
     }
-
-    .login-container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      width: 100%;
-      max-width: 400px;
-      padding: 40px;
-      animation: slideIn 0.3s ease;
+    @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    .cab-art {
+      text-align:center; margin-bottom:28px;
+      font-size:64px; line-height:1;
+      filter:drop-shadow(0 0 12px #00FFFF);
     }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    .login-title {
+      font-family:var(--fa); font-size:22px; font-weight:900;
+      color:var(--nc); text-shadow:var(--gc);
+      text-transform:uppercase; letter-spacing:3px;
+      text-align:center; margin-bottom:4px;
     }
-
-    .logo {
-      text-align: center;
-      margin-bottom: 30px;
-      font-size: 40px;
+    .login-sub {
+      font-size:12px; color:var(--txm); text-align:center;
+      margin-bottom:28px; letter-spacing:1px;
     }
-
-    h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 10px;
-      text-align: center;
+    .divider {
+      display:flex; align-items:center; gap:12px; margin:20px 0;
+      color:var(--txm); font-size:11px; letter-spacing:2px; text-transform:uppercase;
     }
-
-    .subtitle {
-      text-align: center;
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 30px;
+    .divider::before,.divider::after{
+      content:''; flex:1; height:1px; background:rgba(0,255,255,.15);
     }
-
-    .form-group {
-      margin-bottom: 20px;
+    .oauth-btn {
+      width:100%; padding:11px; margin-bottom:8px;
+      font-family:var(--fa); font-size:10px; letter-spacing:2px;
+      background:transparent; color:var(--txm);
+      border:1px solid #334466; border-radius:3px;
+      cursor:pointer; text-transform:uppercase; transition:all .2s;
     }
-
-    label {
-      display: block;
-      color: #333;
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 14px;
+    .oauth-btn:hover { border-color:var(--nc); color:var(--nc); }
+    .login-footer {
+      text-align:center; margin-top:22px;
+      font-size:12px; color:var(--txm);
     }
-
-    input[type="text"],
-    input[type="password"] {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.3s;
+    .login-footer a { color:var(--nc); text-decoration:none; cursor:pointer; }
+    .login-footer a:hover { text-shadow:var(--gc); }
+    .insert-coin {
+      font-family:var(--fa); font-size:10px; letter-spacing:4px;
+      color:var(--np); text-shadow:var(--gp); text-transform:uppercase;
+      text-align:center; margin-bottom:20px;
+      animation:blink 1.2s step-end infinite;
     }
-
-    input[type="text"]:focus,
-    input[type="password"]:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 30px;
-    }
-
-    button {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-    }
-
-    .btn-secondary {
-      background: #f0f0f0;
-      color: #333;
-    }
-
-    .btn-secondary:hover {
-      background: #e0e0e0;
-    }
-
-    .error-message {
-      background: #fee;
-      color: #c33;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .error-message.show {
-      display: block;
-    }
-
-    .success-message {
-      background: #efe;
-      color: #3c3;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .success-message.show {
-      display: block;
-    }
-
-    .loading {
-      display: none;
-      text-align: center;
-      color: #666;
-      font-size: 14px;
-    }
-
-    .loading.show {
-      display: block;
-    }
-
-    .link {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 14px;
-      color: #666;
-    }
-
-    .link a {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .link a:hover {
-      text-decoration: underline;
-    }
-
-    .forgot-password {
-      text-align: right;
-      margin-top: -10px;
-      margin-bottom: 20px;
-    }
-
-    .forgot-password a {
-      color: #667eea;
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .forgot-password a:hover {
-      text-decoration: underline;
-    }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
   </style>
 </head>
-
 <body>
-  <div class="login-container">
-    <div class="logo">🎮</div>
-    <h1>KensGames</h1>
-    <p class="subtitle">Login to play with friends</p>
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
 
-    <div class="error-message" id="errorMessage"></div>
-    <div class="success-message" id="successMessage"></div>
-
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" placeholder="Enter your username" required
-          autocomplete="username" />
+  <nav class="arc-nav">
+    <div class="arc-nav-inner">
+      <a href="/" class="arc-logo">KEN<span>S</span>GAMES</a>
+      <div class="arc-nav-right">
+        <a href="/register" class="btn btn-p">JOIN FREE</a>
       </div>
+    </div>
+  </nav>
 
-      <div class="form-group">
-        <label for="password">Password (optional)</label>
-        <input type="password" id="password" name="password" placeholder="Leave blank for no password"
-          autocomplete="current-password" />
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="cab-art">&#127918;</div>
+      <div class="insert-coin">&#9655; INSERT COIN TO CONTINUE &#9655;</div>
+      <div class="login-title">Sign In</div>
+      <div class="login-sub">Enter your credentials, player</div>
+
+      <form onsubmit="handleLogin(event)">
+        <div class="arc-field">
+          <label>Username or Email</label>
+          <input class="arc-input" type="text" id="l-user" placeholder="player@kensgames.com" required autocomplete="username">
+        </div>
+        <div class="arc-field">
+          <label>Password</label>
+          <input class="arc-input" type="password" id="l-pass" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-c btn-full" style="margin-top:4px;">&#9654; SIGN IN</button>
+        <div class="arc-msg" id="l-msg"></div>
+      </form>
+
+      <div class="divider">or</div>
+      <button class="oauth-btn" onclick="oauthLogin('google')">&#9654; Continue with Google</button>
+      <button class="oauth-btn" onclick="oauthLogin('discord')">&#9654; Continue with Discord</button>
+
+      <div class="login-footer">
+        <a href="/forgot-password">Forgot password?</a>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        No account? <a href="/register">Join free</a>
       </div>
-
-      <div class="button-group">
-        <button type="submit" class="btn-primary">Login</button>
-        <button type="button" class="btn-secondary" onclick="window.location.href='/register'">
-          Create Account
-        </button>
-      </div>
-
-      <div class="loading" id="loading">
-        <span>Logging in...</span>
-      </div>
-    </form>
-
-    <div class="link">
-      Don't have an account? <a href="/register">Sign up here</a>
     </div>
   </div>
 
   <script>
-    // Dynamic API URL - use /api/auth (nginx reverse proxies to localhost:3000)
-    const API_URL = '/api/auth';
+    const API = '/api/auth';
+    if (localStorage.getItem('user_token')) window.location.href = '/lobby';
 
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    async function handleLogin(e) {
       e.preventDefault();
-
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-
-      // Clear messages
-      document.getElementById('errorMessage').classList.remove('show');
-      document.getElementById('successMessage').classList.remove('show');
-
-      // Show loading
-      document.getElementById('loading').classList.add('show');
-
+      const msg = document.getElementById('l-msg');
+      msg.textContent = 'Authenticating...'; msg.className = 'arc-msg';
       try {
-        const response = await fetch(`${API_URL}/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: username,
-            password: password || undefined
-          })
+        const res = await fetch(`${API}/login`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ username: document.getElementById('l-user').value, password: document.getElementById('l-pass').value })
         });
-
-        const data = await response.json();
-
-        if (data.success) {
-          // Store token and user info
-          localStorage.setItem('user_token', data.token);
-          localStorage.setItem('user_id', data.userId);
-          localStorage.setItem('username', data.username);
+        const data = await res.json();
+        if (res.ok) {
+          localStorage.setItem('user_token',   data.token);
+          localStorage.setItem('user_id',      data.userId);
+          localStorage.setItem('username',     data.username);
           localStorage.setItem('display_name', data.displayName);
-          localStorage.setItem('avatar', data.avatar);
-
-          // Show success message
-          document.getElementById('successMessage').textContent = 'Login successful! Redirecting...';
-          document.getElementById('successMessage').classList.add('show');
-
-          // Redirect after brief delay
-          setTimeout(() => {
-            window.location.href = '/lobby';
-          }, 1000);
+          if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar, name: data.displayName }));
+          msg.textContent = 'Welcome back!'; msg.className = 'arc-msg ok';
+          const redir = new URLSearchParams(location.search).get('redirect') || '/lobby';
+          setTimeout(() => window.location.href = redir, 700);
         } else {
-          throw new Error(data.error || 'Login failed');
+          msg.textContent = data.message || 'Invalid credentials'; msg.className = 'arc-msg err';
         }
-      } catch (error) {
-        console.error('Login error:', error);
-        document.getElementById('errorMessage').textContent = error.message;
-        document.getElementById('errorMessage').classList.add('show');
-      } finally {
-        document.getElementById('loading').classList.remove('show');
-      }
-    });
+      } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
+    }
 
-    // Check if already logged in
-    window.addEventListener('load', () => {
-      if (localStorage.getItem('user_token')) {
-        window.location.href = '/lobby';
-      }
-    });
+    function oauthLogin(p) { window.location.href = `${API}/${p}`; }
   </script>
 </body>
-
 </html>
