@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastTrack v2.1.0 - Manifold Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+            color: #00ffcc;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #board {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3) inset;
+        }
+
+        .tile {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border: 2px solid #00ffcc;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            color: #00ffcc;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+        }
+
+        .tile:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+            border-color: #00ff88;
+        }
+
+        .tile.occupied {
+            background: linear-gradient(135deg, #1a4d2e 0%, #0f6b3a 100%);
+        }
+
+        .tile.locked {
+            border-color: #ff6b6b;
+            opacity: 0.5;
+        }
+
+        .tile-content {
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .tile-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .player-piece {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-top: 2px solid #00ffcc;
+        }
+
+        .player-info {
+            flex: 1;
+            padding: 10px 15px;
+            background: rgba(0, 50, 100, 0.5);
+            border-left: 3px solid #00ffcc;
+            margin-right: 10px;
+            border-radius: 5px;
+        }
+
+        .player-info.active {
+            border-left-color: #00ff88;
+            background: rgba(0, 100, 50, 0.5);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .player-name {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .player-stats {
+            font-size: 12px;
+            color: #00ff88;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-top: 2px solid #00ffcc;
+            align-items: center;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #00ff88;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 60px;
+            border: 3px solid #00ffcc;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 200;
+            box-shadow: 0 0 40px rgba(0, 255, 204, 0.5);
+            max-width: 600px;
+        }
+
+        .menu.hidden {
+            display: none;
+        }
+
+        .menu h1 {
+            color: #00ffcc;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+
+        .menu .subtitle {
+            color: #00ff88;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        .menu button {
+            display: block;
+            width: 300px;
+            padding: 15px;
+            margin: 15px auto;
+            background: linear-gradient(135deg, #00ffcc 0%, #00ff88 100%);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .menu button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 30px #00ffcc;
+        }
+
+        .menu p {
+            color: #00ff88;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #00ffcc;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        #status-text {
+            color: #00ffcc;
+            font-size: 12px;
+        }
+
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 60px;
+            border: 3px solid #ffaa00;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 200;
+            box-shadow: 0 0 40px rgba(255, 170, 0, 0.5);
+        }
+
+        .game-over.hidden {
+            display: none;
+        }
+
+        .game-over h1 {
+            color: #ffaa00;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .winner-info {
+            color: #00ffcc;
+            font-size: 24px;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 255, 200, 0.1);
+            border-radius: 8px;
+        }
+
+        .leaderboard {
+            color: #00ff88;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+
+        .leaderboard-entry {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(0, 50, 100, 0.5);
+            border-left: 3px solid #00ffcc;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Status Panel -->
+    <div id="status">
+        <div style="font-weight: bold; color: #00ff88; margin-bottom: 8px;">FastTrack v2.1.0</div>
+        <div id="status-text">Initializing...</div>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" style="display: none;">
+        <!-- Game Board -->
+        <div id="board"></div>
+
+        <!-- Player Info HUD -->
+        <div id="hud"></div>
+
+        <!-- Game Info -->
+        <div class="game-info">
+            <div class="info-item">
+                <div class="info-label">ROUND</div>
+                <div class="info-value" id="round-display">1/12</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">TURN</div>
+                <div class="info-value" id="turn-display">Player 1</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">AVAILABLE MOVES</div>
+                <div class="info-value" id="moves-display">4</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">GAME STATUS</div>
+                <div class="info-value" id="status-display">In Progress</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu" class="menu">
+        <h1>🏁 FASTTRACK</h1>
+        <div class="subtitle">v2.1.0 - Manifold Edition</div>
+        <p style="margin-bottom: 20px;">Strategic board game for 1-4 players</p>
+        <button id="solo-btn">🎮 Solo vs AI</button>
+        <button id="2player-btn">👥 2 Players</button>
+        <button id="3player-btn">👥 3 Players</button>
+        <button id="4player-btn">👥 4 Players</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over" class="game-over hidden">
+        <h1>GAME COMPLETE</h1>
+        <div id="winner-display" class="winner-info">Player 1 Wins!</div>
+        <div class="leaderboard" id="final-scores"></div>
+        <button id="restart-btn" style="margin-top: 20px; width: 200px; padding: 12px;">Play Again</button>
+    </div>
+
+    <!-- Load Manifold Core & Substrates -->
+    <script src="../../js/manifold-core/manifold_surface.js"></script>
+    <script src="../../js/manifold-core/substrate_base.js"></script>
+    <script src="../../js/manifold-core/substrate_registry.js"></script>
+    <script src="../../js/manifold-core/game_config.js"></script>
+
+    <!-- Load All 9 Substrates -->
+    <script src="../../js/manifold-core/physics_substrate.js"></script>
+    <script src="../../js/manifold-core/graphics_substrate.js"></script>
+    <script src="../../js/manifold-core/audio_substrate.js"></script>
+    <script src="../../js/manifold-core/gamelogic_substrate.js"></script>
+    <script src="../../js/manifold-core/controlmapping_substrate.js"></script>
+    <script src="../../js/manifold-core/ui_substrate.js"></script>
+    <script src="../../js/manifold-core/multiplayer_substrate.js"></script>
+    <script src="../../js/manifold-core/persistence_substrate.js"></script>
+    <script src="../../js/manifold-core/ai_substrate.js"></script>
+
+    <!-- Game Coordinator -->
+    <script src="assets/js/fasttrack_coordinator.js"></script>
+
+    <!-- Application -->
+    <script>
+        let game = null;
+
+        const updateStatus = (msg) => {
+            document.getElementById('status-text').textContent = msg;
+        };
+
+        document.getElementById('solo-btn').addEventListener('click', async () => {
+            try {
+                updateStatus('Starting solo game...');
+                document.getElementById('menu').classList.add('hidden');
+                document.getElementById('game-container').style.display = 'flex';
+
+                game = new FastTrackManifold();
+                await game.initialize(1, 'Player');
+
+                updateStatus('Game running ✓');
+                game.run();
+            } catch (err) {
+                console.error('Game initialization error:', err);
+                updateStatus('Error: ' + err.message);
+            }
+        });
+
+        ['2player-btn', '3player-btn', '4player-btn'].forEach((btnId, idx) => {
+            const playerCount = idx + 2;
+            document.getElementById(btnId).addEventListener('click', async () => {
+                try {
+                    updateStatus(`Starting ${playerCount}-player game...`);
+                    document.getElementById('menu').classList.add('hidden');
+                    document.getElementById('game-container').style.display = 'flex';
+
+                    game = new FastTrackManifold();
+                    await game.initialize(playerCount, 'Player');
+
+                    updateStatus('Game running ✓');
+                    game.run();
+                } catch (err) {
+                    console.error('Game initialization error:', err);
+                    updateStatus('Error: ' + err.message);
+                }
+            });
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        console.log(`
+╔════════════════════════════════════════════════════════════════════════════╗
+║                   🏁 FASTTRACK v2.1.0 - MANIFOLD EDITION 🏁              ║
+║                                                                            ║
+║  Strategic board game on manifold architecture                            ║
+║                                                                            ║
+║  Features:                                                                ║
+║    - 1-4 player support (solo vs AI, local multiplayer)                   ║
+║    - 6x6 board tile allocation strategy                                   ║
+║    - Resource management and positioning tactics                          ║
+║    - 12-round progression                                                 ║
+║    - Player ranking and leaderboards                                      ║
+║                                                                            ║
+║  Manifold Benefits:                                                       ║
+║    - Reuses all 9 substrates (GameLogic, UI, Multiplayer, AI, etc)       ║
+║    - Game coordinator only ~400 lines (no substrate duplication)          ║
+║    - Automatic integration with BrickBreaker3D & Space Combat            ║
+║                                                                            ║
+║  Status: Ready for board-based strategy gameplay                          ║
+╚════════════════════════════════════════════════════════════════════════════╝
+        `);
+    </script>
+</body>
+
+</html>

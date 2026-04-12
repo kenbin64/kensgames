@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Join Fast Track Game</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="assets/images/icon-192.png">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <!-- Open Graph for messenger previews -->
+    <meta property="og:title" content="Join My Fast Track Game!">
+    <meta property="og:description" content="Click to join this Fast Track board game session">
+    <meta property="og:image" content="assets/images/icon-512.png">
+    <meta property="og:type" content="website">
+    
+    <link rel="stylesheet" href="assets/css/join.css">
+    <style>
+        /* Phase screens */
+        .phase { display: none; }
+        .phase.active { display: block; }
+        
+        /* Pending approval */
+        .pending-box {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .pending-spinner {
+            width: 60px; height: 60px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #f59e0b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        .pending-text {
+            color: #f59e0b;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .pending-subtext {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        .cancel-link {
+            color: #e94560;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .cancel-link:hover { text-decoration: underline; }
+        
+        /* Waiting room */
+        .waiting-room { padding: 20px 0; }
+        .wr-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .wr-code {
+            font-family: monospace;
+            font-size: 1.8rem;
+            letter-spacing: 0.4rem;
+            color: #e94560;
+            font-weight: bold;
+        }
+        .wr-players {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .wr-player {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+        .wr-player.is-me {
+            border-color: rgba(233, 69, 96, 0.4);
+            background: rgba(233, 69, 96, 0.1);
+        }
+        .wr-player-avatar { font-size: 1.5rem; }
+        .wr-player-name { flex: 1; font-weight: 600; }
+        .wr-player-status {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .wr-player-status.ready { color: #4ade80; }
+        .wr-player-status.not-ready { color: #f59e0b; }
+        
+        .ready-toggle-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: 2px solid #666;
+            background: rgba(100,100,100,0.3);
+            color: #aaa;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 15px 0;
+        }
+        .ready-toggle-btn.is-ready {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        .wr-status-bar {
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+        .wr-status-bar.waiting {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+        .wr-status-bar.all-ready {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+        }
+        
+        /* Rejected */
+        .rejected-box {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .rejected-icon { font-size: 3rem; margin-bottom: 10px; }
+        .rejected-text { color: #e94560; font-size: 1.1rem; margin-bottom: 15px; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Chat in waiting room */
+        .wr-chat {
+            margin-top: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .wr-chat-messages {
+            height: 120px;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+        .wr-chat-messages .system { color: #888; font-style: italic; }
+        .wr-chat-input-row {
+            display: flex;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .wr-chat-input-row input {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 0.9rem;
+        }
+        .wr-chat-input-row input:focus { outline: none; }
+        .wr-chat-input-row button {
+            padding: 10px 16px;
+            background: #e94560;
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="assets/images/icon-192.png" alt="Fast Track" onerror="this.style.display='none'">
+            <h1>Fast Track</h1>
+            <p id="logo-subtitle">Join a private game</p>
+        </div>
+        
+        <div class="card">
+            <!-- ==================== PHASE 1: Enter Name & Avatar ==================== -->
+            <div id="phase-join" class="phase active">
+                <!-- Code display (when joining via link) -->
+                <div id="code-display" class="hidden">
+                    <p style="color: var(--text-secondary, #888); margin-bottom: 5px;">You're joining game:</p>
+                    <div class="game-code" id="display-code">------</div>
+                </div>
+                
+                <!-- Code input (when entering manually) -->
+                <div id="code-input-section">
+                    <div class="input-group">
+                        <label>Game Code</label>
+                        <input type="text" class="input code-input" id="game-code" 
+                               placeholder="ABC123" maxlength="6" autocomplete="off">
+                    </div>
+                </div>
+                
+                <!-- Name input -->
+                <div class="input-group">
+                    <label>Your Name</label>
+                    <input type="text" class="input" id="player-name" 
+                           placeholder="Enter your name" maxlength="20" autocomplete="off">
+                </div>
+                
+                <!-- Quick avatar picker -->
+                <div class="input-group">
+                    <label>Choose an Avatar</label>
+                    <div class="avatar-picker">
+                        <div class="avatar-option selected" data-avatar="person_smile" onclick="selectAvatar(this)">😊</div>
+                        <div class="avatar-option" data-avatar="person_cool" onclick="selectAvatar(this)">😎</div>
+                        <div class="avatar-option" data-avatar="animal_lion" onclick="selectAvatar(this)">🦁</div>
+                        <div class="avatar-option" data-avatar="animal_fox" onclick="selectAvatar(this)">🦊</div>
+                        <div class="avatar-option" data-avatar="space_rocket" onclick="selectAvatar(this)">🚀</div>
+                        <div class="avatar-option" data-avatar="fantasy_dragon" onclick="selectAvatar(this)">🐲</div>
+                        <div class="avatar-option" data-avatar="scifi_robot" onclick="selectAvatar(this)">🤖</div>
+                        <div class="avatar-option" data-avatar="sport_soccer" onclick="selectAvatar(this)">⚽</div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="enterGame()">
+                    🎮 Enter Game
+                </button>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="flex:1;">
+                        ← Back
+                    </button>
+                    <button class="btn btn-secondary" onclick="toggleJoinRules()" style="flex:1; background: rgba(74,222,128,0.15); color: #4ade80; border-color: rgba(74,222,128,0.3);">
+                        📜 Rules
+                    </button>
+                </div>
+                
+                <!-- Inline Rules (toggled) -->
+                <div id="join-rules-panel" style="display:none; margin-top: 12px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 12px; text-align: left; font-size: 0.85rem; color: #ccc;">
+                    <div style="color: #4ade80; font-weight: 600; margin-bottom: 8px;">📜 Quick Rules</div>
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="padding: 4px 0;">🎯 Move all 5 pegs clockwise to your safe zone to win</li>
+                        <li style="padding: 4px 0;">🃏 Ace, 6, Joker = Enter track + extra turn</li>
+                        <li style="padding: 4px 0;">👑 J, Q, K = Move 1 + extra turn + exit bullseye</li>
+                        <li style="padding: 4px 0;">⚡ Land on FastTrack hole = shortcut loop</li>
+                        <li style="padding: 4px 0;">⬅️ Card 4 = Back 4 spaces</li>
+                        <li style="padding: 4px 0;">✂️ Card 7 = Split between 2 pegs</li>
+                        <li style="padding: 4px 0;">💥 Land on opponent = Cut them back</li>
+                        <li style="padding: 4px 0;">🚫 Can't pass or land on your own peg</li>
+                    </ul>
+                </div>
+                
+                <div id="join-error" class="status error hidden"></div>
+            </div>
+            
+            <!-- ==================== PHASE 2: Pending Approval ==================== -->
+            <div id="phase-pending" class="phase">
+                <div class="pending-box">
+                    <div class="pending-spinner"></div>
+                    <div class="pending-text" id="pending-message">Connecting to game server...</div>
+                    <div class="pending-subtext" id="pending-submessage">Please wait</div>
+                    <div class="cancel-link" onclick="cancelJoin()">Cancel</div>
+                </div>
+            </div>
+            
+            <!-- ==================== PHASE 3: Waiting Room (Approved) ==================== -->
+            <div id="phase-waiting" class="phase">
+                <div class="waiting-room">
+                    <div class="wr-header">
+                        <div style="color: #888; font-size: 0.85rem;">Game Code</div>
+                        <div class="wr-code" id="wr-code">------</div>
+                    </div>
+                    
+                    <div style="text-align:center; margin-bottom: 10px;">
+                        <span style="color:#ccc;font-weight:600;">Players (<span id="wr-player-count">0</span>/<span id="wr-max-players">4</span>)</span>
+                    </div>
+                    
+                    <div class="wr-players" id="wr-players-list">
+                        <!-- Dynamically populated -->
+                    </div>
+                    
+                    <button class="ready-toggle-btn" id="wr-ready-btn" onclick="toggleReady()">
+                        ⬜ Click When Ready
+                    </button>
+                    
+                    <div class="wr-status-bar waiting" id="wr-status">
+                        Waiting for all players to be ready...
+                    </div>
+                    
+                    <!-- Chat -->
+                    <div class="wr-chat">
+                        <div class="wr-chat-messages" id="wr-chat-messages">
+                            <div class="system">Welcome! Chat while waiting for the game.</div>
+                        </div>
+                        <div class="wr-chat-input-row">
+                            <input type="text" id="wr-chat-input" placeholder="Type a message..." maxlength="200" 
+                                   onkeypress="if(event.key==='Enter')sendChat()">
+                            <button onclick="sendChat()">Send</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn btn-secondary" onclick="leaveGame()" style="flex:1;">
+                            Leave Game
+                        </button>
+                        <button class="btn btn-secondary" onclick="toggleJoinRules()" style="flex:1; background: rgba(74,222,128,0.15); color: #4ade80; border-color: rgba(74,222,128,0.3);">
+                            📜 Rules
+                        </button>
+                    </div>
+                    
+                    <!-- Inline Rules -->
+                    <div id="wr-rules-panel" style="display:none; margin-top: 12px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 12px; text-align: left; font-size: 0.85rem; color: #ccc;">
+                        <div style="color: #4ade80; font-weight: 600; margin-bottom: 8px;">📜 Quick Rules</div>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <li style="padding: 4px 0;">🎯 Move all 5 pegs clockwise to your safe zone to win</li>
+                            <li style="padding: 4px 0;">🃏 Ace, 6, Joker = Enter track + extra turn</li>
+                            <li style="padding: 4px 0;">👑 J, Q, K = Move 1 + extra turn + exit bullseye</li>
+                            <li style="padding: 4px 0;">⚡ Land on FastTrack hole = shortcut loop</li>
+                            <li style="padding: 4px 0;">⬅️ Card 4 = Back 4 spaces</li>
+                            <li style="padding: 4px 0;">✂️ Card 7 = Split between 2 pegs</li>
+                            <li style="padding: 4px 0;">💥 Land on opponent = Cut them back</li>
+                            <li style="padding: 4px 0;">🚫 Can't pass or land on your own peg</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ==================== PHASE 4: Rejected / Kicked ==================== -->
+            <div id="phase-rejected" class="phase">
+                <div class="rejected-box">
+                    <div class="rejected-icon">🚫</div>
+                    <div class="rejected-text" id="rejected-reason">Your request was declined.</div>
+                    <button class="btn btn-primary" onclick="resetToJoin()">Try Again</button>
+                    <button class="btn btn-secondary" onclick="window.location.href='index.html'">← Back to Home</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ===== State =====
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const LOBBY_WS_URL = isLocal 
+            ? `ws://${window.location.hostname}:8765`
+            : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+        
+        let socket = null;
+        let selectedAvatar = 'person_smile';
+        let gameCode = '';
+        let myUserId = null;
+        let myUsername = '';
+        let sessionData = null;
+        let myReady = false;
+        
+        // Check URL for code
+        const params = new URLSearchParams(window.location.search);
+        const urlCode = params.get('code');
+        
+        if (urlCode) {
+            gameCode = urlCode.toUpperCase();
+            document.getElementById('code-input-section').classList.add('hidden');
+            document.getElementById('code-display').classList.remove('hidden');
+            document.getElementById('display-code').textContent = gameCode;
+        }
+        
+        // ===== Phase Navigation =====
+        function showPhase(phaseId) {
+            document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+            const el = document.getElementById(phaseId);
+            if (el) el.classList.add('active');
+        }
+        
+        // ===== Avatar Selection =====
+        function selectAvatar(element) {
+            document.querySelectorAll('.avatar-option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedAvatar = element.dataset.avatar;
+        }
+        
+        // ===== Phase 1: Enter Game =====
+        function enterGame() {
+            const code = gameCode || document.getElementById('game-code').value.toUpperCase().trim();
+            const name = document.getElementById('player-name').value.trim();
+            
+            if (!code || code.length < 4) {
+                showError('Please enter a valid game code');
+                return;
+            }
+            if (!name) {
+                showError('Please enter your name');
+                return;
+            }
+            
+            gameCode = code;
+            myUsername = name;
+            
+            // Move to pending phase
+            showPhase('phase-pending');
+            document.getElementById('pending-message').textContent = 'Connecting to game server...';
+            document.getElementById('pending-submessage').textContent = 'Please wait';
+            
+            connectAndJoin(code, name);
+        }
+        
+        function showError(msg) {
+            const el = document.getElementById('join-error');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+        
+        // ===== WebSocket Connection =====
+        function connectAndJoin(code, name) {
+            try {
+                socket = new WebSocket(LOBBY_WS_URL);
+                
+                socket.onopen = () => {
+                    document.getElementById('pending-message').textContent = 'Connected! Logging in...';
+                    // Guest login first
+                    socket.send(JSON.stringify({
+                        type: 'guest_login',
+                        name: name,
+                        avatar_id: selectedAvatar
+                    }));
+                };
+                
+                socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleMessage(data);
+                    } catch (e) {
+                        console.error('Parse error:', e);
+                    }
+                };
+                
+                socket.onerror = () => {
+                    document.getElementById('pending-message').textContent = 'Connection failed';
+                    document.getElementById('pending-submessage').textContent = 'Server may be offline. Try again later.';
+                };
+                
+                socket.onclose = () => {
+                    // Only show error if we weren't redirected
+                    if (window.location.href.includes('join.html')) {
+                        const phase = document.querySelector('.phase.active');
+                        if (phase && phase.id === 'phase-pending') {
+                            document.getElementById('pending-message').textContent = 'Disconnected';
+                            document.getElementById('pending-submessage').textContent = 'Connection lost. Click cancel to try again.';
+                        } else if (phase && phase.id === 'phase-waiting') {
+                            addWRChat('system', 'Disconnected from server.');
+                        }
+                    }
+                    socket = null;
+                };
+                
+            } catch (e) {
+                document.getElementById('pending-message').textContent = 'Failed to connect: ' + e.message;
+            }
+        }
+        
+        // ===== Message Handler =====
+        function handleMessage(data) {
+            console.log('[Join] Received:', data.type, data);
+            
+            switch (data.type) {
+                case 'connected':
+                    // Server welcome, wait for auth
+                    break;
+                    
+                case 'auth_success':
+                    myUserId = data.user?.user_id || data.user_id;
+                    myUsername = data.user?.username || myUsername;
+                    document.getElementById('pending-message').textContent = 'Joining game...';
+                    // Now join by code
+                    socket.send(JSON.stringify({
+                        type: 'join_by_code',
+                        code: gameCode
+                    }));
+                    break;
+                
+                case 'join_pending':
+                    // Waiting for host approval
+                    if (data.game_in_progress) {
+                        document.getElementById('pending-message').textContent = 'Game in progress — requesting to join...';
+                        document.getElementById('pending-submessage').textContent = 
+                            `Waiting for ${data.host_username || 'host'} to accept you`;
+                    } else {
+                        document.getElementById('pending-message').textContent = 'Waiting for host approval...';
+                        document.getElementById('pending-submessage').textContent = 
+                            `${data.host_username || 'Host'} needs to accept your request`;
+                    }
+                    break;
+                
+                case 'session_joined':
+                    // Approved! Enter waiting room
+                    sessionData = data.session;
+                    showWaitingRoom();
+                    break;
+                
+                case 'late_join_approved':
+                    // Approved to join a game already in progress — redirect to board immediately
+                    sessionStorage.setItem('ft_session', JSON.stringify({
+                        session: data.session,
+                        user: { name: myUsername, user_id: myUserId, avatar_id: selectedAvatar },
+                        wsUrl: LOBBY_WS_URL,
+                        lateJoin: true,
+                        assignedSlot: data.assigned_slot,
+                        gameState: data.game_state
+                    }));
+                    document.getElementById('pending-message').textContent = 'Approved! Entering game...';
+                    document.getElementById('pending-submessage').textContent = '';
+                    setTimeout(() => {
+                        const p = new URLSearchParams({
+                            session: data.session.session_id,
+                            multiplayer: 'true',
+                            late_join: 'true'
+                        });
+                        window.location.href = `3d.html?${p.toString()}`;
+                    }, 600);
+                    break;
+                
+                case 'join_rejected':
+                    // Rejected by host
+                    showPhase('phase-rejected');
+                    document.getElementById('rejected-reason').textContent = data.reason || 'Your request was declined.';
+                    break;
+                
+                case 'player_joined':
+                    if (sessionData) {
+                        sessionData.players = data.players || sessionData.players;
+                        updateWaitingRoom();
+                        addWRChat('system', `${data.player?.username || 'Someone'} joined!`);
+                    }
+                    break;
+                
+                case 'player_left':
+                    if (sessionData) {
+                        sessionData.players = data.players || sessionData.players;
+                        updateWaitingRoom();
+                        addWRChat('system', `${data.username || 'Someone'} left.`);
+                    }
+                    break;
+                
+                case 'player_ready_changed':
+                    if (sessionData) {
+                        sessionData.players = data.players || sessionData.players;
+                        updateWaitingRoom();
+                        const status = data.ready ? '✅ ready' : '⬜ not ready';
+                        addWRChat('system', `${data.username} is ${status}`);
+                    }
+                    break;
+                    
+                case 'player_kicked':
+                    if (sessionData) {
+                        sessionData.players = data.players || sessionData.players;
+                        updateWaitingRoom();
+                        addWRChat('system', `${data.username} was removed.`);
+                    }
+                    break;
+                
+                case 'kicked':
+                    showPhase('phase-rejected');
+                    document.getElementById('rejected-reason').textContent = data.reason || 'You were removed from the game.';
+                    break;
+                
+                case 'session_settings_updated':
+                    if (sessionData) {
+                        if (data.settings) sessionData.settings = data.settings;
+                        if (data.max_players) sessionData.max_players = data.max_players;
+                        if (data.session) sessionData = data.session;
+                        updateWaitingRoom();
+                    }
+                    break;
+                    
+                case 'chat':
+                    addWRChat(data.username, data.message);
+                    break;
+                
+                case 'game_starting':
+                case 'game_started':
+                    addWRChat('system', 'Game is starting!');
+                    // Store session info for game board
+                    sessionStorage.setItem('ft_session', JSON.stringify({
+                        session: data.session || sessionData,
+                        user: { name: myUsername, user_id: myUserId, avatar_id: selectedAvatar },
+                        wsUrl: LOBBY_WS_URL
+                    }));
+                    // Redirect to game board
+                    setTimeout(() => {
+                        const p = new URLSearchParams({
+                            session: (data.session || sessionData).session_id,
+                            multiplayer: 'true'
+                        });
+                        window.location.href = `3d.html?${p.toString()}`;
+                    }, 800);
+                    break;
+                
+                case 'error':
+                    const activePhase = document.querySelector('.phase.active');
+                    if (activePhase?.id === 'phase-pending') {
+                        document.getElementById('pending-message').textContent = data.message || 'Error';
+                        document.getElementById('pending-submessage').textContent = 'Click cancel to try again.';
+                    } else {
+                        addWRChat('system', 'Error: ' + (data.message || 'Unknown'));
+                    }
+                    break;
+            }
+        }
+        
+        // ===== Phase 2: Cancel Join =====
+        function cancelJoin() {
+            if (socket) {
+                try { socket.send(JSON.stringify({ type: 'cancel_join_request' })); } catch(e) {}
+                socket.close();
+                socket = null;
+            }
+            resetToJoin();
+        }
+        
+        function resetToJoin() {
+            showPhase('phase-join');
+            sessionData = null;
+            myReady = false;
+            document.getElementById('logo-subtitle').textContent = 'Join a private game';
+        }
+        
+        // ===== Phase 3: Waiting Room =====
+        function showWaitingRoom() {
+            showPhase('phase-waiting');
+            document.getElementById('wr-code').textContent = sessionData?.session_code || gameCode;
+            document.getElementById('logo-subtitle').textContent = 'Waiting for game to start';
+            myReady = false;
+            updateReadyButton();
+            updateWaitingRoom();
+        }
+        
+        function updateWaitingRoom() {
+            if (!sessionData) return;
+            const players = sessionData.players || [];
+            const maxPlayers = sessionData.max_players || 4;
+            
+            // Player count
+            document.getElementById('wr-player-count').textContent = players.length;
+            document.getElementById('wr-max-players').textContent = maxPlayers;
+            
+            // Player list
+            const list = document.getElementById('wr-players-list');
+            const avatarEmojis = { person_smile:'😊', person_cool:'😎', animal_lion:'🦁', animal_fox:'🦊', space_rocket:'🚀', fantasy_dragon:'🐲', scifi_robot:'🤖', sport_soccer:'⚽' };
+            list.innerHTML = players.map((p) => {
+                const isMe = p.user_id === myUserId;
+                const ready = p.is_ai || p.ready;
+                const readyClass = ready ? 'ready' : 'not-ready';
+                const readyText = p.is_ai ? '🤖 Bot' : (ready ? '✅ Ready' : '⬜ Not Ready');
+                const avatar = p.is_ai ? '🤖' : (avatarEmojis[p.avatar_id] || '👤');
+                return `
+                    <div class="wr-player ${isMe ? 'is-me' : ''}">
+                        <div class="wr-player-avatar">${avatar}</div>
+                        <div class="wr-player-name">${escapeHtml(p.username)}${p.is_host ? ' 👑' : ''}${isMe ? ' (You)' : ''}</div>
+                        <div class="wr-player-status ${readyClass}">${readyText}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Update my ready state from server data
+            const me = players.find(p => p.user_id === myUserId);
+            if (me) {
+                myReady = me.ready || false;
+                updateReadyButton();
+            }
+            
+            // Status bar
+            const allReady = players.every(p => p.is_ai || p.ready);
+            const statusBar = document.getElementById('wr-status');
+            if (allReady && players.length >= 2) {
+                statusBar.className = 'wr-status-bar all-ready';
+                statusBar.textContent = '✅ All ready! Waiting for host to start...';
+            } else {
+                const notReady = players.filter(p => !p.is_ai && !p.ready).map(p => p.username);
+                statusBar.className = 'wr-status-bar waiting';
+                statusBar.textContent = notReady.length > 0 
+                    ? `Waiting for: ${notReady.join(', ')}`
+                    : 'Waiting for more players...';
+            }
+        }
+        
+        function toggleReady() {
+            if (!socket) return;
+            socket.send(JSON.stringify({ type: 'toggle_ready' }));
+        }
+        
+        function updateReadyButton() {
+            const btn = document.getElementById('wr-ready-btn');
+            if (!btn) return;
+            if (myReady) {
+                btn.textContent = '✅ Ready!';
+                btn.classList.add('is-ready');
+            } else {
+                btn.textContent = '⬜ Click When Ready';
+                btn.classList.remove('is-ready');
+            }
+        }
+        
+        function leaveGame() {
+            if (socket) {
+                try { socket.send(JSON.stringify({ type: 'leave_session' })); } catch(e) {}
+                socket.close();
+                socket = null;
+            }
+            resetToJoin();
+        }
+        
+        // ===== Chat =====
+        function sendChat() {
+            const input = document.getElementById('wr-chat-input');
+            const msg = (input?.value || '').trim();
+            if (!msg || !socket) return;
+            socket.send(JSON.stringify({ type: 'chat', message: msg }));
+            input.value = '';
+        }
+        
+        function addWRChat(author, message) {
+            const container = document.getElementById('wr-chat-messages');
+            if (!container) return;
+            const div = document.createElement('div');
+            if (author === 'system') {
+                div.className = 'system';
+                div.textContent = message;
+            } else {
+                div.innerHTML = `<strong>${escapeHtml(author)}:</strong> ${escapeHtml(message)}`;
+            }
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // ===== Keyboard shortcuts =====
+        document.getElementById('player-name').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') enterGame();
+        });
+        
+        const codeEl = document.getElementById('game-code');
+        if (codeEl) {
+            codeEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') document.getElementById('player-name').focus();
+            });
+        }
+        
+        // Focus appropriate field
+        if (urlCode) {
+            document.getElementById('player-name').focus();
+        } else if (codeEl) {
+            codeEl.focus();
+        }
+        
+        // ===== Rules toggle =====
+        function toggleJoinRules() {
+            // Toggle whichever rules panel is visible in the current phase
+            const panels = ['join-rules-panel', 'wr-rules-panel'];
+            panels.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.closest('.phase.active')) {
+                    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

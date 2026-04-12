@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Track — Free Online Board Game | Card & Peg Racing | Ken's Games</title>
+    <meta name="description" content="Play Fast Track free online — a strategic card & peg racing board game for 2-4 players. Race around a stunning 3D board, take shortcuts, capture opponents. 7 themes, smart AI bots, multiplayer.">
+    <meta name="keywords" content="fast track, board game online, free board game, card game, peg game, racing game, multiplayer board game, family game, strategy game, 3D board game, play online free">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kensgames.com/fasttrack/">
+
+    <!-- ButterflyFX Analytics Substrate (GA4 + Dimensional Journey) -->
+    <script src="analytics_substrate.js"></script>
+
+    <!-- Open Graph (Facebook, LinkedIn, iMessage) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Ken's Games">
+    <meta property="og:title" content="Fast Track — Free Online Board Game">
+    <meta property="og:description" content="Race your pegs around a stunning 3D board. Take shortcuts, capture opponents, outsmart AI bots. Free to play — no download!">
+    <meta property="og:url" content="https://kensgames.com/fasttrack/">
+    <meta property="og:image" content="https://kensgames.com/fasttrack/assets/images/og-preview.png">
+    <meta property="og:image:width" content="1527">
+    <meta property="og:image:height" content="1024">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Fast Track — Free Online Board Game">
+    <meta name="twitter:description" content="Strategic card & peg racing for 2-4 players. 7 stunning 3D themes. Play free now!">
+    <meta name="twitter:image" content="https://kensgames.com/fasttrack/assets/images/og-preview.png">
+
+    <!-- ButterflyFX SEO Substrate (JSON-LD + Breadcrumbs — replaces inline schema) -->
+    <script src="seo_substrate.js"></script>
+
+    <!-- Favicon -->
+    <link rel="icon" href="assets/images/ftLogo.png" type="image/png">
+    <link rel="apple-touch-icon" href="assets/images/ftLogo.png">
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="../../lib/fonts/fonts.css">
+    
+    <!-- Three.js for 3D (locally hosted — no CDN dependency) -->
+    <script src="../../lib/three/three.min.js"></script>
+
+    <link rel="stylesheet" href="assets/css/index.css?v=20260228">
+</head>
+<body>
+    <!-- 3D Background -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Background overlay for readability -->
+    <div id="bg-overlay"></div>
+
+    <!-- Floating Particles -->
+    <div class="particles" id="particles"></div>
+    
+    <!-- Navigation -->
+    <nav>
+        <a href="#" class="nav-logo">
+            <img src="assets/images/ftLogo.png" alt="FastTrack" onerror="this.style.display='none'">
+            <span class="nav-logo-text">FastTrack!</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="#play">Play</a></li>
+            <li><a href="docs.html">Guide</a></li>
+            <li><a href="#rules">Rules</a></li>
+            <li><a href="#cards">Cards</a></li>
+            <li><a href="#features">Guilds</a></li>
+            <li><a href="#tutorials">Tutorials</a></li>
+            <li><a href="#music">Music</a></li>
+            <li><a href="#credits">Credits</a></li>
+        </ul>
+        <div class="nav-cta">
+            <a href="play.html" class="btn btn-primary">Play Free</a>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge">
+            <span>🎉</span> CURRENTLY FREE TO PLAY
+        </div>
+        <h1 class="hero-title">
+            <span class="line1">RACE TO</span>
+            <span class="line2">VICTORY!</span>
+        </h1>
+        <p class="hero-subtitle">
+            The ultimate strategic card & peg racing game. Outsmart opponents, 
+            join guilds, compete in tournaments, and become a champion!
+        </p>
+        <div class="hero-buttons">
+            <a href="ai_setup.html" class="btn btn-primary btn-lg">
+                🤖 Play vs AI
+            </a>
+            <a href="lobby.html?action=private" class="btn btn-private btn-lg">
+                🔒 Private Game
+            </a>
+            <a href="lobby.html?action=join" class="btn btn-join btn-lg">
+                🎟️ Join by Code
+            </a>
+            <a href="play.html" class="btn btn-accent btn-lg">
+                🎮 Multiplayer
+            </a>
+        </div>
+        <div class="hero-stats">
+            <div class="stat-item">
+                <div class="stat-value">2-6</div>
+                <div class="stat-label">Players</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">∞</div>
+                <div class="stat-label">Fun</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">FREE</div>
+                <div class="stat-label">To Play</div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <span>SCROLL</span>
+            <div class="scroll-arrow"></div>
+        </div>
+    </section>
+    
+    <!-- Play Options -->
+    <section id="play" class="play-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Choose Your Mode</span>
+                <h2 class="section-title">Ways to Play</h2>
+                <p class="section-subtitle">
+                    Jump right in - no account needed for solo or private games!
+                </p>
+            </div>
+            
+            <!-- Game Type Selection -->
+            <div class="play-category">
+                <h3>🎯 Choose Game Type</h3>
+                <div class="play-grid">
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🃏</span>
+                        <h3>Card Game</h3>
+                        <p>Classic FastTrack with playing cards. Draw cards to move your pegs!</p>
+                        <a href="ai_setup.html?type=cards" class="btn btn-primary">Play Cards</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🎲</span>
+                        <h3>Dice Game</h3>
+                        <p>Roll the dice for movement! Pure luck and strategy combined.</p>
+                        <a href="ai_setup.html?type=dice" class="btn btn-secondary">Play Dice</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal coming-soon">
+                        <span class="play-icon">🎰</span>
+                        <span class="play-badge badge-soon">Coming Soon</span>
+                        <h3>5-Card Draw</h3>
+                        <p>Hold a hand of 5 cards. Choose which to play for strategic depth!</p>
+                        <span class="btn btn-accent">Coming Soon</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Play Mode Selection -->
+            <div class="play-category">
+                <h3>👥 Choose Play Mode</h3>
+                <div class="play-grid">
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🤖</span>
+                        <span class="play-badge badge-free">No Login</span>
+                        <h3>Play vs AI</h3>
+                        <p>Practice against smart AI. Choose difficulty and player count!</p>
+                        <a href="ai_setup.html" class="btn btn-primary">Solo Play</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🔒</span>
+                        <span class="play-badge badge-free">No Login</span>
+                        <h3>Private Game</h3>
+                        <p>Create a private room, share the code, and play with friends!</p>
+                        <a href="lobby.html?action=private" class="btn btn-secondary">Create Private</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🎟️</span>
+                        <span class="play-badge badge-free">No Login</span>
+                        <h3>Join by Code</h3>
+                        <p>Got a game code? Enter it to join a friend's private game!</p>
+                        <a href="lobby.html?action=join" class="btn btn-secondary">Join Game</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal">
+                        <span class="play-icon">🎮</span>
+                        <span class="play-badge badge-free">No Login</span>
+                        <h3>Multiplayer</h3>
+                        <p>Quick match or public lobby. Jump into a game instantly!</p>
+                        <a href="play.html" class="btn btn-secondary">Play Online</a>
+                    </div>
+                    
+                    <div class="play-card compact reveal coming-soon">
+                        <span class="play-icon">⚔️</span>
+                        <span class="play-badge badge-soon">Coming Soon</span>
+                        <h3>Teams 2v2</h3>
+                        <p>Partner up! Two teams of 2 players compete head-to-head.</p>
+                        <span class="btn btn-accent">Coming Soon</span>
+                    </div>
+                    
+                    <div class="play-card compact reveal coming-soon">
+                        <span class="play-icon">🏆</span>
+                        <span class="play-badge badge-soon">Coming Soon</span>
+                        <h3>Teams 3v3</h3>
+                        <p>Epic team battles! Three players per team for maximum chaos.</p>
+                        <span class="btn btn-accent">Coming Soon</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Screenshots Gallery -->
+    <section class="gallery-section">
+        <div class="section-header">
+            <span class="section-tag">Game Gallery</span>
+            <h2 class="section-title">See It In Action</h2>
+        </div>
+        <div class="gallery-scroll">
+            <div class="gallery-item" data-theme="Space Ace Theme">
+                <img src="assets/images/promoSpaceAceFT.png" alt="Space Ace Theme" onerror="this.parentElement.style.background='linear-gradient(135deg, #3498db, #2980b9)'">
+            </div>
+            <div class="gallery-item" data-theme="Gameplay">
+                <img src="assets/images/ftpromo1.png" alt="FastTrack Gameplay" onerror="this.parentElement.style.background='linear-gradient(135deg, #9b59b6, #8e44ad)'">
+            </div>
+            <div class="gallery-item" data-theme="ButterflyFX">
+                <img src="assets/images/butterflyLogo.png" alt="ButterflyFX Technology" onerror="this.parentElement.style.background='linear-gradient(135deg, #ff6b9d, #9b59b6)'">
+            </div>
+            <!-- Duplicate for infinite scroll -->
+            <div class="gallery-item" data-theme="Space Ace Theme">
+                <img src="assets/images/promoSpaceAceFT.png" alt="Space Ace Theme" onerror="this.parentElement.style.background='linear-gradient(135deg, #3498db, #2980b9)'">
+            </div>
+            <div class="gallery-item" data-theme="Gameplay">
+                <img src="assets/images/ftpromo1.png" alt="FastTrack Gameplay" onerror="this.parentElement.style.background='linear-gradient(135deg, #9b59b6, #8e44ad)'">
+            </div>
+            <div class="gallery-item" data-theme="ButterflyFX">
+                <img src="assets/images/butterflyLogo.png" alt="ButterflyFX Technology" onerror="this.parentElement.style.background='linear-gradient(135deg, #ff6b9d, #9b59b6)'">
+            </div>
+        </div>
+    </section>
+    
+    <!-- Rules Section -->
+    <section id="rules" class="rules-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Learn the Game</span>
+                <h2 class="section-title">How to Play</h2>
+                <p class="section-subtitle">
+                    Easy to learn, challenging to master. Here's everything you need to know!
+                </p>
+            </div>
+            
+            <div class="rules-grid">
+                <div class="rule-card reveal">
+                    <div class="rule-number">1</div>
+                    <h3>Setup</h3>
+                    <p>Each player has 5 pegs — 4 in holding, 1 on the home hole. Your mission: race all 4 pegs into your safe zone, then land the final 5th peg on the home/winner hole to win!</p>
+                </div>
+                
+                <div class="rule-card reveal">
+                    <div class="rule-number">2</div>
+                    <h3>Draw & Play</h3>
+                    <p>On your turn, draw one card. Use it to move a peg. Royal cards (A, J, Q, K, Joker) and 6 grant an extra turn!</p>
+                </div>
+                
+                <div class="rule-card reveal">
+                    <div class="rule-number">3</div>
+                    <h3>Enter the Track</h3>
+                    <p>Pegs start in holding. Use an Ace, 6, or Joker to bring a peg onto your home hole and start racing!</p>
+                </div>
+                
+                <div class="rule-card reveal">
+                    <div class="rule-number">4</div>
+                    <h3>Cut Opponents</h3>
+                    <p>Land on an opponent's peg to "cut" them! Their peg goes back to holding. Strategic cutting is key to victory!</p>
+                </div>
+                
+                <div class="rule-card reveal">
+                    <div class="rule-number">5</div>
+                    <h3>Fast Track Shortcut</h3>
+                    <p>Take the inner ring for a shortcut! The Fast Track is dangerous but can give you a massive advantage.</p>
+                </div>
+                
+                <div class="rule-card reveal">
+                    <div class="rule-number">6</div>
+                    <h3>Win!</h3>
+                    <p>Get all 4 pegs into your safe zone, then land the 5th peg exactly on the home/winner hole. First player to finish all 5 pegs wins! Use Royal cards (J, Q, K) to exit the bullseye.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Cards Reference -->
+    <section id="cards" class="cards-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Master Your Cards</span>
+                <h2 class="section-title">Card Reference</h2>
+                <p class="section-subtitle">
+                    Every card has power. Know them all!
+                </p>
+            </div>
+            
+            <div class="cards-grid">
+                <div class="card-item special reveal">
+                    <div class="card-value">A</div>
+                    <div class="card-name">Ace</div>
+                    <div class="card-desc">1 space • Enter track • Draw again</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">2</div>
+                    <div class="card-name">Two</div>
+                    <div class="card-desc">Move 2 spaces</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">3</div>
+                    <div class="card-name">Three</div>
+                    <div class="card-desc">Move 3 spaces</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">4</div>
+                    <div class="card-name">Four</div>
+                    <div class="card-desc">Move 4 BACKWARD!</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">5</div>
+                    <div class="card-name">Five</div>
+                    <div class="card-desc">Move 5 spaces</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">6</div>
+                    <div class="card-name">Six</div>
+                    <div class="card-desc">6 spaces • Enter track • Draw again</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">7</div>
+                    <div class="card-name">Seven</div>
+                    <div class="card-desc">Split between 2 pegs!</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">8</div>
+                    <div class="card-name">Eight</div>
+                    <div class="card-desc">Move 8 spaces</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">9</div>
+                    <div class="card-name">Nine</div>
+                    <div class="card-desc">Move 9 spaces</div>
+                </div>
+                <div class="card-item reveal">
+                    <div class="card-value">10</div>
+                    <div class="card-name">Ten</div>
+                    <div class="card-desc">Move 10 spaces</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">J</div>
+                    <div class="card-name">Jack</div>
+                    <div class="card-desc">1 space • Draw again • Exit bullseye</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">Q</div>
+                    <div class="card-name">Queen</div>
+                    <div class="card-desc">1 space • Draw again • Exit bullseye</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">K</div>
+                    <div class="card-name">King</div>
+                    <div class="card-desc">1 space • Draw again • Exit bullseye</div>
+                </div>
+                <div class="card-item special reveal">
+                    <div class="card-value">🃏</div>
+                    <div class="card-name">Joker</div>
+                    <div class="card-desc">1 space • Enter track • Draw again</div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Features: Guilds & Tournaments -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Compete & Connect</span>
+                <h2 class="section-title">Guilds & Tournaments</h2>
+                <p class="section-subtitle">
+                    Join the community. Build your legacy!
+                </p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card reveal">
+                    <div class="feature-icon">🏰</div>
+                    <h3>Join a Guild</h3>
+                    <p>Band together with fellow players. Guild games, exclusive chat, and friendly competition!</p>
+                    <ul class="feature-list">
+                        <li>Guild-only games (all humans, no bots)</li>
+                        <li>Private guild chat</li>
+                        <li>Invite members online</li>
+                        <li>2-6 player guild matches</li>
+                        <li>Guildmaster controls</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card reveal">
+                    <div class="feature-icon">🏆</div>
+                    <h3>Tournaments</h3>
+                    <p>Prove you're the best! Compete in guild-vs-guild tournaments for glory!</p>
+                    <ul class="feature-list">
+                        <li>Guildmaster-organized events</li>
+                        <li>Cross-guild competition</li>
+                        <li>Tournament chat access</li>
+                        <li>Track your wins</li>
+                        <li>Rise to the top</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 50px;">
+                <a href="lobby.html" class="btn btn-primary btn-lg">Enter Multiplayer Lobby</a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Tutorial Videos -->
+    <section id="tutorials" class="videos-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Watch & Learn</span>
+                <h2 class="section-title">Tutorial Videos</h2>
+                <p class="section-subtitle">
+                    See the game in action. Master the strategies!
+                </p>
+            </div>
+            
+            <div class="videos-grid">
+                <div class="video-card reveal">
+                    <div class="video-thumb">
+                        <div class="play-button">▶</div>
+                        <span style="color: var(--text-muted);">Getting Started</span>
+                    </div>
+                    <div class="video-info">
+                        <h4>FastTrack Basics</h4>
+                        <p>Learn setup, drawing cards, entering the track, and making your first moves.</p>
+                    </div>
+                </div>
+                
+                <div class="video-card reveal">
+                    <div class="video-thumb">
+                        <div class="play-button">▶</div>
+                        <span style="color: var(--text-muted);">Pro Strategies</span>
+                    </div>
+                    <div class="video-info">
+                        <h4>Winning Strategies</h4>
+                        <p>When to cut, when to protect, Fast Track tactics, and bullseye mastery.</p>
+                    </div>
+                </div>
+                
+                <div class="video-card reveal">
+                    <div class="video-thumb">
+                        <div class="play-button">▶</div>
+                        <span style="color: var(--text-muted);">Multiplayer Guide</span>
+                    </div>
+                    <div class="video-info">
+                        <h4>Guilds & Tournaments</h4>
+                        <p>How to join guilds, compete in tournaments, and dominate the leaderboards.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- ButterflyFX Section -->
+    <section id="about" class="butterflyfx-section">
+        <div class="container">
+            <div class="bfx-content">
+                <div class="bfx-visual reveal">
+                    <div class="helix-animation">
+                        <img src="assets/images/butterflyLogo.png" alt="ButterflyFX" style="max-width: 280px; height: auto; filter: drop-shadow(0 0 30px rgba(255,107,157,0.5));">
+                        <div class="helix-ring"></div>
+                        <div class="helix-ring"></div>
+                        <div class="helix-ring"></div>
+                        <div class="helix-ring"></div>
+                    </div>
+                </div>
+                
+                <div class="bfx-info reveal">
+                    <h3>Powered by ButterflyFX</h3>
+                    <p>
+                        FastTrack runs on ButterflyFX Dimensional Programming — a computing 
+                        paradigm where dimensions ARE the computation. Seven Genesis layers, 
+                        each carrying all lower dimensions within it, governed by the golden 
+                        ratio (φ = 1.618) and the Fibonacci sequence.
+                    </p>
+                    <p>
+                        Every point in the system exists in one of three states: Potential 
+                        (unaddressed possibility), Null (addressed but valueless — pure location), 
+                        or Manifest (addressed and valued). From these states, dimensions unfold — 
+                        not stacked, but carried. Each dimension IS an entire lower dimension.
+                    </p>
+                    
+                    <div class="dimension-list">
+                        <div class="dimension-item">
+                            <span>✦</span> <span>1 · Spark — The First Light</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>◈</span> <span>2 · Mirror — Reflection</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>⟷</span> <span>3 · Relation — Connection</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>◇</span> <span>4 · Form — Structure</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>❋</span> <span>5 · Life — Animation</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>◎</span> <span>6 · Mind — Coherence</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>🦋</span> <span>7 · Completion — The Whole</span>
+                        </div>
+                        <div class="dimension-item">
+                            <span>∞</span> <span>→ Next Spiral (φ unfolds)</span>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 30px;">
+                        <a href="https://butterflyfx.us" target="_blank" class="btn btn-secondary">
+                            Learn More About ButterflyFX
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Music Section: "The Shape of Me" -->
+    <section id="music" class="music-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">🎵 Original Soundtrack</span>
+                <h2 class="section-title">"The Shape of Me"</h2>
+                <p class="section-subtitle">Plucked from pure math. Every note you hear is generated live by equations.</p>
+            </div>
+
+            <div class="music-content">
+                <div class="music-visual reveal">
+                    <div class="waveform-art">
+                        <div class="wave wave-1"></div>
+                        <div class="wave wave-2"></div>
+                        <div class="wave wave-3"></div>
+                        <div class="phi-symbol">φ</div>
+                    </div>
+                </div>
+
+                <div class="music-info reveal">
+                    <h3>Music &amp; Sound Effects Born from Manifolds</h3>
+                    <p>
+                        There are no audio files in FastTrack — no MP3s, no WAVs, no samples of any kind.
+                        Every note, chord, drum hit, melody, and sound effect is created in real time from
+                        <strong>mathematical expressions called manifolds</strong>. A manifold is just a
+                        smooth mathematical surface — think of a bedsheet stretched in the air. Every point
+                        on that surface has a height. The Music Substrate reads points along these surfaces,
+                        and those heights become the pitch, volume, timing, and tone of every sound you hear.
+                    </p>
+                    <p>
+                        Here's the simple version: <strong>math makes a shape, and the shape makes the music.</strong>
+                        When you hear a bass note rumble, that's a point on the surface <span class="math-formula">z = x · y</span>.
+                        When a cymbal sizzles or a victory fanfare plays, those are coordinates on
+                        <span class="math-formula">z = x · y²</span>. The game doesn't <em>play</em> sounds —
+                        it <em>calculates</em> them, live, from the same manifold surfaces that control the
+                        board, the pegs, the cards, and the AI.
+                    </p>
+
+                    <div class="math-explainer">
+                        <div class="math-card">
+                            <div class="math-icon">🎹</div>
+                            <h4>Notes Are Frequencies</h4>
+                            <p>
+                                Every musical note is a vibration. Middle A vibrates 440 times per second.
+                                To get any other note, we use the formula:
+                                <span class="math-formula">f = 440 × 2<sup>(n − 69) / 12</sup></span>
+                                where <em>n</em> is the note number. This one equation creates every
+                                note on the piano — from the deepest bass to the highest chime.
+                            </p>
+                        </div>
+
+                        <div class="math-card">
+                            <div class="math-icon">🌀</div>
+                            <h4>The Golden Ratio Shapes the Sound</h4>
+                            <p>
+                                The golden ratio <strong>φ ≈ 1.618</strong> appears throughout the game.
+                                Board proportions, hole sizes, peg dimensions — all cascade from φ.
+                                The music follows the same spiral: Fibonacci numbers
+                                <span class="math-formula">1, 1, 2, 3, 5, 8, 13, 21…</span>
+                                weight how loud each layer plays and when chord changes happen.
+                                Nature uses this ratio in sunflower seeds, galaxies, and DNA.
+                                We use it to make music that <em>feels</em> right.
+                            </p>
+                        </div>
+
+                        <div class="math-card">
+                            <div class="math-icon">📐</div>
+                            <h4>Manifolds — The Shape Behind Everything</h4>
+                            <p>
+                                A <strong>manifold</strong> is a smooth surface described by an equation.
+                                Imagine a rolling landscape of hills and valleys — except instead of dirt,
+                                it's made of math. FastTrack uses two manifold surfaces:
+                                <span class="math-formula">z = x · y</span> (the "relation" surface — a saddle shape) and
+                                <span class="math-formula">z = x · y²</span> (the "form" surface — a curved bowl).
+                                Every game element lives on these surfaces. A hole's position determines
+                                its rules. A card's coordinates determine its power. The music reads heights
+                                off the surface to decide pitch and rhythm. Sound effects pick coordinates
+                                to determine their tone and intensity. Even the AI walks along gradients
+                                (slopes) on these curves to make decisions.
+                                <strong>One set of equations runs the entire game — board, music, SFX, and AI.</strong>
+                            </p>
+                        </div>
+
+                        <div class="math-card">
+                            <div class="math-icon">🎼</div>
+                            <h4>Step Sequencer — Like a Music Box</h4>
+                            <p>
+                                Imagine a paper roll with holes punched in it, like an old music box.
+                                The Music Substrate does the same thing digitally: a grid of
+                                <strong>16 slots per bar</strong> where each slot can trigger a bass note,
+                                a melody note, a drum hit, or a sound effect — all synthesized live from
+                                manifold coordinates. The patterns are defined as number arrays.
+                                Each game theme has its own song: <em>Neon Circuit</em> (Cosmic),
+                                <em>Stellar Drift</em> (Space Ace), <em>Gladiator March</em> (Colosseum),
+                                and <em>Coral Groove</em> (Undersea) — all built from the same
+                                manifold engine, just different surface coordinates and tempos.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top:40px;">The Substrate Architecture</h3>
+                    <p>
+                        FastTrack is built as a constellation of independent <strong>substrates</strong> —
+                        each one a self-contained system that manages a single domain:
+                    </p>
+                    <div class="substrate-grid">
+                        <div class="substrate-chip">🎵 Music Substrate</div>
+                        <div class="substrate-chip">🔊 Audio Substrate</div>
+                        <div class="substrate-chip">📐 Board Manifold</div>
+                        <div class="substrate-chip">🃏 Card Deck Substrate</div>
+                        <div class="substrate-chip">🎯 Peg Substrate</div>
+                        <div class="substrate-chip">📜 Rules Substrate</div>
+                        <div class="substrate-chip">🏟️ Crowd Substrate</div>
+                        <div class="substrate-chip">🎙️ Commentary Substrate</div>
+                        <div class="substrate-chip">👤 Avatar Substrate</div>
+                        <div class="substrate-chip">🤝 Social Substrate</div>
+                        <div class="substrate-chip">🏢 Lobby Substrate</div>
+                        <div class="substrate-chip">🎨 Themes Engine</div>
+                        <div class="substrate-chip">🧠 Manifold AI</div>
+                        <div class="substrate-chip">🔐 Auth Substrate</div>
+                    </div>
+                    <p style="margin-top:20px;color:var(--text-muted);">
+                        Each substrate is a sealed mathematical surface. They don't call each other —
+                        they publish coordinates and other substrates read the surface.
+                        No spaghetti. No callbacks. Just geometry.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Credits Section -->
+    <section id="credits" class="credits-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">🏆 Credits</span>
+                <h2 class="section-title">Made With Math & Heart</h2>
+            </div>
+
+            <div class="credits-grid">
+                <div class="credit-card reveal">
+                    <div class="credit-icon">👨‍💻</div>
+                    <h3>Ken Bingham</h3>
+                    <p>Creator, Designer, & Developer</p>
+                    <span class="credit-detail">Game design, programming, ButterflyFX engine, substrate architecture, AI system</span>
+                </div>
+
+                <div class="credit-card reveal">
+                    <div class="credit-icon">📐</div>
+                    <h3>Mathematics</h3>
+                    <p>The True Engine</p>
+                    <span class="credit-detail">
+                        Golden Ratio (φ), Fibonacci sequence, manifold surfaces z=xy and z=xy²,
+                        frequency formula f=440×2^((n-69)/12), Web Audio oscillators & filters.
+                        All music, physics, AI, and layout generated from pure math.
+                    </span>
+                </div>
+
+                <div class="credit-card reveal">
+                    <div class="credit-icon">🦋</div>
+                    <h3>ButterflyFX</h3>
+                    <p>Dimensional Programming Platform</p>
+                    <span class="credit-detail">
+                        7-level dimensional helix model. Replaces iteration with dimensional transitions.
+                        Every substrate, manifold, and surface in this game is a ButterflyFX construct.
+                    </span>
+                </div>
+
+                <div class="credit-card reveal">
+                    <div class="credit-icon">🎲</div>
+                    <h3>FastTrack — The Game</h3>
+                    <p>Public Domain Board Game</p>
+                    <span class="credit-detail">
+                        FastTrack is a traditional card-and-peg racing game in the public domain.
+                        Many companies and craftspeople produce their own boards — the game
+                        rules belong to no one. This is an original digital implementation
+                        with 3D graphics, AI, multiplayer, and procedural music.
+                    </span>
+                </div>
+            </div>
+
+            <div class="credits-footer reveal">
+                <p>"The Shape of Me" — all music &amp; sound effects generated live from manifold equations. No samples. No audio files. Pure math.</p>
+                <p style="color:var(--text-muted);margin-top:8px;">© 2026 Ken Bingham · Ken's Games · A ButterflyFX Production</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Ready to Race?</h2>
+            <p>No download. No credit card. Just pure strategic fun!</p>
+            <div class="cta-buttons">
+                <a href="ai_setup.html" class="btn btn-primary btn-lg">🤖 Play vs AI</a>
+                <a href="lobby.html?action=private" class="btn btn-private btn-lg">🔒 Private Game</a>
+                <a href="lobby.html?action=join" class="btn btn-join btn-lg">🎟️ Join by Code</a>
+                <a href="play.html" class="btn btn-secondary btn-lg">🎮 Multiplayer</a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Legal Section -->
+    <section class="legal-section">
+        <div class="legal-content">
+            <h4>Terms of Service</h4>
+            <p>
+                By using FastTrack, you agree to play fair, respect other players, and have fun! 
+                Cheating, harassment, or abuse will result in account suspension. Guild masters 
+                have authority over their guilds and can remove members at their discretion.
+            </p>
+            
+            <h4>Disclaimer</h4>
+            <p>
+                FastTrack is provided "as is" without warranty of any kind. While we strive for 
+                a smooth experience, we cannot guarantee 100% uptime. Game progress and stats 
+                are stored online but are not guaranteed to be permanent. Play responsibly!
+            </p>
+            
+            <h4>Privacy</h4>
+            <p>
+                We collect minimal data: your chosen username, avatar, and game statistics. 
+                We do not sell your data. Chat messages in guilds are visible to guild members. 
+                For private games without login, no data is stored.
+            </p>
+            
+            <h4>Copyright & Attribution</h4>
+            <p>
+                © 2026 Ken Bingham / Ken's Games. A ButterflyFX Production.
+                FastTrack is a traditional folk board game — not owned by any single company.
+                Like many classic peg-and-board games, FastTrack boards are handcrafted and sold by
+                woodworkers, game makers, and artisans worldwide. The game rules are in the public domain.
+                This digital implementation — including all code, 3D graphics, procedural music
+                ("The Shape of Me"), AI system, substrate architecture, and manifold mathematics —
+                is an original work by Ken Bingham. All music is procedurally generated from
+                mathematical formulas; no samples or audio files are used.
+            </p>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col">
+                <h4>Play</h4>
+                <a href="ai_setup.html">Play vs AI</a>
+                <a href="lobby.html?action=private">Private Game</a>
+                <a href="lobby.html?action=join">Join by Code</a>
+                <a href="play.html">Multiplayer</a>
+                <a href="lobby.html">Public Lobby</a>
+            </div>
+            <div class="footer-col">
+                <h4>Learn</h4>
+                <a href="docs.html">Full Guide</a>
+                <a href="docs.html#card-rules">Card Rules</a>
+                <a href="docs.html#strategy">Strategy Tips</a>
+                <a href="docs.html#themes">Themes & Music</a>
+                <a href="docs.html#manifolds">The Science</a>
+                <a href="docs.html#tutorial">Tutorial</a>
+            </div>
+            <div class="footer-col">
+                <h4>Community</h4>
+                <a href="lobby.html">Join a Guild</a>
+                <a href="lobby.html">Tournaments</a>
+                <a href="lobby.html">Leaderboards</a>
+            </div>
+            <div class="footer-col">
+                <h4>About</h4>
+                <a href="docs.html#themes">The Music</a>
+                <a href="docs.html#credits">Credits</a>
+                <a href="presskit.html">Press Kit</a>
+                <a href="docs.html#manifolds">ButterflyFX</a>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>
+                © 2026 <a href="https://kensgames.com">Ken Bingham / Ken's Games</a>.
+                Powered by <a href="https://butterflyfx.us">ButterflyFX</a> Dimensional Technology.
+                FastTrack is a public domain game. Music: "The Shape of Me" — procedurally generated.
+            </p>
+        </div>
+    </footer>
+    
+    <script>
+        // ═══════════════════════════════════════════════════════════════════
+        // DIMENSIONAL PARTICLE SYSTEM
+        // Golden spiral field — Fibonacci-count particles, φ-scaled motion
+        // ═══════════════════════════════════════════════════════════════════
+        
+        function createParticles() {
+            const container = document.getElementById('particles');
+            // Genesis layer colors — 7 layers
+            const colors = [
+                '#ff4466', // Spark (red)
+                '#ff6b9d', // Mirror (pink)
+                '#9b59b6', // Relation (purple)
+                '#3498db', // Form (blue)
+                '#40ffff', // Life (cyan)
+                '#ffd700', // Mind (gold)
+                '#27ae60'  // Completion (green)
+            ];
+            
+            // Fibonacci count: 34 particles
+            for (let i = 0; i < 34; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                // Golden spiral distribution
+                const angle = i * 2.39996322972865; // golden angle in radians
+                const r = Math.sqrt(i / 34) * 100;
+                particle.style.left = (50 + r * Math.cos(angle) * 0.5) + '%';
+                // Fibonacci-based animation timing
+                const fibDurations = [8, 13, 21, 34];
+                const dur = fibDurations[i % fibDurations.length];
+                particle.style.animationDelay = (i * 0.618) + 's';
+                particle.style.animationDuration = dur + 's';
+                particle.style.background = colors[i % colors.length];
+                // φ-scaled sizes: 2, 3, 5 pixels (Fibonacci)
+                const sizes = [2, 3, 5];
+                const size = sizes[i % sizes.length];
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                container.appendChild(particle);
+            }
+        }
+        createParticles();
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // DIMENSIONAL 3D BACKDROP — Golden Spiral Geometry
+        // 7-layer depth, φ-governed proportions, Fibonacci structure
+        // ═══════════════════════════════════════════════════════════════════
+        
+        function init3DBackground() {
+            const canvas = document.getElementById('bg-canvas');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(
+                55.6,
+                window.innerWidth / window.innerHeight,
+                0.1, 1000
+            );
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // 🌊 DIMENSIONAL MANIFOLD - 5 z=xy Saddle Surfaces
+            // Arranged in 3D Star of David pattern
+            const manifoldGroup = new THREE.Group();
+
+            // Vibrant colors for each surface
+            const surfaceColors = [
+                new THREE.Color(0x6366f1), // Indigo
+                new THREE.Color(0x22d3ee), // Cyan
+                new THREE.Color(0xff6b9d), // Pink
+                new THREE.Color(0x8b5cf6), // Purple
+                new THREE.Color(0xfbbf24), // Gold
+            ];
+
+            // Create z=xy saddle surface geometry
+            function createManifoldSurface() {
+                const resolution = 50;
+                const size = 40;
+                const geometry = new THREE.BufferGeometry();
+                const positions = [];
+                const indices = [];
+
+                // Generate z=xy surface vertices
+                for (let i = 0; i <= resolution; i++) {
+                    for (let j = 0; j <= resolution; j++) {
+                        const x = (i / resolution - 0.5) * size;
+                        const y = (j / resolution - 0.5) * size;
+                        const z = x * y / 10; // z=xy (scaled for visibility)
+
+                        positions.push(x, y, z);
+                    }
+                }
+
+                // Generate indices for triangles
+                for (let i = 0; i < resolution; i++) {
+                    for (let j = 0; j < resolution; j++) {
+                        const a = i * (resolution + 1) + j;
+                        const b = a + resolution + 1;
+                        const c = a + 1;
+                        const d = b + 1;
+
+                        indices.push(a, b, c);
+                        indices.push(b, d, c);
+                    }
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setIndex(indices);
+                geometry.computeVertexNormals();
+
+                return geometry;
+            }
+
+            // Create 5 manifold surfaces at 90° intervals
+            // Forms a dimensional cross pattern
+            const surfaceCount = 5;
+            const manifoldSurfaces = [];
+
+            // Positions at 90° intervals (4 cardinal directions + 1 center)
+            const starPositions = [
+                { angle: 0, radius: 0, tilt: 0 },                    // Center
+                { angle: 0, radius: 25, tilt: Math.PI/6 },           // 0° (East)
+                { angle: Math.PI/2, radius: 25, tilt: Math.PI/6 },   // 90° (North)
+                { angle: Math.PI, radius: 25, tilt: Math.PI/6 },     // 180° (West)
+                { angle: Math.PI*3/2, radius: 25, tilt: Math.PI/6 }, // 270° (South)
+            ];
+
+            for (let i = 0; i < surfaceCount; i++) {
+                const geometry = createManifoldSurface();
+
+                // Semi-transparent glowing face
+                const faceMaterial = new THREE.MeshPhongMaterial({
+                    color: surfaceColors[i],
+                    transparent: true,
+                    opacity: 0.15,
+                    side: THREE.DoubleSide,
+                    shininess: 100,
+                    emissive: surfaceColors[i],
+                    emissiveIntensity: 0.3,
+                    depthWrite: false
+                });
+
+                const surface = new THREE.Mesh(geometry, faceMaterial);
+
+                // Position in Star of David pattern
+                const pos = starPositions[i];
+                surface.position.x = Math.cos(pos.angle) * pos.radius;
+                surface.position.y = Math.sin(pos.angle) * pos.radius;
+                surface.rotation.z = pos.angle;
+                surface.rotation.x = pos.tilt;
+
+                manifoldSurfaces.push(surface);
+                manifoldGroup.add(surface);
+            }
+
+            // Add bright glowing wireframe edges for each surface
+            for (let i = 0; i < surfaceCount; i++) {
+                const geometry = createManifoldSurface();
+                const edgeMaterial = new THREE.MeshBasicMaterial({
+                    color: surfaceColors[i],
+                    transparent: true,
+                    opacity: 0.8,
+                    wireframe: true,
+                    depthWrite: false
+                });
+
+                const wireframe = new THREE.Mesh(geometry, edgeMaterial);
+                const pos = starPositions[i];
+                wireframe.position.x = Math.cos(pos.angle) * pos.radius;
+                wireframe.position.y = Math.sin(pos.angle) * pos.radius;
+                wireframe.rotation.z = pos.angle;
+                wireframe.rotation.x = pos.tilt;
+
+                manifoldGroup.add(wireframe);
+            }
+
+            // Create transparent sphere container
+            const sphereGeometry = new THREE.SphereGeometry(80, 32, 32);
+            const sphereMaterial = new THREE.MeshPhongMaterial({
+                color: 0x6366f1,
+                transparent: true,
+                opacity: 0.05,
+                side: THREE.DoubleSide,
+                shininess: 100,
+                depthWrite: false
+            });
+            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            manifoldGroup.add(sphere);
+
+            // Add sphere wireframe
+            const sphereWireGeometry = new THREE.SphereGeometry(80, 16, 16);
+            const sphereWireMaterial = new THREE.MeshBasicMaterial({
+                color: 0x22d3ee,
+                transparent: true,
+                opacity: 0.12,
+                wireframe: true
+            });
+            const sphereWire = new THREE.Mesh(sphereWireGeometry, sphereWireMaterial);
+            manifoldGroup.add(sphereWire);
+
+            // Position the manifold group
+            manifoldGroup.position.set(0, 0, -80);
+            scene.add(manifoldGroup);
+
+            // Add lights for the manifold surfaces
+            const manifoldLight1 = new THREE.PointLight(0x6366f1, 1, 300);
+            manifoldLight1.position.set(100, 100, 0);
+            scene.add(manifoldLight1);
+
+            const manifoldLight2 = new THREE.PointLight(0x22d3ee, 1, 300);
+            manifoldLight2.position.set(-100, -100, 0);
+            scene.add(manifoldLight2);
+
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+
+            // 🌌 Add starfield for depth
+            const starGeometry = new THREE.BufferGeometry();
+            const starVertices = [];
+            for (let i = 0; i < 5000; i++) {
+                const x = (Math.random() - 0.5) * 2000;
+                const y = (Math.random() - 0.5) * 2000;
+                const z = -Math.random() * 2000 - 100;
+                starVertices.push(x, y, z);
+            }
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 1.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+
+            // 🌈 Add nebula clouds for organic depth
+            const nebulaGroup = new THREE.Group();
+            const nebulaColors = [0x6366f1, 0x22d3ee, 0xff6b9d];
+
+            for (let i = 0; i < 3; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(150, 16, 16);
+                const cloudMaterial = new THREE.MeshBasicMaterial({
+                    color: nebulaColors[i],
+                    transparent: true,
+                    opacity: 0.03,
+                    side: THREE.BackSide
+                });
+                const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                cloud.position.set(
+                    (Math.random() - 0.5) * 300,
+                    (Math.random() - 0.5) * 300,
+                    -200 - Math.random() * 300
+                );
+                cloud.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random());
+                nebulaGroup.add(cloud);
+            }
+            scene.add(nebulaGroup);
+
+            camera.position.z = 5;
+
+            // Mouse interaction for manifold rotation
+            let mouseX = 0, mouseY = 0;
+            let targetRotationX = 0, targetRotationY = 0;
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+                mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+
+                // Mouse controls manifold rotation
+                targetRotationY = mouseX * Math.PI * 0.3;
+                targetRotationX = mouseY * Math.PI * 0.2;
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                const time = Date.now() * 0.0001;
+
+                // 🌊 Rotate manifold group - smooth interpolation to mouse position
+                manifoldGroup.rotation.y += (targetRotationY - manifoldGroup.rotation.y) * 0.05;
+                manifoldGroup.rotation.x += (targetRotationX - manifoldGroup.rotation.x) * 0.05;
+
+                // Add continuous slow rotation for Star of David effect
+                manifoldGroup.rotation.y += 0.002;
+                manifoldGroup.rotation.x += 0.001;
+                manifoldGroup.rotation.z += 0.0005;
+
+                // Pulse the sphere slightly
+                const sphereScale = 1 + Math.sin(time * 2) * 0.02;
+                sphere.scale.set(sphereScale, sphereScale, sphereScale);
+
+                // Pulse individual surfaces for depth
+                manifoldSurfaces.forEach((surface, i) => {
+                    const pulse = Math.sin(time * 3 + i * Math.PI * 0.4) * 0.05;
+                    surface.material.emissiveIntensity = 0.3 + pulse;
+                });
+
+                // Camera follows mouse slightly
+                camera.position.x += (mouseX * 2 - camera.position.x) * 0.02;
+                camera.position.y += (-mouseY * 2 - camera.position.y) * 0.02;
+                camera.lookAt(0, 0, -80);
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+        
+        console.log("🦋 THREE.js loaded:", typeof THREE);
+        if (typeof THREE !== 'undefined') {
+            console.log("🌊 Initializing 3D background...");
+            init3DBackground();
+            console.log("✅ 3D background initialized");
+        } else {
+            console.error("❌ THREE.js not loaded!");
+        }
+        
+        // Reveal animations on scroll
+        function setupRevealAnimations() {
+            const reveals = document.querySelectorAll('.reveal');
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            }, {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            });
+            
+            reveals.forEach(el => observer.observe(el));
+        }
+        setupRevealAnimations();
+        
+        // Smooth scroll for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (href !== '#') {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
+        
+        // Dimensional parallax — 7-layer depth
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.hero');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.236}px)`; // φ^-2 parallax
+                hero.style.opacity = Math.max(0, 1 - scrolled * 0.001);
+            }
+        });
+
+        // 🦋 DIMENSIONAL PROGRAMMING: No caching - always observe current manifold state
+        // Service workers removed - reality manifests in real-time, not from cache
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                registrations.forEach(reg => reg.unregister());
+            });
+            caches.keys().then(names => {
+                names.forEach(name => caches.delete(name));
+            });
+        }
+    </script>
+</body>
+</html>

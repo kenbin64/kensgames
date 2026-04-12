@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrickBreaker 3D - Manifold Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #00ffcc;
+            font-family: 'Rajdhani', monospace;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            font-size: 18px;
+            z-index: 100;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        #hud>div {
+            margin-bottom: 15px;
+        }
+
+        .menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 60px;
+            border: 2px solid #00ffcc;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 200;
+            box-shadow: 0 0 30px #00ffcc;
+        }
+
+        .menu.hidden {
+            display: none;
+        }
+
+        .menu h1 {
+            color: #00ffcc;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+
+        .menu .subtitle {
+            color: #00ff88;
+            font-size: 14px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff88;
+        }
+
+        .menu button {
+            display: block;
+            width: 250px;
+            padding: 15px;
+            margin: 15px auto;
+            background: linear-gradient(135deg, #00ffcc 0%, #00ff88 100%);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .menu button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: #00ff88;
+            font-size: 12px;
+            z-index: 100;
+            text-shadow: 0 0 5px #00ff88;
+        }
+
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #00ffcc;
+            font-size: 14px;
+            z-index: 100;
+            max-width: 300px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Status Panel -->
+    <div class="status" id="status">
+        <div>🌀 Manifold Edition</div>
+        <div id="status-text" style="font-size: 12px; color: #00ff88; margin-top: 10px;">Initializing...</div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" style="display: none;">
+        <div id="score-display">Score: 0</div>
+        <div id="lives-display">Lives: 5</div>
+        <div id="level-display">Level: 1</div>
+    </div>
+
+    <!-- Game Menu -->
+    <div id="menu" class="menu">
+        <h1>BRICKBREAKER 3D</h1>
+        <div class="subtitle">🌀 Manifold Edition</div>
+        <button id="solo-btn">🎮 Solo Game</button>
+        <button id="multi-btn">👥 Multiplayer (3 Players)</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over" class="menu hidden">
+        <h1>GAME OVER</h1>
+        <p id="final-score" style="color: #00ffcc; font-size: 24px; margin: 20px 0;">Final Score: 0</p>
+        <button id="restart-btn">Play Again</button>
+    </div>
+
+    <!-- Info -->
+    <div id="info">
+        SPACE: Pause | ESC: Menu
+    </div>
+
+    <!-- Load Manifold Core & Substrates -->
+    <script src="../../js/manifold-core/manifold_surface.js"></script>
+    <script src="../../js/manifold-core/substrate_base.js"></script>
+    <script src="../../js/manifold-core/substrate_registry.js"></script>
+    <script src="../../js/manifold-core/game_config.js"></script>
+
+    <!-- Load All 9 Substrates -->
+    <script src="../../js/manifold-core/physics_substrate.js"></script>
+    <script src="../../js/manifold-core/graphics_substrate.js"></script>
+    <script src="../../js/manifold-core/audio_substrate.js"></script>
+    <script src="../../js/manifold-core/gamelogic_substrate.js"></script>
+    <script src="../../js/manifold-core/controlmapping_substrate.js"></script>
+    <script src="../../js/manifold-core/ui_substrate.js"></script>
+    <script src="../../js/manifold-core/multiplayer_substrate.js"></script>
+    <script src="../../js/manifold-core/persistence_substrate.js"></script>
+    <script src="../../js/manifold-core/ai_substrate.js"></script>
+
+    <!-- Three.js -->
+    <script src="../../lib/three/three.min.js"></script>
+
+    <!-- Game Coordinator -->
+    <script src="assets/js/game_coordinator.js"></script>
+
+    <!-- Application -->
+    <script>
+        let game = null;
+
+        const updateStatus = (msg) => {
+            document.getElementById('status-text').textContent = msg;
+        };
+
+        document.getElementById('solo-btn').addEventListener('click', async () => {
+            try {
+                updateStatus('Initializing solo game...');
+                document.getElementById('menu').classList.add('hidden');
+                document.getElementById('hud').style.display = 'block';
+
+                game = new BrickBreaker3DManifold('canvas');
+                await game.initialize('solo', 1, 'Player1');
+
+                updateStatus('Running ✓';
+                game.run();
+            } catch (err) {
+                console.error('Game initialization error:', err);
+                updateStatus('Error: ' + err.message);
+            }
+        });
+
+        document.getElementById('multi-btn').addEventListener('click', async () => {
+            try {
+                updateStatus('Initializing multiplayer game...');
+                document.getElementById('menu').classList.add('hidden');
+                document.getElementById('hud').style.display = 'block';
+
+                game = new BrickBreaker3DManifold('canvas');
+                await game.initialize('multiplayer', 3, 'Player1');
+
+                updateStatus('Running ✓';
+                game.run();
+            } catch (err) {
+                console.error('Game initialization error:', err);
+                updateStatus('Error: ' + err.message);
+            }
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && game) {
+                e.preventDefault();
+                game.togglePause();
+                updateStatus(game.gameState.isPaused ? 'PAUSED' : 'Running ✓');
+            }
+            if (e.code === 'Escape') {
+                document.getElementById('menu').classList.remove('hidden');
+                document.getElementById('hud').style.display = 'none';
+                if (game) game.gameState.isRunning = false;
+            }
+        });
+
+        console.log(`
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 🌀 BRICKBREAKER 3D - MANIFOLD EDITION 🌀                  ║
+║                                                                            ║
+║  Proof of Concept: Complex game logic on manifold architecture            ║
+║                                                                            ║
+║  Architecture:                                                             ║
+║    - Single manifold coordinate holds ALL game state                      ║
+║    - 9 universal substrates (physics, graphics, audio, etc)               ║
+║    - No code duplication - game_coordinator.js only ~400 lines            ║
+║    - Comparison: OLD ~1200 lines of duplicate code across games           ║
+║                  NEW game-specific code ONLY                               ║
+║                                                                            ║
+║  Key Files:                                                                ║
+║    ✓ js/manifold-core/ - Shared universal substrates                     ║
+║    ✓ brickbreaker3d-manifold/assets/js/game_coordinator.js               ║
+║    ✓ No auth.js, multiplayer.js, script.js (all in substrates)           ║
+║                                                                            ║
+║  Status: Ready to build Space Combat on same infrastructure               ║
+╚════════════════════════════════════════════════════════════════════════════╝
+        `);
+    </script>
+</body>
+
+</html>

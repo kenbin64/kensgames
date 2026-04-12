@@ -1,0 +1,23 @@
+# ══════════════════════════════════════════════════════════
+# BUTTERFLYFX DIMENSIONAL PROGRAMMING STANDARD
+# ══════════════════════════════════════════════════════════
+# robots.txt — Fast Track by Ken's Games
+# Powered by ButterflyFX DimensionsOS
+# https://kensgames.com/fasttrack/
+# ══════════════════════════════════════════════════════════
+
+User-agent: *
+Allow: /
+
+# Exclude test/debug pages
+Disallow: /fasttrack/test_3d.html
+Disallow: /fasttrack/test_sounds.html
+
+# Exclude transient multiplayer pages (no useful content to index)
+Disallow: /fasttrack/join.html
+Disallow: /fasttrack/lobby.html
+Disallow: /fasttrack/mobile.html
+Disallow: /fasttrack/embed.html
+
+# Sitemap
+Sitemap: https://kensgames.com/fasttrack/sitemap.xml

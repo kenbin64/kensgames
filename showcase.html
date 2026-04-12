@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Showcase - Manifold Gaming Portal</title>
+    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
+
+    <style>
+        :root {
+            --primary: #00b4ff;
+            --secondary: #6366f1;
+            --accent: #22d3ee;
+            --gold: #ffd700;
+            --bg-dark: #0a0a14;
+            --bg-card: rgba(20, 20, 40, 0.8);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(10, 10, 20, 0.95) 0%, transparent 100%);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        main {
+            padding-top: 100px;
+            min-height: 100vh;
+        }
+
+        .page-header {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(180deg, transparent, rgba(0, 180, 255, 0.05));
+        }
+
+        .page-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(36px, 6vw, 60px);
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .page-subtitle {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .game-showcase {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .game-section {
+            margin-bottom: 120px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .game-section:nth-child(even) {
+            direction: rtl;
+        }
+
+        .game-section:nth-child(even)>* {
+            direction: ltr;
+        }
+
+        .game-media {
+            position: relative;
+        }
+
+        .game-media canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 180, 255, 0.3);
+            display: none;
+        }
+
+        .game-media canvas.visible {
+            display: block;
+        }
+
+        .media-tabs {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .media-tab {
+            flex: 1;
+            padding: 10px;
+            background: rgba(0, 180, 255, 0.1);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .media-tab.active {
+            background: rgba(0, 180, 255, 0.4);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .media-tab:hover {
+            border-color: var(--primary);
+        }
+
+        .game-info {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .game-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 0;
+        }
+
+        .game-tagline {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .game-description {
+            font-size: 18px;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        .game-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: rgba(0, 180, 255, 0.1);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .feature-item {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .feature-icon {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            font-size: 15px;
+            color: var(--text-muted);
+        }
+
+        .play-button {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #000;
+            border: none;
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .play-button:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 40px rgba(0, 180, 255, 0.4);
+        }
+
+        @media (max-width: 1000px) {
+            .game-section {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .game-section:nth-child(even) {
+                direction: ltr;
+            }
+
+            .game-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .features-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            margin: 100px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav>
+        <a href="/" class="logo">⟳ MANIFOLD</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/kensgames.com/lounge.html">Lounge</a>
+            <a href="/kensgames.com/discover.html">Discover</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Page Header -->
+        <section class="page-header">
+            <h1 class="page-title">🎮 Game Showcase</h1>
+            <p class="page-subtitle">Experience Our Launch Titles</p>
+        </section>
+
+        <!-- Game Showcases -->
+        <section class="game-showcase" id="showcase"></section>
+    </main>
+
+    <!-- Promo Media Substrate -->
+    <script src="./js/substrates/promo_media_substrate.js"></script>
+
+    <!-- Game Launcher -->
+    <script src="./js/substrates/game_launcher.js"></script>
+
+    <script>
+        function renderGameShowcase() {
+            const showcase = document.getElementById('showcase');
+            const promos = PromoMediaSubstrate.getGamePromos();
+            const games = Object.keys(promos);
+
+            games.forEach((gameId, index) => {
+                const promo = promos[gameId];
+
+                const section = document.createElement('div');
+                section.className = 'game-section';
+                section.innerHTML = `
+                    <!-- Media Section -->
+                    <div class="game-media">
+                        <canvas id="preview-canvas-${gameId}" width="800" height="450"></canvas>
+
+                        <!-- Media Tabs -->
+                        <div class="media-tabs">
+                            <button class="media-tab active" onclick="switchMedia('${gameId}', 'preview')">
+                                ▶️ Preview
+                            </button>
+                            <button class="media-tab" onclick="switchMedia('${gameId}', 'video')">
+                                📹 Video
+                            </button>
+                            <button class="media-tab" onclick="switchMedia('${gameId}', 'screenshots')">
+                                📸 Screenshots
+                            </button>
+                        </div>
+
+                        <!-- Video Player (Hidden by default) -->
+                        <div id="video-${gameId}" style="display: none; margin-top: 20px;">
+                            ${PromoMediaSubstrate.createVideoPlayer(gameId)}
+                        </div>
+
+                        <!-- Screenshots (Hidden by default) -->
+                        <div id="screenshots-${gameId}" style="display: none; margin-top: 20px;">
+                            ${PromoMediaSubstrate.createScreenshotCarousel(gameId)}
+                        </div>
+                    </div>
+
+                    <!-- Info Section -->
+                    <div class="game-info">
+                        <div>
+                            <h2 class="game-title">${promo.emoji} ${promo.title}</h2>
+                            <p class="game-tagline">${promo.tagline}</p>
+                        </div>
+
+                        <p class="game-description">${promo.description}</p>
+
+                        <div class="game-stats">
+                            <div class="stat-box">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-value">${promo.stats.players}</div>
+                                <div class="stat-label">Players</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-icon">⏱️</div>
+                                <div class="stat-value">${promo.stats.duration}</div>
+                                <div class="stat-label">Duration</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-icon">📊</div>
+                                <div class="stat-value">${promo.stats.difficulty}</div>
+                                <div class="stat-label">Difficulty</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 20px; font-family: 'Orbitron', sans-serif;">✨ Features</h3>
+                            <div class="features-list">
+                                ${promo.features
+                        .map(
+                            feature => `
+                                    <div class="feature-item">
+                                        <div class="feature-icon">✓</div>
+                                        <div class="feature-text">${feature}</div>
+                                    </div>
+                                `
+                        )
+                        .join('')}
+                            </div>
+                        </div>
+
+                        <button class="play-button" onclick="launchGame('${gameId}', '${promo.title}')">
+                            ▶️ Play Now
+                        </button>
+                    </div>
+                `;
+
+                showcase.appendChild(section);
+
+                // Add divider between sections
+                if (index < games.length - 1) {
+                    const divider = document.createElement('div');
+                    divider.className = 'divider';
+                    showcase.appendChild(divider);
+                }
+
+                // Initialize animated preview
+                setTimeout(() => {
+                    PromoMediaSubstrate.createAnimatedPreview(gameId, `preview-canvas-${gameId}`);
+                }, 100);
+            });
+        }
+
+        function switchMedia(gameId, tab) {
+            // Update tabs
+            document.querySelectorAll(`[data-game="${gameId}"] .media-tab`).forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Hide all media
+            document.getElementById(`preview-canvas-${gameId}`).style.display = 'none';
+            document.getElementById(`video-${gameId}`)?.style.display = 'none';
+            document.getElementById(`screenshots-${gameId}`)?.style.display = 'none';
+
+            // Show selected media
+            if (tab === 'preview') {
+                document.getElementById(`preview-canvas-${gameId}`).style.display = 'block';
+            } else if (tab === 'video') {
+                document.getElementById(`video-${gameId}`).style.display = 'block';
+            } else if (tab === 'screenshots') {
+                document.getElementById(`screenshots-${gameId}`).style.display = 'block';
+            }
+        }
+
+        // Stub: launchGame will be implemented by game_launcher.js
+        function launchGame(gameId, title) {
+            if (window.GameLauncher && window.GameLauncher.launch) {
+                window.GameLauncher.launch(gameId, { title });
+            } else {
+                alert(`Launch ${title} - Game launcher not available`);
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            renderGameShowcase();
+
+            // Fix media tab switching
+            document.querySelectorAll('.media-tab').forEach(tab => {
+                tab.addEventListener('click', function (e) {
+                    const gameId = this.closest('.game-media').querySelector('canvas').id.replace('preview-canvas-', '');
+                    const mediaType = this.textContent.includes('Preview') ? 'preview' :
+                        this.textContent.includes('Video') ? 'video' : 'screenshots';
+
+                    // Update tabs
+                    this.parentElement.querySelectorAll('.media-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Hide all media
+                    this.closest('.game-media').querySelectorAll('canvas, div[id^="video-"], div[id^="screenshots-"]').forEach(el => {
+                        el.style.display = 'none';
+                    });
+
+                    // Show selected
+                    if (mediaType === 'preview') {
+                        document.getElementById(`preview-canvas-${gameId}`).style.display = 'block';
+                    } else if (mediaType === 'video') {
+                        document.getElementById(`video-${gameId}`).style.display = 'block';
+                    } else {
+                        document.getElementById(`screenshots-${gameId}`).style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

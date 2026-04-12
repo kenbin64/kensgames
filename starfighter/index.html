@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Starfighter Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    body {
+      overflow: hidden;
+      background: #000;
+      color: #0ff;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none
+    }
+
+    /* ── Canvas fills entire viewport ── */
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1
+    }
+
+    /* ═══════════════════════════════════════
+       CROSSHAIR — always dead center
+       ═══════════════════════════════════════ */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px;
+      height: 44px;
+      pointer-events: none;
+      z-index: 15;
+      display: none
+    }
+
+    #crosshair .ring {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 44px;
+      height: 44px;
+      border: 2px solid rgba(100, 255, 100, 0.7);
+      border-radius: 50%
+    }
+
+    #crosshair .dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px;
+      height: 4px;
+      background: rgba(100, 255, 100, 0.9);
+      border-radius: 50%
+    }
+
+    #crosshair .h-line {
+      position: absolute;
+      top: 50%;
+      left: -10px;
+      width: 64px;
+      height: 1px;
+      background: rgba(100, 255, 100, 0.5);
+      transform: translateY(-50%)
+    }
+
+    #crosshair .v-line {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      width: 1px;
+      height: 64px;
+      background: rgba(100, 255, 100, 0.5);
+      transform: translateX(-50%)
+    }
+
+    /* Corner brackets */
+    #crosshair .bracket {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-color: rgba(100, 255, 100, 0.6);
+      border-style: solid;
+      border-width: 0
+    }
+
+    #crosshair .bracket.tl {
+      top: -14px;
+      left: -14px;
+      border-top-width: 2px;
+      border-left-width: 2px
+    }
+
+    #crosshair .bracket.tr {
+      top: -14px;
+      right: -14px;
+      border-top-width: 2px;
+      border-right-width: 2px
+    }
+
+    #crosshair .bracket.bl {
+      bottom: -14px;
+      left: -14px;
+      border-bottom-width: 2px;
+      border-left-width: 2px
+    }
+
+    #crosshair .bracket.br {
+      bottom: -14px;
+      right: -14px;
+      border-bottom-width: 2px;
+      border-right-width: 2px
+    }
+
+    /* ═══════════════════════════════════════
+       COMM MARQUEE — very top of screen, above cockpit
+       ═══════════════════════════════════════ */
+    #comm-ticker {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 28px;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 20;
+      background: linear-gradient(180deg, rgba(0, 10, 20, 0.6) 0%, transparent 100%)
+    }
+
+    #comm-ticker-inner {
+      display: flex;
+      gap: 60px;
+      white-space: nowrap;
+      animation: marquee 30s linear infinite;
+      font-size: 12px;
+      line-height: 28px;
+      padding-left: 100%
+    }
+
+    @keyframes marquee {
+      0% {
+        transform: translateX(0)
+      }
+
+      100% {
+        transform: translateX(-100%)
+      }
+    }
+
+    #comm-ticker-inner .comm-item {
+      display: inline
+    }
+
+    #comm-ticker-inner .comm-item.base {
+      color: #0ff
+    }
+
+    #comm-ticker-inner .comm-item.ally {
+      color: #0f0
+    }
+
+    #comm-ticker-inner .comm-item.enemy {
+      color: #f00
+    }
+
+    #comm-ticker-inner .comm-item.warning {
+      color: #f60;
+      font-weight: bold
+    }
+
+    /* ═══════════════════════════════════════
+       SHIP PANEL — full-viewport overlay container
+       All cockpit screen overlays live inside this.
+       Shown/hidden by core.js on launch.
+       ═══════════════════════════════════════ */
+    #ship-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: none
+    }
+
+    /* ═══════════════════════════════════════
+       EXPANDABLE CONTROLS PANEL — left side
+       ═══════════════════════════════════════ */
+    #controls-toggle {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      z-index: 25;
+      width: 24px;
+      height: 80px;
+      background: rgba(2, 8, 18, 0.7);
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0ff;
+      font-size: 14px;
+      transition: background 0.2s
+    }
+
+    #controls-toggle:hover {
+      background: rgba(0, 40, 80, 0.8)
+    }
+
+    #controls-panel {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%) translateX(-100%);
+      z-index: 24;
+      width: 220px;
+      background: rgba(2, 8, 18, 0.92);
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      pointer-events: auto;
+      transition: transform 0.3s ease;
+      backdrop-filter: blur(6px)
+    }
+
+    #controls-panel.open {
+      transform: translateY(-50%) translateX(0)
+    }
+
+    #controls-panel h3 {
+      font-size: 11px;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+      padding-bottom: 6px
+    }
+
+    #controls-panel ul {
+      list-style: none;
+      font-size: 10px;
+      line-height: 1.8
+    }
+
+    #controls-panel kbd {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 4px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 9px
+    }
+
+    #controls-panel li {
+      color: #8cf
+    }
+
+    /* ═══════════════════════════════════════
+       OVERLAYS — countdown, launch, death
+       ═══════════════════════════════════════ */
+    #countdown-display {
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 60;
+      display: none;
+      font-size: 5em;
+      font-weight: bold;
+      color: #ffff00;
+      text-shadow: 0 0 30px #ffff00;
+      font-family: monospace
+    }
+
+    #launch-prompt {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 60;
+      display: none;
+      animation: flashLaunch 0.6s infinite
+    }
+
+    @keyframes flashLaunch {
+
+      0%,
+      100% {
+        opacity: 1;
+        color: #0f0;
+        text-shadow: 0 0 30px #0f0;
+        font-size: 1.8em
+      }
+
+      50% {
+        opacity: 0.3;
+        color: #00ff00;
+        text-shadow: 0 0 50px #00ff00;
+        font-size: 1.9em
+      }
+    }
+
+    #launch-prompt b {
+      display: block;
+      font-weight: bold;
+      margin: 12px 0;
+      font-family: monospace;
+      letter-spacing: 2px
+    }
+
+    #death-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(20, 0, 0, 0.85);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 3em;
+      color: #f00;
+      text-shadow: 0 0 20px #f00;
+      z-index: 100;
+      pointer-events: auto
+    }
+
+    #death-screen button {
+      margin-top: 30px;
+      padding: 10px 20px;
+      font-size: 0.4em;
+      background: #f00;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      pointer-events: auto
+    }
+
+    #death-screen button:hover {
+      background: #c00
+    }
+
+    /* Launch overlays */
+    .launch-overlay-full {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 50
+    }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE — phone collapse
+       ═══════════════════════════════════════ */
+    @media(max-width:600px) {
+      #controls-panel {
+        width: 180px;
+        font-size: 9px
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       RADAR OVERLAY — bottom-left
+       ═══════════════════════════════════════ */
+    #radar-overlay {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      width: 160px;
+      height: 160px;
+      z-index: 18;
+      pointer-events: none;
+      display: none;
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.15), inset 0 0 8px rgba(0, 0, 0, 0.5)
+    }
+
+    #radar-overlay canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%
+    }
+
+    /* ═══════════════════════════════════════
+       GAMEPLAY HUD — top-right stats overlay
+       ═══════════════════════════════════════ */
+    #gameplay-hud {
+      position: absolute;
+      top: 36px;
+      right: 12px;
+      z-index: 18;
+      pointer-events: none;
+      display: none;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      text-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+      letter-spacing: 1px
+    }
+
+    #gameplay-hud .hud-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px
+    }
+
+    #gameplay-hud .hud-label {
+      color: rgba(0, 255, 255, 0.6);
+      font-size: 10px;
+      width: 52px;
+      text-align: right
+    }
+
+    #gameplay-hud .hud-val {
+      color: #0ff;
+      font-weight: bold;
+      min-width: 36px
+    }
+
+    #gameplay-hud .hud-bar-track {
+      width: 80px;
+      height: 6px;
+      background: rgba(0, 255, 255, 0.1);
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      border-radius: 1px;
+      overflow: hidden
+    }
+
+    #gameplay-hud .hud-bar-fill {
+      height: 100%;
+      transition: width 0.15s ease;
+      border-radius: 1px
+    }
+
+    #gameplay-hud .hud-bar-fill.shield {
+      background: linear-gradient(90deg, #00aaff, #00ffff)
+    }
+
+    #gameplay-hud .hud-bar-fill.fuel {
+      background: linear-gradient(90deg, #ccaa00, #ffff00)
+    }
+
+    #gameplay-hud .hud-bar-fill.hull {
+      background: linear-gradient(90deg, #00aa44, #00ff66)
+    }
+
+    #gameplay-hud .hud-score-row {
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(0, 255, 255, 0.15)
+    }
+
+    #gameplay-hud .hud-val.warn {
+      color: #ff4444;
+      text-shadow: 0 0 8px #ff0000
+    }
+
+    #gameplay-hud .hud-val.caution {
+      color: #ffaa00;
+      text-shadow: 0 0 8px #ff8800
+    }
+
+    /* ── Hidden utility ── */
+    .hidden {
+      display: none !important
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Three.js Container (behind everything) -->
+  <div id="game-canvas"></div>
+
+  <!-- Crosshair — always dead center -->
+  <div id="crosshair">
+    <div class="ring"></div>
+    <div class="dot"></div>
+    <div class="h-line"></div>
+    <div class="v-line"></div>
+    <div class="bracket tl"></div>
+    <div class="bracket tr"></div>
+    <div class="bracket bl"></div>
+    <div class="bracket br"></div>
+  </div>
+
+  <!-- ═══ GAMEPLAY HUD — top-right stats ═══ -->
+  <div id="gameplay-hud">
+    <div class="hud-row">
+      <span class="hud-label">SHIELD</span>
+      <div class="hud-bar-track">
+        <div id="ghud-shield-bar" class="hud-bar-fill shield" style="width:100%"></div>
+      </div>
+      <span id="ghud-shield" class="hud-val">100</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">HULL</span>
+      <div class="hud-bar-track">
+        <div id="ghud-hull-bar" class="hud-bar-fill hull" style="width:100%"></div>
+      </div>
+      <span id="ghud-hull" class="hud-val">100</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">FUEL</span>
+      <div class="hud-bar-track">
+        <div id="ghud-fuel-bar" class="hud-bar-fill fuel" style="width:100%"></div>
+      </div>
+      <span id="ghud-fuel" class="hud-val">100</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">TORPS</span>
+      <span id="ghud-torpedoes" class="hud-val">2</span>
+    </div>
+    <div class="hud-row hud-score-row">
+      <span class="hud-label">KILLS</span>
+      <span id="ghud-kills" class="hud-val">0</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">SCORE</span>
+      <span id="ghud-score" class="hud-val">0</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">WAVE</span>
+      <span id="ghud-wave" class="hud-val">1</span>
+    </div>
+  </div>
+
+  <!-- ═══ RADAR OVERLAY — bottom-left ═══ -->
+  <div id="radar-overlay">
+    <canvas id="radar-canvas" width="400" height="400"></canvas>
+  </div>
+
+  <!-- ═══ COMM MARQUEE — very top ═══ -->
+  <div id="comm-ticker">
+    <div id="comm-ticker-inner">
+      <span class="comm-item base">SYSTEMS ONLINE — AWAITING LAUNCH COMMAND</span>
+    </div>
+  </div>
+
+  <!-- ═══ EXPANDABLE CONTROLS PANEL (left side) ═══ -->
+  <div id="controls-toggle"
+    onclick="document.getElementById('controls-panel').classList.toggle('open');this.innerText=document.getElementById('controls-panel').classList.contains('open')?'◀':'▶'">
+    ▶</div>
+  <div id="controls-panel">
+    <h3>FLIGHT CONTROLS</h3>
+    <ul>
+      <li><kbd>Mouse</kbd> Pitch / Yaw</li>
+      <li><kbd>W</kbd> Forward Thrust</li>
+      <li><kbd>S</kbd> Reverse Thrust</li>
+      <li><kbd>A</kbd> Bank Left</li>
+      <li><kbd>D</kbd> Bank Right</li>
+      <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
+      <li><kbd>Shift</kbd> Turbo</li>
+      <li><kbd>L-Click</kbd> Lasers</li>
+      <li><kbd>R-Click</kbd> Torpedo</li>
+      <li><kbd>T</kbd> Lock Target</li>
+      <li><kbd>H</kbd> Toggle This Panel</li>
+    </ul>
+    <h3 style="margin-top:8px">GAMEPAD</h3>
+    <ul>
+      <li><kbd>L-Stick</kbd> Pitch / Yaw</li>
+      <li><kbd>R-Stick</kbd> Roll</li>
+      <li><kbd>RT/LT</kbd> Throttle</li>
+      <li><kbd>A</kbd> Laser</li>
+      <li><kbd>X</kbd> Torpedo</li>
+      <li><kbd>Y</kbd> Lock Target</li>
+      <li><kbd>LB</kbd> Turbo</li>
+    </ul>
+  </div>
+
+  <!-- Ship panel: hidden container for JS compat -->
+  <div id="ship-panel" style="display:none">
+    <span id="hud-speed"></span><span id="hud-throttle"></span><span id="hud-fuel"></span>
+    <span id="hud-hull"></span><span id="hud-shields"></span><span id="hud-base-hull"></span>
+    <span id="hud-wave"></span><span id="hud-score"></span><span id="hud-torpedoes"></span>
+    <div id="gauge-speed" class="gauge-fill"></div>
+    <div id="gauge-throttle" class="gauge-fill"></div>
+    <div id="gauge-fuel" class="gauge-fill"></div>
+    <div id="gauge-hull" class="gauge-fill"></div>
+    <div id="gauge-shields" class="gauge-fill"></div>
+    <div id="gauge-base" class="gauge-fill"></div>
+    <div id="hud-message"></div>
+  </div>
+
+  <!-- ═══ OLD ELEMENTS KEPT FOR JS COMPAT (hidden) ═══ -->
+  <div id="comm-log" class="hidden">
+    <div id="comm-messages"></div>
+  </div>
+  <div id="horizon-container" class="hidden">
+    <div id="horizon-inner">
+      <div id="horizon-sky"></div>
+      <div id="horizon-ground"></div>
+      <div id="horizon-line"></div>
+    </div>
+  </div>
+
+  <!-- Death Screen -->
+  <div id="death-screen">
+    <div>MISSION FAILED</div>
+    <div id="death-reason" style="font-size:0.5em;color:#aaa">The baseship was destroyed.</div>
+    <button onclick="location.reload()">RESTART</button>
+  </div>
+
+  <!-- Countdown / Launch overlays -->
+  <div id="countdown-display">5</div>
+  <div id="launch-prompt">
+    <b>READY TO LAUNCH</b>
+    <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR OR PUSH JOYSTICK FORWARD</div>
+  </div>
+  <div id="launch-overlay" class="launch-overlay-full" style="background:rgba(0,0,0,0.6)">
+    <div style="text-align:center;color:#0ff;font-size:2.5em;margin-bottom:30px;text-shadow:0 0 20px #0ff">⚡ LAUNCH
+      SEQUENCE ⚡</div>
+    <div style="color:#00ff00;font-size:1.5em;font-weight:bold;text-shadow:0 0 15px #00ff00">ACCELERATING THROUGH
+      TUBE...</div>
+  </div>
+  <div id="launch-countdown" class="launch-overlay-full" style="background:rgba(0,0,0,0.5)">
+    <div style="text-align:center;color:#ff00ff;font-size:3em;font-weight:bold;text-shadow:0 0 30px #ff00ff">CLEAR OF
+      BAY</div>
+    <div style="color:#ffff00;font-size:1.3em;margin-top:20px;text-shadow:0 0 10px #ffff00">ENGAGING ENEMY FORCES...
+    </div>
+  </div>
+
+  <!-- Manifold Architecture -->
+  <script src="../../js/substrates/manifold_ingestor.js"></script>
+  <script src="manifold.js"></script>
+
+  <!-- Three.js -->
+  <script src="../../lib/three/three.min.js"></script>
+
+  <!-- Game Logic -->
+  <script src="core.js"></script>
+  <script src="input.js"></script>
+  <script src="3d.js"></script>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.Starfighter) Starfighter.init();
+    });
+  </script>
+</body>
+
+</html>

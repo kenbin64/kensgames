@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Combat - Manifold Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #00ffcc;
+            font-family: 'Rajdhani', monospace;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            font-size: 16px;
+            z-index: 100;
+            text-shadow: 0 0 10px #00ffcc;
+            font-family: monospace;
+        }
+
+        #hud>div {
+            margin-bottom: 12px;
+        }
+
+        #radar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            height: 200px;
+            border: 2px solid #00ffcc;
+            background: rgba(0, 20, 20, 0.8);
+            z-index: 100;
+            box-shadow: 0 0 15px #00ffcc inset;
+        }
+
+        .menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 60px;
+            border: 2px solid #00ffcc;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 200;
+            box-shadow: 0 0 30px #00ffcc;
+        }
+
+        .menu.hidden {
+            display: none;
+        }
+
+        .menu h1 {
+            color: #00ffcc;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+
+        .menu .subtitle {
+            color: #00ff88;
+            font-size: 14px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff88;
+        }
+
+        .menu button {
+            display: block;
+            width: 250px;
+            padding: 15px;
+            margin: 15px auto;
+            background: linear-gradient(135deg, #00ffcc 0%, #00ff88 100%);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .menu button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: #00ff88;
+            font-size: 12px;
+            z-index: 100;
+            text-shadow: 0 0 5px #00ff88;
+        }
+
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #00ffcc;
+            font-size: 14px;
+            z-index: 99;
+            max-width: 300px;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 2px solid #00ffcc;
+            border-radius: 50%;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: #00ffcc;
+        }
+
+        #crosshair::before {
+            width: 2px;
+            height: 60px;
+            left: 50%;
+            top: -30px;
+            transform: translateX(-50%);
+        }
+
+        #crosshair::after {
+            width: 60px;
+            height: 2px;
+            top: 50%;
+            left: -30px;
+            transform: translateY(-50%);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Crosshair -->
+    <div id="crosshair"></div>
+
+    <!-- Status Panel -->
+    <div class="status" id="status">
+        <div>⚔️ Space Combat</div>
+        <div id="status-text" style="font-size: 12px; color: #00ff88; margin-top: 10px;">Initializing...</div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" style="display: none;">
+        <div id="wave-display">Wave: 1/10</div>
+        <div id="enemies-display">Enemies: 0</div>
+        <div id="health-display">Shield: 100%</div>
+        <div id="score-display">Score: 0</div>
+        <div id="throttle-display">Throttle: 0%</div>
+    </div>
+
+    <!-- Radar -->
+    <div id="radar" style="display: none;"></div>
+
+    <!-- Game Menu -->
+    <div id="menu" class="menu">
+        <h1>SPACE COMBAT</h1>
+        <div class="subtitle">⚔️ Manifold Edition</div>
+        <button id="solo-btn">🎮 Solo Campaign</button>
+        <button id="multi-btn">👥 Co-op (1-4 Players)</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over" class="menu hidden">
+        <h1>MISSION FAILED</h1>
+        <p id="final-stats" style="color: #00ffcc; font-size: 18px; margin: 20px 0;">
+        <div>Waves Survived: 0</div>
+        <div>Enemies Destroyed: 0</div>
+        <div id="final-score">Final Score: 0</div>
+        </p>
+        <button id="restart-btn">Try Again</button>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory" class="menu hidden">
+        <h1>STARBASE DEFENDED</h1>
+        <p id="victory-stats" style="color: #00ffcc; font-size: 18px; margin: 20px 0;">
+        <div>All 10 Waves Defeated!</div>
+        <div id="victory-score">Final Score: 0</div>
+        </p>
+        <button id="victory-btn">Return to Menu</button>
+    </div>
+
+    <!-- Info -->
+    <div id="info">
+        W/A/S/D: Thrust | MOUSE: Aim | SPACE: Fire | ESC: Menu
+    </div>
+
+    <!-- Load Manifold Core & Substrates -->
+    <script src="../../js/manifold-core/manifold_surface.js"></script>
+    <script src="../../js/manifold-core/substrate_base.js"></script>
+    <script src="../../js/manifold-core/substrate_registry.js"></script>
+    <script src="../../js/manifold-core/game_config.js"></script>
+
+    <!-- Load All 9 Substrates -->
+    <script src="../../js/manifold-core/physics_substrate.js"></script>
+    <script src="../../js/manifold-core/graphics_substrate.js"></script>
+    <script src="../../js/manifold-core/audio_substrate.js"></script>
+    <script src="../../js/manifold-core/gamelogic_substrate.js"></script>
+    <script src="../../js/manifold-core/controlmapping_substrate.js"></script>
+    <script src="../../js/manifold-core/ui_substrate.js"></script>
+    <script src="../../js/manifold-core/multiplayer_substrate.js"></script>
+    <script src="../../js/manifold-core/persistence_substrate.js"></script>
+    <script src="../../js/manifold-core/ai_substrate.js"></script>
+
+    <!-- Three.js -->
+    <script src="../../lib/three/three.min.js"></script>
+
+    <!-- Game Coordinator -->
+    <script src="assets/js/space_combat_coordinator.js"></script>
+
+    <!-- Application -->
+    <script>
+        let game = null;
+
+        const updateStatus = (msg) => {
+            document.getElementById('status-text').textContent = msg;
+        };
+
+        document.getElementById('solo-btn').addEventListener('click', async () => {
+            try {
+                updateStatus('Launching solo campaign...');
+                document.getElementById('menu').classList.add('hidden');
+                document.getElementById('hud').style.display = 'block';
+                document.getElementById('radar').style.display = 'block';
+
+                game = new SpaceCombatManifold('canvas');
+                await game.initialize('solo', 1, 'Pilot');
+
+                updateStatus('Engaging... ✓');
+                game.run();
+            } catch (err) {
+                console.error('Game initialization error:', err);
+                updateStatus('Error: ' + err.message);
+            }
+        });
+
+        document.getElementById('multi-btn').addEventListener('click', async () => {
+            try {
+                updateStatus('Launching co-op mission...');
+                document.getElementById('menu').classList.add('hidden');
+                document.getElementById('hud').style.display = 'block';
+                document.getElementById('radar').style.display = 'block';
+
+                game = new SpaceCombatManifold('canvas');
+                await game.initialize('multiplayer', 4, 'Pilot');
+
+                updateStatus('Engaging... ✓');
+                game.run();
+            } catch (err) {
+                console.error('Game initialization error:', err);
+                updateStatus('Error: ' + err.message);
+            }
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        document.getElementById('victory-btn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Escape') {
+                document.getElementById('menu').classList.remove('hidden');
+                document.getElementById('hud').style.display = 'none';
+                document.getElementById('radar').style.display = 'none';
+                if (game) game.gameState.isRunning = false;
+            }
+        });
+
+        console.log(`
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    ⚔️ SPACE COMBAT - MANIFOLD EDITION ⚔️                  ║
+║                                                                            ║
+║  Proof of Concept: Complex gameplay on manifold architecture              ║
+║                                                                            ║
+║  Architecture:                                                             ║
+║    - Single manifold coordinate holds ALL game state                      ║
+║    - 9 universal substrates (physics, graphics, audio, etc)               ║
+║    - No code duplication - space_combat_coordinator.js only ~400 lines    ║
+║    - Reuses SAME substrates as BrickBreaker3D-Manifold                    ║
+║                                                                            ║
+║  Gameplay:                                                                ║
+║    - First-person space combat (flight dynamics from physics)             ║
+║    - 10 waves of enemy fighters (AI scaling from ai_substrate)            ║
+║    - Starbase defense objective (gamelogic scoring)                       ║
+║    - 1-4 player co-op multiplayer                                        ║
+║    - Wave progression and difficulty scaling                              ║
+║                                                                            ║
+║  Status: Ready to defend the starbase                                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+        `);
+    </script>
+</body>
+
+</html>

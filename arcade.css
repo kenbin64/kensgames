@@ -1,0 +1,1328 @@
+/* ═══════════════════════════════════════════════════════════════
+   🜂 KEN'S ARCADE — CSS derived from the manifold
+   ═══════════════════════════════════════════════════════════════
+   Schwarz Diamond principle: minimal material → maximum area
+
+   THREE EQUATIONS generate everything:
+     sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = 0   (Gyroid)
+     cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = 0      (Diamond)
+     z = x · y                                          (Saddle)
+
+   THREE COLORS from the three trig terms:
+     sin(x)cos(y) → cyan   #00ffff
+     sin(y)cos(z) → purple #bf00ff
+     sin(z)cos(x) → green  #39ff14
+
+   ALL SPACING from φ (golden ratio = 1.618):
+     φ⁰=1  φ¹=1.618  φ²=2.618  φ³=4.236  φ⁻¹=0.618  φ⁻²=0.382
+
+   BRANCHING FACTOR 4 (Diamond skeleton) → grid columns
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+    /* Neon accent lights in the billiard hall */
+    --c1: #00ffff;
+    --c2: #bf00ff;
+    --c3: #39ff14;
+    /* Billiard hall palette — warm darks */
+    --void: #0c0a08;
+    --surface: #1a1510;
+    --wood: #2a2118;
+    --wood-light: #3d3025;
+    --felt: #1a2a18;
+    --text: #e8ddd0;
+    --dim: #8a7a68;
+    --warm-glow: rgba(255, 180, 80, 0.06);
+    /* Spacing */
+    --phi: 1.618rem;
+    --phi2: 2.618rem;
+    --phi3: 4.236rem;
+    --phi-1: 0.618rem;
+    --phi-2: 0.382rem;
+    /* Neon glows */
+    --glow1: 0 0 10px var(--c1), 0 0 40px rgba(0, 255, 255, 0.15);
+    --glow2: 0 0 10px var(--c2), 0 0 40px rgba(191, 0, 255, 0.15);
+    --glow3: 0 0 10px var(--c3), 0 0 40px rgba(57, 255, 20, 0.15);
+    /* Panels — dark wood with warm edges */
+    --panel-bg: rgba(30, 24, 18, 0.85);
+    --panel-border: rgba(160, 120, 60, 0.2);
+    --panel-radius: 12px;
+}
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--void);
+    background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(255, 160, 60, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(191, 0, 255, 0.03) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 60%, rgba(0, 255, 255, 0.02) 0%, transparent 40%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* Pixel font only for titles and UI chrome */
+.logo,
+.hero-title,
+.hero-equation,
+.section-title,
+.gl-title,
+.arcade-btn,
+.modal-title,
+.panel-title,
+.lobby-name,
+.stat-val,
+.ticker-count,
+.medallion-display,
+.gl-num,
+.code-input {
+    font-family: 'Press Start 2P', monospace;
+}
+
+/* ── GYROID BACKGROUND CANVAS ──────────────────────────────── */
+#gyroid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Scanlines: the manifold breathes through interference */
+.scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.12) 2px, rgba(0, 0, 0, 0.12) 4px);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ── HEADER ────────────────────────────────────────────────── */
+.arcade-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: linear-gradient(180deg, rgba(10, 10, 20, 0.95), rgba(5, 5, 10, 0.9));
+    border-bottom: 1px solid rgba(191, 0, 255, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(16px);
+}
+
+.logo {
+    font-size: 1.1rem;
+    color: var(--c1);
+    text-shadow: var(--glow1);
+    letter-spacing: 4px;
+}
+
+.glitch {
+    position: relative;
+}
+
+.glitch::before,
+.glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.8;
+}
+
+.glitch::before {
+    color: var(--c2);
+    clip-path: inset(0 0 61.8% 0);
+    animation: g1 3s infinite;
+}
+
+.glitch::after {
+    color: var(--c3);
+    clip-path: inset(38.2% 0 0 0);
+    animation: g2 3s infinite;
+}
+
+@keyframes g1 {
+
+    0%,
+    95% {
+        transform: translate(-2px, -1px)
+    }
+
+    96% {
+        transform: translate(4px, 2px)
+    }
+}
+
+@keyframes g2 {
+
+    0%,
+    95% {
+        transform: translate(2px, 1px)
+    }
+
+    97% {
+        transform: translate(-4px, -2px)
+    }
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.player-tag {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.6rem;
+    color: var(--c3);
+    margin-right: 0.5rem;
+}
+
+.blink {
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0
+    }
+}
+
+/* ── BUTTONS — z = hover * base → glow ────────────────────── */
+.arcade-btn {
+    font-size: 0.55rem;
+    padding: 0.6rem 1.2rem;
+    background: transparent;
+    color: var(--c1);
+    border: 1px solid var(--c1);
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.arcade-btn:hover {
+    background: rgba(0, 255, 255, 0.12);
+    color: #fff;
+    box-shadow: var(--glow1);
+    border-color: var(--c1);
+}
+
+.arcade-btn.accent {
+    border-color: var(--c2);
+    color: var(--c2);
+    background: rgba(191, 0, 255, 0.08);
+}
+
+.arcade-btn.accent:hover {
+    background: var(--c2);
+    color: #fff;
+    box-shadow: var(--glow2);
+}
+
+.arcade-btn.full-width {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.arcade-btn.big {
+    font-size: 0.65rem;
+    padding: 0.9rem 2rem;
+}
+
+.arcade-btn.small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.45rem;
+}
+
+.arcade-btn .sub {
+    font-size: 0.4rem;
+    color: var(--dim);
+}
+
+/* ── HERO — the landing surface ───────────────────────────── */
+.hero {
+    min-height: 92vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 4rem 2rem 2rem;
+}
+
+.hero-text {
+    max-width: 720px;
+}
+
+.hero-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--c2);
+    margin-bottom: 2rem;
+    opacity: 0.8;
+}
+
+.hero-title {
+    font-size: clamp(1.6rem, 5vw, 3rem);
+    color: var(--c1);
+    text-shadow: var(--glow1);
+    line-height: 1.5;
+    margin-bottom: 2rem;
+    letter-spacing: 2px;
+}
+
+.hero-accent {
+    color: var(--c3);
+    text-shadow: var(--glow3);
+}
+
+.hero-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(14px, 1.6vw, 17px);
+    color: var(--dim);
+    line-height: 2;
+    margin-bottom: 3rem;
+    font-weight: 300;
+}
+
+.hero-sub em {
+    color: var(--c1);
+    font-style: normal;
+    font-weight: 500;
+}
+
+.hero-cta {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 4rem;
+}
+
+.hero-scroll-hint {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.2);
+    animation: float 2s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(8px);
+    }
+}
+
+/* ── SHARED SECTION STYLES ─────────────────────────────────── */
+.games-section {
+    position: relative;
+    z-index: 1;
+    padding: 5rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.section-title {
+    font-family: 'Press Start 2P', monospace;
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--c1);
+    text-shadow: var(--glow1);
+    margin-bottom: 1rem;
+    letter-spacing: 3px;
+}
+
+.section-sub {
+    font-family: 'Inter', sans-serif;
+    text-align: center;
+    font-size: 16px;
+    color: var(--dim);
+    line-height: 1.8;
+    margin-bottom: 3rem;
+    font-weight: 300;
+}
+
+/* ── HERO extras ──────────────────────────────────────────── */
+.hero-players {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 2rem;
+    font-size: 13px;
+    color: var(--dim);
+}
+
+.glow-pulse {
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(191, 0, 255, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(191, 0, 255, 0.6), 0 0 60px rgba(191, 0, 255, 0.2);
+    }
+}
+
+/* ── GAME CARDS — Big immersive showcase ──────────────────── */
+.game-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.game-card {
+    background: var(--panel-bg);
+    border: 1px solid rgba(0, 255, 255, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.game-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(0, 255, 255, 0.4);
+    box-shadow: 0 8px 40px rgba(0, 255, 255, 0.12);
+}
+
+.game-card.featured {
+    border-color: rgba(191, 0, 255, 0.25);
+}
+
+.game-card.featured:hover {
+    border-color: rgba(191, 0, 255, 0.5);
+    box-shadow: 0 8px 40px rgba(191, 0, 255, 0.15);
+}
+
+.card-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at 50% 20%, rgba(0, 255, 255, 0.06), transparent 60%);
+    pointer-events: none;
+}
+
+.game-card.featured .card-glow {
+    background: radial-gradient(ellipse at 50% 20%, rgba(191, 0, 255, 0.08), transparent 60%);
+}
+
+.card-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(191, 0, 255, 0.2);
+    color: var(--c2);
+    border: 1px solid rgba(191, 0, 255, 0.3);
+    border-radius: 4px;
+    letter-spacing: 1px;
+    z-index: 2;
+}
+
+.free-card-badge {
+    background: rgba(57, 255, 20, 0.15);
+    color: var(--c3);
+    border-color: rgba(57, 255, 20, 0.3);
+}
+
+.card-visual {
+    padding: 2.5rem 2rem 1.5rem;
+    text-align: center;
+    position: relative;
+}
+
+.card-icon-large {
+    font-size: 4rem;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.3));
+}
+
+.card-neon-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 255, 255, 0.1);
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.05);
+}
+
+.game-card.featured .card-neon-ring {
+    border-color: rgba(191, 0, 255, 0.15);
+    box-shadow: 0 0 30px rgba(191, 0, 255, 0.08);
+}
+
+.card-content {
+    padding: 0 1.5rem 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.7rem;
+    color: var(--c1);
+    margin-bottom: 0.75rem;
+    letter-spacing: 2px;
+}
+
+.card-desc {
+    font-size: 14px;
+    color: var(--dim);
+    line-height: 1.8;
+    margin-bottom: 1rem;
+    flex: 1;
+}
+
+.card-meta {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.meta-tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid;
+}
+
+.meta-tag.players {
+    color: var(--c1);
+    border-color: rgba(0, 255, 255, 0.25);
+}
+
+.meta-tag.ai {
+    color: var(--c2);
+    border-color: rgba(191, 0, 255, 0.25);
+}
+
+.meta-tag.live {
+    color: var(--c3);
+    border-color: rgba(57, 255, 20, 0.25);
+}
+
+.meta-tag.solo {
+    color: var(--c3);
+    border-color: rgba(57, 255, 20, 0.25);
+}
+
+.meta-tag.physics {
+    color: var(--c1);
+    border-color: rgba(0, 255, 255, 0.25);
+}
+
+.meta-tag.board {
+    color: var(--c2);
+    border-color: rgba(191, 0, 255, 0.25);
+}
+
+.card-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.card-play-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.5rem;
+    color: var(--c3);
+    text-shadow: 0 0 8px var(--c3);
+}
+
+.card-free-tag {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.5px;
+}
+
+.coming-soon-card {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.coming-soon-card:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(0, 255, 255, 0.1);
+}
+
+.dim {
+    opacity: 0.5;
+}
+
+/* ── CTA SECTION ──────────────────────────────────────────── */
+.cta-section {
+    position: relative;
+    z-index: 1;
+    padding: 4rem 2rem;
+}
+
+.cta-box {
+    max-width: 700px;
+    margin: 0 auto;
+    background: var(--panel-bg);
+    border-radius: 20px;
+    border: 1px solid rgba(191, 0, 255, 0.2);
+    padding: 4rem 3rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+}
+
+.cta-neon-border {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    pointer-events: none;
+    box-shadow: inset 0 0 40px rgba(191, 0, 255, 0.05);
+}
+
+.cta-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 1.2rem;
+    color: var(--c2);
+    text-shadow: var(--glow2);
+    margin-bottom: 1.5rem;
+    letter-spacing: 3px;
+}
+
+.cta-desc {
+    font-size: 16px;
+    color: var(--dim);
+    line-height: 1.8;
+    margin-bottom: 2rem;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ── UNDER THE HOOD ───────────────────────────────────────── */
+.hood-section {
+    position: relative;
+    z-index: 1;
+    padding: 6rem 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.hood-content {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 3rem;
+    align-items: center;
+}
+
+.hood-text p {
+    font-size: 15px;
+    color: var(--dim);
+    line-height: 2;
+    margin-bottom: 1.5rem;
+}
+
+.hood-text em {
+    color: var(--c1);
+    font-style: normal;
+    font-weight: 500;
+}
+
+.hood-highlight {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.5rem !important;
+    color: var(--c2) !important;
+    text-shadow: var(--glow2);
+    letter-spacing: 2px;
+    margin-top: 1rem;
+}
+
+.hood-visual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+}
+
+.hood-stat {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s;
+}
+
+.hood-stat:hover {
+    border-color: rgba(0, 255, 255, 0.3);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.06);
+    transform: translateY(-3px);
+}
+
+.hood-stat-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.hood-stat-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.35rem;
+    color: var(--dim);
+    line-height: 1.8;
+    letter-spacing: 1px;
+}
+
+
+
+/* ── FOOTER ───────────────────────────────────────────────── */
+.arcade-footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: var(--phi2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.45rem;
+    color: var(--dim);
+}
+
+.arcade-footer a {
+    color: var(--c1);
+    text-decoration: none;
+}
+
+.arcade-footer a:hover {
+    text-shadow: var(--glow1);
+}
+
+.footer-sub {
+    margin-top: var(--phi-2);
+    font-size: 0.38rem;
+}
+
+.ticker-count {
+    color: var(--c3);
+    text-shadow: 0 0 8px var(--c3);
+}
+
+
+/* ── LOBBY — the command center (signed in) ───────────────── */
+#page-lobby {
+    position: relative;
+    z-index: 1;
+    padding: var(--phi2);
+    min-height: calc(100vh - 60px);
+}
+
+.lobby-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: var(--phi);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.lobby-panel,
+.gl-panel {
+    background: rgba(18, 18, 31, 0.85);
+    border: 1px solid rgba(0, 255, 255, 0.12);
+    padding: var(--phi);
+    backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
+}
+
+.panel-glow,
+.tile-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0, 255, 255, 0.04), transparent 60%);
+    pointer-events: none;
+}
+
+.panel-title {
+    font-size: 0.6rem;
+    color: var(--c1);
+    margin-bottom: var(--phi-1);
+}
+
+/* Player card */
+.player-card {
+    text-align: center;
+}
+
+.lobby-avatar {
+    font-size: 3rem;
+    margin: var(--phi-1) 0;
+}
+
+.lobby-name {
+    font-size: 0.8rem;
+    color: var(--c1);
+    text-shadow: var(--glow1);
+}
+
+.medallion-display {
+    font-size: 0.55rem;
+    color: var(--c2);
+    margin: var(--phi-2) 0 var(--phi-1);
+}
+
+.lobby-stats {
+    display: flex;
+    justify-content: center;
+    gap: var(--phi-1);
+    margin-bottom: var(--phi-1);
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-val {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--c3);
+}
+
+.stat-label {
+    font-size: 0.35rem;
+    color: var(--dim);
+}
+
+/* Game tiles */
+.game-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phi-2);
+}
+
+.game-tile {
+    display: flex;
+    align-items: center;
+    gap: var(--phi-1);
+    padding: var(--phi-1);
+    border: 1px solid rgba(191, 0, 255, 0.15);
+    background: rgba(5, 5, 10, 0.5);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.game-tile:hover {
+    border-color: var(--c2);
+    box-shadow: 0 0 20px rgba(191, 0, 255, 0.1);
+}
+
+.tile-icon {
+    font-size: 2rem;
+}
+
+.tile-info h3 {
+    font-size: 0.5rem;
+    color: var(--c1);
+}
+
+.tile-info p {
+    font-size: 0.35rem;
+    color: var(--dim);
+    margin-top: 0.2rem;
+}
+
+.tile-players {
+    margin-left: auto;
+    font-size: 0.4rem;
+    color: var(--c3);
+}
+
+/* Settings toggles */
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--phi-2) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.4rem;
+}
+
+.toggle {
+    position: relative;
+    width: 36px;
+    height: 18px;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #333;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.slider::before {
+    content: '';
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--dim);
+    transition: 0.3s;
+}
+
+.toggle input:checked+.slider {
+    background: rgba(0, 255, 255, 0.3);
+}
+
+.toggle input:checked+.slider::before {
+    transform: translateX(18px);
+    background: var(--c1);
+}
+
+.online-ticker {
+    font-size: 0.4rem;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ticker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--c3);
+    box-shadow: 0 0 8px var(--c3);
+    animation: blink 2s infinite;
+}
+
+
+/* ── GAME LOBBY ───────────────────────────────────────────── */
+#page-game-lobby {
+    position: relative;
+    z-index: 1;
+    padding: var(--phi2);
+    min-height: 100vh;
+}
+
+.game-lobby-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.back-btn {
+    margin-bottom: var(--phi-1);
+}
+
+.gl-title {
+    font-size: 1.5rem;
+    color: var(--c1);
+    text-shadow: var(--glow1);
+    margin-bottom: var(--phi);
+}
+
+.gl-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--phi-1);
+}
+
+.gl-panel h2 {
+    font-size: 0.6rem;
+    color: var(--c2);
+    margin-bottom: var(--phi-2);
+}
+
+.gl-desc {
+    font-size: 0.38rem;
+    color: var(--dim);
+    line-height: 1.8;
+    margin-bottom: var(--phi-1);
+}
+
+.gl-options {
+    margin-bottom: var(--phi-1);
+}
+
+.gl-options label {
+    font-size: 0.4rem;
+    color: var(--dim);
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.gl-player-select {
+    display: flex;
+    gap: 0.3rem;
+    margin-bottom: var(--phi-2);
+}
+
+.gl-num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.gl-num.active,
+.gl-num:hover {
+    color: var(--c1);
+    border-color: var(--c1);
+    background: rgba(0, 255, 255, 0.1);
+}
+
+.gl-divider {
+    text-align: center;
+    color: var(--dim);
+    font-size: 0.35rem;
+    margin: var(--phi-1) 0;
+}
+
+.code-input-row {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.code-input {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.8rem;
+    padding: var(--phi-2);
+    background: var(--void);
+    color: var(--c3);
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    text-align: center;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+}
+
+.code-input:focus {
+    border-color: var(--c3);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+    outline: none;
+}
+
+.mm-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.4rem;
+    color: var(--c1);
+    margin-top: var(--phi-1);
+}
+
+.mm-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--c1);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg)
+    }
+}
+
+/* ── MODALS — glass panels on the surface ─────────────────── */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.modal-box {
+    background: rgba(18, 18, 31, 0.95);
+    border: 1px solid var(--c1);
+    padding: var(--phi2);
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 0 60px rgba(0, 255, 255, 0.1);
+    position: relative;
+    backdrop-filter: blur(16px);
+}
+
+.modal-close {
+    position: absolute;
+    top: var(--phi-2);
+    right: var(--phi-1);
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--c1);
+}
+
+.modal-title {
+    font-size: 0.8rem;
+    color: var(--c1);
+    margin-bottom: var(--phi);
+    text-align: center;
+}
+
+.modal-sub {
+    font-size: 0.4rem;
+    color: var(--dim);
+    margin-bottom: var(--phi-1);
+}
+
+.modal label {
+    display: block;
+    font-size: 0.4rem;
+    color: var(--dim);
+    margin: var(--phi-1) 0 0.2rem;
+}
+
+.modal input[type="text"],
+.modal input[type="email"],
+.modal input[type="password"] {
+    width: 100%;
+    padding: var(--phi-2);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.5rem;
+    background: var(--void);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.modal input:focus {
+    border-color: var(--c1);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+}
+
+.auth-toggle {
+    font-size: 0.4rem;
+    color: var(--dim);
+    text-align: center;
+    margin-top: var(--phi-1);
+    cursor: pointer;
+}
+
+.auth-toggle:hover {
+    color: var(--c1);
+}
+
+.auth-forgot {
+    font-size: 0.38rem;
+    text-align: center;
+    margin-top: var(--phi-2);
+}
+
+.auth-forgot a {
+    color: var(--dim);
+    text-decoration: none;
+}
+
+.auth-forgot a:hover {
+    color: var(--c1);
+}
+
+.auth-error {
+    font-size: 0.4rem;
+    color: #ff4444;
+    text-align: center;
+    margin-top: var(--phi-2);
+}
+
+.back-link {
+    color: var(--dim);
+    font-size: 0.38rem;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    color: var(--c1);
+}
+
+/* ── AVATAR ───────────────────────────────────────────────── */
+.avatar-modal-box {
+    max-width: 520px;
+}
+
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.6rem;
+    justify-items: center;
+}
+
+.avatar-grid.big {
+    grid-template-columns: repeat(8, 1fr);
+}
+
+.avatar-pick {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--void);
+    transition: all 0.2s;
+}
+
+.avatar-pick:hover {
+    border-color: var(--c1);
+}
+
+.avatar-pick.selected {
+    border-color: var(--c3);
+    box-shadow: 0 0 10px var(--c3);
+}
+
+/* ── RESPONSIVE — the surface adapts ─────────────────────── */
+@media (max-width: 900px) {
+    .game-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .lobby-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .gl-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hood-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .arcade-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .logo {
+        font-size: 0.9rem;
+    }
+
+    .header-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .game-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .hero {
+        padding: 2rem 1rem;
+        min-height: 70vh;
+    }
+
+    .cta-box {
+        padding: 2.5rem 1.5rem;
+    }
+
+    .hood-visual {
+        grid-template-columns: 1fr 1fr;
+    }
+}

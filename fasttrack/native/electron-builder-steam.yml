@@ -1,0 +1,56 @@
+# Steam Build Configuration
+# Used with: npm run build:steam
+
+appId: us.butterflyfx.fasttrack.steam
+productName: Fast Track
+copyright: Copyright © 2026 ButterflyFX
+
+directories:
+  output: dist/steam
+  buildResources: build
+
+files:
+  - main.js
+  - preload.js
+  - game/**/*
+  - assets/**/*
+  - node_modules/greenworks/**/*
+  - "!node_modules/greenworks/deps"
+  - "!**/*.map"
+
+extraResources:
+  - from: steam
+    to: steam
+    filter:
+      - steam_appid.txt
+      - steam_api64.dll
+      - libsteam_api.so
+      - libsteam_api.dylib
+
+win:
+  target:
+    - target: dir
+      arch: [x64]
+  icon: build/icon.ico
+  files:
+    - "!node_modules/greenworks/lib/!(greenworks-win64.node)"
+
+mac:
+  target:
+    - target: dir
+      arch: [x64, arm64]
+  icon: build/icon.icns
+  files:
+    - "!node_modules/greenworks/lib/!(greenworks-osx64.node)"
+
+linux:
+  target:
+    - target: dir
+      arch: [x64]
+  icon: build/icons
+  files:
+    - "!node_modules/greenworks/lib/!(greenworks-linux64.node)"
+
+# Steam-specific: No installer, just raw files for Steam depot
+nsis: false
+dmg: false

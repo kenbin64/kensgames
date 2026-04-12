@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌀 Manifold Discovery - Game Explorer</title>
+    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
+
+    <style>
+        :root {
+            --primary: #00b4ff;
+            --secondary: #6366f1;
+            --accent: #22d3ee;
+            --gold: #ffd700;
+            --bg-dark: #0a0a14;
+            --bg-card: rgba(20, 20, 40, 0.8);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(10, 10, 20, 0.95) 0%, transparent 100%);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 100px 40px 60px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .visualization-container {
+            position: relative;
+            height: 600px;
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .game-selector {
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+        }
+
+        .selector-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .game-option {
+            padding: 12px;
+            background: rgba(0, 180, 255, 0.05);
+            border: 2px solid rgba(0, 180, 255, 0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .game-option:hover {
+            background: rgba(0, 180, 255, 0.15);
+            border-color: var(--primary);
+        }
+
+        .game-option.active {
+            background: rgba(0, 180, 255, 0.3);
+            border-color: var(--primary);
+            font-weight: 700;
+        }
+
+        .game-option-emoji {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .recommendations {
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+        }
+
+        .recommendations-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .manifold-info {
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+        }
+
+        .info-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .coordinates {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            font-size: 14px;
+        }
+
+        .coord-item {
+            background: rgba(0, 180, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .coord-label {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .coord-value {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        @media (max-width: 1200px) {
+            main {
+                grid-template-columns: 1fr;
+                padding: 100px 20px 60px;
+            }
+
+            .visualization-container {
+                height: 400px;
+            }
+        }
+
+        .info-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav>
+        <a href="/" class="logo">⟳ MANIFOLD</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/kensgames.com/lounge.html">Lounge</a>
+            <a href="/kensgames.com/discover.html">Discover</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- 3D Visualization -->
+        <div class="visualization-container" id="manifold-viz"></div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Game Selector -->
+            <div class="game-selector">
+                <div class="selector-title">Select a Game</div>
+                <div id="game-options"></div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="recommendations">
+                <div class="recommendations-title">🎮 Similar Games</div>
+                <div id="recommendations-list"></div>
+            </div>
+
+            <!-- Manifold Info -->
+            <div class="manifold-info">
+                <div class="info-title">📐 Manifold Coordinates</div>
+                <div class="coordinates" id="coordinates">
+                    <div class="coord-item">
+                        <div class="coord-label">Players (x)</div>
+                        <div class="coord-value">-</div>
+                    </div>
+                    <div class="coord-item">
+                        <div class="coord-label">Duration (y)</div>
+                        <div class="coord-value">-</div>
+                    </div>
+                    <div class="coord-item">
+                        <div class="coord-label">Surface (z=x×y)</div>
+                        <div class="coord-value">-</div>
+                    </div>
+                </div>
+                <div class="info-text">
+                    Each game exists as a point on the z=xy manifold surface. Distance between games determines
+                    recommendations.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Three.js -->
+    <script src="../../../lib/three/three.min.js"></script>
+
+    <!-- Manifold Discovery -->
+    <script src="./js/substrates/manifold_discovery.js"></script>
+
+    <script>
+        // =========================================
+        // MANIFOLD DISCOVERY EXPLORER
+        // =========================================
+
+        const manifold = ManifoldDiscoverySubstrate.getGameManifold();
+        let currentGame = Object.keys(manifold)[0]; // Start with first game
+
+        // Render game selector options
+        function renderGameOptions() {
+            const container = document.getElementById('game-options');
+            container.innerHTML = '';
+
+            Object.keys(manifold).forEach(gameId => {
+                const game = manifold[gameId];
+                const btn = document.createElement('div');
+                btn.className = `game-option ${gameId === currentGame ? 'active' : ''}`;
+                btn.innerHTML = `<span class="game-option-emoji">${game.emoji}</span>${gameId}`;
+                btn.addEventListener('click', () => selectGame(gameId));
+                container.appendChild(btn);
+            });
+        }
+
+        // Select a game
+        function selectGame(gameId) {
+            currentGame = gameId;
+            renderGameOptions();
+            updateRecommendations();
+            updateCoordinates();
+        }
+
+        // Update recommendations
+        function updateRecommendations() {
+            const container = document.getElementById('recommendations-list');
+            container.innerHTML = ManifoldDiscoverySubstrate.formatRecommendations(currentGame);
+        }
+
+        // Update coordinates display
+        function updateCoordinates() {
+            const pos = ManifoldDiscoverySubstrate.getManifoldPosition(currentGame);
+            const coords = document.getElementById('coordinates');
+
+            coords.innerHTML = `
+                <div class="coord-item">
+                    <div class="coord-label">Players (x)</div>
+                    <div class="coord-value">${pos.manifoldX}</div>
+                </div>
+                <div class="coord-item">
+                    <div class="coord-label">Duration (y)</div>
+                    <div class="coord-value">${pos.manifoldY}m</div>
+                </div>
+                <div class="coord-item">
+                    <div class="coord-label">Surface (z=x×y)</div>
+                    <div class="coord-value">${pos.manifoldZ}</div>
+                </div>
+            `;
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            renderGameOptions();
+            updateRecommendations();
+            updateCoordinates();
+
+            // Initialize 3D visualization
+            try {
+                ManifoldDiscoverySubstrate.createVisualizationScene('manifold-viz', currentGame);
+            } catch (e) {
+                console.warn('3D visualization failed (Three.js may not be available):', e);
+                document.getElementById('manifold-viz').innerHTML = `
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100%;
+                        color: #94a3b8;
+                        text-align: center;
+                        padding: 20px;
+                    ">
+                        <div>
+                            <div style="font-size: 48px; margin-bottom: 20px;">🌀</div>
+                            <p>3D Manifold Visualization</p>
+                            <p style="font-size: 12px; margin-top: 10px; color: #5a5a5a;">
+                                (3D scene rendering unavailable in this environment)
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ValidationSubstrate Test Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 { color: #4ade80; }
+        h2 { color: #60a5fa; margin-top: 30px; }
+        .test-section {
+            background: #16213e;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4ade80;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .pass {
+            background: rgba(74, 222, 128, 0.2);
+            border-left: 4px solid #4ade80;
+        }
+        .fail {
+            background: rgba(239, 68, 68, 0.2);
+            border-left: 4px solid #ef4444;
+        }
+        .summary {
+            background: #0f3460;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+        .summary.all-pass { border: 2px solid #4ade80; }
+        .summary.has-fail { border: 2px solid #ef4444; }
+        code {
+            background: #0f3460;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #fbbf24;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 ValidationSubstrate Test Suite</h1>
+    <p>Testing the universal validation substrate for zero duplication compliance.</p>
+    
+    <div id="test-results"></div>
+    <div id="summary"></div>
+
+    <script src="validation_substrate.js"></script>
+    <script>
+        // Test harness
+        const results = [];
+        const resultsEl = document.getElementById('test-results');
+        const summaryEl = document.getElementById('summary');
+
+        function test(name, fn) {
+            try {
+                const result = fn();
+                if (result.pass) {
+                    results.push({ name, pass: true });
+                    resultsEl.innerHTML += `
+                        <div class="test-result pass">
+                            ✅ PASS: ${name}
+                            ${result.message ? `<br><small>${result.message}</small>` : ''}
+                        </div>
+                    `;
+                } else {
+                    results.push({ name, pass: false, error: result.error });
+                    resultsEl.innerHTML += `
+                        <div class="test-result fail">
+                            ❌ FAIL: ${name}
+                            <br><small>${result.error}</small>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                results.push({ name, pass: false, error: error.message });
+                resultsEl.innerHTML += `
+                    <div class="test-result fail">
+                        ❌ ERROR: ${name}
+                        <br><small>${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        // ============================================================
+        // TEST SUITE
+        // ============================================================
+
+        resultsEl.innerHTML += '<div class="test-section"><h2>1. Basic Validation</h2></div>';
+
+        test('ValidationSubstrate exists', () => {
+            assert(typeof ValidationSubstrate === 'object', 'ValidationSubstrate not found');
+            assert(ValidationSubstrate.version === '1.0.0', 'Wrong version');
+            return { pass: true, message: 'ValidationSubstrate loaded correctly' };
+        });
+
+        test('validate() method exists', () => {
+            assert(typeof ValidationSubstrate.validate === 'function', 'validate method not found');
+            return { pass: true };
+        });
+
+        test('validate() accepts valid entity', () => {
+            const entity = { name: 'Test', value: 42 };
+            const schema = {
+                name: (v) => v !== null,
+                value: (v) => v > 0
+            };
+            const result = ValidationSubstrate.validate(entity, schema);
+            assert(result.valid === true, 'Should be valid');
+            assert(result.errors.length === 0, 'Should have no errors');
+            return { pass: true, message: JSON.stringify(result) };
+        });
+
+        test('validate() rejects invalid entity', () => {
+            const entity = { name: null, value: -5 };
+            const schema = {
+                name: (v) => v !== null || 'Name required',
+                value: (v) => v > 0 || 'Value must be positive'
+            };
+            const result = ValidationSubstrate.validate(entity, schema);
+            assert(result.valid === false, 'Should be invalid');
+            assert(result.errors.length === 2, 'Should have 2 errors');
+            assert(result.field === 'name', 'First failed field should be name');
+            return { pass: true, message: `Errors: ${result.errors.join(', ')}` };
+        });
+
+        resultsEl.innerHTML += '<div class="test-section"><h2>2. Common Validators</h2></div>';
+
+        test('validators.required works', () => {
+            const v = ValidationSubstrate.validators;
+            assert(v.required(42) === true, 'Should accept number');
+            assert(v.required('test') === true, 'Should accept string');
+            assert(v.required(null) !== true, 'Should reject null');
+            assert(v.required(undefined) !== true, 'Should reject undefined');
+            return { pass: true };
+        });
+
+        test('validators.isNumber works', () => {
+            const v = ValidationSubstrate.validators;
+            assert(v.isNumber(42) === true, 'Should accept number');
+            assert(v.isNumber(0) === true, 'Should accept zero');
+            assert(v.isNumber('42') !== true, 'Should reject string');
+            assert(v.isNumber(NaN) !== true, 'Should reject NaN');
+            return { pass: true };
+        });
+
+        test('validators.positive works', () => {
+            const v = ValidationSubstrate.validators;
+            assert(v.positive(1) === true, 'Should accept 1');
+            assert(v.positive(100) === true, 'Should accept 100');
+            assert(v.positive(0) !== true, 'Should reject 0');
+            assert(v.positive(-5) !== true, 'Should reject negative');
+            return { pass: true };
+        });
+
+        test('validators.inRange works', () => {
+            const v = ValidationSubstrate.validators;
+            const inRange = v.inRange(1, 10);
+            assert(inRange(5) === true, 'Should accept 5');
+            assert(inRange(1) === true, 'Should accept min');
+            assert(inRange(10) === true, 'Should accept max');
+            assert(inRange(0) !== true, 'Should reject below min');
+            assert(inRange(11) !== true, 'Should reject above max');
+            return { pass: true };
+        });
+
+        resultsEl.innerHTML += '<div class="test-section"><h2>3. Composite Validators</h2></div>';
+
+        test('all() combines validators with AND', () => {
+            const validator = ValidationSubstrate.all(
+                ValidationSubstrate.validators.required,
+                ValidationSubstrate.validators.isNumber,
+                ValidationSubstrate.validators.positive
+            );
+            assert(validator(5) === true, 'Should accept valid value');
+            assert(validator(-5) !== true, 'Should reject negative');
+            assert(validator('5') !== true, 'Should reject string');
+            assert(validator(null) !== true, 'Should reject null');
+            return { pass: true };
+        });
+
+        test('any() combines validators with OR', () => {
+            const validator = ValidationSubstrate.any(
+                (v) => v === 'admin',
+                (v) => v === 'user'
+            );
+            assert(validator('admin') === true, 'Should accept admin');
+            assert(validator('user') === true, 'Should accept user');
+            assert(validator('guest') !== true, 'Should reject guest');
+            return { pass: true };
+        });
+
+        test('optional() allows null/undefined', () => {
+            const validator = ValidationSubstrate.optional(
+                ValidationSubstrate.validators.positive
+            );
+            assert(validator(null) === true, 'Should accept null');
+            assert(validator(undefined) === true, 'Should accept undefined');
+            assert(validator(5) === true, 'Should accept valid value');
+            assert(validator(-5) !== true, 'Should reject invalid value');
+            return { pass: true };
+        });
+
+        resultsEl.innerHTML += '<div class="test-section"><h2>4. Game-Specific Validators</h2></div>';
+
+        test('game.validateMove() works', () => {
+            const validMove = { pegId: 1, toHoleId: 5, steps: 3 };
+            const result = ValidationSubstrate.game.validateMove(validMove);
+            assert(result.valid === true, 'Should accept valid move');
+            return { pass: true, message: JSON.stringify(result) };
+        });
+
+        test('game.validateMove() rejects invalid', () => {
+            const invalidMove = { pegId: null, toHoleId: 5, steps: -1 };
+            const result = ValidationSubstrate.game.validateMove(invalidMove);
+            assert(result.valid === false, 'Should reject invalid move');
+            assert(result.errors.length > 0, 'Should have errors');
+            return { pass: true, message: `Errors: ${result.errors.join(', ')}` };
+        });
+
+        test('game.validateCard() works', () => {
+            const validCard = { rank: 'A', suit: 'hearts' };
+            const result = ValidationSubstrate.game.validateCard(validCard);
+            assert(result.valid === true, 'Should accept valid card');
+            return { pass: true };
+        });
+
+        test('game.validatePeg() works', () => {
+            const validPeg = { id: 1, holeId: 0, color: 0xff0000 };
+            const result = ValidationSubstrate.game.validatePeg(validPeg);
+            assert(result.valid === true, 'Should accept valid peg');
+            return { pass: true };
+        });
+
+        test('game.validatePlayer() works', () => {
+            const validPlayer = { name: 'Player 1', color: 0xff0000, peg: [] };
+            const result = ValidationSubstrate.game.validatePlayer(validPlayer);
+            assert(result.valid === true, 'Should accept valid player');
+            return { pass: true };
+        });
+
+        resultsEl.innerHTML += '<div class="test-section"><h2>5. Real-World Usage</h2></div>';
+
+        test('Complex schema validation', () => {
+            const gameState = {
+                phase: 'play',
+                currentPlayerIndex: 0,
+                turnCount: 5,
+                players: [
+                    { name: 'Alice', score: 10 },
+                    { name: 'Bob', score: 8 }
+                ]
+            };
+
+            const schema = {
+                phase: ValidationSubstrate.validators.oneOf(['draw', 'play', 'end']),
+                currentPlayerIndex: ValidationSubstrate.all(
+                    ValidationSubstrate.validators.isNumber,
+                    ValidationSubstrate.validators.nonNegative,
+                    ValidationSubstrate.validators.integer
+                ),
+                turnCount: ValidationSubstrate.validators.positive,
+                players: ValidationSubstrate.all(
+                    ValidationSubstrate.validators.isArray,
+                    ValidationSubstrate.validators.minItems(2)
+                )
+            };
+
+            const result = ValidationSubstrate.validate(gameState, schema);
+            assert(result.valid === true, 'Should validate complex game state');
+            return { pass: true, message: 'Complex validation passed' };
+        });
+
+        // ============================================================
+        // SUMMARY
+        // ============================================================
+
+        const passCount = results.filter(r => r.pass).length;
+        const failCount = results.filter(r => !r.pass).length;
+        const totalCount = results.length;
+        const allPass = failCount === 0;
+
+        summaryEl.innerHTML = `
+            <div class="summary ${allPass ? 'all-pass' : 'has-fail'}">
+                <h2>Test Summary</h2>
+                <p><strong>Total Tests:</strong> ${totalCount}</p>
+                <p><strong>Passed:</strong> ${passCount} ✅</p>
+                <p><strong>Failed:</strong> ${failCount} ${failCount > 0 ? '❌' : ''}</p>
+                <p><strong>Success Rate:</strong> ${((passCount / totalCount) * 100).toFixed(1)}%</p>
+                ${allPass ? 
+                    '<p style="color: #4ade80; font-size: 24px; margin-top: 20px;">🎉 ALL TESTS PASSED!</p>' :
+                    '<p style="color: #ef4444; font-size: 24px; margin-top: 20px;">⚠️ SOME TESTS FAILED</p>'
+                }
+            </div>
+        `;
+
+        console.log('ValidationSubstrate Test Results:', {
+            total: totalCount,
+            passed: passCount,
+            failed: failCount,
+            successRate: ((passCount / totalCount) * 100).toFixed(1) + '%'
+        });
+    </script>
+</body>
+</html>

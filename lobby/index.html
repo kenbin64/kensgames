@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lobby - KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .lobby-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      animation: slideDown 0.5s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .user-info h2 {
+      font-size: 24px;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .user-meta {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #d32f2f;
+    }
+
+    .games-section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      color: white;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .game-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s;
+      animation: fadeIn 0.5s ease;
+      cursor: pointer;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .game-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .game-thumbnail {
+      width: 100%;
+      height: 160px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 60px;
+    }
+
+    .game-info {
+      padding: 20px;
+    }
+
+    .game-title {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .game-description {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 15px;
+      line-height: 1.5;
+    }
+
+    .game-button {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .game-button:hover {
+      transform: scale(1.02);
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .loading {
+      text-align: center;
+      color: white;
+      padding: 40px;
+      font-size: 18px;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal h2 {
+      font-size: 22px;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    .modal input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="lobby-container">
+    <header>
+      <div class="user-profile">
+        <div class="avatar" id="avatarDisplay">🎮</div>
+        <div class="user-info">
+          <h2 id="usernameDisplay">Player</h2>
+          <div class="user-meta">Welcome back!</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" onclick="showChangePasswordModal()">Change Password</button>
+        <button class="btn-danger" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <section class="games-section">
+      <h3 class="section-title">🎮 Available Games</h3>
+
+      <div class="error-message" id="errorMessage"></div>
+
+      <div id="gamesContainer" class="games-grid">
+        <div class="loading">Loading games...</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal">
+      <h2>Change Password</h2>
+      <input type="password" id="currentPassword" placeholder="Current password" />
+      <input type="password" id="newPassword" placeholder="New password (min 6 chars)" />
+      <input type="password" id="confirmPassword" placeholder="Confirm new password" />
+      <div class="modal-buttons">
+        <button class="btn-secondary" onclick="closePasswordModal()">Cancel</button>
+        <button class="btn-primary" onclick="changePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Games available in the portal
+    const GAMES = [
+      {
+        id: 'brickbreaker3d',
+        title: 'BrickBreaker3D',
+        emoji: '🧱',
+        description: 'Classic brick breaker game with 3D graphics',
+        url: '/brickbreaker3d-manifold/'
+      },
+      {
+        id: 'space-combat',
+        title: 'Space Combat',
+        emoji: '🚀',
+        description: 'Engage in intense space battles',
+        url: '/space-combat-manifold/'
+      },
+      {
+        id: 'fasttrack',
+        title: 'FastTrack',
+        emoji: '🏎️',
+        description: 'Multiplayer racing game',
+        url: '/fasttrack-manifold/'
+      }
+    ];
+
+    // Initialize lobby on page load
+    window.addEventListener('load', () => {
+      initializeLobby();
+    });
+
+    function initializeLobby() {
+      // Check if logged in
+      const token = localStorage.getItem('user_token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      // Load user profile
+      const username = localStorage.getItem('username');
+      const displayName = localStorage.getItem('display_name');
+      const avatar = localStorage.getItem('avatar');
+
+      document.getElementById('usernameDisplay').textContent = displayName || username;
+      document.getElementById('avatarDisplay').textContent = avatar || '🎮';
+
+      // Load games
+      loadGames();
+    }
+
+    function loadGames() {
+      const container = document.getElementById('gamesContainer');
+      container.innerHTML = '';
+
+      GAMES.forEach((game, index) => {
+        const card = document.createElement('div');
+        card.className = 'game-card';
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.innerHTML = `
+          <div class="game-thumbnail">${game.emoji}</div>
+          <div class="game-info">
+            <div class="game-title">${game.title}</div>
+            <div class="game-description">${game.description}</div>
+            <button class="game-button" onclick="playGame('${game.url}')">Play Game</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function playGame(gameUrl) {
+      window.location.href = gameUrl;
+    }
+
+    function showChangePasswordModal() {
+      document.getElementById('passwordModal').classList.add('show');
+    }
+
+    function closePasswordModal() {
+      document.getElementById('passwordModal').classList.remove('show');
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+    }
+
+    async function changePassword() {
+      // TODO: Implement password change when backend endpoint is available
+      alert('Password change coming soon!');
+      closePasswordModal();
+    }
+
+    function logout() {
+      // Clear session
+      localStorage.removeItem('user_token');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('username');
+      localStorage.removeItem('display_name');
+      localStorage.removeItem('avatar');
+
+      // Redirect to login
+      window.location.href = '/login';
+    }
+  </script>
+</body>
+
+</html>

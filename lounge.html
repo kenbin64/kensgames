@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎭 Logged-In Lounge - Manifold Gaming Portal</title>
+    <meta name="description"
+        content="Multiplayer game lobbies, real-time matchmaking, and global leaderboards on the Manifold Gaming Portal">
+    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
+
+    <style>
+        :root {
+            --primary: #00b4ff;
+            --secondary: #6366f1;
+            --accent: #22d3ee;
+            --gold: #ffd700;
+            --butterfly: #ff6b9d;
+            --bg-dark: #0a0a14;
+            --bg-card: rgba(20, 20, 40, 0.8);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(10, 10, 20, 0.95) 0%, transparent 100%);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        main {
+            position: relative;
+            z-index: 1;
+            padding-top: 100px;
+            min-height: 100vh;
+        }
+
+        .lounge-header {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .lounge-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(48px, 8vw, 72px);
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 60px rgba(0, 180, 255, 0.3);
+        }
+
+        .lounge-subtitle {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .online-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 180, 255, 0.1);
+            border: 2px solid var(--primary);
+            padding: 12px 24px;
+            border-radius: 20px;
+            margin-top: 20px;
+        }
+
+        .online-dot {
+            width: 12px;
+            height: 12px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        section {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 36px;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .game-lobby-card {
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-lobby-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--gold));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.4s;
+        }
+
+        .game-lobby-card:hover {
+            transform: translateY(-12px);
+            border-color: var(--primary);
+            box-shadow: 0 30px 60px rgba(0, 180, 255, 0.2);
+        }
+
+        .game-lobby-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .game-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .game-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--text), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .game-desc {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .lobby-stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 180, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #000;
+            border: none;
+            border-radius: 50px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 40px rgba(0, 180, 255, 0.4);
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            background: rgba(0, 180, 255, 0.1);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 20px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+        }
+
+        .filter-btn.active {
+            background: rgba(0, 180, 255, 0.4);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .leaderboard-section {
+            background: linear-gradient(180deg, transparent, rgba(0, 180, 255, 0.08), transparent);
+        }
+
+        .leaderboard-widget {
+            background: var(--bg-card);
+            border: 2px solid rgba(0, 180, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .leaderboard-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-row {
+            border-bottom: 1px solid rgba(0, 180, 255, 0.2);
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rank {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            width: 40px;
+        }
+
+        .player-name {
+            flex: 1;
+            margin-left: 15px;
+            text-align: left;
+        }
+
+        .score {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        @media (max-width: 900px) {
+            nav {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .lounge-header {
+                padding: 40px 20px;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="/" class="logo">⟳ MANIFOLD</a>
+        <div class="nav-links">
+            <a href="/">🎮 Home</a>
+            <a href="/kensgames.com/lounge.html">🎭 Lounge</a>
+            <a href="#" onclick="handleLogout()">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Header -->
+        <section class="lounge-header">
+            <h1 class="lounge-title">🎭 The Logged-In Lounge</h1>
+            <p class="lounge-subtitle">Matchmade Multiplayer Gaming</p>
+            <div class="online-status">
+                <div class="online-dot"></div>
+                <span id="online-players">0 players online</span>
+            </div>
+        </section>
+
+        <!-- Game Lobbies -->
+        <section>
+            <h2 class="section-title">⚔️ Multiplayer Games</h2>
+
+            <div class="filters">
+                <button class="filter-btn active" onclick="filterGames('all')">All Games</button>
+                <button class="filter-btn" onclick="filterGames('fastpaced')">Fast-Paced</button>
+                <button class="filter-btn" onclick="filterGames('competitive')">Competitive</button>
+                <button class="filter-btn" onclick="filterGames('coop')">Cooperative</button>
+            </div>
+
+            <div class="games-grid" id="lobbies-grid"></div>
+        </section>
+
+        <!-- Global Leaderboard -->
+        <section class="leaderboard-section">
+            <h2 class="section-title">🏆 Global Rankings</h2>
+
+            <div class="leaderboard-widget">
+                <div class="leaderboard-title">Top 10 Players</div>
+                <div class="leaderboard-table" id="global-leaderboard"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Three.js for 3D Background -->
+    <script src="../../../lib/three/three.min.js"></script>
+
+    <!-- Leaderboard Substrate -->
+    <script src="./js/substrates/leaderboard_substrate.js"></script>
+
+    <script>
+        // =========================================
+        // 🌌 DIMENSIONAL BACKGROUND
+        // =========================================
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0, 100);
+
+        // Stars
+        const starCount = 2000;
+        const starPositions = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const radius = 300 + Math.random() * 500;
+
+            starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+            starPositions[i * 3 + 2] = radius * Math.cos(phi) - 200;
+
+            const color = Math.random() > 0.9 ? new THREE.Color(Math.random() * 0xffffff) : new THREE.Color(0xffffff);
+            starColors[i * 3] = color.r;
+            starColors[i * 3 + 1] = color.g;
+            starColors[i * 3 + 2] = color.b;
+        }
+
+        const starGeometry = new THREE.BufferGeometry();
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+        const starMaterial = new THREE.PointsMaterial({
+            size: 1.5,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        const ambientLight = new THREE.AmbientLight(0x606060, 0.4);
+        scene.add(ambientLight);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            stars.rotation.y += 0.0001;
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // =========================================
+        // LOUNGE LOGIC
+        // =========================================
+
+        const multiplayer_games = [
+            {
+                id: 'fasttrack-v2',
+                title: 'FastTrack v2.1.0',
+                icon: '🏎️',
+                desc: 'Classic racing. 2-4 players, 45 min.',
+                players: Math.floor(Math.random() * 100) + 20,
+                lobbies: Math.floor(Math.random() * 5) + 2,
+                category: 'fastpaced'
+            },
+            {
+                id: 'fasttrack-5card',
+                title: 'FastTrack 5 Card Draw',
+                icon: '🎲',
+                desc: 'Quick variant. 2-4 players, 15 min.',
+                players: Math.floor(Math.random() * 80) + 15,
+                lobbies: Math.floor(Math.random() * 4) + 1,
+                category: 'fastpaced'
+            },
+            {
+                id: 'brickbreaker-multi',
+                title: 'BrickBreaker3D Arena',
+                icon: '🎯',
+                desc: 'Competitive. 1-4 players, 25 min.',
+                players: Math.floor(Math.random() * 120) + 30,
+                lobbies: Math.floor(Math.random() * 6) + 3,
+                category: 'competitive'
+            }
+        ];
+
+        function renderLobbies(games = multiplayer_games) {
+            const grid = document.getElementById('lobbies-grid');
+            grid.innerHTML = '';
+
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-lobby-card';
+                card.innerHTML = `
+                    <div class="game-icon">${game.icon}</div>
+                    <h3 class="game-title">${game.title}</h3>
+                    <p class="game-desc">${game.desc}</p>
+                    <div class="lobby-stats">
+                        <div class="stat">
+                            <span class="stat-value">${game.players}</span>
+                            <span class="stat-label">Playing</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">${game.lobbies}</span>
+                            <span class="stat-label">Lobbies</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">🌟</span>
+                            <span class="stat-label">Hot</span>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="joinLobby('${game.id}', '${game.title}')">
+                        Join Game
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+
+            // Update online count
+            const totalOnline = games.reduce((sum, g) => sum + g.players, 0);
+            document.getElementById('online-players').textContent = `${totalOnline} players online`;
+        }
+
+        function filterGames(category) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (category === 'all') {
+                renderLobbies(multiplayer_games);
+            } else {
+                const filtered = multiplayer_games.filter(g => g.category === category);
+                renderLobbies(filtered);
+            }
+        }
+
+        function joinLobby(gameId, gameTitle) {
+            alert(`🎮 Joining ${gameTitle}...\n\nIn production, this would:\n- Connect to WebSocket server\n- Put you in a game lobby\n- Match you with players\n- Launch the game`);
+            // TODO: Implement actual multiplayer connection
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('user_session');
+            window.location.href = '/';
+        }
+
+        function renderGlobalLeaderboard() {
+            const widget = document.getElementById('global-leaderboard');
+
+            // Get aggregated leaderboard from all games
+            const allScores = [];
+            ['fasttrack-v2', 'fasttrack-5card', 'brickbreaker-multi'].forEach(gameId => {
+                const lb = LeaderboardSubstrate.getLeaderboard(gameId, 100);
+                allScores.push(...lb);
+            });
+
+            // Sort and get top 10
+            allScores.sort((a, b) => b.score - a.score);
+            const topPlayers = allScores.slice(0, 10);
+
+            if (topPlayers.length === 0) {
+                widget.innerHTML = '<p style="color: #94a3b8; text-align: center;">No scores yet. Start playing to top the leaderboard!</p>';
+                return;
+            }
+
+            topPlayers.forEach((entry, i) => {
+                const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                const row = document.createElement('div');
+                row.className = 'leaderboard-row';
+                row.style.background = i < 3 ? `rgba(255, 215, 0, ${0.1 - i * 0.02})` : 'transparent';
+                row.innerHTML = `
+                    <span class="rank">${medal}</span>
+                    <span class="player-name">${entry.avatar} ${entry.playerName}</span>
+                    <span class="score">${entry.score.toLocaleString()}</span>
+                `;
+                widget.appendChild(row);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            renderLobbies();
+            renderGlobalLeaderboard();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Email - KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .verify-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 450px;
+      padding: 40px;
+      animation: slideIn 0.3s ease;
+      text-align: center;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .logo {
+      font-size: 50px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    input[type="number"] {
+      font-size: 32px;
+      letter-spacing: 8px;
+    }
+
+    .message {
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .message.show {
+      display: block;
+    }
+
+    .message.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #4caf50;
+    }
+
+    .message.error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #f44336;
+    }
+
+    .message.info {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #2196f3;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 20px;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      display: none;
+    }
+
+    .loading.show {
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .resend-link {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .resend-link a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .resend-link a:hover {
+      text-decoration: underline;
+    }
+
+    .back-link {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .back-link a {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="verify-container">
+    <div class="logo">📧</div>
+    <h1>Verify Your Email</h1>
+    <p class="subtitle">We sent a 6-digit code to your email. Enter it below to activate your account and start playing!
+    </p>
+
+    <div id="successMessage" class="message success"></div>
+    <div id="errorMessage" class="message error"></div>
+    <div id="infoMessage" class="message info"></div>
+
+    <form id="verifyForm">
+      <!-- Username -->
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="Your username" required>
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="your@email.com" required>
+      </div>
+
+      <!-- Verification Code -->
+      <div class="form-group">
+        <label for="verificationCode">Verification Code</label>
+        <input type="number" id="verificationCode" placeholder="000000" min="0" max="999999" required>
+      </div>
+
+      <button type="submit" id="verifyBtn">
+        <span class="loading" id="loading">
+          <div class="spinner"></div>
+        </span>
+        <span id="buttonText">Verify Email</span>
+      </button>
+    </form>
+
+    <div class="resend-link">
+      Didn't receive the code? <a onclick="resendVerificationEmail()">Resend</a>
+    </div>
+
+    <div class="back-link">
+      <a href="/login">Back to Login</a>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '/api/auth';
+
+    // Pre-fill from URL parameters if present
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('email');
+      const username = params.get('username');
+      const code = params.get('code');
+
+      if (email) document.getElementById('email').value = email;
+      if (username) document.getElementById('username').value = username;
+      if (code) document.getElementById('verificationCode').value = code;
+    });
+
+    document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const verificationCode = document.getElementById('verificationCode').value.trim();
+
+      // Clear messages
+      clearMessages();
+
+      // Show loading
+      document.getElementById('loading').classList.add('show');
+      document.getElementById('buttonText').textContent = 'Verifying...';
+
+      try {
+        const response = await fetch(`${API_URL}/verify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: username,
+            email: email,
+            verificationCode: verificationCode
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess(data.message);
+          document.getElementById('verifyForm').disabled = true;
+          document.getElementById('verifyBtn').disabled = true;
+
+          // Redirect to login after 3 seconds
+          setTimeout(() => {
+            window.location.href = '/login?verified=true';
+          }, 3000);
+        } else {
+          showError(data.error || 'Verification failed');
+        }
+      } catch (error) {
+        console.error('Verification error:', error);
+        showError('Verification failed. Please try again.');
+      } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('buttonText').textContent = 'Verify Email';
+      }
+    });
+
+    async function resendVerificationEmail() {
+      const email = document.getElementById('email').value.trim();
+      const username = document.getElementById('username').value.trim();
+
+      if (!email || !username) {
+        showError('Please enter your username and email');
+        return;
+      }
+
+      clearMessages();
+      showInfo('Sending verification code...');
+
+      try {
+        const response = await fetch(`${API_URL}/resend-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: username,
+            email: email
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess('Verification code sent! Check your email.');
+        } else {
+          showError(data.error || 'Failed to resend code');
+        }
+      } catch (error) {
+        console.error('Resend error:', error);
+        showError('Failed to resend code. Please try again.');
+      }
+    }
+
+    function showSuccess(message) {
+      const el = document.getElementById('successMessage');
+      el.textContent = message;
+      el.classList.add('show');
+    }
+
+    function showError(message) {
+      const el = document.getElementById('errorMessage');
+      el.textContent = message;
+      el.classList.add('show');
+    }
+
+    function showInfo(message) {
+      const el = document.getElementById('infoMessage');
+      el.textContent = message;
+      el.classList.add('show');
+    }
+
+    function clearMessages() {
+      document.getElementById('successMessage').classList.remove('show');
+      document.getElementById('errorMessage').classList.remove('show');
+      document.getElementById('infoMessage').classList.remove('show');
+    }
+  </script>
+</body>
+
+</html>

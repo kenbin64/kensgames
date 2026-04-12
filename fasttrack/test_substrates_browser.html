@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Substrate Test - Browser</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #4ade80; }
+        .status { 
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass { background: rgba(74, 222, 128, 0.2); border-left: 4px solid #4ade80; }
+        .fail { background: rgba(239, 68, 68, 0.2); border-left: 4px solid #ef4444; }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Substrate Browser Test</h1>
+    <p>Testing that all substrates load correctly in the browser...</p>
+    
+    <div id="results"></div>
+    <div id="manifold"></div>
+
+    <!-- Load substrates in order -->
+    <script src="validation_substrate.js?v=20260226"></script>
+    <script src="event_substrate.js?v=20260226"></script>
+    <script src="state_substrate.js?v=20260226"></script>
+    <script src="array_substrate.js?v=20260226"></script>
+    <script src="substrate_manifold.js?v=20260226"></script>
+
+    <script>
+        const results = document.getElementById('results');
+        const manifoldDiv = document.getElementById('manifold');
+        
+        function test(name, condition) {
+            const div = document.createElement('div');
+            div.className = condition ? 'status pass' : 'status fail';
+            div.textContent = (condition ? '✅ ' : '❌ ') + name;
+            results.appendChild(div);
+            return condition;
+        }
+
+        // Run tests
+        let allPass = true;
+
+        allPass &= test('ValidationSubstrate loaded', typeof ValidationSubstrate !== 'undefined');
+        allPass &= test('EventSubstrate loaded', typeof EventSubstrate !== 'undefined');
+        allPass &= test('StateSubstrate loaded', typeof StateSubstrate !== 'undefined');
+        allPass &= test('ArraySubstrate loaded', typeof ArraySubstrate !== 'undefined');
+        allPass &= test('SubstrateManifold loaded', typeof SubstrateManifold !== 'undefined');
+
+        if (typeof SubstrateManifold !== 'undefined') {
+            const stats = SubstrateManifold.getStats();
+            allPass &= test('SubstrateManifold has 4 substrates', stats.totalSubstrates === 4);
+            
+            // Show manifold visualization
+            const viz = SubstrateManifold.visualize();
+            manifoldDiv.innerHTML = '<h2>Substrate Manifold</h2><pre>' + viz + '</pre>';
+        }
+
+        // Test basic functionality
+        if (typeof ValidationSubstrate !== 'undefined') {
+            const result = ValidationSubstrate.game.validateMove({
+                pegId: 1,
+                toHoleId: 5,
+                steps: 3
+            });
+            allPass &= test('ValidationSubstrate.validate() works', result.valid === true);
+        }
+
+        if (typeof ArraySubstrate !== 'undefined') {
+            const filtered = ArraySubstrate.filter([1,2,3,4,5], x => x > 2);
+            allPass &= test('ArraySubstrate.filter() works', filtered.length === 3);
+        }
+
+        if (typeof StateSubstrate !== 'undefined') {
+            StateSubstrate.set('test', 'value');
+            const value = StateSubstrate.get('test');
+            allPass &= test('StateSubstrate.set/get() works', value === 'value');
+        }
+
+        // Final result
+        const finalDiv = document.createElement('div');
+        finalDiv.className = allPass ? 'status pass' : 'status fail';
+        finalDiv.innerHTML = allPass 
+            ? '<h2>🎉 ALL TESTS PASSED - Substrates are working in browser!</h2>'
+            : '<h2>⚠️ SOME TESTS FAILED</h2>';
+        results.appendChild(finalDiv);
+
+        console.log('Substrate test complete. All pass:', allPass);
+    </script>
+</body>
+</html>

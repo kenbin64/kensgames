@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Board Render Test</title>
+    <!-- Three.js (locally hosted — no CDN dependency) -->
+    <script src="../../lib/three/three.min.js"></script>
+</head>
+<body>
+    <div id="status"></div>
+    <script>
+        const status = document.getElementById('status');
+        status.innerHTML = 'Testing board render...<br>';
+        
+        // Test if Three.js loads
+        if (typeof THREE !== 'undefined') {
+            status.innerHTML += '✅ THREE.js loaded<br>';
+        } else {
+            status.innerHTML += '❌ THREE.js failed<br>';
+        }
+        
+        // Redirect to actual game
+        setTimeout(() => {
+            window.location.href = 'lobby.html';
+        }, 1000);
+    </script>
+</body>
+</html>

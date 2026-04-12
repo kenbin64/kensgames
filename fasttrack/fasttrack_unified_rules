@@ -1,0 +1,192 @@
+{
+  "fasttrack_unified_ruleset": {
+    "version": "2.0",
+    "description": "Master ruleset unifying all Fasttrack variants: single-card draw, 5-card draw, and 2-dice mode. Canonical source: FASTTRACK_RULES.md v2.0.",
+
+    "players": {
+      "min_players": 2,
+      "max_players": 6,
+      "standard_online_max": 4,
+      "tokens_per_player": 5,
+      "token_start_distribution": {
+        "holding_area": 4,
+        "home_hole": 1
+      }
+    },
+
+    "board": {
+      "movement_direction": "clockwise",
+      "outer_track_holes": 36,
+      "fasttrack_holes": 6,
+      "safe_zone_holes_per_player": 4,
+      "winner_holes_per_player": 1,
+      "bullseye_holes": 1,
+      "home_hole": {
+        "definition": "Diamond-marked hole at the start of each player's track section",
+        "is_start_position": true,
+        "can_be_cut": true
+      },
+      "safe_zone": {
+        "holes_required": 4,
+        "direction": "clockwise_only",
+        "owner_only": true,
+        "safe_from_cuts": true,
+        "exact_landing": true
+      }
+    },
+
+    "fasttrack": {
+      "entry_condition": "Landing exactly on an FT hole as final move (clockwise only, NOT backward)",
+      "must_loop": true,
+      "origin_fasttrack_hole": "ft-{playerIdx} matching player's color",
+
+      "bullseye_entry_from_fasttrack": {
+        "allowed": true,
+        "condition": "Any peg on any ft-* hole with a 1-step card (A, J, Q, K, Joker)",
+        "no_waiting_period": true
+      },
+
+      "blocking_rules": {
+        "if_blocked_by_own_token": "Must exit at prior FT hole or choose alternate move",
+        "multiple_tokens_on_fasttrack": "Can move either token if both moves are legal"
+      },
+
+      "losing_fasttrack": {
+        "on_4_card": "Peg gets mustExitFasttrack flag; must exit on that move",
+        "on_non_ft_move": "If player has FT pegs but moves a non-FT peg, ALL FT pegs lose status at end of turn",
+        "on_voluntary_exit": "Peg moving off FT to outer track loses FT status"
+      }
+    },
+
+    "bullseye": {
+      "entry_condition": "Must land exactly on bullseye as final step (typically from FT with 1-step card)",
+      "while_inside": "Peg is stuck and safe from cuts. Only one peg at a time.",
+      "exit_cards": ["jack", "queen", "king"],
+      "exit_NOT_allowed": ["ace", "joker", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+      "exit_dice": "doubles",
+      "exit_destination": "ft-{playerIdx} (player's own FT hole)",
+      "if_own_ft_occupied": "Exit to previous FT hole"
+    },
+
+    "win_condition": {
+      "safe_zone_filled": true,
+      "description": "4 pegs in safe zone holes, then 5th peg lands exactly on winner/home hole (must have completedCircuit)",
+      "exactness_required": true
+    },
+
+    "token_rules": {
+      "cannot_overtake_own_token": true,
+      "cannot_land_on_own_token": true,
+      "cutting_allowed": true,
+      "cut_destination": {
+        "primary": "opponent_holding_area",
+        "fallback": "opponent_home_hole",
+        "fallback_condition": "when all 4 holding holes are occupied"
+      },
+      "cut_safe_zones": ["holding", "bullseye", "safe_zone"],
+      "cut_NOT_safe": ["home_hole", "fasttrack", "outer_track"]
+    },
+
+    "entry_from_holding": {
+      "destination": "home_hole (diamond marker)",
+      "card_triggers": ["ace", "joker", "six"],
+      "dice_triggers": [2, 6, 12],
+      "notes": "Places peg on home hole. Cannot enter if home hole occupied by own peg."
+    },
+
+    "movement_rules": {
+      "standard_direction": "clockwise",
+
+      "extra_turn_cards": ["ace", "joker", "six", "jack", "queen", "king"],
+      "extra_turn_condition": "Only granted if a legal move was made",
+
+      "royals": {
+        "cards": ["jack", "queen", "king"],
+        "movement": 1,
+        "extra_turn": true,
+        "can_exit_bullseye": true,
+        "can_enter_from_holding": false
+      },
+
+      "ace": {
+        "movement": 1,
+        "direction": "clockwise",
+        "extra_turn": true,
+        "can_enter_from_holding": true,
+        "can_exit_bullseye": false
+      },
+
+      "joker": {
+        "movement": 1,
+        "direction": "clockwise",
+        "extra_turn": true,
+        "can_enter_from_holding": true,
+        "can_exit_bullseye": false
+      },
+
+      "card_6": {
+        "entry_from_holding": true,
+        "entry_movement": 0,
+        "normal_movement": 6,
+        "extra_turn": true
+      },
+
+      "card_7": {
+        "split_allowed": true,
+        "total_steps": 7,
+        "requires_two_tokens_in_play": true,
+        "both_moves_clockwise": true,
+        "cut_only_on_second_move": true,
+        "ft_peg_must_complete_circuit_to_split_with_outer": true,
+        "two_ft_pegs_can_split": true
+      },
+
+      "card_4": {
+        "movement": 4,
+        "direction": "counter_clockwise",
+        "extra_turn": false,
+        "restrictions": {
+          "cannot_enter_fasttrack_mode": true,
+          "cannot_enter_bullseye": true,
+          "cannot_enter_safe_zone": true,
+          "can_traverse_home_perimeter": true,
+          "backward_past_safe_entry_satisfies_circuit": true
+        }
+      },
+
+      "dice_movement": {
+        "movement_type": "sum_based",
+        "direction": "clockwise"
+      },
+      "dice_royals": {
+        "doubles": true,
+        "movement": "sum_of_dice",
+        "extra_turn": true
+      }
+    },
+
+    "variants": {
+      "single_card_draw": {
+        "cards_drawn_per_turn": 1,
+        "choose_one_to_play": true,
+        "discard_after_play": true
+      },
+      "five_card_draw": {
+        "cards_drawn_per_turn": 5,
+        "choose_one_to_play": true,
+        "discard_remaining": true,
+        "decks_used": 2,
+        "total_cards": 108,
+        "includes_jokers": true
+      },
+      "two_dice_roll": {
+        "dice_count": 2,
+        "dice_sides": 6,
+        "movement": "sum_of_dice",
+        "entry_values": [2, 6, 12],
+        "royal_equivalent": "doubles",
+        "extra_turn_on_doubles": true
+      }
+    }
+  }
+}

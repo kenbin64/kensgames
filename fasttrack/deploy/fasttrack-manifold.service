@@ -1,0 +1,25 @@
+[Unit]
+Description=ButterflyFX Manifold Server (Math Transmission Protocol)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/kensgames/fasttrack
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/butterflyfx/dimensionsos
+Environment=MANIFOLD_HOST=127.0.0.1
+Environment=MANIFOLD_PORT=8767
+ExecStart=/usr/bin/python3 /var/www/kensgames/fasttrack/manifold_runner.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

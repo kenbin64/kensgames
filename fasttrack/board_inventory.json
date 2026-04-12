@@ -1,0 +1,193 @@
+{
+  "_meta": {
+    "name": "Fastrack! Board Inventory",
+    "version": "2.0.0",
+    "created": "2026-02-19",
+    "updated": "2026-02-19",
+    "framework": "ButterflyFX Dimensional Substrate",
+    "description": "Complete inventory of all board elements as manifold substrates. All dimensions use golden ratio (φ) cascading for aesthetic harmony.",
+    "gameName": "Fastrack!",
+    "tagline": "The Fast Track to Victory",
+    "designSystem": "Golden Ratio (φ = 1.618033988749895)"
+  },
+  "board": {
+    "id": "board-main",
+    "type": "hexagon",
+    "identity": {
+      "name": "Fast Track Game Board",
+      "level": 4,
+      "semanticLevel": "Manifestation"
+    },
+    "geometry": {
+      "shape": "hexagon",
+      "radius": 300,
+      "thickness": 16,
+      "vertices": 6,
+      "orientation": "flat-top",
+      "startAngle": -30
+    },
+    "material": {
+      "type": "wood",
+      "color": "#d4a574",
+      "roughness": 0.7,
+      "metalness": 0.1
+    }
+  },
+  "borders": {
+    "count": 6,
+    "type": "edge_segment",
+    "segments": [
+      { "id": "border-0", "playerIndex": 0, "color": "#ff0000", "colorName": "Red", "angle": 0 },
+      { "id": "border-1", "playerIndex": 1, "color": "#00ff4a", "colorName": "Teal", "angle": 60 },
+      { "id": "border-2", "playerIndex": 2, "color": "#9400ff", "colorName": "Violet", "angle": 120 },
+      { "id": "border-3", "playerIndex": 3, "color": "#ffdf00", "colorName": "Gold", "angle": 180 },
+      { "id": "border-4", "playerIndex": 4, "color": "#00d4ff", "colorName": "Azure", "angle": 240 },
+      { "id": "border-5", "playerIndex": 5, "color": "#ff008a", "colorName": "Pink", "angle": 300 }
+    ],
+    "geometry": {
+      "width": 15,
+      "height": 22
+    }
+  },
+  "goldenRatio": {
+    "PHI": 1.618033988749895,
+    "BASE_UNIT": 5,
+    "LEVEL_1": 8,
+    "LEVEL_2": 13,
+    "LEVEL_3": 21,
+    "LEVEL_4": 34,
+    "description": "All dimensions cascade from BASE_UNIT using golden ratio"
+  },
+  "constants": {
+    "BOARD_RADIUS": 300,
+    "BOARD_THICKNESS": 21,
+    "innerRadius": 99,
+    "outerRadius": 259.8,
+    "innerHexRadius": 114,
+    "wedgeFactor": 0.618,
+    "HOLE_RADIUS": 8,
+    "TRACK_HOLE_RADIUS": 8,
+    "CENTER_HOLE_RADIUS": 8,
+    "RING_WIDTH": 13,
+    "DIAMOND_SIZE": 13,
+    "BORDER_WIDTH": 13,
+    "PENTAGON_SIZE": 21,
+    "HOLDING_CIRCLE_RADIUS": 34,
+    "HOLDING_HOLE_SPACING": 21,
+    "LINE_HEIGHT": 13,
+    "BORDER_HEIGHT": 29
+  },
+  "players": [
+    { "index": 0, "color": "#ff0000", "colorName": "Red", "colorHex": "0xff0000", "hue": 0 },
+    { "index": 1, "color": "#00ff4a", "colorName": "Teal", "colorHex": "0x00ff4a", "hue": 137.5 },
+    { "index": 2, "color": "#9400ff", "colorName": "Violet", "colorHex": "0x9400ff", "hue": 275 },
+    { "index": 3, "color": "#ffdf00", "colorName": "Gold", "colorHex": "0xffdf00", "hue": 52.5 },
+    { "index": 4, "color": "#00d4ff", "colorName": "Azure", "colorHex": "0x00d4ff", "hue": 190 },
+    { "index": 5, "color": "#ff008a", "colorName": "Pink", "colorHex": "0xff008a", "hue": 327.5 }
+  ],
+  "holes": {
+    "totalCount": 133,
+    "types": {
+      "fasttrack": {
+        "count": 6,
+        "description": "Fast track holes at inner hexagon corners with colored pentagons",
+        "marker": "pentagon",
+        "idFormat": "ft-{playerIndex}"
+      },
+      "center": {
+        "count": 1,
+        "description": "Center bullseye hole with 6 colored rings",
+        "idFormat": "center"
+      },
+      "outer": {
+        "count": 24,
+        "description": "Outer track holes (4 per wedge, excluding home)",
+        "idFormat": "outer-{playerIndex}-{0-3}"
+      },
+      "home": {
+        "count": 6,
+        "description": "Home/winner holes (rightmost outer hole with diamond marker)",
+        "marker": "diamond",
+        "idFormat": "home-{playerIndex}"
+      },
+      "side-left": {
+        "count": 24,
+        "description": "Left side connecting holes (4 per wedge)",
+        "idFormat": "side-left-{playerIndex}-{1-4}"
+      },
+      "side-right": {
+        "count": 24,
+        "description": "Right side connecting holes (4 per wedge)",
+        "idFormat": "side-right-{playerIndex}-{1-4}"
+      },
+      "safezone": {
+        "count": 24,
+        "description": "Safe zone holes (4 per wedge) along wedge centerline, aligned with side holes using t=h/5 interpolation",
+        "idFormat": "safe-{playerIndex}-{1-4}",
+        "enclosure": {
+          "type": "colored-rectangle",
+          "color": "player color",
+          "opacity": 0.6
+        }
+      },
+      "holding": {
+        "count": 24,
+        "description": "Holding area holes (4 per player in 2x2 grid)",
+        "idFormat": "hold-{playerIndex}-{0-3}"
+      }
+    },
+    "registry": "Generated at runtime - see holeRegistry Map in board_3d.html"
+  },
+  "markers": {
+    "pentagons": {
+      "count": 6,
+      "description": "Colored pentagon markers around fast track holes",
+      "size": 21,
+      "goldenLevel": "LEVEL_3"
+    },
+    "diamonds": {
+      "count": 6,
+      "description": "Colored diamond markers around home/winner holes",
+      "size": 13,
+      "goldenLevel": "LEVEL_2"
+    },
+    "bullseye": {
+      "rings": 6,
+      "ringWidth": 13,
+      "centerHoleRadius": 8,
+      "goldenLevels": ["RING_WIDTH: LEVEL_2", "CENTER_HOLE_RADIUS: LEVEL_1"]
+    }
+  },
+  "pegs": {
+    "perPlayer": 5,
+    "totalCount": 30,
+    "style": "Light Bright illuminated pegs with flat disc tops (golden ratio proportioned)",
+    "geometry": {
+      "topRadius": 5,
+      "bottomRadius": 8,
+      "height": 34,
+      "discRadius": 8,
+      "discHeight": 3,
+      "segments": 32,
+      "goldenNotes": "height=LEVEL_4, radii=LEVEL_1, topRadius=LEVEL_1/PHI"
+    },
+    "components": {
+      "body": "Tapered cylinder, translucent glowing",
+      "disc": "Flat cylinder top, same color as body"
+    },
+    "startPositions": {
+      "holding": 4,
+      "home": 1
+    }
+  },
+  "branding": {
+    "text": "★ Fastrack!",
+    "location": "divider circle between bullseye and pentagons",
+    "style": {
+      "font": "bold 64px Segoe UI, Arial",
+      "gradient": ["#FFD700", "#FFA500", "#FFD700"],
+      "dropShadow": true,
+      "orientation": "clockwise, bottoms toward center"
+    }
+  }
+}

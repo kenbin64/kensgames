@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Flow & Multiplayer Tests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .summary {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        }
+        
+        .stat-card.error {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.8;
+        }
+        
+        .results {
+            padding: 30px;
+        }
+        
+        .category-header {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0 10px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .test-item {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #6c757d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .test-item.passed {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .test-item.failed {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        
+        .test-name {
+            font-weight: 600;
+            flex: 1;
+        }
+        
+        .test-details {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        .test-status {
+            font-size: 1.5em;
+            margin-left: 15px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Game Flow & Multiplayer Tests</h1>
+            <p>Testing wizards, socket connections, and navigation flows</p>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="runTests()">
+                ▶️ Run All Tests
+            </button>
+            <button class="btn btn-secondary" onclick="clearResults()">
+                🗑️ Clear Results
+            </button>
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'">
+                🏠 Back to Home
+            </button>
+        </div>
+        
+        <div id="summary" class="summary" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="total-tests">0</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-value" id="passed-tests">0</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat-card error">
+                <div class="stat-value" id="failed-tests">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="success-rate">0%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+        
+        <div id="results" class="results">
+            <div class="loading">
+                Click "Run All Tests" to test game creation wizards and multiplayer flows
+            </div>
+        </div>
+    </div>
+    
+    <script src="test_game_flows.js?v=20260226"></script>
+    
+    <script>
+        function runTests() {
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            
+            resultsDiv.innerHTML = '<div class="loading">Running tests...</div>';
+            
+            setTimeout(() => {
+                const summary = GameFlowTest.runAllTests();
+                displayResults(summary);
+                summaryDiv.style.display = 'grid';
+            }, 500);
+        }
+        
+        function displayResults(summary) {
+            const resultsDiv = document.getElementById('results');
+            
+            document.getElementById('total-tests').textContent = summary.total;
+            document.getElementById('passed-tests').textContent = summary.passed;
+            document.getElementById('failed-tests').textContent = summary.failed;
+            document.getElementById('success-rate').textContent = summary.successRate.toFixed(1) + '%';
+            
+            const categories = {
+                'URL & Detection': [],
+                'Navigation': [],
+                'Socket Connection': [],
+                'Game Codes': [],
+                'Existing Game': [],
+                'Wizards': [],
+                'Page Routing': []
+            };
+            
+            summary.results.forEach(result => {
+                if (result.test.includes('URL') || result.test.includes('Game type')) {
+                    categories['URL & Detection'].push(result);
+                } else if (result.test.includes('Navigation') || result.test.includes('Leave')) {
+                    categories['Navigation'].push(result);
+                } else if (result.test.includes('Socket') || result.test.includes('socket')) {
+                    categories['Socket Connection'].push(result);
+                } else if (result.test.includes('code') || result.test.includes('Code')) {
+                    categories['Game Codes'].push(result);
+                } else if (result.test.includes('Existing Game')) {
+                    categories['Existing Game'].push(result);
+                } else if (result.test.includes('wizard') || result.test.includes('Wizard')) {
+                    categories['Wizards'].push(result);
+                } else if (result.test.includes('routing') || result.test.includes('Page')) {
+                    categories['Page Routing'].push(result);
+                }
+            });
+            
+            let html = '';
+            
+            for (const [category, tests] of Object.entries(categories)) {
+                if (tests.length > 0) {
+                    html += `<div class="category-header">${category}</div>`;
+                    
+                    tests.forEach(result => {
+                        const statusClass = result.passed ? 'passed' : 'failed';
+                        const statusIcon = result.passed ? '✅' : '❌';
+                        
+                        html += `
+                            <div class="test-item ${statusClass}">
+                                <div>
+                                    <div class="test-name">${result.test}</div>
+                                    ${result.details ? `<div class="test-details">${result.details}</div>` : ''}
+                                </div>
+                                <div class="test-status">${statusIcon}</div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = `
+                <div class="loading">
+                    Click "Run All Tests" to test game creation wizards and multiplayer flows
+                </div>
+            `;
+            document.getElementById('summary').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

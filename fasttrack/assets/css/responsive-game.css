@@ -1,0 +1,908 @@
+/**
+ * FastTrack Game - Responsive & 3D Immersive Enhancements
+ * 
+ * Device-adaptive layout, touch controls, and holodeck depth effects
+ * Based on Dimensional Computing principles (φ, Fibonacci, 7-layers)
+ * 
+ * @version 2.0.0
+ * @author ButterflyFX
+ */
+
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+:root {
+    /* Golden Ratio Scale */
+    --phi: 1.618033988749895;
+    
+    /* Responsive spacing */
+    --game-spacing: clamp(8px, 2vw, 20px);
+    --panel-width: clamp(100px, 20vw, 180px);
+    --button-size: clamp(36px, 8vw, 50px);
+    --card-width: clamp(50px, 12vw, 80px);
+    --card-height: clamp(70px, 16vw, 112px);
+    
+    /* UI panel dimensions */
+    --ui-panel-width: clamp(120px, 18vw, 180px);
+    --info-panel-width: clamp(150px, 25vw, 250px);
+    
+    /* Touch target sizes */
+    --touch-target-min: 44px;
+    
+    /* Z-index layers */
+    --z-board: 1;
+    --z-pegs: 10;
+    --z-ui-back: 100;
+    --z-panels: 500;
+    --z-cards: 1000;
+    --z-modals: 5000;
+    --z-overlays: 8000;
+    --z-loading: 10000;
+    
+    /* Animation timings (Fibonacci) */
+    --timing-fast: 89ms;
+    --timing-normal: 144ms;
+    --timing-smooth: 233ms;
+    --timing-slow: 377ms;
+    
+    /* Depth layers for parallax */
+    --depth-bg: 0.1;
+    --depth-board: 0.5;
+    --depth-ui: 1.0;
+}
+
+/* ============================================
+   BASE RESPONSIVE RESETS
+   ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    height: 100dvh;
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0a0604;   /* Billiard room dark */
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+}
+
+/* iOS viewport fix */
+@supports (-webkit-touch-callout: none) {
+    body {
+        height: -webkit-fill-available;
+    }
+}
+
+/* ============================================
+   GAME LAYOUT SHELL — Top bar / Canvas / Action bar
+   ============================================ */
+#game-top-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 12px;
+    background: rgba(8, 5, 2, 0.92);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10006;
+    min-height: 56px;
+    padding-top: calc(6px + env(safe-area-inset-top, 0));
+}
+
+#game-top-bar .gtb-player-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+#game-top-bar .gtb-player-dots::-webkit-scrollbar { display: none; }
+
+/* Compact dot for each player in the top bar */
+.gtb-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+    cursor: default;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.gtb-dot.current {
+    border-color: #d4af37;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+    transform: scale(1.15);
+}
+.gtb-dot .gtb-peg-badge {
+    position: absolute;
+    bottom: -3px;
+    right: -3px;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 2px;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+.gtb-dot .gtb-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(8,5,2,0.96);
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 8px;
+    padding: 5px 10px;
+    white-space: nowrap;
+    font-size: 11px;
+    color: #f0e8d8;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 10010;
+    transition: opacity 0.15s;
+}
+.gtb-dot:hover .gtb-tooltip { opacity: 1; }
+
+/* Deck + drawn card section in the top bar */
+#gtb-deck-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+#gtb-deck-btn {
+    width: 38px;
+    height: 52px;
+    background: linear-gradient(135deg, #2980b9, #1a5276);
+    border-radius: 5px;
+    border: 2px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+    position: relative;
+}
+#gtb-deck-btn::after {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: 2px; bottom: 2px;
+    background: linear-gradient(135deg, #3498db, #2471a3);
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.25);
+    z-index: -1;
+}
+#gtb-deck-btn.draw-ready {
+    animation: deckPulseTop 1.2s ease-in-out infinite;
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.6);
+}
+@keyframes deckPulseTop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+#gtb-drawn-card {
+    width: 38px;
+    height: 52px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 5px;
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 900;
+    color: #c0392b;
+    flex-shrink: 0;
+}
+#gtb-drawn-card.empty {
+    background: rgba(255,255,255,0.07);
+    border: 2px dashed rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.25);
+    font-size: 12px;
+}
+#gtb-drawn-card.black { color: #2c3e50; }
+
+/* The 3D canvas container */
+#container {
+    flex: 1;
+    min-height: 0;           /* Crucial: allow flex child to shrink below content size */
+    width: 100%;
+    position: relative;
+    z-index: var(--z-board);
+}
+
+/* Bottom action bar — shows move buttons */
+#game-action-bar {
+    flex-shrink: 0;
+    display: none;           /* Hidden until there are move choices to show */
+    flex-direction: column;
+    gap: 0;
+    background: rgba(8, 5, 2, 0.95);
+    border-top: 1px solid rgba(212, 175, 55, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 8px 10px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
+    z-index: 10006;
+    max-height: 45vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+#game-action-bar.visible {
+    display: flex;
+}
+#gab-title {
+    color: rgba(240, 232, 216, 0.7);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-align: center;
+}
+#gab-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+.gab-btn {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 2px solid rgba(212, 175, 55, 0.5);
+    background: rgba(30, 20, 10, 0.85);
+    color: #f0e8d8;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+}
+.gab-btn:hover, .gab-btn:focus {
+    border-color: #d4af37;
+    background: rgba(212, 175, 55, 0.15);
+    transform: translateY(-1px);
+}
+.gab-btn:active { transform: translateY(0); }
+.gab-btn.recommended {
+    border-color: #4ade80;
+    box-shadow: 0 0 8px rgba(74,222,128,0.3);
+}
+.gab-btn .gab-icon { font-size: 16px; flex-shrink: 0; }
+.gab-btn .gab-label { flex: 1; line-height: 1.3; }
+.gab-btn .gab-badge {
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(212,175,55,0.3);
+    color: #d4af37;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.gab-btn.recommended .gab-badge {
+    background: rgba(74,222,128,0.3);
+    color: #4ade80;
+}
+
+/* FastTrack status-losing move buttons */
+.gab-btn.ft-loss-move {
+    border-color: rgba(255, 160, 0, 0.45);
+    background: rgba(40, 20, 5, 0.85);
+    opacity: 0.85;
+}
+.gab-btn.ft-loss-move:hover, .gab-btn.ft-loss-move:focus {
+    border-color: #ffa000;
+    background: rgba(255, 160, 0, 0.12);
+}
+.gab-badge.ft-loss-badge {
+    background: rgba(255, 160, 0, 0.3);
+    color: #ffa000;
+}
+/* Divider between FT-preserving and FT-losing moves */
+.gab-ft-divider {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(255, 160, 0, 0.55);
+    letter-spacing: 0.5px;
+    padding: 2px 0;
+    flex-shrink: 0;
+}
+
+/* 7-card split UI */
+#gab-split-container {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 4px;
+}
+#gab-split-container.visible { display: flex; }
+.gab-split-header {
+    color: #d4af37;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+}
+.gab-split-step {
+    background: rgba(212,175,55,0.08);
+    border: 1px solid rgba(212,175,55,0.25);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.gab-split-step-title {
+    color: rgba(240,232,216,0.6);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 5px;
+}
+.gab-split-step-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+/* ============================================
+   LEGACY #ui PANEL - REMOVED
+   Settings now handled by GameUIMinimal menu
+   ============================================ */
+
+/* ============================================
+   INFO PANEL (Bottom Left)
+   ============================================ */
+#info {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 10px;
+    color: #fff;
+    z-index: var(--z-ui-back);
+    font-size: 12px;
+}
+
+@media (min-width: 769px) {
+    #info {
+        bottom: 20px;
+        left: 20px;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    #info {
+        display: none; /* Hide on mobile - free up space */
+    }
+}
+
+/* ============================================
+   PLAYER PANELS — legacy element, now hidden
+   (replaced by #game-top-bar dots)
+   ============================================ */
+#player-panels {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Desktop - full panels */
+@media (min-width: 1025px) {
+    #player-panels {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 15px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    .player-panel {
+        padding: 12px 18px !important;
+        min-width: 140px;
+    }
+}
+
+/* Tablet - compact panels */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #player-panels {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 10px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    .player-panel {
+        padding: 8px 14px !important;
+        min-width: 110px;
+        font-size: 12px !important;
+    }
+}
+
+/* Mobile - compact player panels (horizontal strip below header) */
+@media (max-width: 768px) {
+    #player-panels {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        top: 60px !important;
+        padding: 6px 8px !important;
+        background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%) !important;
+    }
+    
+    #player-panels::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .player-panel {
+        padding: 5px 8px !important;
+        min-width: 70px !important;
+        max-width: 110px !important;
+        flex: 0 0 auto !important;
+        font-size: 10px !important;
+        border-radius: 8px !important;
+        background: rgba(0,0,0,0.6) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+    }
+    
+    .player-panel .player-name {
+        font-size: 10px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 70px !important;
+    }
+    
+    .player-panel .peg-indicator {
+        width: 14px !important;
+        height: 14px !important;
+    }
+    
+    .player-panel .peg-count,
+    .player-panel .safe-count {
+        font-size: 9px !important;
+    }
+    
+    /* Smaller AI badge on mobile */
+    .ai-badge {
+        font-size: 7px !important;
+        padding: 1px 3px !important;
+    }
+    
+    /* Current turn panel stands out */
+    .player-panel.current-turn {
+        transform: scale(1.08) !important;
+        min-width: 80px !important;
+        z-index: 2;
+    }
+}
+
+/* Current turn indicator - works on all sizes */
+.player-panel.current-turn {
+    box-shadow: 0 0 20px 5px rgba(74, 222, 128, 0.6) !important;
+    transform: scale(1.05);
+    border: 2px solid #4ade80 !important;
+    animation: turnPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes turnPulse {
+    0%, 100% { box-shadow: 0 0 20px 5px rgba(74, 222, 128, 0.4); }
+    50% { box-shadow: 0 0 30px 8px rgba(74, 222, 128, 0.7); }
+}
+
+/* ============================================
+   CARD CONTAINER — HIDDEN (using compact panel deck)
+   ============================================ */
+#card-container,
+#card-container-placeholder,
+.card-ui-container {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Desktop cards - old card UI hidden, no styles needed */
+
+/* Card holodeck effect */
+.game-card,
+.card-container .card {
+    transform-style: preserve-3d;
+    transition: transform var(--timing-smooth);
+    cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .game-card:hover,
+    .card-container .card:hover {
+        transform: translateY(-10px) rotateX(5deg) scale(1.1);
+        box-shadow: 
+            0 15px 30px rgba(0, 0, 0, 0.5),
+            0 0 30px rgba(136, 85, 255, 0.4);
+    }
+}
+
+@media (hover: none) {
+    .game-card:active,
+    .card-container .card:active {
+        transform: scale(0.95);
+    }
+}
+
+/* ============================================
+   START GAME SCREEN (Responsive)
+   ============================================ */
+#start-game-screen {
+    padding: var(--game-spacing);
+    padding-top: calc(20px + env(safe-area-inset-top, 0));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#start-game-screen h1 {
+    font-size: clamp(28px, 8vw, 48px);
+    text-align: center;
+}
+
+#start-game-screen .subtitle {
+    font-size: clamp(14px, 3vw, 18px);
+}
+
+.player-setup {
+    padding: clamp(15px, 4vw, 30px) clamp(20px, 5vw, 50px);
+    max-width: 600px;
+    margin: 0 auto 20px;
+}
+
+.player-list {
+    display: flex;
+    gap: clamp(10px, 3vw, 20px);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.player-card {
+    padding: clamp(10px, 2vw, 15px) clamp(15px, 3vw, 25px);
+    min-width: clamp(90px, 20vw, 120px);
+}
+
+.player-card .name {
+    font-size: clamp(12px, 2.5vw, 16px);
+}
+
+.player-card .type {
+    font-size: clamp(10px, 2vw, 12px);
+}
+
+#start-btn {
+    padding: clamp(12px, 3vw, 20px) clamp(30px, 8vw, 60px);
+    font-size: clamp(16px, 4vw, 24px);
+    min-height: var(--touch-target-min);
+}
+
+/* ============================================
+   MODALS & OVERLAYS (Responsive)
+   ============================================ */
+.ai-thinking,
+#turn-action-banner,
+#bot-alert,
+.split-move-indicator {
+    padding: clamp(15px, 4vw, 30px) clamp(25px, 6vw, 50px);
+    border-radius: clamp(10px, 2vw, 20px);
+    font-size: clamp(14px, 3vw, 18px);
+    max-width: calc(100vw - 40px);
+}
+
+#pause-overlay {
+    padding: var(--game-spacing);
+}
+
+#pause-overlay .pause-title {
+    font-size: clamp(28px, 8vw, 48px);
+}
+
+#pause-overlay .pause-timer {
+    font-size: clamp(40px, 12vw, 72px);
+}
+
+#pause-overlay .resume-btn {
+    padding: clamp(10px, 3vw, 15px) clamp(25px, 6vw, 40px);
+    font-size: clamp(16px, 4vw, 24px);
+    min-height: var(--touch-target-min);
+}
+
+/* Pause button - accessible on all devices */
+#pause-btn {
+    width: var(--button-size);
+    height: var(--button-size);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    font-size: clamp(16px, 4vw, 20px);
+}
+
+@media (max-width: 768px) {
+    #pause-btn {
+        bottom: 140px; /* Above rules button */
+    }
+    #rules-toggle-btn {
+        bottom: 80px; /* Above mobile UI dock */
+    }
+    #camera-toggle-btn {
+        bottom: 200px; /* Above pause button */
+    }
+    #exit-game-btn {
+        bottom: 260px; /* Above camera button */
+    }
+}
+
+/* TURN TIMER — REMOVED */
+
+/* ============================================
+   MOBILE TOUCH GESTURES OVERLAY
+   ============================================ */
+.touch-controls {
+    display: none;
+    position: fixed;
+    bottom: 150px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-ui-back);
+    gap: 15px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .touch-controls {
+        display: flex;
+    }
+}
+
+.touch-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--timing-fast);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.touch-btn:active {
+    transform: scale(0.9);
+    background: rgba(136, 85, 255, 0.5);
+}
+
+/* ============================================
+   3D DEPTH ENHANCEMENTS
+   ============================================ */
+
+/* Board container depth effect */
+/* NOTE: perspective and preserve-3d REMOVED — they break WebGL context creation
+   in Three.js. The 3D rendering is done by WebGL, not CSS transforms. */
+/*
+#container {
+    perspective: 2000px;
+    transform-style: preserve-3d;
+}
+*/
+
+/* Ambient glow behind board */
+#container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80%;
+    height: 80%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+        ellipse at center,
+        rgba(136, 85, 255, 0.15) 0%,
+        rgba(64, 255, 255, 0.05) 40%,
+        transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* ============================================
+   LANDSCAPE ORIENTATION HANDLING
+   ============================================ */
+@media (max-height: 500px) and (orientation: landscape) {
+    #player-panels {
+        padding: 5px 10px !important;
+    }
+    
+    .player-panel {
+        padding: 4px 8px !important;
+        min-width: 70px !important;
+    }
+    
+    #card-container,
+    .card-container {
+        bottom: 60px !important;
+    }
+    
+    .card-container .card,
+    .game-card {
+        width: 40px;
+        height: 56px;
+        font-size: 14px;
+    }
+}
+
+/* ============================================
+   HIGH DPI (Retina) ENHANCEMENTS
+   ============================================ */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Sharper borders and shadows */
+    .player-panel,
+    .game-card {
+        box-shadow: 
+            0 0 0 0.5px rgba(255, 255, 255, 0.1),
+            0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* ============================================
+   DARK MODE (System Preference)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    /* Already dark, but enhance contrast */
+    #info,
+    .player-panel {
+        border-color: rgba(136, 85, 255, 0.4);
+    }
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .player-panel.current-turn {
+        animation: none;
+    }
+}
+
+/* ============================================
+   YOUR TURN POPUP — Billiard-styled, 2s auto-dismiss
+   ============================================ */
+#your-turn-popup {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-12px);
+    z-index: 20010;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px 12px 16px;
+    background: linear-gradient(135deg, rgba(10,8,4,0.97) 0%, rgba(20,14,8,0.97) 100%);
+    border: 1.5px solid rgba(212,175,55,0.6);
+    border-radius: 12px;
+    box-shadow:
+        0 4px 24px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(212,175,55,0.15),
+        inset 0 1px 0 rgba(212,175,55,0.12);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+}
+#your-turn-popup.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+#your-turn-popup.fading {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+    pointer-events: none;
+}
+.ytp-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+}
+.ytp-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.ytp-label {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(212,175,55,0.8);
+}
+.ytp-name {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #f0e8d8;
+    line-height: 1.2;
+}
+.ytp-dismiss {
+    background: none;
+    border: none;
+    color: rgba(240,232,216,0.45);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+.ytp-dismiss:hover {
+    color: #f0e8d8;
+    background: rgba(212,175,55,0.15);
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    #container,
+    #info,
+    #player-panels,
+    .card-container {
+        display: none !important;
+    }
+}

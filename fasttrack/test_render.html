@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Render Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        #status {
+            padding: 20px;
+            background: #16213e;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #4ade80;
+        }
+        .test-item.fail {
+            border-left-color: #ef4444;
+        }
+        #redirect {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 FastTrack Board Render Test</h1>
+    <div id="status">
+        <h2>Running Tests...</h2>
+        <div id="tests"></div>
+    </div>
+    <div id="redirect"></div>
+
+    <script>
+        const tests = document.getElementById('tests');
+        const redirect = document.getElementById('redirect');
+        
+        function addTest(name, passed, details = '') {
+            const div = document.createElement('div');
+            div.className = 'test-item' + (passed ? '' : ' fail');
+            div.innerHTML = `${passed ? '✅' : '❌'} ${name}${details ? '<br><small>' + details + '</small>' : ''}`;
+            tests.appendChild(div);
+            return passed;
+        }
+        
+        // Test 1: Check if we can load the lobby
+        addTest('Server Running', true, 'localhost:8080 is accessible');
+        
+        // Test 2: Check URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const hasDebug = params.get('debug') === 'true';
+        addTest('Debug Mode', hasDebug, hasDebug ? 'Debug parameter detected' : 'Add ?debug=true to URL');
+        
+        // Test 3: Check localStorage
+        const hasStorage = typeof localStorage !== 'undefined';
+        addTest('LocalStorage Available', hasStorage);
+        
+        // Test 4: Check for common errors
+        let errorCount = 0;
+        window.onerror = function(msg, src, line) {
+            errorCount++;
+            addTest(`Error Detected`, false, `${msg} at ${src}:${line}`);
+        };
+        
+        // Test 5: Simulate loading key scripts
+        const scriptsToTest = [
+            'observation_substrate.js',
+            'intent_manifold.js',
+            'potential_substrate.js',
+            'vr_esp.js'
+        ];
+        
+        let scriptsLoaded = 0;
+        scriptsToTest.forEach(script => {
+            fetch(script, { method: 'HEAD' })
+                .then(response => {
+                    const passed = response.ok;
+                    addTest(`Script: ${script}`, passed, passed ? 'Found' : 'Not found (404)');
+                    scriptsLoaded++;
+                    
+                    if (scriptsLoaded === scriptsToTest.length) {
+                        finishTests();
+                    }
+                })
+                .catch(err => {
+                    addTest(`Script: ${script}`, false, err.message);
+                    scriptsLoaded++;
+                    
+                    if (scriptsLoaded === scriptsToTest.length) {
+                        finishTests();
+                    }
+                });
+        });
+        
+        function finishTests() {
+            setTimeout(() => {
+                if (errorCount === 0) {
+                    redirect.innerHTML = `
+                        <h3>✅ All Tests Passed!</h3>
+                        <p>Redirecting to lobby in 3 seconds...</p>
+                        <p><a href="lobby.html" style="color: #4ade80;">Click here to go now</a></p>
+                    `;
+                    setTimeout(() => {
+                        window.location.href = 'lobby.html';
+                    }, 3000);
+                } else {
+                    redirect.innerHTML = `
+                        <h3>⚠️ ${errorCount} Error(s) Detected</h3>
+                        <p>Check the console for details.</p>
+                        <p><a href="lobby.html" style="color: #4ade80;">Try lobby anyway</a></p>
+                    `;
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
+

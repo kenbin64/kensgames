@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Login - Manifold Gaming Portal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #0a0a14;
+            color: #e2e8f0;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .loading {
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid rgba(0, 180, 255, 0.3);
+            border-top: 3px solid #00b4ff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <h2>Authenticating with Facebook...</h2>
+        <p>Redirecting you back to the game portal</p>
+    </div>
+
+    <script>
+        /**
+         * OAuth Facebook Callback Handler
+         * MVP: simulates a successful login from the real OAuth code.
+         * Production: replace the userData block with a real /api/auth/oauth/exchange call.
+         */
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            const state = params.get('state');
+            const error = params.get('error');
+            const stored = sessionStorage.getItem('oauth_state_facebook');
+
+            function fail(reason) {
+                window.location.href = `/?login=failed&provider=facebook&reason=${encodeURIComponent(reason)}`;
+            }
+
+            if (error) {
+                return fail(error);
+            }
+
+            if (!code) {
+                return fail('missing_code');
+            }
+
+            if (stored && stored !== state) {
+                return fail('invalid_state');
+            }
+
+            // MVP simulation — replace with real token exchange when backend is ready
+            const userData = {
+                id: `fb_${Math.random().toString(36).substring(2, 9)}`,
+                name: `FacebookUser_${Math.floor(Math.random() * 10000)}`,
+                displayName: `Player_${Math.floor(Math.random() * 1000)}`,
+                avatar: '🔵',
+                provider: 'facebook',
+                email: `user_${Math.random().toString(36).substring(2, 9)}@fb.local`,
+                authenticated: true,
+                timestamp: Date.now()
+            };
+
+            sessionStorage.setItem('user_session', JSON.stringify(userData));
+            sessionStorage.removeItem('oauth_state_facebook');
+
+            window.location.href = '/?login=success&provider=facebook';
+        })();
+    </script>
+</body>
+
+</html>

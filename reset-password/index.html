@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password - KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 450px;
+      padding: 40px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon {
+      text-align: center;
+      font-size: 50px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="password"],
+    input[type="email"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="password"]:focus,
+    input[type="email"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .password-strength {
+      margin-top: 8px;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .strength-bar {
+      height: 100%;
+      width: 0%;
+      transition: all 0.3s;
+      border-radius: 2px;
+    }
+
+    .strength-bar.weak {
+      width: 33%;
+      background: #c33;
+    }
+
+    .strength-bar.medium {
+      width: 66%;
+      background: #ff9800;
+    }
+
+    .strength-bar.strong {
+      width: 100%;
+      background: #3c3;
+    }
+
+    .strength-text {
+      font-size: 11px;
+      margin-top: 4px;
+      color: #666;
+    }
+
+    .requirements {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+
+    .requirement {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      color: #666;
+    }
+
+    .requirement:last-child {
+      margin-bottom: 0;
+    }
+
+    .requirement.met {
+      color: #3c3;
+    }
+
+    .requirement-icon {
+      margin-right: 8px;
+      min-width: 20px;
+    }
+
+    .feedback {
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.valid {
+      color: #3c3;
+    }
+
+    .feedback.invalid {
+      color: #c33;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .success-message {
+      background: #efe;
+      color: #3c3;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .link a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .link a:hover {
+      text-decoration: underline;
+    }
+
+    .error-box {
+      background: #fee;
+      color: #c33;
+      padding: 20px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+
+    .error-box a {
+      color: #c33;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="icon">🔑</div>
+    <h1>Reset Password</h1>
+    <p class="subtitle">Enter your new password below</p>
+
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+    <form id="resetForm">
+      <!-- Email (hidden/readonly) -->
+      <input type="hidden" id="email" name="email" />
+      <input type="hidden" id="token" name="token" />
+
+      <!-- Email Display -->
+      <div class="form-group" style="display: none;">
+        <label>Email:</label>
+        <p id="emailDisplay" style="padding: 12px; background: #f5f5f5; border-radius: 6px; color: #666;"></p>
+      </div>
+
+      <!-- New Password -->
+      <div class="form-group">
+        <label for="password">New Password</label>
+        <input type="password" id="password" name="password" placeholder="Create a strong password" required
+          autocomplete="new-password" />
+        <div class="password-strength">
+          <div class="strength-bar" id="strengthBar"></div>
+        </div>
+        <div class="strength-text" id="strengthText"></div>
+
+        <div class="requirements">
+          <div class="requirement" id="req-length">
+            <span class="requirement-icon">○</span>
+            <span>At least 8 characters</span>
+          </div>
+          <div class="requirement" id="req-uppercase">
+            <span class="requirement-icon">○</span>
+            <span>At least 1 uppercase letter (A-Z)</span>
+          </div>
+          <div class="requirement" id="req-special">
+            <span class="requirement-icon">○</span>
+            <span>At least 1 special character (!%$#&)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter password" required
+          autocomplete="new-password" />
+        <div class="feedback" id="confirmFeedback"></div>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="btn-primary" id="submitBtn">Reset Password</button>
+        <button type="button" class="btn-secondary" onclick="window.location.href='/login'">
+          Back to Login
+        </button>
+      </div>
+
+      <div class="loading" id="loading">
+        <span>Resetting password...</span>
+      </div>
+    </form>
+
+    <div id="errorBox"></div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000/api/auth';
+
+    // Get token and email from URL
+    function initializeForm() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const email = params.get('email');
+
+      if (!token || !email) {
+        document.getElementById('errorBox').innerHTML = `
+          <div class="error-box">
+            ❌ Invalid recovery link or missing token<br>
+            <a href="/forgot-password">← Request a new recovery link</a>
+          </div>
+        `;
+        document.getElementById('resetForm').style.display = 'none';
+        return;
+      }
+
+      document.getElementById('token').value = token;
+      document.getElementById('email').value = email;
+      document.getElementById('emailDisplay').textContent = email;
+    }
+
+    // Password strength validation
+    document.getElementById('password').addEventListener('input', validatePassword);
+    function validatePassword() {
+      const password = document.getElementById('password').value;
+
+      const hasLength = password.length >= 8;
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasSpecial = /[!%$#&]/.test(password);
+
+      updateRequirement('req-length', hasLength);
+      updateRequirement('req-uppercase', hasUppercase);
+      updateRequirement('req-special', hasSpecial);
+
+      let strength = 0;
+      if (hasLength) strength++;
+      if (hasUppercase) strength++;
+      if (hasSpecial) strength++;
+
+      const strengthBar = document.getElementById('strengthBar');
+      const strengthText = document.getElementById('strengthText');
+
+      strengthBar.className = 'strength-bar';
+      if (strength === 0) {
+        strengthText.textContent = '';
+      } else if (strength === 1) {
+        strengthBar.classList.add('weak');
+        strengthText.textContent = 'Weak password';
+      } else if (strength === 2) {
+        strengthBar.classList.add('medium');
+        strengthText.textContent = 'Medium strength';
+      } else {
+        strengthBar.classList.add('strong');
+        strengthText.textContent = 'Strong password ✓';
+      }
+
+      validateConfirm();
+    }
+
+    function updateRequirement(id, met) {
+      const element = document.getElementById(id);
+      const icon = element.querySelector('.requirement-icon');
+      if (met) {
+        element.classList.add('met');
+        icon.textContent = '✓';
+      } else {
+        element.classList.remove('met');
+        icon.textContent = '○';
+      }
+    }
+
+    // Confirm password validation
+    document.getElementById('confirmPassword').addEventListener('input', validateConfirm);
+    function validateConfirm() {
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('confirmPassword').value;
+      const feedback = document.getElementById('confirmFeedback');
+
+      if (password.length === 0 && confirm.length === 0) {
+        feedback.classList.remove('show');
+      } else if (confirm.length === 0) {
+        feedback.textContent = '⊘ Confirm password';
+        feedback.classList.add('show', 'invalid');
+        feedback.classList.remove('valid');
+      } else if (password !== confirm) {
+        feedback.textContent = '❌ Passwords do not match';
+        feedback.classList.add('show', 'invalid');
+        feedback.classList.remove('valid');
+      } else {
+        feedback.textContent = '✓ Passwords match';
+        feedback.classList.add('show', 'valid');
+        feedback.classList.remove('invalid');
+      }
+    }
+
+    // Form submission
+    document.getElementById('resetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      const token = document.getElementById('token').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (password !== confirmPassword) {
+        document.getElementById('errorMessage').textContent = 'Passwords do not match';
+        document.getElementById('errorMessage').classList.add('show');
+        return;
+      }
+
+      document.getElementById('errorMessage').classList.remove('show');
+      document.getElementById('successMessage').classList.remove('show');
+      document.getElementById('loading').classList.add('show');
+      document.getElementById('submitBtn').disabled = true;
+
+      try {
+        const response = await fetch(`${API_URL}/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            token: token,
+            password: password
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('successMessage').innerHTML = '<strong>✓ Password reset successful!</strong><br>Redirecting to login...';
+          document.getElementById('successMessage').classList.add('show');
+
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        } else {
+          throw new Error(data.error || 'Password reset failed');
+        }
+      } catch (error) {
+        console.error('Reset error:', error);
+        document.getElementById('errorMessage').textContent = error.message;
+        document.getElementById('errorMessage').classList.add('show');
+      } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('submitBtn').disabled = false;
+      }
+    });
+
+    // Check if already logged in and initialize form
+    window.addEventListener('load', () => {
+      if (localStorage.getItem('user_token')) {
+        window.location.href = '/lobby';
+      }
+      initializeForm();
+    });
+  </script>
+</body>
+
+</html>

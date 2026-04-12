@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fast Track — How to Play, Rules, Themes &amp; More</title>
+    <meta name="description" content="Complete guide to Fast Track board game. Rules, strategy, themes, controls, difficulty levels and more. Learn to play in minutes.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kensgames.com/fasttrack/docs.html">
+
+    <script src="analytics_substrate.js"></script>
+    <script src="seo_substrate.js"></script>
+
+    <link rel="icon" href="assets/images/ftLogo.png" type="image/png">
+    <link rel="apple-touch-icon" href="assets/images/ftLogo.png">
+    <link rel="stylesheet" href="../../lib/fonts/fonts.css">
+
+    <style>
+        :root {
+            --primary: #e74c3c;
+            --primary-dark: #c0392b;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --bg-dark: #0d1117;
+            --bg-card: #161b22;
+            --bg-hover: #21262d;
+            --text: #f0f6fc;
+            --text-muted: #8b949e;
+            --border: #30363d;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.65;
+            overflow-x: hidden;
+        }
+        a { color: var(--secondary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ═══ TOP BAR ═══ */
+        .top-bar {
+            position: sticky; top: 0; z-index: 100;
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            background: rgba(13,17,23,0.97);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .top-bar .back-btn {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 1.3em; cursor: pointer; padding: 6px 10px;
+            border-radius: 8px; min-width: 40px; min-height: 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .top-bar .back-btn:active { background: rgba(255,255,255,0.1); }
+        .top-bar .title { font-weight: 700; font-size: 1.05em; }
+
+        /* ═══ TABLE OF CONTENTS ═══ */
+        .toc {
+            max-width: 720px; margin: 0 auto;
+            padding: 20px 16px;
+        }
+        .toc h2 {
+            font-size: 1.1em; color: var(--gold);
+            margin-bottom: 16px; font-weight: 700;
+        }
+        .toc-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .toc-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 16px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            text-decoration: none; color: var(--text);
+        }
+        .toc-item:hover { border-color: var(--primary); background: var(--bg-hover); text-decoration: none; }
+        .toc-icon { font-size: 1.4em; flex-shrink: 0; }
+        .toc-label { font-size: 0.85em; font-weight: 600; }
+        @media (max-width: 480px) {
+            .toc-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ═══ CONTENT ═══ */
+        .doc-section {
+            max-width: 720px; margin: 0 auto;
+            padding: 24px 16px 16px;
+            border-top: 1px solid var(--border);
+        }
+        .doc-section h2 {
+            font-size: 1.15em; font-weight: 700;
+            color: var(--gold); margin-bottom: 14px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .doc-section h3 {
+            font-size: 0.95em; font-weight: 700;
+            color: var(--text); margin: 18px 0 8px;
+        }
+        .doc-section p {
+            margin-bottom: 12px; color: #c9d1d9; font-size: 0.92em;
+        }
+
+        .rule-list {
+            list-style: none; padding: 0; margin: 0 0 16px;
+        }
+        .rule-list li {
+            padding: 10px 14px; margin-bottom: 6px;
+            background: var(--bg-card); border-radius: 10px;
+            border-left: 3px solid var(--primary);
+            font-size: 0.88em; color: #c9d1d9;
+            display: flex; align-items: flex-start; gap: 10px;
+        }
+        .rule-list li .ri { font-size: 1.1em; flex-shrink: 0; margin-top: 1px; }
+
+        .info-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px; margin-bottom: 12px;
+        }
+        .info-card .ic-title {
+            font-weight: 700; font-size: 0.9em; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .info-card .ic-body { font-size: 0.85em; color: var(--text-muted); }
+
+        .theme-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 18px; margin-bottom: 14px;
+            display: flex; gap: 16px; align-items: flex-start;
+        }
+        .theme-icon { font-size: 2.4em; flex-shrink: 0; }
+        .theme-info { flex: 1; }
+        .theme-info .t-name { font-weight: 700; font-size: 0.95em; }
+        .theme-info .t-desc { font-size: 0.82em; color: var(--text-muted); margin: 4px 0; }
+        .theme-info .t-music { font-size: 0.78em; color: #8b949e; }
+
+        .diff-card {
+            background: var(--bg-card); border-left: 4px solid;
+            border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+        }
+        .diff-card .dc-name { font-weight: 700; font-size: 0.92em; }
+        .diff-card .dc-desc { font-size: 0.82em; color: var(--text-muted); margin-top: 4px; }
+
+        .glossary-term {
+            padding: 10px 14px; margin-bottom: 6px;
+            background: var(--bg-card); border-radius: 10px;
+            font-size: 0.88em;
+        }
+        .glossary-term strong { color: var(--gold); }
+
+        .controls-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-bottom: 14px;
+        }
+        .ctrl-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px; text-align: center;
+        }
+        .ctrl-card .cc-icon { font-size: 1.6em; margin-bottom: 4px; }
+        .ctrl-card .cc-label { font-weight: 600; font-size: 0.82em; }
+        .ctrl-card .cc-desc { font-size: 0.75em; color: var(--text-muted); margin-top: 2px; }
+        @media (max-width: 480px) {
+            .controls-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        .board-map {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px; text-align: center;
+            margin-bottom: 14px;
+        }
+        .board-map .bm-legend {
+            display: flex; flex-wrap: wrap; gap: 10px;
+            justify-content: center; margin-top: 12px;
+        }
+        .legend-item {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.78em; color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            display: inline-block; border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .back-to-top {
+            display: block; text-align: center;
+            padding: 14px; font-size: 0.85em;
+            color: var(--text-muted); cursor: pointer;
+        }
+        .back-to-top:hover { color: var(--text); }
+
+        .credits-section {
+            text-align: center; padding: 40px 16px;
+            max-width: 720px; margin: 0 auto;
+        }
+        .credits-section .credit-logo { font-size: 3em; margin-bottom: 8px; }
+        .credits-section h2 {
+            font-size: 1.2em; color: var(--gold); margin-bottom: 16px;
+        }
+        .credits-section p { font-size: 0.88em; color: var(--text-muted); margin-bottom: 8px; }
+
+        .strategy-list { list-style: none; padding: 0; }
+        .strategy-list li {
+            padding: 12px 14px; margin-bottom: 8px;
+            background: var(--bg-card); border-radius: 10px;
+            font-size: 0.88em; border-left: 3px solid var(--success);
+        }
+        .strategy-list li strong { color: var(--success); }
+
+        /* Smooth scroll */
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+    <button class="back-btn" onclick="history.back()" title="Back">&larr;</button>
+    <span class="title">📖 Fast Track Guide</span>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PREFACE: HOW TO USE THIS GUIDE            -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="preface">
+    <h2>👋 Welcome</h2>
+    <p>This guide covers everything about Fast Track. Each section stands on its own. Tap any topic below to jump straight to it. If you are new, start with <a href="#how-to-win">How to Win</a> and then read <a href="#getting-pegs-out">Getting Pegs Out</a>.</p>
+    <p>Sections are short on purpose. No jargon, no tech speak. Just what you need to play well and have fun.</p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc" id="toc">
+    <h2>📑 Contents</h2>
+    <div class="toc-grid">
+        <a class="toc-item" href="#how-to-win"><span class="toc-icon">🏆</span><span class="toc-label">How to Win</span></a>
+        <a class="toc-item" href="#getting-pegs-out"><span class="toc-icon">🚪</span><span class="toc-label">Getting Pegs Out</span></a>
+        <a class="toc-item" href="#card-rules"><span class="toc-icon">🃏</span><span class="toc-label">Card Rules</span></a>
+        <a class="toc-item" href="#special-holds"><span class="toc-icon">✋</span><span class="toc-label">Special Hold Rules</span></a>
+        <a class="toc-item" href="#fast-track"><span class="toc-icon">⚡</span><span class="toc-label">Fast Track Shortcut</span></a>
+        <a class="toc-item" href="#bullseye"><span class="toc-icon">🎯</span><span class="toc-label">Bullseye Hole</span></a>
+        <a class="toc-item" href="#safe-zone"><span class="toc-icon">🏠</span><span class="toc-label">Safe Zone &amp; Home</span></a>
+        <a class="toc-item" href="#board-map"><span class="toc-icon">🗺️</span><span class="toc-label">Board Map</span></a>
+        <a class="toc-item" href="#controls"><span class="toc-icon">🎮</span><span class="toc-label">Game Controls</span></a>
+        <a class="toc-item" href="#settings"><span class="toc-icon">⚙️</span><span class="toc-label">Settings &amp; Menus</span></a>
+        <a class="toc-item" href="#themes"><span class="toc-icon">🎨</span><span class="toc-label">Themes &amp; Music</span></a>
+        <a class="toc-item" href="#difficulty"><span class="toc-icon">⚔️</span><span class="toc-label">Difficulty Levels</span></a>
+        <a class="toc-item" href="#strategy"><span class="toc-icon">🧠</span><span class="toc-label">Strategy Tips</span></a>
+        <a class="toc-item" href="#tutorial"><span class="toc-icon">📚</span><span class="toc-label">Tutorial</span></a>
+        <a class="toc-item" href="#manifolds"><span class="toc-icon">🌀</span><span class="toc-label">The Science Behind It</span></a>
+        <a class="toc-item" href="#glossary"><span class="toc-icon">📘</span><span class="toc-label">Glossary</span></a>
+        <a class="toc-item" href="#navigation"><span class="toc-icon">🧭</span><span class="toc-label">Website Navigation</span></a>
+        <a class="toc-item" href="#credits"><span class="toc-icon">🎬</span><span class="toc-label">Credits &amp; About</span></a>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- HOW TO WIN                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="how-to-win">
+    <h2>🏆 How to Win</h2>
+    <p>You have 5 pegs. They start in your holding area. Move all 5 pegs clockwise around the board and into your safe zone. First player to get all 5 pegs home wins.</p>
+    <ul class="rule-list">
+        <li><span class="ri">1️⃣</span> Draw a card from the deck each turn.</li>
+        <li><span class="ri">2️⃣</span> Move a peg the number of spaces shown on the card.</li>
+        <li><span class="ri">3️⃣</span> Pegs travel clockwise around the outer track.</li>
+        <li><span class="ri">4️⃣</span> When a peg reaches your safe zone entrance, it turns inward toward home.</li>
+        <li><span class="ri">5️⃣</span> First to get all 5 pegs safely home wins the game.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- GETTING PEGS OUT                           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="getting-pegs-out">
+    <h2>🚪 Getting Pegs Out of Holding</h2>
+    <p>Your pegs begin in the holding area, off the board. Only three types of cards can bring a peg onto the starting position.</p>
+    <ul class="rule-list">
+        <li><span class="ri">🂡</span> <strong>Ace</strong> places one peg on your start position and gives you an extra turn.</li>
+        <li><span class="ri">6️⃣</span> <strong>Six</strong> places one peg on your start position and gives you an extra turn.</li>
+        <li><span class="ri">🃏</span> <strong>Joker</strong> places one peg on your start position and gives you an extra turn.</li>
+    </ul>
+    <p>If you draw any other card and have no pegs on the board, your turn is skipped.</p>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- CARD RULES                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="card-rules">
+    <h2>🃏 Card Rules</h2>
+
+    <h3>Number Cards (2, 3, 5, 8, 9, 10)</h3>
+    <p>Move one peg forward that many spaces. No special abilities.</p>
+
+    <h3>Ace, 6, Joker</h3>
+    <ul class="rule-list">
+        <li><span class="ri">🔄</span> Enter a peg from holding <strong>or</strong> move a peg on the board.</li>
+        <li><span class="ri">➕</span> You always get an extra turn after playing one of these.</li>
+    </ul>
+
+    <h3>4 (Backward Card)</h3>
+    <ul class="rule-list">
+        <li><span class="ri">⬅️</span> Move one peg <strong>backward</strong> 4 spaces.</li>
+        <li><span class="ri">🚫</span> Cannot enter the Fast Track, bullseye, or safe zone while moving backward.</li>
+        <li><span class="ri">⚡</span> Drawing a 4 ends Fast Track status for <strong>all</strong> players. Every peg currently on the Fast Track is returned to the regular track.</li>
+    </ul>
+
+    <h3>7 (Split Card)</h3>
+    <ul class="rule-list">
+        <li><span class="ri">✂️</span> Split 7 moves between <strong>two</strong> of your pegs. For example, move one peg 3 and another 4.</li>
+        <li><span class="ri">➡️</span> Both portions move <strong>forward</strong> (clockwise).</li>
+        <li><span class="ri">📝</span> You can also use the full 7 on a single peg.</li>
+    </ul>
+
+    <h3>Jack, Queen, King (Royals)</h3>
+    <ul class="rule-list">
+        <li><span class="ri">👑</span> Move one peg <strong>1 space</strong> forward.</li>
+        <li><span class="ri">➕</span> You get an extra turn.</li>
+        <li><span class="ri">🎯</span> These are the <strong>only</strong> cards that can exit the bullseye.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SPECIAL HOLD RULES                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="special-holds">
+    <h2>✋ Special Hold Rules</h2>
+    <ul class="rule-list">
+        <li><span class="ri">🚫</span> <strong>No passing your own pegs.</strong> You cannot move a peg past or onto a space that already has one of your own pegs.</li>
+        <li><span class="ri">💥</span> <strong>Cutting.</strong> If your peg lands on a space occupied by an opponent's peg, that opponent's peg is sent back to their holding area.</li>
+        <li><span class="ri">🔐</span> <strong>Start position block.</strong> If your starting hole is occupied by your own peg, you cannot enter a new one from holding until you move that peg.</li>
+        <li><span class="ri">⏭️</span> <strong>No playable move?</strong> If you cannot legally move any peg with the card you drew, your turn ends and the card is discarded.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FAST TRACK                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="fast-track">
+    <h2>⚡ Fast Track Shortcut</h2>
+    <p>The Fast Track is an inner ring of special holes that lets you skip large portions of the outer track. It is a high risk, high reward shortcut.</p>
+    <ul class="rule-list">
+        <li><span class="ri">🕳️</span> <strong>Entering.</strong> If your peg lands <strong>exactly</strong> on a Fast Track entry hole on the outer ring, it drops into the Fast Track.</li>
+        <li><span class="ri">🔁</span> <strong>Traveling.</strong> From the Fast Track, your peg moves along the inner ring, covering ground much faster.</li>
+        <li><span class="ri">⬅️</span> <strong>The 4 card danger.</strong> When <strong>anyone</strong> draws a 4, all pegs currently on the Fast Track are immediately returned to the outer track. This affects every player.</li>
+        <li><span class="ri">🎯</span> <strong>Bullseye option.</strong> A peg on the Fast Track that lands on the center bullseye hole with a 1 step card enters the bullseye.</li>
+        <li><span class="ri">🔥</span> <strong>Losing status.</strong> If you have a peg on the Fast Track but you choose to move a different peg (one not on the Fast Track), your Fast Track peg loses its status and returns to the outer ring.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- BULLSEYE                                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="bullseye">
+    <h2>🎯 Center Bullseye</h2>
+    <p>The bullseye is the single hole in the very center of the board. Landing here is powerful but tricky to exit.</p>
+    <ul class="rule-list">
+        <li><span class="ri">📍</span> <strong>How to enter.</strong> A peg on the Fast Track that is exactly 1 step away from the bullseye can move into it using any 1 step card (Ace, 6, Joker, J, Q, or K).</li>
+        <li><span class="ri">🔒</span> <strong>Trapped until a Royal.</strong> Once in the bullseye, the only way out is with a <strong>Jack, Queen, or King</strong>. No other card can move a peg out of this hole.</li>
+        <li><span class="ri">🚀</span> <strong>Where you exit to.</strong> The peg exits the bullseye back to the outer track, positioned near your safe zone entrance for a quick finish.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SAFE ZONE & HOME                           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="safe-zone">
+    <h2>🏠 Safe Zone and Home Stretch</h2>
+    <p>Each player has a private column of holes leading to a final home position. No opponent can enter your safe zone.</p>
+    <ul class="rule-list">
+        <li><span class="ri">🛡️</span> <strong>Protected.</strong> Once a peg enters the safe zone, it cannot be cut by opponents.</li>
+        <li><span class="ri">🎯</span> <strong>Exact count.</strong> You must land on the home position exactly. If you overshoot, you cannot make that move.</li>
+        <li><span class="ri">⬅️</span> <strong>No backward entry.</strong> The 4 card cannot be used to enter or move through the safe zone.</li>
+        <li><span class="ri">🏁</span> <strong>Done.</strong> Once a peg reaches home, it is permanently safe and removed from play.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- BOARD MAP                                  -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="board-map">
+    <h2>🗺️ Board Map</h2>
+    <div class="board-map">
+        <p style="font-size:0.88em; color:var(--text-muted); margin-bottom:14px;">The Fast Track board is a circular track with special positions.</p>
+        <div style="position:relative; width:260px; height:260px; margin:0 auto; border:2px solid var(--border); border-radius:50%; background:rgba(212,165,116,0.15);">
+            <!-- Center bullseye -->
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#000;">🎯</div>
+            <!-- Inner ring (FT) -->
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:120px;height:120px;border:2px dashed rgba(255,215,0,0.4);border-radius:50%;"></div>
+            <!-- Start positions -->
+            <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:11px;color:#e74c3c;font-weight:700;">🔴 Start</div>
+            <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:11px;color:#27ae60;font-weight:700;">🟢 Start</div>
+            <div style="position:absolute;top:50%;left:8px;transform:translateY(-50%);font-size:11px;color:#3498db;font-weight:700;">🔵 Start</div>
+            <div style="position:absolute;top:50%;right:8px;transform:translateY(-50%);font-size:11px;color:#f1c40f;font-weight:700;">🟡 Start</div>
+            <!-- FT entries -->
+            <div style="position:absolute;top:30%;left:30%;font-size:10px;color:var(--gold);">⚡FT</div>
+            <div style="position:absolute;top:30%;right:30%;font-size:10px;color:var(--gold);">⚡FT</div>
+            <div style="position:absolute;bottom:30%;left:30%;font-size:10px;color:var(--gold);">⚡FT</div>
+            <div style="position:absolute;bottom:30%;right:30%;font-size:10px;color:var(--gold);">⚡FT</div>
+            <!-- Safe zones -->
+            <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:9px;color:#e74c3c;">Safe↓</div>
+            <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:9px;color:#27ae60;">Safe↑</div>
+        </div>
+        <div class="bm-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#333;"></span> Regular Hole</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--gold);"></span> FT Entry</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--gold);border:2px solid #fff;"></span> Bullseye</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#e74c3c;"></span> Player Start</div>
+            <div class="legend-item"><span class="legend-dot" style="background:rgba(231,76,60,0.4);"></span> Safe Zone</div>
+        </div>
+    </div>
+    <ul class="rule-list">
+        <li><span class="ri">⭕</span> <strong>Outer ring:</strong> The main circular track where pegs travel clockwise.</li>
+        <li><span class="ri">⚡</span> <strong>Fast Track entries:</strong> Special holes on the outer ring that drop pegs into the inner shortcut ring.</li>
+        <li><span class="ri">🔁</span> <strong>Inner ring (Fast Track):</strong> A shortcut loop that lets pegs skip ahead quickly.</li>
+        <li><span class="ri">🎯</span> <strong>Bullseye:</strong> The center hole. Enter from the Fast Track with a 1 step card. Exit only with J, Q, or K.</li>
+        <li><span class="ri">🏠</span> <strong>Safe zone:</strong> Your private column leading to home. Opponents cannot enter.</li>
+        <li><span class="ri">🟢</span> <strong>Start position:</strong> Where your pegs enter the board from holding.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- GAME CONTROLS                              -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="controls">
+    <h2>🎮 Game Controls</h2>
+    <p>Everything in the game is controlled by tapping (or clicking on desktop).</p>
+
+    <h3>During Your Turn</h3>
+    <div class="controls-grid">
+        <div class="ctrl-card">
+            <div class="cc-icon">🂠</div>
+            <div class="cc-label">Tap Deck</div>
+            <div class="cc-desc">Draw a card</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">📍</div>
+            <div class="cc-label">Tap Green Dot</div>
+            <div class="cc-desc">Move peg to that spot</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">🔵</div>
+            <div class="cc-label">Tap Peg</div>
+            <div class="cc-desc">Select which peg to move</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">✂️</div>
+            <div class="cc-label">Split 7 Dialog</div>
+            <div class="cc-desc">Choose how to split moves</div>
+        </div>
+    </div>
+
+    <h3>Camera</h3>
+    <div class="controls-grid">
+        <div class="ctrl-card">
+            <div class="cc-icon">👆</div>
+            <div class="cc-label">Drag/Swipe</div>
+            <div class="cc-desc">Rotate the view</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">🔍</div>
+            <div class="cc-label">Pinch</div>
+            <div class="cc-desc">Zoom in and out</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">📹</div>
+            <div class="cc-label">Camera Button</div>
+            <div class="cc-desc">Choose view mode</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">🎯</div>
+            <div class="cc-label">Reset View</div>
+            <div class="cc-desc">Back to default angle</div>
+        </div>
+    </div>
+
+    <h3>On Screen Buttons</h3>
+    <div class="controls-grid">
+        <div class="ctrl-card">
+            <div class="cc-icon">☰</div>
+            <div class="cc-label">Menu (top right)</div>
+            <div class="cc-desc">Open settings panel</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">🚪</div>
+            <div class="cc-label">Exit</div>
+            <div class="cc-desc">Leave current game</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">👩</div>
+            <div class="cc-label">Mom Button</div>
+            <div class="cc-desc">Get a helpful hint</div>
+        </div>
+        <div class="ctrl-card">
+            <div class="cc-icon">📖</div>
+            <div class="cc-label">Rules</div>
+            <div class="cc-desc">Quick rules reference</div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SETTINGS & MENUS                           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="settings">
+    <h2>⚙️ Settings and Menus</h2>
+    <p>Tap the ☰ hamburger icon in the top right corner during a game to open the settings panel.</p>
+
+    <h3>Available Settings</h3>
+    <div class="info-card">
+        <div class="ic-title">🎨 Theme</div>
+        <div class="ic-body">Switch between 7 visual themes. The board, background, and colors all change. Music changes to match.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🎵 Music Toggle</div>
+        <div class="ic-body">Turn background music on or off. Adjust the volume with the slider below it.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🔊 Sound FX Toggle</div>
+        <div class="ic-body">Turn game sound effects on or off. Adjust volume with its slider.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🎤 Commentary Toggle</div>
+        <div class="ic-body">Enable or disable the play by play announcements during the game.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">👥 Player List</div>
+        <div class="ic-body">See all players in the current game, who is human, who is a bot, and how many pegs each has at home.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🔄 Restart</div>
+        <div class="ic-body">Start the current game over with the same players and settings.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🚪 Exit to Menu</div>
+        <div class="ic-body">Leave the current game and return to the main menu.</div>
+    </div>
+
+    <h3>Setup Wizard (Before the Game)</h3>
+    <p>When you choose "Solo vs Bots" from the main menu, you go through a two step setup.</p>
+    <div class="info-card">
+        <div class="ic-title">Step 1: Profile</div>
+        <div class="ic-body">Enter your name and pick an avatar from the paged grid. Swipe left or right to see more avatars. Tap one to select it.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 2: Settings</div>
+        <div class="ic-body">Choose difficulty (Easy through Warpath) and number of players (2, 3, or 4). Then tap Start Game.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- THEMES & MUSIC                             -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="themes">
+    <h2>🎨 Themes and Music</h2>
+    <p>Each theme transforms the entire board, the 3D environment around it, and the music. All music is generated live from mathematical equations. No audio files are used. Every note is created in real time by the game engine.</p>
+
+    <div class="theme-card">
+        <div class="theme-icon">🌌</div>
+        <div class="theme-info">
+            <div class="t-name">Cosmic Space</div>
+            <div class="t-desc">Deep space with glowing nebulas, drifting stars, and floating geometric shapes. A calm yet mysterious atmosphere.</div>
+            <div class="t-music">🎵 "Cosmic Whirl" (116 BPM) &mdash; ambient synth pads, gentle arpeggios, evolving textures</div>
+        </div>
+    </div>
+
+    <div class="theme-card">
+        <div class="theme-icon">⚔️</div>
+        <div class="theme-info">
+            <div class="t-name">Roman Colosseum</div>
+            <div class="t-desc">A grand amphitheatre with stone arches, cheering spectators in togas, and an emperor watching from the balcony. Crowd reacts to game events.</div>
+            <div class="t-music">🎵 "Imperator's March" (92 BPM) &mdash; deep brass, war drums, solemn strings, triumphant fanfares</div>
+        </div>
+    </div>
+
+    <div class="theme-card">
+        <div class="theme-icon">🚀</div>
+        <div class="theme-info">
+            <div class="t-name">Space Ace</div>
+            <div class="t-desc">Epic space adventure with orbiting planets, spaceships swooping by, and a brilliant sun lighting the scene.</div>
+            <div class="t-music">🎵 "Neon Circuit" (128 BPM) &mdash; driving chiptune beats, pulsing bass, 8 bit lead melodies</div>
+        </div>
+    </div>
+
+    <div class="theme-card">
+        <div class="theme-icon">🌊</div>
+        <div class="theme-info">
+            <div class="t-name">Under the Sea</div>
+            <div class="t-desc">A magical underwater world with tropical fish, colorful coral reefs, and shimmering sunbeams filtering through the water.</div>
+            <div class="t-music">🎵 "Calypso Reef" (126 BPM) &mdash; tropical steel drums, ocean wave rhythms, playful marimba melodies</div>
+        </div>
+    </div>
+
+    <div class="theme-card">
+        <div class="theme-icon">👁️</div>
+        <div class="theme-info">
+            <div class="t-name">Clean (Accessible)</div>
+            <div class="t-desc">A minimal design with high contrast colors, no red/green combinations, and clear visuals. Made for players who need colorblind safe options.</div>
+            <div class="t-music">🎵 Uses the default "Neon Circuit" track</div>
+        </div>
+    </div>
+
+    <div class="theme-card">
+        <div class="theme-icon">🌀</div>
+        <div class="theme-info">
+            <div class="t-name">Golden Spiral (Fibonacci)</div>
+            <div class="t-desc">Mathematical beauty brought to life. Golden spirals, Fibonacci number patterns, and warm amber gold tones inspired by nature's geometry.</div>
+            <div class="t-music">🎵 Uses the default "Neon Circuit" track with golden harmonic overtones</div>
+        </div>
+    </div>
+
+    <div class="info-card" style="border-left:3px solid var(--gold);">
+        <div class="ic-title">📜 Music Copyright</div>
+        <div class="ic-body">All music is 100% procedurally generated by the ButterflyFX Music Substrate engine. No samples, no audio files. Every note is synthesized live in your browser using Web Audio API and mathematical waveforms. All compositions are original works. &copy; 2025&ndash;2026 ButterflyFX / Ken's Games. All rights reserved.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- DIFFICULTY LEVELS                          -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="difficulty">
+    <h2>⚔️ Difficulty Levels</h2>
+    <p>Choose how challenging the bots play. Higher difficulty means smarter, more aggressive opponents.</p>
+
+    <div class="diff-card" style="border-color: #27ae60;">
+        <div class="dc-name">😊 Easy</div>
+        <div class="dc-desc">Bots play casually. They rarely cut your pegs and often make suboptimal moves. Move highlights show you every legal option. Great for learning.</div>
+    </div>
+    <div class="diff-card" style="border-color: #3498db;">
+        <div class="dc-name">🎯 Normal</div>
+        <div class="dc-desc">Bots make balanced decisions. They will cut you when it is clearly advantageous but will not go out of their way to target you. Move highlights are shown.</div>
+    </div>
+    <div class="diff-card" style="border-color: #e67e22;">
+        <div class="dc-name">🔥 Hard</div>
+        <div class="dc-desc">Bots play strategically. They prioritize cutting, use the Fast Track aggressively, and plan several moves ahead. Fewer hints are shown.</div>
+    </div>
+    <div class="diff-card" style="border-color: #e74c3c;">
+        <div class="dc-name">🏆 Expert</div>
+        <div class="dc-desc">Bots play near perfectly. They make optimal moves, aggressively block your safe zone, and coordinate with each other. No move highlights.</div>
+    </div>
+    <div class="diff-card" style="border-color: #9b59b6;">
+        <div class="dc-name">🔥👹 Warpath</div>
+        <div class="dc-desc">Bots are hunting you. Their primary goal is to cut your pegs, even if it costs them strategically. They will chase your pegs around the board. Winning is extremely difficult. This mode is for players who want a true challenge.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- STRATEGY TIPS                              -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="strategy">
+    <h2>🧠 Strategy Tips</h2>
+
+    <h3>Beginner Tips</h3>
+    <ul class="strategy-list">
+        <li><strong>Get pegs out early.</strong> The more pegs you have on the board, the more options you have each turn.</li>
+        <li><strong>Save royals for the bullseye.</strong> Jack, Queen, and King are the only way out of the bullseye. Do not waste them on regular moves if you have a peg trapped there.</li>
+        <li><strong>Spread your pegs.</strong> If all your pegs are bunched together, you will block yourself.</li>
+    </ul>
+
+    <h3>Intermediate Tips</h3>
+    <ul class="strategy-list">
+        <li><strong>Use the Fast Track wisely.</strong> It is a powerful shortcut, but a single 4 card from any player ends it for everyone. Consider how many 4s have already been played.</li>
+        <li><strong>Cut when it counts.</strong> Landing on an opponent near their safe zone is more valuable than cutting one that just entered the board.</li>
+        <li><strong>Watch the 4 card.</strong> If you have a peg on the Fast Track, be aware that any player drawing a 4 will kick you off.</li>
+    </ul>
+
+    <h3>Advanced Tips</h3>
+    <ul class="strategy-list">
+        <li><strong>Count cards.</strong> There are four 4s in the deck. If all four have been played and the deck has not reshuffled, the Fast Track is safe.</li>
+        <li><strong>Use the bullseye exit strategically.</strong> Exiting the bullseye places you near your safe zone. If timed well, one turn from the bullseye can win the game.</li>
+        <li><strong>Force opponents off the Fast Track.</strong> If you draw a 4, it is sometimes worth the backward move because it also disrupts every opponent on the Fast Track.</li>
+        <li><strong>Block your start position.</strong> Keep a peg near your start to prevent opponents from using that area freely.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- TUTORIAL                                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="tutorial">
+    <h2>📚 Tutorial: Your First Game</h2>
+    <p>Follow these steps to play your first game of Fast Track.</p>
+
+    <div class="info-card">
+        <div class="ic-title">Step 1: Start a Game</div>
+        <div class="ic-body">From the main page, tap "Solo vs Bots." Enter your name, pick an avatar, choose Easy difficulty, and set 2 players. Tap Start Game.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 2: Draw a Card</div>
+        <div class="ic-body">When you see "Your Turn!" tap the card deck on the right side of the screen. A card will flip over.  If you drew an Ace, 6, or Joker, you can place a peg on your starting position.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 3: Move a Peg</div>
+        <div class="ic-body">Green dots appear on the board showing where you can move. Tap a green dot to move your peg there. If no green dots appear, you have no legal moves and your turn ends.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 4: Watch the Bot</div>
+        <div class="ic-body">The bot takes its turn automatically. Watch its peg move. Then it is your turn again.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 5: Use the Fast Track</div>
+        <div class="ic-body">If your peg lands exactly on a Fast Track entry hole, it will enter the Fast Track automatically. You will see your peg move to the inner ring.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Step 6: Get Pegs Home</div>
+        <div class="ic-body">Guide your pegs around the board into your colored safe zone. Move them to the final home position. Get all 5 home to win.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">Tip: Use Mom</div>
+        <div class="ic-body">If you are ever stuck, tap the Mom button (bottom of screen). She gives friendly hints about your best move.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- THE SCIENCE BEHIND IT (Manifolds)          -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="manifolds">
+    <h2>🌀 The Science Behind Fast Track</h2>
+    <p>Fast Track is built on something called a "manifold" system. That sounds complicated, but it is actually a simple and beautiful idea. Let's walk through it with ordinary language.</p>
+
+    <h3>What Is a Manifold?</h3>
+    <p>Imagine a bedsheet. Lay it flat and it is a simple 2D surface. Now grab the corners and twist it, drape it over a ball, fold it into waves. It is still the same sheet, but its shape has changed. A manifold is exactly that: a surface that can be flat, curved, twisted, or folded into any shape, and still follows reliable rules at every point.</p>
+    <p>In Fast Track, the game board is a manifold. Each hole on the board sits at a specific point on a mathematical surface described by equations like z = xy (a smooth saddle shape) or z = xy² (a more dramatic curved surface). These coordinates determine everything about that hole.</p>
+
+    <h3>What Is a Substrate?</h3>
+    <p>A substrate is a layer that runs underneath something and provides it with services. Think of soil under a garden. The flowers do not need to know about worms and minerals. They just grow because the soil provides what they need.</p>
+    <p>In Fast Track, substrates are invisible engines that run beneath the game. There is a Music Substrate, a Rules Substrate, a Crowd Substrate, and more. Each one does a specific job without the player needing to know it exists.</p>
+
+    <h3>How Does a Manifold Make Music?</h3>
+    <p>Every hole on the board has coordinates (x, y, z) on the manifold surface. The Music Substrate reads those coordinates and translates them into notes.</p>
+    <p>For example, a hole at position (3, 5) on the z = xy surface sits at height z = 15. The substrate maps that height to a musical pitch. Low positions make bass notes. High positions make treble notes. When a peg moves, the sequence of holes it passes through creates a melody.</p>
+    <p>The same principle creates chords, rhythms, and textures. The x coordinate might control tempo, the y coordinate might control instrument type, and z controls pitch. This means the music is never random. It is always a direct reflection of what is happening on the board.</p>
+
+    <h3>How Does a Manifold Make Colors?</h3>
+    <p>Colors work the same way. Each position on the manifold maps to a hue, saturation, and brightness. Holes near the center might glow gold. Holes on the outer edge might pulse blue. When a theme changes, the manifold equations change, and every color on the board shifts to match the new mood.</p>
+
+    <h3>How Does It Control Bots?</h3>
+    <p>Each bot "lives" on the manifold surface at a point determined by its personality type. A cautious bot sits at a gentle slope on z = xy, where decisions are smooth and conservative. An aggressive bot sits at a steep cliff on z = xy², where decisions are sharp and bold.</p>
+    <p>The manifold gives each bot a "gravity" that pulls its decisions in a natural direction. This is why bots in Fast Track feel like they have real personalities. They are not following a list of "if this, then that" instructions. They are rolling along the curves of a mathematical surface, and the shape of that surface determines their character.</p>
+
+    <h3>Why Does This Matter?</h3>
+    <p>Most games use separate systems for rules, sound, visuals, and AI. In Fast Track, all of these come from the same mathematical surface. Change the surface and everything changes together: new colors, new music, new bot behavior, new game feel.</p>
+    <p>This is the core idea behind ButterflyFX's Dimensional Programming. One equation, many dimensions, infinite expressions.</p>
+
+    <h3>Key Terms</h3>
+    <div class="glossary-term"><strong>Manifold</strong> &mdash; A mathematical surface (like z = xy) that the game board sits on. It provides coordinates that drive music, color, rules, and AI.</div>
+    <div class="glossary-term"><strong>Substrate</strong> &mdash; An invisible engine layer that uses manifold coordinates to produce something useful (music, crowd noise, visuals).</div>
+    <div class="glossary-term"><strong>z = xy surface</strong> &mdash; A saddle shaped manifold. Produces smooth, balanced outcomes. Used for normal difficulty bots and mellow music.</div>
+    <div class="glossary-term"><strong>z = xy² surface</strong> &mdash; A steeper, more dramatic manifold. Produces intense outcomes. Used for aggressive bots and energetic music.</div>
+    <div class="glossary-term"><strong>Dimensional Programming</strong> &mdash; ButterflyFX's approach where one mathematical structure (the manifold) generates multiple outputs (sound, color, behavior) simultaneously.</div>
+    <div class="glossary-term"><strong>Procedural Generation</strong> &mdash; Creating content (music, colors, decisions) from equations in real time instead of loading pre made files.</div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- GLOSSARY                                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="glossary">
+    <h2>📘 Glossary</h2>
+    <div class="glossary-term"><strong>Peg</strong> &mdash; Your game piece. You have 5 of them. Move them around the board to win.</div>
+    <div class="glossary-term"><strong>Holding Area</strong> &mdash; Where your pegs wait before entering the board. Use an Ace, 6, or Joker to bring them out.</div>
+    <div class="glossary-term"><strong>Start Position</strong> &mdash; The hole where your peg enters the board from holding.</div>
+    <div class="glossary-term"><strong>Outer Track</strong> &mdash; The main circular ring of holes that pegs travel along clockwise.</div>
+    <div class="glossary-term"><strong>Fast Track</strong> &mdash; The inner shortcut ring. Enter by landing exactly on a Fast Track entry hole.</div>
+    <div class="glossary-term"><strong>Fast Track Entry</strong> &mdash; Special holes on the outer ring that connect to the inner Fast Track.</div>
+    <div class="glossary-term"><strong>Bullseye</strong> &mdash; The center hole of the board. Enter from the Fast Track. Exit only with J, Q, or K.</div>
+    <div class="glossary-term"><strong>Safe Zone</strong> &mdash; Your private column of holes leading to home. Opponents cannot enter.</div>
+    <div class="glossary-term"><strong>Home</strong> &mdash; The final position in your safe zone. A peg here is permanently safe.</div>
+    <div class="glossary-term"><strong>Cut</strong> &mdash; Landing on an opponent's peg to send it back to their holding area.</div>
+    <div class="glossary-term"><strong>Extra Turn</strong> &mdash; Some cards (Ace, 6, Joker, J, Q, K) let you draw and play again immediately.</div>
+    <div class="glossary-term"><strong>Split</strong> &mdash; The 7 card's ability to divide its moves between two pegs.</div>
+    <div class="glossary-term"><strong>Royal</strong> &mdash; Jack, Queen, or King. Move 1 space, grant an extra turn, and can exit the bullseye.</div>
+    <div class="glossary-term"><strong>Deck</strong> &mdash; The pile of cards you draw from each turn.</div>
+    <div class="glossary-term"><strong>Theme</strong> &mdash; A visual and musical style that changes the entire look and sound of the game.</div>
+    <div class="glossary-term"><strong>Bot</strong> &mdash; A computer controlled opponent.</div>
+    <div class="glossary-term"><strong>Manifold</strong> &mdash; The mathematical surface underlying the game board (see <a href="#manifolds">The Science Behind It</a>).</div>
+    <div class="glossary-term"><strong>Substrate</strong> &mdash; An engine layer that uses manifold data to produce music, colors, or behavior.</div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- WEBSITE NAVIGATION                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="doc-section" id="navigation">
+    <h2>🧭 Getting Around the Website</h2>
+
+    <h3>Main Pages</h3>
+    <div class="info-card">
+        <div class="ic-title">🏠 Home Page</div>
+        <div class="ic-body">The landing page at kensgames.com/fasttrack. Shows game features, how to play, and three buttons to start playing: Solo vs Bots, Private Game, and Online Lobby.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🤖 Solo Setup</div>
+        <div class="ic-body">Choose your name, avatar, difficulty, and number of opponents. Two simple steps then you are in the game.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🔒 Private Game</div>
+        <div class="ic-body">Create a private game with a 6 letter code or join one by entering a code. Share the code with friends to get them in.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">🌐 Online Lobby</div>
+        <div class="ic-body">Find public games or create one. See who is looking for players. Quick match puts you in the next available game.</div>
+    </div>
+    <div class="info-card">
+        <div class="ic-title">📖 This Guide</div>
+        <div class="ic-body">The page you are reading now. Accessible from the game menu, the setup wizard, and the home page.</div>
+    </div>
+
+    <h3>How to Use the Setup Wizard</h3>
+    <p>The setup wizard has a sticky button bar at the top of the screen. Tap "Next" to proceed to the next step. Tap the back arrow to go to the previous step. The main action button (Next or Start Game) is always visible at the top so you never have to scroll to find it.</p>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- CREDITS & ABOUT                            -->
+<!-- ══════════════════════════════════════════ -->
+<div class="credits-section" id="credits">
+    <div class="credit-logo">🎯</div>
+    <h2>Credits and About</h2>
+    <p><strong>Fast Track</strong> is a digital board game by Ken's Games, powered by ButterflyFX Dimensional Programming.</p>
+    <p>Fast Track is a digital interpretation of the classic pegged board game known by various names worldwide. This version does not claim ownership of the traditional game concept.</p>
+    <p style="margin-top: 20px;"><strong>Engine:</strong> ButterflyFX Dimensional Programming Standard</p>
+    <p><strong>Music Engine:</strong> ButterflyFX Music Substrate v2.0</p>
+    <p><strong>3D Renderer:</strong> Three.js</p>
+    <p><strong>AI System:</strong> ManifoldAI (z = xy / z = xy² geometric decision surfaces)</p>
+    <p><strong>Crowd System:</strong> Crowd Substrate (procedural crowd audio synthesis)</p>
+    <p><strong>Analytics:</strong> ButterflyFX Analytics Substrate</p>
+    <p style="margin-top: 20px;"><strong>All music</strong> is 100% procedurally generated. No third party samples, loops, or audio files are used. Every note is created live from mathematical waveforms. All compositions are original. &copy; 2025&ndash;2026 ButterflyFX / Ken's Games.</p>
+    <p style="margin-top: 12px;"><strong>Three.js</strong> is used under the MIT License. &copy; 2010&ndash;2026 Three.js authors.</p>
+    <p style="margin-top: 12px;"><strong>Poppins font</strong> by Indian Type Foundry, used under the SIL Open Font License.</p>
+    <p style="margin-top: 20px; font-size: 0.82em; color: var(--text-muted);">&copy; 2025&ndash;2026 Ken's Games / ButterflyFX. All rights reserved.</p>
+    <p style="font-size: 0.78em; color: var(--text-muted);">Made with math, music, and love. 🦋</p>
+</div>
+
+<a class="back-to-top" href="#toc">↑ Back to Contents</a>
+
+</body>
+</html>

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KensGames Portal - Manifold Gaming Universe</title>
+    <meta name="description"
+        content="KensGames - Revolutionary gaming portal powered by manifold mathematics. Play BrickBreaker3D, Space Combat, FastTrack with unified login.">
+
+    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="/fasttrack/assets/images/icon-192.png">
+    <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
+
+    <style>
+        :root {
+            /* 80s Arcade Neon Palette */
+            --neon-cyan: #00FFFF;
+            --neon-pink: #FF00FF;
+            --neon-yellow: #FFE800;
+            --neon-orange: #FF6600;
+            --neon-purple: #9900FF;
+            --neon-green: #00FF41;
+            --bg-dark: #04040C;
+            --bg-card: rgba(4, 4, 20, 0.92);
+            --text: #E0E0FF;
+            --text-muted: #8888AA;
+            --glow-cyan: 0 0 8px #00FFFF, 0 0 20px #00FFFF, 0 0 40px #00FFFF;
+            --glow-pink: 0 0 8px #FF00FF, 0 0 20px #FF00FF, 0 0 40px #FF00FF;
+            --glow-yellow: 0 0 8px #FFE800, 0 0 20px #FFE800, 0 0 40px #FFE800;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0a0a1a 50%, var(--bg-dark) 100%);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        #scanlines {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 3px,
+                    rgba(0, 0, 0, 0.04) 3px,
+                    rgba(0, 0, 0, 0.04) 4px);
+        }
+
+        body > * {
+            position: relative;
+            z-index: 2;
+        }
+
+        header {
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+            padding: 20px 40px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan);
+            letter-spacing: 2px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: 2px solid var(--neon-cyan);
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-login {
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-login:hover {
+            transform: scale(1.05);
+            box-shadow: var(--glow-cyan), 0 0 20px var(--neon-cyan);
+        }
+
+        .btn-guest {
+            background: transparent;
+            color: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        .btn-guest:hover {
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: var(--glow-cyan);
+            transform: scale(1.05);
+        }
+
+        .hero {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
+            border-bottom: 2px solid var(--neon-pink);
+            padding: 80px 40px;
+            text-align: center;
+            box-shadow: inset 0 0 40px rgba(255, 0, 255, 0.1);
+        }
+
+        .hero-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan), var(--glow-pink);
+            font-weight: 900;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .btn-large {
+            padding: 15px 40px;
+            font-size: 16px;
+            border-radius: 6px;
+        }
+
+        .btn-play {
+            background: var(--neon-yellow);
+            color: var(--bg-dark);
+            border-color: var(--neon-yellow);
+            box-shadow: var(--glow-yellow);
+        }
+
+        .btn-play:hover {
+            transform: scale(1.1);
+            box-shadow: var(--glow-yellow), 0 0 30px var(--neon-yellow);
+        }
+
+        .games-section {
+            max-width: 1400px;
+            margin: 100px auto;
+            padding: 0 40px;
+        }
+
+        .section-title {
+            font-size: 48px;
+            margin-bottom: 60px;
+            text-align: center;
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .game-card {
+            background: var(--bg-card);
+            border: 2px solid var(--neon-pink);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            box-shadow: inset 0 0 20px rgba(255, 0, 255, 0.1);
+        }
+
+        .game-card:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: var(--glow-cyan), inset 0 0 20px rgba(0, 255, 255, 0.2);
+            transform: translateY(-10px);
+        }
+
+        .game-image {
+            width: 100%;
+            height: 280px;
+            background: linear-gradient(135deg, #1a1a3a 0%, #0a0a2a 100%);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-bottom: 2px solid var(--neon-pink);
+        }
+
+        .game-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .game-info {
+            padding: 30px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .game-title {
+            font-size: 28px;
+            margin-bottom: 12px;
+            color: var(--neon-yellow);
+            text-shadow: var(--glow-yellow);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .game-description {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .game-button {
+            align-self: flex-start;
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            font-weight: 700;
+            border-radius: 4px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.2);
+            transition: all 0.3s;
+        }
+
+        .game-button:hover {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            transform: translateX(5px);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .manifold-section {
+            background: var(--bg-card);
+            border: 2px solid var(--neon-purple);
+            border-radius: 8px;
+            padding: 60px 40px;
+            margin: 100px 40px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: inset 0 0 40px rgba(153, 0, 255, 0.1), var(--glow-pink);
+        }
+
+        .manifold-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .manifold-text h2 {
+            font-size: 40px;
+            margin-bottom: 20px;
+            color: var(--neon-purple);
+            text-shadow: var(--glow-pink);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .manifold-text p {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+
+        .manifold-features {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .manifold-features li {
+            padding: 12px 0;
+            padding-left: 30px;
+            position: relative;
+            color: var(--text-muted);
+            font-size: 14px;
+            border-left: 2px solid var(--neon-cyan);
+            margin-bottom: 10px;
+        }
+
+        .manifold-features li:before {
+            content: "✓";
+            position: absolute;
+            left: -12px;
+            color: var(--neon-cyan);
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .manifold-diagram {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(153, 0, 255, 0.05) 100%);
+            border: 2px dashed var(--neon-cyan);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        .manifold-diagram-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 10px var(--neon-cyan));
+        }
+
+        .manifold-diagram p {
+            color: var(--neon-cyan);
+            font-weight: 700;
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .manifold-diagram p:last-child {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        footer {
+            background: var(--bg-card);
+            border-top: 2px solid var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 100px;
+        }
+
+        footer p {
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 40px;
+            }
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+            .manifold-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            nav {
+                flex-direction: column;
+                align-items: center;
+            }
+            .section-title {
+                font-size: 32px;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .game-card {
+            animation: slideIn 0.6s ease;
+            animation-fill-mode: both;
+        }
+
+        .game-card:nth-child(1) { animation-delay: 0.1s; }
+        .game-card:nth-child(2) { animation-delay: 0.2s; }
+        .game-card:nth-child(3) { animation-delay: 0.3s; }
+    </style>
+</head>
+
+<body>
+    <div id="scanlines"></div>
+
+    <header>
+        <nav>
+            <div class="logo">🎮 KENSGAMES</div>
+            <div class="nav-buttons">
+                <button class="btn-guest" onclick="playAsGuest()">👤 GUEST</button>
+                <button class="btn-login" onclick="goToLogin()">🔐 LOGIN</button>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h1>KENSGAMES</h1>
+            <p>⚡ Manifold-Powered Gaming Universe ⚡</p>
+            <p>Experience next-generation multiplayer games built on revolutionary mathematical architecture.</p>
+            <div class="hero-buttons">
+                <button class="btn-play btn-large" onclick="goToLogin()">🎮 PLAY NOW</button>
+                <button class="btn-guest btn-large" onclick="playAsGuest()">👤 GUEST MODE</button>
+            </div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 20px;">Create an account to track stats, earn medallions, and compete globally</p>
+        </div>
+    </section>
+
+    <section class="games-section">
+        <h2 class="section-title">🎮 FEATURED GAMES</h2>
+
+        <div class="games-grid">
+            <div class="game-card">
+                <div class="game-image">
+                    <img src="/fasttrack/assets/images/art/breakout.png" alt="BrickBreaker3D">
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">BRICKBREAKER3D</div>
+                        <div class="game-description">
+                            Classic brick-breaker reimagined in stunning 3D. Break through waves of bricks, master power-ups, and climb the global leaderboard.
+                        </div>
+                    </div>
+                    <button class="game-button" onclick="goToGame('/brickbreaker3d-manifold/')">PLAY →</button>
+                </div>
+            </div>
+
+            <div class="game-card">
+                <div class="game-image" style="background: linear-gradient(135deg, #1a3a52 0%, #0a1a2f 100%);">
+                    <div style="font-size: 120px; text-align: center; width: 100%; filter: drop-shadow(0 0 20px currentColor); color: var(--neon-cyan);">🚀</div>
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">SPACE COMBAT</div>
+                        <div class="game-description">
+                            Engage in intense multiplayer space warfare. Pilot advanced spacecraft, outsmart opponents, and become the galactic champion.
+                        </div>
+                    </div>
+                    <button class="game-button" onclick="goToGame('/space-combat-manifold/')">PLAY →</button>
+                </div>
+            </div>
+
+            <div class="game-card">
+                <div class="game-image" style="background: linear-gradient(135deg, #2d5a1a 0%, #1a3a0f 100%);">
+                    <div style="font-size: 120px; text-align: center; width: 100%; filter: drop-shadow(0 0 20px currentColor); color: var(--neon-green);">🏎️</div>
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">FASTTRACK</div>
+                        <div class="game-description">
+                            Multiplayer racing at breakneck speeds. Challenge friends, master dynamic tracks, and dominate real-time competitions.
+                        </div>
+                    </div>
+                    <button class="game-button" onclick="goToGame('/fasttrack-manifold/')">PLAY →</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="manifold-section">
+        <div class="manifold-content">
+            <div class="manifold-text">
+                <h2>⚙️ MANIFOLD TECHNOLOGY</h2>
+                <p>KensGames is built on a revolutionary mathematical foundation called <strong>manifold geometry</strong>. This cutting-edge architecture transforms how multiplayer games handle data, synchronization, and player interactions.</p>
+
+                <ul class="manifold-features">
+                    <li><strong>Single Source of Truth</strong> — All game data lives on mathematical coordinates</li>
+                    <li><strong>Zero Code Duplication</strong> — Games share reusable substrates across the platform</li>
+                    <li><strong>Instant Synchronization</strong> — Real-time player data across all games</li>
+                    <li><strong>Scalable Architecture</strong> — Handles millions of players without bottlenecks</li>
+                    <li><strong>Fair Matchmaking</strong> — Based on mathematical precision and player metrics</li>
+                </ul>
+            </div>
+
+            <div class="manifold-diagram">
+                <div class="manifold-diagram-icon">📐</div>
+                <p>MANIFOLD COORDINATE SYSTEM</p>
+                <p style="font-size: 24px; color: var(--neon-cyan); text-shadow: var(--glow-cyan); margin: 15px 0;">z = x · y</p>
+                <p>Mathematical multi-dimensional data storage & retrieval</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p style="color: var(--neon-cyan); text-shadow: var(--glow-cyan); font-weight: bold;">🎮 KENSGAMES © 2026</p>
+        <p>A Manifold-Powered Gaming Portal</p>
+        <p style="margin-top: 15px; font-size: 12px;">Login to access: Leaderboards • Guilds • Tournaments • Medallion Status • Player Profiles</p>
+    </footer>
+
+    <script>
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+
+        function playAsGuest() {
+            localStorage.setItem('user_token', 'guest-' + Date.now());
+            localStorage.setItem('username', 'Guest Player');
+            localStorage.setItem('display_name', 'Guest');
+            window.location.href = '/lobby';
+        }
+
+        function goToGame(gamePath) {
+            const token = localStorage.getItem('user_token');
+            if (token) {
+                window.location.href = gamePath;
+            } else {
+                window.location.href = '/login?redirect=' + encodeURIComponent(gamePath);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('user_token');
+        });
+    </script>
+</body>
+
+</html>

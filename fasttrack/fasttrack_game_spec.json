@@ -1,0 +1,319 @@
+{
+  "game": {
+    "name": "Fasttrack",
+    "min_players": 2,
+    "max_players_total": 6,
+    "max_players_online": 4,
+    "max_ai_players": 4,
+    "standard_player_count": {
+      "preferred": 4,
+      "normal_range": [3, 4],
+      "six_player_mode": "only when 6 human players are present"
+    }
+  },
+  "deck": {
+    "type": "standard_52_plus_jokers",
+    "jokers_included": true,
+    "total_cards": 54,
+    "cards": {
+      "ace": { "rank": "A", "value": 1, "type": "royal", "extra_turn": true, "can_exit_holding": true },
+      "king": { "rank": "K", "value": 1, "type": "royal", "extra_turn": true, "can_exit_holding": false },
+      "queen": { "rank": "Q", "value": 1, "type": "royal", "extra_turn": true, "can_exit_holding": false },
+      "jack": { "rank": "J", "value": 1, "type": "royal", "extra_turn": true, "can_exit_holding": false },
+      "ten": { "rank": "10", "value": 10, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "nine": { "rank": "9", "value": 9, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "eight": { "rank": "8", "value": 8, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "seven": { "rank": "7", "value": 7, "type": "special_split", "extra_turn": false, "can_exit_holding": false },
+      "six": { "rank": "6", "value": 6, "type": "special_extra_turn", "extra_turn": true, "can_exit_holding": true },
+      "five": { "rank": "5", "value": 5, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "four": { "rank": "4", "value": 4, "type": "special_backward", "extra_turn": false, "can_exit_holding": false, "direction": "counter_clockwise" },
+      "three": { "rank": "3", "value": 3, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "two": { "rank": "2", "value": 2, "type": "number", "extra_turn": false, "can_exit_holding": false },
+      "joker": { "rank": "JOKER", "value": 1, "type": "royal", "extra_turn": true, "can_exit_holding": true }
+    },
+    "suits": ["hearts", "diamonds", "clubs", "spades"],
+    "composition": {
+      "per_suit": 13,
+      "jokers": 2,
+      "total": 54
+    }
+  },
+  "board": {
+    "shape": "hexagon",
+    "orientation": "flat_bottom",
+    "movement_direction": "clockwise",
+    "backward_movement_allowed": true,
+    "backward_movement_card": "4",
+    "backward_movement_restrictions": {
+      "cannot_enter_fasttrack": true,
+      "cannot_enter_safe_zone": true,
+      "cannot_enter_bullseye": true
+    },
+    "holes": {
+      "naming": {
+        "pattern": "<color>_<index>_<descriptor>",
+        "example": "red_001_outer_track",
+        "description": "All holes have a color prefix, an index like _001, and a descriptive word with a number."
+      },
+      "types": [
+        "outer_track",
+        "fasttrack",
+        "safe_zone",
+        "home_winning",
+        "holding",
+        "bullseye_center"
+      ]
+    },
+    "zones": {
+      "holding_area": {
+        "description": "Each player has 4 holding holes for pegs not yet in play.",
+        "capacity_per_player": 4,
+        "pegs_start_here": true
+      },
+      "outer_track": {
+        "description": "Main clockwise track around the board.",
+        "holes_per_section": 12,
+        "total_sections": 6,
+        "total_holes": 72,
+        "overtake_own_pegs_allowed": false,
+        "land_on_own_pegs_allowed": false
+      },
+      "fasttrack": {
+        "description": "Inner circular track with special behavior.",
+        "total_holes": 6,
+        "entry_condition": "Land exactly on a fasttrack hole as final move.",
+        "must_loop": true,
+        "must_pass_own_origin_fasttrack_hole": true,
+        "origin_fasttrack_hole": "fasttrack hole that matches the player's color",
+        "leaving_fasttrack_condition": "If player chooses any non-fasttrack move on their turn, they lose fasttrack and must continue on regular track.",
+        "entry_effects": {
+          "fanfare": true,
+          "visual": "clapping, cheering, giant words 'Fasttrack!' jumping off the board"
+        }
+      },
+      "safe_zone": {
+        "description": "Final approach path to the home winning hole for each player.",
+        "holes_per_player": 4,
+        "direction": "clockwise_only",
+        "backward_entry_allowed": false,
+        "opponent_entry_allowed": false
+      },
+      "home_winning": {
+        "description": "Final diamond-shaped winning hole for each player.",
+        "shape": "diamond",
+        "holes_per_player": 1,
+        "win_condition": "All 4 safe zone holes filled plus exact landing on home winning hole."
+      },
+      "bullseye_center": {
+        "description": "Center of gravity hole in the middle of the board.",
+        "total_holes": 1,
+        "entry_condition": "Must enter as the last move of a card.",
+        "exit_condition": "Can only exit by drawing a royal (including Ace and Joker).",
+        "exit_destination": "Player's own origin fasttrack hole.",
+        "exit_collision_rule": {
+          "if_own_peg_on_origin_fasttrack": "Bullseye peg goes to the previous fasttrack hole (one step counter-clockwise on fasttrack)."
+        }
+      }
+    }
+  },
+  "players": {
+    "colors": {
+      "red": { "hex": "#e74c3c", "corner": 1 },
+      "orange": { "hex": "#f39c12", "corner": 2 },
+      "green": { "hex": "#27ae60", "corner": 3 },
+      "blue": { "hex": "#3498db", "corner": 4 },
+      "purple": { "hex": "#9b59b6", "corner": 5 },
+      "yellow": { "hex": "#f1c40f", "corner": 6 }
+    },
+    "standard_4_player_colors": ["red", "orange", "green", "blue"],
+    "standard_3_player_colors": ["red", "green", "blue"],
+    "standard_2_player_colors": ["red", "blue"]
+  },
+  "pegs": {
+    "per_player": 4,
+    "start_location": "holding_area",
+    "total_possible": 24,
+    "dimensions": {
+      "radius": 8,
+      "height": 25
+    },
+    "occupancy": {
+      "one_peg_per_hole": true,
+      "cutting_allowed": true,
+      "own_peg_blocking": true
+    },
+    "movement_constraints": {
+      "cannot_overtake_own_peg": true,
+      "cannot_land_on_own_peg": true,
+      "must_follow_track_direction": "clockwise, except when using a 4 card",
+      "illegal_move_ends_turn": true
+    }
+  },
+  "turn_structure": {
+    "phases": ["draw", "play", "extra_turn_check"],
+    "draw_phase": {
+      "description": "Active player draws the top card from the deck.",
+      "action": "draw_card"
+    },
+    "play_phase": {
+      "description": "Player chooses a legal move for one or more pegs according to the card rules.",
+      "no_legal_move_rule": {
+        "description": "If there is no legal move with the drawn card, the turn ends.",
+        "exception": "If the card is replayable and no move is made, the extra turn is still not granted; extra turns require a successful legal move."
+      }
+    },
+    "replayable_cards": ["ace", "king", "queen", "jack", "joker", "six"],
+    "selection_ui": {
+      "legal_destination_highlighting": true,
+      "rule": "For each peg and card, all legal destination holes are highlighted.",
+      "execution": "Player clicks on a highlighted destination hole to execute the move.",
+      "animation": {
+        "stepwise_movement": true,
+        "description": "Peg visually moves hole by hole until reaching destination."
+      }
+    }
+  },
+  "card_rules": {
+    "royals": {
+      "cards": ["ace", "king", "queen", "jack", "joker"],
+      "movement": 1,
+      "direction": "clockwise",
+      "extra_turn": true,
+      "can_free_from_bullseye": true
+    },
+    "entry_from_holding": {
+      "cards": ["ace", "joker", "six"],
+      "effect": "May bring one peg out of holding area.",
+      "destination": "Player's home hole only (the first hole on their track, not fasttrack)."
+    },
+    "card_6": {
+      "movement": 6,
+      "direction": "clockwise",
+      "extra_turn": true,
+      "can_exit_holding": true,
+      "behavior": {
+        "if_pegs_in_holding": "May bring a peg out to home hole OR move 6 spaces",
+        "if_no_pegs_in_holding": "Move 6 spaces"
+      }
+    },
+    "card_7": {
+      "type": "special_split",
+      "total_movement": 7,
+      "direction": "clockwise",
+      "extra_turn": false,
+      "split_rule": {
+        "total_steps": 7,
+        "min_pegs_required": 2,
+        "max_pegs_moved": 2,
+        "distribution": "Any non-negative integer combination that sums to 7 (e.g., 3+4, 1+6, 2+5, 0+7).",
+        "constraints": [
+          "Each partial move must be individually legal.",
+          "Cannot overtake or land on own pegs.",
+          "Cannot violate zone entry rules."
+        ]
+      },
+      "single_peg_fallback": "If only 1 peg in play, move it all 7 spaces"
+    },
+    "card_4": {
+      "type": "special_backward",
+      "movement": 4,
+      "direction": "counter_clockwise",
+      "extra_turn": false,
+      "restrictions": [
+        "Cannot move backward into fasttrack.",
+        "Cannot move backward into safe zone.",
+        "Cannot move backward into bullseye center."
+      ]
+    },
+    "number_cards": {
+      "cards": ["2", "3", "5", "8", "9", "10"],
+      "movement": "equal to card value",
+      "direction": "clockwise",
+      "extra_turn": false
+    }
+  },
+  "fasttrack_rules": {
+    "entry": {
+      "condition": "A peg's final move lands exactly on a fasttrack hole.",
+      "animation": "fanfare with 'Fasttrack!' text jumping off board"
+    },
+    "movement_on_fasttrack": {
+      "direction": "clockwise",
+      "must_complete_loop": true,
+      "requirement": "Peg must at least reach its own color origin fasttrack hole before exiting toward safe zone/home."
+    },
+    "losing_fasttrack": {
+      "condition": "Player chooses any move that does not continue along fasttrack with that peg when able.",
+      "effect": "Peg leaves fasttrack and must continue on the regular track from its current position."
+    },
+    "bullseye_interaction": {
+      "entering_from_fasttrack": true,
+      "restriction": "Once player has started moving around fasttrack (beyond initial entry), they can no longer enter bullseye from fasttrack; they must complete the loop first."
+    }
+  },
+  "bullseye_rules": {
+    "entering": {
+      "condition": "Peg must land exactly on the bullseye center as the last move of a card.",
+      "source_zones": ["outer_track", "fasttrack"]
+    },
+    "while_in_bullseye": {
+      "movement_allowed": false,
+      "description": "Peg is stuck; no movement allowed until a royal is drawn."
+    },
+    "exiting": {
+      "required_cards": ["ace", "king", "queen", "jack", "joker"],
+      "destination": "Player's origin fasttrack hole",
+      "extra_turn": true,
+      "collision_rule": {
+        "condition": "Origin fasttrack hole is occupied by player's own peg",
+        "resolution": "Exiting peg is placed on the previous fasttrack hole (one step counter-clockwise)"
+      }
+    }
+  },
+  "cutting_rules": {
+    "trigger": "Landing on opponent's peg",
+    "effect": "Opponent's peg is cut and sent back",
+    "animations": {
+      "stack": "Moving peg jumps on top of opposing peg",
+      "spring": "Opposing peg springs down and pops out of the hole",
+      "flight": "Opposing peg flies across the board to holding area"
+    },
+    "cut_peg_destination": {
+      "primary": "Unoccupied holding hole of that peg's owner",
+      "fallback": "Player's home hole if holding is full"
+    }
+  },
+  "win_condition": {
+    "description": "A player wins when all 4 of their pegs are in their safe zone and then one peg lands exactly on the home winning hole.",
+    "requirements": {
+      "all_pegs_in_safe_zone": true,
+      "exact_landing_on_home": true
+    },
+    "celebration": {
+      "confetti": true,
+      "fanfare": true,
+      "player_spotlight": true
+    }
+  },
+  "legal_move_engine": {
+    "algorithm": [
+      "1. For drawn card, enumerate all pegs and all possible moves according to card rules.",
+      "2. Filter out moves that would cause a peg to overtake or land on a friendly peg.",
+      "3. Filter out moves that violate zone entry rules (fasttrack, safe zone, bullseye, backward restrictions).",
+      "4. If no legal moves remain, the turn ends immediately.",
+      "5. Extra turn is only awarded if at least one legal move is executed."
+    ],
+    "ui_integration": {
+      "highlight_legal_destinations": true,
+      "highlight_color": "golden_glow",
+      "click_to_confirm_move": true,
+      "show_path_preview": true
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "date": "2026-02-18",
+    "author": "ButterflyFX",
+    "license": "Proprietary"
+  }
+}

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .register-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 650px;
+      padding: 40px;
+      animation: slideIn 0.3s ease;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 40px;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .feedback {
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.valid {
+      color: #3c3;
+    }
+
+    .feedback.invalid {
+      color: #c33;
+    }
+
+    /* Avatar Picker with Tabs */
+    .avatar-section {
+      margin-bottom: 20px;
+    }
+
+    .avatar-label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .avatar-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .avatar-tab-btn {
+      padding: 10px 16px;
+      border: none;
+      background: #f0f0f0;
+      color: #333;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all 0.3s;
+      border: 2px solid transparent;
+    }
+
+    .avatar-tab-btn:hover {
+      background: #e0e0e0;
+    }
+
+    .avatar-tab-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 10px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+
+    .avatar-option {
+      padding: 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      text-align: center;
+      aspect-ratio: 1;
+      overflow: hidden;
+    }
+
+    .avatar-option img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .avatar-option:hover {
+      border-color: #667eea;
+      transform: scale(1.05);
+    }
+
+    .avatar-option.selected {
+      border-color: #667eea;
+      box-shadow: 0 0 10px rgba(102, 126, 234, 0.5), inset 0 0 0 3px #667eea;
+    }
+
+    /* Password Strength Meter */
+    .password-strength {
+      margin-top: 8px;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .strength-bar {
+      height: 100%;
+      width: 0%;
+      transition: all 0.3s;
+      border-radius: 2px;
+    }
+
+    .strength-bar.weak {
+      width: 33%;
+      background: #c33;
+    }
+
+    .strength-bar.medium {
+      width: 66%;
+      background: #ff9800;
+    }
+
+    .strength-bar.strong {
+      width: 100%;
+      background: #3c3;
+    }
+
+    .strength-text {
+      font-size: 11px;
+      margin-top: 4px;
+      color: #666;
+    }
+
+    /* Requirements Checklist */
+    .requirements {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+
+    .requirement-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .requirement-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .requirement-check {
+      margin-right: 8px;
+      font-weight: bold;
+      color: #999;
+    }
+
+    .requirement-check.met {
+      color: #3c3;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .login-link {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .login-link a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .login-link a:hover {
+      text-decoration: underline;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="register-container">
+    <div class="logo">🎮</div>
+    <h1>Create Your Account</h1>
+    <p class="subtitle">Join the KensGames community</p>
+
+    <form id="registerForm">
+      <!-- Username -->
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="3-24 characters, no spaces" required>
+        <div id="usernameFeedback" class="feedback"></div>
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="your@email.com" required>
+        <div id="emailFeedback" class="feedback"></div>
+      </div>
+
+      <!-- Avatar Picker with Tabs -->
+      <div class="avatar-section">
+        <label class="avatar-label">Choose Your Avatar</label>
+        <div class="avatar-tabs" id="avatarTabs"></div>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter password" required>
+        <div class="password-strength">
+          <div class="strength-bar" id="strengthBar"></div>
+        </div>
+        <div class="strength-text" id="strengthText"></div>
+        <div class="requirements">
+          <div class="requirement-item">
+            <span class="requirement-check" id="check-length">○</span>
+            <span>At least 8 characters</span>
+          </div>
+          <div class="requirement-item">
+            <span class="requirement-check" id="check-upper">○</span>
+            <span>At least 1 uppercase letter</span>
+          </div>
+          <div class="requirement-item">
+            <span class="requirement-check" id="check-special">○</span>
+            <span>At least 1 special character (!%$#&)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Confirm password" required>
+        <div id="confirmFeedback" class="feedback"></div>
+      </div>
+
+      <button type="submit" id="registerBtn">Create Account</button>
+      <div class="login-link">
+        Already have an account? <a href="/login">Login here</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Avatar Catalog with DiceBear API for People (diverse real avatars)
+    // Other categories use emoji as placeholders
+    const AVATAR_CATALOG = {
+      people: {
+        name: '👥 People',
+        useDiceBear: true,
+        description: 'Diverse, real avatars generated by DiceBear API',
+        avatars: [
+          // Pale/White skin, various features
+          { id: 'person_pale_1', seed: 'pale_blonde_female', description: 'Pale skin, blonde hair' },
+          { id: 'person_pale_2', seed: 'pale_brunette_male', description: 'Pale skin, brown hair, male' },
+          { id: 'person_pale_3', seed: 'pale_redhead_female', description: 'Pale skin, red hair, female' },
+          { id: 'person_pale_4', seed: 'pale_black_male', description: 'Pale skin, black hair, male' },
+          { id: 'person_pale_5', seed: 'pale_gray_male', description: 'Pale skin, gray hair, male' },
+
+          // Light tan/European
+          { id: 'person_light_1', seed: 'light_tan_dark_hair_female', description: 'Light tan, dark hair, female' },
+          { id: 'person_light_2', seed: 'light_tan_blonde_male', description: 'Light tan, blonde, male' },
+          { id: 'person_light_3', seed: 'light_tan_brown_female', description: 'Light tan, brown hair, female' },
+          { id: 'person_light_4', seed: 'light_olive_black_male', description: 'Light olive, black hair, male' },
+          { id: 'person_light_5', seed: 'light_mediterranean_female', description: 'Mediterranean, curly dark hair' },
+
+          // Medium brown/South Asian/Middle Eastern
+          { id: 'person_medium_1', seed: 'medium_brown_dark_hair_female', description: 'Medium brown, dark hair, female' },
+          { id: 'person_medium_2', seed: 'medium_brown_male', description: 'Medium brown skin, male' },
+          { id: 'person_medium_3', seed: 'south_asian_female', description: 'South Asian features, female' },
+          { id: 'person_medium_4', seed: 'middle_eastern_male', description: 'Middle Eastern features, male' },
+          { id: 'person_medium_5', seed: 'medium_tan_curly_female', description: 'Medium tan, curly hair, female' },
+
+          // Dark brown/Latino/Indigenous
+          { id: 'person_dark_brown_1', seed: 'dark_brown_black_hair_female', description: 'Dark brown, black hair, female' },
+          { id: 'person_dark_brown_2', seed: 'dark_brown_male', description: 'Dark brown skin, male' },
+          { id: 'person_dark_brown_3', seed: 'indigenous_female', description: 'Indigenous features, female' },
+          { id: 'person_dark_brown_4', seed: 'latino_curly_male', description: 'Latino, curly hair, male' },
+          { id: 'person_dark_brown_5', seed: 'dark_brown_wavy_female', description: 'Dark brown, wavy hair, female' },
+
+          // Black/African
+          { id: 'person_black_1', seed: 'black_afro_female', description: 'Black skin, afro, female' },
+          { id: 'person_black_2', seed: 'black_coils_male', description: 'Black skin, coily hair, male' },
+          { id: 'person_black_3', seed: 'black_braids_female', description: 'Black skin, braids, female' },
+          { id: 'person_black_4', seed: 'black_short_male', description: 'Black skin, short hair, male' },
+          { id: 'person_black_5', seed: 'black_natural_female', description: 'Black skin, natural hair, female' },
+
+          // East/Southeast Asian
+          { id: 'person_asian_1', seed: 'east_asian_female', description: 'East Asian features, female' },
+          { id: 'person_asian_2', seed: 'east_asian_male', description: 'East Asian features, male' },
+          { id: 'person_asian_3', seed: 'southeast_asian_female', description: 'Southeast Asian, female' },
+          { id: 'person_asian_4', seed: 'asian_long_black_female', description: 'Asian, long black hair, female' },
+          { id: 'person_asian_5', seed: 'asian_male_glasses', description: 'Asian, male with glasses' },
+
+          // Various ages and presentations
+          { id: 'person_elder_1', seed: 'elder_gray_female', description: 'Older, gray hair, female' },
+          { id: 'person_elder_2', seed: 'elder_male', description: 'Older male' },
+          { id: 'person_young_1', seed: 'young_vibrant_female', description: 'Young, vibrant presentation' },
+          { id: 'person_young_2', seed: 'young_male', description: 'Young male' }
+        ]
+      },
+      science: {
+        name: '🔬 Science',
+        avatars: [
+          { id: 'sci_scientist', emoji: '👨‍🔬', name: 'Scientist' },
+          { id: 'sci_scientist_f', emoji: '👩‍🔬', name: 'Female Scientist' },
+          { id: 'sci_microscope', emoji: '🔬', name: 'Microscope' },
+          { id: 'sci_test_tube', emoji: '🧪', name: 'Test Tube' },
+          { id: 'sci_dna', emoji: '🧬', name: 'DNA Helix' },
+          { id: 'sci_atom', emoji: '⚛️', name: 'Atom' },
+          { id: 'sci_flask', emoji: '⚗️', name: 'Flask' },
+          { id: 'sci_telescope', emoji: '🔭', name: 'Telescope' },
+          { id: 'sci_thermometer', emoji: '🌡️', name: 'Thermometer' },
+          { id: 'sci_beaker', emoji: '🍸', name: 'Beaker' },
+          { id: 'sci_gear', emoji: '⚙️', name: 'Gear' },
+          { id: 'sci_electric', emoji: '⚡', name: 'Lightning Bolt' },
+          { id: 'sci_fire', emoji: '🔥', name: 'Fire' },
+          { id: 'sci_water', emoji: '💧', name: 'Water Drop' },
+          { id: 'sci_mountain', emoji: '⛰️', name: 'Mountain' },
+          { id: 'sci_planet', emoji: '🌍', name: 'Planet' },
+        ]
+      },
+      scifi: {
+        name: '🚀 Sci-Fi',
+        avatars: [
+          { id: 'scifi_rocket', emoji: '🚀', name: 'Rocket' },
+          { id: 'scifi_astronaut', emoji: '👨‍🚀', name: 'Astronaut' },
+          { id: 'scifi_astronaut_f', emoji: '👩‍🚀', name: 'Female Astronaut' },
+          { id: 'scifi_alien', emoji: '👽', name: 'Alien' },
+          { id: 'scifi_ufo', emoji: '🛸', name: 'UFO' },
+          { id: 'scifi_satellite', emoji: '🛰️', name: 'Satellite' },
+          { id: 'scifi_robot', emoji: '🤖', name: 'Robot' },
+          { id: 'scifi_computer', emoji: '💻', name: 'Computer' },
+          { id: 'scifi_circuit', emoji: '🔌', name: 'Electric Plug' },
+          { id: 'scifi_laser', emoji: '🔫', name: 'Laser Gun' },
+          { id: 'scifi_future_city', emoji: '🏙️', name: 'Futuristic City' },
+          { id: 'scifi_station', emoji: '🚁', name: 'Space Station' },
+          { id: 'scifi_eye', emoji: '👁️', name: 'Eye' },
+          { id: 'scifi_network', emoji: '🕸️', name: 'Network' },
+          { id: 'scifi_android', emoji: '🦾', name: 'Mechanical Hand' },
+          { id: 'scifi_star', emoji: '⭐', name: 'Star' },
+        ]
+      },
+      fantasy: {
+        name: '🧙 Fantasy',
+        avatars: [
+          { id: 'fantasy_wizard', emoji: '🧙', name: 'Wizard' },
+          { id: 'fantasy_wizard_f', emoji: '🧙‍♀️', name: 'Female Wizard' },
+          { id: 'fantasy_dragon', emoji: '🐉', name: 'Dragon' },
+          { id: 'fantasy_unicorn', emoji: '🦄', name: 'Unicorn' },
+          { id: 'fantasy_crown', emoji: '👑', name: 'Crown' },
+          { id: 'fantasy_shield', emoji: '🛡️', name: 'Shield' },
+          { id: 'fantasy_sword', emoji: '⚔️', name: 'Sword' },
+          { id: 'fantasy_bow', emoji: '🏹', name: 'Bow & Arrow' },
+          { id: 'fantasy_potion', emoji: '🧪', name: 'Potion Bottle' },
+          { id: 'fantasy_spellbook', emoji: '📖', name: 'Spellbook' },
+          { id: 'fantasy_cauldron', emoji: '🫖', name: 'Cauldron' },
+          { id: 'fantasy_phoenix', emoji: '🔥', name: 'Phoenix Fire' },
+          { id: 'fantasy_fairy', emoji: '🧚', name: 'Fairy' },
+          { id: 'fantasy_goblin', emoji: '👹', name: 'Halloween Goblin' },
+          { id: 'fantasy_castle', emoji: '🏰', name: 'Castle' },
+          { id: 'fantasy_treasure', emoji: '💎', name: 'Treasure Gem' },
+        ]
+      },
+      food: {
+        name: '🍕 Food',
+        avatars: [
+          { id: 'food_pizza', emoji: '🍕', name: 'Pizza' },
+          { id: 'food_hamburger', emoji: '🍔', name: 'Hamburger' },
+          { id: 'food_sushi', emoji: '🍣', name: 'Sushi' },
+          { id: 'food_taco', emoji: '🌮', name: 'Taco' },
+          { id: 'food_ramen', emoji: '🍜', name: 'Ramen' },
+          { id: 'food_donut', emoji: '🍩', name: 'Donut' },
+          { id: 'food_watermelon', emoji: '🍉', name: 'Watermelon' },
+          { id: 'food_apple', emoji: '🍎', name: 'Apple' },
+          { id: 'food_orange', emoji: '🍊', name: 'Orange' },
+          { id: 'food_strawberry', emoji: '🍓', name: 'Strawberry' },
+          { id: 'food_banana', emoji: '🍌', name: 'Banana' },
+          { id: 'food_grapes', emoji: '🍇', name: 'Grapes' },
+          { id: 'food_cake', emoji: '🎂', name: 'Birthday Cake' },
+          { id: 'food_coffee', emoji: '☕', name: 'Coffee' },
+          { id: 'food_beer', emoji: '🍺', name: 'Beer' },
+          { id: 'food_ice_cream', emoji: '🍦', name: 'Ice Cream' },
+        ]
+      },
+      animals: {
+        name: '🐾 Animals',
+        avatars: [
+          { id: 'animal_lion', emoji: '🦁', name: 'Lion' },
+          { id: 'animal_tiger', emoji: '🐯', name: 'Tiger' },
+          { id: 'animal_bear', emoji: '🐻', name: 'Bear' },
+          { id: 'animal_fox', emoji: '🦊', name: 'Fox' },
+          { id: 'animal_dog', emoji: '🐕', name: 'Dog' },
+          { id: 'animal_cat', emoji: '🐱', name: 'Cat' },
+          { id: 'animal_eagle', emoji: '🦅', name: 'Eagle' },
+          { id: 'animal_penguin', emoji: '🐧', name: 'Penguin' },
+          { id: 'animal_owl', emoji: '🦉', name: 'Owl' },
+          { id: 'animal_wolf', emoji: '🐺', name: 'Wolf' },
+          { id: 'animal_pig', emoji: '🐷', name: 'Pig' },
+          { id: 'animal_cow', emoji: '🐄', name: 'Cow' },
+          { id: 'animal_horse', emoji: '🐴', name: 'Horse' },
+          { id: 'animal_panda', emoji: '🐼', name: 'Panda' },
+          { id: 'animal_monkey', emoji: '🐵', name: 'Monkey' },
+          { id: 'animal_shark', emoji: '🦈', name: 'Shark' },
+        ]
+      },
+      gaming: {
+        name: '🎮 Gaming',
+        avatars: [
+          { id: 'game_joystick', emoji: '🕹️', name: 'Joystick' },
+          { id: 'game_die_1', emoji: '🎲', name: 'Dice' },
+          { id: 'game_target', emoji: '🎯', name: 'Target' },
+          { id: 'game_dart', emoji: '🎱', name: 'Billiard Ball' },
+          { id: 'game_bowling', emoji: '🎳', name: 'Bowling' },
+          { id: 'game_chess', emoji: '♟️', name: 'Chess Pawn' },
+          { id: 'game_trophy', emoji: '🏆', name: 'Trophy' },
+          { id: 'game_medal', emoji: '🥇', name: 'Gold Medal' },
+          { id: 'game_fire', emoji: '🔥', name: 'On Fire' },
+          { id: 'game_star', emoji: '⭐', name: 'Star' },
+          { id: 'game_explosion', emoji: '💥', name: 'Explosion' },
+          { id: 'game_lightning', emoji: '⚡', name: 'Lightning' },
+          { id: 'game_skull', emoji: '💀', name: 'Skull' },
+          { id: 'game_gem', emoji: '💎', name: 'Gem' },
+          { id: 'game_heart', emoji: '❤️', name: 'Heart' },
+          { id: 'game_bomb', emoji: '💣', name: 'Bomb' },
+        ]
+      }
+    };
+
+    let selectedAvatar = 'person_pale_1';
+    let currentCategory = 'people';
+
+    // Initialize avatar picker
+    function initAvatarPicker() {
+      const tabsContainer = document.getElementById('avatarTabs');
+
+      Object.entries(AVATAR_CATALOG).forEach(([categoryId, category], index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `avatar-tab-btn ${index === 0 ? 'active' : ''}`;
+        btn.textContent = category.name;
+        btn.onclick = (e) => {
+          e.preventDefault();
+          selectCategory(categoryId);
+        };
+        tabsContainer.appendChild(btn);
+      });
+
+      // Show first category
+      selectCategory('people');
+    }
+
+    function selectCategory(categoryId) {
+      currentCategory = categoryId;
+
+      // Update active tab
+      document.querySelectorAll('.avatar-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Update grid
+      const category = AVATAR_CATALOG[categoryId];
+      const grid = document.getElementById('avatarGrid');
+
+      if (category.useDiceBear) {
+        grid.innerHTML = '<div class="loading">Loading diverse avatars...</div>';
+
+        // Generate DiceBear avatars
+        grid.innerHTML = category.avatars.map(avatar => `
+          <div class="avatar-option ${avatar.id === selectedAvatar ? 'selected' : ''}"
+               onclick="selectAvatar('${avatar.id}')"
+               title="${avatar.description}">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatar.seed)}&scale=80"
+                 alt="${avatar.description}"
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ccc%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'">
+          </div>
+        `).join('');
+      } else {
+        grid.innerHTML = category.avatars.map(avatar => `
+          <div class="avatar-option ${avatar.id === selectedAvatar ? 'selected' : ''}"
+               onclick="selectAvatar('${avatar.id}')"
+               title="${avatar.name}">
+            ${avatar.emoji}
+          </div>
+        `).join('');
+      }
+    }
+
+    function selectAvatar(avatarId) {
+      selectedAvatar = avatarId;
+      document.querySelectorAll('.avatar-option').forEach(opt => {
+        opt.classList.remove('selected');
+      });
+      event.target.closest('.avatar-option').classList.add('selected');
+    }
+
+    // Form validation
+    function validateUsername(username) {
+      const regex = /^[a-zA-Z0-9_-]{3,24}$/;
+      if (!username) return { valid: false, message: 'Username required' };
+      if (!regex.test(username)) return { valid: false, message: 'Username must be 3-24 chars, alphanumeric + underscore/dash' };
+      return { valid: true, message: '✓ Username available' };
+    }
+
+    function validateEmail(email, username) {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email) return { valid: false, message: 'Email required' };
+      if (!regex.test(email)) return { valid: false, message: 'Invalid email format' };
+      if (email.toLowerCase().includes(username.toLowerCase())) {
+        return { valid: false, message: 'Email cannot contain username' };
+      }
+      return { valid: true, message: '✓ Email valid' };
+    }
+
+    function validatePassword(password) {
+      const checks = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        special: /[!%$#&]/.test(password)
+      };
+
+      document.getElementById('check-length').textContent = checks.length ? '✓' : '○';
+      document.getElementById('check-length').classList.toggle('met', checks.length);
+
+      document.getElementById('check-upper').textContent = checks.uppercase ? '✓' : '○';
+      document.getElementById('check-upper').classList.toggle('met', checks.uppercase);
+
+      document.getElementById('check-special').textContent = checks.special ? '✓' : '○';
+      document.getElementById('check-special').classList.toggle('met', checks.special);
+
+      const metCount = Object.values(checks).filter(v => v).length;
+      const strengthBar = document.getElementById('strengthBar');
+      const strengthText = document.getElementById('strengthText');
+
+      if (metCount === 0) {
+        strengthBar.className = 'strength-bar';
+        strengthText.textContent = '';
+      } else if (metCount === 1) {
+        strengthBar.className = 'strength-bar weak';
+        strengthText.textContent = 'Weak';
+      } else if (metCount === 2) {
+        strengthBar.className = 'strength-bar medium';
+        strengthText.textContent = 'Medium';
+      } else {
+        strengthBar.className = 'strength-bar strong';
+        strengthText.textContent = 'Strong';
+      }
+
+      return Object.values(checks).every(v => v);
+    }
+
+    // Event listeners
+    document.getElementById('username').addEventListener('input', function() {
+      const result = validateUsername(this.value);
+      const feedback = document.getElementById('usernameFeedback');
+      feedback.textContent = result.message;
+      feedback.classList.toggle('show', this.value.length > 0);
+      feedback.classList.toggle('valid', result.valid);
+      feedback.classList.toggle('invalid', !result.valid && this.value.length > 0);
+    });
+
+    document.getElementById('email').addEventListener('input', function() {
+      const username = document.getElementById('username').value;
+      const result = validateEmail(this.value, username);
+      const feedback = document.getElementById('emailFeedback');
+      feedback.textContent = result.message;
+      feedback.classList.toggle('show', this.value.length > 0);
+      feedback.classList.toggle('valid', result.valid);
+      feedback.classList.toggle('invalid', !result.valid && this.value.length > 0);
+    });
+
+    document.getElementById('password').addEventListener('input', function() {
+      validatePassword(this.value);
+    });
+
+    document.getElementById('confirmPassword').addEventListener('input', function() {
+      const password = document.getElementById('password').value;
+      const feedback = document.getElementById('confirmFeedback');
+
+      if (this.value && password !== this.value) {
+        feedback.textContent = 'Passwords do not match';
+        feedback.classList.add('show', 'invalid');
+        feedback.classList.remove('valid');
+      } else if (this.value && password === this.value) {
+        feedback.textContent = '✓ Passwords match';
+        feedback.classList.add('show', 'valid');
+        feedback.classList.remove('invalid');
+      } else {
+        feedback.classList.remove('show');
+      }
+    });
+
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      // Final validation
+      if (!validateUsername(username).valid) {
+        alert('Invalid username');
+        return;
+      }
+      if (!validateEmail(email, username).valid) {
+        alert('Invalid email');
+        return;
+      }
+      if (!validatePassword(password)) {
+        alert('Password does not meet requirements');
+        return;
+      }
+      if (password !== confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            email,
+            password,
+            avatar: selectedAvatar
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert('Account created! Redirecting to login...');
+          window.location.href = '/login';
+        } else {
+          alert('Registration failed: ' + data.error);
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        alert('Registration failed. Please try again.');
+      }
+    });
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', initAvatarPicker);
+  </script>
+</body>
+
+</html>
