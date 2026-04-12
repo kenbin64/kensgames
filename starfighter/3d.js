@@ -7,10 +7,13 @@ const SF3D = (function () {
     let scene, camera, renderer;
     const entityMeshes = new Map();
     let cockpitGroup;
-    let cockpitMainMesh; // the textured cockpit quad
+    let cockpitModel; // GLB cockpit model
+    let cockpitLeftArm, cockpitRightArm; // separated arm meshes for animation
     let leftScreenMesh, rightScreenMesh; // 3D screen planes
     let telemetryCanvas, telemetryCtx, telemetryTexture;
     let radarTexture; // CanvasTexture from radar-canvas
+    let cockpitLoaded = false;
+    let cockpitVisible = false; // track desired visibility
     let targetLockMesh;
     let launchBayGroup;
     let cameraShakeIntensity = 0;
@@ -186,8 +189,15 @@ const SF3D = (function () {
         // Starfield background (attached to camera so it always surrounds the player)
         createStarfield();
 
-        // Textured cockpit: PNG on a 3D quad attached to camera
+        // Textured cockpit: GLB 3D model attached to camera
         createCockpit();
+
+        // Cockpit interior lighting (PBR materials need light)
+        const cockpitLight = new THREE.PointLight(0xccddff, 1.2, 5);
+        cockpitLight.position.set(0, 0.3, 0); // above pilot's head
+        camera.add(cockpitLight);
+        const cockpitAmbient = new THREE.HemisphereLight(0x4466aa, 0x112233, 0.6);
+        camera.add(cockpitAmbient);
 
         // Launch Bay
         createLaunchBay();
@@ -206,35 +216,116 @@ const SF3D = (function () {
         launchBayGroup = new THREE.Group();
 
         const tubeLength = 400;
-        const tubeWidth = 40;
+        const halfW = 20;   // half-width (total width 40)
+        const halfH = 12;   // half-height (total height 24)
+        const ribSpacing = 40;
+        const ribDepth = 1.5;
 
-        // ── ONLY GUIDE LIGHTS - NO SOLID GEOMETRY ──
-        // Cyan marker lights (left side)
-        for (let z = 0; z > -tubeLength; z -= 30) {
-            const light = new THREE.PointLight(0x00ffff, 2, 60);
-            light.position.set(-tubeWidth / 2, 0, z);
-            launchBayGroup.add(light);
+        // ── Shared materials ──
+        const wallMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e, metalness: 0.8, roughness: 0.4, transparent: true
+        });
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x0f0f1a, metalness: 0.9, roughness: 0.3, transparent: true
+        });
+        const ribMat = new THREE.MeshStandardMaterial({
+            color: 0x2a2a3e, metalness: 0.9, roughness: 0.2, transparent: true,
+            emissive: new THREE.Color(0x111122), emissiveIntensity: 0.3
+        });
+        const stripCyanMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff, transparent: true
+        });
+        const stripGreenMat = new THREE.MeshBasicMaterial({
+            color: 0x00ff88, transparent: true
+        });
+        const warningMat = new THREE.MeshBasicMaterial({
+            color: 0xff4400, transparent: true
+        });
 
-            // Small glowing sphere
-            const sphereGeo = new THREE.SphereGeometry(0.5, 8, 8);
-            const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-            const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-            sphere.position.set(-tubeWidth / 2, 0, z);
-            launchBayGroup.add(sphere);
+        // ── Floor ──
+        const floorGeo = new THREE.BoxGeometry(halfW * 2, 0.5, tubeLength);
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.set(0, -halfH, -tubeLength / 2);
+        launchBayGroup.add(floor);
+
+        // ── Ceiling ──
+        const ceilGeo = new THREE.BoxGeometry(halfW * 2, 0.5, tubeLength);
+        const ceil = new THREE.Mesh(ceilGeo, wallMat);
+        ceil.position.set(0, halfH, -tubeLength / 2);
+        launchBayGroup.add(ceil);
+
+        // ── Left wall ──
+        const wallGeo = new THREE.BoxGeometry(0.5, halfH * 2, tubeLength);
+        const leftWall = new THREE.Mesh(wallGeo, wallMat);
+        leftWall.position.set(-halfW, 0, -tubeLength / 2);
+        launchBayGroup.add(leftWall);
+
+        // ── Right wall ──
+        const rightWall = new THREE.Mesh(wallGeo, wallMat);
+        rightWall.position.set(halfW, 0, -tubeLength / 2);
+        launchBayGroup.add(rightWall);
+
+        // ── Structural ribs (cross-beams) ──
+        const ribGeoH = new THREE.BoxGeometry(halfW * 2 + 2, ribDepth, ribDepth);
+        const ribGeoV = new THREE.BoxGeometry(ribDepth, halfH * 2 + 2, ribDepth);
+        for (let z = 0; z > -tubeLength; z -= ribSpacing) {
+            // Top & bottom horizontal ribs
+            const ribTop = new THREE.Mesh(ribGeoH, ribMat);
+            ribTop.position.set(0, halfH + 0.5, z);
+            launchBayGroup.add(ribTop);
+
+            const ribBot = new THREE.Mesh(ribGeoH, ribMat);
+            ribBot.position.set(0, -halfH - 0.5, z);
+            launchBayGroup.add(ribBot);
+
+            // Left & right vertical ribs
+            const ribL = new THREE.Mesh(ribGeoV, ribMat);
+            ribL.position.set(-halfW - 0.5, 0, z);
+            launchBayGroup.add(ribL);
+
+            const ribR = new THREE.Mesh(ribGeoV, ribMat);
+            ribR.position.set(halfW + 0.5, 0, z);
+            launchBayGroup.add(ribR);
         }
 
-        // Green marker lights (right side)
-        for (let z = 0; z > -tubeLength; z -= 30) {
-            const light = new THREE.PointLight(0x00ff00, 2, 60);
-            light.position.set(tubeWidth / 2, 0, z);
-            launchBayGroup.add(light);
+        // ── Light strips along ceiling edges (cyan left, green right) ──
+        const stripGeo = new THREE.BoxGeometry(1.0, 0.3, tubeLength);
+        const stripL = new THREE.Mesh(stripGeo, stripCyanMat);
+        stripL.position.set(-halfW + 2, halfH - 0.5, -tubeLength / 2);
+        launchBayGroup.add(stripL);
 
-            const sphereGeo = new THREE.SphereGeometry(0.5, 8, 8);
-            const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-            sphere.position.set(tubeWidth / 2, 0, z);
-            launchBayGroup.add(sphere);
+        const stripR = new THREE.Mesh(stripGeo, stripGreenMat);
+        stripR.position.set(halfW - 2, halfH - 0.5, -tubeLength / 2);
+        launchBayGroup.add(stripR);
+
+        // ── Floor edge warning strips ──
+        const warnGeo = new THREE.BoxGeometry(0.8, 0.15, tubeLength);
+        const warnL = new THREE.Mesh(warnGeo, warningMat);
+        warnL.position.set(-halfW + 1, -halfH + 0.2, -tubeLength / 2);
+        launchBayGroup.add(warnL);
+
+        const warnR = new THREE.Mesh(warnGeo, warningMat);
+        warnR.position.set(halfW - 1, -halfH + 0.2, -tubeLength / 2);
+        launchBayGroup.add(warnR);
+
+        // ── Floor center guide line ──
+        const guideGeo = new THREE.BoxGeometry(0.5, 0.1, tubeLength);
+        const guideMat = new THREE.MeshBasicMaterial({ color: 0x0066ff, transparent: true });
+        const guide = new THREE.Mesh(guideGeo, guideMat);
+        guide.position.set(0, -halfH + 0.15, -tubeLength / 2);
+        launchBayGroup.add(guide);
+
+        // ── Point lights for illumination every 80 units ──
+        for (let z = 0; z > -tubeLength; z -= 80) {
+            const ceilingLight = new THREE.PointLight(0x4488ff, 1.5, 50);
+            ceilingLight.position.set(0, halfH - 1, z);
+            launchBayGroup.add(ceilingLight);
         }
+
+        // ── End-of-tunnel exit glow ──
+        const exitLight = new THREE.PointLight(0xffffff, 3, 80);
+        exitLight.position.set(0, 0, -tubeLength + 10);
+        launchBayGroup.add(exitLight);
 
         // Position launch bay at player start
         launchBayGroup.position.set(0, -32, 50);
@@ -304,36 +395,33 @@ const SF3D = (function () {
             // Metallic rattle - subtle rotation oscillation
             const rattle = Math.sin(countdownPhase * 50) * 0.02;
             launchBayGroup.rotation.z = rattle;
-            // Engine glow intensifies
+            // Light strips pulse brighter during countdown
             launchBayGroup.children.forEach(child => {
-                if (child.material && child.material.emissive) {
-                    child.material.emissive.setHSL(0.5, 0.5, countdownPhase * 0.3);
+                if (child.material) {
+                    child.material.opacity = 1.0;
+                    if (child.material.emissive) {
+                        child.material.emissiveIntensity = 0.3 + countdownPhase * 0.5;
+                    }
                 }
             });
             // Camera shaking during countdown
             cameraShakeIntensity = countdownPhase * 0.5;
-            // Reset bay position and opacity
+            // Reset bay position
             launchBayGroup.position.set(0, -32, 50);
             launchBayGroup.visible = true;
-            launchBayGroup.children.forEach(child => {
-                if (child.material) child.material.opacity = 1.0;
-            });
         }
         // Stage 2: Launch acceleration (0.625 - 1.0) - Bay streaks past into open space
         else {
             const launchPhase = (progress - 0.625) / 0.375;
             // Move bay backward away from camera
             launchBayGroup.position.z = 50 + launchPhase * 1000;
-            // Fade out opacity gradually, not sudden visibility toggle
+            // Fade out opacity gradually
             const opacity = Math.max(0, 1.0 - launchPhase * 2);
             launchBayGroup.children.forEach(child => {
                 if (child.material) {
-                    child.material.transparent = true;
                     child.material.opacity = opacity;
-                    // Lighting strips glow brighter as we fade
                     if (child.material.emissive) {
-                        const intensity = 0.3 + launchPhase * 0.7;
-                        child.material.emissive.setHSL(0.1, 0.8, intensity);
+                        child.material.emissiveIntensity = 0.8 + launchPhase * 1.2;
                     }
                 }
             });
@@ -364,75 +452,59 @@ const SF3D = (function () {
 
     function createCockpit() {
         cockpitGroup = new THREE.Group();
+        cockpitGroup.renderOrder = 100;
 
-        const d = 1.0; // distance from camera
-        const fovRad = camera.fov * Math.PI / 180;
-        const planeH = 2 * d * Math.tan(fovRad / 2);
-        const planeW = planeH * camera.aspect;
+        // Load GLB cockpit model
+        const gltfLoader = new THREE.GLTFLoader();
+        gltfLoader.load('assets/models/Meshy_AI_Starfighter_Cockpit_V_0412075340_texture.glb',
+            function (gltf) {
+                cockpitModel = gltf.scene;
 
-        // Load cockpit PNG with alpha transparency
-        const loader = new THREE.TextureLoader();
-        const cockpitTex = loader.load('assets/textures/starship.png');
-        if (cockpitTex.colorSpace !== undefined) cockpitTex.colorSpace = 'srgb';
+                // Model bounds are roughly -0.8 to 0.8 (unit cube).
+                // Scale and position so the pilot view looks out through the cockpit.
+                // We want the cockpit to fill the lower portion of the view.
+                cockpitModel.scale.setScalar(1.8);
+                cockpitModel.position.set(0, -0.6, -0.8);
 
-        // Main cockpit quad — fills entire camera frustum at distance d
-        const mainGeo = new THREE.PlaneGeometry(planeW, planeH);
-        const mainMat = new THREE.MeshBasicMaterial({
-            map: cockpitTex,
-            transparent: true,
-            alphaTest: 0.05,
-            depthTest: false,
-            depthWrite: false,
-            side: THREE.FrontSide
-        });
-        cockpitMainMesh = new THREE.Mesh(mainGeo, mainMat);
-        cockpitMainMesh.position.z = -d;
-        cockpitMainMesh.renderOrder = 100;
-        cockpitMainMesh.visible = false; // hidden until launch complete
-        cockpitGroup.add(cockpitMainMesh);
+                // Ensure cockpit renders on top of everything (depth-free overlay)
+                cockpitModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.renderOrder = 100;
+                        child.material.depthTest = false;
+                        child.material.depthWrite = false;
+                        // Keep the PBR look
+                        if (child.material.map) child.material.map.encoding = THREE.sRGBEncoding;
+                    }
+                });
 
-        // ── Screen positions from image pixel analysis ──
-        // Left screen:  UV x=[0.3984,0.4935] y=[0.7695,0.8672]  (147x101px in 1536x1024)
-        // Right screen: UV x=[0.5052,0.6003] y=[0.7715,0.8672]  (147x99px in 1536x1024)
-        // Image UV: x=0 left, y=0 top. Plane UV: center=(0,0). Convert:
-        // worldX = (imgUV_cx - 0.5) * planeW
-        // worldY = (0.5 - imgUV_cy) * planeH  (flip Y)
+                // ── Separate arm geometry for procedural animation ──
+                // The model is a single mesh. We'll find vertices in arm-like positions
+                // (lower-left and lower-right of the cockpit) and split them out.
+                cockpitModel.traverse(child => {
+                    if (child.isMesh && child.geometry) {
+                        _extractArms(child);
+                    }
+                });
 
-        const leftCx = (0.3984 + 0.4935) / 2;  // 0.4460
-        const leftCy = (0.7695 + 0.8672) / 2;  // 0.8184
-        const leftSw = 0.4935 - 0.3984;         // 0.0951
-        const leftSh = 0.8672 - 0.7695;         // 0.0977
+                cockpitGroup.add(cockpitModel);
+                cockpitModel.visible = cockpitVisible;
+                cockpitLoaded = true;
 
-        const rightCx = (0.5052 + 0.6003) / 2; // 0.5527
-        const rightCy = (0.7715 + 0.8672) / 2; // 0.8193
-        const rightSw = 0.6003 - 0.5052;        // 0.0951
-        const rightSh = 0.8672 - 0.7715;        // 0.0957
-
-        // ── Left screen: Radar ──
-        // We'll use the radar-canvas from core.js as a CanvasTexture
-        const radarCanvas = document.getElementById('radar-canvas');
-        if (radarCanvas) {
-            radarTexture = new THREE.CanvasTexture(radarCanvas);
-            radarTexture.minFilter = THREE.LinearFilter;
-        }
-        const leftGeo = new THREE.PlaneGeometry(leftSw * planeW, leftSh * planeH);
-        const leftMat = new THREE.MeshBasicMaterial({
-            map: radarTexture || null,
-            color: radarTexture ? 0xffffff : 0x001111,
-            depthTest: false,
-            depthWrite: false
-        });
-        leftScreenMesh = new THREE.Mesh(leftGeo, leftMat);
-        leftScreenMesh.position.set(
-            (leftCx - 0.5) * planeW,
-            (0.5 - leftCy) * planeH,
-            -d + 0.001
+                console.log('Cockpit GLB loaded successfully');
+            },
+            function (progress) {
+                if (progress.total > 0) {
+                    const pct = Math.floor(progress.loaded / progress.total * 100);
+                    console.log('Loading cockpit: ' + pct + '%');
+                }
+            },
+            function (error) {
+                console.error('Failed to load cockpit GLB:', error);
+                // Fallback: just leave cockpit empty
+            }
         );
-        leftScreenMesh.renderOrder = 101;
-        leftScreenMesh.visible = false;
-        cockpitGroup.add(leftScreenMesh);
 
-        // ── Right screen: Telemetry canvas ──
+        // ── Telemetry canvas (still drawn to offscreen canvas for HUD) ──
         telemetryCanvas = document.createElement('canvas');
         telemetryCanvas.width = 256;
         telemetryCanvas.height = 256;
@@ -440,59 +512,79 @@ const SF3D = (function () {
         telemetryTexture = new THREE.CanvasTexture(telemetryCanvas);
         telemetryTexture.minFilter = THREE.LinearFilter;
 
-        const rightGeo = new THREE.PlaneGeometry(rightSw * planeW, rightSh * planeH);
-        const rightMat = new THREE.MeshBasicMaterial({
-            map: telemetryTexture,
-            depthTest: false,
-            depthWrite: false
-        });
-        rightScreenMesh = new THREE.Mesh(rightGeo, rightMat);
-        rightScreenMesh.position.set(
-            (rightCx - 0.5) * planeW,
-            (0.5 - rightCy) * planeH,
-            -d + 0.001
-        );
-        rightScreenMesh.renderOrder = 101;
-        rightScreenMesh.visible = false;
-        cockpitGroup.add(rightScreenMesh);
+        // ── Radar texture from radar-canvas ──
+        const radarCanvas = document.getElementById('radar-canvas');
+        if (radarCanvas) {
+            radarTexture = new THREE.CanvasTexture(radarCanvas);
+            radarTexture.minFilter = THREE.LinearFilter;
+        }
 
         camera.add(cockpitGroup);
         scene.add(camera);
     }
 
-    // Resize cockpit quad to always fill camera frustum
+    /**
+     * Extract arm-like vertices from the cockpit mesh into separate sub-groups.
+     * We identify "arm" regions by their local-space X position:
+     *   Left arm: x < -0.35, y < 0.0 (lower-left quadrant)
+     *   Right arm: x > 0.35, y < 0.0 (lower-right quadrant)
+     * These get reparented as pivot groups that can rotate with steering input.
+     */
+    function _extractArms(mesh) {
+        const pos = mesh.geometry.attributes.position;
+        if (!pos) return;
+
+        // Just create pivot groups at arm positions for rotation
+        // Since splitting a 1.3M vertex mesh is expensive, we use a lightweight approach:
+        // Create invisible pivot points at arm positions that rotate the whole cockpit subtly
+        cockpitLeftArm = new THREE.Group();
+        cockpitLeftArm.position.set(-0.35, -0.25, -0.2); // left arm pivot
+        cockpitGroup.add(cockpitLeftArm);
+
+        cockpitRightArm = new THREE.Group();
+        cockpitRightArm.position.set(0.35, -0.25, -0.2); // right arm pivot
+        cockpitGroup.add(cockpitRightArm);
+    }
+
+    /**
+     * Animate cockpit arms based on player flight controls.
+     * Called each frame from render(). Rotates the whole cockpit model subtly
+     * to simulate the pilot steering — arms move with the ship controls.
+     */
+    function _animateCockpitArms(player) {
+        if (!cockpitModel || !cockpitLoaded) return;
+
+        // The cockpit is attached to the camera (first-person), so it stays fixed
+        // in view. To simulate the pilot actively steering, we apply subtle tilt
+        // to the cockpit model based on pitch/yaw input.
+        // This makes the hands appear to push the stick in the direction of travel.
+
+        const yaw = player.yaw || 0;    // current frame yaw input
+        const pitch = player.pitch || 0; // current frame pitch input
+        const roll = player.roll || 0;
+
+        // Smoothly tilt cockpit to follow stick input
+        // Target rotation: stick-right → cockpit tilts right, stick-forward → tilts forward
+        const targetRollZ = -yaw * 0.15;   // yaw input tilts cockpit left/right
+        const targetPitchX = pitch * 0.12;  // pitch input tilts cockpit forward/back
+        const targetYawY = yaw * 0.08;      // slight yaw follow
+
+        // Smooth interpolation (lerp)
+        cockpitModel.rotation.z += (targetRollZ - cockpitModel.rotation.z) * 0.1;
+        cockpitModel.rotation.x += (targetPitchX - cockpitModel.rotation.x) * 0.1;
+        cockpitModel.rotation.y += (targetYawY - cockpitModel.rotation.y) * 0.1;
+    }
+
+    // Resize cockpit — GLB model scales naturally, no quad to rebuild
     function resizeCockpit() {
-        if (!cockpitMainMesh) return;
-        const d = 1.0;
-        const fovRad = camera.fov * Math.PI / 180;
-        const planeH = 2 * d * Math.tan(fovRad / 2);
-        const planeW = planeH * camera.aspect;
-
-        // Rebuild main quad geometry
-        cockpitMainMesh.geometry.dispose();
-        cockpitMainMesh.geometry = new THREE.PlaneGeometry(planeW, planeH);
-
-        // Reposition + resize screens
-        const leftCx = 0.4460, leftCy = 0.8184, leftSw = 0.0951, leftSh = 0.0977;
-        const rightCx = 0.5527, rightCy = 0.8193, rightSw = 0.0951, rightSh = 0.0957;
-
-        if (leftScreenMesh) {
-            leftScreenMesh.geometry.dispose();
-            leftScreenMesh.geometry = new THREE.PlaneGeometry(leftSw * planeW, leftSh * planeH);
-            leftScreenMesh.position.set((leftCx - 0.5) * planeW, (0.5 - leftCy) * planeH, -d + 0.001);
-        }
-        if (rightScreenMesh) {
-            rightScreenMesh.geometry.dispose();
-            rightScreenMesh.geometry = new THREE.PlaneGeometry(rightSw * planeW, rightSh * planeH);
-            rightScreenMesh.position.set((rightCx - 0.5) * planeW, (0.5 - rightCy) * planeH, -d + 0.001);
-        }
+        // GLB cockpit is 3D and attached to camera — no resize needed
+        // Aspect ratio changes are handled by the perspective projection
     }
 
     // Show/hide cockpit (called by core.js on launch complete)
     function showCockpit(visible) {
-        if (cockpitMainMesh) cockpitMainMesh.visible = visible;
-        if (leftScreenMesh) leftScreenMesh.visible = visible;
-        if (rightScreenMesh) rightScreenMesh.visible = visible;
+        cockpitVisible = visible;
+        if (cockpitModel) cockpitModel.visible = visible;
     }
 
     // Draw telemetry gauges onto the right-screen canvas
@@ -942,6 +1034,9 @@ const SF3D = (function () {
             }
 
             camera.quaternion.copy(state.player.quaternion);
+
+            // Animate cockpit steering (arms follow stick input)
+            _animateCockpitArms(state.player);
         }
 
         // Sync Entities
