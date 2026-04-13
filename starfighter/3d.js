@@ -22,34 +22,22 @@ const SF3D = (function () {
     const glbModels = {};    // { modelName: THREE.Group }
     // LOD levels: [{ path, distance }] — distance is the camera distance at which
     // Three.js switches FROM this level to the next (coarser) one.
-    // LOD tiers per GDD §13.2: Hero 0-500, Near 500-2000, Mid 2000-5000
-    // Capital ships use FULL original GLBs at hero range (only 1 instance each)
-    // Fighters use optimized lod0 (many instances) with generous thresholds
+    // Model paths — single LOD using full original GLBs
     const GLB_LOD = {
         enemy: [
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 500 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 2000 },
+            { path: 'assets/models/AlienEnemyFighter.glb', distance: 0 },
         ],
         ally: [
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 500 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 2000 },
+            { path: 'assets/models/HumanFriendlStarFighter.glb', distance: 0 },
         ],
         'alien-baseship': [
-            { path: 'assets/models/AlienMotherShip.glb', distance: 0 },           // Full 31MB original at hero range
-            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 2000 },
-            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 5000 },
+            { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
         ],
         baseship: [
-            { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },      // Full 32MB original at hero range
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 2000 },
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 5000 },
+            { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },
         ],
         station: [
-            { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 }, // Full 35MB original
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 2000 },
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 5000 },
+            { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 },
         ],
         // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [

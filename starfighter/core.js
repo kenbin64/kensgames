@@ -17,7 +17,7 @@ const Starfighter = (function () {
         running: false,
         lastTime: 0,
         arenaRadius: 8000,
-        phase: 'launching', // 'launching', 'combat', 'landing', 'land-approach'
+        phase: 'loading', // 'loading', 'bay-ready', 'launching', 'combat', 'landing', 'land-approach', 'docking'
         launchTimer: 0,
         launchDuration: 8.0, // 5 sec countdown + 3 sec acceleration
         cutsceneCamPos: null, // isolated camera position for launch cutscene
@@ -328,7 +328,7 @@ const Starfighter = (function () {
 
     function _startGame() {
         state.running = true;
-        state.phase = 'launching';
+        state.phase = 'bay-ready';  // Wait for player to push red launch button
         state._launchAudioPlayed = false;
         state._launchBlastPlayed = false;
         state._paBriefingDone = false;
@@ -339,38 +339,71 @@ const Starfighter = (function () {
         if (window.SFAudio) {
             SFAudio.init();
             SFAudio.startBayAmbience();
+        }
+
+        // Start Loop (renders cockpit/bay scene even in bay-ready)
+        state.lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+
+        // Show countdown area, cockpit stays visible during bay for immersion
+        document.getElementById('ship-panel').style.display = 'none';
+        document.getElementById('crosshair').style.display = 'none';
+        document.getElementById('countdown-display').style.display = 'block';
+        document.getElementById('countdown-display').innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
+
+        // Show the red LAUNCH button
+        let launchBtn = document.getElementById('launch-btn');
+        if (!launchBtn) {
+            launchBtn = document.createElement('button');
+            launchBtn.id = 'launch-btn';
+            launchBtn.innerHTML = '&#9654; LAUNCH';
+            launchBtn.style.cssText = 'position:absolute;bottom:50%;left:50%;transform:translate(-50%,50%);z-index:70;' +
+                'padding:20px 48px;font-family:"Courier New",monospace;font-size:22px;font-weight:bold;letter-spacing:3px;' +
+                'background:linear-gradient(180deg,#cc0000,#880000);color:#fff;border:3px solid #ff3333;border-radius:8px;' +
+                'cursor:pointer;pointer-events:auto;text-shadow:0 0 8px #ff0000;box-shadow:0 0 30px rgba(255,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.2);' +
+                'transition:all 0.15s ease;text-transform:uppercase';
+            launchBtn.onmouseenter = () => {
+                launchBtn.style.background = 'linear-gradient(180deg,#ee2222,#aa0000)';
+                launchBtn.style.boxShadow = '0 0 50px rgba(255,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.3)';
+            };
+            launchBtn.onmouseleave = () => {
+                launchBtn.style.background = 'linear-gradient(180deg,#cc0000,#880000)';
+                launchBtn.style.boxShadow = '0 0 30px rgba(255,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.2)';
+            };
+            launchBtn.onclick = () => {
+                _beginLaunchSequence();
+            };
+            document.body.appendChild(launchBtn);
+        }
+        launchBtn.style.display = 'block';
+
+        addComm("Baseship", "Fighter, secure in launch bay. Press LAUNCH when ready.", "base");
+    }
+
+    function _beginLaunchSequence() {
+        // Hide the red launch button
+        const launchBtn = document.getElementById('launch-btn');
+        if (launchBtn) launchBtn.style.display = 'none';
+
+        state.phase = 'launching';
+        state.launchTimer = 0;
+
+        // Klaxon on launch commit
+        if (window.SFAudio) {
             SFAudio.playSound('klaxon');
         }
 
         // Auto-deploy mission briefing panel (first time only — with backstory)
         if (!state._briefingShownOnce) {
             state._briefingShownOnce = true;
-            const panel = document.getElementById('controls-panel');
-            if (panel) {
-                panel.classList.add('show-backstory');
-                if (window.SFInput) SFInput.togglePanel(true);
-            }
-        } else {
-            // Subsequent launches: still show backstory section during launch bay
-            const panel = document.getElementById('controls-panel');
-            if (panel) panel.classList.add('show-backstory');
         }
-
-        // Start Loop
-        state.lastTime = performance.now();
-        requestAnimationFrame(gameLoop);
-
-        // Show countdown, cockpit stays visible during launch for immersion
-        document.getElementById('ship-panel').style.display = 'none';
-        document.getElementById('crosshair').style.display = 'none';
-        document.getElementById('countdown-display').style.display = 'block';
 
         // Show skip button
         let skipBtn = document.getElementById('skip-launch-btn');
         if (!skipBtn) {
             skipBtn = document.createElement('button');
             skipBtn.id = 'skip-launch-btn';
-            skipBtn.innerText = 'SKIP ▶▶';
+            skipBtn.innerText = 'SKIP \u25B6\u25B6';
             skipBtn.style.cssText = 'position:absolute;bottom:32px;right:32px;z-index:65;padding:8px 18px;font-family:monospace;font-size:13px;background:rgba(0,255,255,0.1);color:#0ff;border:1px solid rgba(0,255,255,0.3);border-radius:4px;cursor:pointer;pointer-events:auto;transition:background 0.2s';
             skipBtn.onmouseenter = () => skipBtn.style.background = 'rgba(0,255,255,0.25)';
             skipBtn.onmouseleave = () => skipBtn.style.background = 'rgba(0,255,255,0.1)';
@@ -382,8 +415,7 @@ const Starfighter = (function () {
         skipBtn.style.display = 'block';
 
         // GDD §3.1: PA announcer mission briefing — synced with launch phases
-        // Phase 1 (dock) now lasts 0-64% = ~16s, so all 4 PA calls happen during dock
-        addComm("Baseship", "Fighter, secure in launch bay. Ready for departure.", "base");
+        addComm("Baseship", "Launch sequence initiating...", "base");
         if (window.SFAudio && SFAudio.speak) {
             // PA 1: Situational awareness (0.5s — during dock)
             setTimeout(() => {
@@ -408,17 +440,27 @@ const Starfighter = (function () {
                 SFAudio.speak(`Mission briefing. Wave ${state.wave}. Expect ${5 + state.wave * 2} hostile fighters.${state.wave >= 2 ? ' Warning. Enemy capital ship detected in the sector.' : ''} You are cleared for departure in your Mark Four Starfighter. Twin lasers and proton torpedoes are loaded. Good hunting, pilot.`);
             }, 14000);
         }
-        addComm("Baseship", "Launch sequence initiating...", "base");
     }
 
     function completeLaunch() {
         // ── Cutscene ends: hand off to combat as a separate entity ──
         state.phase = 'combat';
 
-        // Hide backstory from panel (combat = controls only)
-        const panel = document.getElementById('controls-panel');
-        if (panel) panel.classList.remove('show-backstory');
-        // Auto-close panel on launch
+        // Hide launch UI elements
+        const launchBtn = document.getElementById('launch-btn');
+        if (launchBtn) launchBtn.style.display = 'none';
+
+        // Close any open console panels on launch
+        const missionPanel = document.getElementById('mission-panel');
+        const tutorialPanel = document.getElementById('tutorial-panel');
+        if (missionPanel) missionPanel.classList.remove('open');
+        if (tutorialPanel) tutorialPanel.classList.remove('open');
+        const btnMission = document.getElementById('btn-mission');
+        const btnTutorial = document.getElementById('btn-tutorial');
+        if (btnMission) btnMission.classList.remove('active');
+        if (btnTutorial) btnTutorial.classList.remove('active');
+
+        // Auto-close old panel on launch
         if (window.SFInput) SFInput.togglePanel(false);
 
         // Audio transition: bay silence → vacuum cockpit hum + engine systems
@@ -509,7 +551,7 @@ const Starfighter = (function () {
             }, 3000);
         }
 
-        // GDD §9.3: 8s docked, then re-launch
+        // GDD §9.3: 8s docked, then show launch button for next wave
         setTimeout(() => {
             state.player.position.set(0, -32, 50);
             state.player.velocity.set(0, 0, 0);
@@ -518,7 +560,7 @@ const Starfighter = (function () {
             state.player.pitch = 0;
             state.player.yaw = 0;
             state.player.roll = 0;
-            state.phase = 'launching';
+            state.phase = 'bay-ready';  // Wait for player to push launch button again
             state.launchTimer = 0;
             state._launchAudioPlayed = false;
             state._launchBlastPlayed = false;
@@ -538,7 +580,6 @@ const Starfighter = (function () {
                 SFAudio.stopThrustRumble();
                 SFAudio.stopStrafeHiss();
                 SFAudio.startBayAmbience();
-                SFAudio.playSound('klaxon');
             }
 
             // Setup for next launch
@@ -547,19 +588,14 @@ const Starfighter = (function () {
                 SF3D.showLaunchBay();
             }
 
-            // Show skip button again
-            const skipBtn = document.getElementById('skip-launch-btn');
-            if (skipBtn) skipBtn.style.display = 'block';
+            // Show red launch button for next wave
+            const launchBtn = document.getElementById('launch-btn');
+            if (launchBtn) launchBtn.style.display = 'block';
+            document.getElementById('countdown-display').style.display = 'block';
+            document.getElementById('countdown-display').innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
 
-            // PA mission briefing for next wave
-            if (window.SFAudio && SFAudio.speak) {
-                setTimeout(() => {
-                    SFAudio.speak(`Wave ${state.wave}. ${5 + state.wave * 2} hostiles expected.${state.wave >= 2 ? ' Capital ship threat confirmed.' : ''} Good hunting, pilot.`);
-                }, 2000);
-            }
+            addComm("Baseship", `Wave ${state.wave} standing by. Press LAUNCH when ready, pilot.`, "base");
 
-            addComm("Baseship", "Launch sequence initiating...", "base");
-            countdownDisplay.style.display = 'block';
             document.getElementById('ship-panel').style.display = 'none';
             document.getElementById('gameplay-hud').style.display = 'none';
             document.getElementById('crosshair').style.display = 'none';
@@ -654,6 +690,14 @@ const Starfighter = (function () {
 
         // Cap dt to prevent physics explosions on lag
         const safeDt = Math.min(dt, 0.1);
+
+        // ── Bay Ready Phase — player is in bay, waiting to push red LAUNCH button ──
+        if (state.phase === 'bay-ready') {
+            // Just render the bay scene, no launch timer advancement
+            if (window.SF3D) SF3D.render(state);
+            _frameCount++;
+            return;
+        }
 
         // ── Launch Cutscene Phase — GDD §3: Four-phase launch ──
         if (state.phase === 'launching') {
@@ -1455,7 +1499,11 @@ const Starfighter = (function () {
     let radarElevRing;
     let radarLevelRing;      // baseship-orientation horizon
     let radarLevelUp;        // small "up" tick on level ring
-    let radarFovCone;        // camera FOV wedge
+    let radarFovCone;        // camera FOV wedge group
+    let radarFovEdges;       // wireframe edges of FOV pyramid
+    let radarFovFaces;       // semi-transparent faces of FOV pyramid
+    let radarVectorMeter;    // 3-axis orientation gizmo group
+    let radarAxisFwd, radarAxisUp, radarAxisRight; // axis arrow meshes
     let radarBlipPool = [];
     const RADAR_RANGE = 5000; // GDD §7: 5000m range
     const RADAR_SHIP_OFFSET = 0.35; // player dot offset toward rear (+Z) for depth perception
@@ -1507,44 +1555,62 @@ const Starfighter = (function () {
         radarForwardMarker = new THREE.Mesh(fwdGeo, fwdMat);
         radarScene.add(radarForwardMarker);
 
-        // ── FOV Pyramid Wedge — shows screen viewport as a 4-sided pyramid ──
+        // ── 3D FOV Pyramid — shows camera viewport as a clipped pyramid inside the sphere ──
         // Built from ship position toward forward (-Z), matching camera FOV
+        // Clipped to the sphere surface so it reads as a 3D volume
         const camFOV = 75;
         const aspect = 16 / 9;
         const halfV = THREE.MathUtils.degToRad(camFOV / 2);
         const halfH = Math.atan(Math.tan(halfV) * aspect);
-        const wedgeLen = 0.92 + SHIP_OFFSET; // from ship offset to sphere edge
+        const wedgeLen = 0.92; // distance from apex to sphere edge
         const farHalfW = Math.tan(halfH) * wedgeLen;
         const farHalfH = Math.tan(halfV) * wedgeLen;
-        // Pyramid apex at ship pos (0, 0, SHIP_OFFSET), opening toward -Z
-        const fz = -wedgeLen + SHIP_OFFSET; // far Z
-        const apex = new THREE.Vector3(0, 0, SHIP_OFFSET);
-        const ftr = new THREE.Vector3(farHalfW, farHalfH, fz);   // far top-right
-        const ftl = new THREE.Vector3(-farHalfW, farHalfH, fz);  // far top-left
-        const fbl = new THREE.Vector3(-farHalfW, -farHalfH, fz); // far bottom-left
-        const fbr = new THREE.Vector3(farHalfW, -farHalfH, fz);  // far bottom-right
+        // Pyramid apex at origin of group (will be positioned at ship marker)
+        const fz = -wedgeLen;
+        const apex = new THREE.Vector3(0, 0, 0);
+        const ftr = new THREE.Vector3(farHalfW, farHalfH, fz);
+        const ftl = new THREE.Vector3(-farHalfW, farHalfH, fz);
+        const fbl = new THREE.Vector3(-farHalfW, -farHalfH, fz);
+        const fbr = new THREE.Vector3(farHalfW, -farHalfH, fz);
 
-        // Wireframe edges of the pyramid
+        // Clip far corners to sphere surface (radius 1.0 from world origin)
+        // Since the group sits at shipOff, clamp so no corner exceeds sphere
+        [ftr, ftl, fbl, fbr].forEach(v => {
+            const worldPos = v.clone();
+            worldPos.z += SHIP_OFFSET; // account for group position
+            const len = worldPos.length();
+            if (len > 0.98) {
+                worldPos.multiplyScalar(0.98 / len);
+                v.copy(worldPos);
+                v.z -= SHIP_OFFSET;
+            }
+        });
+
+        radarFovCone = new THREE.Group();
+        radarFovCone.position.set(0, 0, SHIP_OFFSET);
+        radarScene.add(radarFovCone);
+
+        // Wireframe edges — bright green, clearly visible
         const wedgeEdgeGeo = new THREE.BufferGeometry().setFromPoints([
             apex, ftr, apex, ftl, apex, fbl, apex, fbr,  // 4 edges from apex
             ftr, ftl, ftl, fbl, fbl, fbr, fbr, ftr       // far rectangle
         ]);
         const wedgeEdgeMat = new THREE.LineBasicMaterial({
-            color: 0x00ff88, transparent: true, opacity: 0.35
+            color: 0x00ff88, transparent: true, opacity: 0.5
         });
-        radarFovCone = new THREE.LineSegments(wedgeEdgeGeo, wedgeEdgeMat);
-        radarScene.add(radarFovCone);
+        radarFovEdges = new THREE.LineSegments(wedgeEdgeGeo, wedgeEdgeMat);
+        radarFovCone.add(radarFovEdges);
 
-        // Semi-transparent pyramid faces for spatial fill
+        // Semi-transparent pyramid faces — visible 3D volume
         const wedgeFaceGeo = new THREE.BufferGeometry();
         const verts = new Float32Array([
-            // top face: apex, ftl, ftr
+            // top face
             apex.x, apex.y, apex.z, ftl.x, ftl.y, ftl.z, ftr.x, ftr.y, ftr.z,
-            // bottom face: apex, fbr, fbl
+            // bottom face
             apex.x, apex.y, apex.z, fbr.x, fbr.y, fbr.z, fbl.x, fbl.y, fbl.z,
-            // left face: apex, fbl, ftl
+            // left face
             apex.x, apex.y, apex.z, fbl.x, fbl.y, fbl.z, ftl.x, ftl.y, ftl.z,
-            // right face: apex, ftr, fbr
+            // right face
             apex.x, apex.y, apex.z, ftr.x, ftr.y, ftr.z, fbr.x, fbr.y, fbr.z,
             // far cap: two triangles
             ftr.x, ftr.y, ftr.z, ftl.x, ftl.y, ftl.z, fbl.x, fbl.y, fbl.z,
@@ -1553,11 +1619,46 @@ const Starfighter = (function () {
         wedgeFaceGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
         wedgeFaceGeo.computeVertexNormals();
         const wedgeFaceMat = new THREE.MeshBasicMaterial({
-            color: 0x00ff88, transparent: true, opacity: 0.04,
+            color: 0x00ff88, transparent: true, opacity: 0.08,
             side: THREE.DoubleSide, depthWrite: false
         });
-        const wedgeFaces = new THREE.Mesh(wedgeFaceGeo, wedgeFaceMat);
-        radarScene.add(wedgeFaces);
+        radarFovFaces = new THREE.Mesh(wedgeFaceGeo, wedgeFaceMat);
+        radarFovCone.add(radarFovFaces);
+
+        // ── 3-Axis Vector Meter — shows ship orientation relative to world frame ──
+        // Forward (green), Up (cyan), Right (red) arrows from ship marker
+        radarVectorMeter = new THREE.Group();
+        radarVectorMeter.position.set(0, 0, SHIP_OFFSET);
+        radarScene.add(radarVectorMeter);
+
+        function _makeAxisArrow(color, length) {
+            const group = new THREE.Group();
+            // Shaft
+            const shaftGeo = new THREE.CylinderGeometry(0.012, 0.012, length, 6);
+            const shaftMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+            const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+            shaft.position.y = length / 2;
+            group.add(shaft);
+            // Arrowhead
+            const headGeo = new THREE.ConeGeometry(0.03, 0.06, 6);
+            const headMat = new THREE.MeshBasicMaterial({ color });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = length;
+            group.add(head);
+            return group;
+        }
+
+        // Forward axis — green — points where ship faces
+        radarAxisFwd = _makeAxisArrow(0x00ff88, 0.28);
+        radarVectorMeter.add(radarAxisFwd);
+
+        // Up axis — cyan — points where ship's roof faces
+        radarAxisUp = _makeAxisArrow(0x00ccff, 0.22);
+        radarVectorMeter.add(radarAxisUp);
+
+        // Right axis — red/orange — points to ship's starboard
+        radarAxisRight = _makeAxisArrow(0xff6644, 0.18);
+        radarVectorMeter.add(radarAxisRight);
 
         // GDD §7: Base marker — always visible, larger blue diamond
         const baseGeo = new THREE.OctahedronGeometry(0.08, 0);
@@ -1615,8 +1716,25 @@ const Starfighter = (function () {
         radarForwardMarker.lookAt(shipOff);
         radarForwardMarker.rotateX(Math.PI / 2);
 
-        // ── FOV Wedge — geometry is already built at ship offset; no need to reposition ──
-        // radarFovCone lines/faces stay fixed relative to the ship marker
+        // ── Vector Meter — rotate world axes into player-local space ──
+        if (radarVectorMeter) {
+            // World forward (0,0,-1), up (0,1,0), right (1,0,0) in player-local space
+            const worldFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(invQuat);
+            const worldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(invQuat);
+            const worldRight = new THREE.Vector3(1, 0, 0).applyQuaternion(invQuat);
+
+            // Orient each arrow to point along its world axis (arrows built along +Y)
+            const upRef = new THREE.Vector3(0, 1, 0);
+
+            const fwdQuat = new THREE.Quaternion().setFromUnitVectors(upRef, worldFwd);
+            radarAxisFwd.quaternion.copy(fwdQuat);
+
+            const upQuat = new THREE.Quaternion().setFromUnitVectors(upRef, worldUp);
+            radarAxisUp.quaternion.copy(upQuat);
+
+            const rightQuat = new THREE.Quaternion().setFromUnitVectors(upRef, worldRight);
+            radarAxisRight.quaternion.copy(rightQuat);
+        }
 
         // ── Level Ring — baseship's horizon plane projected into player-local space ──
         if (radarLevelRing && state.baseship) {

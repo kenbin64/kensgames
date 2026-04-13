@@ -497,7 +497,7 @@ const SFAudio = (function () {
   // AMBIENT DRONES (persistent loops)
   // ══════════════════════════════════════
 
-  // GDD §3.1: Low hum of bay systems
+  // GDD §3.1: Starbase landing bay ambience — full din of a busy military station
   function startBayAmbience() {
     if (!ctx) init();
     resume();
@@ -507,7 +507,7 @@ const SFAudio = (function () {
     g.gain.value = 0.06;
     g.connect(masterGain);
 
-    // Low-frequency bay hum (two detuned oscillators)
+    // Low-frequency bay hum (two detuned oscillators — reactor/power grid)
     const osc1 = ctx.createOscillator();
     osc1.type = 'sine';
     osc1.frequency.value = 55;
@@ -520,7 +520,7 @@ const SFAudio = (function () {
     osc2.connect(g);
     osc2.start();
 
-    // Filtered noise floor (activity din)
+    // Filtered noise floor (activity din — distant crews, loaders, comms chatter)
     const noise = ctx.createBufferSource();
     noise.buffer = _getNoiseBuffer();
     noise.loop = true;
@@ -534,7 +534,117 @@ const SFAudio = (function () {
     noiseG.connect(masterGain);
     noise.start();
 
-    bayAmbience = { osc1, osc2, noise, g, noiseG };
+    // ── Heavy machinery rumble (distant hydraulics / cargo lifts) ──
+    const machineOsc = ctx.createOscillator();
+    machineOsc.type = 'sawtooth';
+    machineOsc.frequency.value = 32;  // deep industrial rumble
+    const machineLPF = ctx.createBiquadFilter();
+    machineLPF.type = 'lowpass';
+    machineLPF.frequency.value = 80;
+    machineLPF.Q.value = 3;
+    const machineG = ctx.createGain();
+    machineG.gain.value = 0.025;
+    machineOsc.connect(machineLPF);
+    machineLPF.connect(machineG);
+    machineG.connect(masterGain);
+    machineOsc.start();
+
+    // ── Ventilation / air handling system hiss ──
+    const ventNoise = ctx.createBufferSource();
+    ventNoise.buffer = _getNoiseBuffer();
+    ventNoise.loop = true;
+    const ventBPF = ctx.createBiquadFilter();
+    ventBPF.type = 'bandpass';
+    ventBPF.frequency.value = 1200;
+    ventBPF.Q.value = 0.5;
+    const ventG = ctx.createGain();
+    ventG.gain.value = 0.015;
+    ventNoise.connect(ventBPF);
+    ventBPF.connect(ventG);
+    ventG.connect(masterGain);
+    ventNoise.start();
+
+    // ── Metallic resonance — large hangar reverberant tone ──
+    const metalOsc1 = ctx.createOscillator();
+    metalOsc1.type = 'triangle';
+    metalOsc1.frequency.value = 110; // hangar structural resonance
+    const metalOsc2 = ctx.createOscillator();
+    metalOsc2.type = 'triangle';
+    metalOsc2.frequency.value = 165; // harmonic
+    const metalG = ctx.createGain();
+    metalG.gain.value = 0.008;
+    metalOsc1.connect(metalG);
+    metalOsc2.connect(metalG);
+    metalG.connect(masterGain);
+    metalOsc1.start();
+    metalOsc2.start();
+
+    // ── Periodic clanks and hydraulic hisses (scheduled bursts) ──
+    let bayEventInterval = null;
+    function scheduleBayEvents() {
+      bayEventInterval = setInterval(() => {
+        if (!bayAmbience) { clearInterval(bayEventInterval); return; }
+        const now = ctx.currentTime;
+        const roll = Math.random();
+
+        if (roll < 0.3) {
+          // Metallic clank — tool drop or clamp engage
+          const clank = ctx.createOscillator();
+          clank.type = 'triangle';
+          clank.frequency.setValueAtTime(800 + Math.random() * 600, now);
+          clank.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+          const clankG = ctx.createGain();
+          clankG.gain.setValueAtTime(0.04, now);
+          clankG.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          clank.connect(clankG);
+          clankG.connect(masterGain);
+          clank.start(now);
+          clank.stop(now + 0.15);
+        } else if (roll < 0.55) {
+          // Hydraulic hiss — cargo arm or clamp release
+          const hiss = ctx.createBufferSource();
+          hiss.buffer = _getNoiseBuffer();
+          const hissFilter = ctx.createBiquadFilter();
+          hissFilter.type = 'bandpass';
+          hissFilter.frequency.value = 2500 + Math.random() * 1500;
+          hissFilter.Q.value = 1.5;
+          const hissG = ctx.createGain();
+          const dur = 0.3 + Math.random() * 0.4;
+          hissG.gain.setValueAtTime(0.025, now);
+          hissG.gain.exponentialRampToValueAtTime(0.001, now + dur);
+          hiss.connect(hissFilter);
+          hissFilter.connect(hissG);
+          hissG.connect(masterGain);
+          hiss.start(now);
+          hiss.stop(now + dur + 0.05);
+        } else if (roll < 0.7) {
+          // Distant PA chime — two-tone station alert
+          const chime1 = ctx.createOscillator();
+          chime1.type = 'sine';
+          chime1.frequency.value = 880;
+          const chime2 = ctx.createOscillator();
+          chime2.type = 'sine';
+          chime2.frequency.value = 1100;
+          const chimeG = ctx.createGain();
+          chimeG.gain.setValueAtTime(0.02, now);
+          chimeG.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          chime1.connect(chimeG);
+          chimeG.connect(masterGain);
+          chime1.start(now);
+          chime1.stop(now + 0.2);
+          const chimeG2 = ctx.createGain();
+          chimeG2.gain.setValueAtTime(0.02, now + 0.2);
+          chimeG2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          chime2.connect(chimeG2);
+          chimeG2.connect(masterGain);
+          chime2.start(now + 0.2);
+          chime2.stop(now + 0.5);
+        }
+      }, 2000 + Math.random() * 3000); // every 2-5 seconds
+    }
+    scheduleBayEvents();
+
+    bayAmbience = { osc1, osc2, noise, g, noiseG, machineOsc, machineG, ventNoise, ventG, metalOsc1, metalOsc2, metalG, bayEventInterval };
   }
 
   function stopBayAmbience() {
@@ -542,10 +652,20 @@ const SFAudio = (function () {
     const t = ctx.currentTime;
     bayAmbience.g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
     bayAmbience.noiseG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    if (bayAmbience.machineG) bayAmbience.machineG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    if (bayAmbience.ventG) bayAmbience.ventG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    if (bayAmbience.metalG) bayAmbience.metalG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    if (bayAmbience.bayEventInterval) clearInterval(bayAmbience.bayEventInterval);
     const ba = bayAmbience;
     bayAmbience = null;
     setTimeout(() => {
-      try { ba.osc1.stop(); ba.osc2.stop(); ba.noise.stop(); } catch (e) { }
+      try {
+        ba.osc1.stop(); ba.osc2.stop(); ba.noise.stop();
+        if (ba.machineOsc) ba.machineOsc.stop();
+        if (ba.ventNoise) ba.ventNoise.stop();
+        if (ba.metalOsc1) ba.metalOsc1.stop();
+        if (ba.metalOsc2) ba.metalOsc2.stop();
+      } catch (e) { }
     }, 600);
   }
 
@@ -699,16 +819,24 @@ const SFAudio = (function () {
     initPAChain();
 
     const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = opts.rate || 0.92;   // slightly deliberate pace
-    utter.pitch = opts.pitch || 0.85; // calm, authoritative
+    utter.rate = opts.rate || 0.88;    // measured, deliberate PA cadence
+    utter.pitch = opts.pitch || 0.75;  // low, authoritative — airport terminal commander
     utter.volume = opts.volume || 1.0;
 
-    // Prefer a natural-sounding English voice
+    // Find the most natural-sounding deep English voice — PA announcer style
     const voices = speechSynthesis.getVoices();
-    const preferred = voices.find(v => /Google UK English (Male|Female)/i.test(v.name))
+    const preferred =
+      // Top tier: Google UK Male — deep, crisp, authoritative
+      voices.find(v => /Google UK English Male/i.test(v.name))
+      // Microsoft natural voices — Daniel (UK deep male) or Guy (US deep)
+      || voices.find(v => /Microsoft.*Daniel.*Online/i.test(v.name))
+      || voices.find(v => /Microsoft.*Guy.*Online/i.test(v.name))
       || voices.find(v => /Microsoft.*Online.*Natural/i.test(v.name) && v.lang.startsWith('en'))
+      // Any Google English voice (generally higher quality than espeak)
       || voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
+      // Prefer remote/cloud voices over local (usually higher quality)
       || voices.find(v => v.lang.startsWith('en-') && !v.localService)
+      // Last resort: any English voice
       || voices.find(v => v.lang.startsWith('en'));
     if (preferred) utter.voice = preferred;
 

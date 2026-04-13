@@ -187,6 +187,141 @@
     }
 
     /* ═══════════════════════════════════════
+       CONSOLE TOGGLE BUTTONS — always-visible white rocket console style
+       ═══════════════════════════════════════ */
+    #console-buttons {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      display: flex;
+      gap: 12px;
+      pointer-events: auto
+    }
+
+    #console-buttons .console-btn {
+      padding: 8px 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+      text-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.05)
+    }
+
+    #console-buttons .console-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.15)
+    }
+
+    #console-buttons .console-btn.active {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.7);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.2)
+    }
+
+    /* ═══════════════════════════════════════
+       MISSION BRIEFING PANEL — standalone toggle panel
+       ═══════════════════════════════════════ */
+    #mission-panel {
+      display: none;
+      position: absolute;
+      top: 80px;
+      left: 16px;
+      width: 320px;
+      max-height: 60vh;
+      overflow-y: auto;
+      z-index: 22;
+      background: rgba(0, 10, 20, 0.88);
+      border: 1px solid rgba(0, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #0ff;
+      pointer-events: auto;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.05)
+    }
+
+    #mission-panel.open {
+      display: block
+    }
+
+    #mission-panel h3 {
+      color: #ff8800;
+      font-size: 13px;
+      margin-bottom: 8px;
+      letter-spacing: 2px
+    }
+
+    /* ═══════════════════════════════════════
+       CONTROLS TUTORIAL PANEL — standalone toggle panel
+       ═══════════════════════════════════════ */
+    #tutorial-panel {
+      display: none;
+      position: absolute;
+      top: 80px;
+      right: 16px;
+      width: 320px;
+      max-height: 60vh;
+      overflow-y: auto;
+      z-index: 22;
+      background: rgba(0, 10, 20, 0.88);
+      border: 1px solid rgba(0, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #0ff;
+      pointer-events: auto;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.05)
+    }
+
+    #tutorial-panel.open {
+      display: block
+    }
+
+    #tutorial-panel h3 {
+      color: #0ff;
+      font-size: 13px;
+      margin-bottom: 8px;
+      letter-spacing: 2px
+    }
+
+    #tutorial-panel ul {
+      list-style: none;
+      padding: 0
+    }
+
+    #tutorial-panel li {
+      margin-bottom: 4px;
+      line-height: 1.6
+    }
+
+    #tutorial-panel kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-size: 10px;
+      background: rgba(0, 255, 255, 0.1);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 2px;
+      color: #0ff;
+      margin-right: 4px
+    }
+
+    /* ═══════════════════════════════════════
        COMM MARQUEE — very top of screen, above cockpit
        ═══════════════════════════════════════ */
     #comm-ticker {
@@ -680,6 +815,63 @@
     <div id="comm-ticker-inner">
       <span class="comm-item base">SYSTEMS ONLINE — AWAITING LAUNCH COMMAND</span>
     </div>
+  </div>
+
+  <!-- ═══ CONSOLE TOGGLE BUTTONS — always-visible white rocket console style ═══ -->
+  <div id="console-buttons">
+    <button class="console-btn" id="btn-mission"
+      onclick="document.getElementById('mission-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('tutorial-panel').classList.remove('open');document.getElementById('btn-tutorial').classList.remove('active')">&#9733;
+      MISSION</button>
+    <button class="console-btn" id="btn-tutorial"
+      onclick="document.getElementById('tutorial-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('mission-panel').classList.remove('open');document.getElementById('btn-mission').classList.remove('active')">&#9881;
+      CONTROLS</button>
+  </div>
+
+  <!-- ═══ MISSION BRIEFING PANEL ═══ -->
+  <div id="mission-panel">
+    <h3>MISSION BRIEFING</h3>
+    <div style="color:#ff8800;font-weight:bold;margin-bottom:6px">YEAR 2387 — EARTH ORBIT</div>
+    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">An alien force — <span style="color:#f0f">HIVE SIGMA</span>
+      — emerged from deep space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate.
+      They don't negotiate. <span style="color:#f44">They consume.</span></p>
+    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">You fly a <span style="color:#0ff">UEDF Mk-IV
+        Starfighter</span> — twin laser cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the
+      <span style="color:#48f">UEDF Battleship Resolute</span> — Earth's last heavy carrier.</p>
+    <p style="color:#ff4;font-weight:bold;line-height:1.7;margin-bottom:12px">If the Resolute falls, the orbital defense
+      line collapses. Protect her at all costs.</p>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
+      Press MISSION button to close</div>
+  </div>
+
+  <!-- ═══ CONTROLS TUTORIAL PANEL ═══ -->
+  <div id="tutorial-panel">
+    <h3>FLIGHT CONTROLS</h3>
+    <ul>
+      <li><kbd>Mouse</kbd> Pitch / Yaw</li>
+      <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
+      <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
+      <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
+      <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
+      <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
+      <li><kbd>V</kbd> Flight Assist ON/OFF</li>
+      <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
+      <li><kbd>R-Click</kbd> Torpedo</li>
+      <li><kbd>T</kbd> Lock Target</li>
+    </ul>
+    <h3 style="margin-top:12px">GAMEPAD</h3>
+    <ul>
+      <li><kbd>R-Stick</kbd> Pitch / Yaw</li>
+      <li><kbd>L-Stick</kbd> Throttle / Strafe</li>
+      <li><kbd>LB/RB</kbd> Roll</li>
+      <li><kbd>RT</kbd> Lasers</li>
+      <li><kbd>LT</kbd> Torpedo</li>
+      <li><kbd>A</kbd> Afterburner</li>
+      <li><kbd>B</kbd> Boost</li>
+      <li><kbd>X</kbd> Flight Assist</li>
+      <li><kbd>Y</kbd> Lock Target</li>
+    </ul>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
+      Press CONTROLS button to close</div>
   </div>
 
   <!-- ═══ CONTROLLER WIREFRAME OVERLAY — bottom-right ═══ -->

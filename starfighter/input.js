@@ -36,8 +36,9 @@ const SFInput = (function () {
             // Resume audio on first user gesture
             if (window.SFAudio) SFAudio.resume();
 
-            // Ignore touch UI buttons
-            if (e.target.classList && e.target.classList.contains('action-btn')) return;
+            // Ignore UI buttons — don't let them trigger pointer lock or fire weapons
+            if (e.target.closest('#console-buttons, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn') ||
+                (e.target.classList && e.target.classList.contains('action-btn'))) return;
 
             if (document.pointerLockElement !== document.body) {
                 document.body.requestPointerLock();
