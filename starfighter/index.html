@@ -48,17 +48,15 @@
       border: 2px solid rgba(0, 255, 255, 0.6);
       border-radius: 8px;
       cursor: pointer;
-      backdrop-filter: blur(8px);
       pointer-events: auto;
       text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
-      box-shadow: 0 0 40px rgba(0, 255, 255, 0.15);
-      animation: fsResumePulse 2s ease-in-out infinite
+      animation: fsResumePulse 2s ease-in-out infinite;
+      will-change: opacity
     }
 
     #fs-resume:hover {
       background: rgba(0, 40, 60, 0.95);
       border-color: #0ff;
-      box-shadow: 0 0 60px rgba(0, 255, 255, 0.4);
       text-shadow: 0 0 20px rgba(0, 255, 255, 0.8)
     }
 
@@ -737,9 +735,7 @@
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       color: #0ff;
-      pointer-events: auto;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.05)
+      pointer-events: auto
     }
 
     #mission-panel.open {
@@ -772,9 +768,7 @@
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       color: #0ff;
-      pointer-events: auto;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.05)
+      pointer-events: auto
     }
 
     #tutorial-panel.open {

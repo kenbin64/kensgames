@@ -33,6 +33,8 @@ const SF3D = (function () {
     const _tmpVec = new THREE.Vector3();
     let _staticAnimFrame = 0;
     let _lastTelemetrySignature = '';
+    const _activeIds = new Set();  // reused every frame — no allocation
+    let _frameTime = 0;  // cached performance.now() per frame
 
     // ── GLB model cache: loaded once, cloned per entity ──
     const glbModels = {};    // { modelName: THREE.Group }
@@ -1761,6 +1763,7 @@ const SF3D = (function () {
 
         // Update pooled particle system
         _updateParticles(0.016);
+        _frameTime = performance.now();  // cache once per frame
 
         // Update Camera to Player Position/Rotation
         if (state.player) {
@@ -1782,7 +1785,7 @@ const SF3D = (function () {
         }
 
         // Sync Entities
-        const activeIds = new Set();
+        _activeIds.clear();
 
         for (let i = 0, len = state.entities.length; i < len; i++) {
             const e = state.entities[i];
@@ -1793,7 +1796,7 @@ const SF3D = (function () {
                 continue;
             }
 
-            activeIds.add(e.id);
+            _activeIds.add(e.id);
             let mesh = entityMeshes.get(e.id);
 
             if (!mesh) {
@@ -1827,7 +1830,7 @@ const SF3D = (function () {
             if (mesh.userData && mesh.userData.alienGlow) {
                 const glow = mesh.getObjectByName('bioGlow');
                 if (glow) {
-                    const pulse = 0.7 + 0.3 * Math.sin(performance.now() * 0.003 + e.id * 1.7);
+                    const pulse = 0.7 + 0.3 * Math.sin(_frameTime * 0.003 + e.id * 1.7);
                     glow.intensity = glow.intensity * 0.9 + (pulse * (ALIEN_GLOW_COLORS[e.type] ? ALIEN_GLOW_COLORS[e.type].pointIntensity : 2.5)) * 0.1;
                 }
             }
@@ -1847,14 +1850,14 @@ const SF3D = (function () {
             targetLockMesh.scale.set(r / 20, r / 20, r / 20);
             // Face camera then spin slowly on local Z
             targetLockMesh.quaternion.copy(camera.quaternion);
-            targetLockMesh.rotateZ(performance.now() * 0.001);
+            targetLockMesh.rotateZ(_frameTime * 0.001);
         } else {
             if (targetLockMesh) targetLockMesh.visible = false;
         }
 
         // Cleanup removed entities
         for (const [id, mesh] of entityMeshes) {
-            if (!activeIds.has(id)) {
+            if (!_activeIds.has(id)) {
                 scene.remove(mesh);
                 entityMeshes.delete(id);
             }
@@ -1904,7 +1907,7 @@ const SF3D = (function () {
             _tmpSphere.center.copy(_tmpVec);
             _tmpSphere.radius = 4200;
             if (_viewFrustum.intersectsSphere(_tmpSphere)) {
-                const t = performance.now() * 0.001;
+                const t = _frameTime * 0.001;
                 sunGrp.children.forEach(child => {
                     if (child.name && child.name.startsWith('corona-')) {
                         const idx = parseInt(child.name.split('-')[1]);

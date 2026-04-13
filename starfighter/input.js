@@ -369,7 +369,8 @@ const SFInput = (function () {
         if (pad) {
             // Auto-detect: if any axis/button is active, switch to gamepad
             const anyAxis = pad.axes.some(a => Math.abs(a) > 0.15);
-            const anyBtn = Array.from(pad.buttons).some(b => b.pressed);
+            let anyBtn = false;
+            for (let bi = 0; bi < pad.buttons.length; bi++) { if (pad.buttons[bi].pressed) { anyBtn = true; break; } }
             if (anyAxis || anyBtn) lastInputDevice = 'gamepad';
             // Right stick: Pitch / Yaw (GDD §12.4)
             if (Math.abs(pad.axes[2]) > 0.1) player.yaw += -pad.axes[2] * dt * 2.0;
@@ -444,35 +445,45 @@ const SFInput = (function () {
 
     function isKeyDown(code) { return !!keys[code]; }
 
+    const _liveEls = {};
+    let _liveElsCached = false;
+    function _cacheLiveEls() {
+        const ids = ['live-throttle', 'live-pitch', 'live-yaw', 'live-roll',
+            'live-strafe-h', 'live-strafe-v', 'live-speed',
+            'live-afterburner', 'live-fa', 'detected-device'];
+        for (let i = 0; i < ids.length; i++) _liveEls[ids[i]] = document.getElementById(ids[i]);
+        _liveElsCached = true;
+    }
+
     function updateLivePanel() {
         if (!player) return;
         const panel = document.getElementById('controls-panel');
         if (!panel || !panel.classList.contains('open')) return;
+        if (!_liveElsCached) _cacheLiveEls();
 
-        const el = (id) => document.getElementById(id);
         const fmt = (v) => (v >= 0 ? ' ' : '') + v.toFixed(2);
-
         const spd = player.velocity ? player.velocity.length() : 0;
-        if (el('live-throttle')) el('live-throttle').textContent = fmt(player.throttle || 0);
-        if (el('live-pitch')) el('live-pitch').textContent = fmt(player.pitch || 0);
-        if (el('live-yaw')) el('live-yaw').textContent = fmt(player.yaw || 0);
-        if (el('live-roll')) el('live-roll').textContent = fmt(player.roll || 0);
-        if (el('live-strafe-h')) el('live-strafe-h').textContent = fmt(player.strafeH || 0);
-        if (el('live-strafe-v')) el('live-strafe-v').textContent = fmt(player.strafeV || 0);
-        if (el('live-speed')) el('live-speed').textContent = Math.round(spd);
-        if (el('live-afterburner')) {
+        const e = _liveEls;
+        if (e['live-throttle']) e['live-throttle'].textContent = fmt(player.throttle || 0);
+        if (e['live-pitch']) e['live-pitch'].textContent = fmt(player.pitch || 0);
+        if (e['live-yaw']) e['live-yaw'].textContent = fmt(player.yaw || 0);
+        if (e['live-roll']) e['live-roll'].textContent = fmt(player.roll || 0);
+        if (e['live-strafe-h']) e['live-strafe-h'].textContent = fmt(player.strafeH || 0);
+        if (e['live-strafe-v']) e['live-strafe-v'].textContent = fmt(player.strafeV || 0);
+        if (e['live-speed']) e['live-speed'].textContent = Math.round(spd);
+        if (e['live-afterburner']) {
             const ab = player.afterburnerActive;
-            el('live-afterburner').textContent = ab ? 'ON' : 'OFF';
-            el('live-afterburner').style.color = ab ? '#f00' : '#f80';
+            e['live-afterburner'].textContent = ab ? 'ON' : 'OFF';
+            e['live-afterburner'].style.color = ab ? '#f00' : '#f80';
         }
-        if (el('live-fa')) {
+        if (e['live-fa']) {
             const fa = player.flightAssist !== false;
-            el('live-fa').textContent = fa ? 'ON' : 'OFF';
-            el('live-fa').style.color = fa ? '#0ff' : '#f80';
+            e['live-fa'].textContent = fa ? 'ON' : 'OFF';
+            e['live-fa'].style.color = fa ? '#0ff' : '#f80';
         }
 
         // Device auto-detection
-        const devEl = el('detected-device');
+        const devEl = e['detected-device'];
         if (devEl) {
             if (lastInputDevice === 'touch') {
                 devEl.textContent = 'TOUCH + GYRO';

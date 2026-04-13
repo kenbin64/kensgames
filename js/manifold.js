@@ -287,6 +287,21 @@ const Manifold = (() => {
   const _pairSet = new Set();
   const _pairs = [];
 
+  // ── Spatial grid for broad-phase collision ──
+  const _gridCellSize = 200;  // world units per cell
+  const _grid = new Map();    // cellKey → [idx, idx, ...]
+  const _cellPool = [];       // recycled arrays
+
+  function _gridKey(x, y) {
+    return ((x / _gridCellSize) | 0) + ',' + ((y / _gridCellSize) | 0);
+  }
+
+  function _getCell(key) {
+    let c = _grid.get(key);
+    if (!c) { c = _cellPool.pop() || []; _grid.set(key, c); }
+    return c;
+  }
+
   function detectCollisions(regionName) {
     const rName = regionName || '_global';
     const s = _regionSets.get(rName);
@@ -295,30 +310,64 @@ const Manifold = (() => {
     _pairSet.clear();
     _pairs.length = 0;
 
-    // Build compact position array from typed array — no objects allocated
-    const arr = [];
+    // Recycle grid cells
+    for (const [k, arr] of _grid) { arr.length = 0; _cellPool.push(arr); }
+    _grid.clear();
+
+    // Build compact arrays from typed storage — flat, no object allocation
+    const n = s.size;
+    // Reuse flat arrays across frames
+    if (!detectCollisions._ids || detectCollisions._ids.length < n) {
+      detectCollisions._ids = new Array(n * 2);
+      detectCollisions._xs = new Float64Array(n * 2);
+      detectCollisions._ys = new Float64Array(n * 2);
+      detectCollisions._rs = new Float64Array(n * 2);
+    }
+    const ids = detectCollisions._ids;
+    const xs = detectCollisions._xs;
+    const ys = detectCollisions._ys;
+    const rs = detectCollisions._rs;
+    let count = 0;
+
     for (const id of s) {
       const m = _meta.get(id);
       if (m?.markedForDeletion) continue;
       const idx = _ids.get(id);
       const off = idx * 2;
-      arr.push({ id, x: _xy[off], y: _xy[off + 1], radius: m?.radius || 10 });
+      ids[count] = id;
+      xs[count] = _xy[off];
+      ys[count] = _xy[off + 1];
+      rs[count] = m?.radius || 10;
+      // Insert into grid cell + neighboring cells for objects that span boundaries
+      const cx = (xs[count] / _gridCellSize) | 0;
+      const cy = (ys[count] / _gridCellSize) | 0;
+      const r = rs[count];
+      const span = r > _gridCellSize * 0.5 ? 1 : 0; // large objects check neighbors
+      for (let dx = -span; dx <= span; dx++) {
+        for (let dy = -span; dy <= span; dy++) {
+          _getCell((cx + dx) + ',' + (cy + dy)).push(count);
+        }
+      }
+      count++;
     }
 
-    const n = arr.length;
-    for (let i = 0; i < n; i++) {
-      const a = arr[i];
-      for (let j = i + 1; j < n; j++) {
-        const b = arr[j];
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const dSq = dx * dx + dy * dy;
-        const rSum = a.radius + b.radius;
-        if (dSq < rSum * rSum) {
-          const key = a.id < b.id ? a.id + b.id : b.id + a.id;
-          if (!_pairSet.has(key)) {
-            _pairSet.add(key);
-            _pairs.push([_reconstruct(a.id), _reconstruct(b.id)]);
+    // Narrow-phase: only check entities in the same cell
+    for (const [, cell] of _grid) {
+      const cn = cell.length;
+      for (let i = 0; i < cn; i++) {
+        const ai = cell[i];
+        for (let j = i + 1; j < cn; j++) {
+          const bi = cell[j];
+          const dx = xs[ai] - xs[bi];
+          const dy = ys[ai] - ys[bi];
+          const dSq = dx * dx + dy * dy;
+          const rSum = rs[ai] + rs[bi];
+          if (dSq < rSum * rSum) {
+            const key = ids[ai] < ids[bi] ? ids[ai] + ids[bi] : ids[bi] + ids[ai];
+            if (!_pairSet.has(key)) {
+              _pairSet.add(key);
+              _pairs.push([_reconstruct(ids[ai]), _reconstruct(ids[bi])]);
+            }
           }
         }
       }

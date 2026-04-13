@@ -145,21 +145,27 @@ const Starfighter = (function () {
         };
     }
 
+    // Scratch vectors for _bearing — reuse to avoid GC pressure
+    const _bFwd = new THREE.Vector3();
+    const _bRight = new THREE.Vector3();
+    const _bUp = new THREE.Vector3();
+    const _bToTarget = new THREE.Vector3();
+
     // Convert a world position to a clock-position bearing relative to the player's facing
     function _bearing(targetPos) {
         if (!state.player || !targetPos) return '';
         const p = state.player;
         // Get player's forward and right vectors
-        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(p.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(p.quaternion);
-        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion);
-        const toTarget = new THREE.Vector3().subVectors(targetPos, p.position);
-        const dist = Math.floor(toTarget.length());
-        toTarget.normalize();
+        _bFwd.set(0, 0, -1).applyQuaternion(p.quaternion);
+        _bRight.set(1, 0, 0).applyQuaternion(p.quaternion);
+        _bUp.set(0, 1, 0).applyQuaternion(p.quaternion);
+        _bToTarget.subVectors(targetPos, p.position);
+        const dist = Math.floor(_bToTarget.length());
+        _bToTarget.normalize();
         // Project onto player's horizontal plane (fwd/right)
-        const dotFwd = fwd.dot(toTarget);
-        const dotRight = right.dot(toTarget);
-        const dotUp = up.dot(toTarget);
+        const dotFwd = _bFwd.dot(_bToTarget);
+        const dotRight = _bRight.dot(_bToTarget);
+        const dotUp = _bUp.dot(_bToTarget);
         // Clock position from atan2
         let angle = Math.atan2(dotRight, dotFwd); // 0 = 12 o'clock (ahead)
         if (angle < 0) angle += Math.PI * 2;
@@ -1034,9 +1040,15 @@ const Starfighter = (function () {
         }
         _attachTutorialHandlers();
 
-        // Announcer narrates the briefing
+        // Announcer narrates the briefing — game-state aware
         if (window.SFAudio && SFAudio.speakAs) {
-            SFAudio.speakAs('Cdr. Vasquez', `${_cs()}, welcome aboard the Resolute. This is your flight orientation briefing. Review your controls on screen. When ready, select practice flight to get familiar with your ship, or skip to launch directly into combat.`);
+            const s = _snap();
+            const baseLine = `${_cs()}, welcome aboard the Resolute.`;
+            const stateLine = state.wave > 1
+                ? ` We're on wave ${state.wave}. Base hull is at ${s.basePct}percent. ${s.totalHostile > 0 ? s.totalHostile + ' hostiles still on scope.' : 'Sector is momentarily clear.'}`
+                : ' This is your first deployment.';
+            const actionLine = ' Review your controls on screen. Select practice flight to warm up, or skip to launch directly.';
+            SFAudio.speakAs('Cdr. Vasquez', baseLine + stateLine + actionLine);
         }
 
         // Keyboard: Escape to skip
@@ -1104,9 +1116,13 @@ const Starfighter = (function () {
             state.entities.push(dummy);
         }
 
-        addComm(_crew('command'), `${_cs()}, practice range is active. Three stationary targets deployed. Fly around, test your weapons. When ready, press Escape to end practice.`, 'base');
-        if (window.SFAudio && SFAudio.speakAs) {
-            SFAudio.speakAs('CPO Okafor', `${_cs()}, you are now in the practice range. Three target drones are positioned around you. Steer with your mouse, scroll wheel controls your throttle, and fire your lasers with left click or spacebar. When you're comfortable, press Escape to end practice and begin the mission.`);
+        {
+            const s = _snap();
+            const waveLine = state.wave > 1 ? ` Wave ${state.wave} is standing by — ${s.totalHostile > 0 ? s.totalHostile + ' contacts on scope' : 'sector quiet'}.` : '';
+            addComm(_crew('command'), `${_cs()}, practice range active. Three target drones deployed.${waveLine} Press Escape when ready.`, 'base');
+            if (window.SFAudio && SFAudio.speakAs) {
+                SFAudio.speakAs('CPO Okafor', `${_cs()}, you are now in the practice range. Three target drones around you.${waveLine} Steer with your mouse, scroll wheel for throttle, left click or spacebar to fire lasers. Press Escape when you're ready to launch.`);
+            }
         }
 
         // ── Practice Input Wireframe + Command Chart overlay ──
@@ -1405,27 +1421,42 @@ const Starfighter = (function () {
 
             // PA 1: Situational awareness (0.5s — during dock) — Commander
             setTimeout(() => {
-                SFAudio.speakAs('Cdr. Vasquez', "Attention all hands. This is Resolute command. Launch operations are now commencing.");
+                const basePct = state.baseship ? Math.floor((state.baseship.hull / 5000) * 100) : 100;
+                SFAudio.speakAs('Cdr. Vasquez', `Attention all hands. This is Resolute command. Ship status: hull at ${basePct} percent. Launch operations are now commencing.`);
             }, 500);
 
-            // PA 2: Backstory — the threat (4s — during dock) — Sensor officer
+            // PA 2: Threat intel (4s — during dock) — Sensor officer
             setTimeout(() => {
                 const sensorOfficer = _crew('sensor');
+                const s = _snap();
                 addComm(sensorOfficer, `Hive Sigma contact — organic-metallic signatures, wave ${state.wave} approach vector.`, 'base');
-                SFAudio.speakAs(sensorOfficer, "Intelligence update. Alien force designation Hive Sigma continues advance on Earth orbit. Their ships are organic metallic hybrids. They do not communicate. They do not negotiate. They consume.");
+                const threatDetail = s.dreadnoughts > 0 ? ' Dreadnought class vessels detected in their formation.'
+                    : s.predators > 0 ? ' Predator drones among their advance scouts.'
+                        : s.bombers > 0 ? ' Bomber wings are forming up for attack runs.' : '';
+                SFAudio.speakAs(sensorOfficer, `Intelligence update. Alien force designation Hive Sigma, wave ${state.wave}, advancing on Earth orbit. Their ships are organic metallic hybrids. They do not negotiate. They consume.${threatDetail}`);
             }, 4000);
 
             // PA 3: The stakes (9s — during dock) — XO
             setTimeout(() => {
-                addComm(_crew('command'), `The Resolute is Earth's last heavy carrier. Base hull ${Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100)}%. She must not fall.`, 'base');
-                SFAudio.speakAs('XO Tanaka', "All pilots be advised. The Resolute is one of Earth's last heavy carriers. If she falls, the orbital defense line collapses. Protect her at all costs.");
+                const basePct = Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100);
+                addComm(_crew('command'), `The Resolute is Earth's last heavy carrier. Base hull ${basePct}%. She must not fall.`, 'base');
+                const urgency = basePct < 40 ? ` She's taken heavy damage — hull at ${basePct} percent. We cannot afford another hit like that.`
+                    : basePct < 70 ? ` Hull integrity is at ${basePct} percent. Keep those bombers off her.`
+                        : ` Hull holding strong at ${basePct} percent.`;
+                SFAudio.speakAs('XO Tanaka', `All pilots be advised. The Resolute is one of Earth's last heavy carriers.${urgency} If she falls, the orbital defense line collapses. Protect her at all costs.`);
             }, 9000);
 
             // PA 4: Mission brief (14s — still in dock, just before countdown starts at 16s) — Tactical
             setTimeout(() => {
                 const tacOfficer = _crew('sensor');
-                addComm(tacOfficer, `Wave ${state.wave}: ${5 + state.wave * 2} hostile contacts expected. Base hull ${Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100)}%.`, 'base');
-                SFAudio.speakAs('Lt. Chen', `Mission briefing. Wave ${state.wave}. Expect ${5 + state.wave * 2} hostile fighters.${state.wave >= 2 ? ' Warning. Enemy capital ship detected in the sector.' : ''} ${_cs()}, you are cleared for departure in your Mark Four Starfighter. Twin lasers and proton torpedoes are loaded. Good hunting.`);
+                const s = _snap();
+                const expected = 5 + state.wave * 2;
+                const basePct = Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100);
+                addComm(tacOfficer, `Wave ${state.wave}: ${expected} hostile contacts expected. Base hull ${basePct}%.`, 'base');
+                const capWarn = state.wave >= 2 ? ' Warning. Enemy capital ship detected in the sector.' : '';
+                const torpLine = state.player.torpedoes > 0 ? ` ${state.player.torpedoes} torpedoes loaded.` : ' Torpedo bay empty — resupply on landing.';
+                const hullLine = state.player.hull < 80 ? ` Your hull is reading ${Math.floor(state.player.hull)} percent — fly smart out there.` : '';
+                SFAudio.speakAs('Lt. Chen', `Mission briefing. Wave ${state.wave}. Expect ${expected} hostile fighters.${capWarn}${hullLine} ${_cs()}, you are cleared for departure.${torpLine} Good hunting.`);
             }, 14000);
         } else {
             _queueAdaptiveLaunchBriefing();
@@ -1553,7 +1584,12 @@ const Starfighter = (function () {
         if (window.SFMusic) SFMusic.setIntensity(0.1);
 
         if (window.SFAudio && SFAudio.speakAs) {
-            SFAudio.speakAs('CPO Okafor', `Wave ${prevWave} complete. ${state.kills} confirmed kills. Rearming for wave ${state.wave}.`);
+            const hullPct = Math.floor(state.player.hull);
+            const bPct = Math.floor((state.baseship.hull / 5000) * 100);
+            const perfLine = state.kills > 10 ? ' Outstanding work out there.' : state.kills > 5 ? ' Solid flying.' : '';
+            const hullLine = hullPct < 50 ? ` Your hull took a beating — ${hullPct} percent. Repair crews are on it.` : '';
+            const baseLine = bPct < 50 ? ` Resolute hull at ${bPct} percent — she needs better cover next wave.` : '';
+            SFAudio.speakAs('CPO Okafor', `Wave ${prevWave} complete. ${state.kills} confirmed kills.${perfLine}${hullLine}${baseLine} Rearming for wave ${state.wave}.`);
         }
 
         if (state.wave >= 2) {
@@ -1561,7 +1597,11 @@ const Starfighter = (function () {
                 const sensorOfficer = _crew('sensor');
                 { const s = _snap(); addComm(sensorOfficer, `Wave ${state.wave} intel: ${s.dreadnoughts > 0 ? 'dreadnought' : 'capital ship'} signature detected. Base hull ${s.basePct}%.`, 'warning'); }
                 if (window.SFAudio && SFAudio.speakAs) {
-                    SFAudio.speakAs(sensorOfficer, "Intelligence reports an enemy capital ship inbound. Destroy it before it reaches the Resolute.");
+                    const bPct2 = Math.floor((state.baseship.hull / 5000) * 100);
+                    const capLine = bPct2 < 50
+                        ? `Intelligence reports an enemy capital ship inbound. Resolute hull at ${bPct2} percent — we cannot take a direct hit. Focus fire on that ship.`
+                        : `Intelligence reports an enemy capital ship inbound. Destroy it before it reaches the Resolute.`;
+                    SFAudio.speakAs(sensorOfficer, capLine);
                 }
             }, 3000);
         }
@@ -2076,10 +2116,9 @@ const Starfighter = (function () {
 
                     const accelProgress = (progress - 0.80) / 0.12;
                     const launchSpeed = accelProgress * accelProgress * 1200;
-                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
-                    const moveVec = forward.clone().multiplyScalar(launchSpeed * safeDt);
-                    state.cutsceneCamPos.add(moveVec);
-                    state.cutsceneVelocity.copy(forward.clone().multiplyScalar(launchSpeed));
+                    _v1.set(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
+                    state.cutsceneCamPos.addScaledVector(_v1, launchSpeed * safeDt);
+                    state.cutsceneVelocity.copy(_v1).multiplyScalar(launchSpeed);
                 }
                 // ── Phase 4: Bay Exit (92-100% = ~2s) — burst into space ──
                 else {
@@ -2089,10 +2128,9 @@ const Starfighter = (function () {
 
                     const exitProgress = (progress - 0.92) / 0.08;
                     const exitSpeed = 1200 * (1.0 - exitProgress * 0.5);
-                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
-                    const moveVec = forward.clone().multiplyScalar(exitSpeed * safeDt);
-                    state.cutsceneCamPos.add(moveVec);
-                    state.cutsceneVelocity.copy(forward.clone().multiplyScalar(exitSpeed));
+                    _v1.set(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
+                    state.cutsceneCamPos.addScaledVector(_v1, exitSpeed * safeDt);
+                    state.cutsceneVelocity.copy(_v1).multiplyScalar(exitSpeed);
                 }
 
                 // Feed cutscene camera position to player for rendering only
@@ -2147,13 +2185,13 @@ const Starfighter = (function () {
                     const apProgress = Math.min(state.autopilotTimer / 12.0, 1.0); // 12s travel, 3s dock
 
                     // Calculate direction and distance to baseship bay entrance
-                    const bayTarget = state.baseship.position.clone().add(new THREE.Vector3(0, 0, 800));
-                    const toBase = bayTarget.clone().sub(state.player.position);
-                    const distToBase = toBase.length();
+                    _v1.copy(state.baseship.position).add(_v2.set(0, 0, 800));
+                    _v2.copy(_v1).sub(state.player.position);
+                    const distToBase = _v2.length();
 
                     // Smoothly turn and fly toward base
-                    const targetDir = toBase.normalize();
-                    _q1.setFromUnitVectors(_v2.set(0, 0, -1), targetDir);
+                    _v2.normalize();
+                    _q1.setFromUnitVectors(_v1.set(0, 0, -1), _v2);
                     state.player.quaternion.slerp(_q1, safeDt * 2.0);
 
                     // Speed profile: accelerate, cruise, decelerate
@@ -2262,9 +2300,9 @@ const Starfighter = (function () {
                 const progress = Math.min(t, 1.0);
 
                 // Move player toward baseship hangar
-                const bayPos = new THREE.Vector3(0, -32, 50);
-                const targetPos = state.baseship.position.clone().add(bayPos);
-                state.player.position.lerp(targetPos, progress * 0.3);
+                _v1.copy(state.baseship.position).add(_v2.set(0, -32, 50));
+                state.player.position.lerp(_v1, progress * 0.3);
+
 
                 // Dock the player to baseship on completion
                 if (progress >= 1.0) {
@@ -3005,7 +3043,11 @@ const Starfighter = (function () {
         const opsOfficer = _crew('ops');
         addComm(opsOfficer, `${_cs()}, Medical Frigate '${med._callsign}' dispatched. Hull ${Math.floor(state.player.hull)}%, shields ${Math.floor(state.player.shields)}%. Hold for repair.`, 'base');
         if (window.SFAudio && SFAudio.speakAs) {
-            SFAudio.speakAs(opsOfficer, `Medical frigate ${med._callsign} is inbound. Maintain course for emergency repair.`);
+            const hPct = Math.floor(state.player.hull);
+            const sPct = Math.floor(state.player.shields);
+            const urgency = hPct < 25 ? `Hull critical at ${hPct} percent.` : `Hull at ${hPct} percent, shields ${sPct}.`;
+            const battleCtx = _snap().totalHostile > 0 ? ` ${_snap().totalHostile} hostiles still active — watch your six.` : '';
+            SFAudio.speakAs(opsOfficer, `Medical frigate ${med._callsign} is inbound. ${urgency}${battleCtx} Hold position for emergency repair.`);
         }
     }
 
@@ -3018,7 +3060,7 @@ const Starfighter = (function () {
         if (med._docked) {
             med._dockTimer += dt;
             // Stay alongside player
-            _v1.copy(state.player.position).add(new THREE.Vector3(-45, 15, 25));
+            _v1.copy(state.player.position).add(_v2.set(-45, 15, 25));
             med.position.lerp(_v1, dt * 2.0);
             med.velocity.set(0, 0, 0);
 
@@ -3046,7 +3088,9 @@ const Starfighter = (function () {
                 med._docked = false;
                 addComm(med._callsign, `${_cs()}, repair cycle complete. Hull ${Math.floor(state.player.hull)}%, shields ${Math.floor(state.player.shields)}%. Returning to station.`, 'ally');
                 if (window.SFAudio && SFAudio.speakAs) {
-                    SFAudio.speakAs('Lt. Cruz', `${med._callsign} repairs complete. Returning to station.`);
+                    const hFinal = Math.floor(state.player.hull);
+                    const sFinal = Math.floor(state.player.shields);
+                    SFAudio.speakAs('Lt. Cruz', `${med._callsign} repairs complete. Hull ${hFinal} percent, shields ${sFinal}. Returning to station. Stay safe out there, ${_cs()}.`);
                 }
             }
             return;
