@@ -22,55 +22,58 @@ const SF3D = (function () {
     const glbModels = {};    // { modelName: THREE.Group }
     // LOD levels: [{ path, distance }] — distance is the camera distance at which
     // Three.js switches FROM this level to the next (coarser) one.
+    // LOD tiers per GDD §13.2: Hero 0-500, Near 500-2000, Mid 2000-5000
+    // Capital ships use FULL original GLBs at hero range (only 1 instance each)
+    // Fighters use optimized lod0 (many instances) with generous thresholds
     const GLB_LOD = {
         enemy: [
             { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 150 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 500 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 500 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 2000 },
         ],
         ally: [
             { path: 'assets/models/optimized/HumanFriendlStarFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 150 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 500 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 500 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 2000 },
         ],
         'alien-baseship': [
-            { path: 'assets/models/optimized/AlienMotherShip_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 400 },
-            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 1200 },
+            { path: 'assets/models/AlienMotherShip.glb', distance: 0 },           // Full 31MB original at hero range
+            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 2000 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 5000 },
         ],
         baseship: [
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 400 },
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 1200 },
+            { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },      // Full 32MB original at hero range
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 2000 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 5000 },
         ],
         station: [
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 500 },
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 1500 },
+            { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 }, // Full 35MB original
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 2000 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 5000 },
         ],
+        // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [
-            { path: 'assets/models/optimized/Earth_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/Earth_lod1.glb', distance: 2000 },
-            { path: 'assets/models/optimized/Earth_lod2.glb', distance: 5000 },
+            { path: 'assets/models/Earth.glb', distance: 0 },
         ],
     };
-    // Scale factors so models fit their gameplay radius
+    // Scale factors — Galactica-scale capital ships, proportional fighters
+    // Fighter wingspan ~15m, Baseship ~1200m (80× fighter), Mothership ~800m
     const GLB_SCALES = {
-        enemy: 18,    // fighters ~radius 10
-        'alien-baseship': 200,   // capital ship ~radius 150
-        baseship: 400,   // human battleship is large
-        ally: 16,
-        station: 300,
-        earth: 3000,  // big planet in background
+        enemy: 18,             // alien fighter ~15m wingspan
+        'alien-baseship': 500, // alien mothership ~800m — massive capital ship
+        baseship: 800,         // human carrier ~1200m — Galactica-scale, towering on approach
+        ally: 16,              // human fighter ~13m wingspan
+        station: 400,          // space station ~600m
+        earth: 8000,  // massive planet — far beyond arena, fills the sky impressively
     };
 
     // ── Shared starfield vertex data (world-space positions, shared with radar) ──
-    const STAR_COUNT = 4000;
-    const STAR_RADIUS = 9000;
+    const STAR_COUNT = 6000;
+    const STAR_RADIUS = 30000;
     let starfieldVerts = null; // Float32Array — filled once, read by radar
 
     // ── Particle pool (reuse sprites instead of allocating) ──
-    const MAX_PARTICLES = 200;
+    const MAX_PARTICLES = 500;
     const particlePool = [];
     let activeParticles = 0;
     let particlePoints = null;
@@ -119,6 +122,15 @@ const SF3D = (function () {
 
     function _updateParticles(dt) {
         if (!particlePoints) return;
+        // Decay muzzle flash lights
+        for (let fi = 0; fi < _muzzleFlashPool.length; fi++) {
+            const f = _muzzleFlashPool[fi];
+            if (f.timer > 0) {
+                f.timer -= dt;
+                if (f.timer <= 0) f.light.intensity = 0;
+                else f.light.intensity = 3.0 * (f.timer / 0.1);
+            }
+        }
         let write = 0;
         for (let read = 0; read < activeParticles; read++) {
             particleAges[read] += dt;
@@ -178,30 +190,40 @@ const SF3D = (function () {
         scene.fog = new THREE.FogExp2(0x000000, 0.00005);
 
         // Camera setup
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 80000);
 
         // Renderer setup
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
+        // Cockpit visor filter — sun in space is blinding; the canopy polarizes
+        // light down to a level the human eye (and HUD) can tolerate
+        renderer.toneMappingExposure = 0.55;
         container.appendChild(renderer.domElement);
 
         // ── Sun direction — all lighting derives from this ──
-        const SUN_POS = new THREE.Vector3(15000, 8000, 6000);
+        const SUN_POS = new THREE.Vector3(30000, 16000, 12000);
+        const EARTH_POS = new THREE.Vector3(-6000, -18000, -12000);
 
-        // Ambient — very dim base so nothing is pitch black
-        const ambient = new THREE.AmbientLight(0x0a0a18, 0.15);
+        // Ambient — very dim base so deep-shadow side isn't pitch black
+        const ambient = new THREE.AmbientLight(0x060610, 0.08);
         scene.add(ambient);
 
-        // Primary sun directional light — casts strong one-side illumination
-        const sunLight = new THREE.DirectionalLight(0xfff5e0, 3.5);
+        // Primary sun directional light — intense (space has no atmosphere to soften)
+        // Cockpit visor filter (toneMappingExposure) tames this to a viewable level
+        const sunLight = new THREE.DirectionalLight(0xfff5e0, 5.0);
         sunLight.position.copy(SUN_POS);
         scene.add(sunLight);
 
-        // Very subtle fill from opposite side (simulates scattered light / nebula)
-        const fillLight = new THREE.DirectionalLight(0x1a1a33, 0.15);
+        // ── Earth-shine — blue reflected light from the Earth's day side ──
+        const earthShineDir = EARTH_POS.clone().normalize();
+        const earthShine = new THREE.DirectionalLight(0x4488cc, 0.6);
+        earthShine.position.copy(earthShineDir.clone().multiplyScalar(-1)); // light FROM Earth toward scene
+        scene.add(earthShine);
+
+        // Very subtle fill from opposite sun (scattered starlight / nebula)
+        const fillLight = new THREE.DirectionalLight(0x0a0a1a, 0.08);
         fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
         scene.add(fillLight);
 
@@ -246,7 +268,7 @@ const SF3D = (function () {
         sunGroup.add(new THREE.Mesh(haloGeo, haloMat));
 
         // Sun point light — the actual light source for nearby objects
-        const sunPLight = new THREE.PointLight(0xfff5e0, 3, 50000);
+        const sunPLight = new THREE.PointLight(0xfff5e0, 5, 60000);
         sunGroup.add(sunPLight);
 
         sunGroup.position.copy(SUN_POS);
@@ -261,11 +283,11 @@ const SF3D = (function () {
         // Cockpit GLB
         createCockpit();
 
-        // Cockpit interior lighting
-        const cockpitLight = new THREE.PointLight(0xccddff, 1.2, 5);
+        // Cockpit interior lighting — slightly brighter to compensate for visor filter
+        const cockpitLight = new THREE.PointLight(0xccddff, 2.0, 5);
         cockpitLight.position.set(0, 0.3, 0);
         camera.add(cockpitLight);
-        const cockpitAmbient = new THREE.HemisphereLight(0x4466aa, 0x112233, 0.6);
+        const cockpitAmbient = new THREE.HemisphereLight(0x4466aa, 0x112233, 1.0);
         camera.add(cockpitAmbient);
 
         // Launch Bay
@@ -284,9 +306,38 @@ const SF3D = (function () {
         window.addEventListener('resize', onWindowResize, false);
     }
 
+    // ── Loading progress tracking ──
+    let _totalModelsToLoad = 0;
+    let _modelsLoaded = 0;
+    let _allModelsReady = false;
+    let _onReadyCallback = null;
+
+    function _updateLoadingProgress(label) {
+        _modelsLoaded++;
+        const pct = Math.floor((_modelsLoaded / _totalModelsToLoad) * 100);
+        const bar = document.getElementById('loading-bar');
+        const text = document.getElementById('loading-text');
+        if (bar) bar.style.width = pct + '%';
+        if (text) text.textContent = label ? ('LOADING ' + label.toUpperCase() + '...') : ('LOADING ' + pct + '%');
+        if (_modelsLoaded >= _totalModelsToLoad) {
+            _allModelsReady = true;
+            console.log('All GLB models loaded — game ready');
+            const loadScreen = document.getElementById('loading-screen');
+            if (loadScreen) loadScreen.style.display = 'none';
+            if (_onReadyCallback) _onReadyCallback();
+        }
+    }
+
+    function onAllModelsReady(cb) { _onReadyCallback = cb; if (_allModelsReady) cb(); }
+    function isReady() { return _allModelsReady; }
+
     // ── Preload all GLB LOD levels so cloning is instant ──
     function _preloadGLBModels() {
         const loader = new THREE.GLTFLoader();
+        // Count total files to load (all levels across all keys + cockpit)
+        _totalModelsToLoad = 1; // cockpit
+        Object.values(GLB_LOD).forEach(levels => { _totalModelsToLoad += levels.length; });
+
         Object.entries(GLB_LOD).forEach(([key, levels]) => {
             const lod = new THREE.LOD();
             glbModels[key] = lod;
@@ -303,6 +354,7 @@ const SF3D = (function () {
                         });
                         levelResults[idx] = { model, distance };
                         loaded++;
+                        _updateLoadingProgress(key);
 
                         if (loaded === levels.length) {
                             levelResults.sort((a, b) => a.distance - b.distance);
@@ -325,12 +377,12 @@ const SF3D = (function () {
                             });
 
                             console.log(`GLB LOD ready: ${key} (${levels.length} levels)`);
-                            if (key === 'earth') _placeEarth(lod);
+                            if (key === 'earth') { _placeEarth(lod); _placeMoon(); }
                             if (key === 'station') _placeStation(lod);
                         }
                     },
                     null,
-                    err => console.error('Failed to load LOD:', path, err)
+                    err => { console.error('Failed to load LOD:', path, err); _updateLoadingProgress(key); }
                 );
             });
         });
@@ -444,9 +496,64 @@ const SF3D = (function () {
         clouds.name = 'earth-clouds';
         earthGroup.add(clouds);
 
-        // Position Earth below and to the side — looming large
-        earthGroup.position.set(-4000, -8000, -3000);
+        // Position Earth far beyond arena boundary (8000) — unreachable but impressive
+        // At scale 8000 with radius ~6400, the planet fills a huge chunk of the sky
+        earthGroup.position.set(-6000, -18000, -12000);
         scene.add(earthGroup);
+    }
+
+    // ── Place Moon — illuminated by sun, slight Earth-shine on near side ──
+    function _placeMoon() {
+        const moonGroup = new THREE.Group();
+        moonGroup.name = 'moon-scenery';
+
+        const moonRadius = 1200; // ~1/5 Earth visual radius (6400), realistic ratio is ~1/4
+
+        // Moon surface — grey regolith with subtle bump texture feel
+        const moonGeo = new THREE.SphereGeometry(moonRadius, 48, 48);
+        const moonMat = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            roughness: 0.95,
+            metalness: 0.0,
+            // Simulate cratered terrain with a bumpMap-like normal perturbation
+            flatShading: false
+        });
+        const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+        moonGroup.add(moonMesh);
+
+        // Subtle Earth-shine glow on the Earth-facing hemisphere
+        const earthGlowGeo = new THREE.SphereGeometry(moonRadius * 1.005, 32, 32);
+        const earthGlowMat = new THREE.ShaderMaterial({
+            uniforms: {
+                earthDir: { value: new THREE.Vector3(6000, 18000, 12000).normalize() }
+            },
+            vertexShader: [
+                'varying vec3 vNormal;',
+                'void main() {',
+                '  vNormal = normalize(normalMatrix * normal);',
+                '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                '}'
+            ].join('\n'),
+            fragmentShader: [
+                'uniform vec3 earthDir;',
+                'varying vec3 vNormal;',
+                'void main() {',
+                '  float facing = max(0.0, dot(vNormal, earthDir));',
+                '  float intensity = pow(facing, 2.0) * 0.12;',
+                '  gl_FragColor = vec4(0.3, 0.5, 0.8, intensity);',
+                '}'
+            ].join('\n'),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.FrontSide
+        });
+        moonGroup.add(new THREE.Mesh(earthGlowGeo, earthGlowMat));
+
+        // Position moon offset from Earth — 45° ahead in orbit, slightly above
+        // Earth is at (-6000, -18000, -12000); moon orbits ~25000 units from Earth center
+        moonGroup.position.set(12000, -10000, -20000);
+        scene.add(moonGroup);
     }
 
     // ── Place Space Station as scenery ──
@@ -561,15 +668,15 @@ const SF3D = (function () {
         guide.position.set(0, -halfH + 0.15, -tubeLength / 2);
         launchBayGroup.add(guide);
 
-        // ── Point lights for illumination every 80 units ──
+        // ── Point lights for illumination every 80 units (boosted for visor filter) ──
         for (let z = 0; z > -tubeLength; z -= 80) {
-            const ceilingLight = new THREE.PointLight(0x4488ff, 1.5, 50);
+            const ceilingLight = new THREE.PointLight(0x4488ff, 3.0, 60);
             ceilingLight.position.set(0, halfH - 1, z);
             launchBayGroup.add(ceilingLight);
         }
 
         // ── End-of-tunnel exit glow ──
-        const exitLight = new THREE.PointLight(0xffffff, 3, 80);
+        const exitLight = new THREE.PointLight(0xffffff, 6, 100);
         exitLight.position.set(0, 0, -tubeLength + 10);
         launchBayGroup.add(exitLight);
 
@@ -735,18 +842,20 @@ const SF3D = (function () {
                 cockpitGroup.add(cockpitModel);
                 cockpitModel.visible = cockpitVisible;
                 cockpitLoaded = true;
+                _updateLoadingProgress('cockpit');
 
                 console.log('Cockpit GLB loaded successfully');
             },
             function (progress) {
                 if (progress.total > 0) {
                     const pct = Math.floor(progress.loaded / progress.total * 100);
-                    console.log('Loading cockpit: ' + pct + '%');
+                    const text = document.getElementById('loading-text');
+                    if (text) text.textContent = 'LOADING COCKPIT... ' + pct + '%';
                 }
             },
             function (error) {
                 console.error('Failed to load cockpit GLB:', error);
-                // Fallback: just leave cockpit empty
+                _updateLoadingProgress('cockpit');
             }
         );
 
@@ -967,12 +1076,14 @@ const SF3D = (function () {
             alienCapSpike: new THREE.MeshPhysicalMaterial({ color: 0x664488, metalness: 1.0, roughness: 0.05, clearcoat: 1.0 }),
             alienCapGlow: new THREE.MeshBasicMaterial({ color: 0xff00ff }),
             alienShield: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.08 }),
-            // Laser
-            laserCore: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
-            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }),
-            // Torpedo
-            torpCore: new THREE.MeshBasicMaterial({ color: 0x00ffff }),
-            torpGlow: new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }),
+            // Laser — GDD §10.1: green-cyan #00FFAA energy bolts
+            laserCore: new THREE.MeshBasicMaterial({ color: 0x00ffaa }),
+            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }),
+            laserTrail: new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }),
+            // Torpedo — GDD §10.1: bright warhead + orange #FF8800 exhaust trail
+            torpCore: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+            torpGlow: new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending }),
+            torpTrail: new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending }),
         };
         return sharedMats;
     }
@@ -1002,15 +1113,49 @@ const SF3D = (function () {
         } else if (type === 'alien-baseship') {
             mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(80, 1), m.alienCap));
         } else if (type === 'laser') {
-            const geo = new THREE.CylinderGeometry(0.8, 0.8, 20, 6);
-            geo.rotateX(Math.PI / 2);
-            mesh.add(new THREE.Mesh(geo, m.laserCore));
-            const glowGeo = new THREE.CylinderGeometry(1.5, 1.5, 22, 6);
+            // GDD §10.1: Dual linked pulse cannons — two parallel energy bolts
+            const boltLen = 18, boltR = 0.6, glowR = 1.8, sep = 3.5;
+            const boltGeo = new THREE.CylinderGeometry(boltR, boltR * 0.3, boltLen, 8);
+            boltGeo.rotateX(Math.PI / 2);
+            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.5, boltLen + 4, 8);
             glowGeo.rotateX(Math.PI / 2);
-            mesh.add(new THREE.Mesh(glowGeo, m.laserGlow));
+            const trailGeo = new THREE.CylinderGeometry(glowR * 1.5, 0.1, boltLen * 2, 6);
+            trailGeo.rotateX(Math.PI / 2);
+            trailGeo.translate(0, 0, boltLen * 0.6);
+            // Left bolt
+            const boltL = new THREE.Mesh(boltGeo, m.laserCore);
+            boltL.position.x = -sep;
+            mesh.add(boltL);
+            const glowL = new THREE.Mesh(glowGeo, m.laserGlow);
+            glowL.position.x = -sep;
+            mesh.add(glowL);
+            const trailL = new THREE.Mesh(trailGeo, m.laserTrail);
+            trailL.position.x = -sep;
+            mesh.add(trailL);
+            // Right bolt
+            const boltR2 = new THREE.Mesh(boltGeo, m.laserCore);
+            boltR2.position.x = sep;
+            mesh.add(boltR2);
+            const glowR2 = new THREE.Mesh(glowGeo, m.laserGlow);
+            glowR2.position.x = sep;
+            mesh.add(glowR2);
+            const trailR2 = new THREE.Mesh(trailGeo, m.laserTrail);
+            trailR2.position.x = sep;
+            mesh.add(trailR2);
         } else if (type === 'torpedo') {
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), m.torpCore));
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(5, 8, 8), m.torpGlow));
+            // GDD §10.1: Bright warhead + orange sparkler trail
+            // Warhead — bright white-hot core
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2, 12, 12), m.torpCore));
+            // Inner glow — orange
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 10, 10), m.torpGlow));
+            // Outer sparkle halo
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(6, 8, 8), m.torpTrail));
+            // Exhaust cone trail behind torpedo
+            const coneGeo = new THREE.ConeGeometry(3.5, 20, 8);
+            coneGeo.rotateX(-Math.PI / 2);
+            coneGeo.translate(0, 0, 14);
+            mesh.add(new THREE.Mesh(coneGeo, m.torpTrail));
+            mesh.userData.isTorpedo = true;
         } else {
             mesh.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
         }
@@ -1025,31 +1170,55 @@ const SF3D = (function () {
     }
 
     function spawnExplosion(pos) {
-        // Single flash light (kept — explosions are rare)
-        const light = new THREE.PointLight(0xffaa00, 8, 500);
+        // ── Space explosion: bright white flash, expanding debris, NO sustained fire ──
+        // Only a brief fuel flash (white/blue), then grey-white debris particles
+        const light = new THREE.PointLight(0xffffff, 12, 800);
         light.position.copy(pos);
         scene.add(light);
-        setTimeout(() => scene.remove(light), 300);
+        // Rapid flash decay: bright white → dim orange → gone
+        let flashTimer = 0;
+        const flashInterval = setInterval(() => {
+            flashTimer += 30;
+            const t = flashTimer / 200;
+            light.intensity = 12 * Math.max(0, 1 - t * t);
+            if (t >= 1) { scene.remove(light); clearInterval(flashInterval); }
+        }, 30);
 
-        // Explosion particles via pooled system
-        const colors = [[1, 0.53, 0], [1, 0.67, 0], [1, 1, 0], [1, 0.4, 0]];
-        for (let i = 0; i < 25; i++) {
+        // Phase 1: Initial fuel flash (white-blue, very brief — the only "fire" moment)
+        const flashColors = [[1, 1, 1], [0.7, 0.85, 1], [1, 0.95, 0.8]];
+        for (let i = 0; i < 15; i++) {
             const a = Math.random() * Math.PI * 2;
             const el = (Math.random() - 0.5) * Math.PI;
-            const sp = 100 + Math.random() * 300;
-            const c = colors[(Math.random() * 4) | 0];
+            const sp = 200 + Math.random() * 400;
+            const c = flashColors[(Math.random() * 3) | 0];
             _emitParticle(pos.x, pos.y, pos.z,
                 Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
-                c[0], c[1], c[2], 1.2 + Math.random() * 0.5);
+                c[0], c[1], c[2], 0.3 + Math.random() * 0.2); // very short-lived
         }
-        // Shockwave ring
-        for (let i = 0; i < 10; i++) {
+
+        // Phase 2: Expanding debris cloud (grey-white chunks, no fire — vacuum)
+        const debrisColors = [[0.6, 0.6, 0.65], [0.4, 0.4, 0.45], [0.8, 0.8, 0.75], [0.3, 0.3, 0.35]];
+        for (let i = 0; i < 30; i++) {
             const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 60 + Math.random() * 250;
+            const c = debrisColors[(Math.random() * 4) | 0];
             _emitParticle(pos.x, pos.y, pos.z,
-                Math.cos(a) * 150, (Math.random() - 0.5) * 100, Math.sin(a) * 150,
-                1, 0.67, 0, 0.8);
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
+                c[0], c[1], c[2], 1.5 + Math.random() * 1.0);
         }
-        cameraShakeIntensity = Math.max(cameraShakeIntensity, 2.0);
+
+        // Phase 3: Sparks — hot metal fragments (orange-white, fast, small, brief)
+        for (let i = 0; i < 12; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 300 + Math.random() * 500;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
+                1, 0.7 + Math.random() * 0.3, 0.3 * Math.random(), 0.4 + Math.random() * 0.3);
+        }
+
+        cameraShakeIntensity = Math.max(cameraShakeIntensity, 2.5);
     }
 
     function spawnImpactEffect(pos, color = 0xff00ff) {
@@ -1063,13 +1232,67 @@ const SF3D = (function () {
         }
     }
 
+    // ── Muzzle flash point light pool (reusable, no allocation in hot path) ──
+    const _muzzleFlashPool = [];
+    let _muzzleFlashIdx = 0;
+    function _getMuzzleFlash() {
+        if (_muzzleFlashPool.length < 4) {
+            const light = new THREE.PointLight(0x00ffaa, 3.0, 50);
+            scene.add(light);
+            _muzzleFlashPool.push({ light, timer: 0 });
+            return _muzzleFlashPool[_muzzleFlashPool.length - 1];
+        }
+        const flash = _muzzleFlashPool[_muzzleFlashIdx % 4];
+        _muzzleFlashIdx++;
+        return flash;
+    }
+
     function spawnLaser(laserEntity) {
         const p = laserEntity.position;
-        for (let i = 0; i < 4; i++) {
-            const a = (i / 4) * Math.PI * 2;
+        // GDD §8.3: Muzzle flash — point light #00FFAA, intensity 3.0, decay 0.1s, range 50
+        const flash = _getMuzzleFlash();
+        flash.light.position.copy(p);
+        flash.light.intensity = 3.0;
+        flash.timer = 0.1;
+        // Green-cyan muzzle spark particles (dual cannon)
+        for (let i = 0; i < 6; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 60 + Math.random() * 80;
             _emitParticle(p.x, p.y, p.z,
-                Math.cos(a) * 50, (Math.random() - 0.5) * 30, Math.sin(a) * 50,
-                0, 1, 0, 0.2);
+                Math.cos(a) * sp * 0.3, (Math.random() - 0.5) * sp * 0.2, Math.sin(a) * sp * 0.3 - sp,
+                0, 1, 0.67, 0.15 + Math.random() * 0.1);
+        }
+    }
+
+    function spawnTorpedoTrail(torpEntity) {
+        // GDD §10.1: Orange sparkler exhaust — continuous particle stream
+        const p = torpEntity.position;
+        const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(torpEntity.quaternion);
+        for (let i = 0; i < 5; i++) {
+            const spread = 40;
+            _emitParticle(
+                p.x + (Math.random() - 0.5) * 2,
+                p.y + (Math.random() - 0.5) * 2,
+                p.z + (Math.random() - 0.5) * 2,
+                fwd.x * 60 + (Math.random() - 0.5) * spread,
+                fwd.y * 60 + (Math.random() - 0.5) * spread,
+                fwd.z * 60 + (Math.random() - 0.5) * spread,
+                1, 0.5 + Math.random() * 0.3, Math.random() * 0.2,
+                0.4 + Math.random() * 0.4
+            );
+        }
+        // Bright white sparks (sparkler effect)
+        for (let i = 0; i < 3; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 30 + Math.random() * 50;
+            _emitParticle(
+                p.x, p.y, p.z,
+                Math.cos(a) * sp + fwd.x * 20,
+                (Math.random() - 0.5) * sp + fwd.y * 20,
+                Math.sin(a) * sp + fwd.z * 20,
+                1, 1, 0.8,
+                0.2 + Math.random() * 0.2
+            );
         }
     }
 
@@ -1119,6 +1342,14 @@ const SF3D = (function () {
             mesh.position.copy(e.position);
             mesh.quaternion.copy(e.quaternion);
             mesh.visible = true; // Ensure it's visible when not in launch phase
+
+            // Update LOD level selection based on camera distance
+            if (mesh.isLOD) mesh.update(camera);
+
+            // Torpedo sparkler trail — continuous particle emission
+            if (e.type === 'torpedo' && mesh.userData && mesh.userData.isTorpedo) {
+                spawnTorpedoTrail(e);
+            }
         });
 
         // Target Lock Reticle
@@ -1153,7 +1384,14 @@ const SF3D = (function () {
 
         // Rotate station slowly
         const station = scene.getObjectByName('station-scenery');
-        if (station) station.rotation.y += 0.001;
+        if (station) {
+            station.rotation.y += 0.001;
+            if (station.isLOD) station.update(camera);
+        }
+
+        // Rotate moon very slowly (tidally locked in real life, slight drift here for visual)
+        const moon = scene.getObjectByName('moon-scenery');
+        if (moon) moon.rotation.y += 0.00008;
 
         // Animate sun corona — subtle breathing pulse
         const sunGrp = scene.getObjectByName('sun-group');
@@ -1179,7 +1417,7 @@ const SF3D = (function () {
         resizeCockpit();
     }
 
-    return { init, render, spawnExplosion, spawnLaser, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, updateTelemetryScreen, updateRadarTexture };
+    return { init, render, spawnExplosion, spawnLaser, spawnTorpedoTrail, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
 })();
 
 window.SF3D = SF3D;

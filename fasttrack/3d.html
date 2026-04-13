@@ -5,6 +5,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FastTrack 3D — Manifold Gaming</title>
+  <script>
+    if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
+      window.location.replace('/lobby/');
+    }
+  </script>
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
   <style>
     * {
@@ -856,7 +861,137 @@
         width: 140px;
       }
     }
+
+    /* ── Settings gear button — top-right ── */
+    #btn-settings {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 50;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(8, 10, 24, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    #btn-settings:hover {
+      background: rgba(8, 10, 24, 0.8);
+      color: #fff;
+      transform: rotate(30deg);
+    }
+
+    /* ── Settings overlay ── */
+    #settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(6px);
+      align-items: center;
+      justify-content: center;
+    }
+
+    #settings-overlay.open {
+      display: flex;
+    }
+
+    #settings-panel {
+      background: rgba(8, 10, 24, 0.92);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px 32px;
+      min-width: 280px;
+      max-width: 340px;
+      box-shadow: 0 16px 64px rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    #settings-panel h2 {
+      margin: 0 0 20px;
+      font-size: 1.2em;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .setting-row label {
+      font-size: 0.85em;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .setting-row input[type="range"] {
+      width: 120px;
+      accent-color: #00b4ff;
+      cursor: pointer;
+    }
+
+    .settings-divider {
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin: 18px 0;
+    }
+
+    #btn-exit-game {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      background: rgba(220, 50, 50, 0.25);
+      border: 1px solid rgba(220, 50, 50, 0.4);
+      border-radius: 8px;
+      color: #ff6b6b;
+      font-size: 0.9em;
+      font-family: 'Rajdhani', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #btn-exit-game:hover {
+      background: rgba(220, 50, 50, 0.45);
+      color: #fff;
+    }
+
+    #btn-close-settings {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85em;
+      font-family: 'Rajdhani', sans-serif;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #btn-close-settings:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
   </style>
+  <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -919,6 +1054,30 @@
     <div id="move-hints"></div>
   </div>
 
+  <!-- ── Settings gear — top-right ── -->
+  <button id="btn-settings" onclick="toggleSettings()" title="Settings">⚙</button>
+
+  <!-- ── Settings overlay ── -->
+  <div id="settings-overlay" onclick="if(event.target===this)toggleSettings()">
+    <div id="settings-panel">
+      <h2>⚙ Settings</h2>
+
+      <div class="setting-row">
+        <label>Music</label>
+        <input type="range" id="vol-music" min="0" max="100" value="0" oninput="setMusicVolume(this.value)">
+      </div>
+      <div class="setting-row">
+        <label>Sound FX</label>
+        <input type="range" id="vol-sfx" min="0" max="100" value="70" oninput="setSfxVolume(this.value)">
+      </div>
+
+      <hr class="settings-divider">
+
+      <button id="btn-exit-game" onclick="exitGame()">✕ Exit Game</button>
+      <button id="btn-close-settings" onclick="toggleSettings()">Close</button>
+    </div>
+  </div>
+
   <!-- ── Camera controls — bottom-right ── -->
   <div id="panel-cam" class="glass-panel">
     <button class="cam-btn active" onclick="setCameraView('manual')">Free</button>
@@ -950,6 +1109,7 @@
   <script src="art-data.js"></script>
 
   <!-- 🜂 MANIFOLD ENGINE — z = x · y sacred primitive + Schwarz Diamond geometry -->
+  <script src="../../js/manifold.js"></script>
   <script src="../../js/substrates/manifold_ingestor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
@@ -966,6 +1126,75 @@
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
   <script src="fasttrack-3d.js"></script>
+
+  <script>
+    // ── Settings panel wiring ──
+    function toggleSettings() {
+      document.getElementById('settings-overlay').classList.toggle('open');
+    }
+
+    function setMusicVolume(val) {
+      const v = val / 100;
+      if (typeof GameSettings !== 'undefined') {
+        GameSettings.musicEnabled = v > 0;
+        GameSettings.save();
+      }
+      if (window.ManifoldAudio) {
+        if (v === 0) {
+          ManifoldAudio.stopMusic();
+        } else {
+          if (!ManifoldAudio.musicPlaying) ManifoldAudio.startMusic();
+        }
+        // Scale the ragtime ambient gain
+        if (ManifoldAudio._rtGain) {
+          ManifoldAudio._rtGain.gain.setTargetAtTime(v * 0.12, ManifoldAudio.ctx.currentTime, 0.1);
+        }
+        // Scale master gain proportionally for music
+        if (ManifoldAudio.masterGain) {
+          ManifoldAudio._musicVol = v;
+        }
+      }
+      if (window.AudioSubstrate) {
+        AudioSubstrate.setVolume('music', v);
+      }
+    }
+
+    function setSfxVolume(val) {
+      const v = val / 100;
+      if (typeof GameSettings !== 'undefined') {
+        GameSettings.soundEnabled = v > 0;
+        GameSettings.save();
+      }
+      if (window.ManifoldAudio && ManifoldAudio.masterGain) {
+        ManifoldAudio.masterGain.gain.setTargetAtTime(Math.max(v, 0.01), ManifoldAudio.ctx.currentTime, 0.1);
+      }
+      if (window.AudioSubstrate) {
+        AudioSubstrate.setVolume('sfx', v);
+        AudioSubstrate.setVolume('commentary', v);
+        AudioSubstrate.setVolume('crowd', v);
+      }
+    }
+
+    function exitGame() {
+      if (confirm('Exit this game?')) {
+        window.location.href = '/lobby/';
+      }
+    }
+
+    // Wire intent manifold functions
+    window.toggleSound = function () { const el = document.getElementById('vol-sfx'); el.value = el.value > 0 ? 0 : 70; setSfxVolume(el.value); };
+    window.toggleMusic = function () { const el = document.getElementById('vol-music'); el.value = el.value > 0 ? 0 : 50; setMusicVolume(el.value); };
+    window.exitToMenu = exitGame;
+
+    // Init slider values from saved settings on load
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof GameSettings !== 'undefined') {
+        GameSettings.load();
+        document.getElementById('vol-music').value = GameSettings.musicEnabled ? 50 : 0;
+        document.getElementById('vol-sfx').value = GameSettings.soundEnabled ? 70 : 0;
+      }
+    });
+  </script>
 </body>
 
 </html>

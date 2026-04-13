@@ -1,62 +1,31 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
  * 🜂 SPACE COMBAT MANIFOLD — SCHWARZ DIAMOND HELIX
- * One Manifold. All Ships. One Universe.
+ * Lens on the unified Manifold — region "starfighter"
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * SURFACE: Schwarz Diamond
  *   cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0
- *   Triply periodic minimal surface — no boundary, helix at any length.
  *
- * PRIMITIVE: z = x · y  (multiplicative)
- *   (x, y) is the coordinate. z follows.
- *
- * EFFICIENCY:
- *   - Spatial hash grid: O(n) collision detection instead of O(n²)
- *   - Lazy stamping: trig computed on demand, not every frame
- *   - Zero allocation in hot paths: reuse arrays and scratch vectors
+ * This is NO LONGER a standalone manifold. It delegates to the unified
+ * Manifold (window.Manifold) using region "starfighter". Same API.
+ * Games that loaded SpaceManifold directly still work — zero breakage.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 const SpaceManifold = (function () {
 
-  const points = new Map();
-
-  // Schwarz Diamond constants
+  const REGION = 'starfighter';
   const SCALE = 2000;
   const K = (2 * Math.PI) / SCALE;
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // SPATIAL HASH GRID — O(n) broad-phase collision detection
-  // ════════════════════════════════════════════════════════════════════════════
-
-  const CELL_SIZE = 500;        // game units per cell (covers combined radius: baseship 200 + alien-baseship 150 = 350)
-  const INV_CELL = 1 / CELL_SIZE;
-  const grid = new Map();       // "x,y,z" → entity[]
-  let gridDirty = true;
-
-  function _cellKey(x, y, z) {
-    return ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) | 0;
-  }
-
-  function _rebuildGrid() {
-    grid.clear();
-    for (const [, e] of points) {
-      if (e.markedForDeletion) continue;
-      const cx = (e.position.x * INV_CELL) | 0;
-      const cy = (e.position.y * INV_CELL) | 0;
-      const cz = (e.position.z * INV_CELL) | 0;
-      const key = _cellKey(cx, cy, cz);
-      const bucket = grid.get(key);
-      if (bucket) bucket.push(e);
-      else grid.set(key, [e]);
-    }
-    gridDirty = false;
-  }
+  // Ensure region exists on the unified manifold
+  const M = window.Manifold;
+  if (M) M.region(REGION, { cellSize: 1000 });
 
   // ════════════════════════════════════════════════════════════════════════════
-  // SCHWARZ DIAMOND — on-demand, not per-frame
+  // SCHWARZ DIAMOND — game-specific surface math (kept for stamping)
   // ════════════════════════════════════════════════════════════════════════════
 
   function diamond(x, y, z) {
@@ -87,7 +56,6 @@ const SpaceManifold = (function () {
     return { u: mx, v: my, w: mx * my };
   }
 
-  // Stamp on demand — call when you need manifold state, not every frame
   function stamp(e) {
     const p = e.position;
     const mx = p.x * K, my = p.y * K;
@@ -101,62 +69,35 @@ const SpaceManifold = (function () {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PLACE / REMOVE
+  // DELEGATED API — all calls route through unified Manifold
   // ════════════════════════════════════════════════════════════════════════════
 
   function place(entity) {
-    points.set(entity.id, entity);
-    gridDirty = true;
+    if (M) M.place(entity, REGION);
   }
 
   function remove(id) {
-    points.delete(id);
-    gridDirty = true;
+    if (M) M.remove(id);
   }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // EVOLVE — advance all positions. Marks grid dirty for next collision check.
-  // No trig. No stamps. Pure position += velocity * dt.
-  // ════════════════════════════════════════════════════════════════════════════
 
   function evolve(dt) {
-    for (const [, e] of points) {
-      if (e.markedForDeletion) continue;
-      e.position.x += e.velocity.x * dt;
-      e.position.y += e.velocity.y * dt;
-      e.position.z += e.velocity.z * dt;
-    }
-    gridDirty = true;
+    if (M) M.evolve(dt, REGION);
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // OBSERVE — pure reads
-  // ════════════════════════════════════════════════════════════════════════════
-
-  // Reusable array to avoid allocation per frame
-  let _liveCache = [];
-  let _liveDirty = true;
+  function reap() {
+    if (M) M.reap(REGION);
+  }
 
   function observe(id) {
-    return points.get(id) || null;
+    return M ? M.observe(id) : null;
   }
 
   function observeAll() {
-    if (!_liveDirty) return _liveCache;
-    _liveCache = [];
-    for (const [, p] of points) {
-      if (!p.markedForDeletion) _liveCache.push(p);
-    }
-    _liveDirty = false;
-    return _liveCache;
+    return M ? M.observeAll(REGION) : [];
   }
 
   function observeByType(type) {
-    const result = [];
-    for (const [, p] of points) {
-      if (!p.markedForDeletion && p.type === type) result.push(p);
-    }
-    return result;
+    return M ? M.observeByType(type, REGION) : [];
   }
 
   function observeRelative(observer, target) {
@@ -164,87 +105,22 @@ const SpaceManifold = (function () {
     return target.position.clone().sub(observer.position).applyQuaternion(invQuat);
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PROXIMITY — spatial hash broad phase + exact distance narrow phase
-  // ════════════════════════════════════════════════════════════════════════════
-
-  const _pairSet = new Set();   // dedup pairs
-  const _pairs = [];            // reusable result
-
   function detectCollisions() {
-    if (gridDirty) _rebuildGrid();
-
-    _pairSet.clear();
-    _pairs.length = 0;
-
-    for (const [, bucket] of grid) {
-      const n = bucket.length;
-      if (n < 2) continue;
-      for (let i = 0; i < n; i++) {
-        const a = bucket[i];
-        if (a.markedForDeletion) continue;
-        for (let j = i + 1; j < n; j++) {
-          const b = bucket[j];
-          if (b.markedForDeletion) continue;
-          // Dedup: smaller id first
-          const key = a.id < b.id ? a.id + b.id : b.id + a.id;
-          if (_pairSet.has(key)) continue;
-          const dx = a.position.x - b.position.x;
-          const dy = a.position.y - b.position.y;
-          const dz = a.position.z - b.position.z;
-          const dSq = dx * dx + dy * dy + dz * dz;
-          const rSum = (a.radius || 10) + (b.radius || 10);
-          if (dSq < rSum * rSum) {
-            _pairSet.add(key);
-            _pairs.push([a, b]);
-          }
-        }
-      }
-    }
-
-    // CELL_SIZE=500 covers the largest combined radius pair (baseship 200 + alien-baseship 150 = 350)
-    // so same-cell checks are sufficient.
-
-    return _pairs;
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // REAP / DISTANCE
-  // ════════════════════════════════════════════════════════════════════════════
-
-  function reap() {
-    for (const [id, p] of points) {
-      if (p.markedForDeletion) points.delete(id);
-    }
-    gridDirty = true;
-    _liveDirty = true;
+    return M ? M.detectCollisions(REGION) : [];
   }
 
   function distance(a, b) {
-    const dx = a.position.x - b.position.x;
-    const dy = a.position.y - b.position.y;
-    const dz = a.position.z - b.position.z;
-    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return M ? M.distance(a, b) : 0;
   }
 
   function distanceSq(a, b) {
-    const dx = a.position.x - b.position.x;
-    const dy = a.position.y - b.position.y;
-    const dz = a.position.z - b.position.z;
-    return dx * dx + dy * dy + dz * dz;
+    return M ? M.distanceSq(a, b) : 0;
   }
 
-  // Mark live cache dirty whenever entities change
-  function _invalidateLive() { _liveDirty = true; }
-
-  // Override place/remove to also invalidate live cache
-  const _origPlace = place;
-  const _origRemove = remove;
-
   return {
-    place(entity) { _origPlace(entity); _invalidateLive(); },
-    remove(id) { _origRemove(id); _invalidateLive(); },
-    evolve(dt) { evolve(dt); _invalidateLive(); },
+    place,
+    remove,
+    evolve,
     reap,
     observe,
     observeAll,

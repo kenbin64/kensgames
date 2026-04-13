@@ -73,6 +73,9 @@ const BASE = path.resolve(__dirname);
 // ─────────────────────────────────────────────────────────────────────────────
 // LOAD SUBSTRATES
 // ─────────────────────────────────────────────────────────────────────────────
+const Manifold = require(path.resolve(__dirname, '..', 'manifold'));
+global.window.Manifold = Manifold;
+global.Manifold = Manifold;
 const ManifoldIngestor = require(`${BASE}/manifold_ingestor`);
 const GameRegistry = require(`${BASE}/game_registry_manifold`);
 const Discovery = require(`${BASE}/manifold_discovery`);
@@ -88,7 +91,7 @@ section('① MANIFOLD INGESTOR — z = x · y');
         { x: 'playerCount', y: 'duration' });
     assert('z = x * y primitive (2 × 45 = 90)', e.manifold.z === 90);
     assert('token === manifold.z', e.token === 90);
-    assert('source data preserved', e.source.name === 'FastTrack');
+    assert('source dropped (lives on GitHub)', e.source === null);
     assert('gyroid surface value is a number', typeof e.surface.gyroid === 'number');
     assert('diamond surface value is a number', typeof e.surface.diamond === 'number');
     assert('blend is weighted combo', typeof e.surface.blend === 'number');

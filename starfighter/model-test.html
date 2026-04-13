@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Optimisation Test — Starfighter</title>
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root{ --nc:#00FFFF;--np:#FF00FF;--ny:#FFE800;--ng:#00FF41;--bg:#04040C;--txm:#8888AA; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:#E0E0FF;font-family:'Segoe UI',sans-serif;}
+    header{background:rgba(4,4,20,.95);border-bottom:2px solid var(--nc);box-shadow:0 0 24px var(--nc);
+           padding:14px 30px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100;}
+    header h1{font-family:'Orbitron',monospace;font-size:16px;color:var(--nc);
+              text-shadow:0 0 16px var(--nc);letter-spacing:3px;text-transform:uppercase;}
+    .legend{display:flex;gap:18px;margin-left:auto;font-size:11px;}
+    .leg{display:flex;align-items:center;gap:6px;}
+    .dot{width:10px;height:10px;border-radius:50%;}
+    #summary{background:rgba(0,255,255,.05);border:1px solid rgba(0,255,255,.2);
+             margin:20px 30px;padding:16px 24px;border-radius:4px;
+             display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;}
+    .sum-val{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:var(--nc);
+             text-shadow:0 0 12px var(--nc);}
+    .sum-label{font-size:10px;color:var(--txm);letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
+    #grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(680px,1fr));gap:24px;padding:0 30px 40px;}
+    .model-row{background:rgba(4,4,20,.9);border:2px solid rgba(0,255,255,.2);border-radius:6px;overflow:hidden;}
+    .model-row.pass{border-color:rgba(0,255,65,.4);}
+    .model-row.fail{border-color:rgba(255,0,255,.6);}
+    .model-header{padding:14px 20px;display:flex;align-items:center;gap:12px;
+                  background:rgba(0,255,255,.04);border-bottom:1px solid rgba(0,255,255,.1);}
+    .model-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;
+                color:var(--ny);text-shadow:0 0 10px var(--ny);text-transform:uppercase;flex:1;}
+    .status-badge{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;
+                  padding:3px 10px;border-radius:2px;text-transform:uppercase;}
+    .badge-loading{background:rgba(255,232,0,.2);color:var(--ny);border:1px solid var(--ny);}
+    .badge-pass{background:rgba(0,255,65,.2);color:var(--ng);border:1px solid var(--ng);}
+    .badge-fail{background:rgba(255,0,255,.2);color:var(--np);border:1px solid var(--np);}
+    .canvases{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(0,255,255,.1);}
+    .canvas-wrap{position:relative;background:#020208;}
+    .canvas-label{position:absolute;top:8px;left:10px;z-index:10;
+                  font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;
+                  text-transform:uppercase;padding:3px 8px;border-radius:2px;}
+    .label-orig{background:rgba(255,0,255,.3);color:var(--np);}
+    .label-opt{background:rgba(0,255,65,.3);color:var(--ng);}
+    canvas{width:100%;height:220px;display:block;}
+    .stats-row{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(0,255,255,.1);}
+    .stat-box{padding:12px 16px;background:rgba(4,4,20,.95);}
+    .stat-line{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;}
+    .stat-key{color:var(--txm);}
+    .stat-val{font-family:'Orbitron',monospace;font-size:11px;}
+    .stat-val.good{color:var(--ng);}
+    .stat-val.warn{color:var(--ny);}
+    .stat-val.bad{color:var(--np);}
+    .err-msg{padding:10px 16px;font-size:12px;color:var(--np);background:rgba(255,0,255,.05);}
+  </style>
+</head>
+<body>
+<header>
+  <h1>&#9651; Model Optimisation Test</h1>
+  <div class="legend">
+    <div class="leg"><div class="dot" style="background:var(--np)"></div>Original</div>
+    <div class="leg"><div class="dot" style="background:var(--ng)"></div>Optimized</div>
+    <div class="leg"><div class="dot" style="background:var(--ny)"></div>Loading</div>
+  </div>
+  <a href="/starfighter/lobby.html" style="font-family:'Orbitron',monospace;font-size:10px;
+     color:var(--nc);text-decoration:none;border:1px solid var(--nc);padding:6px 14px;border-radius:3px;">
+    &#8592; Back to Lobby
+  </a>
+</header>
+
+<div id="summary">
+  <div><div class="sum-val" id="s-orig">--</div><div class="sum-label">Original MB</div></div>
+  <div><div class="sum-val" id="s-opt">--</div><div class="sum-label">Optimised MB</div></div>
+  <div><div class="sum-val" id="s-saved">--</div><div class="sum-label">MB Saved</div></div>
+  <div><div class="sum-val" id="s-ratio" style="color:var(--ng)">--</div><div class="sum-label">Size Reduction</div></div>
+</div>
+
+<div id="grid"></div>
+
+<script src="../../lib/three/three.min.js"></script>
+<script src="../../lib/three/GLTFLoader.js"></script>
+<script>
+const MODELS = [
+  { key:'enemy',   file:'AlienEnemyFighter.glb',                    origMB:27.3, optMB:10.4 },
+  { key:'baseship',file:'AlienMotherShip.glb',                      origMB:30.8, optMB: 9.4 },
+  { key:'earth',   file:'Earth.glb',                                origMB:22.8, optMB: 8.4 },
+  { key:'ally',    file:'HumanFriendlStarFighter.glb',              origMB:15.6, optMB: 9.0 },
+  { key:'battle',  file:'HumanSpaceBattleShip.glb',                 origMB:31.5, optMB: 8.4 },
+  { key:'station', file:'HumanSpaceStationWithAritificalGravity.glb',origMB:34.6, optMB:10.5 },
+  { key:'cockpit', file:'firstPersonStarFighterCockpit.glb',         origMB:75.3, optMB: 9.9 },
+];
+
+// Update summary bar
+const totOrig = MODELS.reduce((s,m)=>s+m.origMB,0);
+const totOpt  = MODELS.reduce((s,m)=>s+m.optMB,0);
+document.getElementById('s-orig').textContent  = totOrig.toFixed(1);
+document.getElementById('s-opt').textContent   = totOpt.toFixed(1);
+document.getElementById('s-saved').textContent = (totOrig-totOpt).toFixed(1);
+document.getElementById('s-ratio').textContent = Math.round((1-totOpt/totOrig)*100)+'%';
+
+const grid = document.getElementById('grid');
+const scenes = []; // for animation loop
+
+function countMesh(scene){
+  let verts=0, tris=0, mats=new Set(), hasTex=false;
+  scene.traverse(c=>{
+    if(c.isMesh){
+      const g=c.geometry;
+      if(g.attributes.position) verts+=g.attributes.position.count;
+      if(g.index) tris+=g.index.count/3; else if(g.attributes.position) tris+=g.attributes.position.count/3;
+      if(c.material){ [].concat(c.material).forEach(m=>{ mats.add(m.uuid); if(m.map) hasTex=true; }); }
+    }
+  });
+  return { verts:Math.round(verts), tris:Math.round(tris), mats:mats.size, hasTex };
+}
+
+function makeScene(canvas){
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.physicallyCorrectLights = true;
+  const w=canvas.clientWidth, h=canvas.clientHeight;
+  renderer.setSize(w,h,false);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x020208);
+  const camera = new THREE.PerspectiveCamera(45, w/h, 0.01, 5000);
+  camera.position.set(0,0,5);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  const dir = new THREE.DirectionalLight(0x00ffff, 1.2);
+  dir.position.set(5,8,5);
+  const fill = new THREE.DirectionalLight(0xff00ff, 0.4);
+  fill.position.set(-5,-3,-5);
+  scene.add(ambient, dir, fill);
+
+  return { renderer, scene, camera, pivot:null };
+}
+
+function fitCamera(sc, object){
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  sc.camera.position.set(center.x, center.y, center.z + maxDim * 1.8);
+  sc.camera.lookAt(center);
+  const pivot = new THREE.Object3D();
+  pivot.position.copy(center);
+  sc.scene.add(pivot);
+  object.position.sub(center);
+  pivot.add(object);
+  sc.pivot = pivot;
+}
+
+function buildCard(m){
+  const row = document.createElement('div');
+  row.className = 'model-row';
+  row.id = 'row-'+m.key;
+  row.innerHTML = `
+    <div class="model-header">
+      <div class="model-name">${m.file.replace('.glb','')}</div>
+      <div style="font-size:11px;color:var(--txm);margin-right:12px;">
+        ${m.origMB}MB &rarr; <span style="color:var(--ng)">${m.optMB}MB</span>
+        &nbsp;<span style="color:var(--np)">-${Math.round((1-m.optMB/m.origMB)*100)}%</span>
+      </div>
+      <div class="status-badge badge-loading" id="badge-${m.key}">Loading</div>
+    </div>
+    <div class="canvases">
+      <div class="canvas-wrap">
+        <div class="canvas-label label-orig">Original</div>
+        <canvas id="orig-${m.key}"></canvas>
+      </div>
+      <div class="canvas-wrap">
+        <div class="canvas-label label-opt">Optimised</div>
+        <canvas id="opt-${m.key}"></canvas>
+      </div>
+    </div>
+    <div class="stats-row" id="stats-${m.key}">
+      <div class="stat-box"><div style="color:var(--txm);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Original</div><div id="orig-stats-${m.key}">Loading...</div></div>
+      <div class="stat-box"><div style="color:var(--txm);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Optimised</div><div id="opt-stats-${m.key}">Loading...</div></div>
+    </div>
+    <div class="err-msg" id="err-${m.key}" style="display:none"></div>`;
+  grid.appendChild(row);
+}
+
+function renderStats(el, info, isBetter){
+  el.innerHTML = `
+    <div class="stat-line"><span class="stat-key">Vertices</span><span class="stat-val ${isBetter?'good':''}">${info.verts.toLocaleString()}</span></div>
+    <div class="stat-line"><span class="stat-key">Triangles</span><span class="stat-val ${isBetter?'good':''}">${info.tris.toLocaleString()}</span></div>
+    <div class="stat-line"><span class="stat-key">Materials</span><span class="stat-val">${info.mats}</span></div>
+    <div class="stat-line"><span class="stat-key">Textures</span><span class="stat-val ${info.hasTex?'good':'warn'}">${info.hasTex?'Yes':'None'}</span></div>`;
+}
+
+async function loadModel(path){
+  return new Promise((resolve,reject)=>{
+    const t0=performance.now();
+    new THREE.GLTFLoader().load(path, gltf=>resolve({scene:gltf.scene, ms:performance.now()-t0}),
+      null, err=>reject(err));
+  });
+}
+
+async function testModel(m){
+  buildCard(m);
+  const badge = document.getElementById('badge-'+m.key);
+  const row   = document.getElementById('row-'+m.key);
+  const errEl = document.getElementById('err-'+m.key);
+
+  try {
+    const [orig, opt] = await Promise.all([
+      loadModel(`assets/models/${m.file}`),
+      loadModel(`assets/models/optimized/${m.file}`)
+    ]);
+
+    const origInfo = countMesh(orig.scene);
+    const optInfo  = countMesh(opt.scene);
+
+    renderStats(document.getElementById('orig-stats-'+m.key), origInfo, false);
+    renderStats(document.getElementById('opt-stats-'+m.key),  optInfo,  true);
+
+    // Check visual parity — textures, materials, geometry presence
+    const pass = optInfo.verts > 0 && optInfo.tris > 0 &&
+                 optInfo.mats === origInfo.mats &&
+                 optInfo.hasTex === origInfo.hasTex;
+
+    row.className = 'model-row ' + (pass?'pass':'fail');
+    badge.className = 'status-badge ' + (pass?'badge-pass':'badge-fail');
+    badge.textContent = pass ? '✓ PASS' : '✗ CHECK';
+
+    // Set up side-by-side rendering
+    for(const [canvasId, gltfScene] of [
+      ['orig-'+m.key, orig.scene],
+      ['opt-'+m.key,  opt.scene]
+    ]){
+      const canvas = document.getElementById(canvasId);
+      const sc = makeScene(canvas);
+      fitCamera(sc, gltfScene);
+      sc.scene.add(gltfScene);
+      scenes.push(sc);
+    }
+
+  } catch(err){
+    badge.className = 'status-badge badge-fail';
+    badge.textContent = '✗ ERROR';
+    row.className = 'model-row fail';
+    errEl.style.display = 'block';
+    errEl.textContent = 'Load error: ' + (err.message || err);
+    console.error(m.file, err);
+  }
+}
+
+// Animate all scenes
+let frame = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  frame++;
+  scenes.forEach(sc=>{
+    if(sc.pivot) sc.pivot.rotation.y = frame * 0.008;
+    sc.renderer.render(sc.scene, sc.camera);
+  });
+}
+animate();
+
+// Load all models (sequentially to not overwhelm bandwidth)
+(async()=>{
+  for(const m of MODELS) await testModel(m);
+})();
+</script>
+</body>
+</html>

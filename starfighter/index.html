@@ -5,6 +5,11 @@
   <meta charset="UTF-8">
   <title>Starfighter Simulator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script>
+    if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
+      window.location.replace('/lobby/');
+    }
+  </script>
   <style>
     * {
       margin: 0;
@@ -123,6 +128,64 @@
       border-right-width: 2px
     }
 
+    /* ── Crosshair TRACKING state — amber ── */
+    #crosshair.tracking .ring {
+      border-color: rgba(255, 180, 50, 0.8)
+    }
+
+    #crosshair.tracking .dot {
+      background: rgba(255, 180, 50, 0.9)
+    }
+
+    #crosshair.tracking .h-line,
+    #crosshair.tracking .v-line {
+      background: rgba(255, 180, 50, 0.5)
+    }
+
+    #crosshair.tracking .bracket {
+      border-color: rgba(255, 180, 50, 0.7)
+    }
+
+    /* ── Crosshair LOCKED state — red, pulsing ── */
+    #crosshair.locked .ring {
+      border-color: rgba(255, 50, 50, 0.9);
+      animation: lockPulse 0.6s ease-in-out infinite
+    }
+
+    #crosshair.locked .dot {
+      background: rgba(255, 50, 50, 1.0)
+    }
+
+    #crosshair.locked .h-line,
+    #crosshair.locked .v-line {
+      background: rgba(255, 50, 50, 0.6)
+    }
+
+    #crosshair.locked .bracket {
+      border-color: rgba(255, 50, 50, 0.8)
+    }
+
+    @keyframes lockPulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.5
+      }
+    }
+
+    /* ── Backstory section visibility ── */
+    #panel-backstory {
+      display: none
+    }
+
+    #controls-panel.show-backstory #panel-backstory {
+      display: block
+    }
+
     /* ═══════════════════════════════════════
        COMM MARQUEE — very top of screen, above cockpit
        ═══════════════════════════════════════ */
@@ -196,81 +259,115 @@
     }
 
     /* ═══════════════════════════════════════
-       EXPANDABLE CONTROLS PANEL — left side
+       CONTROLLER WIREFRAME OVERLAY — bottom-right
        ═══════════════════════════════════════ */
-    #controls-toggle {
+    #ctrl-overlay {
       position: absolute;
-      top: 50%;
-      left: 0;
-      transform: translateY(-50%);
+      bottom: 16px;
+      right: 16px;
       z-index: 25;
-      width: 24px;
-      height: 80px;
-      background: rgba(2, 8, 18, 0.7);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-left: none;
-      border-radius: 0 6px 6px 0;
-      cursor: pointer;
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #0ff;
-      font-size: 14px;
-      transition: background 0.2s
+      pointer-events: none;
+      opacity: 0.55;
+      transition: opacity 0.3s;
+      display: none
     }
 
-    #controls-toggle:hover {
+    #ctrl-overlay:hover {
+      opacity: 0.9
+    }
+
+    #ctrl-overlay svg {
+      display: block;
+      pointer-events: auto
+    }
+
+    #ctrl-overlay .ctrl-label {
+      font-family: 'Courier New', monospace;
+      font-size: 7px;
+      fill: #0ff;
+      dominant-baseline: middle;
+      text-anchor: middle
+    }
+
+    #ctrl-overlay .ctrl-label-action {
+      font-family: 'Courier New', monospace;
+      font-size: 6px;
+      fill: #ff8;
+      dominant-baseline: middle;
+      text-anchor: start
+    }
+
+    #ctrl-overlay .ctrl-wire {
+      fill: none;
+      stroke: rgba(0, 255, 255, 0.4);
+      stroke-width: 1
+    }
+
+    #ctrl-overlay .ctrl-wire-fill {
+      fill: rgba(0, 255, 255, 0.06);
+      stroke: rgba(0, 255, 255, 0.5);
+      stroke-width: 0.8
+    }
+
+    #ctrl-overlay .ctrl-btn-wire {
+      fill: rgba(0, 255, 255, 0.08);
+      stroke: rgba(0, 255, 255, 0.5);
+      stroke-width: 0.6
+    }
+
+    #ctrl-overlay .ctrl-dot {
+      fill: rgba(0, 255, 255, 0.3)
+    }
+
+    /* Mobile hamburger toggle */
+    #ctrl-hamburger {
+      display: none;
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      z-index: 26;
+      width: 36px;
+      height: 36px;
+      background: rgba(2, 8, 18, 0.85);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      pointer-events: auto;
+      color: #0ff;
+      font-size: 20px;
+      align-items: center;
+      justify-content: center;
+      line-height: 36px;
+      text-align: center
+    }
+
+    #ctrl-hamburger:hover {
       background: rgba(0, 40, 80, 0.8)
     }
 
+    @media(max-width:768px) {
+      #ctrl-overlay {
+        display: none !important;
+        bottom: 60px;
+        right: 10px
+      }
+
+      #ctrl-overlay.mobile-open {
+        display: block !important
+      }
+
+      #ctrl-hamburger {
+        display: flex
+      }
+    }
+
+    /* Keep old panel toggle/panel hidden — replaced by overlay */
+    #controls-toggle {
+      display: none
+    }
+
     #controls-panel {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      transform: translateY(-50%) translateX(-100%);
-      z-index: 24;
-      width: 220px;
-      background: rgba(2, 8, 18, 0.92);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-left: none;
-      border-radius: 0 8px 8px 0;
-      padding: 12px 14px;
-      pointer-events: auto;
-      transition: transform 0.3s ease;
-      backdrop-filter: blur(6px)
-    }
-
-    #controls-panel.open {
-      transform: translateY(-50%) translateX(0)
-    }
-
-    #controls-panel h3 {
-      font-size: 11px;
-      color: #fff;
-      margin-bottom: 8px;
-      letter-spacing: 2px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.15);
-      padding-bottom: 6px
-    }
-
-    #controls-panel ul {
-      list-style: none;
-      font-size: 10px;
-      line-height: 1.8
-    }
-
-    #controls-panel kbd {
-      background: rgba(255, 255, 255, 0.08);
-      padding: 1px 4px;
-      border-radius: 2px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #fff;
-      font-size: 9px
-    }
-
-    #controls-panel li {
-      color: #8cf
+      display: none
     }
 
     /* ═══════════════════════════════════════
@@ -380,9 +477,11 @@
        RESPONSIVE — phone collapse
        ═══════════════════════════════════════ */
     @media(max-width:600px) {
-      #controls-panel {
-        width: 180px;
-        font-size: 9px
+      #radar-overlay {
+        width: 120px;
+        height: 120px;
+        bottom: 10px;
+        left: 10px
       }
     }
 
@@ -495,6 +594,7 @@
       display: none !important
     }
   </style>
+  <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -553,6 +653,21 @@
       <span class="hud-label">WAVE</span>
       <span id="ghud-wave" class="hud-val">1</span>
     </div>
+    <div class="hud-row hud-score-row">
+      <span class="hud-label">BOOST</span>
+      <div class="hud-bar-track">
+        <div id="ghud-boost-bar" class="hud-bar-fill fuel" style="width:0%"></div>
+      </div>
+      <span id="ghud-boost" class="hud-val">RDY</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">FA</span>
+      <span id="ghud-fa" class="hud-val" style="color:#00ff88">ON</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">MODE</span>
+      <span id="ghud-speed-mode" class="hud-val">CRUISE</span>
+    </div>
   </div>
 
   <!-- ═══ RADAR OVERLAY — bottom-left ═══ -->
@@ -567,35 +682,194 @@
     </div>
   </div>
 
-  <!-- ═══ EXPANDABLE CONTROLS PANEL (left side) ═══ -->
-  <div id="controls-toggle"
-    onclick="document.getElementById('controls-panel').classList.toggle('open');this.innerText=document.getElementById('controls-panel').classList.contains('open')?'◀':'▶'">
-    ▶</div>
-  <div id="controls-panel">
+  <!-- ═══ CONTROLLER WIREFRAME OVERLAY — bottom-right ═══ -->
+  <div id="ctrl-hamburger" onclick="document.getElementById('ctrl-overlay').classList.toggle('mobile-open')">☰</div>
+  <div id="ctrl-overlay">
+    <!-- KEYBOARD + MOUSE wireframe (default) -->
+    <svg id="ctrl-kb" width="220" height="140" viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+      <!-- Mouse body -->
+      <rect x="150" y="8" width="40" height="60" rx="12" class="ctrl-wire-fill" />
+      <line x1="170" y1="8" x2="170" y2="32" stroke="rgba(0,255,255,0.4)" stroke-width="0.5" />
+      <circle cx="163" cy="18" r="7" class="ctrl-btn-wire" />
+      <circle cx="177" cy="18" r="7" class="ctrl-btn-wire" />
+      <rect x="167" y="30" width="6" height="10" rx="3" class="ctrl-btn-wire" />
+      <text x="163" y="19" class="ctrl-label">L</text>
+      <text x="177" y="19" class="ctrl-label">R</text>
+      <text x="192" y="16" class="ctrl-label-action">FIRE</text>
+      <text x="192" y="24" class="ctrl-label-action">TORP</text>
+      <text x="170" y="54" class="ctrl-label" font-size="5">AIM</text>
+      <!-- Keyboard section -->
+      <rect x="6" y="6" width="130" height="66" rx="4" class="ctrl-wire-fill" />
+      <!-- WASD cluster -->
+      <rect x="32" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="40" y="23" class="ctrl-label">W</text>
+      <rect x="14" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="22" y="41" class="ctrl-label">A</text>
+      <rect x="32" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="40" y="41" class="ctrl-label">S</text>
+      <rect x="50" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="58" y="41" class="ctrl-label">D</text>
+      <!-- QE -->
+      <rect x="14" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="22" y="23" class="ctrl-label">Q</text>
+      <rect x="50" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="58" y="23" class="ctrl-label">E</text>
+      <!-- Shift -->
+      <rect x="14" y="50" width="30" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="29" y="59" class="ctrl-label" font-size="5">SHIFT</text>
+      <!-- F V T -->
+      <rect x="70" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="78" y="23" class="ctrl-label">F</text>
+      <rect x="70" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="78" y="41" class="ctrl-label">V</text>
+      <rect x="88" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="96" y="23" class="ctrl-label">T</text>
+      <!-- Space -->
+      <rect x="50" y="50" width="56" height="14" rx="2" class="ctrl-btn-wire" />
+      <text x="78" y="59" class="ctrl-label" font-size="5">SPACE</text>
+      <!-- Labels -->
+      <text x="4" y="82" class="ctrl-label-action">W/S = Throttle</text>
+      <text x="4" y="91" class="ctrl-label-action">A/D = Strafe</text>
+      <text x="4" y="100" class="ctrl-label-action">Q/E = Roll</text>
+      <text x="4" y="109" class="ctrl-label-action">SHIFT = Afterburner</text>
+      <text x="4" y="118" class="ctrl-label-action">F = Boost V = FA</text>
+      <text x="4" y="127" class="ctrl-label-action">T = Lock SPACE = Fire</text>
+      <text x="4" y="136" class="ctrl-label-action">Tab = Toggle This</text>
+    </svg>
+    <!-- GAMEPAD wireframe -->
+    <svg id="ctrl-gp" width="220" height="140" viewBox="0 0 220 140" style="display:none"
+      xmlns="http://www.w3.org/2000/svg">
+      <!-- Controller body -->
+      <path
+        d="M50,30 Q60,15 110,15 Q160,15 170,30 Q185,65 175,90 Q168,105 155,100 Q145,95 130,85 L90,85 Q75,95 65,100 Q52,105 45,90 Q35,65 50,30Z"
+        class="ctrl-wire-fill" />
+      <!-- Left stick -->
+      <circle cx="80" cy="52" r="12" class="ctrl-btn-wire" />
+      <circle cx="80" cy="52" r="3" class="ctrl-dot" />
+      <text x="80" y="74" class="ctrl-label" font-size="5">THROTTLE</text>
+      <text x="80" y="80" class="ctrl-label" font-size="5">STRAFE</text>
+      <!-- Right stick -->
+      <circle cx="140" cy="65" r="12" class="ctrl-btn-wire" />
+      <circle cx="140" cy="65" r="3" class="ctrl-dot" />
+      <text x="140" y="84" class="ctrl-label" font-size="5">PITCH</text>
+      <text x="140" y="90" class="ctrl-label" font-size="5">YAW</text>
+      <!-- ABXY buttons -->
+      <circle cx="155" cy="42" r="6" class="ctrl-btn-wire" />
+      <text x="155" y="43" class="ctrl-label">Y</text>
+      <circle cx="167" cy="52" r="6" class="ctrl-btn-wire" />
+      <text x="167" y="53" class="ctrl-label">B</text>
+      <circle cx="155" cy="62" r="6" class="ctrl-btn-wire" />
+      <text x="155" y="63" class="ctrl-label">A</text>
+      <circle cx="143" cy="42" r="6" class="ctrl-btn-wire" style="display:none" />
+      <!-- D-pad -->
+      <rect x="62" y="32" width="7" height="7" rx="1" class="ctrl-btn-wire" />
+      <rect x="55" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
+      <rect x="62" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
+      <rect x="69" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
+      <rect x="62" y="46" width="7" height="7" rx="1" class="ctrl-btn-wire" />
+      <!-- Bumpers/Triggers -->
+      <rect x="55" y="18" width="25" height="8" rx="3" class="ctrl-btn-wire" />
+      <text x="67" y="24" class="ctrl-label" font-size="5">LB</text>
+      <rect x="140" y="18" width="25" height="8" rx="3" class="ctrl-btn-wire" />
+      <text x="152" y="24" class="ctrl-label" font-size="5">RB</text>
+      <rect x="55" y="10" width="25" height="7" rx="3" class="ctrl-btn-wire" />
+      <text x="67" y="15" class="ctrl-label" font-size="5">LT</text>
+      <rect x="140" y="10" width="25" height="7" rx="3" class="ctrl-btn-wire" />
+      <text x="152" y="15" class="ctrl-label" font-size="5">RT</text>
+      <!-- Labels -->
+      <text x="4" y="102" class="ctrl-label-action">LB/RB = Roll</text>
+      <text x="4" y="111" class="ctrl-label-action">RT = Fire LT = Torpedo</text>
+      <text x="4" y="120" class="ctrl-label-action">A = Afterburner B = Boost</text>
+      <text x="4" y="129" class="ctrl-label-action">X = Flight Assist Y = Lock</text>
+    </svg>
+    <!-- TOUCH wireframe (phone/tablet) -->
+    <svg id="ctrl-touch" width="180" height="100" viewBox="0 0 180 100" style="display:none"
+      xmlns="http://www.w3.org/2000/svg">
+      <!-- Phone body -->
+      <rect x="10" y="5" width="160" height="90" rx="10" class="ctrl-wire-fill" />
+      <rect x="16" y="10" width="148" height="75" rx="4"
+        style="fill:rgba(0,0,0,0.3);stroke:rgba(0,255,255,0.3);stroke-width:0.5" />
+      <!-- Left zone -->
+      <circle cx="50" cy="55" r="18" class="ctrl-btn-wire" style="stroke-dasharray:3,2" />
+      <text x="50" y="50" class="ctrl-label" font-size="5">THROTTLE</text>
+      <text x="50" y="58" class="ctrl-label" font-size="5">STRAFE</text>
+      <!-- Right zone -->
+      <circle cx="130" cy="55" r="18" class="ctrl-btn-wire" style="stroke-dasharray:3,2" />
+      <text x="130" y="50" class="ctrl-label" font-size="5">PITCH</text>
+      <text x="130" y="58" class="ctrl-label" font-size="5">YAW</text>
+      <!-- Action buttons -->
+      <circle cx="150" cy="25" r="8" class="ctrl-btn-wire" />
+      <text x="150" y="26" class="ctrl-label" font-size="5">FIRE</text>
+      <circle cx="130" cy="25" r="8" class="ctrl-btn-wire" />
+      <text x="130" y="26" class="ctrl-label" font-size="5">TORP</text>
+    </svg>
+  </div>
+
+  <!-- Keep old panel div for JS compatibility (hidden) -->
+  <div id="controls-toggle" style="display:none">▶</div>
+  <div id="controls-panel" style="display:none">
+    <div id="input-device-status"
+      style="margin-bottom:8px;padding:4px 6px;background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.2);border-radius:3px;font-size:11px;color:#0ff">
+      DEVICE: <span id="detected-device">KEYBOARD + MOUSE</span>
+    </div>
+    <h3>LIVE INPUT</h3>
+    <div id="live-input-values" style="font-size:11px;line-height:1.6;margin-bottom:8px;font-family:monospace">
+      <div>Throttle: <span id="live-throttle" style="color:#0f0">0.00</span></div>
+      <div>Pitch: <span id="live-pitch" style="color:#0f0">0.00</span></div>
+      <div>Yaw: <span id="live-yaw" style="color:#0f0">0.00</span></div>
+      <div>Roll: <span id="live-roll" style="color:#0f0">0.00</span></div>
+      <div>Strafe H: <span id="live-strafe-h" style="color:#0f0">0.00</span></div>
+      <div>Strafe V: <span id="live-strafe-v" style="color:#0f0">0.00</span></div>
+      <div>Speed: <span id="live-speed" style="color:#0f0">0</span> m/s</div>
+      <div>Afterburn: <span id="live-afterburner" style="color:#f80">OFF</span></div>
+      <div>FA: <span id="live-fa" style="color:#0ff">ON</span></div>
+    </div>
+
+    <!-- ═══ BACKSTORY SECTION — only visible in launch bay ═══ -->
+    <div id="panel-backstory">
+      <h3>MISSION BRIEFING</h3>
+      <div style="font-size:10px;color:#8cf;line-height:1.7;margin-bottom:10px">
+        <div style="color:#ff8800;font-weight:bold;margin-bottom:4px">YEAR 2387 — EARTH ORBIT</div>
+        <p style="margin-bottom:6px">An alien force — <span style="color:#f0f">HIVE SIGMA</span> — emerged from deep
+          space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate. They don't
+          negotiate. <span style="color:#f44">They consume.</span></p>
+        <p style="margin-bottom:6px">You fly a <span style="color:#0ff">UEDF Mk-IV Starfighter</span> — twin laser
+          cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the <span style="color:#48f">UEDF
+            Battleship Resolute</span> — Earth's last heavy carrier.</p>
+        <p style="color:#ff4;font-weight:bold">If the Resolute falls, the orbital defense line collapses. Protect her at
+          all costs.</p>
+      </div>
+    </div>
+
     <h3>FLIGHT CONTROLS</h3>
     <ul>
       <li><kbd>Mouse</kbd> Pitch / Yaw</li>
-      <li><kbd>W</kbd> Forward Thrust</li>
-      <li><kbd>S</kbd> Reverse Thrust</li>
-      <li><kbd>A</kbd> Bank Left</li>
-      <li><kbd>D</kbd> Bank Right</li>
+      <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
+      <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
       <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
-      <li><kbd>Shift</kbd> Turbo</li>
-      <li><kbd>L-Click</kbd> Lasers</li>
+      <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
+      <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
+      <li><kbd>V</kbd> Flight Assist ON/OFF</li>
+      <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
       <li><kbd>R-Click</kbd> Torpedo</li>
       <li><kbd>T</kbd> Lock Target</li>
-      <li><kbd>H</kbd> Toggle This Panel</li>
+      <li><kbd>Tab</kbd> Toggle This Panel</li>
     </ul>
     <h3 style="margin-top:8px">GAMEPAD</h3>
     <ul>
-      <li><kbd>L-Stick</kbd> Pitch / Yaw</li>
-      <li><kbd>R-Stick</kbd> Roll</li>
-      <li><kbd>RT/LT</kbd> Throttle</li>
-      <li><kbd>A</kbd> Laser</li>
-      <li><kbd>X</kbd> Torpedo</li>
+      <li><kbd>R-Stick</kbd> Pitch / Yaw</li>
+      <li><kbd>L-Stick</kbd> Throttle / Strafe</li>
+      <li><kbd>LB/RB</kbd> Roll</li>
+      <li><kbd>RT</kbd> Lasers</li>
+      <li><kbd>LT</kbd> Torpedo</li>
+      <li><kbd>A</kbd> Afterburner</li>
+      <li><kbd>B</kbd> Boost</li>
+      <li><kbd>X</kbd> Flight Assist</li>
       <li><kbd>Y</kbd> Lock Target</li>
-      <li><kbd>LB</kbd> Turbo</li>
     </ul>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:9px;color:#668">
+      Press <kbd>Tab</kbd> to close
+    </div>
   </div>
 
   <!-- Ship panel: hidden container for JS compat -->
@@ -650,7 +924,60 @@
     </div>
   </div>
 
+  <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
+  <div id="loading-screen"
+    style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
+    <div
+      style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
+    </div>
+    <div id="loading-text"
+      style="color:#0ff;font-family:'Courier New',monospace;margin-top:24px;font-size:14px;letter-spacing:2px">
+      INITIALIZING MANIFOLD...</div>
+    <div id="loading-progress"
+      style="width:220px;height:4px;background:rgba(0,255,255,0.1);margin-top:16px;border-radius:2px;overflow:hidden">
+      <div id="loading-bar" style="width:0%;height:100%;background:#0ff;transition:width 0.3s ease;border-radius:2px">
+      </div>
+    </div>
+  </div>
+  <style>
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg)
+      }
+
+      100% {
+        transform: rotate(360deg)
+      }
+    }
+  </style>
+
+  <!-- Respawn overlay -->
+  <div id="respawn-screen"
+    style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(20,0,0,0.7);z-index:90;pointer-events:none;flex-direction:column;justify-content:center;align-items:center">
+    <div style="color:#ff4444;font-family:'Courier New',monospace;font-size:2.5em;text-shadow:0 0 20px #f00">FIGHTER
+      DOWN</div>
+    <div id="respawn-timer"
+      style="color:#ffff00;font-family:'Courier New',monospace;font-size:4em;margin-top:20px;text-shadow:0 0 30px #ff0">
+      5</div>
+    <div style="color:#0ff;font-family:'Courier New',monospace;font-size:1.2em;margin-top:16px">Scrambling
+      replacement...</div>
+  </div>
+
+  <!-- Victory overlay -->
+  <div id="victory-screen"
+    style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,10,20,0.85);z-index:100;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto">
+    <div style="color:#00ff88;font-family:'Courier New',monospace;font-size:3em;text-shadow:0 0 30px #0f8">VICTORY</div>
+    <div id="victory-reason" style="color:#0ff;font-family:'Courier New',monospace;font-size:1.3em;margin-top:16px">
+      Enemy Base Station Destroyed</div>
+    <div id="victory-score" style="color:#fff;font-family:'Courier New',monospace;font-size:1.5em;margin-top:24px">
+    </div>
+    <button onclick="location.reload()"
+      style="margin-top:30px;padding:10px 20px;font-size:16px;background:#00aa66;color:#fff;border:none;cursor:pointer;border-radius:5px;pointer-events:auto">PLAY
+      AGAIN</button>
+  </div>
+
   <!-- Manifold Architecture -->
+  <script src="../../js/manifold.js"></script>
   <script src="../../js/substrates/manifold_ingestor.js"></script>
   <script src="manifold.js"></script>
 
@@ -659,6 +986,7 @@
   <script src="../../lib/three/GLTFLoader.js"></script>
 
   <!-- Game Logic -->
+  <script src="audio.js"></script>
   <script src="core.js"></script>
   <script src="input.js"></script>
   <script src="3d.js"></script>

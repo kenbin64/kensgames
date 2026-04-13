@@ -395,7 +395,7 @@ class SmartPeg {
                     const ftPath = ftReentryResult.path;
                     if (ftPath.length >= 3) {
                         const prevHole = ftPath[ftPath.length - 2];
-                        if (prevHole.startsWith('ft-') && prevHole !== ownFtHole && !this._ownPegInCenter()) {
+                        if (prevHole.startsWith('ft-') && !this._ownPegInCenter()) {
                             const alreadyCenter = destinations.some(d => d.isCenterOption);
                             if (!alreadyCenter) {
                                 destinations.push({
@@ -411,7 +411,8 @@ class SmartPeg {
                     }
                 }
                 // Direct bullseye (1-hop card at current ft-* with re-entry)
-                if (canEnterBullseye && hops === 1 && this.peg.holeId !== ownFtHole
+                // Center is position zero — any ft-* hole qualifies.
+                if (canEnterBullseye && hops === 1
                     && !this._ownPegInCenter() && !destinations.some(d => d.isCenterOption)) {
                     destinations.push({
                         holeId: 'center',
@@ -459,13 +460,11 @@ class SmartPeg {
         }
 
         // OPTION: FastTrack peg with 1-hop card → bullseye
-        // RULE: A peg on FastTrack can enter bullseye with a 1-step card from any ft-* hole
-        // EXCEPT their own color's FastTrack hole (ft-{boardPos}). Moving to center
-        // from your own FT entry point is considered a backwards move.
+        // RULE: A peg on ANY ft-* hole on FastTrack can enter bullseye with a 1-step card.
+        // Center is position zero — it is never "in front of" another peg.
         // Cards with movement=1: A, Joker, J, Q, K.
         // GUARD: Pegs that have exited bullseye before can NEVER re-enter.
-        if (canEnterBullseye && this.peg.onFasttrack && isOnFtHole && hops === 1
-            && this.peg.holeId !== ownFtHole) {
+        if (canEnterBullseye && this.peg.onFasttrack && isOnFtHole && hops === 1) {
             if (!this._ownPegInCenter()) {
                 const already = destinations.some(d => d.isCenterOption);
                 if (!already) {
@@ -479,8 +478,6 @@ class SmartPeg {
                     console.log(`🎯 [SmartPeg] Offering bullseye option - FT peg at ${this.peg.holeId} with 1-step card`);
                 }
             }
-        } else if (this.peg.onFasttrack && this.peg.holeId === ownFtHole && hops === 1) {
-            console.log(`🚫 [SmartPeg] Bullseye blocked - peg is on own FT hole ${ownFtHole} (backwards move)`);
         } else if (!canEnterBullseye && this.peg.onFasttrack && isOnFtHole && hops === 1) {
             console.log(`🚫 [SmartPeg] Bullseye blocked - peg has previously exited bullseye (no re-entry)`);
         }
@@ -510,10 +507,9 @@ class SmartPeg {
         const prevHole = path[path.length - 2];
 
         // On FastTrack, 1 step past any ft-* → bullseye option
-        // RULE: Bullseye is reachable from any ft-* hole EXCEPT the player's own
-        // color FT hole (ft-{boardPos}). From own hole, bullseye is backwards.
+        // RULE: Bullseye is reachable from ANY ft-* hole. Center is position zero.
         const ownFtHole = `ft-${this.boardPos}`;
-        if (this.peg.onFasttrack && prevHole.startsWith('ft-') && prevHole !== ownFtHole) {
+        if (this.peg.onFasttrack && prevHole.startsWith('ft-')) {
             if (!this._ownPegInCenter()) {
                 destinations.push({
                     holeId: 'center',
@@ -526,12 +522,12 @@ class SmartPeg {
         }
 
         // On perimeter, passing through ft-* with 1 step remaining → bullseye option
-        // Same restriction: cannot enter bullseye via own color FT hole
+        // Any ft-* as penultimate hop qualifies — center is position zero.
         if (!this.peg.onFasttrack) {
             for (let i = 0; i < path.length - 1; i++) {
                 if (path[i].startsWith('ft-')) {
                     const stepsAfterFt = path.length - 1 - i;
-                    if (stepsAfterFt === 1 && path[i] !== ownFtHole && !this._ownPegInCenter()) {
+                    if (stepsAfterFt === 1 && !this._ownPegInCenter()) {
                         destinations.push({
                             holeId: 'center',
                             steps: hops,
@@ -851,47 +847,47 @@ window.SmartPegManager = SmartPegManager;
             setTimeout(checkAndIntegrate, 100);
             return;
         }
-        
+
         console.log('⚔️ [SmartPeg] Integrating with PegSubstrate for gladiator personalities...');
-        
+
         // Extend SmartPegManager with substrate integration
         const manager = window.smartPegManager;
-        
+
         // Enhanced move recording with capture detection
         const originalRecordMove = manager.recordMove.bind(manager);
-        manager.recordMove = function(player, peg, move, card) {
+        manager.recordMove = function (player, peg, move, card) {
             const result = originalRecordMove(player, peg, move, card);
-            
+
             // If this is a capture move, trigger gladiator combat
             if (move.capturedPeg || move.isCapture) {
                 const capturerPegId = peg.id;
                 const victimPegId = move.capturedPeg?.id || move.capturedPegId;
                 const captureHole = move.toHoleId || move.to;
-                
+
                 if (victimPegId) {
                     // Ensure both pegs exist in substrate
                     if (!PegSubstrate.getPeg(capturerPegId)) {
                         PegSubstrate.createPegEntity(capturerPegId, player.index, player.color, peg.holeId);
                     }
-                    
+
                     // Execute gladiator capture
                     PegSubstrate.executeCapture(capturerPegId, victimPegId, captureHole);
                 }
             }
-            
+
             return result;
         };
-        
+
         // Hook into destination calculation for capture preference
         const originalCalculateDestinations = manager.calculateDestinations.bind(manager);
-        manager.calculateDestinations = function(peg, card, player) {
+        manager.calculateDestinations = function (peg, card, player) {
             const destinations = originalCalculateDestinations(peg, card, player);
-            
+
             // Ensure peg exists in substrate
             if (!PegSubstrate.getPeg(peg.id)) {
                 PegSubstrate.createPegEntity(peg.id, player.index, player.color, peg.holeId);
             }
-            
+
             // Sort destinations - captures first if peg has gladiator bloodlust
             if (PegSubstrate.wantsToCapture(peg.id)) {
                 destinations.sort((a, b) => {
@@ -900,12 +896,12 @@ window.SmartPegManager = SmartPegManager;
                     return bCapture - aCapture;  // Captures first
                 });
             }
-            
+
             return destinations;
         };
-        
+
         // Add method to get peg personality info
-        manager.getPegPersonality = function(pegId) {
+        manager.getPegPersonality = function (pegId) {
             const peg = PegSubstrate.getPeg(pegId);
             if (!peg) return null;
             return {
@@ -917,21 +913,21 @@ window.SmartPegManager = SmartPegManager;
                 captured: peg.capturedCount
             };
         };
-        
+
         // Add gladiator leaderboard
-        manager.getGladiatorLeaderboard = function() {
+        manager.getGladiatorLeaderboard = function () {
             return PegSubstrate.getCaptureLeaderboard();
         };
-        
+
         // Add method to get capture event for UI display
-        manager.getLastCaptureEvent = function() {
+        manager.getLastCaptureEvent = function () {
             const log = PegSubstrate.getManifoldLog({ type: 'CAPTURE', limit: 1 });
             return log.length > 0 ? log[0].data : null;
         };
-        
+
         console.log('⚔️ [SmartPeg] Gladiator integration complete! Pegs now have personalities.');
     };
-    
+
     // Start integration check
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', checkAndIntegrate);

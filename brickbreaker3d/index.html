@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BrickBreaker 3D - Manifold Audio Edition</title>
+    <script>
+        if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
+            window.location.replace('/lobby/');
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -135,6 +140,7 @@
             text-shadow: 0 0 5px #39ff14;
         }
     </style>
+  <script src="/js/analytics.js"></script>
 </head>
 
 <body>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,100 +9,302 @@
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    :root{ --accent:#00FF41; --gaccent:0 0 8px #00FF41,0 0 24px #00FF41; }
-    body{ display:flex;flex-direction:column;min-height:100vh; }
-    .lobby-wrap{ flex:1;display:flex;flex-direction:column;align-items:center;padding:40px 20px; }
+    :root {
+      --accent: #00FF41;
+      --gaccent: 0 0 8px #00FF41, 0 0 24px #00FF41;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .lobby-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
 
     /* Cabinet art */
-    .cabinet{
-      width:220px;margin:0 auto 32px;
-      display:flex;flex-direction:column;align-items:center;
-      animation:fadeUp .5s ease;
+    .cabinet {
+      width: 220px;
+      margin: 0 auto 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: fadeUp .5s ease;
     }
-    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-    .cab-top{
-      width:160px;height:14px;background:var(--accent);
-      box-shadow:var(--gaccent);border-radius:4px 4px 0 0;
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
     }
-    .cab-body{
-      width:180px;background:rgba(4,20,4,.96);
-      border:2px solid var(--accent);box-shadow:var(--gaccent),inset 0 0 30px rgba(0,255,65,.06);
-      border-radius:0 0 8px 8px;padding:20px 16px;text-align:center;
+
+    .cab-top {
+      width: 160px;
+      height: 14px;
+      background: var(--accent);
+      box-shadow: var(--gaccent);
+      border-radius: 4px 4px 0 0;
     }
-    .cab-screen{
-      width:100%;height:90px;background:#020c02;
-      border:2px solid rgba(0,255,65,.4);border-radius:4px;
-      display:flex;align-items:center;justify-content:center;
-      font-size:42px;margin-bottom:12px;
-      box-shadow:inset 0 0 20px rgba(0,255,65,.15);
+
+    .cab-body {
+      width: 180px;
+      background: rgba(4, 20, 4, .96);
+      border: 2px solid var(--accent);
+      box-shadow: var(--gaccent), inset 0 0 30px rgba(0, 255, 65, .06);
+      border-radius: 0 0 8px 8px;
+      padding: 20px 16px;
+      text-align: center;
     }
-    .cab-label{
-      font-family:var(--fa);font-size:9px;letter-spacing:3px;
-      color:var(--accent);text-shadow:var(--gaccent);text-transform:uppercase;
+
+    .cab-screen {
+      width: 100%;
+      height: 90px;
+      background: #020c02;
+      border: 2px solid rgba(0, 255, 65, .4);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      margin-bottom: 12px;
+      box-shadow: inset 0 0 20px rgba(0, 255, 65, .15);
     }
-    .cab-buttons{display:flex;gap:6px;justify-content:center;margin-top:10px;}
-    .cab-btn{
-      width:12px;height:12px;border-radius:50%;
-      background:var(--ny);box-shadow:0 0 6px var(--ny);
+
+    .cab-label {
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-shadow: var(--gaccent);
+      text-transform: uppercase;
     }
-    .cab-btn:nth-child(2){background:var(--np);box-shadow:0 0 6px var(--np);}
-    .cab-btn:nth-child(3){background:var(--nc);box-shadow:0 0 6px var(--nc);}
+
+    .cab-buttons {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .cab-btn {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--ny);
+      box-shadow: 0 0 6px var(--ny);
+    }
+
+    .cab-btn:nth-child(2) {
+      background: var(--np);
+      box-shadow: 0 0 6px var(--np);
+    }
+
+    .cab-btn:nth-child(3) {
+      background: var(--nc);
+      box-shadow: 0 0 6px var(--nc);
+    }
 
     /* Player card */
-    .player-card{
-      display:flex;align-items:center;gap:14px;
-      background:rgba(0,255,65,.05);border:1px solid rgba(0,255,65,.2);
-      border-radius:4px;padding:12px 18px;margin-bottom:28px;
-      width:100%;max-width:520px;
+    .player-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0, 255, 65, .05);
+      border: 1px solid rgba(0, 255, 65, .2);
+      border-radius: 4px;
+      padding: 12px 18px;
+      margin-bottom: 28px;
+      width: 100%;
+      max-width: 520px;
     }
-    .player-name{font-family:var(--fa);font-size:13px;color:var(--accent);text-shadow:var(--gaccent);}
-    .player-meta{font-size:11px;color:var(--txm);}
-    .online-count{
-      margin-left:auto;text-align:right;
-      font-family:var(--fa);font-size:10px;color:var(--accent);letter-spacing:1px;
+
+    .player-name {
+      font-family: var(--fa);
+      font-size: 13px;
+      color: var(--accent);
+      text-shadow: var(--gaccent);
     }
-    .online-dot{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:var(--gaccent);margin-right:5px;animation:pulse 1.5s ease infinite;}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+    .player-meta {
+      font-size: 11px;
+      color: var(--txm);
+    }
+
+    .online-count {
+      margin-left: auto;
+      text-align: right;
+      font-family: var(--fa);
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    .online-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: var(--gaccent);
+      margin-right: 5px;
+      animation: pulse 1.5s ease infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
 
     /* Mode cards */
-    .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;width:100%;max-width:740px;margin-bottom:32px;}
-    .mode-card{
-      background:rgba(4,20,4,.9);border:2px solid rgba(0,255,65,.25);
-      border-radius:6px;padding:28px 22px;text-align:center;
-      cursor:pointer;transition:all .25s;
+    .modes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 740px;
+      margin-bottom: 32px;
     }
-    .mode-card:hover{border-color:var(--accent);box-shadow:var(--gaccent),inset 0 0 20px rgba(0,255,65,.06);transform:translateY(-6px);}
-    .mode-icon{font-size:44px;margin-bottom:14px;display:block;filter:drop-shadow(0 0 8px currentColor);}
-    .mode-title{font-family:var(--fa);font-size:14px;font-weight:900;color:var(--accent);text-shadow:var(--gaccent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-    .mode-desc{font-size:12px;color:var(--txm);line-height:1.7;margin-bottom:18px;}
-    .mode-avail{font-family:var(--fa);font-size:9px;letter-spacing:2px;color:var(--ng);text-transform:uppercase;}
-    .mode-avail.locked{color:var(--np);}
+
+    .mode-card {
+      background: rgba(4, 20, 4, .9);
+      border: 2px solid rgba(0, 255, 65, .25);
+      border-radius: 6px;
+      padding: 28px 22px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .25s;
+    }
+
+    .mode-card:hover {
+      border-color: var(--accent);
+      box-shadow: var(--gaccent), inset 0 0 20px rgba(0, 255, 65, .06);
+      transform: translateY(-6px);
+    }
+
+    .mode-icon {
+      font-size: 44px;
+      margin-bottom: 14px;
+      display: block;
+      filter: drop-shadow(0 0 8px currentColor);
+    }
+
+    .mode-title {
+      font-family: var(--fa);
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--accent);
+      text-shadow: var(--gaccent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .mode-desc {
+      font-size: 12px;
+      color: var(--txm);
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }
+
+    .mode-avail {
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--ng);
+      text-transform: uppercase;
+    }
+
+    .mode-avail.locked {
+      color: var(--np);
+    }
 
     /* Private panel */
-    .private-panel{
-      display:none;width:100%;max-width:520px;
-      background:rgba(4,20,4,.9);border:2px solid rgba(0,255,65,.3);
-      border-radius:6px;padding:28px;
+    .private-panel {
+      display: none;
+      width: 100%;
+      max-width: 520px;
+      background: rgba(4, 20, 4, .9);
+      border: 2px solid rgba(0, 255, 65, .3);
+      border-radius: 6px;
+      padding: 28px;
     }
-    .private-panel.open{display:block;animation:fadeUp .3s ease;}
-    .priv-tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid rgba(0,255,65,.2);}
-    .priv-tab{
-      font-family:var(--fa);font-size:10px;letter-spacing:2px;
-      padding:8px 16px;background:none;border:none;
-      color:var(--txm);cursor:pointer;text-transform:uppercase;
-      border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;
+
+    .private-panel.open {
+      display: block;
+      animation: fadeUp .3s ease;
     }
-    .priv-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-    .code-display{
-      font-family:var(--fa);font-size:36px;letter-spacing:8px;
-      color:var(--accent);text-shadow:var(--gaccent);
-      text-align:center;padding:20px;
-      background:rgba(0,255,65,.05);border:1px solid rgba(0,255,65,.2);
-      border-radius:4px;margin-bottom:14px;cursor:pointer;
+
+    .priv-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 22px;
+      border-bottom: 2px solid rgba(0, 255, 65, .2);
     }
-    .code-hint{font-size:11px;color:var(--txm);text-align:center;margin-bottom:16px;}
+
+    .priv-tab {
+      font-family: var(--fa);
+      font-size: 10px;
+      letter-spacing: 2px;
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      color: var(--txm);
+      cursor: pointer;
+      text-transform: uppercase;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all .2s;
+    }
+
+    .priv-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .code-display {
+      font-family: var(--fa);
+      font-size: 36px;
+      letter-spacing: 8px;
+      color: var(--accent);
+      text-shadow: var(--gaccent);
+      text-align: center;
+      padding: 20px;
+      background: rgba(0, 255, 65, .05);
+      border: 1px solid rgba(0, 255, 65, .2);
+      border-radius: 4px;
+      margin-bottom: 14px;
+      cursor: pointer;
+    }
+
+    .code-hint {
+      font-size: 11px;
+      color: var(--txm);
+      text-align: center;
+      margin-bottom: 16px;
+    }
   </style>
+  <script src="/js/analytics.js"></script>
 </head>
+
 <body>
   <div id="tron-grid"></div>
   <div id="scanlines"></div>
@@ -125,7 +328,11 @@
       <div class="cab-body">
         <div class="cab-screen">&#9646;&#9646;&#9644;&#9645;&#9646;&#9646;</div>
         <div class="cab-label">FastTrack</div>
-        <div class="cab-buttons"><div class="cab-btn"></div><div class="cab-btn"></div><div class="cab-btn"></div></div>
+        <div class="cab-buttons">
+          <div class="cab-btn"></div>
+          <div class="cab-btn"></div>
+          <div class="cab-btn"></div>
+        </div>
       </div>
     </div>
 
@@ -137,8 +344,7 @@
         <div class="player-meta">Strategy Board Game &bull; 2&ndash;4 Players</div>
       </div>
       <div class="online-count">
-        <div><span class="online-dot"></span><span id="online-num">--</span> online</div>
-        <div style="font-size:9px;color:var(--txm);margin-top:3px;">Ready to play</div>
+        <div><span class="online-dot"></span>Ready to play</div>
       </div>
     </div>
 
@@ -159,7 +365,8 @@
       <div class="mode-card" onclick="togglePrivate()">
         <span class="mode-icon" style="color:#FFE800">&#128273;</span>
         <div class="mode-title">Private Game</div>
-        <div class="mode-desc">Create a room and share the code. Friends join from anywhere &mdash; no account needed.</div>
+        <div class="mode-desc">Create a room and share the code. Friends join from anywhere &mdash; no account needed.
+        </div>
         <div class="mode-avail">No login to join</div>
       </div>
     </div>
@@ -173,13 +380,16 @@
       <div id="priv-create">
         <div class="code-display" id="room-code" onclick="copyCode()">------</div>
         <div class="code-hint">Click code to copy &bull; Share with friends to join</div>
-        <button class="btn btn-y btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH GAME</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required to create a private room</div>
+        <button class="btn btn-y btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
+          GAME</button>
+        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
+          to create a private room</div>
       </div>
       <div id="priv-join" style="display:none">
         <div class="arc-field">
           <label>Room Code</label>
-          <input class="arc-input" id="join-code" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
+          <input class="arc-input" id="join-code" placeholder="ABC123" maxlength="6"
+            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
         </div>
         <div class="arc-field">
           <label>Your Name (guests)</label>
@@ -193,9 +403,9 @@
 
   <script src="/js/substrates/avatar_picker.js"></script>
   <script>
-    const token    = localStorage.getItem('user_token');
+    const token = localStorage.getItem('user_token');
     const username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
-    const av       = AvatarPicker.get();
+    const av = AvatarPicker.get();
 
     // Avatar badge
     document.getElementById('p-name').textContent = username;
@@ -209,11 +419,7 @@
       AvatarPicker.show(() => location.reload(), true);
     }
 
-    // Simulate online count
-    function updateOnline() {
-      document.getElementById('online-num').textContent = 8 + Math.floor(Math.random() * 24);
-    }
-    updateOnline(); setInterval(updateOnline, 8000);
+    // Online count removed — will be driven by real analytics
 
     // Matchmaker availability
     if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding match...';
@@ -236,15 +442,15 @@
     }
 
     function privTab(tab) {
-      document.querySelectorAll('.priv-tab').forEach((t,i) => t.classList.toggle('active',['create','join'][i]===tab));
-      document.getElementById('priv-create').style.display = tab==='create' ? 'block' : 'none';
-      document.getElementById('priv-join').style.display   = tab==='join'   ? 'block' : 'none';
+      document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab));
+      document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none';
+      document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none';
     }
 
     let _code = '';
     function generateCode() {
       if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
-      _code = Math.random().toString(36).substring(2,8).toUpperCase();
+      _code = Math.random().toString(36).substring(2, 8).toUpperCase();
       document.getElementById('room-code').textContent = _code;
       document.getElementById('launch-btn').disabled = false;
       document.getElementById('priv-status').textContent = 'Share code with friends. You start the game.';
@@ -262,7 +468,7 @@
     function joinPrivate() {
       const code = document.getElementById('join-code').value.trim().toUpperCase();
       const name = document.getElementById('guest-name').value.trim() || 'Guest';
-      const msg  = document.getElementById('join-msg');
+      const msg = document.getElementById('join-msg');
       if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
       if (!localStorage.getItem('user_token')) {
         localStorage.setItem('username', name);
@@ -273,4 +479,5 @@
     }
   </script>
 </body>
+
 </html>

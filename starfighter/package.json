@@ -1,7 +1,6 @@
 {
   "name": "starfighter",
   "version": "1.0.0",
-  "description": "",
   "main": "3d.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,6 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.3.0",
     "meshoptimizer": "^1.1.0"
-  }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "description": ""
 }

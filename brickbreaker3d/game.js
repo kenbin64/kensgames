@@ -270,7 +270,7 @@ function setupPlayers() {
     const numPlayers = isMulti ? parseInt(gameMode.slice(5)) : 1;
     const numBalls = isMulti ? numPlayers : 1; // solo = 1 ball at a time
     const baseSpeed = isMulti ? SPEED_MULTI : (gameMode === 'easy' ? SPEED_EASY : SPEED_HARD);
-    const lives = 1; // 1 ball/life per player
+    const lives = isMulti ? 1 : (gameMode === 'easy' ? 5 : 3);
 
     // Create players
     for (let i = 0; i < numPlayers; i++) {
@@ -316,9 +316,11 @@ function setupPlayers() {
 }
 
 function spawnBall(ownerIdx, baseSpeed, isMulti) {
-    const color = 0xcccccc; // All balls start colorless
+    // In multiplayer each player owns their ball from the start
+    const color = isMulti ? PLAYER_COLORS[ownerIdx] : 0xcccccc;
     const geo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
     const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.8, roughness: 0.2 });
+    if (isMulti) { mat.emissive = new THREE.Color(PLAYER_COLORS[ownerIdx]); mat.emissiveIntensity = 0.5; }
     const b = new THREE.Mesh(geo, mat);
     b.castShadow = true;
     b.receiveShadow = true;
@@ -328,12 +330,18 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     const vz = Math.cos(angle) * baseSpeed * 0.4;
     b.velocity = new THREE.Vector3(vx, baseSpeed, vz);
 
-    // Spawn randomly near the center instead of near a specific player, since they are colorless
-    const offset = new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
-    b.position.set(0, -10, 0).add(offset);
+    // Spawn near owner's paddle position (or center for solo)
+    if (isMulti) {
+        const startPositions = [[0, 0], [-10, -10], [10, 10], [-10, 10]];
+        const sp = startPositions[ownerIdx] || [0, 0];
+        b.position.set(sp[0] + (Math.random() - 0.5) * 4, -10, sp[1] + (Math.random() - 0.5) * 4);
+    } else {
+        const offset = new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
+        b.position.set(0, -10, 0).add(offset);
+    }
 
-    b.belongsTo = -1;            // no owner initially
-    b.lastTouchedBy = ownerIdx;  // kept for scoring credit if it somehow hits a brick before a paddle
+    b.belongsTo = isMulti ? ownerIdx : -1;
+    b.lastTouchedBy = ownerIdx;
     b.owner = ownerIdx;          // kept for AI compatibility
     b.alive = true;
     b.baseSpeed = baseSpeed;
@@ -728,35 +736,31 @@ function animate() {
 
             // Ball fell through
             if (!deflected && b.position.y < (-HALF_H - 1)) {
-                const victimIdx = isMulti ? b.belongsTo : 0;
+                if (isMulti) {
+                    // Multiplayer: ball is permanently gone — not replaced
+                    b.alive = false;
+                    b.visible = false;
+                    scene.remove(b);
 
-                if (isMulti && victimIdx === -1) {
-                    // Colorless ball fell — just respawn it in the center area
-                    b.position.set((Math.random() - 0.5) * 10, -10, (Math.random() - 0.5) * 10);
-                    const angle = Math.random() * Math.PI * 2;
-                    b.velocity.set(Math.sin(angle) * b.baseSpeed * 0.6, b.baseSpeed, Math.cos(angle) * b.baseSpeed * 0.4);
+                    // Check if all balls are gone → game over, highest score wins
+                    const aliveBalls = balls.filter(bl => bl.alive);
+                    if (aliveBalls.length === 0) {
+                        let best = players[0];
+                        for (let p of players) if (p.score > best.score) best = p;
+                        endGame(`All balls lost! Player ${best.id + 1} wins with ${best.score} pts!`);
+                    }
                 } else {
-                    // It belongs to a player. They lose points and the ball resets to colorless.
-                    // This implements the zero-sum energy transfer optimal manifold behavior.
-                    players[victimIdx].score = Math.max(0, players[victimIdx].score - 500);
-
-                    if (isMulti) {
-                        // Reset ball to colorless instead of removing it
-                        b.belongsTo = -1;
-                        b.lastTouchedBy = -1;
-                        b.material.color.setHex(0xcccccc);
-                        b.material.emissiveIntensity = 0;
-
-                        // Respawn
-                        b.position.set((Math.random() - 0.5) * 10, -10, (Math.random() - 0.5) * 10);
-                        const angle = Math.random() * Math.PI * 2;
-                        b.velocity.set(Math.sin(angle) * b.baseSpeed * 0.6, b.baseSpeed, Math.cos(angle) * b.baseSpeed * 0.4);
+                    // Solo play: standard life loss
+                    players[0].lives--;
+                    b.alive = false;
+                    b.visible = false;
+                    scene.remove(b);
+                    if (players[0].lives <= 0) {
+                        endGame('Game Over');
                     } else {
-                        // Solo play: standard life loss
-                        players[0].lives--;
-                        b.alive = false;
-                        b.visible = false;
-                        if (players[0].lives <= 0) endGame('Game Over');
+                        // Respawn a new ball
+                        const spd = gameMode === 'easy' ? SPEED_EASY : SPEED_HARD;
+                        spawnBall(0, spd, false);
                     }
                 }
             }
@@ -902,10 +906,12 @@ function updateHUD() {
     const isMulti = gameMode.startsWith('multi');
 
     if (isMulti) {
+        const aliveBalls = balls.filter(b => b.alive).length;
+        const totalBalls = players.length;
         hud.innerHTML = players.map((p, i) => {
             const colorHex = '#' + PLAYER_COLORS[i].toString(16).padStart(6, '0');
             return `<div style="color:${colorHex}">${i === 0 ? 'YOU' : `P${i + 1}`}: ${p.score}</div>`;
-        }).join('');
+        }).join('') + `<div style="color:#aaa;margin-top:4px">Balls: ${aliveBalls}/${totalBalls}</div>`;
     } else {
         const p = players[0];
         hud.innerHTML =

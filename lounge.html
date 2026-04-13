@@ -368,6 +368,7 @@
             }
         }
     </style>
+  <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -378,7 +379,7 @@
         <a href="/" class="logo">⟳ MANIFOLD</a>
         <div class="nav-links">
             <a href="/">🎮 Home</a>
-            <a href="/kensgames.com/lounge.html">🎭 Lounge</a>
+            <a href="/lobby/">🎲 Game Portal</a>
             <a href="#" onclick="handleLogout()">🚪 Logout</a>
         </div>
     </nav>
@@ -391,7 +392,7 @@
             <p class="lounge-subtitle">Matchmade Multiplayer Gaming</p>
             <div class="online-status">
                 <div class="online-dot"></div>
-                <span id="online-players">0 players online</span>
+                <span>Multiplayer Ready</span>
             </div>
         </section>
 
@@ -500,8 +501,6 @@
                 title: 'FastTrack v2.1.0',
                 icon: '🏎️',
                 desc: 'Classic racing. 2-4 players, 45 min.',
-                players: Math.floor(Math.random() * 100) + 20,
-                lobbies: Math.floor(Math.random() * 5) + 2,
                 category: 'fastpaced'
             },
             {
@@ -509,8 +508,6 @@
                 title: 'FastTrack 5 Card Draw',
                 icon: '🎲',
                 desc: 'Quick variant. 2-4 players, 15 min.',
-                players: Math.floor(Math.random() * 80) + 15,
-                lobbies: Math.floor(Math.random() * 4) + 1,
                 category: 'fastpaced'
             },
             {
@@ -518,8 +515,6 @@
                 title: 'BrickBreaker3D Arena',
                 icon: '🎯',
                 desc: 'Competitive. 1-4 players, 25 min.',
-                players: Math.floor(Math.random() * 120) + 30,
-                lobbies: Math.floor(Math.random() * 6) + 3,
                 category: 'competitive'
             }
         ];
@@ -537,16 +532,7 @@
                     <p class="game-desc">${game.desc}</p>
                     <div class="lobby-stats">
                         <div class="stat">
-                            <span class="stat-value">${game.players}</span>
-                            <span class="stat-label">Playing</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value">${game.lobbies}</span>
-                            <span class="stat-label">Lobbies</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value">🌟</span>
-                            <span class="stat-label">Hot</span>
+                            <span class="stat-value">${game.desc}</span>
                         </div>
                     </div>
                     <button class="btn" onclick="joinLobby('${game.id}', '${game.title}')">
@@ -556,9 +542,7 @@
                 grid.appendChild(card);
             });
 
-            // Update online count
-            const totalOnline = games.reduce((sum, g) => sum + g.players, 0);
-            document.getElementById('online-players').textContent = `${totalOnline} players online`;
+            // Online count — driven by real analytics when available
         }
 
         function filterGames(category) {

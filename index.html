@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="/lib/fonts/fonts.css">
 
     <style>
+        /* ═══════════════════════════════════════════════════════════
+           KensGames — Tron / 80s Arcade Landing Page
+           ═══════════════════════════════════════════════════════════ */
         :root {
             --neon-cyan: #00FFFF;
             --neon-pink: #FF00FF;
@@ -45,34 +48,96 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, #0a0a1a 50%, var(--bg-dark) 100%);
+            background: var(--bg-dark);
             color: var(--text);
             line-height: 1.6;
         }
 
+        /* ── Gyroid background canvas ── */
+        #gyroid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.18;
+            pointer-events: none;
+        }
+
+        /* ── Tron grid overlay ── */
+        #tron-grid {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* ── CRT scanlines ── */
         #scanlines {
             position: fixed;
             inset: 0;
             z-index: 1;
             pointer-events: none;
-            background: repeating-linear-gradient(0deg,
-                    transparent,
-                    transparent 3px,
-                    rgba(0, 0, 0, 0.04) 3px,
-                    rgba(0, 0, 0, 0.04) 4px);
+            background: repeating-linear-gradient(0deg, transparent, transparent 3px,
+                    rgba(0, 0, 0, 0.06) 3px, rgba(0, 0, 0, 0.06) 4px);
         }
 
-        body>* {
+        /* ── Floating arcade symbols ── */
+        .arcade-symbols {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .sym {
+            position: absolute;
+            bottom: -40px;
+            opacity: 0.07;
+            animation: sym-float linear infinite;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        @keyframes sym-float {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 0.07;
+            }
+
+            90% {
+                opacity: 0.07;
+            }
+
+            100% {
+                transform: translateY(-110vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* All content above overlays */
+        body>*:not(#gyroid-bg):not(#tron-grid):not(#scanlines):not(.arcade-symbols):not(.modal-overlay) {
             position: relative;
             z-index: 2;
         }
 
+        /* ══════════════════════════════════════
+           HEADER / NAV
+           ══════════════════════════════════════ */
         header {
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
+            background: rgba(4, 4, 20, 0.92);
+            backdrop-filter: blur(12px);
             border-bottom: 2px solid var(--neon-cyan);
-            box-shadow: var(--glow-cyan);
-            padding: 20px 40px;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4), 0 2px 30px rgba(0, 255, 255, 0.15);
+            padding: 14px 40px;
             position: sticky;
             top: 0;
             z-index: 100;
@@ -88,349 +153,324 @@
         }
 
         .logo {
-            font-size: 32px;
-            font-weight: bold;
+            font-family: var(--font-arcade);
+            font-size: 26px;
+            font-weight: 900;
             color: var(--neon-cyan);
             text-shadow: var(--glow-cyan);
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            white-space: nowrap;
         }
 
-        .nav-buttons {
+        .logo span {
+            color: var(--neon-pink);
+            text-shadow: var(--glow-pink);
+        }
+
+        .nav-links {
             display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            list-style: none;
+            gap: 6px;
         }
 
+        .nav-links li a {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            transition: all 0.25s;
+        }
+
+        .nav-links li a:hover {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 8px var(--neon-cyan);
+            background: rgba(0, 255, 255, 0.06);
+        }
+
+        .nav-auth {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* ── Buttons ── */
         button {
-            padding: 10px 20px;
-            border: 2px solid var(--neon-cyan);
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 14px;
+            font-family: var(--font-arcade);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.25s;
             text-transform: uppercase;
             letter-spacing: 1px;
+            border: none;
+            border-radius: 3px;
         }
 
         .btn-login {
+            padding: 8px 20px;
+            font-size: 11px;
             background: var(--neon-cyan);
             color: var(--bg-dark);
-            box-shadow: var(--glow-cyan);
+            font-weight: 900;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
         }
 
         .btn-login:hover {
             transform: scale(1.05);
-            box-shadow: var(--glow-cyan), 0 0 20px var(--neon-cyan);
-        }
-
-        .btn-guest {
-            background: transparent;
-            color: var(--neon-cyan);
-            border-color: var(--neon-cyan);
-            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
-        }
-
-        .btn-guest:hover {
-            background: rgba(0, 255, 255, 0.1);
             box-shadow: var(--glow-cyan);
-            transform: scale(1.05);
         }
 
-        .hero {
-            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
-            border-bottom: 2px solid var(--neon-pink);
-            padding: 80px 40px;
-            text-align: center;
-            box-shadow: inset 0 0 40px rgba(255, 0, 255, 0.1);
-        }
-
-        .hero-content {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        .hero h1 {
-            font-size: 64px;
-            margin-bottom: 20px;
-            color: var(--neon-cyan);
-            text-shadow: var(--glow-cyan), var(--glow-pink);
+        .btn-register {
+            padding: 8px 20px;
+            font-size: 11px;
+            background: var(--neon-pink);
+            color: #fff;
             font-weight: 900;
-            letter-spacing: -1px;
-            text-transform: uppercase;
+            box-shadow: 0 0 12px rgba(255, 0, 255, 0.4);
         }
 
-        .hero p {
-            font-size: 18px;
+        .btn-register:hover {
+            transform: scale(1.05);
+            box-shadow: var(--glow-pink);
+        }
+
+        .btn-ghost {
+            padding: 8px 18px;
+            font-size: 11px;
+            background: transparent;
             color: var(--text-muted);
-            margin-bottom: 30px;
-            line-height: 1.8;
+            border: 1px solid rgba(136, 136, 170, 0.3);
         }
 
-        .hero-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 40px;
-        }
-
-        .btn-large {
-            padding: 15px 40px;
-            font-size: 16px;
-            border-radius: 6px;
-        }
-
-        .btn-play {
-            background: var(--neon-yellow);
-            color: var(--bg-dark);
-            border-color: var(--neon-yellow);
-            box-shadow: var(--glow-yellow);
-        }
-
-        .btn-play:hover {
-            transform: scale(1.1);
-            box-shadow: var(--glow-yellow), 0 0 30px var(--neon-yellow);
-        }
-
-        .games-section {
-            max-width: 1400px;
-            margin: 100px auto;
-            padding: 0 40px;
-        }
-
-        .section-title {
-            font-size: 48px;
-            margin-bottom: 60px;
-            text-align: center;
+        .btn-ghost:hover {
             color: var(--neon-cyan);
-            text-shadow: var(--glow-cyan);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .games-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 40px;
-            margin-bottom: 60px;
-        }
-
-        .game-card {
-            background: var(--bg-card);
-            border: 2px solid var(--neon-pink);
-            border-radius: 8px;
-            overflow: hidden;
-            transition: all 0.3s;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            box-shadow: inset 0 0 20px rgba(255, 0, 255, 0.1);
-        }
-
-        .game-card:hover {
             border-color: var(--neon-cyan);
-            box-shadow: var(--glow-cyan), inset 0 0 20px rgba(0, 255, 255, 0.2);
-            transform: translateY(-10px);
         }
 
-        .game-image {
-            width: 100%;
-            height: 280px;
-            background: linear-gradient(135deg, #1a1a3a 0%, #0a0a2a 100%);
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            border-bottom: 2px solid var(--neon-pink);
-        }
-
-        .game-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .game-info {
-            padding: 30px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .game-title {
-            font-size: 28px;
-            margin-bottom: 12px;
-            color: var(--neon-yellow);
-            text-shadow: var(--glow-yellow);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .game-description {
-            color: var(--text-muted);
-            font-size: 14px;
-            line-height: 1.7;
-            margin-bottom: 20px;
-        }
-
-        .game-button {
-            align-self: flex-start;
-            padding: 10px 20px;
+        .btn-green {
+            padding: 10px 24px;
+            font-size: 12px;
             background: transparent;
             color: var(--neon-green);
             border: 2px solid var(--neon-green);
             font-weight: 700;
-            border-radius: 4px;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.2);
-            transition: all 0.3s;
+            box-shadow: inset 0 0 12px rgba(0, 255, 65, 0.15);
         }
 
-        .game-button:hover {
+        .btn-green:hover {
             background: var(--neon-green);
             color: var(--bg-dark);
-            transform: translateX(5px);
-            box-shadow: var(--glow-cyan);
+            box-shadow: var(--glow-green);
+            transform: translateX(4px);
         }
 
-        .manifold-section {
-            background: var(--bg-card);
-            border: 2px solid var(--neon-purple);
-            border-radius: 8px;
-            padding: 60px 40px;
-            margin: 100px 40px;
-            max-width: 1400px;
-            margin-left: auto;
-            margin-right: auto;
-            box-shadow: inset 0 0 40px rgba(153, 0, 255, 0.1), var(--glow-pink);
+        .btn-play {
+            padding: 14px 40px;
+            font-size: 14px;
+            font-weight: 900;
+            background: var(--neon-yellow);
+            color: var(--bg-dark);
+            box-shadow: 0 0 16px rgba(255, 232, 0, 0.5);
         }
 
-        .manifold-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 60px;
-            align-items: center;
+        .btn-play:hover {
+            transform: scale(1.08);
+            box-shadow: var(--glow-yellow);
         }
 
-        .manifold-text h2 {
-            font-size: 40px;
+        /* ══════════════════════════════════════
+           HERO
+           ══════════════════════════════════════ */
+        .hero {
+            text-align: center;
+            padding: 80px 40px 60px;
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(0, 255, 255, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 100%, rgba(255, 0, 255, 0.04) 0%, transparent 50%);
+            border-bottom: 2px solid rgba(255, 0, 255, 0.3);
+        }
+
+        .hero-eyebrow {
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            letter-spacing: 4px;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 10px rgba(255, 232, 0, 0.6);
             margin-bottom: 20px;
-            color: var(--neon-purple);
-            text-shadow: var(--glow-pink);
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            animation: blink-slow 2.5s ease-in-out infinite alternate;
         }
 
-        .manifold-text p {
+        @keyframes blink-slow {
+            0% {
+                opacity: 1
+            }
+
+            100% {
+                opacity: 0.4
+            }
+        }
+
+        .hero h1 {
+            font-family: var(--font-arcade);
+            font-size: 72px;
+            font-weight: 900;
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan), 0 0 80px rgba(0, 255, 255, 0.3);
+            letter-spacing: 6px;
+            margin-bottom: 8px;
+        }
+
+        .hero h1 .accent {
+            color: var(--neon-pink);
+            text-shadow: var(--glow-pink), 0 0 80px rgba(255, 0, 255, 0.3);
+        }
+
+        .hero-sub {
+            font-family: var(--font-arcade);
+            font-size: 13px;
+            letter-spacing: 3px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .hero p {
+            max-width: 700px;
+            margin: 0 auto 30px;
             font-size: 16px;
             color: var(--text-muted);
-            margin-bottom: 20px;
             line-height: 1.8;
         }
 
-        .manifold-features {
-            list-style: none;
-            margin-top: 20px;
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
         }
 
-        .manifold-features li {
-            padding: 12px 0;
-            padding-left: 30px;
-            position: relative;
-            color: var(--text-muted);
-            font-size: 14px;
-            border-left: 2px solid var(--neon-cyan);
-            margin-bottom: 10px;
+        .hero-note {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(136, 136, 170, 0.6);
         }
 
-        .manifold-features li:before {
-            content: "✓";
-            position: absolute;
-            left: -12px;
-            color: var(--neon-cyan);
-            font-weight: bold;
-            font-size: 18px;
+        /* ══════════════════════════════════════
+           BENCHMARKS STRIP
+           ══════════════════════════════════════ */
+        .benchmarks {
+            background: rgba(0, 255, 255, 0.03);
+            border-top: 1px solid rgba(0, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 28px 40px;
+            overflow: hidden;
         }
 
-        .manifold-diagram {
-            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(153, 0, 255, 0.05) 100%);
-            border: 2px dashed var(--neon-cyan);
-            border-radius: 8px;
-            padding: 40px;
+        .benchmarks-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .bench-item {
             text-align: center;
-            min-height: 300px;
+            min-width: 100px;
+        }
+
+        .bench-value {
+            display: block;
+            font-family: var(--font-arcade);
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+            line-height: 1.2;
+        }
+
+        .bench-label {
+            display: block;
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* ══════════════════════════════════════
+           SECTION SCAFFOLDING
+           ══════════════════════════════════════ */
+        .page-section {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 80px 40px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .section-eyebrow {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 4px;
+            color: var(--neon-pink);
+            text-shadow: 0 0 8px rgba(255, 0, 255, 0.5);
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-family: var(--font-arcade);
+            font-size: 36px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        /* ══════════════════════════════════════
+           GAME CARDS
+           ══════════════════════════════════════ */
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .game-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 0, 255, 0.25);
+            border-radius: 6px;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1);
+            transition: all 0.3s;
+            animation: slideIn 0.5s ease both;
         }
 
-        .manifold-diagram-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-            filter: drop-shadow(0 0 10px var(--neon-cyan));
+        .game-card:nth-child(1) {
+            animation-delay: 0.05s;
         }
 
-        .manifold-diagram p {
-            color: var(--neon-cyan);
-            font-weight: 700;
-            margin: 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .game-card:nth-child(2) {
+            animation-delay: 0.15s;
         }
 
-        .manifold-diagram p:last-child {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-transform: none;
-            letter-spacing: normal;
+        .game-card:nth-child(3) {
+            animation-delay: 0.25s;
         }
 
-        footer {
-            background: var(--bg-card);
-            border-top: 2px solid var(--neon-cyan);
-            box-shadow: var(--glow-cyan);
-            padding: 40px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-top: 100px;
-        }
-
-        footer p {
-            margin-bottom: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 40px;
-            }
-
-            .games-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .manifold-content {
-                grid-template-columns: 1fr;
-                gap: 40px;
-            }
-
-            nav {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .section-title {
-                font-size: 32px;
-            }
+        .game-card:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.25), inset 0 0 20px rgba(0, 255, 255, 0.05);
+            transform: translateY(-6px);
         }
 
         @keyframes slideIn {
@@ -445,23 +485,666 @@
             }
         }
 
-        .game-card {
-            animation: slideIn 0.6s ease;
-            animation-fill-mode: both;
+        .game-image {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-bottom: 1px solid rgba(255, 0, 255, 0.2);
         }
 
-        .game-card:nth-child(1) {
-            animation-delay: 0.1s;
+        .game-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
-        .game-card:nth-child(2) {
-            animation-delay: 0.2s;
+        .img-placeholder {
+            text-align: center;
         }
 
-        .game-card:nth-child(3) {
-            animation-delay: 0.3s;
+        .ph-icon {
+            font-size: 24px;
+            letter-spacing: 4px;
+            opacity: 0.5;
+        }
+
+        .ph-text {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            letter-spacing: 2px;
+        }
+
+        .game-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            text-shadow: 0 0 6px var(--neon-green);
+        }
+
+        .game-info {
+            padding: 24px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .game-title {
+            font-family: var(--font-arcade);
+            font-size: 18px;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 8px rgba(255, 232, 0, 0.4);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .game-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .game-tag {
+            font-family: var(--font-arcade);
+            font-size: 8px;
+            letter-spacing: 1px;
+            padding: 3px 8px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .game-description {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-top: 10px;
+        }
+
+        /* ══════════════════════════════════════
+           ENGINE SECTION
+           ══════════════════════════════════════ */
+        .engine-section {
+            background:
+                linear-gradient(135deg, rgba(153, 0, 255, 0.04) 0%, rgba(0, 255, 255, 0.04) 100%);
+            border-top: 1px solid rgba(153, 0, 255, 0.2);
+            border-bottom: 1px solid rgba(153, 0, 255, 0.2);
+            padding: 80px 40px;
+        }
+
+        .engine-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 60px;
+            align-items: start;
+        }
+
+        .engine-text h2 {
+            font-family: var(--font-arcade);
+            font-size: 32px;
+            color: var(--neon-purple);
+            text-shadow: 0 0 12px rgba(153, 0, 255, 0.5);
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .engine-text p {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.9;
+            margin-bottom: 16px;
+        }
+
+        .engine-features {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .engine-features li {
+            padding: 10px 0 10px 20px;
+            border-left: 2px solid var(--neon-cyan);
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 8px;
+        }
+
+        .engine-features li strong {
+            color: var(--neon-cyan);
+        }
+
+        .engine-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .engine-stat {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: var(--bg-card);
+            border-left: 3px solid var(--neon-cyan);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .engine-stat-icon {
+            font-size: 18px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 6px var(--neon-cyan);
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .engine-stat-label {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .engine-stat-value {
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            color: var(--neon-cyan);
+            margin-left: auto;
+            text-align: right;
+        }
+
+        /* ══════════════════════════════════════
+           COMING SOON
+           ══════════════════════════════════════ */
+        .upcoming-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+        }
+
+        .upcoming-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 0, 255, 0.15);
+            border-radius: 6px;
+            padding: 28px;
+            transition: all 0.3s;
+        }
+
+        .upcoming-card:hover {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 16px rgba(255, 0, 255, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .upcoming-title {
+            font-family: var(--font-arcade);
+            font-size: 15px;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 6px rgba(255, 232, 0, 0.3);
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .upcoming-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 14px;
+        }
+
+        .upcoming-eta {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            color: var(--neon-pink);
+            letter-spacing: 1px;
+        }
+
+        /* ══════════════════════════════════════
+           AUTH MODAL
+           ══════════════════════════════════════ */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 8px;
+            box-shadow: var(--glow-cyan), 0 0 60px rgba(0, 255, 255, 0.15);
+            padding: 36px;
+            width: 90%;
+            max-width: 440px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 20px;
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            padding: 4px 8px;
+        }
+
+        .modal-close:hover {
+            color: var(--neon-cyan);
+        }
+
+        .modal-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            padding-bottom: 12px;
+        }
+
+        .modal-tab {
+            font-size: 10px;
+            padding: 6px 14px;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 3px;
+        }
+
+        .modal-tab.active {
+            color: var(--neon-cyan);
+            border-color: rgba(0, 255, 255, 0.3);
+            background: rgba(0, 255, 255, 0.06);
+        }
+
+        .modal-tab:hover {
+            color: var(--neon-cyan);
+        }
+
+        .modal-panel {
+            display: none;
+        }
+
+        .modal-panel.active {
+            display: block;
+        }
+
+        .modal-panel h3 {
+            font-family: var(--font-arcade);
+            font-size: 18px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+            margin-bottom: 6px;
+        }
+
+        .modal-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.25s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+        }
+
+        .form-submit {
+            width: 100%;
+            padding: 12px;
+            font-size: 12px;
+            font-weight: 900;
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+            margin-top: 8px;
+        }
+
+        .form-submit:hover {
+            box-shadow: var(--glow-cyan);
+            transform: scale(1.02);
+        }
+
+        .form-msg {
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            text-align: center;
+            margin-top: 12px;
+            color: var(--text-muted);
+            min-height: 18px;
+        }
+
+        .form-msg.ok {
+            color: var(--neon-green);
+        }
+
+        .form-msg.err {
+            color: #ff4444;
+        }
+
+        .form-footer {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .form-footer a {
+            color: var(--neon-cyan);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* ══════════════════════════════════════
+           MANIFOLD (old sidebar variant) — kept for fallback
+           ══════════════════════════════════════ */
+        .manifold-section {
+            background: var(--bg-card);
+            border: 2px solid var(--neon-purple);
+            border-radius: 8px;
+            padding: 60px 40px;
+            margin: 80px 40px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: inset 0 0 40px rgba(153, 0, 255, 0.1);
+        }
+
+        .manifold-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .manifold-text h2 {
+            font-family: var(--font-arcade);
+            font-size: 32px;
+            color: var(--neon-purple);
+            text-shadow: var(--glow-pink);
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+
+        .manifold-text p {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+
+        .manifold-features {
+            list-style: none;
+            margin-top: 16px;
+        }
+
+        .manifold-features li {
+            padding: 10px 0 10px 24px;
+            border-left: 2px solid var(--neon-cyan);
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .manifold-features li:before {
+            content: "\2713";
+            position: absolute;
+            left: -12px;
+            color: var(--neon-cyan);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .manifold-diagram {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.04), rgba(153, 0, 255, 0.04));
+            border: 2px dashed rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .manifold-diagram-icon {
+            font-size: 60px;
+            margin-bottom: 16px;
+            filter: drop-shadow(0 0 8px var(--neon-cyan));
+        }
+
+        .manifold-diagram p {
+            color: var(--neon-cyan);
+            font-weight: 700;
+            margin: 8px 0;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        .manifold-diagram p:last-child {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 0;
+        }
+
+        /* ══════════════════════════════════════
+           FOOTER
+           ══════════════════════════════════════ */
+        footer {
+            background: rgba(4, 4, 20, 0.96);
+            border-top: 2px solid var(--neon-cyan);
+            box-shadow: 0 -2px 20px rgba(0, 255, 255, 0.15);
+            padding: 50px 40px 30px;
+            margin-top: 0;
+        }
+
+        .footer-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .footer-brand .logo {
+            font-size: 22px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .footer-brand p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        .footer-col h4 {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--neon-pink);
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .footer-col ul {
+            list-style: none;
+        }
+
+        .footer-col ul li {
+            margin-bottom: 8px;
+        }
+
+        .footer-col ul li a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .footer-col ul li a:hover {
+            color: var(--neon-cyan);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid rgba(0, 255, 255, 0.1);
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        .footer-copy {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: rgba(136, 136, 170, 0.5);
+            margin-bottom: 4px;
+        }
+
+        .footer-copy span {
+            color: var(--neon-cyan);
+        }
+
+        /* ══════════════════════════════════════
+           Code tag in inline text
+           ══════════════════════════════════════ */
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        /* ══════════════════════════════════════
+           RESPONSIVE
+           ══════════════════════════════════════ */
+        @media (max-width: 900px) {
+            .hero h1 {
+                font-size: 44px;
+                letter-spacing: 3px;
+            }
+
+            .section-title {
+                font-size: 26px;
+            }
+
+            .engine-inner {
+                grid-template-columns: 1fr;
+            }
+
+            .manifold-content {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-inner {
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            header {
+                padding: 10px 16px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 50px 20px 40px;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .page-section {
+                padding: 50px 20px;
+            }
+
+            .engine-section {
+                padding: 50px 20px;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-inner {
+                grid-template-columns: 1fr;
+            }
+
+            .benchmarks-inner {
+                gap: 12px;
+            }
+
+            .bench-value {
+                font-size: 22px;
+            }
         }
     </style>
+  <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -477,8 +1160,9 @@
                 <li><a href="#games">Games</a></li>
                 <li><a href="#engine">The Engine</a></li>
                 <li><a href="#upcoming">Coming Soon</a></li>
-                <li><a href="/lounge.html">Lounge</a></li>
-                <li><a href="/discover.html">Discover</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#manifold">Manifold</a></li>
+                <li><a href="#tos">Terms</a></li>
             </ul>
             <div class="nav-auth">
                 <button class="btn-ghost" onclick="openModal('forgot')">Forgot?</button>
@@ -507,14 +1191,11 @@
     <div class="benchmarks">
         <div class="benchmarks-inner">
             <div class="bench-item"><span class="bench-value">60</span><span class="bench-label">FPS Locked</span></div>
-            <div class="bench-item"><span class="bench-value">&lt;80ms</span><span class="bench-label">Response
-                    Time</span></div>
-            <div class="bench-item"><span class="bench-value">4</span><span class="bench-label">Player
-                    Multiplayer</span></div>
             <div class="bench-item"><span class="bench-value">0</span><span class="bench-label">Ads Ever</span></div>
             <div class="bench-item"><span class="bench-value">&#8734;</span><span
                     class="bench-label">Replayability</span></div>
-            <div class="bench-item"><span class="bench-value">3</span><span class="bench-label">Live Games</span></div>
+            <div class="bench-item"><span class="bench-value">&#128737;</span><span class="bench-label">No
+                    Tracking</span></div>
         </div>
     </div>
 
@@ -741,6 +1422,220 @@
         </div>
     </div>
 
+    <!-- ── ABOUT ─────────────────────────────────────────────── -->
+    <section class="page-section" id="about">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; The Creator &#9632;</div>
+            <h2 class="section-title">About</h2>
+        </div>
+        <div
+            style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+            <div>
+                <p style="font-size:16px;color:var(--text-muted);line-height:1.9;margin-bottom:20px;">
+                    I&rsquo;m <strong style="color:var(--neon-cyan)">Kenneth Bingham</strong> &mdash; software engineer,
+                    digital artist, and the architect behind KensGames.
+                    I build everything here from scratch: the engine, the games, the multiplayer infrastructure, the
+                    art.
+                    No templates, no game-maker tools, no shortcuts.
+                </p>
+                <p style="font-size:16px;color:var(--text-muted);line-height:1.9;margin-bottom:20px;">
+                    My background spans full-stack development, 3D graphics, generative art, and systems thinking.
+                    KensGames is the convergence of all of it &mdash; a portal where mathematical elegance meets arcade
+                    intensity.
+                </p>
+                <p style="font-size:16px;color:var(--text-muted);line-height:1.9;">
+                    When I&rsquo;m not coding, I create digital and generative artwork available at my art store. I also
+                    write
+                    about programming, game design, and the philosophy of building things that matter.
+                </p>
+            </div>
+            <div
+                style="background:var(--bg-card);border:2px solid var(--neon-purple);border-radius:8px;padding:30px;box-shadow:inset 0 0 20px rgba(153,0,255,0.1)">
+                <h3
+                    style="font-size:18px;color:var(--neon-pink);margin-bottom:20px;text-transform:uppercase;letter-spacing:2px">
+                    Connect</h3>
+                <div style="display:flex;flex-direction:column;gap:14px">
+                    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener"
+                        style="color:var(--neon-yellow);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9998; <span>Substack &mdash; Writing &amp; Essays</span></a>
+                    <a href="https://github.com/kenbin64" target="_blank" rel="noopener"
+                        style="color:var(--neon-green);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9881; <span>GitHub &mdash; Open Source</span></a>
+                    <a href="https://www.linkedin.com/in/kenneth-bingham-11378b10/" target="_blank" rel="noopener"
+                        style="color:var(--neon-cyan);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9670; <span>LinkedIn &mdash; Professional</span></a>
+                    <a href="https://x.com/realken_bingham" target="_blank" rel="noopener"
+                        style="color:var(--text);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#10023; <span>X (Twitter)</span></a>
+                    <a href="https://www.facebook.com/kenny.bingham" target="_blank" rel="noopener"
+                        style="color:#6688ff;text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9679; <span>Facebook</span></a>
+                    <a href="mailto:kenetrics.art@gmail.com"
+                        style="color:var(--neon-pink);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9993; <span>kenetrics.art@gmail.com</span></a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── ABOUT MANIFOLD ─────────────────────────────────────── -->
+    <section class="page-section" id="manifold">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; The Theory &#9632;</div>
+            <h2 class="section-title">About Manifold</h2>
+        </div>
+        <div style="max-width:900px;margin:0 auto">
+            <div
+                style="background:var(--bg-card);border:2px solid var(--neon-purple);border-radius:8px;padding:40px;box-shadow:inset 0 0 30px rgba(153,0,255,0.1),var(--glow-pink);margin-bottom:30px">
+                <p style="font-size:18px;color:var(--neon-cyan);line-height:1.9;margin-bottom:20px;font-weight:600">
+                    Manifold is a dimensional programming paradigm that uses mathematical surfaces as the foundational
+                    architecture for software systems.
+                </p>
+                <p style="font-size:15px;color:var(--text-muted);line-height:1.9;margin-bottom:20px;">
+                    Instead of traditional software layers (frontend, backend, database), Manifold treats every element
+                    of a
+                    system &mdash; players, games, scores, sessions, UI components &mdash; as points embedded in a
+                    continuous geometric
+                    space. The surface equation <code
+                        style="color:var(--neon-yellow);background:rgba(255,232,0,0.1);padding:2px 6px;border-radius:3px">z = x &middot; y</code>
+                    (the hyperbolic paraboloid, or saddle surface) is the core primitive. Every interaction is a
+                    coordinate on this surface.
+                </p>
+                <p style="font-size:15px;color:var(--text-muted);line-height:1.9;margin-bottom:20px;">
+                    This isn&rsquo;t metaphor. The game engine literally maps player positions, AI decisions,
+                    matchmaking, scoring,
+                    and rendering through dimensional substrates &mdash; reusable modules that plug into the manifold
+                    surface. A substrate
+                    for audio, a substrate for physics, a substrate for networking &mdash; all sharing one coordinate
+                    system.
+                </p>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:24px">
+                <div
+                    style="background:var(--bg-card);border:2px solid rgba(0,255,255,0.2);border-radius:8px;padding:24px;text-align:center">
+                    <div style="font-size:36px;margin-bottom:10px;color:var(--neon-cyan)">&#8734;</div>
+                    <div style="font-size:14px;color:var(--neon-cyan);font-weight:700;margin-bottom:6px">Gyroid Surface
+                    </div>
+                    <div style="font-size:12px;color:var(--text-muted);line-height:1.6">sin(x)cos(y) + sin(y)cos(z) +
+                        sin(z)cos(x) = 0</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">The background renderer.
+                        Infinite, non-self-intersecting, minimal surface.</div>
+                </div>
+                <div
+                    style="background:var(--bg-card);border:2px solid rgba(191,0,255,0.2);border-radius:8px;padding:24px;text-align:center">
+                    <div style="font-size:36px;margin-bottom:10px;color:var(--neon-purple)">&#9670;</div>
+                    <div style="font-size:14px;color:var(--neon-purple);font-weight:700;margin-bottom:6px">Diamond
+                        Surface</div>
+                    <div style="font-size:12px;color:var(--text-muted);line-height:1.6">cos(x)cos(y)cos(z) &minus;
+                        sin(x)sin(y)sin(z) = 0</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">The structural skeleton.
+                        Branching factor 4, drives grid columns and data flow.</div>
+                </div>
+                <div
+                    style="background:var(--bg-card);border:2px solid rgba(0,255,65,0.2);border-radius:8px;padding:24px;text-align:center">
+                    <div style="font-size:36px;margin-bottom:10px;color:var(--neon-green)">&#8960;</div>
+                    <div style="font-size:14px;color:var(--neon-green);font-weight:700;margin-bottom:6px">Saddle Surface
+                    </div>
+                    <div style="font-size:12px;color:var(--text-muted);line-height:1.6">z = x &middot; y</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">The core computation primitive.
+                        Every game event maps to a point on this surface.</div>
+                </div>
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.8">
+                All spacing in the UI derives from &phi; (golden ratio = 1.618). All colors derive from the three trig
+                terms.
+                <br>This isn&rsquo;t decoration &mdash; it&rsquo;s the architecture rendering itself.
+                <a href="/discover.html" style="color:var(--neon-purple);margin-left:8px">Explore the geometry
+                    &#8594;</a>
+            </p>
+        </div>
+    </section>
+
+    <!-- ── TERMS OF SERVICE ───────────────────────────────────── -->
+    <section class="page-section" id="tos">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; Legal &#9632;</div>
+            <h2 class="section-title">Terms of Service</h2>
+        </div>
+        <div
+            style="max-width:800px;margin:0 auto;background:var(--bg-card);border:2px solid rgba(0,255,255,0.1);border-radius:8px;padding:40px">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px"><strong
+                    style="color:var(--neon-cyan)">Effective Date:</strong> January 1, 2026</p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                1. Acceptance</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                By accessing KensGames.com (&ldquo;the Portal&rdquo;), you agree to these Terms of Service. If you do
+                not agree, do not use the Portal.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                2. Accounts</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                You may create a free account. You are responsible for maintaining the security of your credentials.
+                One account per person. Sharing accounts is prohibited. We reserve the right to suspend or terminate
+                accounts that violate these terms.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                3. Conduct</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                You agree not to: cheat, hack, exploit bugs, harass other players, use automated tools or bots, attempt
+                to access other users&rsquo; accounts, or interfere with the operation of the Portal. Fair play is
+                enforced.
+                Violations result in permanent bans.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                4. Content &amp; IP</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                All games, code, art, audio, and design on KensGames are the intellectual property of Kenneth Bingham.
+                You may not copy, reverse-engineer, redistribute, or create derivative works from any Portal content
+                without explicit written permission.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                5. Privacy</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                We collect only what&rsquo;s necessary: email, username, and gameplay data (scores, session stats). We
+                do not sell
+                data to third parties. We do not use tracking pixels or advertising networks. No ads. No data brokers.
+                Ever.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                6. No Warranties</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                The Portal is provided &ldquo;as is&rdquo; without warranty of any kind. We do not guarantee uptime,
+                data preservation,
+                or uninterrupted service. Games may be updated, modified, or retired at any time.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                7. Limitation of Liability</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+                KensGames and its creator shall not be liable for any indirect, incidental, or consequential damages
+                arising
+                from use of the Portal.
+            </p>
+
+            <h3
+                style="font-size:15px;color:var(--neon-yellow);margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px">
+                8. Changes</h3>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.8">
+                We may update these terms at any time. Continued use of the Portal constitutes acceptance of updated
+                terms.
+            </p>
+        </div>
+    </section>
+
     <footer>
         <div class="footer-inner">
             <div class="footer-brand">
@@ -754,24 +1649,35 @@
                     <li><a href="/fasttrack/">FastTrack</a></li>
                     <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
                     <li><a href="/starfighter/">Alien Space Attack</a></li>
-                    <li><a href="/lounge.html">Multiplayer Lounge</a></li>
                 </ul>
             </div>
             <div class="footer-col">
                 <h4>Portal</h4>
                 <ul>
+                    <li><a href="/lobby/">Game Lobby</a></li>
                     <li><a href="/discover.html">Discover</a></li>
                     <li><a href="#engine">The Engine</a></li>
                     <li><a href="#upcoming">Coming Soon</a></li>
                 </ul>
             </div>
+            <div class="footer-col">
+                <h4>Info</h4>
+                <ul>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#manifold">Manifold</a></li>
+                    <li><a href="#tos">Terms of Service</a></li>
+                    <li><a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Blog</a></li>
+                </ul>
+            </div>
         </div>
         <div class="footer-bottom">
-            <div class="footer-copy"><span>KensGames</span> &copy; 2026 &mdash; All rights reserved</div>
+            <div class="footer-copy"><span>KensGames</span> &copy; 2026 Kenneth Bingham &mdash; All rights reserved
+            </div>
             <div class="footer-copy">No ads &nbsp;&#9632;&nbsp; No tracking &nbsp;&#9632;&nbsp; No pay-to-win</div>
         </div>
     </footer>
 
+    <script src="/js/manifold.js"></script>
     <script src="/gyroid.js"></script>
     <script src="/js/substrates/avatar_picker.js"></script>
     <script>
@@ -784,7 +1690,7 @@
             s.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
             s.style.left = Math.random() * 100 + 'vw';
             s.style.animationDuration = (18 + Math.random() * 28) + 's';
-            s.style.animationDelay Math.random() * 30) + 's';
+            s.style.animationDelay = (Math.random() * 30) + 's';
             s.style.fontSize = (16 + Math.random() * 30) + 'px';
             s.style.color = ['#00FFFF', '#FF00FF', '#FFE800', '#00FF41'][Math.floor(Math.random() * 4)];
             container.appendChild(s);
@@ -823,7 +1729,7 @@
                     msg.textContent = 'Welcome back!'; msg.className = 'form-msg ok';
                     setTimeout(() => { closeModal(); window.location.href = '/lobby'; }, 800);
                 } else {
-                    msg.textContent = data.message || 'Invalid credentials'; msg.className = 'form-msg err';
+                    msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'form-msg err';
                 }
             } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
         }
@@ -842,7 +1748,7 @@
                     msg.textContent = 'Account created! Check your email to verify.'; msg.className = 'form-msg ok';
                     setTimeout(() => switchTab('login'), 2500);
                 } else {
-                    msg.textContent = data.message || 'Registration failed'; msg.className = 'form-msg err';
+                    msg.textContent = data.error || data.message || 'Registration failed'; msg.className = 'form-msg err';
                 }
             } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
         }
@@ -857,7 +1763,7 @@
                     body: JSON.stringify({ email: document.getElementById('forgot-email').value })
                 });
                 const data = await res.json();
-                msg.textContent = res.ok ? 'Reset link sent - check your inbox' : (data.message || 'Error');
+                msg.textContent = res.ok ? 'Reset link sent - check your inbox' : (data.error || data.message || 'Error');
                 msg.className = 'form-msg ' + (res.ok ? 'ok' : 'err');
             } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
         }
