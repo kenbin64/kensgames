@@ -69,6 +69,147 @@ const SpaceManifold = (function () {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // DIMENSIONAL REGISTRY — all game constants as manifold dimensions
+  //
+  // Instead of hardcoded numbers scattered across substrates, every tunable
+  // value lives here as a named dimension. Substrates read via dim(name).
+  // Values can be overridden at runtime via setDim() or derived dynamically
+  // via manifold lenses — enabling adaptive difficulty, dynamic balancing,
+  // and hot-tuning without touching substrate code.
+  //
+  // Convention: dot-separated namespace (player.maxSpeed, weapon.laser.damage)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  const _dims = {
+    // ── Player Flight ──
+    'player.maxSpeed': 120,    // base thrust m/s
+    'player.afterburnerSpeed': 280,    // afterburner max m/s
+    'player.boostSpeed': 400,    // boost max m/s
+    'player.hull': 100,    // starting hull
+    'player.shields': 100,    // starting shields
+    'player.torpedoes': 8,      // torpedo magazine
+    'player.fuel': 100,    // fuel capacity
+    'player.boostDuration': 3.0,    // seconds
+    'player.boostFuelCost': 25,     // fuel units per boost
+    'player.boostCooldown': 8.0,    // seconds after boost expires
+    'player.afterburnerBurn': 5,      // fuel units/second
+    'player.fuelRegen': 2,      // fuel units/second when idle
+    'player.strafeSpeed': 60,     // lateral m/s
+    'player.faDamping': 2.0,    // FA-ON velocity→0 seconds
+    'player.faLerp': 0.08,   // FA-ON smooth factor
+    'player.pitchDamp': 0.9,    // per-frame pitch decay
+    'player.yawDamp': 0.9,    // per-frame yaw decay
+    'player.rollDamp': 0.9,    // per-frame roll decay
+    'player.strafeHDamp': 0.8,    // per-frame horizontal strafe decay
+    'player.strafeVDamp': 0.8,    // per-frame vertical strafe decay
+    'player.radius': 10,     // collision radius
+
+    // ── Baseship ──
+    'baseship.hull': 5000,
+    'baseship.shields': 2000,
+    'baseship.radius': 500,
+    'baseship.repairHull': 1000,   // hull restored between waves
+    'baseship.repairShields': 500,    // shields restored between waves
+
+    // ── Weapons ──
+    'weapon.laser.speed': 800,    // m/s projectile velocity
+    'weapon.laser.damage': 15,     // per hit
+    'weapon.laser.maxAge': 2.5,    // seconds (range = speed × age)
+    'weapon.laser.fireRate': 6,      // rounds per second
+    'weapon.laser.radius': 2,      // collision radius
+    'weapon.torpedo.speed': 200,    // initial m/s
+    'weapon.torpedo.damage': 80,     // per hit
+    'weapon.torpedo.maxAge': 20,     // seconds
+    'weapon.torpedo.accelTime': 1.5,    // seconds to reach max speed
+    'weapon.torpedo.radius': 8,      // collision radius
+
+    // ── Entity Caps ──
+    'cap.lasers': 60,
+    'cap.plasma': 20,
+    'cap.torpedoes': 12,
+
+    // ── Enemy Cooldowns ──
+    'enemy.fireCooldown': 1.5,    // seconds between shots
+    'enemy.baseship.fireCooldown': 4.0, // alien baseship torpedo interval
+    'enemy.predator.plasmaCooldown': 3.0,
+    'enemy.bomber.bombInterval': 6.0,
+    'enemy.dreadnought.turretInterval': 2.0,
+    'enemy.dreadnought.beamCooldown': 15,
+
+    // ── Score ──
+    'score.enemy': 100,
+    'score.interceptor': 250,
+    'score.bomber': 300,
+    'score.predator': 500,
+    'score.dreadnought': 2500,
+    'score.victory': 5000,
+    'score.friendlyKill': -50,
+
+    // ── Damage ──
+    'damage.eggSplash': 20,
+    'damage.collision': 50,
+
+    // ── Timing ──
+    'timing.launch': 8.0,    // launch sequence seconds
+    'timing.landing': 5.0,    // landing sequence seconds
+    'timing.comm': 8.0,    // random comm interval
+    'timing.respawn': 7.0,    // respawn countdown
+    'timing.entrySpeed': 100,    // speed exiting bay into combat
+
+    // ── Radar ──
+    'radar.range': 5000,   // detection range meters
+
+    // ── Lives ──
+    'lives.max': 3,
+
+    // ── Arena ──
+    'arena.radius': 8000,
+
+    // ── Hive ──
+    'hive.hull': 5000,
+  };
+
+  // Runtime overrides layer — setDim writes here, dim reads overlay first
+  const _overrides = {};
+
+  /**
+   * Read a dimension value. Checks overrides first, then defaults.
+   * This is the ONLY way substrates should access game constants.
+   */
+  function dim(name) {
+    if (name in _overrides) return _overrides[name];
+    if (name in _dims) return _dims[name];
+    return undefined;
+  }
+
+  /**
+   * Override a dimension at runtime. Does not mutate defaults.
+   * Use for adaptive difficulty, powerups, debug tuning, etc.
+   */
+  function setDim(name, value) {
+    _overrides[name] = value;
+    // Also register as a manifold lens for cross-system visibility
+    if (M) M.lens('dim:' + name, () => value);
+  }
+
+  /**
+   * Reset a dimension override back to its default.
+   */
+  function resetDim(name) {
+    delete _overrides[name];
+  }
+
+  /**
+   * Get all dimension names and current values (for debug/telemetry).
+   */
+  function allDims() {
+    const result = {};
+    for (const k in _dims) result[k] = dim(k);
+    for (const k in _overrides) result[k] = _overrides[k];
+    return result;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // DELEGATED API — all calls route through unified Manifold
   // ════════════════════════════════════════════════════════════════════════════
 
@@ -134,6 +275,10 @@ const SpaceManifold = (function () {
     diamondGrad,
     helixPhase,
     manifoldCoord,
+    dim,
+    setDim,
+    resetDim,
+    allDims,
     SCALE,
     K,
   };

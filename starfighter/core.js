@@ -65,7 +65,7 @@ const Starfighter = (function () {
 
     function _makeDynamicBattleBrief() {
         const hostiles = _countActiveHostiles();
-        const baseHullPct = Math.max(0, Math.floor(((state.baseship ? state.baseship.hull : 0) / 5000) * 100));
+        const baseHullPct = Math.max(0, Math.floor(((state.baseship ? state.baseship.hull : 0) / dim('baseship.hull')) * 100));
         const pilotSlot = (state.maxLives - state.livesRemaining + 1);
         const frontline = hostiles > 14 ? 'Frontline is saturated.' : hostiles > 7 ? 'Heavy contact on the perimeter.' : 'Engagement remains containable.';
         return `Pilot ${pilotSlot} of ${state.maxLives}. Wave ${state.wave}. ${hostiles} hostile signatures active. Base hull ${baseHullPct} percent. ${frontline}`;
@@ -98,7 +98,7 @@ const Starfighter = (function () {
             }
             if (e.type === 'alien-base') {
                 alienHive = e;
-                alienHiveHullPct = Math.floor((e.hull / 5000) * 100);
+                alienHiveHullPct = Math.floor((e.hull / dim('hive.hull')) * 100);
             }
             if (e.type === 'enemy') enemies++;
             else if (e.type === 'interceptor') interceptors++;
@@ -132,7 +132,7 @@ const Starfighter = (function () {
         const closestM = Math.floor(Math.sqrt(closestDist));
         const hullPct = p ? Math.floor(p.hull) : 0;
         const shieldPct = p ? Math.floor(p.shields) : 0;
-        const basePct = b ? Math.floor((b.hull / 5000) * 100) : 0;
+        const basePct = b ? Math.floor((b.hull / dim('baseship.hull')) * 100) : 0;
         const fuelPct = p ? Math.floor(p.fuel) : 0;
         const torpCount = p ? p.torpedoes : 0;
         const speed = p ? Math.floor(p.velocity.length()) : 0;
@@ -398,7 +398,7 @@ const Starfighter = (function () {
         state._replacementVariant = replacementAnnouncements[(state.maxLives - state.livesRemaining + state.wave + state.kills) % replacementAnnouncements.length];
         state._replacementBriefing = _makeDynamicBattleBrief();
         state.respawning = true;
-        state.respawnTimer = 7.0;
+        state.respawnTimer = dim('timing.respawn');
         state.respawnReason = reason;
 
         const cmdOfficer = _crew('command');
@@ -500,18 +500,14 @@ const Starfighter = (function () {
     // The Manifold — ground truth for all entity state
     const M = window.SpaceManifold;
 
+    // Dimensional shorthand — all game constants flow through SpaceManifold.dim()
+    const dim = (name) => M.dim(name);
+
     // Scratch vectors — reuse to avoid GC pressure in hot path
     const _v1 = new THREE.Vector3();
     const _v2 = new THREE.Vector3();
     const _q1 = new THREE.Quaternion();
     let _frameCount = 0; // for throttling HUD updates
-
-    // ── Entity caps — prevent runaway entity accumulation that causes freezes ──
-    const MAX_LASERS = 60;       // hard cap on laser entities in scene
-    const MAX_PLASMA = 20;       // hard cap on plasma bolts
-    const MAX_TORPEDOES = 12;    // hard cap on torpedo entities
-    const ENEMY_FIRE_COOLDOWN = 1.5; // seconds between enemy laser shots
-    const BASESHIP_FIRE_COOLDOWN = 4.0; // seconds between alien baseship torpedo shots
 
     class Entity {
         constructor(type, x, y, z) {
@@ -569,7 +565,7 @@ const Starfighter = (function () {
             if (window.SFAudio) SFAudio.playSound('shockwave');
 
             if (this.type === 'enemy') {
-                state.score += 100;
+                state.score += dim('score.enemy');
                 state.kills++;
                 // Credit kill to the player who fired
                 if (this.killedBy === 'player') state.playerKills++;
@@ -579,28 +575,28 @@ const Starfighter = (function () {
                 checkWave();
 
             } else if (this.type === 'predator') {
-                state.score += 500; // high-value target
+                state.score += dim('score.predator');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
                 addComm(_crew('tactical'), _killComm('predator'), 'base');
                 checkWave();
 
             } else if (this.type === 'interceptor') {
-                state.score += 250; // GDD: Interceptor 250 pts
+                state.score += dim('score.interceptor');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
                 addComm(_crew('tactical'), _killComm('interceptor'), 'base');
                 checkWave();
 
             } else if (this.type === 'bomber') {
-                state.score += 300; // GDD: Bomber 300 pts
+                state.score += dim('score.bomber');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
                 addComm(_crew('tactical'), _killComm('bomber'), 'base');
                 checkWave();
 
             } else if (this.type === 'dreadnought') {
-                state.score += 2500; // GDD: Dreadnought 2500 pts
+                state.score += dim('score.dreadnought');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
                 addComm(_crew('command'), _killComm('dreadnought'), 'base');
@@ -613,7 +609,7 @@ const Starfighter = (function () {
 
             } else if (this.type === 'alien-base') {
                 // ── VICTORY ──
-                state.score += 5000;
+                state.score += dim('score.victory');
                 addComm(_crew('command'), `ENEMY BASE DESTROYED! Score ${state.score}. MISSION COMPLETE!`, 'base');
                 setTimeout(() => gameOver('VICTORY — Enemy Station Destroyed!', true), 2000);
 
@@ -629,7 +625,7 @@ const Starfighter = (function () {
                 setTimeout(() => gameOver('DEFEAT — Civilian Station Destroyed'), 2000);
 
             } else if (this.type === 'ally') {
-                state.score -= 50;
+                state.score -= Math.abs(dim('score.friendlyKill'));
                 { const s = _snap(); addComm(`Alpha-${Math.floor(Math.random() * 3) + 1}`, `Going down! ${s.totalHostile} hostiles still out there — cover the base!`, 'ally'); }
             }
         }
@@ -639,17 +635,17 @@ const Starfighter = (function () {
         constructor() {
             super('player', 0, -32, 50); // Start inside baseship hangar bay
             this.throttle = 0; // 0 to 1
-            // GDD §4.1 Flight Parameters
-            this.maxSpeed = 120;        // base thrust 120 m/s
-            this.afterburnerSpeed = 280; // afterburner max 280 m/s
-            this.boostSpeed = 400;       // boost 400 m/s
+            // GDD §4.1 Flight Parameters — all from manifold dimensions
+            this.maxSpeed = dim('player.maxSpeed');
+            this.afterburnerSpeed = dim('player.afterburnerSpeed');
+            this.boostSpeed = dim('player.boostSpeed');
             this.pitch = 0;
             this.yaw = 0;
             this.roll = 0;
             this.strafeH = 0;           // horizontal strafe input
             this.strafeV = 0;           // vertical strafe input
-            this.torpedoes = 8;          // GDD §4.2: 8 torpedo magazine
-            this.fuel = 100;
+            this.torpedoes = dim('player.torpedoes');
+            this.fuel = dim('player.fuel');
             this.afterburnerActive = false;
             this.boostActive = false;
             this.boostTimer = 0;         // remaining boost duration
@@ -672,11 +668,11 @@ const Starfighter = (function () {
                 this.boostTimer -= dt;
                 if (this.boostTimer <= 0) {
                     this.boostActive = false;
-                    this.boostCooldown = 8.0; // GDD §4.1: 8s cooldown
+                    this.boostCooldown = dim('player.boostCooldown');
                 }
             } else if (this.afterburnerActive && this.fuel > 0) {
                 currentMax = this.afterburnerSpeed;
-                this.fuel = Math.max(0, this.fuel - dt * 5); // GDD §4.1: 5 units/second
+                this.fuel = Math.max(0, this.fuel - dt * dim('player.afterburnerBurn'));
             }
 
             // Boost cooldown tick
@@ -685,21 +681,21 @@ const Starfighter = (function () {
             // Forward velocity
             const targetVel = _v1.clone().multiplyScalar(this.throttle * currentMax);
 
-            // Strafe (GDD §4.1: 60 m/s)
+            // Strafe — speed from manifold dimension
             if (this.strafeH !== 0 || this.strafeV !== 0) {
+                const sSpd = dim('player.strafeSpeed');
                 const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.quaternion);
                 const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.quaternion);
-                targetVel.add(right.multiplyScalar(this.strafeH * 60));
-                targetVel.add(up.multiplyScalar(this.strafeV * 60));
+                targetVel.add(right.multiplyScalar(this.strafeH * sSpd));
+                targetVel.add(up.multiplyScalar(this.strafeV * sSpd));
             }
 
             if (this.flightAssist) {
-                // GDD §4.1 FA-ON: velocity dampens to zero over 2.0s when no input
+                // FA-ON: velocity dampens to zero — damping from manifold dimension
                 if (this.throttle < 0.01 && this.strafeH === 0 && this.strafeV === 0) {
-                    this.velocity.multiplyScalar(1 - dt / 2.0); // linear damping
+                    this.velocity.multiplyScalar(1 - dt / dim('player.faDamping'));
                 } else {
-                    // Smooth lerp toward target (lerp factor 0.08 per GDD)
-                    this.velocity.lerp(targetVel, 0.08);
+                    this.velocity.lerp(targetVel, dim('player.faLerp'));
                 }
             } else {
                 // GDD §4.1 FA-OFF: Newtonian — add thrust to existing velocity
@@ -713,23 +709,24 @@ const Starfighter = (function () {
 
             // Fuel regen when not using afterburner
             if (!this.afterburnerActive && !this.boostActive) {
-                this.fuel = Math.min(100, this.fuel + dt * 2);
+                this.fuel = Math.min(dim('player.fuel'), this.fuel + dt * dim('player.fuelRegen'));
             }
 
-            // Input damping
-            this.pitch *= 0.9;
-            this.yaw *= 0.9;
-            this.roll *= 0.9;
-            this.strafeH *= 0.8;
-            this.strafeV *= 0.8;
+            // Input damping — from manifold dimensions
+            this.pitch *= dim('player.pitchDamp');
+            this.yaw *= dim('player.yawDamp');
+            this.roll *= dim('player.rollDamp');
+            this.strafeH *= dim('player.strafeHDamp');
+            this.strafeV *= dim('player.strafeVDamp');
         }
 
         // GDD §4.1: Boost — tap to activate, 400 m/s for 3s, costs 25 fuel
         activateBoost() {
-            if (this.boostCooldown > 0 || this.boostActive || this.fuel < 25) return;
+            const cost = dim('player.boostFuelCost');
+            if (this.boostCooldown > 0 || this.boostActive || this.fuel < cost) return;
             this.boostActive = true;
-            this.boostTimer = 3.0;
-            this.fuel -= 25;
+            this.boostTimer = dim('player.boostDuration');
+            this.fuel -= cost;
             if (window.SFAudio) SFAudio.playSound('boost');
         }
 
@@ -742,13 +739,14 @@ const Starfighter = (function () {
     class Baseship extends Entity {
         constructor() {
             super('baseship', 0, 0, 0);
-            this.hull = 5000;
-            this.shields = 2000;
-            this.radius = 500; // Galactica-scale carrier (~1200m), collision radius
+            this.hull = dim('baseship.hull');
+            this.shields = dim('baseship.shields');
+            this.radius = dim('baseship.radius');
         }
     }
 
     function init() {
+        state.maxLives = dim('lives.max');
         state.livesRemaining = state.maxLives;
         state.respawning = false;
         state.respawnTimer = 0;
@@ -757,12 +755,13 @@ const Starfighter = (function () {
         state._replacementBriefing = '';
 
         state.player = new Player();
-        state.player.hull = 100;
-        state.player.shields = 100;
+        state.player.hull = dim('player.hull');
+        state.player.shields = dim('player.shields');
         state.baseship = new Baseship();
         state.entities.push(state.player, state.baseship);
-        state.phase = 'loading'; // Wait for assets before launching
+        state.phase = 'loading';
         state.launchTimer = 0;
+        state.arenaRadius = dim('arena.radius');
 
         // Parse URL params: ?ai=0 disables AI wingmen (on by default)
         const params = new URLSearchParams(window.location.search);
@@ -1076,9 +1075,9 @@ const Starfighter = (function () {
             state.player.position.set(0, 0, -1500);
             state.player.quaternion.set(0, 0, 0, 1);
             state.player.velocity.set(0, 0, 0);
-            state.player.hull = 100;
-            state.player.shields = 100;
-            state.player.fuel = 100;
+            state.player.hull = dim('player.hull');
+            state.player.shields = dim('player.shields');
+            state.player.fuel = dim('player.fuel');
             state.player.torpedoes = 99;
         }
 
@@ -1421,7 +1420,7 @@ const Starfighter = (function () {
 
             // PA 1: Situational awareness (0.5s — during dock) — Commander
             setTimeout(() => {
-                const basePct = state.baseship ? Math.floor((state.baseship.hull / 5000) * 100) : 100;
+                const basePct = state.baseship ? Math.floor((state.baseship.hull / dim('baseship.hull')) * 100) : 100;
                 SFAudio.speakAs('Cdr. Vasquez', `Attention all hands. This is Resolute command. Ship status: hull at ${basePct} percent. Launch operations are now commencing.`);
             }, 500);
 
@@ -1438,7 +1437,7 @@ const Starfighter = (function () {
 
             // PA 3: The stakes (9s — during dock) — XO
             setTimeout(() => {
-                const basePct = Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100);
+                const basePct = Math.floor(((state.baseship ? state.baseship.hull : dim('baseship.hull')) / dim('baseship.hull')) * 100);
                 addComm(_crew('command'), `The Resolute is Earth's last heavy carrier. Base hull ${basePct}%. She must not fall.`, 'base');
                 const urgency = basePct < 40 ? ` She's taken heavy damage — hull at ${basePct} percent. We cannot afford another hit like that.`
                     : basePct < 70 ? ` Hull integrity is at ${basePct} percent. Keep those bombers off her.`
@@ -1451,7 +1450,7 @@ const Starfighter = (function () {
                 const tacOfficer = _crew('sensor');
                 const s = _snap();
                 const expected = 5 + state.wave * 2;
-                const basePct = Math.floor(((state.baseship ? state.baseship.hull : 5000) / 5000) * 100);
+                const basePct = Math.floor(((state.baseship ? state.baseship.hull : dim('baseship.hull')) / dim('baseship.hull')) * 100);
                 addComm(tacOfficer, `Wave ${state.wave}: ${expected} hostile contacts expected. Base hull ${basePct}%.`, 'base');
                 const capWarn = state.wave >= 2 ? ' Warning. Enemy capital ship detected in the sector.' : '';
                 const torpLine = state.player.torpedoes > 0 ? ` ${state.player.torpedoes} torpedoes loaded.` : ' Torpedo bay empty — resupply on landing.';
@@ -1500,7 +1499,7 @@ const Starfighter = (function () {
         state.player.quaternion.set(0, 0, 0, 1); // facing -Z (away from baseship)
 
         // Carry launch momentum into combat
-        const entrySpeed = 100; // cruising speed exiting the bay
+        const entrySpeed = dim('timing.entrySpeed');
         state.player.throttle = 0.5;
         state.player.velocity.copy(launchDir.clone().multiplyScalar(entrySpeed));
 
@@ -1538,11 +1537,11 @@ const Starfighter = (function () {
         state.phase = 'docking';
         const prevWave = state.wave;
         state.wave++;
-        state.player.torpedoes = 8; // GDD §9.3: Replenish torpedoes between waves
+        state.player.torpedoes = dim('player.torpedoes');
 
         // GDD §9.3: Shield restores, hull carries, fuel replenished
-        state.player.shields = 100;
-        state.player.fuel = 100;
+        state.player.shields = dim('player.shields');
+        state.player.fuel = dim('player.fuel');
         state.player.boostCooldown = 0;
         state.player.boostActive = false;
 
@@ -1573,7 +1572,7 @@ const Starfighter = (function () {
         countdownDisplay.innerHTML = `WAVE ${prevWave} COMPLETE<br>` +
             `<span style="font-size:0.5em;color:#88ccff">` +
             `Kills: ${state.kills} | Score: ${state.score}<br>` +
-            `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / 5000) * 100)}%` +
+            `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / dim('baseship.hull')) * 100)}%` +
             `</span><br>` +
             `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
 
@@ -1585,7 +1584,7 @@ const Starfighter = (function () {
 
         if (window.SFAudio && SFAudio.speakAs) {
             const hullPct = Math.floor(state.player.hull);
-            const bPct = Math.floor((state.baseship.hull / 5000) * 100);
+            const bPct = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
             const perfLine = state.kills > 10 ? ' Outstanding work out there.' : state.kills > 5 ? ' Solid flying.' : '';
             const hullLine = hullPct < 50 ? ` Your hull took a beating — ${hullPct} percent. Repair crews are on it.` : '';
             const baseLine = bPct < 50 ? ` Resolute hull at ${bPct} percent — she needs better cover next wave.` : '';
@@ -1597,7 +1596,7 @@ const Starfighter = (function () {
                 const sensorOfficer = _crew('sensor');
                 { const s = _snap(); addComm(sensorOfficer, `Wave ${state.wave} intel: ${s.dreadnoughts > 0 ? 'dreadnought' : 'capital ship'} signature detected. Base hull ${s.basePct}%.`, 'warning'); }
                 if (window.SFAudio && SFAudio.speakAs) {
-                    const bPct2 = Math.floor((state.baseship.hull / 5000) * 100);
+                    const bPct2 = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
                     const capLine = bPct2 < 50
                         ? `Intelligence reports an enemy capital ship inbound. Resolute hull at ${bPct2} percent — we cannot take a direct hit. Focus fire on that ship.`
                         : `Intelligence reports an enemy capital ship inbound. Destroy it before it reaches the Resolute.`;
@@ -1623,11 +1622,11 @@ const Starfighter = (function () {
             state.cutsceneCamPos = null;
             state.cutsceneCamQuat = null;
             state.cutsceneVelocity = null;
-            state.player.hull = Math.min(100, state.player.hull + 25); // partial hull repair
+            state.player.hull = Math.min(dim('player.hull'), state.player.hull + 25); // partial hull repair
 
             // Resupply baseship if damaged
-            state.baseship.hull = Math.min(5000, state.baseship.hull + 1000);
-            state.baseship.shields = Math.min(2000, state.baseship.shields + 500);
+            state.baseship.hull = Math.min(dim('baseship.hull'), state.baseship.hull + dim('baseship.repairHull'));
+            state.baseship.shields = Math.min(dim('baseship.shields'), state.baseship.shields + dim('baseship.repairShields'));
 
             // Audio transition back to bay
             if (window.SFAudio) {
@@ -1784,7 +1783,7 @@ const Starfighter = (function () {
                 bm._manifoldDerivation = profile.trace;
                 bm.radius = 20;
                 bm._bombCooldown = 0;
-                bm._bombInterval = 6.0;               // drops a torpedo every 6s when close
+                bm._bombInterval = dim('enemy.bomber.bombInterval');
                 state.entities.push(bm);
             }
             if (state.wave === 3) addComm(_crew('tactical'), `${_snap().bombers} bombers inbound, heading for the Resolute! Base hull ${_snap().basePct}% — intercept!`, 'warning');
@@ -1831,7 +1830,7 @@ const Starfighter = (function () {
                 pred.radius = 40;                     // larger than fighters (~30m)
                 pred._turnRate = 0.4;                 // slow turn rate (not nimble)
                 pred._plasmaTimer = 0;                // cooldown between plasma bursts
-                pred._plasmaCooldown = 3.0;           // seconds between attacks
+                pred._plasmaCooldown = dim('enemy.predator.plasmaCooldown');
                 pred._consumeTarget = null;           // entity it's trying to eat
                 pred._consuming = false;              // currently consuming a kill
                 pred._consumeTimer = 0;
@@ -1859,8 +1858,8 @@ const Starfighter = (function () {
             dn._manifoldDerivation = profile.trace;
             dn.radius = 300;                              // massive (~400m)
             dn._turretCooldown = 0;
-            dn._turretInterval = 2.0;                     // fires turrets every 2s
-            dn._beamCooldown = 15;                        // beam weapon takes 15s to charge
+            dn._turretInterval = dim('enemy.dreadnought.turretInterval');
+            dn._beamCooldown = dim('enemy.dreadnought.beamCooldown');
             dn._beamCharging = false;
             state.entities.push(dn);
 
@@ -1875,7 +1874,7 @@ const Starfighter = (function () {
             const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
             const hivePos = baseDir.multiplyScalar(6500);
             const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
-            hive.hull = 5000;
+            hive.hull = dim('hive.hull');
             hive.maxSpeed = 0; // stationary
             hive.radius = 500; // massive structure
             hive.velocity.set(0, 0, 0);
@@ -1981,8 +1980,8 @@ const Starfighter = (function () {
             state.respawning = false;
             // Recreate player
             state.player = new Player();
-            state.player.hull = 100;
-            state.player.shields = 100;
+            state.player.hull = dim('player.hull');
+            state.player.shields = dim('player.shields');
             state.entities.push(state.player);
             if (M) M.add(state.player);
             if (window.SFInput) SFInput.init(state.player);
@@ -2425,7 +2424,8 @@ const Starfighter = (function () {
                     const dx = e.position.x - state.player.position.x;
                     const dy = e.position.y - state.player.position.y;
                     const dz = e.position.z - state.player.position.z;
-                    if (dx * dx + dy * dy + dz * dz > 25000000) { // 5000²
+                    const rr = dim('radar.range');
+                    if (dx * dx + dy * dy + dz * dz > rr * rr) {
                         e.markedForDeletion = true;
                         if (M) M.remove(e.id);
                     }
@@ -2516,7 +2516,7 @@ const Starfighter = (function () {
                 else if (closestDist < 1500 * 1500) musicIntensity += 0.15;
                 if (nearCount > 3) musicIntensity += 0.15; // multiple threats — crescendo
                 if (nearCount > 6) musicIntensity += 0.15; // major battle
-                const basePct = state.baseship ? state.baseship.hull / 5000 : 1;
+                const basePct = state.baseship ? state.baseship.hull / dim('baseship.hull') : 1;
                 if (basePct < 0.3) musicIntensity += 0.15; // baseship in danger
                 SFMusic.setIntensity(Math.min(1, musicIntensity));
 
@@ -2658,7 +2658,7 @@ const Starfighter = (function () {
             const dz = entity.position.z - state.player.position.z;
             if (dx * dx + dy * dy + dz * dz < 640000) {
                 fireLaser(entity, 'enemy');
-                entity._fireCooldown = ENEMY_FIRE_COOLDOWN;
+                entity._fireCooldown = dim('enemy.fireCooldown');
             }
         }
     }
@@ -2701,18 +2701,18 @@ const Starfighter = (function () {
 
     // ── Torpedo fire dimension ──
     function _combatFireTorpedo(entity, target) {
-        if (_countType('torpedo') >= MAX_TORPEDOES) return;
+        if (_countType('torpedo') >= dim('cap.torpedoes')) return;
         _v1.set(0, -10, -20).applyQuaternion(entity.quaternion);
         const t = new Entity('torpedo',
             entity.position.x + _v1.x, entity.position.y + _v1.y, entity.position.z + _v1.z);
         t.quaternion.copy(entity.quaternion);
-        _v1.set(0, 0, -200).applyQuaternion(t.quaternion);
+        _v1.set(0, 0, -dim('weapon.torpedo.speed')).applyQuaternion(t.quaternion);
         t.velocity.copy(_v1);
         t.owner = 'enemy';
-        t.radius = 8;
+        t.radius = dim('weapon.torpedo.radius');
         t.target = target;
-        t.maxAge = 20;
-        t.damage = entity.type === 'alien-baseship' ? 80 : 60;
+        t.maxAge = dim('weapon.torpedo.maxAge');
+        t.damage = entity.type === 'alien-baseship' ? dim('weapon.torpedo.damage') : 60;
         t.launchTime = performance.now() / 1000;
         state.entities.push(t);
         if (window.SFAudio) SFAudio.playSound('torpedo');
@@ -2720,7 +2720,7 @@ const Starfighter = (function () {
 
     // ── Heavy torpedo dimension (dreadnought special) ──
     function _combatFireHeavyTorp(entity, target) {
-        if (_countType('torpedo') >= MAX_TORPEDOES) return;
+        if (_countType('torpedo') >= dim('cap.torpedoes')) return;
         _v1.set(0, 0, -40).applyQuaternion(entity.quaternion);
         const t = new Entity('torpedo',
             entity.position.x + _v1.x, entity.position.y + _v1.y, entity.position.z + _v1.z);
@@ -2802,10 +2802,10 @@ const Starfighter = (function () {
         if (entity._fireCooldown <= 0 && dist2 < prof.fireRange * prof.fireRange) {
             if (prof.weapon === 'laser') {
                 fireLaser(entity, entity.type === 'wingman' ? 'wingman' : 'enemy');
-                entity._fireCooldown = ENEMY_FIRE_COOLDOWN * prof.cooldownMul + Math.random() * 0.3;
+                entity._fireCooldown = dim('enemy.fireCooldown') * prof.cooldownMul + Math.random() * 0.3;
             } else if (prof.weapon === 'torpedo') {
                 _combatFireTorpedo(entity, target);
-                entity._fireCooldown = entity._bombInterval || BASESHIP_FIRE_COOLDOWN;
+                entity._fireCooldown = entity._bombInterval || dim('enemy.baseship.fireCooldown');
             } else if (prof.weapon === 'turret') {
                 for (let s = 0; s < 3; s++) {
                     setTimeout(() => { if (!entity.markedForDeletion) fireLaser(entity, 'enemy'); }, s * 150);
@@ -2894,7 +2894,7 @@ const Starfighter = (function () {
 
     // ── Plasma projectile: distance-based damage, disables on shield hit, consumes on hull breach ──
     function _firePlasma(source, target) {
-        if (_countType('plasma') >= MAX_PLASMA) return;
+        if (_countType('plasma') >= dim('cap.plasma')) return;
         // Plasma emits from the underbelly (-Y local) — that's where its vulnerable
         const spawnOffset = _v1.set(0, -15, -10).applyQuaternion(source.quaternion);
         const p = new Entity('plasma',
@@ -3600,9 +3600,8 @@ const Starfighter = (function () {
         }
     }
 
-    // GDD §10.1: Pulse cannons fire at 6 rounds/second (both cannons simultaneously)
+    // GDD §10.1: Pulse cannon fire rate from manifold dimension
     let _lastFireTime = 0;
-    const FIRE_INTERVAL = 1 / 6; // 6 rps
 
     function _countType(t) {
         let c = 0;
@@ -3616,11 +3615,11 @@ const Starfighter = (function () {
         // Block player firing inside the bay / countdown / tutorial
         if (ownerType === 'player' && state.phase !== 'combat') return;
         const now = performance.now() / 1000;
-        if (ownerType === 'player' && now - _lastFireTime < FIRE_INTERVAL) return;
+        if (ownerType === 'player' && now - _lastFireTime < 1 / dim('weapon.laser.fireRate')) return;
         if (ownerType === 'player') _lastFireTime = now;
 
         // Cap laser entities to prevent freeze
-        if (_countType('laser') >= MAX_LASERS) return;
+        if (_countType('laser') >= dim('cap.lasers')) return;
 
         // GDD §10.1: Dual linked pulse cannons — two bolts fired simultaneously
         _v1.set(0, 0, -10).applyQuaternion(source.quaternion);
@@ -3629,13 +3628,13 @@ const Starfighter = (function () {
             source.position.y + _v1.y,
             source.position.z + _v1.z);
         l.quaternion.copy(source.quaternion);
-        // GDD §10.1: 800 m/s projectile speed
-        _v1.set(0, 0, -800).applyQuaternion(l.quaternion);
+        // Projectile speed from manifold dimension
+        _v1.set(0, 0, -dim('weapon.laser.speed')).applyQuaternion(l.quaternion);
         l.velocity.copy(_v1);
         l.owner = ownerType;
-        l.radius = 2;
-        l.maxAge = 2.5;  // 2000 range / 800 m/s = 2.5s
-        l.damage = 15;   // GDD §10.1
+        l.radius = dim('weapon.laser.radius');
+        l.maxAge = dim('weapon.laser.maxAge');
+        l.damage = dim('weapon.laser.damage');
         state.entities.push(l);
         if (window.SF3D) SF3D.spawnLaser(l);
         if (window.SFAudio) SFAudio.playSound('laser');
@@ -3646,7 +3645,7 @@ const Starfighter = (function () {
         if (ownerType === 'player' && state.phase !== 'combat') return;
         if (source.torpedoes <= 0) return;
         // Cap torpedo entities to prevent freeze
-        if (_countType('torpedo') >= MAX_TORPEDOES) return;
+        if (_countType('torpedo') >= dim('cap.torpedoes')) return;
         source.torpedoes--;
 
         _v1.set(0, -10, -20).applyQuaternion(source.quaternion);
@@ -3655,14 +3654,14 @@ const Starfighter = (function () {
             source.position.y + _v1.y,
             source.position.z + _v1.z);
         t.quaternion.copy(source.quaternion);
-        // GDD §10.1: 200 m/s initial, accelerates to 350 m/s over 1.5s
-        _v1.set(0, 0, -200).applyQuaternion(t.quaternion);
+        // Torpedo speed from manifold dimension
+        _v1.set(0, 0, -dim('weapon.torpedo.speed')).applyQuaternion(t.quaternion);
         t.velocity.copy(_v1);
         t.owner = ownerType;
-        t.radius = 8;
+        t.radius = dim('weapon.torpedo.radius');
         t.target = source.lockedTarget;
-        t.maxAge = 20;   // GDD: 4000 range — long enough to reach
-        t.damage = 80;   // GDD §10.1
+        t.maxAge = dim('weapon.torpedo.maxAge');
+        t.damage = dim('weapon.torpedo.damage');
         t.launchTime = performance.now() / 1000;
         state.entities.push(t);
         if (window.SFAudio) SFAudio.playSound('torpedo');
@@ -3671,14 +3670,14 @@ const Starfighter = (function () {
     function handleCollision(a, b) {
         // ── Egg collision — ships hitting eggs take damage (egg's only defense) ──
         if (a.type === 'egg' && b.type !== 'laser' && b.type !== 'torpedo' && b.type !== 'plasma') {
-            b.takeDamage(20); // acid splash from ruptured egg
+            b.takeDamage(dim('damage.eggSplash'));
             a.markedForDeletion = true;
             if (M) M.remove(a.id);
             if (window.SF3D) SF3D.spawnImpactEffect(a.position, 0x88ff00);
             return;
         }
         if (b.type === 'egg' && a.type !== 'laser' && a.type !== 'torpedo' && a.type !== 'plasma') {
-            a.takeDamage(20); // acid splash
+            a.takeDamage(dim('damage.eggSplash'));
             b.markedForDeletion = true;
             if (M) M.remove(b.id);
             if (window.SF3D) SF3D.spawnImpactEffect(b.position, 0x88ff00);
@@ -3753,9 +3752,9 @@ const Starfighter = (function () {
         const speed = Math.floor(state.player.velocity.length());
         const throttle = Math.floor(state.player.throttle * 100);
         const fuel = Math.floor(state.player.fuel);
-        const hullPct = Math.floor((state.player.hull / 100) * 100);
-        const shieldPct = Math.floor((state.player.shields / 100) * 100);
-        const basePct = Math.floor((state.baseship.hull / 5000) * 100);
+        const hullPct = Math.floor((state.player.hull / dim('player.hull')) * 100);
+        const shieldPct = Math.floor((state.player.shields / dim('player.shields')) * 100);
+        const basePct = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
         const maxSpd = state.player.boostActive ? state.player.boostSpeed
             : state.player.afterburnerActive ? state.player.afterburnerSpeed
                 : state.player.maxSpeed;
@@ -3926,7 +3925,7 @@ const Starfighter = (function () {
     let radarVectorMeter;    // 3-axis orientation gizmo group
     let radarAxisFwd, radarAxisUp, radarAxisRight; // axis arrow meshes
     let radarBlipPool = [];
-    const RADAR_RANGE = 5000; // GDD §7: 5000m range
+    const RADAR_RANGE = dim('radar.range');
     const RADAR_SHIP_OFFSET = 0.35; // player dot offset toward rear (+Z) for depth perception
     let _lastHudSignature = '';
     let _lastRadarPushMs = 0;
