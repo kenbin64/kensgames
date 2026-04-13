@@ -1,0 +1,12 @@
+{
+  "sampledFrames": 150,
+  "frameTimeAvgMs": 33.333,
+  "frameTimeP95Ms": 33.5,
+  "frameTimeP99Ms": 49.8,
+  "fpsAvg": 30,
+  "memory": {
+    "usedJSHeapSize": 330825728,
+    "totalJSHeapSize": 334757888,
+    "jsHeapSizeLimit": 4294705152
+  }
+}

@@ -641,6 +641,205 @@ select:focus {
     background: rgba(0, 255, 255, 0.08);
 }
 
+/* Profile modal avatar grid (uses .avatar-grid / .avatar-option / .avatar-categories / .avatar-category) */
+.avatar-grid,
+.wizard-avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.5rem;
+}
+
+.avatar-option,
+.wizard-avatar-grid .avatar-opt {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    transition: all 0.2s;
+}
+
+.avatar-option:hover,
+.wizard-avatar-grid .avatar-opt:hover {
+    border-color: var(--amber);
+    background: var(--amber-dim);
+    transform: scale(1.1);
+}
+
+.avatar-option.selected,
+.wizard-avatar-grid .avatar-opt.selected {
+    border-color: var(--cyan);
+    background: rgba(0, 255, 255, 0.1);
+    box-shadow: var(--glow-cyan);
+}
+
+.avatar-categories,
+.wizard-avatar-cats {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.avatar-category,
+.wizard-avatar-cats button {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-input);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.avatar-category.active,
+.wizard-avatar-cats button.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0, 255, 255, 0.08);
+}
+
+/* ── PRIVATE GAME WIZARD ─────────────────────────────────── */
+.wizard-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 0;
+}
+
+.wizard-step {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+    color: var(--text-dim);
+    background: var(--bg-card);
+    transition: all 0.3s;
+}
+
+.wizard-step.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: var(--glow-cyan);
+}
+
+.wizard-step.done {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(57, 255, 20, 0.1);
+}
+
+.wizard-step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+}
+
+.wizard-step-line.done {
+    background: var(--green);
+}
+
+.wizard-panel {
+    display: none;
+}
+
+.wizard-panel.active {
+    display: block;
+}
+
+.wizard-content {
+    padding: 0.25rem 0;
+}
+
+.wizard-avatar-preview {
+    font-size: 2.5rem;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    flex-shrink: 0;
+}
+
+.wizard-share-icons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    justify-content: center;
+}
+
+.wizard-share-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wizard-share-btn:hover {
+    border-color: var(--cyan);
+    background: rgba(0, 255, 255, 0.08);
+}
+
+.wizard-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.wizard-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.wizard-toggle input[type="checkbox"] {
+    accent-color: var(--cyan);
+    width: 18px;
+    height: 18px;
+}
+
+.wizard-toggle input[type="number"] {
+    width: 60px;
+    padding: 0.25rem 0.4rem;
+    text-align: center;
+    background: var(--bg-input);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
 
 /* ── MODALS ────────────────────────────────────────────────── */
 .modal-overlay {
@@ -1309,7 +1508,9 @@ select:focus {
         grid-template-columns: 1fr;
     }
 
-    .avatar-picker-grid {
+    .avatar-picker-grid,
+    .avatar-grid,
+    .wizard-avatar-grid {
         grid-template-columns: repeat(6, 1fr);
     }
 
@@ -1341,7 +1542,10 @@ select:focus {
 }
 
 @media (max-width: 480px) {
-    .avatar-picker-grid {
+
+    .avatar-picker-grid,
+    .avatar-grid,
+    .wizard-avatar-grid {
         grid-template-columns: repeat(5, 1fr);
     }
 
@@ -1352,4 +1556,136 @@ select:focus {
     .modal {
         padding: 1.25rem;
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SPEAKEASY ATMOSPHERE — 3D Ragtime Lounge Overlay
+   Warm amber / gold / mahogany — Art Deco accents
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Canvas lives behind everything */
+#speakeasy-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Push all content above canvas */
+body {
+    position: relative;
+    z-index: 1;
+}
+
+/* Warm the body background for the speakeasy mood */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 40%, rgba(180, 120, 40, 0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 50% 100%, rgba(120, 60, 10, 0.08) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ── Music toggle button ── */
+#speakeasy-music-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(30, 15, 5, 0.85);
+    border: 1px solid rgba(200, 160, 60, 0.3);
+    border-radius: 24px;
+    color: #c8a03c;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.3s;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(200, 160, 60, 0.1);
+}
+
+#speakeasy-music-toggle:hover {
+    border-color: rgba(220, 180, 70, 0.6);
+    background: rgba(40, 20, 8, 0.9);
+    box-shadow: 0 0 18px rgba(200, 160, 60, 0.15), 0 4px 16px rgba(0, 0, 0, 0.5);
+    transform: translateY(-1px);
+}
+
+#speakeasy-music-toggle.music-playing {
+    border-color: rgba(220, 180, 70, 0.5);
+}
+
+#speakeasy-music-toggle .music-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+#speakeasy-music-toggle .music-label {
+    letter-spacing: 0.5px;
+}
+
+/* ── Warm art-deco border on auth card ── */
+.auth-card.card {
+    border: 1px solid rgba(200, 160, 60, 0.18);
+    box-shadow:
+        0 0 40px rgba(180, 120, 30, 0.06),
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(200, 160, 60, 0.08);
+}
+
+/* ── Art Deco header flourish ── */
+.header {
+    border-bottom-color: rgba(200, 160, 60, 0.15) !important;
+    box-shadow:
+        0 1px 0 rgba(200, 160, 60, 0.06),
+        0 4px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Card warm accents ── */
+.card {
+    border-color: rgba(200, 160, 60, 0.1);
+}
+
+.card:hover {
+    border-color: rgba(200, 160, 60, 0.2);
+}
+
+/* ── Quick action tiles: warm glow on hover ── */
+.quick-action:hover {
+    box-shadow: 0 0 20px rgba(200, 160, 60, 0.1), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Tabs: gold underline on active ── */
+.tab.active::after {
+    background: linear-gradient(90deg, rgba(200, 160, 60, 0.6), rgba(200, 160, 60, 0.2)) !important;
+}
+
+/* ── Art Deco divider flourish ── */
+.auth-divider span::before,
+.auth-divider span::after {
+    background: linear-gradient(90deg, transparent, rgba(200, 160, 60, 0.3), transparent) !important;
+}
+
+/* ── Ambient warm film grain (subtle) ── */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+    mix-blend-mode: overlay;
 }

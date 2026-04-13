@@ -4,7 +4,7 @@
  */
 
 // =============================================================================
-// Configuration  
+// Configuration
 // =============================================================================
 
 // Auto-detect WebSocket protocol based on page protocol
@@ -41,18 +41,18 @@ const state = {
 function connectToLobby() {
     try {
         state.socket = new WebSocket(LOBBY_CONFIG.wsUrl);
-        
+
         state.socket.onopen = () => {
             console.log('[Lobby] Connected to server');
             state.connected = true;
             state.reconnectAttempts = 0;
             showToast('Connected to lobby', 'success');
         };
-        
+
         state.socket.onclose = () => {
             console.log('[Lobby] Disconnected from server');
             state.connected = false;
-            
+
             if (state.reconnectAttempts < LOBBY_CONFIG.maxReconnectAttempts) {
                 state.reconnectAttempts++;
                 setTimeout(connectToLobby, LOBBY_CONFIG.reconnectInterval);
@@ -60,11 +60,11 @@ function connectToLobby() {
                 showToast('Connection lost. Please refresh the page.', 'error');
             }
         };
-        
+
         state.socket.onerror = (error) => {
             console.error('[Lobby] WebSocket error:', error);
         };
-        
+
         state.socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -93,7 +93,7 @@ function send(data) {
 
 function handleServerMessage(data) {
     console.log('[Lobby] Received:', data.type, data);
-    
+
     const handlers = {
         'connected': onConnected,
         'auth_success': onAuthSuccess,
@@ -125,9 +125,9 @@ function handleServerMessage(data) {
         'user_search_results': onUserSearchResults,
         'chat': onChatMessage,
         'prestige_awarded': onPrestigeAwarded,
-        'pong': () => {},
+        'pong': () => { },
     };
-    
+
     const handler = handlers[data.type];
     if (handler) {
         handler(data);
@@ -138,7 +138,7 @@ function handleServerMessage(data) {
 
 function onConnected(data) {
     console.log('[Lobby] Welcome message:', data.message);
-    
+
     // Check for stored credentials
     const stored = localStorage.getItem('ft_user');
     if (stored) {
@@ -148,8 +148,9 @@ function onConnected(data) {
         } catch (e) {
             localStorage.removeItem('ft_user');
         }
-    } else if (state.pendingAction) {
-        // Auto-guest-login for private/join actions (no login required)
+    } else if (state.pendingAction && state.pendingAction !== 'private') {
+        // Auto-guest-login for join actions (no login required)
+        // Private game creation requires sign-in
         send({
             type: 'guest_login',
             name: `Player_${Math.random().toString(36).slice(2, 6)}`,
@@ -166,13 +167,13 @@ function onAuthSuccess(data) {
         localStorage.setItem('ft_user', JSON.stringify(state.pendingCredentials));
         state.pendingCredentials = null;
     }
-    
+
     updateUserUI();
     showMainApp();
     refreshGames();
-    
+
     showToast(`Welcome, ${data.user.username}!`, 'success');
-    
+
     // Handle pending actions (from URL params or auth-screen buttons)
     if (state.pendingAction) {
         const action = state.pendingAction;
@@ -225,7 +226,7 @@ function onProfile(data) {
 
 function onSessionCreated(data) {
     state.currentSession = data.session;
-    
+
     // If wizard is open, populate step 1 with room code
     const wizardModal = document.getElementById('private-wizard-modal');
     if (wizardModal && wizardModal.classList.contains('active')) {
@@ -291,10 +292,10 @@ function onGameStarted(data) {
     // Stash full session roster in sessionStorage so board can name every slot correctly
     // (avoiding URL length limits)
     const roster = (session.players || []).map(p => ({
-        user_id:  p.user_id,
+        user_id: p.user_id,
         username: p.username,
-        avatar:   AVATAR_EMOJIS[p.avatar_id] || '👤',
-        is_ai:    !!(p.is_ai || p.is_bot),
+        avatar: AVATAR_EMOJIS[p.avatar_id] || '👤',
+        is_ai: !!(p.is_ai || p.is_bot),
     }));
     try {
         sessionStorage.setItem('ft_session_players', JSON.stringify(roster));
@@ -303,12 +304,12 @@ function onGameStarted(data) {
 
     // Redirect to game board with full player info in URL
     const params = new URLSearchParams({
-        session:    session.session_id,
+        session: session.session_id,
         multiplayer: 'true',
-        wsUrl:      LOBBY_CONFIG.wsUrl,
-        name:       me?.username || state.user?.username || 'Player',
-        avatar:     myEmoji,
-        players:    String(session.players?.length || 2),
+        wsUrl: LOBBY_CONFIG.wsUrl,
+        name: me?.username || state.user?.username || 'Player',
+        avatar: myEmoji,
+        players: String(session.players?.length || 2),
     });
 
     window.location.href = `3d.html?${params.toString()}`;
@@ -325,48 +326,48 @@ function onGuildCreated(data) {
     showToast('Guild created!', 'success');
     closeModal('create-guild-modal');
     state.user.guild_id = data.guild.guild_id;
-    
+
     // Update guild state
     guildState.guild = data.guild;
     guildState.isGuildmaster = true;  // Creator is always guildmaster
-    guildState.members = [{ 
-        id: state.user.id, 
-        name: state.user.username, 
-        online: true, 
-        isGuildmaster: true 
+    guildState.members = [{
+        id: state.user.id,
+        name: state.user.username,
+        online: true,
+        isGuildmaster: true
     }];
-    
+
     renderMyGuild(data.guild);
 }
 
 function onGuildJoined(data) {
     showToast(`Joined ${data.guild.name}!`, 'success');
     state.user.guild_id = data.guild.guild_id;
-    
+
     // Update guild state
     guildState.guild = data.guild;
     guildState.isGuildmaster = data.guild.guildmaster_id === state.user.id;
-    
+
     renderMyGuild(data.guild);
 }
 
 function onGuildLeft() {
     showToast('Left guild', 'success');
     state.user.guild_id = null;
-    
+
     // Reset guild state
     guildState.guild = null;
     guildState.isGuildmaster = false;
     guildState.members = [];
     guildState.tournaments = [];
     guildState.pendingInvites = [];
-    
+
     updateGuildPanel();
 }
 
 function onGuildSearchResults(data) {
     // Check if this is a tournament guild search
-    if (document.getElementById('create-tournament-modal').style.display !== 'none' || 
+    if (document.getElementById('create-tournament-modal').style.display !== 'none' ||
         document.getElementById('create-tournament-modal').classList.contains('active')) {
         handleGuildSearchResults(data.guilds);
     } else {
@@ -383,14 +384,14 @@ function onGuildDetails(data) {
         tournaments: data.tournaments,
         pendingInvites: data.pendingInvites
     });
-    
+
     renderMyGuild(data.guild, data.members);
 }
 
 function onGuildMembers(data) {
     guildState.members = data.members || [];
     guildState.onlineMembers = guildState.members.filter(m => m.online);
-    
+
     // Update display if modal is open
     if (document.getElementById('guild-members-modal').classList.contains('active')) {
         renderGuildMembersList();
@@ -398,7 +399,7 @@ function onGuildMembers(data) {
     if (document.getElementById('manage-members-modal').classList.contains('active')) {
         renderManageMembersList();
     }
-    
+
     // Update online count
     const onlineCountEl = document.getElementById('guild-online-count');
     if (onlineCountEl) {
@@ -409,7 +410,7 @@ function onGuildMembers(data) {
 function onGuildTournaments(data) {
     guildState.tournaments = data.tournaments || [];
     guildState.pendingInvites = data.pendingInvites || [];
-    
+
     // Update display if modal is open
     if (document.getElementById('guild-tournaments-modal').classList.contains('active')) {
         renderTournamentsList();
@@ -418,7 +419,7 @@ function onGuildTournaments(data) {
 
 function onGuildDisbanded(data) {
     showToast(data.message || 'Your guild has been disbanded', 'info');
-    
+
     // Reset guild state
     state.user.guild_id = null;
     guildState.guild = null;
@@ -426,14 +427,14 @@ function onGuildDisbanded(data) {
     guildState.members = [];
     guildState.tournaments = [];
     guildState.pendingInvites = [];
-    
+
     // Close any open guild modals
     closeModal('manage-members-modal');
     closeModal('guild-members-modal');
     closeModal('guild-tournaments-modal');
     closeModal('create-tournament-modal');
     closeModal('disband-guild-modal');
-    
+
     updateGuildPanel();
 }
 
@@ -449,7 +450,7 @@ function onGuildMemberBooted(data) {
     } else {
         // Someone else was booted
         guildState.members = guildState.members.filter(m => m.id !== data.memberId);
-        
+
         // Update displays
         if (document.getElementById('guild-members-modal').classList.contains('active')) {
             renderGuildMembersList();
@@ -480,16 +481,9 @@ function onPrestigeAwarded(data) {
 // =============================================================================
 
 function createPrivateAsGuest() {
-    state.pendingAction = 'private';
-    if (state.connected) {
-        send({
-            type: 'guest_login',
-            name: `Player_${Math.random().toString(36).slice(2, 6)}`,
-            avatar_id: 'person_smile'
-        });
-    } else {
-        showToast('Connecting to server...', 'error');
-    }
+    // Private game creation requires sign-in
+    showToast('Please sign in to create a private game', 'error');
+    showAuthScreen();
 }
 
 function joinByCodeAsGuest() {
@@ -508,7 +502,7 @@ function joinByCodeAsGuest() {
 function showAuthTab(tab) {
     document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.auth-tab:${tab === 'login' ? 'first-child' : 'last-child'}`).classList.add('active');
-    
+
     document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
     document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
 }
@@ -527,13 +521,13 @@ function handleLogin(event) {
 
 function handleRegister(event) {
     event.preventDefault();
-    
+
     const username = document.getElementById('register-username').value.trim();
     const password = document.getElementById('register-password').value;
     const email = document.getElementById('register-email').value.trim();
-    
+
     send({ type: 'register', username, password, email });
-    
+
     // Store for auto-login after registration
     localStorage.setItem('ft_user', JSON.stringify({ username, password }));
 }
@@ -588,7 +582,7 @@ function updateUserUI() {
 function switchTab(tabId) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
-    
+
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(`panel-${tabId}`).classList.add('active');
 }
@@ -642,29 +636,29 @@ function showCreatePrivateGame() {
     // Open wizard at step 1 and immediately create session to get room code
     state.wizardStep = 1;
     state.wizardAvatar = state.user?.avatar_id || 'person_smile';
-    
+
     // Reset wizard UI
     document.getElementById('wizard-room-code').textContent = '------';
     document.getElementById('wizard-share-url').value = '';
-    
+
     // Pre-fill username from logged-in user
     const usernameInput = document.getElementById('wizard-username');
     if (usernameInput) {
         usernameInput.value = state.user?.username || '';
     }
     document.getElementById('wizard-avatar-preview').textContent = getAvatarEmoji(state.wizardAvatar);
-    
+
     // Reset settings
     document.getElementById('wiz-music').checked = true;
     document.getElementById('wiz-allow-ai').checked = true;
     document.getElementById('wiz-turn-timer').checked = false;
     document.getElementById('wiz-late-arrivals').checked = true;
     document.getElementById('wiz-max-players').value = '4';
-    
+
     // Show wizard
     updateWizardSteps();
     openModal('private-wizard-modal');
-    
+
     // Create session immediately to get a room code
     send({
         type: 'create_session',
@@ -687,26 +681,26 @@ function showCreatePrivateGame() {
 
 function updateWizardSteps() {
     const step = state.wizardStep;
-    
+
     // Update step indicators
     document.querySelectorAll('.wizard-step').forEach(el => {
         const s = parseInt(el.dataset.step);
         el.classList.toggle('active', s === step);
         el.classList.toggle('done', s < step);
     });
-    
+
     // Update lines between steps
     const lines = document.querySelectorAll('.wizard-step-line');
     lines.forEach((line, i) => {
         line.classList.toggle('done', (i + 1) < step);
     });
-    
+
     // Show/hide panels
     for (let i = 1; i <= 4; i++) {
         const panel = document.getElementById(`wizard-step-${i}`);
         if (panel) panel.classList.toggle('active', i === step);
     }
-    
+
     // Update title
     const titles = {
         1: '🔒 Share Game Code',
@@ -715,7 +709,7 @@ function updateWizardSteps() {
         4: '⏳ Waiting Lobby'
     };
     document.getElementById('wizard-title').textContent = titles[step] || '';
-    
+
     // Step-specific init
     if (step === 2) {
         wizardInitAvatarPicker();
@@ -760,11 +754,11 @@ function wizardCheckUsername() {
 function wizardInitAvatarPicker() {
     const catsContainer = document.getElementById('wizard-avatar-cats');
     const cats = Object.entries(AVATAR_CATALOG);
-    
+
     catsContainer.innerHTML = cats.map(([id, cat], idx) => `
         <button class="${idx === 0 ? 'active' : ''}" data-cat="${id}" onclick="wizardSelectCategory('${id}')">${cat.icon} ${cat.name}</button>
     `).join('');
-    
+
     wizardRenderAvatarGrid(cats[0][0]);
 }
 
@@ -777,9 +771,9 @@ function wizardSelectCategory(catId) {
 function wizardRenderAvatarGrid(catId) {
     const cat = AVATAR_CATALOG[catId];
     const grid = document.getElementById('wizard-avatar-grid');
-    
+
     grid.innerHTML = cat.avatars.map(a => `
-        <div class="avatar-opt ${state.wizardAvatar === a.id ? 'selected' : ''}" 
+        <div class="avatar-opt ${state.wizardAvatar === a.id ? 'selected' : ''}"
              data-id="${a.id}" onclick="wizardPickAvatar('${a.id}')" title="${a.name}">
             ${a.emoji}
         </div>
@@ -789,7 +783,7 @@ function wizardRenderAvatarGrid(catId) {
 function wizardPickAvatar(avatarId) {
     state.wizardAvatar = avatarId;
     document.getElementById('wizard-avatar-preview').textContent = getAvatarEmoji(avatarId);
-    
+
     document.querySelectorAll('.wizard-avatar-grid .avatar-opt').forEach(el => {
         el.classList.toggle('selected', el.dataset.id === avatarId);
     });
@@ -798,7 +792,7 @@ function wizardPickAvatar(avatarId) {
 function wizardApplySettings() {
     // Apply wizard step 2 + 3 settings to the session
     if (!state.currentSession) return;
-    
+
     const username = document.getElementById('wizard-username').value.trim() || state.user?.username;
     const avatarId = state.wizardAvatar || 'person_smile';
     const allowAi = document.getElementById('wiz-allow-ai').checked;
@@ -806,7 +800,7 @@ function wizardApplySettings() {
     const lateArrivals = document.getElementById('wiz-late-arrivals').checked;
     const maxPlayers = parseInt(document.getElementById('wiz-max-players').value);
     const music = document.getElementById('wiz-music').checked;
-    
+
     // Update player name/avatar in session (works for guests and logged-in users)
     if (username || avatarId) {
         send({ type: 'update_player_info', username: username, avatar_id: avatarId });
@@ -815,7 +809,7 @@ function wizardApplySettings() {
             if (avatarId) state.user.avatar_id = avatarId;
         }
     }
-    
+
     // Send session settings update
     send({
         type: 'update_session_settings',
@@ -829,7 +823,7 @@ function wizardApplySettings() {
         },
         max_players: maxPlayers
     });
-    
+
     // Store music pref locally
     state.musicEnabled = music;
 }
@@ -864,17 +858,17 @@ function createPrivateGame(event) {
 
 function createPublicGameWithSettings(event) {
     event.preventDefault();
-    
+
     const playerCount = parseInt(document.getElementById('public-player-count').value);
-    
+
     // Validate public game limits (3-4 players only)
     if (playerCount < 3 || playerCount > 4) {
         showToast('Public games must have 3-4 players', 'error');
         return;
     }
-    
+
     closeModal('create-public-modal');
-    
+
     send({
         type: 'create_session',
         private: false,
@@ -910,15 +904,15 @@ function showJoinByCode() {
 
 function joinByCode(event) {
     event.preventDefault();
-    
+
     const code = document.getElementById('join-code-input').value.toUpperCase().trim();
     const guestName = document.getElementById('guest-name-input').value.trim();
-    
+
     if (!code) {
         showToast('Please enter a game code', 'error');
         return;
     }
-    
+
     // If not logged in, do guest login first
     if (!state.user) {
         send({
@@ -926,7 +920,7 @@ function joinByCode(event) {
             name: guestName || `Guest_${Math.random().toString(36).slice(2, 6)}`,
             avatar_id: 'person_smile'
         });
-        
+
         // Wait for auth then join
         const origHandler = onAuthSuccess;
         onAuthSuccess = (data) => {
@@ -937,7 +931,7 @@ function joinByCode(event) {
     } else {
         send({ type: 'join_by_code', code });
     }
-    
+
     closeModal('join-code-modal');
 }
 
@@ -949,27 +943,27 @@ function showWaitingRoom(session, code, shareUrl) {
         updateWizardSteps();
         return;
     }
-    
+
     // Legacy waiting room for non-wizard flows (public games, join-by-code)
     document.getElementById('waiting-room-code').textContent = code;
-    
+
     let url = shareUrl || `${window.location.origin}${window.location.pathname.replace('lobby.html', 'join.html')}?code=${code}`;
     if (url.startsWith('/')) url = window.location.origin + url;
     document.getElementById('share-url').value = url;
-    
+
     updateWaitingRoom();
     openModal('waiting-room-modal');
 }
 
 function updateWaitingRoom() {
     if (!state.currentSession) return;
-    
+
     const session = state.currentSession;
     const isHost = session.host_id === state.user?.user_id;
     const aiCount = session.players.filter(p => p.is_ai).length;
     const humanCount = session.players.filter(p => !p.is_ai).length;
     const totalPlayers = session.players.length;
-    
+
     // Build player slot HTML
     const slots = [];
     for (let i = 0; i < session.max_players; i++) {
@@ -992,24 +986,24 @@ function updateWaitingRoom() {
             `);
         }
     }
-    
+
     // Update wizard step 4 (if it exists)
     const wizardPlayers = document.getElementById('wizard-waiting-players');
     if (wizardPlayers) {
         wizardPlayers.innerHTML = slots.join('');
     }
-    
+
     // Wizard bot controls
     const allowAi = session.settings?.allow_bots !== false;
     const gameIsFull = totalPlayers >= session.max_players;
     const maxBotsReached = aiCount >= 3;
     const canAddBots = isHost && allowAi && !gameIsFull && !maxBotsReached;
-    
+
     const wizAddAi = document.getElementById('wizard-add-ai');
     const wizRemoveAi = document.getElementById('wizard-remove-ai');
     const wizBotControls = document.getElementById('wizard-bot-controls');
     const wizBotInfo = document.getElementById('wizard-bot-info');
-    
+
     if (wizBotControls) {
         wizBotControls.style.display = (isHost && allowAi) ? 'flex' : 'none';
     }
@@ -1022,7 +1016,7 @@ function updateWaitingRoom() {
     if (wizBotInfo) {
         wizBotInfo.textContent = aiCount > 0 ? `🤖 ${aiCount} bot${aiCount > 1 ? 's' : ''} in game` : '';
     }
-    
+
     // Start button — require 2+ total players (human + bots)
     const wizStartBtn = document.getElementById('wizard-start-btn');
     const wizStartNote = document.getElementById('wizard-start-note');
@@ -1039,19 +1033,19 @@ function updateWaitingRoom() {
             }
         }
     }
-    
+
     // Also update legacy waiting room elements (for public games / join-by-code)
     const legacyContainer = document.getElementById('waiting-players');
     if (legacyContainer) {
         legacyContainer.innerHTML = slots.join('');
     }
-    
+
     const addAiBtn = document.getElementById('add-ai-btn');
     const removeAiBtn = document.getElementById('remove-ai-btn');
     const botCountInfo = document.getElementById('bot-count-info');
     const botLimitWarning = document.getElementById('bot-limit-warning');
     const gameSetupOptions = document.getElementById('game-setup-options');
-    
+
     if (gameSetupOptions) {
         gameSetupOptions.style.display = isHost ? 'block' : 'none';
     }
@@ -1067,7 +1061,7 @@ function updateWaitingRoom() {
     if (botLimitWarning) {
         botLimitWarning.style.display = 'none';
     }
-    
+
     const startBtn = document.getElementById('start-game-btn');
     if (startBtn) {
         startBtn.disabled = !isHost || session.players.length < 2;
@@ -1076,49 +1070,49 @@ function updateWaitingRoom() {
 
 function addAIPlayer() {
     if (!state.currentSession) return;
-    
+
     const session = state.currentSession;
     const aiCount = session.players.filter(p => p.is_ai).length;
     const humanCount = session.players.filter(p => !p.is_ai).length;
     const totalPlayers = session.players.length;
-    
+
     // Check limits
     if (totalPlayers >= session.max_players) {
         showToast('Game is full', 'error');
         return;
     }
-    
+
     // Check bot limits for private games
     if (session.is_private && aiCount >= 3) {
         showToast('Maximum 3 bots allowed', 'error');
         return;
     }
-    
+
     // Private games with bots limited to 4 players total
     if (session.is_private && (totalPlayers + 1) > 4) {
         showToast('Games with bots limited to 4 total players', 'error');
         return;
     }
-    
+
     // Public games check no_bots setting
     if (!session.is_private && session.settings?.no_bots) {
         showToast('This game is set to no bots', 'error');
         return;
     }
-    
+
     send({ type: 'add_ai_player', level: 'medium' });
 }
 
 function removeAIPlayer() {
     if (!state.currentSession) return;
-    
+
     // Find the last AI player to remove
     const aiPlayers = state.currentSession.players.filter(p => p.is_ai);
     if (aiPlayers.length === 0) {
         showToast('No bots to remove', 'error');
         return;
     }
-    
+
     // Remove the last added AI
     const lastAI = aiPlayers[aiPlayers.length - 1];
     send({ type: 'remove_ai_player', player_id: lastAI.user_id });
@@ -1147,7 +1141,7 @@ function shareViaMessenger() {
     const url = document.getElementById('wizard-share-url')?.value || document.getElementById('share-url')?.value || state.wizardShareUrl;
     const code = state.wizardShareCode || document.getElementById('waiting-room-code')?.textContent || '';
     const text = `Join my Fast Track game! Code: ${code}\n${url}`;
-    
+
     if (navigator.share) {
         navigator.share({
             title: 'Fast Track Game',
@@ -1172,7 +1166,7 @@ function playOfflineWithAI() {
         ai_players: '1',
         ai_level: 'medium'
     });
-    
+
     window.location.href = `3d.html?${params.toString()}`;
 }
 
@@ -1187,9 +1181,9 @@ function showProfileModal() {
 
 function showAvatarPicker() {
     closeModal('profile-modal');
-    
+
     state.selectedAvatar = state.user?.avatar_id || 'person_smile';
-    
+
     // Render categories
     const categoriesContainer = document.getElementById('avatar-categories');
     categoriesContainer.innerHTML = Object.entries(AVATAR_CATALOG).map(([id, cat], idx) => `
@@ -1197,11 +1191,11 @@ function showAvatarPicker() {
             ${cat.icon} ${cat.name}
         </button>
     `).join('');
-    
+
     // Render first category
     const firstCategory = Object.keys(AVATAR_CATALOG)[0];
     renderAvatarGrid(firstCategory);
-    
+
     openModal('avatar-modal');
 }
 
@@ -1214,10 +1208,10 @@ function selectAvatarCategory(categoryId) {
 function renderAvatarGrid(categoryId) {
     const category = AVATAR_CATALOG[categoryId];
     const container = document.getElementById('avatar-grid');
-    
+
     container.innerHTML = category.avatars.map(avatar => `
-        <div class="avatar-option ${state.selectedAvatar === avatar.id ? 'selected' : ''}" 
-             data-avatar="${avatar.id}" 
+        <div class="avatar-option ${state.selectedAvatar === avatar.id ? 'selected' : ''}"
+             data-avatar="${avatar.id}"
              onclick="selectAvatar('${avatar.id}')"
              title="${avatar.name}">
             ${avatar.emoji}
@@ -1227,7 +1221,7 @@ function renderAvatarGrid(categoryId) {
 
 function selectAvatar(avatarId) {
     state.selectedAvatar = avatarId;
-    
+
     document.querySelectorAll('.avatar-option').forEach(opt => {
         opt.classList.toggle('selected', opt.dataset.avatar === avatarId);
     });
@@ -1247,10 +1241,10 @@ function showCreateGuild() {
 
 function createGuild(event) {
     event.preventDefault();
-    
+
     const name = document.getElementById('guild-name').value.trim();
     const tag = document.getElementById('guild-tag').value.trim().toUpperCase();
-    
+
     send({ type: 'create_guild', name, tag });
 }
 
@@ -1263,12 +1257,12 @@ function searchGuilds() {
 
 function renderGuildSearchResults(guilds) {
     const container = document.getElementById('guild-search-results');
-    
+
     if (guilds.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No guilds found</p>';
         return;
     }
-    
+
     container.innerHTML = guilds.map(guild => `
         <div class="session-item" onclick="joinGuild('${guild.guild_id}')">
             <div class="session-info">
@@ -1296,11 +1290,11 @@ function renderMyGuild(guild, members) {
     const membersOnlineCard = document.getElementById('guild-members-online-card');
     const guildGamesCard = document.getElementById('guild-games-card');
     const tournamentBtn = document.getElementById('guild-tournament-btn');
-    
+
     // Determine if current user is guildmaster
     const isGuildmaster = guild.guildmaster_id === state.user.id;
     guildState.isGuildmaster = isGuildmaster;
-    
+
     // Show guild info
     container.innerHTML = `
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
@@ -1314,11 +1308,11 @@ function renderMyGuild(guild, members) {
             </div>
         </div>
     `;
-    
+
     // Hide create guild button, show controls
     if (createGuildBtn) createGuildBtn.style.display = 'none';
     if (guildControls) guildControls.style.display = 'block';
-    
+
     // Show/hide guildmaster-specific controls
     if (guildmasterControls) {
         guildmasterControls.style.display = isGuildmaster ? 'block' : 'none';
@@ -1326,21 +1320,21 @@ function renderMyGuild(guild, members) {
     if (leaveGuildSection) {
         leaveGuildSection.style.display = isGuildmaster ? 'none' : 'block';
     }
-    
+
     // Show tournament button (guildmasters can create, everyone can view)
     if (tournamentBtn) {
         tournamentBtn.style.display = 'inline-block';
     }
-    
+
     // Show guild cards
     if (membersOnlineCard) membersOnlineCard.style.display = 'block';
     if (guildGamesCard) guildGamesCard.style.display = 'block';
-    
+
     // Show guild chat card and update chat UI
     const chatCard = document.getElementById('guild-chat-card');
     if (chatCard) chatCard.style.display = 'block';
     updateGuildChatUI();
-    
+
     // Update guild state members
     if (members) {
         guildState.members = members.map(m => ({
@@ -1352,11 +1346,11 @@ function renderMyGuild(guild, members) {
             avatar_id: m.avatar_id
         }));
         guildState.onlineMembers = guildState.members.filter(m => m.online);
-        
+
         // Update online members list
         renderGuildOnlineMembers();
     }
-    
+
     // Update online count
     const onlineCountEl = document.getElementById('guild-online-count');
     if (onlineCountEl) {
@@ -1367,14 +1361,14 @@ function renderMyGuild(guild, members) {
 function renderGuildOnlineMembers() {
     const container = document.getElementById('guild-online-list');
     if (!container) return;
-    
+
     const onlineMembers = guildState.onlineMembers;
-    
+
     if (onlineMembers.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem;">No members online</p>';
         return;
     }
-    
+
     container.innerHTML = onlineMembers.map(member => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 0.25rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -1406,12 +1400,12 @@ function searchPlayers() {
 
 function renderPlayerSearchResults(users) {
     const container = document.getElementById('player-search-results');
-    
+
     if (users.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No players found</p>';
         return;
     }
-    
+
     container.innerHTML = users.map(user => `
         <div class="session-item">
             <div class="session-info">
@@ -1434,11 +1428,11 @@ function renderPlayerSearchResults(users) {
 
 function goToTutorialStep(step) {
     state.tutorialStep = step;
-    
+
     document.querySelectorAll('.tutorial-step').forEach((s, i) => {
         s.classList.toggle('active', i === step);
     });
-    
+
     document.querySelectorAll('.tutorial-dot').forEach((d, i) => {
         d.classList.toggle('active', i === step);
     });
@@ -1464,7 +1458,7 @@ function prevTutorialStep() {
 function sendChat() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
-    
+
     if (message) {
         send({ type: 'chat', message });
         input.value = '';
@@ -1520,7 +1514,7 @@ function showToast(message, type = 'info') {
     toast.className = `toast ${type}`;
     toast.textContent = message;
     container.appendChild(toast);
-    
+
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
@@ -1561,9 +1555,9 @@ function showCreateGuildGame() {
 
 function createGuildGame(e) {
     e.preventDefault();
-    
+
     const playerCount = parseInt(document.getElementById('guild-game-player-count').value);
-    
+
     // Create guild game - all human, guild members only
     send({
         type: 'create_guild_game',
@@ -1575,7 +1569,7 @@ function createGuildGame(e) {
             requireApproval: false // Any guild member can join
         }
     });
-    
+
     closeModal('create-guild-game-modal');
     showToast('Creating guild game...', 'info');
 }
@@ -1588,19 +1582,19 @@ function showGuildMembers() {
 function loadGuildMembers() {
     // Request member list from server
     send({ type: 'get_guild_members', guildId: guildState.guild.id });
-    
+
     // Display members from current state
     renderGuildMembersList();
 }
 
 function renderGuildMembersList() {
     const container = document.getElementById('guild-members-list');
-    
+
     if (!guildState.members || guildState.members.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No members found</p>';
         return;
     }
-    
+
     container.innerHTML = guildState.members.map(member => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -1625,16 +1619,16 @@ function renderGuildMembersList() {
 function filterGuildMembers() {
     const search = document.getElementById('guild-member-search').value.toLowerCase();
     const container = document.getElementById('guild-members-list');
-    
-    const filtered = guildState.members.filter(m => 
+
+    const filtered = guildState.members.filter(m =>
         m.name.toLowerCase().includes(search)
     );
-    
+
     if (filtered.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No matching members</p>';
         return;
     }
-    
+
     // Re-render with filtered list
     container.innerHTML = filtered.map(member => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
@@ -1660,13 +1654,13 @@ function filterGuildMembers() {
 function inviteGuildMemberToGame(memberId) {
     const member = guildState.members.find(m => m.id === memberId);
     if (!member) return;
-    
+
     send({
         type: 'invite_guild_member',
         memberId: memberId,
         guildId: guildState.guild.id
     });
-    
+
     showToast(`Invited ${member.name} to game`, 'success');
 }
 
@@ -1675,22 +1669,22 @@ function showManageMembers() {
         showToast('Only the Guildmaster can manage members', 'error');
         return;
     }
-    
+
     showModal('manage-members-modal');
     renderManageMembersList();
 }
 
 function renderManageMembersList() {
     const container = document.getElementById('manage-members-list');
-    
+
     // Filter out the guildmaster - can't boot yourself
     const bootableMembers = guildState.members.filter(m => !m.isGuildmaster);
-    
+
     if (bootableMembers.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No other members in guild</p>';
         return;
     }
-    
+
     container.innerHTML = bootableMembers.map(member => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -1709,19 +1703,19 @@ function renderManageMembersList() {
 
 function bootGuildMember(memberId, memberName) {
     if (!guildState.isGuildmaster) return;
-    
+
     if (!confirm(`Remove ${memberName} from the guild?`)) return;
-    
+
     send({
         type: 'boot_guild_member',
         memberId: memberId,
         guildId: guildState.guild.id
     });
-    
+
     // Remove from local state immediately
     guildState.members = guildState.members.filter(m => m.id !== memberId);
     renderManageMembersList();
-    
+
     showToast(`${memberName} has been removed from the guild`, 'success');
 }
 
@@ -1739,7 +1733,7 @@ function renderTournamentsList() {
     const container = document.getElementById('active-tournaments-list');
     const pendingSection = document.getElementById('pending-tournament-invites-section');
     const pendingContainer = document.getElementById('pending-tournament-invites-list');
-    
+
     // Render active tournaments
     if (!guildState.tournaments || guildState.tournaments.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem;">No active tournaments</p>';
@@ -1761,7 +1755,7 @@ function renderTournamentsList() {
             </div>
         `).join('');
     }
-    
+
     // Render pending invites (only for guildmaster)
     if (guildState.isGuildmaster && guildState.pendingInvites && guildState.pendingInvites.length > 0) {
         pendingSection.style.display = 'block';
@@ -1790,7 +1784,7 @@ function acceptTournamentInvite(inviteId) {
         inviteId: inviteId,
         response: 'accept'
     });
-    
+
     showToast('Tournament invite accepted', 'success');
     guildState.pendingInvites = guildState.pendingInvites.filter(i => i.id !== inviteId);
     renderTournamentsList();
@@ -1802,7 +1796,7 @@ function declineTournamentInvite(inviteId) {
         inviteId: inviteId,
         response: 'decline'
     });
-    
+
     showToast('Tournament invite declined', 'info');
     guildState.pendingInvites = guildState.pendingInvites.filter(i => i.id !== inviteId);
     renderTournamentsList();
@@ -1813,12 +1807,12 @@ function showCreateTournament() {
         showToast('Only the Guildmaster can create tournaments', 'error');
         return;
     }
-    
+
     guildState.tournamentGuildsToInvite = [];
     document.getElementById('tournament-guild-results').innerHTML = '';
     document.getElementById('invited-guilds-list').style.display = 'none';
     document.getElementById('invited-guilds-tags').innerHTML = '';
-    
+
     showModal('create-tournament-modal');
 }
 
@@ -1828,25 +1822,25 @@ function searchGuildsForTournament() {
         document.getElementById('tournament-guild-results').innerHTML = '';
         return;
     }
-    
+
     send({ type: 'search_guilds', query: query });
 }
 
 // Called when search results come back
 function handleGuildSearchResults(guilds) {
     const container = document.getElementById('tournament-guild-results');
-    
+
     // Filter out own guild and already invited guilds
-    const available = guilds.filter(g => 
-        g.id !== guildState.guild.id && 
+    const available = guilds.filter(g =>
+        g.id !== guildState.guild.id &&
         !guildState.tournamentGuildsToInvite.find(invited => invited.id === g.id)
     );
-    
+
     if (available.length === 0) {
         container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-secondary);">No matching guilds found</p>';
         return;
     }
-    
+
     container.innerHTML = available.map(guild => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
             <div>
@@ -1863,10 +1857,10 @@ function handleGuildSearchResults(guilds) {
 
 function addGuildToTournament(guildId, tag, name) {
     if (guildState.tournamentGuildsToInvite.find(g => g.id === guildId)) return;
-    
+
     guildState.tournamentGuildsToInvite.push({ id: guildId, tag, name });
     updateInvitedGuildsList();
-    
+
     // Clear search
     document.getElementById('tournament-guild-search').value = '';
     document.getElementById('tournament-guild-results').innerHTML = '';
@@ -1880,12 +1874,12 @@ function removeGuildFromTournament(guildId) {
 function updateInvitedGuildsList() {
     const container = document.getElementById('invited-guilds-list');
     const tagsContainer = document.getElementById('invited-guilds-tags');
-    
+
     if (guildState.tournamentGuildsToInvite.length === 0) {
         container.style.display = 'none';
         return;
     }
-    
+
     container.style.display = 'block';
     tagsContainer.innerHTML = guildState.tournamentGuildsToInvite.map(guild => `
         <span style="display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(100,216,255,0.2); color: #64d8ff; padding: 0.3rem 0.6rem; border-radius: 5px; margin-right: 0.5rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
@@ -1897,21 +1891,21 @@ function updateInvitedGuildsList() {
 
 function createGuildTournament(e) {
     e.preventDefault();
-    
+
     const name = document.getElementById('tournament-name').value.trim();
-    
+
     if (guildState.tournamentGuildsToInvite.length === 0) {
         showToast('Please invite at least one guild', 'error');
         return;
     }
-    
+
     send({
         type: 'create_guild_tournament',
         name: name,
         hostGuildId: guildState.guild.id,
         invitedGuildIds: guildState.tournamentGuildsToInvite.map(g => g.id)
     });
-    
+
     closeModal('create-tournament-modal');
     showToast('Tournament invitations sent!', 'success');
 }
@@ -1921,27 +1915,27 @@ function showLeaveGuildConfirm() {
         showToast('Guildmasters cannot leave. Use "Disband Guild" instead.', 'error');
         return;
     }
-    
+
     document.getElementById('leave-guild-name').textContent = guildState.guild?.name || 'this guild';
     showModal('leave-guild-modal');
 }
 
 function leaveGuild() {
     if (guildState.isGuildmaster) return;
-    
+
     send({
         type: 'leave_guild',
         guildId: guildState.guild.id
     });
-    
+
     closeModal('leave-guild-modal');
     showToast('You have left the guild', 'info');
-    
+
     // Reset guild state
     guildState.guild = null;
     guildState.isGuildmaster = false;
     guildState.members = [];
-    
+
     // Update UI to show "No Guild" state
     updateGuildPanel();
 }
@@ -1951,26 +1945,26 @@ function showDisbandGuildConfirm() {
         showToast('Only the Guildmaster can disband the guild', 'error');
         return;
     }
-    
+
     showModal('disband-guild-modal');
 }
 
 function disbandGuild() {
     if (!guildState.isGuildmaster) return;
-    
+
     send({
         type: 'disband_guild',
         guildId: guildState.guild.id
     });
-    
+
     closeModal('disband-guild-modal');
     showToast('Guild has been disbanded', 'info');
-    
+
     // Reset guild state
     guildState.guild = null;
     guildState.isGuildmaster = false;
     guildState.members = [];
-    
+
     // Update UI
     updateGuildPanel();
 }
@@ -1987,7 +1981,7 @@ function updateGuildPanel() {
     const guildChatCard = document.getElementById('guild-chat-card');
     const onlineCountEl = document.getElementById('guild-online-count');
     const onlineListEl = document.getElementById('guild-online-list');
-    
+
     if (!guildState.guild) {
         // No guild - reset to default state
         if (myGuildInfo) {
@@ -2017,13 +2011,13 @@ function handleGuildUpdate(data) {
         guildState.onlineMembers = guildState.members.filter(m => m.online);
         guildState.tournaments = data.tournaments || [];
         guildState.pendingInvites = data.pendingInvites || [];
-        
+
         // Update online count display
         const onlineCountEl = document.getElementById('guild-online-count');
         if (onlineCountEl) {
             onlineCountEl.textContent = guildState.onlineMembers.length;
         }
-        
+
         // Show/hide guildmaster controls
         const gmControls = document.getElementById('guildmaster-controls');
         const leaveSection = document.getElementById('leave-guild-section');
@@ -2033,7 +2027,7 @@ function handleGuildUpdate(data) {
         if (leaveSection) {
             leaveSection.style.display = guildState.isGuildmaster ? 'none' : 'block';
         }
-        
+
         // Update chat state from guild data
         if (data.chatEnabled !== undefined) {
             chatState.enabled = data.chatEnabled;
@@ -2046,7 +2040,7 @@ function handleGuildUpdate(data) {
             chatState.pendingApprovals = data.pendingChatApprovals;
             updatePendingApprovalsBadge();
         }
-        
+
         // Show guild chat card
         updateGuildChatUI();
     }
@@ -2064,21 +2058,21 @@ function updateGuildChatUI() {
     const notApprovedNotice = document.getElementById('chat-not-approved-notice');
     const gmChatControls = document.getElementById('guildmaster-chat-controls');
     const toggleBtn = document.getElementById('toggle-guild-chat-text');
-    
+
     if (!guildState.guild) {
         if (chatCard) chatCard.style.display = 'none';
         return;
     }
-    
+
     // Show chat card when in guild
     if (chatCard) chatCard.style.display = 'block';
-    
+
     // Hide all states first
     if (chatArea) chatArea.style.display = 'none';
     if (disabledNotice) disabledNotice.style.display = 'none';
     if (optedOutNotice) optedOutNotice.style.display = 'none';
     if (notApprovedNotice) notApprovedNotice.style.display = 'none';
-    
+
     // Show appropriate state
     if (!chatState.enabled) {
         if (disabledNotice) disabledNotice.style.display = 'block';
@@ -2089,12 +2083,12 @@ function updateGuildChatUI() {
     } else {
         if (chatArea) chatArea.style.display = 'block';
     }
-    
+
     // Show guildmaster chat controls
     if (gmChatControls) {
         gmChatControls.style.display = guildState.isGuildmaster ? 'block' : 'none';
     }
-    
+
     // Update toggle button text
     if (toggleBtn) {
         toggleBtn.textContent = chatState.enabled ? 'Disable Chat' : 'Enable Chat';
@@ -2111,45 +2105,45 @@ function showChatSettings() {
 
 function toggleChatOptOut() {
     chatState.optedOut = !chatState.optedOut;
-    
+
     // Save preference locally
     localStorage.setItem('ft_chat_opted_out', chatState.optedOut ? 'true' : 'false');
-    
+
     // Save preference to server
     send({
         type: 'update_chat_preference',
         optedOut: chatState.optedOut
     });
-    
+
     // Update UI
     updateGuildChatUI();
-    
+
     const optToggle = document.getElementById('chat-opt-toggle');
     if (optToggle) {
         optToggle.textContent = chatState.optedOut ? '🔔' : '🔇';
         optToggle.title = chatState.optedOut ? 'Opt back into chat' : 'Opt out of chat';
     }
-    
+
     // Update checkbox in settings modal
     const optOutToggle = document.getElementById('chat-opt-out-toggle');
     if (optOutToggle) {
         optOutToggle.checked = chatState.optedOut;
     }
-    
+
     showToast(chatState.optedOut ? 'You have opted out of chat' : 'Chat enabled', 'info');
 }
 
 function toggleGuildChat() {
     if (!guildState.isGuildmaster) return;
-    
+
     chatState.enabled = !chatState.enabled;
-    
+
     send({
         type: 'toggle_guild_chat',
         guildId: guildState.guild.id || guildState.guild.guild_id,
         enabled: chatState.enabled
     });
-    
+
     updateGuildChatUI();
     showToast(chatState.enabled ? 'Guild chat enabled' : 'Guild chat disabled', 'info');
 }
@@ -2163,18 +2157,18 @@ function handleGuildChatKeypress(event) {
 function sendGuildChatMessage() {
     const input = document.getElementById('guild-chat-input');
     const message = input.value.trim();
-    
+
     if (!message) return;
     if (!guildState.guild) return;
     if (chatState.optedOut || !chatState.enabled) return;
     if (!chatState.approved && !guildState.isGuildmaster) return;
-    
+
     send({
         type: 'guild_chat_message',
         guildId: guildState.guild.id || guildState.guild.guild_id,
         message: message
     });
-    
+
     input.value = '';
 }
 
@@ -2183,23 +2177,23 @@ function addGuildChatMessage(data) {
     if (chatState.blockedUsers.find(u => u.id === data.senderId)) {
         return; // Don't show messages from blocked users
     }
-    
+
     // Check if we're blocked by sender (server should filter, but double-check)
     if (chatState.blockedByUsers.includes(data.senderId)) {
         return;
     }
-    
+
     const container = document.getElementById('guild-chat-messages');
     if (!container) return;
-    
+
     // Remove "no messages" placeholder
     const placeholder = container.querySelector('p');
     if (placeholder && placeholder.textContent.includes('No messages')) {
         placeholder.remove();
     }
-    
+
     const time = new Date(data.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
+
     const messageEl = document.createElement('div');
     messageEl.className = 'chat-message';
     messageEl.dataset.senderId = data.senderId;
@@ -2220,10 +2214,10 @@ function addGuildChatMessage(data) {
         </div>
         <div class="chat-message-text">${escapeHtml(data.message)}</div>
     `;
-    
+
     container.appendChild(messageEl);
     container.scrollTop = container.scrollHeight;
-    
+
     // Store message
     chatState.messages.push(data);
 }
@@ -2231,7 +2225,7 @@ function addGuildChatMessage(data) {
 // Chat Approval System
 function showChatApprovals() {
     if (!guildState.isGuildmaster) return;
-    
+
     renderChatApprovalsList();
     showModal('chat-approvals-modal');
 }
@@ -2239,12 +2233,12 @@ function showChatApprovals() {
 function renderChatApprovalsList() {
     const container = document.getElementById('chat-approval-list');
     if (!container) return;
-    
+
     if (!chatState.pendingApprovals || chatState.pendingApprovals.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No pending approvals</p>';
         return;
     }
-    
+
     container.innerHTML = chatState.pendingApprovals.map(user => `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
             <div>
@@ -2265,12 +2259,12 @@ function approveChatUser(userId) {
         guildId: guildState.guild.id || guildState.guild.guild_id,
         userId: userId
     });
-    
+
     // Remove from pending
     chatState.pendingApprovals = chatState.pendingApprovals.filter(u => u.id !== userId);
     renderChatApprovalsList();
     updatePendingApprovalsBadge();
-    
+
     showToast('User approved for chat', 'success');
 }
 
@@ -2280,19 +2274,19 @@ function denyChatUser(userId) {
         guildId: guildState.guild.id || guildState.guild.guild_id,
         userId: userId
     });
-    
+
     // Remove from pending
     chatState.pendingApprovals = chatState.pendingApprovals.filter(u => u.id !== userId);
     renderChatApprovalsList();
     updatePendingApprovalsBadge();
-    
+
     showToast('User denied chat access', 'info');
 }
 
 function updatePendingApprovalsBadge() {
     const badge = document.getElementById('pending-approvals-badge');
     if (!badge) return;
-    
+
     const count = chatState.pendingApprovals?.length || 0;
     badge.style.display = count > 0 ? 'inline' : 'none';
     badge.textContent = count;
@@ -2312,19 +2306,19 @@ function loadBlockedUsers() {
 function renderBlockedUsersList() {
     const container = document.getElementById('blocked-users-list');
     if (!container) return;
-    
+
     if (!chatState.blockedUsers || chatState.blockedUsers.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No blocked users</p>';
         return;
     }
-    
+
     const now = Date.now();
-    
+
     container.innerHTML = chatState.blockedUsers.map(user => {
         const cooldownEnd = chatState.unblockCooldowns[user.id];
         const canBlock = !cooldownEnd || now >= cooldownEnd;
         const cooldownRemaining = cooldownEnd ? Math.max(0, Math.ceil((cooldownEnd - now) / (1000 * 60 * 60))) : 0;
-        
+
         return `
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 0.5rem;">
                 <div>
@@ -2345,33 +2339,33 @@ function searchUsersToBlock() {
         document.getElementById('block-user-results').innerHTML = '';
         return;
     }
-    
+
     send({ type: 'search_users_to_block', query: query });
 }
 
 function handleBlockUserSearchResults(users) {
     const container = document.getElementById('block-user-results');
     if (!container) return;
-    
+
     // Filter out already blocked users and self
-    const available = users.filter(u => 
-        u.id !== state.user.id && 
+    const available = users.filter(u =>
+        u.id !== state.user.id &&
         !chatState.blockedUsers.find(b => b.id === u.id)
     );
-    
+
     if (available.length === 0) {
         container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-secondary);">No matching users</p>';
         return;
     }
-    
+
     // Check for cooldowns
     const now = Date.now();
-    
+
     container.innerHTML = available.map(user => {
         const cooldownEnd = chatState.unblockCooldowns[user.id];
         const canBlock = !cooldownEnd || now >= cooldownEnd;
         const cooldownHours = cooldownEnd ? Math.max(0, Math.ceil((cooldownEnd - now) / (1000 * 60 * 60))) : 0;
-        
+
         return `
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 0.25rem;">
                 <span style="font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(user.name)}</span>
@@ -2395,22 +2389,22 @@ function blockUser(userId, userName) {
         showToast(`Must wait ${hours} hours before blocking this user again`, 'error');
         return;
     }
-    
+
     send({
         type: 'block_user',
         userId: userId
     });
-    
+
     // Add to local blocked list
     chatState.blockedUsers.push({ id: userId, name: userName, blockedAt: Date.now() });
-    
+
     // Clear search
     document.getElementById('block-user-search').value = '';
     document.getElementById('block-user-results').innerHTML = '';
-    
+
     renderBlockedUsersList();
     showToast('User blocked', 'info');
-    
+
     // Remove their messages from chat
     removeBlockedUserMessages(userId);
 }
@@ -2426,16 +2420,16 @@ function unblockUser(userId, userName) {
         type: 'unblock_user',
         userId: userId
     });
-    
+
     // Remove from blocked list
     chatState.blockedUsers = chatState.blockedUsers.filter(u => u.id !== userId);
-    
+
     // Set 24-hour cooldown before can block again
     chatState.unblockCooldowns[userId] = Date.now() + (24 * 60 * 60 * 1000);
-    
+
     // Save cooldowns to localStorage
     localStorage.setItem('ft_block_cooldowns', JSON.stringify(chatState.unblockCooldowns));
-    
+
     renderBlockedUsersList();
     showToast(`${userName} unblocked. Must wait 24h to block again.`, 'info');
 }
@@ -2444,7 +2438,7 @@ function removeBlockedUserMessages(userId) {
     // Remove from DOM
     const messages = document.querySelectorAll(`.chat-message[data-sender-id="${userId}"]`);
     messages.forEach(el => el.remove());
-    
+
     // Remove from state
     chatState.messages = chatState.messages.filter(m => m.senderId !== userId);
 }
@@ -2454,7 +2448,7 @@ function loadBlockCooldowns() {
         const stored = localStorage.getItem('ft_block_cooldowns');
         if (stored) {
             chatState.unblockCooldowns = JSON.parse(stored);
-            
+
             // Clean up expired cooldowns
             const now = Date.now();
             Object.keys(chatState.unblockCooldowns).forEach(userId => {
@@ -2480,7 +2474,7 @@ function onChatUpdate(data) {
         chatState.pendingApprovals = data.pendingApprovals;
         updatePendingApprovalsBadge();
     }
-    
+
     updateGuildChatUI();
 }
 
@@ -2514,7 +2508,7 @@ function init() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const action = params.get('action');
-    
+
     if (code) {
         state.pendingAction = 'code';
         state.pendingCode = code;
@@ -2523,19 +2517,19 @@ function init() {
     } else if (action === 'join') {
         state.pendingAction = 'join';
     }
-    
+
     // Load block cooldowns from localStorage
     loadBlockCooldowns();
-    
+
     // Load chat opt-out preference
     const chatOptedOut = localStorage.getItem('ft_chat_opted_out');
     if (chatOptedOut === 'true') {
         chatState.optedOut = true;
     }
-    
+
     // Connect to lobby
     connectToLobby();
-    
+
     // Ping every 30 seconds to keep connection alive
     setInterval(() => {
         if (state.connected) {

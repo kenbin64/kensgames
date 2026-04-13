@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-04-13T19:20:00.000Z",
+  "overall": {
+    "lines": 7441,
+    "manifoldCalls": 20,
+    "directEntityWrites": 35,
+    "directStateWrites": 100,
+    "directPhysicsOps": 245,
+    "directTotal": 380,
+    "manifoldSignalDensityPct": 0.27,
+    "manifoldPressureIndex": 0.053
+  }
+}

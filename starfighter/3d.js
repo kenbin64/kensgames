@@ -8,15 +8,31 @@ const SF3D = (function () {
     const entityMeshes = new Map();
     let cockpitGroup;
     let cockpitModel; // GLB cockpit model
+    let manifoldCockpitGroup;
+    let manifoldCockpitShell;
+    let manifoldCockpitDash;
+    let manifoldCockpitMat;
+    let manifoldCockpitShellMat;
     let cockpitLeftArm, cockpitRightArm; // separated arm meshes for animation
     let leftScreenMesh, rightScreenMesh; // 3D screen planes
     let telemetryCanvas, telemetryCtx, telemetryTexture;
     let radarTexture; // CanvasTexture from radar-canvas
     let cockpitLoaded = false;
+    let cockpitLoadFailed = false;
     let cockpitVisible = true; // cockpit always visible — seamless through launch and combat
+    let lastCockpitToggleAt = 0;
+    let lastCockpitToggleValue = true;
+    const MANIFOLD_COCKPIT_DEBUG = /(?:\?|&)manifoldCockpit=1(?:&|$)/.test(window.location.search);
     let targetLockMesh;
     let launchBayGroup;
     let cameraShakeIntensity = 0;
+    const STRICT_MODEL_BASELINE = true;
+    const _viewProj = new THREE.Matrix4();
+    const _viewFrustum = new THREE.Frustum();
+    const _tmpSphere = new THREE.Sphere();
+    const _tmpVec = new THREE.Vector3();
+    let _staticAnimFrame = 0;
+    let _lastTelemetrySignature = '';
 
     // ── GLB model cache: loaded once, cloned per entity ──
     const glbModels = {};    // { modelName: THREE.Group }
@@ -33,11 +49,28 @@ const SF3D = (function () {
         'alien-baseship': [
             { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
         ],
+        predator: [
+            { path: 'assets/models/AlienEnemyPreditorDrone.glb', distance: 0 },
+        ],
         baseship: [
             { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },
         ],
         station: [
             { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 },
+        ],
+        // New enemy types
+        interceptor: [
+            { path: 'assets/models/Interceptor_Needle.glb', distance: 0 },
+        ],
+        bomber: [
+            { path: 'assets/models/Bomber_Leviathan%20Tick.glb', distance: 0 },
+        ],
+        dreadnought: [
+            { path: 'assets/models/Dreadnought_Hive%20Throne.glb', distance: 0 },
+        ],
+        // Friendly support
+        tanker: [
+            { path: 'assets/models/friendlyfueltanker.glb', distance: 0 },
         ],
         // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [
@@ -48,15 +81,33 @@ const SF3D = (function () {
     // Fighter wingspan ~15m, Baseship ~1200m (80× fighter), Mothership ~800m
     const GLB_SCALES = {
         enemy: 18,             // alien fighter ~15m wingspan
+        predator: 35,          // predator drone ~30m — larger, menacing hunter
+        interceptor: 14,       // interceptor ~12m — sleek, smaller than drone
+        bomber: 30,            // bomber ~25m — bulbous heavy craft
+        dreadnought: 500,      // dreadnought ~400m — massive boss capital
         'alien-baseship': 500, // alien mothership ~800m — massive capital ship
         baseship: 800,         // human carrier ~1200m — Galactica-scale, towering on approach
         ally: 16,              // human fighter ~13m wingspan
+        tanker: 40,            // fuel tanker ~50m — chunky support craft
         station: 400,          // space station ~600m
         earth: 8000,  // massive planet — far beyond arena, fills the sky impressively
     };
 
+    // ── Dimensional LOD Manifold: z = xy ──
+    // Visual detail (z) is the product of model fidelity (x) and camera distance (y)
+    // Tier 0 (near): Full GLB model — Tier 1 (mid): Procedural mesh — Tier 2 (far): Glow sphere
+    const PRELOAD_MODELS = STRICT_MODEL_BASELINE
+        ? new Set(Object.keys(GLB_LOD))
+        : new Set(['earth', 'baseship', 'station', 'ally']);
+    const LOD_GLOW_DIST = {
+        enemy: 2000, predator: 2500, interceptor: 1800, bomber: 2500,
+        dreadnought: 5000, 'alien-baseship': 4000, tanker: 2000,
+        ally: 2000, baseship: 6000, station: 8000, earth: 50000,
+    };
+    const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
+
     // ── Shared starfield vertex data (world-space positions, shared with radar) ──
-    const STAR_COUNT = 6000;
+    const STAR_COUNT = 4000;
     const STAR_RADIUS = 30000;
     let starfieldVerts = null; // Float32Array — filled once, read by radar
 
@@ -233,7 +284,7 @@ const SF3D = (function () {
         sunGroup.add(new THREE.Mesh(photoGeo, photoMat));
 
         // Multi-layer corona — fades from yellow-white to deep orange/red
-        const coronaColors = [0xffee88, 0xffdd44, 0xffaa22, 0xff8800, 0xff5500, 0xff3300, 0xcc1100];
+        const coronaColors = [0xffee88, 0xffaa22, 0xff5500, 0xcc1100];
         for (let i = 0; i < coronaColors.length; i++) {
             const r = 850 + i * 250;
             const coronaGeo = new THREE.SphereGeometry(r, 24, 24);
@@ -284,14 +335,44 @@ const SF3D = (function () {
         // Preload all GLB models
         _preloadGLBModels();
 
-        // Target Lock Reticle
-        const reticleGeo = new THREE.BoxGeometry(20, 20, 20);
-        const reticleMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
-        targetLockMesh = new THREE.Mesh(reticleGeo, reticleMat);
+        // Target Lock Reticle — modern bracket-style ring
+        targetLockMesh = _createTargetReticle();
         targetLockMesh.visible = false;
         scene.add(targetLockMesh);
 
         window.addEventListener('resize', onWindowResize, false);
+    }
+
+    // ── Create modern targeting reticle (ring + corner brackets) ──
+    function _createTargetReticle() {
+        const group = new THREE.Group();
+        // Outer ring
+        const ringGeo = new THREE.RingGeometry(9, 10, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        group.add(ring);
+        // Inner ring (thinner, brighter)
+        const innerRingGeo = new THREE.RingGeometry(6.5, 7, 32);
+        const innerRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
+        group.add(new THREE.Mesh(innerRingGeo, innerRingMat));
+        // Corner brackets (four L-shaped lines)
+        const bracketMat = new THREE.LineBasicMaterial({ color: 0x00ffcc });
+        const bSize = 12, bLen = 4;
+        const corners = [
+            [[-bSize, bSize, 0], [-bSize + bLen, bSize, 0], [-bSize, bSize, 0], [-bSize, bSize - bLen, 0]],
+            [[bSize, bSize, 0], [bSize - bLen, bSize, 0], [bSize, bSize, 0], [bSize, bSize - bLen, 0]],
+            [[-bSize, -bSize, 0], [-bSize + bLen, -bSize, 0], [-bSize, -bSize, 0], [-bSize, -bSize + bLen, 0]],
+            [[bSize, -bSize, 0], [bSize - bLen, -bSize, 0], [bSize, -bSize, 0], [bSize, -bSize + bLen, 0]],
+        ];
+        corners.forEach(pts => {
+            const geo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(...p)));
+            group.add(new THREE.LineSegments(geo, bracketMat));
+        });
+        // Diamond center pip
+        const dotGeo = new THREE.RingGeometry(0, 1.5, 4);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+        group.add(new THREE.Mesh(dotGeo, dotMat));
+        return group;
     }
 
     // ── Loading progress tracking ──
@@ -319,61 +400,160 @@ const SF3D = (function () {
     function onAllModelsReady(cb) { _onReadyCallback = cb; if (_allModelsReady) cb(); }
     function isReady() { return _allModelsReady; }
 
-    // ── Preload all GLB LOD levels so cloning is instant ──
+    // ── Preload essential GLBs; lazy-load combat models on demand ──
+    // Dimensional LOD: preloaded types get GLB + glow sphere immediately;
+    // lazy types start as procedural fallback, GLB streams in during gameplay
     function _preloadGLBModels() {
         const loader = new THREE.GLTFLoader();
-        // Count total files to load (all levels across all keys + cockpit)
+
+        // Only count preloaded models for loading screen (+ cockpit)
         _totalModelsToLoad = 1; // cockpit
-        Object.values(GLB_LOD).forEach(levels => { _totalModelsToLoad += levels.length; });
+        Object.entries(GLB_LOD).forEach(([key, levels]) => {
+            if (PRELOAD_MODELS.has(key)) _totalModelsToLoad += levels.length;
+        });
 
         Object.entries(GLB_LOD).forEach(([key, levels]) => {
-            const lod = new THREE.LOD();
-            glbModels[key] = lod;
-            let loaded = 0;
-            const levelResults = new Array(levels.length);
-
-            levels.forEach(({ path, distance }, idx) => {
-                loader.load(path,
-                    function (gltf) {
-                        const model = gltf.scene;
-                        model.traverse(child => {
-                            if (child.isMesh && child.material && child.material.map)
-                                child.material.map.encoding = THREE.sRGBEncoding;
-                        });
-                        levelResults[idx] = { model, distance };
-                        loaded++;
-                        _updateLoadingProgress(key);
-
-                        if (loaded === levels.length) {
-                            levelResults.sort((a, b) => a.distance - b.distance);
-
-                            // Collect lod0 materials to apply to stripped levels
-                            const lod0Mats = [];
-                            levelResults[0].model.traverse(c => {
-                                if (c.isMesh) lod0Mats.push(c.material);
-                            });
-
-                            levelResults.forEach(({ model, distance }, i) => {
-                                if (i > 0) {
-                                    let mi = 0;
-                                    model.traverse(c => {
-                                        if (c.isMesh && lod0Mats[mi])
-                                            c.material = lod0Mats[mi++];
-                                    });
-                                }
-                                lod.addLevel(model, distance);
-                            });
-
-                            console.log(`GLB LOD ready: ${key} (${levels.length} levels)`);
-                            if (key === 'earth') { _placeEarth(lod); _placeMoon(); }
-                            if (key === 'station') _placeStation(lod);
-                        }
-                    },
-                    null,
-                    err => { console.error('Failed to load LOD:', path, err); _updateLoadingProgress(key); }
-                );
-            });
+            if (PRELOAD_MODELS.has(key)) {
+                // ── Essential: load immediately, block loading screen ──
+                _loadGLBType(loader, key, levels, true);
+            } else {
+                // ── Combat entity: empty template, lazy-loaded on first encounter ──
+                glbModels[key] = new THREE.LOD(); // empty — triggers procedural fallback
+            }
         });
+    }
+
+    // Shared GLB loading logic — used by both preload and lazy paths
+    function _loadGLBType(loader, key, levels, countProgress) {
+        const lod = new THREE.LOD();
+        glbModels[key] = lod;
+        let loaded = 0;
+        const levelResults = new Array(levels.length);
+
+        levels.forEach(({ path, distance }, idx) => {
+            loader.load(path,
+                function (gltf) {
+                    const model = gltf.scene;
+                    model.traverse(child => {
+                        if (child.isMesh && child.material && child.material.map)
+                            child.material.map.encoding = THREE.sRGBEncoding;
+                    });
+                    levelResults[idx] = { model, distance };
+                    loaded++;
+                    if (countProgress) _updateLoadingProgress(key);
+
+                    if (loaded === levels.length) {
+                        levelResults.sort((a, b) => a.distance - b.distance);
+
+                        const lod0Mats = [];
+                        levelResults[0].model.traverse(c => {
+                            if (c.isMesh) lod0Mats.push(c.material);
+                        });
+
+                        levelResults.forEach(({ model, distance }, i) => {
+                            if (i > 0) {
+                                let mi = 0;
+                                model.traverse(c => {
+                                    if (c.isMesh && lod0Mats[mi])
+                                        c.material = lod0Mats[mi++];
+                                });
+                            }
+                            if (!STRICT_MODEL_BASELINE && ALIEN_GLOW_COLORS[key]) _applyBioluminescence(model, key);
+                            lod.addLevel(model, distance);
+                        });
+
+                        // Add glow sphere as far-distance tier (disabled in strict model baseline)
+                        if (!STRICT_MODEL_BASELINE) {
+                            const glowDist = LOD_GLOW_DIST[key];
+                            if (glowDist) lod.addLevel(_createGlowSphere(key), glowDist);
+                        }
+
+                        console.log(`GLB LOD ready: ${key} (${levels.length} detail + glow)`);
+                        if (!countProgress) _lazyState[key] = 'loaded';
+                        if (key === 'earth') { _placeEarth(lod); _placeMoon(); }
+                        if (key === 'station') _placeStation(lod);
+                    }
+                },
+                null,
+                err => {
+                    console.error('Failed to load GLB:', path, err);
+                    if (countProgress) _updateLoadingProgress(key);
+                    if (!countProgress) _lazyState[key] = 'error';
+                }
+            );
+        });
+    }
+
+    // ── Lazy loader: streams combat model GLBs on first encounter ──
+    function _triggerLazyLoad(key) {
+        if (_lazyState[key]) return; // already loading/loaded
+        _lazyState[key] = 'loading';
+        console.log(`Lazy-loading GLB: ${key}...`);
+        const levels = GLB_LOD[key];
+        if (!levels || !levels[0]) return;
+        const loader = new THREE.GLTFLoader();
+        _loadGLBType(loader, key, levels, false);
+    }
+
+    // ── Bioluminescent glow for alien species from Brown Giant ──
+    // They glow like deep-sea creatures in the vacuum of space
+    const ALIEN_GLOW_COLORS = {
+        enemy: { emissive: 0x22ff44, intensity: 0.6, pointColor: 0x44ff66, pointIntensity: 2.5, pointDist: 120 },
+        predator: { emissive: 0x44ff00, intensity: 0.8, pointColor: 0x66ff22, pointIntensity: 4.0, pointDist: 200 },
+        interceptor: { emissive: 0x00ffcc, intensity: 0.7, pointColor: 0x22ffdd, pointIntensity: 3.0, pointDist: 100 },
+        bomber: { emissive: 0xff6600, intensity: 0.6, pointColor: 0xff8800, pointIntensity: 3.5, pointDist: 180 },
+        dreadnought: { emissive: 0xff0044, intensity: 0.7, pointColor: 0xff2266, pointIntensity: 8.0, pointDist: 800 },
+        'alien-baseship': { emissive: 0xff00ff, intensity: 0.5, pointColor: 0xff44ff, pointIntensity: 6.0, pointDist: 600 },
+    };
+
+    // ── Glow Sphere: far-distance LOD tier — minimal geometry, maximum visibility ──
+    function _createGlowSphere(key) {
+        const group = new THREE.Group();
+        const cfg = ALIEN_GLOW_COLORS[key];
+        const color = cfg ? cfg.emissive :
+            (key === 'tanker' ? 0x00ff88 :
+                key === 'ally' ? 0x4488ff :
+                    key === 'baseship' ? 0x4488ff :
+                        key === 'station' ? 0x4488ff : 0xffffff);
+
+        // Core sphere — bright, visible at distance
+        group.add(new THREE.Mesh(
+            new THREE.SphereGeometry(0.5, 8, 8),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
+        ));
+        // Additive halo — soft bloom effect
+        group.add(new THREE.Mesh(
+            new THREE.SphereGeometry(1.2, 6, 6),
+            new THREE.MeshBasicMaterial({
+                color, transparent: true, opacity: 0.25,
+                blending: THREE.AdditiveBlending, side: THREE.BackSide
+            })
+        ));
+        return group;
+    }
+
+    function _applyBioluminescence(model, key) {
+        const cfg = ALIEN_GLOW_COLORS[key];
+        if (!cfg) return;
+        model.traverse(child => {
+            if (child.isMesh && child.material) {
+                // Clone material so shared instances don't bleed
+                child.material = child.material.clone();
+                child.material.emissive = new THREE.Color(cfg.emissive);
+                child.material.emissiveIntensity = cfg.intensity;
+                // Make slightly translucent for organic feel
+                child.material.transparent = true;
+                child.material.opacity = 0.92;
+            }
+        });
+    }
+
+    function _addGlowLight(mesh, key) {
+        const cfg = ALIEN_GLOW_COLORS[key];
+        if (!cfg) return;
+        const light = new THREE.PointLight(cfg.pointColor, cfg.pointIntensity, cfg.pointDist);
+        light.name = 'bioGlow';
+        mesh.add(light);
     }
 
     // ── Clone a LOD model for a new entity ──
@@ -402,7 +582,7 @@ const SF3D = (function () {
         const earthRadius = GLB_SCALES.earth * 0.8;
 
         // ── Atmosphere shell — soft blue glow around the limb ──
-        const atmosGeo = new THREE.SphereGeometry(earthRadius * 1.02, 64, 64);
+        const atmosGeo = new THREE.SphereGeometry(earthRadius * 1.02, 32, 32);
         const atmosMat = new THREE.ShaderMaterial({
             uniforms: {
                 glowColor: { value: new THREE.Color(0x4488ff) },
@@ -440,7 +620,7 @@ const SF3D = (function () {
         earthGroup.add(atmosphere);
 
         // ── Thin bright limb ring — Fresnel edge highlight ──
-        const limbGeo = new THREE.SphereGeometry(earthRadius * 1.01, 64, 64);
+        const limbGeo = new THREE.SphereGeometry(earthRadius * 1.01, 32, 32);
         const limbMat = new THREE.ShaderMaterial({
             uniforms: {
                 sunDirection: { value: new THREE.Vector3(15000, 8000, 6000).normalize() }
@@ -730,7 +910,7 @@ const SF3D = (function () {
     function updateLaunchCinematic(progress) {
         if (!launchBayGroup) return;
 
-        // Stage 1: Countdown phase (0 - 0.625) - Rattling bay with engine spooling
+        // Stage 1: Countdown phase (0 - 0.625) - Bay idle → engine spool-up
         if (progress < 0.625) {
             const countdownPhase = progress / 0.625;
             // Metallic rattle - subtle rotation oscillation
@@ -745,8 +925,14 @@ const SF3D = (function () {
                     }
                 }
             });
-            // Camera shaking during countdown
-            cameraShakeIntensity = countdownPhase * 0.5;
+            // Only shake during engine rev-up (last 30% of countdown, ~70%+ progress)
+            // Before that the ship is just sitting idle in the bay — no shake
+            if (countdownPhase > 0.7) {
+                const revPhase = (countdownPhase - 0.7) / 0.3; // 0→1 during rev-up
+                cameraShakeIntensity = revPhase * 0.4;
+            } else {
+                cameraShakeIntensity = 0;
+            }
             // Reset bay position
             launchBayGroup.position.set(0, -32, 50);
             launchBayGroup.visible = true;
@@ -794,6 +980,11 @@ const SF3D = (function () {
     function createCockpit() {
         cockpitGroup = new THREE.Group();
         cockpitGroup.renderOrder = 100;
+        cockpitGroup.frustumCulled = false;
+
+        // Build manifold cockpit as a diagnostic/fallback lens.
+        // Visual default remains the authored GLB cockpit.
+        createManifoldCockpit();
 
         // Load GLB cockpit model
         const gltfLoader = new THREE.GLTFLoader();
@@ -811,16 +1002,19 @@ const SF3D = (function () {
                 cockpitModel.traverse(child => {
                     if (child.isMesh) {
                         child.renderOrder = 100;
+                        child.frustumCulled = false;
+                        child.material.side = THREE.DoubleSide;
+                        // Keep cockpit as a camera-overlay layer so nearby world geometry
+                        // (baseship hull / launch tunnel) cannot punch it out after launch.
                         child.material.depthTest = false;
                         child.material.depthWrite = false;
+                        child.material.toneMapped = true;
                         // Keep the PBR look
                         if (child.material.map) child.material.map.encoding = THREE.sRGBEncoding;
                     }
                 });
 
                 // ── Separate arm geometry for procedural animation ──
-                // The model is a single mesh. We'll find vertices in arm-like positions
-                // (lower-left and lower-right of the cockpit) and split them out.
                 cockpitModel.traverse(child => {
                     if (child.isMesh && child.geometry) {
                         _extractArms(child);
@@ -830,6 +1024,8 @@ const SF3D = (function () {
                 cockpitGroup.add(cockpitModel);
                 cockpitModel.visible = cockpitVisible;
                 cockpitLoaded = true;
+                cockpitLoadFailed = false;
+                if (manifoldCockpitGroup) manifoldCockpitGroup.visible = cockpitVisible && MANIFOLD_COCKPIT_DEBUG;
                 _updateLoadingProgress('cockpit');
 
                 console.log('Cockpit GLB loaded successfully');
@@ -843,6 +1039,8 @@ const SF3D = (function () {
             },
             function (error) {
                 console.error('Failed to load cockpit GLB:', error);
+                cockpitLoadFailed = true;
+                if (manifoldCockpitGroup) manifoldCockpitGroup.visible = cockpitVisible;
                 _updateLoadingProgress('cockpit');
             }
         );
@@ -864,6 +1062,105 @@ const SF3D = (function () {
 
         camera.add(cockpitGroup);
         scene.add(camera);
+    }
+
+    function createManifoldCockpit() {
+        manifoldCockpitGroup = new THREE.Group();
+        manifoldCockpitGroup.position.set(0, -0.57, -0.75);
+        manifoldCockpitGroup.renderOrder = 99;
+        manifoldCockpitGroup.frustumCulled = false;
+        manifoldCockpitGroup.visible = MANIFOLD_COCKPIT_DEBUG;
+
+        const shellPositions = [];
+        const shellColors = [];
+        const manifold = window.SpaceManifold;
+        const shellColor = new THREE.Color();
+
+        for (let xi = -16; xi <= 16; xi++) {
+            for (let yi = -12; yi <= 10; yi++) {
+                const x = xi * 0.055;
+                const y = yi * 0.055;
+                const fold = x * y;
+                const z = -0.18 - Math.abs(fold) * 2.15 - Math.pow(Math.abs(x), 1.45) * 0.32;
+                const field = manifold && manifold.diamond ? manifold.diamond(x * 700, y * 700, z * 700) : 0;
+
+                if (Math.abs(field) < 0.33 || Math.abs(fold) < 0.045) {
+                    shellPositions.push(
+                        x,
+                        y + field * 0.03,
+                        z - Math.abs(field) * 0.08
+                    );
+
+                    const intensity = 0.35 + (0.25 * (1 - Math.min(1, Math.abs(field))));
+                    shellColor.setRGB(0.08, 0.65 + intensity * 0.4, 0.9 + intensity * 0.1);
+                    shellColors.push(shellColor.r, shellColor.g, shellColor.b);
+                }
+            }
+        }
+
+        const shellGeo = new THREE.BufferGeometry();
+        shellGeo.setAttribute('position', new THREE.Float32BufferAttribute(shellPositions, 3));
+        shellGeo.setAttribute('color', new THREE.Float32BufferAttribute(shellColors, 3));
+        manifoldCockpitShellMat = new THREE.PointsMaterial({
+            size: 0.028,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            sizeAttenuation: true,
+        });
+        manifoldCockpitShell = new THREE.Points(shellGeo, manifoldCockpitShellMat);
+        manifoldCockpitShell.renderOrder = 99;
+        manifoldCockpitShell.frustumCulled = false;
+        manifoldCockpitGroup.add(manifoldCockpitShell);
+
+        const dashGeo = new THREE.BoxGeometry(1.55, 0.18, 0.88, 4, 1, 3);
+        manifoldCockpitMat = new THREE.MeshStandardMaterial({
+            color: 0x0b1322,
+            emissive: 0x0f8fb0,
+            emissiveIntensity: 0.28,
+            roughness: 0.72,
+            metalness: 0.55,
+            transparent: true,
+            opacity: 0.92,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            depthTest: false,
+        });
+        manifoldCockpitDash = new THREE.Mesh(dashGeo, manifoldCockpitMat);
+        manifoldCockpitDash.position.set(0, -0.17, -0.28);
+        manifoldCockpitDash.rotation.x = -0.32;
+        manifoldCockpitDash.renderOrder = 98;
+        manifoldCockpitDash.frustumCulled = false;
+        manifoldCockpitGroup.add(manifoldCockpitDash);
+
+        const railMat = new THREE.LineBasicMaterial({
+            color: 0x66eeff,
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+            depthTest: false,
+        });
+        const railCurves = [-1, 1].map(sign => {
+            const points = [];
+            for (let i = 0; i <= 18; i++) {
+                const t = i / 18;
+                const x = sign * (0.34 + 0.14 * (1 - t));
+                const y = -0.28 + Math.sin(t * Math.PI) * 0.38;
+                const z = -0.18 - t * 1.05 - Math.abs(x * y) * 0.55;
+                points.push(new THREE.Vector3(x, y, z));
+            }
+            return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), railMat);
+        });
+        railCurves.forEach(line => {
+            line.renderOrder = 99;
+            line.frustumCulled = false;
+            manifoldCockpitGroup.add(line);
+        });
+
+        cockpitGroup.add(manifoldCockpitGroup);
     }
 
     /**
@@ -902,8 +1199,8 @@ const SF3D = (function () {
         // to the cockpit model based on pitch/yaw input.
         // This makes the hands appear to push the stick in the direction of travel.
 
-        const yaw = player.yaw || 0;    // current frame yaw input
-        const pitch = player.pitch || 0; // current frame pitch input
+        const yaw = THREE.MathUtils.clamp(player.yaw || 0, -1.6, 1.6);    // bounded steering intent
+        const pitch = THREE.MathUtils.clamp(player.pitch || 0, -1.4, 1.4); // bounded steering intent
         const roll = player.roll || 0;
 
         // Smoothly tilt cockpit to follow stick input
@@ -913,9 +1210,33 @@ const SF3D = (function () {
         const targetYawY = yaw * 0.08;      // slight yaw follow
 
         // Smooth interpolation (lerp)
-        cockpitModel.rotation.z += (targetRollZ - cockpitModel.rotation.z) * 0.1;
-        cockpitModel.rotation.x += (targetPitchX - cockpitModel.rotation.x) * 0.1;
-        cockpitModel.rotation.y += (targetYawY - cockpitModel.rotation.y) * 0.1;
+        cockpitModel.rotation.z += (targetRollZ - cockpitModel.rotation.z) * 0.12;
+        cockpitModel.rotation.x += (targetPitchX - cockpitModel.rotation.x) * 0.12;
+        cockpitModel.rotation.y += (targetYawY - cockpitModel.rotation.y) * 0.12;
+
+        // Hard safety rails: keep cockpit in-frame even if input spikes slip through.
+        cockpitModel.rotation.z = THREE.MathUtils.clamp(cockpitModel.rotation.z, -0.26, 0.26);
+        cockpitModel.rotation.x = THREE.MathUtils.clamp(cockpitModel.rotation.x, -0.22, 0.22);
+        cockpitModel.rotation.y = THREE.MathUtils.clamp(cockpitModel.rotation.y, -0.16, 0.16);
+    }
+
+    function _animateManifoldCockpit(player) {
+        if (!manifoldCockpitGroup || !manifoldCockpitGroup.visible) return;
+
+        const yaw = player.yaw || 0;
+        const pitch = player.pitch || 0;
+        const throttle = player.throttle || 0;
+        const phase = window.SpaceManifold && window.SpaceManifold.helixPhase
+            ? window.SpaceManifold.helixPhase(player.position.x, player.position.y)
+            : performance.now() * 0.001;
+
+        manifoldCockpitGroup.rotation.z += ((-yaw * 0.08) - manifoldCockpitGroup.rotation.z) * 0.08;
+        manifoldCockpitGroup.rotation.x += ((pitch * 0.06) - manifoldCockpitGroup.rotation.x) * 0.08;
+
+        const pulse = 0.55 + 0.25 * Math.sin(performance.now() * 0.002 + phase);
+        const thrustGlow = 0.18 + Math.max(0, throttle) * 0.18;
+        if (manifoldCockpitShellMat) manifoldCockpitShellMat.opacity = cockpitLoaded ? 0.24 + pulse * 0.08 : 0.72 + pulse * 0.12;
+        if (manifoldCockpitMat) manifoldCockpitMat.emissiveIntensity = 0.22 + pulse * 0.2 + thrustGlow;
     }
 
     // Resize cockpit — GLB model scales naturally, no quad to rebuild
@@ -927,12 +1248,41 @@ const SF3D = (function () {
     // Show/hide cockpit (called by core.js on launch complete)
     function showCockpit(visible) {
         cockpitVisible = visible;
+        lastCockpitToggleAt = Date.now();
+        lastCockpitToggleValue = !!visible;
         if (cockpitModel) cockpitModel.visible = visible;
+        if (manifoldCockpitGroup) manifoldCockpitGroup.visible = visible && (MANIFOLD_COCKPIT_DEBUG || cockpitLoadFailed);
+    }
+
+    function getCockpitDebugState() {
+        return {
+            cockpitLoaded,
+            cockpitVisible,
+            hasCockpitModel: !!cockpitModel,
+            hasManifoldCockpit: !!manifoldCockpitGroup,
+            cockpitLoadFailed,
+            manifoldCockpitDebugMode: MANIFOLD_COCKPIT_DEBUG,
+            cockpitModelVisible: cockpitModel ? !!cockpitModel.visible : null,
+            manifoldCockpitVisible: manifoldCockpitGroup ? !!manifoldCockpitGroup.visible : null,
+            lastCockpitToggleAt,
+            lastCockpitToggleValue,
+        };
     }
 
     // Draw telemetry gauges onto the right-screen canvas
     function updateTelemetryScreen(data) {
         if (!telemetryCtx) return;
+
+        // Delta-only telemetry: if values did not change, keep canvas as-is.
+        const sig = [
+            data.speed, data.maxSpeed, data.throttle, data.fuel,
+            data.hull, data.shields, data.basePct,
+            data.score, data.wave, data.torpedoes,
+            data.kills, data.message || ''
+        ].join('|');
+        if (sig === _lastTelemetrySignature) return;
+        _lastTelemetrySignature = sig;
+
         const c = telemetryCtx;
         const W = 256, H = 256;
         c.clearRect(0, 0, W, H);
@@ -1079,27 +1429,130 @@ const SF3D = (function () {
     function createEntityMesh(type) {
         let mesh;
 
-        // ── Try GLB LOD clone first ──
-        if (glbModels[type]) {
-            mesh = _cloneLOD(type);
-            mesh.scale.setScalar(GLB_SCALES[type] || 10);
+        // ── Map entity types to GLB model keys ──
+        const glbKey = type === 'wingman' ? 'ally' : type;
+
+        // ── Try GLB LOD clone first (only if model has finished loading levels) ──
+        if (glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0) {
+            mesh = _cloneLOD(glbKey);
+            mesh.scale.setScalar(GLB_SCALES[glbKey] || 10);
+            if (type === 'wingman') mesh.userData.isWingman = true;
             if (type === 'baseship') mesh.userData.isBaseship = true;
+            if (type === 'tanker') mesh.userData.isTanker = true;
+            // Add bioluminescent point light to alien types
+            if (ALIEN_GLOW_COLORS[glbKey]) {
+                _addGlowLight(mesh, glbKey);
+                mesh.userData.alienGlow = true;
+            }
             scene.add(mesh);
             return mesh;
         }
+
+        // ── Trigger lazy GLB load for combat types (streams in during gameplay) ──
+        if (GLB_LOD[glbKey] && !_lazyState[glbKey]) _triggerLazyLoad(glbKey);
 
         // ── Fallback: simple procedural geometry while GLBs load ──
         mesh = new THREE.Group();
         const m = _getSharedMats();
 
         if (type === 'enemy') {
-            // Placeholder: small green octahedron
-            mesh.add(new THREE.Mesh(new THREE.OctahedronGeometry(8, 0), m.alien));
+            // Fallback: bioluminescent organic form (glow worm from Brown Giant)
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0x22ff44, transparent: true, opacity: 0.85 });
+            const body = new THREE.Mesh(new THREE.IcosahedronGeometry(10, 1), bodyMat);
+            mesh.add(body);
+            // Inner glow core
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xaaffaa, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(6, 8, 8), coreMat));
+            // Outer glow halo
+            const haloMat = new THREE.MeshBasicMaterial({ color: 0x22ff44, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, side: THREE.BackSide });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(16, 8, 8), haloMat));
+            // Point light
+            _addGlowLight(mesh, 'enemy');
+            mesh.userData.alienGlow = true;
         } else if (type === 'baseship') {
             mesh.userData.isBaseship = true;
             mesh.add(new THREE.Mesh(new THREE.BoxGeometry(120, 50, 600), m.hull));
         } else if (type === 'alien-baseship') {
             mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(80, 1), m.alienCap));
+        } else if (type === 'predator') {
+            // Predator Drone fallback: intense bioluminescent hunter
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0x44ff00, transparent: true, opacity: 0.9 });
+            mesh.add(new THREE.Mesh(new THREE.DodecahedronGeometry(20, 0), bodyMat));
+            // Blazing plasma core
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0x88ff22, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(10, 8, 8), coreMat));
+            // Outer glow halo
+            const haloMat = new THREE.MeshBasicMaterial({ color: 0x66ff00, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, side: THREE.BackSide });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), haloMat));
+            _addGlowLight(mesh, 'predator');
+            mesh.userData.alienGlow = true;
+        } else if (type === 'interceptor') {
+            // Interceptor fallback: sleek cyan glowing form
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.85 });
+            mesh.add(new THREE.Mesh(new THREE.ConeGeometry(6, 20, 6), bodyMat));
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0x88ffee, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), coreMat));
+            _addGlowLight(mesh, 'interceptor');
+            mesh.userData.alienGlow = true;
+        } else if (type === 'bomber') {
+            // Bomber fallback: bulbous orange-glowing form
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.85 });
+            const bodyGeo = new THREE.SphereGeometry(14, 8, 8);
+            bodyGeo.scale(1.3, 0.8, 1.0);
+            mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8), coreMat));
+            _addGlowLight(mesh, 'bomber');
+            mesh.userData.alienGlow = true;
+        } else if (type === 'dreadnought') {
+            // Dreadnought fallback: massive red-glowing form
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0xff0044, transparent: true, opacity: 0.85 });
+            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(60, 1), bodyMat));
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xff4488, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(40, 8, 8), coreMat));
+            _addGlowLight(mesh, 'dreadnought');
+            mesh.userData.alienGlow = true;
+        } else if (type === 'tanker') {
+            // Tanker fallback: white-orange utility craft
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xccbbaa, metalness: 0.5, roughness: 0.5 });
+            const bodyGeo = new THREE.BoxGeometry(20, 12, 35);
+            mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
+            const boomMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+            const boom = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 20, 6), boomMat);
+            boom.rotation.x = Math.PI / 2;
+            boom.position.z = -17;
+            mesh.add(boom);
+            // Beacon light
+            const beacon = new THREE.PointLight(0x00ff88, 2, 100);
+            beacon.position.set(0, 8, -25);
+            mesh.add(beacon);
+        } else if (type === 'plasma') {
+            // Toxic green plasma bolt
+            const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x44ff00, transparent: true, opacity: 0.8 });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), plasmaMat));
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0x88ff44, transparent: true, opacity: 0.3 });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 6, 6), glowMat));
+        } else if (type === 'egg') {
+            // Organic egg — yellowish-green translucent ovoid
+            const eggMat = new THREE.MeshBasicMaterial({ color: 0x99cc33, transparent: true, opacity: 0.75 });
+            const eggGeo = new THREE.SphereGeometry(5, 8, 8);
+            eggGeo.scale(1, 1.3, 1); // elongated
+            mesh.add(new THREE.Mesh(eggGeo, eggMat));
+            // Inner glow (something growing inside)
+            const innerMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.4 });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 6), innerMat));
+        } else if (type === 'youngling') {
+            // Small spidery creature — dark with red eyes
+            const bodyMat = new THREE.MeshBasicMaterial({ color: 0x332211, transparent: true, opacity: 0.9 });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 6, 6), bodyMat));
+            // Red eyes
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.6, 4, 4), eyeMat);
+            eye1.position.set(1.2, 0.5, -2.5);
+            mesh.add(eye1);
+            const eye2 = new THREE.Mesh(new THREE.SphereGeometry(0.6, 4, 4), eyeMat);
+            eye2.position.set(-1.2, 0.5, -2.5);
+            mesh.add(eye2);
         } else if (type === 'laser') {
             // GDD §10.1: Dual linked pulse cannons — two parallel energy bolts
             const boltLen = 18, boltR = 0.6, glowR = 1.8, sep = 3.5;
@@ -1287,6 +1740,25 @@ const SF3D = (function () {
     function render(state) {
         if (!scene) return;
 
+        // Cockpit must stay visible during all player-flight phases.
+        const phase = state && state.phase;
+        const cockpitRequired = phase === 'bay-ready' || phase === 'launching' || phase === 'combat' ||
+            phase === 'land-approach' || phase === 'landing' || phase === 'docking';
+        if (cockpitRequired && !cockpitVisible) {
+            cockpitVisible = true;
+            lastCockpitToggleAt = Date.now();
+            lastCockpitToggleValue = true;
+        }
+
+        if (cockpitGroup) cockpitGroup.visible = cockpitVisible;
+        if (cockpitModel) cockpitModel.visible = cockpitVisible;
+        if (manifoldCockpitGroup) manifoldCockpitGroup.visible = cockpitVisible && (MANIFOLD_COCKPIT_DEBUG || cockpitLoadFailed);
+
+        // Build camera frustum once per frame for on-screen culling decisions.
+        camera.updateMatrixWorld();
+        _viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        _viewFrustum.setFromProjectionMatrix(_viewProj);
+
         // Update pooled particle system
         _updateParticles(0.016);
 
@@ -1306,17 +1778,19 @@ const SF3D = (function () {
 
             // Animate cockpit steering (arms follow stick input)
             _animateCockpitArms(state.player);
+            _animateManifoldCockpit(state.player);
         }
 
         // Sync Entities
         const activeIds = new Set();
 
-        state.entities.forEach(e => {
-            if (e.type === 'player') return; // Handled by camera
+        for (let i = 0, len = state.entities.length; i < len; i++) {
+            const e = state.entities[i];
+            if (e.type === 'player') continue; // Handled by camera
 
             // Skip baseship during launch phase - don't even create or show it
             if (e.type === 'baseship' && launchPhaseActive) {
-                return;
+                continue;
             }
 
             activeIds.add(e.id);
@@ -1327,18 +1801,42 @@ const SF3D = (function () {
                 entityMeshes.set(e.id, mesh);
             }
 
-            mesh.position.copy(e.position);
-            mesh.quaternion.copy(e.quaternion);
-            mesh.visible = true; // Ensure it's visible when not in launch phase
+            // Delta-only transform updates.
+            const ud = mesh.userData;
+            if (ud._px !== e.position.x || ud._py !== e.position.y || ud._pz !== e.position.z) {
+                mesh.position.copy(e.position);
+                ud._px = e.position.x; ud._py = e.position.y; ud._pz = e.position.z;
+            }
+            if (ud._qx !== e.quaternion.x || ud._qy !== e.quaternion.y || ud._qz !== e.quaternion.z || ud._qw !== e.quaternion.w) {
+                mesh.quaternion.copy(e.quaternion);
+                ud._qx = e.quaternion.x; ud._qy = e.quaternion.y; ud._qz = e.quaternion.z; ud._qw = e.quaternion.w;
+            }
+
+            // On-screen work only: if outside camera frustum, hide and skip expensive updates.
+            const cullRadius = Math.max(8, (e.radius || 10) * 1.25);
+            _tmpSphere.center.copy(mesh.position);
+            _tmpSphere.radius = cullRadius;
+            const onScreen = _viewFrustum.intersectsSphere(_tmpSphere);
+            mesh.visible = onScreen;
+            if (!onScreen) continue;
 
             // Update LOD level selection based on camera distance
             if (mesh.isLOD) mesh.update(camera);
+
+            // Bioluminescent pulse — alien organisms glow rhythmically in space
+            if (mesh.userData && mesh.userData.alienGlow) {
+                const glow = mesh.getObjectByName('bioGlow');
+                if (glow) {
+                    const pulse = 0.7 + 0.3 * Math.sin(performance.now() * 0.003 + e.id * 1.7);
+                    glow.intensity = glow.intensity * 0.9 + (pulse * (ALIEN_GLOW_COLORS[e.type] ? ALIEN_GLOW_COLORS[e.type].pointIntensity : 2.5)) * 0.1;
+                }
+            }
 
             // Torpedo sparkler trail — continuous particle emission
             if (e.type === 'torpedo' && mesh.userData && mesh.userData.isTorpedo) {
                 spawnTorpedoTrail(e);
             }
-        });
+        }
 
         // Target Lock Reticle
         if (state.player && state.player.lockedTarget) {
@@ -1347,9 +1845,9 @@ const SF3D = (function () {
             // Scale reticle to fit the target's radius
             const r = state.player.lockedTarget.radius * 2.5;
             targetLockMesh.scale.set(r / 20, r / 20, r / 20);
-            // Rotate it slowly for visual effect
-            targetLockMesh.rotation.x += 0.05;
-            targetLockMesh.rotation.y += 0.05;
+            // Face camera then spin slowly on local Z
+            targetLockMesh.quaternion.copy(camera.quaternion);
+            targetLockMesh.rotateZ(performance.now() * 0.001);
         } else {
             if (targetLockMesh) targetLockMesh.visible = false;
         }
@@ -1363,35 +1861,58 @@ const SF3D = (function () {
         }
 
         // Rotate Earth slowly, clouds slightly faster
+        // Static scenery: animate only intermittently and only when potentially visible.
+        _staticAnimFrame = (_staticAnimFrame + 1) % 3;
+
         const earth = scene.getObjectByName('earth-scenery');
-        if (earth) {
-            earth.rotation.y += 0.0003;
-            const clouds = earth.getObjectByName('earth-clouds');
-            if (clouds) clouds.rotation.y += 0.0005;
+        if (earth && _staticAnimFrame === 0) {
+            earth.getWorldPosition(_tmpVec);
+            _tmpSphere.center.copy(_tmpVec);
+            _tmpSphere.radius = 9000;
+            if (_viewFrustum.intersectsSphere(_tmpSphere)) {
+                earth.rotation.y += 0.0003;
+                const clouds = earth.getObjectByName('earth-clouds');
+                if (clouds) clouds.rotation.y += 0.0005;
+            }
         }
 
         // Rotate station slowly
         const station = scene.getObjectByName('station-scenery');
-        if (station) {
-            station.rotation.y += 0.001;
-            if (station.isLOD) station.update(camera);
+        if (station && _staticAnimFrame === 0) {
+            station.getWorldPosition(_tmpVec);
+            _tmpSphere.center.copy(_tmpVec);
+            _tmpSphere.radius = 900;
+            if (_viewFrustum.intersectsSphere(_tmpSphere)) {
+                station.rotation.y += 0.001;
+                if (station.isLOD) station.update(camera);
+            }
         }
 
         // Rotate moon very slowly (tidally locked in real life, slight drift here for visual)
         const moon = scene.getObjectByName('moon-scenery');
-        if (moon) moon.rotation.y += 0.00008;
+        if (moon && _staticAnimFrame === 0) {
+            moon.getWorldPosition(_tmpVec);
+            _tmpSphere.center.copy(_tmpVec);
+            _tmpSphere.radius = 1600;
+            if (_viewFrustum.intersectsSphere(_tmpSphere)) moon.rotation.y += 0.00008;
+        }
 
         // Animate sun corona — subtle breathing pulse
         const sunGrp = scene.getObjectByName('sun-group');
-        if (sunGrp) {
-            const t = performance.now() * 0.001;
-            sunGrp.children.forEach(child => {
-                if (child.name && child.name.startsWith('corona-')) {
-                    const idx = parseInt(child.name.split('-')[1]);
-                    const pulse = 1.0 + Math.sin(t * (0.5 + idx * 0.15) + idx) * 0.04;
-                    child.scale.setScalar(pulse);
-                }
-            });
+        if (sunGrp && _staticAnimFrame === 0) {
+            sunGrp.getWorldPosition(_tmpVec);
+            _tmpSphere.center.copy(_tmpVec);
+            _tmpSphere.radius = 4200;
+            if (_viewFrustum.intersectsSphere(_tmpSphere)) {
+                const t = performance.now() * 0.001;
+                sunGrp.children.forEach(child => {
+                    if (child.name && child.name.startsWith('corona-')) {
+                        const idx = parseInt(child.name.split('-')[1]);
+                        const pulse = 1.0 + Math.sin(t * (0.5 + idx * 0.15) + idx) * 0.04;
+                        child.scale.setScalar(pulse);
+                    }
+                });
+            }
         }
 
         renderer.render(scene, camera);
@@ -1405,7 +1926,61 @@ const SF3D = (function () {
         resizeCockpit();
     }
 
-    return { init, render, spawnExplosion, spawnLaser, spawnTorpedoTrail, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
+    // ── Predator Drone plasma bolt — toxic green glowing projectile ──
+    function spawnPlasma(plasmaEntity) {
+        const p = plasmaEntity.position;
+        // Green toxic muzzle flash
+        const flash = _getMuzzleFlash();
+        flash.light.position.copy(p);
+        flash.light.color.setHex(0x44ff00);
+        flash.light.intensity = 4.0;
+        flash.timer = 0.15;
+        // Spray of green plasma particles
+        for (let i = 0; i < 10; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 40 + Math.random() * 60;
+            _emitParticle(p.x, p.y, p.z,
+                Math.cos(a) * sp * 0.4, (Math.random() - 0.5) * sp * 0.4, Math.sin(a) * sp * 0.4,
+                0.2, 1, 0, 0.3 + Math.random() * 0.3);
+        }
+    }
+
+    // ── Egg spawn — subtle organic pulse ──
+    function spawnEgg(eggEntity) {
+        const p = eggEntity.position;
+        for (let i = 0; i < 5; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 10 + Math.random() * 20;
+            _emitParticle(p.x, p.y, p.z,
+                Math.cos(a) * sp * 0.3, (Math.random() - 0.5) * sp * 0.3, Math.sin(a) * sp * 0.3,
+                0.6, 0.8, 0.2, 0.4 + Math.random() * 0.3);
+        }
+    }
+
+    // ── Egg hatch — burst of particles ──
+    function spawnEggHatch(pos) {
+        // Green/orange organic burst
+        for (let i = 0; i < 15; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 30 + Math.random() * 50;
+            const r = Math.random() > 0.5 ? 0.9 : 0.4;
+            const g = Math.random() > 0.5 ? 0.8 : 0.3;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp,
+                Math.sin(el) * sp,
+                Math.sin(a) * Math.cos(el) * sp,
+                r, g, 0, 0.4 + Math.random() * 0.4);
+        }
+        // Flash
+        const flash = _getMuzzleFlash();
+        flash.light.position.copy(pos);
+        flash.light.color.setHex(0xaaff00);
+        flash.light.intensity = 2.0;
+        flash.timer = 0.2;
+    }
+
+    return { init, render, spawnExplosion, spawnLaser, spawnPlasma, spawnEgg, spawnEggHatch, spawnTorpedoTrail, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, getCockpitDebugState, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
 })();
 
 window.SF3D = SF3D;

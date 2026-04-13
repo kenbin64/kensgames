@@ -8,11 +8,163 @@ const SFAudio = (function () {
   let ctx = null;
   let masterGain = null;
   let initialized = false;
+  let _pausedByGame = false;
 
   // Persistent engine drones (looping)
   let engineDrone = null;
   let bayAmbience = null;
   let cockpitHum = null;
+
+  // ── Cached speech voice (resolved async) ──
+  let _cachedVoice = null;
+  const _voiceCacheByModule = {};
+  let _activeVoiceModule = 'au_female';
+
+  const VOICE_MODULES = {
+    au_female: {
+      label: 'Australian Female PA',
+      lang: 'en-AU',
+      preferFemale: true,
+      rate: 0.92,
+      pitch: 1.05,
+      volume: 1.0,
+      selectors: [
+        /Google.*Australian.*Female/i,
+        /Microsoft.*Natasha.*Online/i,
+        /Microsoft.*Annette.*Online/i,
+      ]
+    },
+    au_command: {
+      label: 'Australian Command',
+      lang: 'en-AU',
+      preferFemale: false,
+      rate: 0.9,
+      pitch: 0.98,
+      volume: 1.0,
+      selectors: [
+        /Google.*Australian/i,
+        /Microsoft.*Australia/i,
+      ]
+    },
+    uk_female: {
+      label: 'UK Female PA',
+      lang: 'en-GB',
+      preferFemale: true,
+      rate: 0.93,
+      pitch: 1.03,
+      volume: 1.0,
+      selectors: [
+        /Google UK English Female/i,
+        /Microsoft.*Libby.*Online/i,
+        /Microsoft.*Sonia.*Online/i,
+      ]
+    },
+    us_female: {
+      label: 'US Female PA',
+      lang: 'en-US',
+      preferFemale: true,
+      rate: 0.92,
+      pitch: 1.02,
+      volume: 1.0,
+      selectors: [
+        /Microsoft.*Aria.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    // ── Crew-distinct voice modules ──
+    uk_male: {
+      label: 'UK Male Officer',
+      lang: 'en-GB',
+      preferFemale: false,
+      rate: 0.88,
+      pitch: 0.82,
+      volume: 1.0,
+      selectors: [
+        /Google UK English Male/i,
+        /Microsoft.*Ryan.*Online/i,
+        /Microsoft.*George.*Online/i,
+      ]
+    },
+    us_male: {
+      label: 'US Male Officer',
+      lang: 'en-US',
+      preferFemale: false,
+      rate: 0.90,
+      pitch: 0.78,
+      volume: 1.0,
+      selectors: [
+        /Google US English/i,
+        /Microsoft.*Guy.*Online/i,
+        /Microsoft.*Eric.*Online/i,
+        /Microsoft.*Christopher.*Online/i,
+      ]
+    },
+    us_male_deep: {
+      label: 'US Male Deep',
+      lang: 'en-US',
+      preferFemale: false,
+      rate: 0.85,
+      pitch: 0.65,
+      volume: 1.0,
+      selectors: [
+        /Microsoft.*Guy.*Online/i,
+        /Microsoft.*Davis.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    us_female_bright: {
+      label: 'US Female Bright',
+      lang: 'en-US',
+      preferFemale: true,
+      rate: 0.95,
+      pitch: 1.15,
+      volume: 1.0,
+      selectors: [
+        /Microsoft.*Jenny.*Online/i,
+        /Microsoft.*Aria.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    in_female: {
+      label: 'Indian Female Officer',
+      lang: 'en-IN',
+      preferFemale: true,
+      rate: 0.91,
+      pitch: 1.08,
+      volume: 1.0,
+      selectors: [
+        /Google.*India/i,
+        /Microsoft.*Neerja.*Online/i,
+        /Microsoft.*Prabhat/i,
+      ]
+    },
+    za_male: {
+      label: 'South African Male',
+      lang: 'en-ZA',
+      preferFemale: false,
+      rate: 0.88,
+      pitch: 0.85,
+      volume: 1.0,
+      selectors: [
+        /Google.*South Africa/i,
+        /Microsoft.*Luke/i,
+      ]
+    },
+  };
+
+  // ── Per-crew voice mapping: each CIC officer gets a distinct voice/accent ──
+  const CREW_VOICE_MAP = {
+    'Cdr. Vasquez': 'us_male_deep',     // deep commanding male
+    'XO Tanaka': 'uk_male',           // British-accented male XO
+    'Lt. Chen': 'us_female',         // US female tactical
+    'Sgt. Kozlov': 'us_male',           // US male sergeant
+    'Ens. Park': 'us_female_bright',  // bright young ensign
+    'Ens. Osei': 'za_male',           // South African male
+    'CPO Okafor': 'au_command',        // Australian deck chief
+    'PO2 Ruiz': 'au_female',         // Australian female deck
+    'Lt. Cruz': 'in_female',         // Indian female ops
+    'Dr. Hollis': 'uk_female',         // British female science
+  };
 
   // ── Engine thrust rumble system ──
   let thrustRumble = null;    // main forward/reverse burn nodes
@@ -51,12 +203,107 @@ const SFAudio = (function () {
     shockwaveGain.connect(masterGain);
 
     _loadSamples();
+    _initVoiceCache();
     initialized = true;
   }
 
   // Resume AudioContext on user gesture (required by browsers)
   function resume() {
     if (ctx && ctx.state === 'suspended') ctx.resume();
+  }
+
+  function pauseAll() {
+    if (!ctx) return;
+    if (ctx.state === 'running') {
+      _pausedByGame = true;
+      ctx.suspend();
+    }
+  }
+
+  function resumeAll() {
+    if (!ctx) return;
+    if (_pausedByGame && ctx.state === 'suspended') {
+      _pausedByGame = false;
+      ctx.resume();
+    }
+  }
+
+  // ── Pre-cache all voice modules used by crew ──
+  function _initVoiceCache() {
+    if (!('speechSynthesis' in window)) return;
+    // Resolve all modules up front
+    _resolveAllVoices();
+    // Chrome/Edge load voices async — listen for the event
+    speechSynthesis.addEventListener('voiceschanged', _resolveAllVoices);
+  }
+
+  function _resolveAllVoices() {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+    Object.keys(VOICE_MODULES).forEach(id => _resolveVoice(id));
+  }
+
+  function _pickVoice(moduleId, voices) {
+    const cfg = VOICE_MODULES[moduleId] || VOICE_MODULES.au_female;
+    let best = null;
+    let bestScore = -1e9;
+
+    voices.forEach(v => {
+      let score = 0;
+
+      // Strong explicit selector matches first
+      if (cfg.selectors.some(re => re.test(v.name))) score += 120;
+
+      if (cfg.lang && v.lang === cfg.lang) score += 60;
+      if (cfg.lang && v.lang && v.lang.startsWith(cfg.lang.split('-')[0])) score += 20;
+
+      if (cfg.preferFemale) {
+        if (/female|natasha|annette|libby|sonia|aria|olivia|samantha|karen/i.test(v.name)) score += 30;
+      }
+
+      // Prefer cloud/online neural voices when available
+      if (!v.localService) score += 12;
+      if (/online|neural|natural|enhanced/i.test(v.name)) score += 10;
+
+      // Penalize generic sounding labels
+      if (/generic|default|robot|espeak|festival/i.test(v.name)) score -= 100;
+
+      if (score > bestScore) {
+        best = v;
+        bestScore = score;
+      }
+    });
+
+    return best;
+  }
+
+  function _resolveVoice(moduleId = _activeVoiceModule) {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+    const chosen = _pickVoice(moduleId, voices)
+      || voices.find(v => v.lang && v.lang.startsWith('en'))
+      || voices[0];
+
+    _voiceCacheByModule[moduleId] = chosen || null;
+    if (moduleId === _activeVoiceModule) _cachedVoice = _voiceCacheByModule[moduleId];
+
+    if (chosen) console.log(`PA Voice selected [${moduleId}]:`, chosen.name, chosen.lang);
+  }
+
+  function setVoiceModule(moduleId) {
+    if (!VOICE_MODULES[moduleId]) return false;
+    _activeVoiceModule = moduleId;
+    _resolveVoice(moduleId);
+    _cachedVoice = _voiceCacheByModule[moduleId] || null;
+    return true;
+  }
+
+  function getVoiceModule() {
+    return _activeVoiceModule;
+  }
+
+  function listVoiceModules() {
+    return Object.entries(VOICE_MODULES).map(([id, cfg]) => ({ id, label: cfg.label }));
   }
 
   // ── Utility: white noise buffer ──
@@ -100,6 +347,9 @@ const SFAudio = (function () {
       case 'clamp_release': return _playClampRelease(t);
       case 'turbine_whine': return _playTurbineWhine(t);
       case 'shockwave': return _playShockwave(t);
+      case 'plasma_spit': return _playPlasmaSpit(t);
+      case 'hull_alarm': return _playHullAlarm(t);
+      case 'egg_hatch': return _playEggHatch(t);
     }
   }
 
@@ -256,6 +506,146 @@ const SFAudio = (function () {
     src.buffer = buf;
     src.connect(shockwaveGain);
     src.start(t);
+  }
+
+  // Predator Drone plasma spit — organic visceral spew, wet + crackling
+  function _playPlasmaSpit(t) {
+    // Low gurgling growl (organic source)
+    const growl = ctx.createOscillator();
+    growl.type = 'sawtooth';
+    growl.frequency.setValueAtTime(60, t);
+    growl.frequency.exponentialRampToValueAtTime(40, t + 0.4);
+    const growlG = ctx.createGain();
+    growlG.gain.setValueAtTime(0.15, t);
+    growlG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    const growlLP = ctx.createBiquadFilter();
+    growlLP.type = 'lowpass';
+    growlLP.frequency.value = 200;
+    growl.connect(growlLP);
+    growlLP.connect(growlG);
+    growlG.connect(masterGain);
+    growl.start(t);
+    growl.stop(t + 0.5);
+
+    // Wet splatter burst (noise through resonant bandpass)
+    const noise = ctx.createBufferSource();
+    noise.buffer = _getNoiseBuffer();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1200, t);
+    bp.frequency.exponentialRampToValueAtTime(400, t + 0.3);
+    bp.Q.value = 4;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.2, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    noise.connect(bp);
+    bp.connect(ng);
+    ng.connect(masterGain);
+    noise.start(t);
+    noise.stop(t + 0.35);
+
+    // Crackling electric discharge (the plasma energy)
+    const crackle = ctx.createOscillator();
+    crackle.type = 'square';
+    crackle.frequency.setValueAtTime(800, t);
+    crackle.frequency.setValueAtTime(200, t + 0.05);
+    crackle.frequency.setValueAtTime(1200, t + 0.1);
+    crackle.frequency.setValueAtTime(300, t + 0.15);
+    crackle.frequency.exponentialRampToValueAtTime(100, t + 0.3);
+    const crG = ctx.createGain();
+    crG.gain.setValueAtTime(0.08, t);
+    crG.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    crackle.connect(crG);
+    crG.connect(masterGain);
+    crackle.start(t);
+    crackle.stop(t + 0.3);
+
+    // Sub-bass thump (the spew impact leaving the creature)
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(50, t);
+    sub.frequency.exponentialRampToValueAtTime(25, t + 0.2);
+    const subG = ctx.createGain();
+    subG.gain.setValueAtTime(0.2, t);
+    subG.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    sub.connect(subG);
+    subG.connect(masterGain);
+    sub.start(t);
+    sub.stop(t + 0.25);
+  }
+
+  // Hull breach alarm — urgent repeating klaxon-style alert, organic threat
+  function _playHullAlarm(t) {
+    // Sharp alternating tones — more urgent than standard warning
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(880, t);
+    osc1.frequency.setValueAtTime(440, t + 0.1);
+    osc1.frequency.setValueAtTime(880, t + 0.2);
+    osc1.frequency.setValueAtTime(440, t + 0.3);
+    osc1.frequency.setValueAtTime(880, t + 0.4);
+    const g1 = ctx.createGain();
+    g1.gain.setValueAtTime(0.08, t);
+    g1.gain.setValueAtTime(0.08, t + 0.45);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 900;
+    filter.Q.value = 3;
+    osc1.connect(filter);
+    filter.connect(g1);
+    g1.connect(masterGain);
+    osc1.start(t);
+    osc1.stop(t + 0.5);
+
+    // Sub-bass throb for urgency
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(80, t);
+    const subG = ctx.createGain();
+    subG.gain.setValueAtTime(0.15, t);
+    subG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    sub.connect(subG);
+    subG.connect(masterGain);
+    sub.start(t);
+    sub.stop(t + 0.5);
+  }
+
+  // Egg hatch — wet organic cracking/splitting sound
+  function _playEggHatch(t) {
+    // Crackle noise burst (shell breaking)
+    const bufLen = ctx.sampleRate * 0.3;
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen) * (Math.random() > 0.7 ? 1 : 0.2);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const nFilter = ctx.createBiquadFilter();
+    nFilter.type = 'highpass';
+    nFilter.frequency.value = 2000;
+    const nG = ctx.createGain();
+    nG.gain.setValueAtTime(0.1, t);
+    nG.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    noise.connect(nFilter);
+    nFilter.connect(nG);
+    nG.connect(masterGain);
+    noise.start(t);
+    noise.stop(t + 0.3);
+
+    // Wet squelch (organic membrane)
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.2);
+    const oscG = ctx.createGain();
+    oscG.gain.setValueAtTime(0.08, t);
+    oscG.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(oscG);
+    oscG.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.25);
   }
 
   function _playWarning(t) {
@@ -818,27 +1208,34 @@ const SFAudio = (function () {
     if (!ctx) init();
     initPAChain();
 
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = opts.rate || 0.88;    // measured, deliberate PA cadence
-    utter.pitch = opts.pitch || 0.75;  // low, authoritative — airport terminal commander
-    utter.volume = opts.volume || 1.0;
+    const moduleId = opts.voiceModule && VOICE_MODULES[opts.voiceModule] ? opts.voiceModule : _activeVoiceModule;
+    const voiceCfg = VOICE_MODULES[moduleId] || VOICE_MODULES.au_female;
 
-    // Find the most natural-sounding deep English voice — PA announcer style
-    const voices = speechSynthesis.getVoices();
-    const preferred =
-      // Top tier: Google UK Male — deep, crisp, authoritative
-      voices.find(v => /Google UK English Male/i.test(v.name))
-      // Microsoft natural voices — Daniel (UK deep male) or Guy (US deep)
-      || voices.find(v => /Microsoft.*Daniel.*Online/i.test(v.name))
-      || voices.find(v => /Microsoft.*Guy.*Online/i.test(v.name))
-      || voices.find(v => /Microsoft.*Online.*Natural/i.test(v.name) && v.lang.startsWith('en'))
-      // Any Google English voice (generally higher quality than espeak)
-      || voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
-      // Prefer remote/cloud voices over local (usually higher quality)
-      || voices.find(v => v.lang.startsWith('en-') && !v.localService)
-      // Last resort: any English voice
-      || voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utter.voice = preferred;
+    if (!_voiceCacheByModule[moduleId]) _resolveVoice(moduleId);
+    const moduleVoice = _voiceCacheByModule[moduleId] || _cachedVoice;
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = (opts.rate !== undefined ? opts.rate : voiceCfg.rate);
+    utter.pitch = (opts.pitch !== undefined ? opts.pitch : voiceCfg.pitch);
+    utter.volume = (opts.volume !== undefined ? opts.volume : voiceCfg.volume);
+
+    // Module-selected voice
+    if (moduleVoice) {
+      utter.voice = moduleVoice;
+      _cachedVoice = moduleVoice;
+    } else {
+      // Voices may not have loaded yet — resolve and retry
+      _resolveVoice(moduleId);
+      const voices = speechSynthesis.getVoices();
+      const preferred = _pickVoice(moduleId, voices)
+        || voices.find(v => v.lang && v.lang.startsWith('en'))
+        || voices[0];
+      if (preferred) {
+        utter.voice = preferred;
+        _voiceCacheByModule[moduleId] = preferred;
+        _cachedVoice = preferred;
+      }
+    }
 
     // Route speech through PA processing chain via MediaStreamDestination
     if (paChain && ctx.createMediaStreamSource) {
@@ -904,6 +1301,12 @@ const SFAudio = (function () {
       postGain.connect(masterGain);
       postStatic.start(ctx.currentTime + estimatedDuration);
     }
+  }
+
+  // ── speakAs: speak with a specific crew member's voice ──
+  function speakAs(crewName, text, opts = {}) {
+    const voiceModule = CREW_VOICE_MAP[crewName] || _activeVoiceModule;
+    speak(text, { ...opts, voiceModule });
   }
 
   // Volume control
@@ -1071,8 +1474,11 @@ const SFAudio = (function () {
   return {
     init,
     resume,
+    pauseAll,
+    resumeAll,
     playSound,
     speak,
+    speakAs,
     startBayAmbience,
     stopBayAmbience,
     startCockpitHum,
@@ -1084,7 +1490,12 @@ const SFAudio = (function () {
     setThrustLevel,
     startStrafeHiss,
     stopStrafeHiss,
-    setStrafeLevel
+    setStrafeLevel,
+    setVoiceModule,
+    getVoiceModule,
+    listVoiceModules,
+    getCtx: () => ctx,
+    getMasterGain: () => masterGain
   };
 })();
 

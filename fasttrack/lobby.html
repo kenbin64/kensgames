@@ -3,481 +3,1116 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FastTrack Lobby &mdash; KensGames</title>
-  <link rel="icon" href="assets/images/ftLogo.png" type="image/png">
-  <link rel="stylesheet" href="/lib/fonts/fonts.css">
-  <link rel="stylesheet" href="/lib/arcade-theme.css">
-  <style>
-    :root {
-      --accent: #00FF41;
-      --gaccent: 0 0 8px #00FF41, 0 0 24px #00FF41;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .lobby-wrap {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
-    }
-
-    /* Cabinet art */
-    .cabinet {
-      width: 220px;
-      margin: 0 auto 32px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      animation: fadeUp .5s ease;
-    }
-
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
-    }
-
-    .cab-top {
-      width: 160px;
-      height: 14px;
-      background: var(--accent);
-      box-shadow: var(--gaccent);
-      border-radius: 4px 4px 0 0;
-    }
-
-    .cab-body {
-      width: 180px;
-      background: rgba(4, 20, 4, .96);
-      border: 2px solid var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 30px rgba(0, 255, 65, .06);
-      border-radius: 0 0 8px 8px;
-      padding: 20px 16px;
-      text-align: center;
-    }
-
-    .cab-screen {
-      width: 100%;
-      height: 90px;
-      background: #020c02;
-      border: 2px solid rgba(0, 255, 65, .4);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 42px;
-      margin-bottom: 12px;
-      box-shadow: inset 0 0 20px rgba(0, 255, 65, .15);
-    }
-
-    .cab-label {
-      font-family: var(--fa);
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-    }
-
-    .cab-buttons {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      margin-top: 10px;
-    }
-
-    .cab-btn {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--ny);
-      box-shadow: 0 0 6px var(--ny);
-    }
-
-    .cab-btn:nth-child(2) {
-      background: var(--np);
-      box-shadow: 0 0 6px var(--np);
-    }
-
-    .cab-btn:nth-child(3) {
-      background: var(--nc);
-      box-shadow: 0 0 6px var(--nc);
-    }
-
-    /* Player card */
-    .player-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: rgba(0, 255, 65, .05);
-      border: 1px solid rgba(0, 255, 65, .2);
-      border-radius: 4px;
-      padding: 12px 18px;
-      margin-bottom: 28px;
-      width: 100%;
-      max-width: 520px;
-    }
-
-    .player-name {
-      font-family: var(--fa);
-      font-size: 13px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-    }
-
-    .player-meta {
-      font-size: 11px;
-      color: var(--txm);
-    }
-
-    .online-count {
-      margin-left: auto;
-      text-align: right;
-      font-family: var(--fa);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .online-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      box-shadow: var(--gaccent);
-      margin-right: 5px;
-      animation: pulse 1.5s ease infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .3
-      }
-    }
-
-    /* Mode cards */
-    .modes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      width: 100%;
-      max-width: 740px;
-      margin-bottom: 32px;
-    }
-
-    .mode-card {
-      background: rgba(4, 20, 4, .9);
-      border: 2px solid rgba(0, 255, 65, .25);
-      border-radius: 6px;
-      padding: 28px 22px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .25s;
-    }
-
-    .mode-card:hover {
-      border-color: var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 20px rgba(0, 255, 65, .06);
-      transform: translateY(-6px);
-    }
-
-    .mode-icon {
-      font-size: 44px;
-      margin-bottom: 14px;
-      display: block;
-      filter: drop-shadow(0 0 8px currentColor);
-    }
-
-    .mode-title {
-      font-family: var(--fa);
-      font-size: 14px;
-      font-weight: 900;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .mode-desc {
-      font-size: 12px;
-      color: var(--txm);
-      line-height: 1.7;
-      margin-bottom: 18px;
-    }
-
-    .mode-avail {
-      font-family: var(--fa);
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: var(--ng);
-      text-transform: uppercase;
-    }
-
-    .mode-avail.locked {
-      color: var(--np);
-    }
-
-    /* Private panel */
-    .private-panel {
-      display: none;
-      width: 100%;
-      max-width: 520px;
-      background: rgba(4, 20, 4, .9);
-      border: 2px solid rgba(0, 255, 65, .3);
-      border-radius: 6px;
-      padding: 28px;
-    }
-
-    .private-panel.open {
-      display: block;
-      animation: fadeUp .3s ease;
-    }
-
-    .priv-tabs {
-      display: flex;
-      gap: 0;
-      margin-bottom: 22px;
-      border-bottom: 2px solid rgba(0, 255, 65, .2);
-    }
-
-    .priv-tab {
-      font-family: var(--fa);
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 8px 16px;
-      background: none;
-      border: none;
-      color: var(--txm);
-      cursor: pointer;
-      text-transform: uppercase;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: all .2s;
-    }
-
-    .priv-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-
-    .code-display {
-      font-family: var(--fa);
-      font-size: 36px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-align: center;
-      padding: 20px;
-      background: rgba(0, 255, 65, .05);
-      border: 1px solid rgba(0, 255, 65, .2);
-      border-radius: 4px;
-      margin-bottom: 14px;
-      cursor: pointer;
-    }
-
-    .code-hint {
-      font-size: 11px;
-      color: var(--txm);
-      text-align: center;
-      margin-bottom: 16px;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Fast Track - Lobby</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="assets/images/ftLogo.png">
+  <link rel="apple-touch-icon" href="assets/images/ftLogo.png">
+  <meta name="theme-color" content="#07040f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="assets/css/lobby.css">
+  <link rel="stylesheet" href="assets/css/lobby-inline.css">
   <script src="/js/analytics.js"></script>
 </head>
 
 <body>
-  <div id="tron-grid"></div>
-  <div id="scanlines"></div>
+  <!-- Speakeasy 3D atmosphere canvas -->
+  <canvas id="speakeasy-canvas"></canvas>
 
-  <nav class="arc-nav">
-    <div class="arc-nav-inner">
-      <a href="/" class="arc-logo">KEN<span>S</span>GAMES</a>
-      <ul class="arc-nav-links">
-        <li><a href="/">&#8592; Portal</a></li>
-        <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
-        <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
-      </ul>
-      <div class="arc-nav-right" id="nav-avatar"></div>
-    </div>
-  </nav>
+  <!-- Music toggle -->
+  <button id="speakeasy-music-toggle" onclick="Speakeasy.toggleMusic()" title="Toggle ragtime music">
+    <span class="music-icon">🔇</span><span class="music-label">Music Off</span>
+  </button>
 
-  <div class="lobby-wrap">
-    <!-- Arcade Cabinet Art -->
-    <div class="cabinet">
-      <div class="cab-top"></div>
-      <div class="cab-body">
-        <div class="cab-screen">&#9646;&#9646;&#9644;&#9645;&#9646;&#9646;</div>
-        <div class="cab-label">FastTrack</div>
-        <div class="cab-buttons">
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-        </div>
-      </div>
+  <!-- Auth Screen -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-logo">
+      <img src="assets/images/icon-192.png" alt="Fast Track">
+      <h1>Fast Track</h1>
+      <p style="color: var(--text-secondary);">The Ultimate Board Game</p>
     </div>
 
-    <!-- Player card -->
-    <div class="player-card">
-      <div class="arc-avatar" id="av-badge" style="font-size:26px"></div>
-      <div>
-        <div class="player-name" id="p-name">Player</div>
-        <div class="player-meta">Strategy Board Game &bull; 2&ndash;4 Players</div>
+    <div class="auth-card card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="showAuthTab('login')">Login</button>
+        <button class="auth-tab" onclick="showAuthTab('register')">Register</button>
       </div>
-      <div class="online-count">
-        <div><span class="online-dot"></span>Ready to play</div>
-      </div>
-    </div>
 
-    <!-- Mode selection -->
-    <div class="modes">
-      <div class="mode-card" onclick="startSolo()">
-        <span class="mode-icon" style="color:#00FF41">&#129302;</span>
-        <div class="mode-title">Solo vs AI</div>
-        <div class="mode-desc">Play against up to 3 AI bots. Perfect your strategy before facing humans.</div>
-        <div class="mode-avail">Available &bull; Any skill level</div>
-      </div>
-      <div class="mode-card" onclick="startMatchmaker()">
-        <span class="mode-icon" style="color:#00FFFF">&#9889;</span>
-        <div class="mode-title">Matchmaker</div>
-        <div class="mode-desc">Get matched with live players. Ranked system. Login required.</div>
-        <div class="mode-avail" id="mm-avail">Login required</div>
-      </div>
-      <div class="mode-card" onclick="togglePrivate()">
-        <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Private Game</div>
-        <div class="mode-desc">Create a room and share the code. Friends join from anywhere &mdash; no account needed.
+      <!-- Login Form -->
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="input-group">
+          <label>Username</label>
+          <input type="text" class="input" id="login-username" placeholder="Enter username" required>
         </div>
-        <div class="mode-avail">No login to join</div>
-      </div>
-    </div>
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" class="input" id="login-password" placeholder="Enter password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+      </form>
 
-    <!-- Private game panel -->
-    <div class="private-panel" id="priv-panel">
-      <div class="priv-tabs">
-        <button class="priv-tab active" onclick="privTab('create')">Create Room</button>
-        <button class="priv-tab" onclick="privTab('join')">Join with Code</button>
-      </div>
-      <div id="priv-create">
-        <div class="code-display" id="room-code" onclick="copyCode()">------</div>
-        <div class="code-hint">Click code to copy &bull; Share with friends to join</div>
-        <button class="btn btn-y btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
-          GAME</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
-          to create a private room</div>
-      </div>
-      <div id="priv-join" style="display:none">
-        <div class="arc-field">
-          <label>Room Code</label>
-          <input class="arc-input" id="join-code" placeholder="ABC123" maxlength="6"
-            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
+      <!-- Register Form -->
+      <form id="register-form" style="display: none;" onsubmit="handleRegister(event)">
+        <div class="input-group">
+          <label>Username</label>
+          <input type="text" class="input" id="register-username" placeholder="Choose username" required minlength="3">
         </div>
-        <div class="arc-field">
-          <label>Your Name (guests)</label>
-          <input class="arc-input" id="guest-name" placeholder="Arcade Player">
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" class="input" id="register-password" placeholder="Choose password" required
+            minlength="4">
         </div>
-        <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN ROOM</button>
-        <div class="arc-msg" id="join-msg"></div>
+        <div class="input-group">
+          <label>Email (optional)</label>
+          <input type="email" class="input" id="register-email" placeholder="your@email.com">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
+      </form>
+
+      <div class="auth-divider"><span>or play without login</span></div>
+
+      <button class="btn btn-secondary private-game-btn" onclick="showPrivateGameJoin()">
+        🎟️ Join Private Game
+      </button>
+      <button class="btn btn-secondary private-game-btn" onclick="playOfflineWithAI()">
+        🤖 Play Offline vs Bots
+      </button>
+      <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 0.75rem; text-align: center;">🔒 Sign in to
+        create private games</p>
+    </div>
+  </div>
+
+  <!-- Main App (hidden until logged in) -->
+  <div id="main-app" style="display: none;">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <img src="assets/images/icon-72.png" class="logo-icon" alt="">
+        <span>Fast Track</span>
+      </div>
+
+      <div class="user-info" onclick="showProfileModal()">
+        <div class="user-details">
+          <div class="user-name" id="header-username">Player</div>
+          <div class="user-prestige">
+            <span class="prestige-badge prestige-bronze" id="header-prestige">BRONZE</span>
+            <span id="header-points">0 pts</span>
+          </div>
+        </div>
+        <div class="user-avatar" id="header-avatar">👤</div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <div class="quick-action" onclick="createPublicGame()">
+          <div class="quick-action-icon">🎯</div>
+          <div class="quick-action-title">Quick Match</div>
+          <div class="quick-action-desc">Create public game</div>
+        </div>
+        <div class="quick-action" onclick="showCreatePrivateGame()">
+          <div class="quick-action-icon">🔒</div>
+          <div class="quick-action-title">Private Game</div>
+          <div class="quick-action-desc">Invite friends</div>
+        </div>
+        <div class="quick-action" onclick="showJoinByCode()">
+          <div class="quick-action-icon">🎟️</div>
+          <div class="quick-action-title">Join by Code</div>
+          <div class="quick-action-desc">Enter game code</div>
+        </div>
+        <div class="quick-action" onclick="playOfflineWithAI()">
+          <div class="quick-action-icon">🤖</div>
+          <div class="quick-action-title">vs Bots</div>
+          <div class="quick-action-desc">Play offline</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="games" onclick="switchTab('games')">
+          <span class="tab-icon">🎮</span> Games
+        </button>
+        <button class="tab" data-tab="guilds" onclick="switchTab('guilds')">
+          <span class="tab-icon">⚔️</span> Guilds
+        </button>
+        <button class="tab" data-tab="players" onclick="switchTab('players')">
+          <span class="tab-icon">👥</span> Players
+        </button>
+        <button class="tab" data-tab="tutorial" onclick="switchTab('tutorial')">
+          <span class="tab-icon">📖</span> How to Play
+        </button>
+        <button class="tab" data-tab="chat" onclick="switchTab('chat')">
+          <span class="tab-icon">💬</span> Chat
+        </button>
+      </div>
+
+      <!-- Games Panel -->
+      <div class="panel active" id="panel-games">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🎮 Active Games</h3>
+            <button class="btn btn-small btn-secondary" onclick="refreshGames()">↻ Refresh</button>
+          </div>
+          <div class="session-list" id="session-list">
+            <div class="loading-spinner"></div>
+          </div>
+
+          <!-- Enhanced "No Games" panel with all play options -->
+          <div id="no-games-panel" style="display: none;">
+            <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+              <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎲</div>
+              <p style="margin-bottom: 1rem;">No active games right now. Start playing with one of these
+                options:</p>
+            </div>
+
+            <div class="no-games-options"
+              style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0 1rem 1.5rem;">
+              <!-- Private Game Option -->
+              <div class="play-option" onclick="showCreatePrivateGame()"
+                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
+                <div style="font-size: 2.5rem;">🔒</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">
+                    Private Game</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Create a game with a
+                    shareable code. Invite friends via link!</div>
+                </div>
+                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
+              </div>
+
+              <!-- Quick Match Option -->
+              <div class="play-option" onclick="createPublicGame()"
+                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
+                <div style="font-size: 2.5rem;">🎯</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Quick
+                    Match</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Create a public game
+                    for anyone to join. Add bots if needed.</div>
+                </div>
+                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
+              </div>
+
+              <!-- Solo vs Bots Option -->
+              <div class="play-option" onclick="playOfflineWithAI()"
+                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
+                <div style="font-size: 2.5rem;">🤖</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Solo
+                    vs Bots</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Play offline against
+                    bot opponents. No waiting required!</div>
+                </div>
+                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
+              </div>
+
+              <!-- Join by Code Option -->
+              <div class="play-option" onclick="showJoinByCode()"
+                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
+                <div style="font-size: 2.5rem;">🎟️</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Join
+                    by Code</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Have a game code from
+                    a friend? Enter it here!</div>
+                </div>
+                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guilds Panel -->
+      <div class="panel" id="panel-guilds">
+        <!-- Your Guild Section -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">⚔️ Your Guild</h3>
+            <button class="btn btn-small btn-primary" id="create-guild-btn" onclick="showCreateGuild()">+
+              Create Guild</button>
+          </div>
+          <div id="my-guild-info">
+            <p style="color: var(--text-secondary);">You're not in a guild yet.</p>
+          </div>
+
+          <!-- Guild Controls (shown when in a guild) -->
+          <div id="guild-controls" style="display: none;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
+              <button class="btn btn-small btn-primary" onclick="showCreateGuildGame()">🎮 Start Guild
+                Game</button>
+              <button class="btn btn-small btn-secondary" onclick="showGuildMembers()">👥 Members</button>
+              <button class="btn btn-small btn-secondary" id="guild-tournament-btn" onclick="showGuildTournaments()"
+                style="display: none;">🏆 Tournaments</button>
+            </div>
+
+            <!-- Guildmaster Controls -->
+            <div id="guildmaster-controls"
+              style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px;">
+              <div style="font-size: 0.9rem; color: #ffd700; margin-bottom: 0.75rem; font-weight: 600;">👑
+                Guildmaster Controls</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button class="btn btn-small btn-secondary" onclick="showManageMembers()">⚙️ Manage
+                  Members</button>
+                <button class="btn btn-small btn-secondary" onclick="showCreateTournament()">🏆 Create
+                  Tournament</button>
+                <button class="btn btn-small" style="background: rgba(239,68,68,0.2); color: #ef4444;"
+                  onclick="showDisbandGuildConfirm()">☠️ Disband Guild</button>
+              </div>
+              <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
+                ⚠️ If you leave, the guild will be abolished
+              </p>
+            </div>
+
+            <!-- Leave Guild Button (non-guildmasters) -->
+            <div id="leave-guild-section" style="display: none; margin-top: 1rem;">
+              <button class="btn btn-small" style="background: rgba(239,68,68,0.2); color: #ef4444;"
+                onclick="showLeaveGuildConfirm()">🚪 Leave Guild</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Guild Members Online (shown when in a guild) -->
+        <div class="card" id="guild-members-online-card" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title">🟢 Guild Members Online</h3>
+            <span id="guild-online-count" style="color: var(--text-secondary); font-size: 0.9rem;">0
+              online</span>
+          </div>
+          <div id="guild-online-list" style="max-height: 200px; overflow-y: auto;">
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">No members online</p>
+          </div>
+        </div>
+
+        <!-- Guild Games (shown when in a guild) -->
+        <div class="card" id="guild-games-card" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title">🎲 Active Guild Games</h3>
+          </div>
+          <div id="guild-games-list">
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">No active guild games</p>
+          </div>
+        </div>
+
+        <!-- Guild Chat Section (shown when in a guild) -->
+        <div class="card" id="guild-chat-card" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title">💬 Guild Chat</h3>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-small btn-secondary" onclick="showChatSettings()" title="Chat Settings">⚙️</button>
+              <button class="btn btn-small btn-secondary" id="chat-opt-toggle" onclick="toggleChatOptOut()"
+                title="Opt out of chat">🔇</button>
+            </div>
+          </div>
+
+          <!-- Chat disabled notice -->
+          <div id="chat-disabled-notice"
+            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔇</div>
+            <p style="font-size: 0.85rem;">Chat is disabled by the Guildmaster</p>
+          </div>
+
+          <!-- Chat opted out notice -->
+          <div id="chat-opted-out-notice"
+            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔕</div>
+            <p style="font-size: 0.85rem;">You have opted out of chat</p>
+            <button class="btn btn-small btn-secondary" onclick="toggleChatOptOut()"
+              style="margin-top: 0.5rem;">Re-enable Chat</button>
+          </div>
+
+          <!-- Chat not approved notice -->
+          <div id="chat-not-approved-notice"
+            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏳</div>
+            <p style="font-size: 0.85rem;">Waiting for chat approval from Guildmaster</p>
+          </div>
+
+          <!-- Active chat area -->
+          <div id="guild-chat-area" style="display: none;">
+            <div id="guild-chat-messages"
+              style="height: 250px; overflow-y: auto; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 0.75rem;">
+              <p style="color: var(--text-secondary); font-size: 0.85rem; text-align: center;">No messages
+                yet</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" class="input" id="guild-chat-input" placeholder="Type a message..." style="flex: 1;"
+                onkeypress="handleGuildChatKeypress(event)">
+              <button class="btn btn-primary" onclick="sendGuildChatMessage()">Send</button>
+            </div>
+          </div>
+
+          <!-- Guildmaster chat controls -->
+          <div id="guildmaster-chat-controls"
+            style="display: none; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <div style="font-size: 0.85rem; color: #ffd700; margin-bottom: 0.5rem; font-weight: 600;">👑
+              Chat Controls</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <button class="btn btn-small btn-secondary" id="toggle-guild-chat-btn" onclick="toggleGuildChat()">
+                <span id="toggle-guild-chat-text">Disable Chat</span>
+              </button>
+              <button class="btn btn-small btn-secondary" onclick="showChatApprovals()">📋 Approvals <span
+                  id="pending-approvals-badge"
+                  style="display: none; background: #ef4444; color: #fff; padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; margin-left: 0.3rem;">0</span></button>
+              <button class="btn btn-small btn-secondary" onclick="showBlockedUsers()">🚫 Blocked</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Find Guilds Section -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🔍 Find Guilds</h3>
+          </div>
+          <div class="input-group" style="margin-bottom: 0;">
+            <input type="text" class="input" id="guild-search" placeholder="Search guilds..." oninput="searchGuilds()">
+          </div>
+          <div id="guild-search-results" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Guild Rules Info -->
+        <div class="card" style="background: rgba(100,200,255,0.05); border: 1px solid rgba(100,200,255,0.2);">
+          <div class="card-header">
+            <h3 class="card-title" style="font-size: 0.95rem;">📜 Guild Rules</h3>
+          </div>
+          <ul
+            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.8;">
+            <li>🎮 <strong>Guild games:</strong> All human, guild members only (2-6 players)</li>
+            <li>🤖 <strong>No bots allowed</strong> in guild games or tournaments</li>
+            <li>👑 <strong>Guildmaster:</strong> Creator, cannot be changed</li>
+            <li>☠️ <strong>If guildmaster leaves:</strong> Guild abolished</li>
+            <li>🏆 <strong>Tournaments:</strong> Guildmaster-to-guildmaster only</li>
+          </ul>
+
+          <!-- Chat Rules -->
+          <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(100,200,255,0.15);">
+            <div style="font-size: 0.85rem; color: #64d8ff; margin-bottom: 0.5rem; font-weight: 500;">💬
+              Chat Rules</div>
+            <ul
+              style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.7;">
+              <li><strong>Guild chat only</strong> — except during tournaments</li>
+              <li><strong>Approval required</strong> — guildmaster approves chat access</li>
+              <li><strong>Guildmaster controls:</strong> Can disable chat, block users</li>
+              <li><strong>Anyone can block</strong> — blocks are silent</li>
+              <li><strong>Unblock cooldown:</strong> 24h before blocking again</li>
+              <li><strong>Blocked users:</strong> See no trace of your presence</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Players Panel -->
+      <div class="panel" id="panel-players">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">👥 Find Players</h3>
+          </div>
+          <div class="input-group">
+            <input type="text" class="input" id="player-search" placeholder="Search by username..."
+              oninput="searchPlayers()">
+          </div>
+          <div id="player-search-results"></div>
+        </div>
+      </div>
+
+      <!-- Tutorial Panel -->
+      <div class="panel" id="panel-tutorial">
+        <div class="card">
+          <div class="tutorial-step active" data-step="0">
+            <h2>Welcome to Fast Track!</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🎲</div>
+            <p>Fast Track is a strategic racing board game for 2-6 players. Race your pegs around the board
+              and into your safe zone to win!</p>
+          </div>
+
+          <div class="tutorial-step" data-step="1">
+            <h2>The Board</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🔵🔴🟢🟡🟣🟠</div>
+            <p>Each player has a color with 5 pegs. 4 start in the Holding Area, and 1 starts on the Diamond
+              (Home) hole. Get all 5 pegs to your Safe Zone to win!</p>
+          </div>
+
+          <div class="tutorial-step" data-step="2">
+            <h2>Moving Pegs</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🎯</div>
+            <p>Roll the dice and move your pegs clockwise around the outer track. Land exactly on the Safe
+              Zone Entry (2 spaces before your Safe Zone) to enter.</p>
+          </div>
+
+          <div class="tutorial-step" data-step="3">
+            <h2>The Fast Track</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🚀</div>
+            <p>The inner Fast Track is a shortcut! Enter through any colored pentagon (except your own) and
+              exit at your own color. Risky but rewarding!</p>
+          </div>
+
+          <div class="tutorial-step" data-step="4">
+            <h2>The Bullseye</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">⭕</div>
+            <p>Land on the center Bullseye for safety. Rolling J, Q, or K lets you exit to any Fast Track
+              pentagon. Strategic positioning!</p>
+          </div>
+
+          <div class="tutorial-step" data-step="5">
+            <h2>Sending Opponents Home</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">💥</div>
+            <p>Land on an opponent's peg to send them back to their Holding Area! But beware - they can do
+              the same to you. Pegs in Safe Zones cannot be attacked.</p>
+          </div>
+
+          <div class="tutorial-step" data-step="6">
+            <h2>Prestige Points</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🏆</div>
+            <p>Earn prestige by winning games, making strategic plays, and sending opponents home. Rise
+              through the ranks: Bronze → Silver → Gold → Diamond → Platinum!</p>
+          </div>
+
+          <div class="tutorial-step" data-step="7">
+            <h2>Ready to Play!</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🎮</div>
+            <p>You're ready! Create a game, invite friends with a code, or join a public match. Good luck!
+            </p>
+            <button class="btn btn-primary" onclick="switchTab('games')" style="margin-top: 1rem;">Find a
+              Game</button>
+          </div>
+
+          <div class="tutorial-dots">
+            <span class="tutorial-dot active" onclick="goToTutorialStep(0)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(1)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(2)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(3)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(4)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(5)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(6)"></span>
+            <span class="tutorial-dot" onclick="goToTutorialStep(7)"></span>
+          </div>
+
+          <div class="tutorial-nav">
+            <button class="btn btn-secondary" onclick="prevTutorialStep()">← Previous</button>
+            <button class="btn btn-primary" onclick="nextTutorialStep()">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Panel -->
+      <div class="panel" id="panel-chat">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">💬 Lobby Chat</h3>
+          </div>
+          <div class="chat-container">
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-row">
+              <input type="text" class="input" id="chat-input" placeholder="Type a message..."
+                onkeydown="handleChatKeydown(event)">
+              <button class="btn btn-primary" onclick="sendChat()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+
+  <!-- Profile Modal -->
+  <div class="modal-overlay" id="profile-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">👤 Profile</h2>
+        <button class="modal-close" onclick="closeModal('profile-modal')">×</button>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 5rem;" id="profile-avatar-display">👤</div>
+        <h3 id="profile-username">Player</h3>
+        <div class="user-prestige" style="justify-content: center; margin-top: 0.5rem;">
+          <span class="prestige-badge prestige-bronze" id="profile-prestige">BRONZE</span>
+          <span id="profile-points">0 pts</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center; margin-bottom: 1.5rem;">
+        <div>
+          <div style="font-size: 1.5rem; font-weight: bold;" id="profile-games">0</div>
+          <div style="color: var(--text-secondary); font-size: 0.85rem;">Games Played</div>
+        </div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: bold;" id="profile-wins">0</div>
+          <div style="color: var(--text-secondary); font-size: 0.85rem;">Wins</div>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary" style="width: 100%; margin-bottom: 0.5rem;" onclick="showAvatarPicker()">
+        🎨 Change Avatar
+      </button>
+      <button class="btn btn-secondary" style="width: 100%;" onclick="logout()">
+        🚪 Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- Avatar Picker Modal -->
+  <div class="modal-overlay" id="avatar-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">🎨 Choose Avatar</h2>
+        <button class="modal-close" onclick="closeModal('avatar-modal')">×</button>
+      </div>
+
+      <div class="avatar-categories" id="avatar-categories"></div>
+      <div class="avatar-grid" id="avatar-grid"></div>
+
+      <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveAvatar()">
+        Save Avatar
+      </button>
+    </div>
+  </div>
+
+  <!-- Join by Code Modal -->
+  <div class="modal-overlay" id="join-code-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">🎟️ Join Game</h2>
+        <button class="modal-close" onclick="closeModal('join-code-modal')">×</button>
+      </div>
+
+      <form onsubmit="joinByCode(event)">
+        <div class="input-group">
+          <label>Game Code</label>
+          <input type="text" class="input" id="join-code-input" placeholder="Enter 6-character code" maxlength="6"
+            style="text-align: center; font-size: 1.5rem; letter-spacing: 0.3rem; text-transform: uppercase;">
+        </div>
+
+        <div class="input-group" id="guest-name-group">
+          <label>Your Name</label>
+          <input type="text" class="input" id="guest-name-input" placeholder="Enter your name">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Join Game</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Guild Modal -->
+  <div class="modal-overlay" id="create-guild-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">⚔️ Create Guild</h2>
+        <button class="modal-close" onclick="closeModal('create-guild-modal')">×</button>
+      </div>
+
+      <form onsubmit="createGuild(event)">
+        <div class="input-group">
+          <label>Guild Name</label>
+          <input type="text" class="input" id="guild-name" placeholder="e.g., Fast Track Masters" required
+            minlength="3">
+        </div>
+        <div class="input-group">
+          <label>Guild Tag (2-4 characters)</label>
+          <input type="text" class="input" id="guild-tag" placeholder="e.g., FTM" required minlength="2" maxlength="4"
+            style="text-transform: uppercase;">
+        </div>
+
+        <div
+          style="background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
+          <p style="font-size: 0.85rem; color: #ffd700; margin: 0;">
+            👑 You will become the <strong>Guildmaster</strong>.<br>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">This role cannot be transferred.
+              If you leave, the guild will be abolished.</span>
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Guild</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Guild Game Modal -->
+  <div class="modal-overlay" id="create-guild-game-modal">
+    <div class="modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <h2 class="modal-title">⚔️ Guild Game</h2>
+        <button class="modal-close" onclick="closeModal('create-guild-game-modal')">×</button>
+      </div>
+
+      <form onsubmit="createGuildGame(event)">
+        <div class="input-group">
+          <label>Number of Players</label>
+          <select class="input" id="guild-game-player-count">
+            <option value="2">2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players</option>
+          </select>
+        </div>
+
+        <div
+          style="background: rgba(100,200,255,0.1); border: 1px solid rgba(100,200,255,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">📜 Guild Game
+            Rules</div>
+          <ul
+            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.6;">
+            <li>🚫 <strong>No bots allowed</strong></li>
+            <li>👥 Guild members only</li>
+            <li>✅ Any guild member can organize</li>
+            <li>🎯 No approval required from guildmaster</li>
+          </ul>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Guild Game</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Guild Members Modal -->
+  <div class="modal-overlay" id="guild-members-modal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 class="modal-title">👥 Guild Members</h2>
+        <button class="modal-close" onclick="closeModal('guild-members-modal')">×</button>
+      </div>
+
+      <div class="input-group">
+        <input type="text" class="input" id="guild-member-search" placeholder="Search members..."
+          oninput="filterGuildMembers()">
+      </div>
+
+      <div id="guild-members-list" style="max-height: 400px; overflow-y: auto;">
+        <p style="color: var(--text-secondary);">Loading members...</p>
       </div>
     </div>
   </div>
 
-  <script src="/js/substrates/avatar_picker.js"></script>
-  <script>
-    const token = localStorage.getItem('user_token');
-    const username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
-    const av = AvatarPicker.get();
+  <!-- Manage Members Modal (Guildmaster only) -->
+  <div class="modal-overlay" id="manage-members-modal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ Manage Members</h2>
+        <button class="modal-close" onclick="closeModal('manage-members-modal')">×</button>
+      </div>
 
-    // Avatar badge
-    document.getElementById('p-name').textContent = username;
-    AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
-    const badge = document.getElementById('av-badge');
-    badge.textContent = av ? av.emoji : '?';
-    if (!av) badge.style.color = 'var(--np)';
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        👑 As Guildmaster, you can remove any member from the guild.
+      </p>
 
-    // Require avatar
-    if (!AvatarPicker.has()) {
-      AvatarPicker.show(() => location.reload(), true);
-    }
+      <div id="manage-members-list" style="max-height: 400px; overflow-y: auto;">
+        <p style="color: var(--text-secondary);">Loading members...</p>
+      </div>
+    </div>
+  </div>
 
-    // Online count removed — will be driven by real analytics
+  <!-- Guild Tournaments Modal -->
+  <div class="modal-overlay" id="guild-tournaments-modal">
+    <div class="modal" style="max-width: 550px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🏆 Guild Tournaments</h2>
+        <button class="modal-close" onclick="closeModal('guild-tournaments-modal')">×</button>
+      </div>
 
-    // Matchmaker availability
-    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding match...';
+      <div id="active-tournaments-section">
+        <h4 style="color: var(--text-primary); margin-bottom: 0.75rem;">Active Tournaments</h4>
+        <div id="active-tournaments-list" style="margin-bottom: 1.5rem;">
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">No active tournaments</p>
+        </div>
+      </div>
 
-    function startSolo() {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
-      window.location.href = '/fasttrack/index.html?mode=solo';
-    }
+      <div id="pending-tournament-invites-section" style="display: none;">
+        <h4 style="color: #ffd700; margin-bottom: 0.75rem;">📥 Pending Invites</h4>
+        <div id="pending-tournament-invites-list" style="margin-bottom: 1.5rem;"></div>
+      </div>
+    </div>
+  </div>
 
-    function startMatchmaker() {
-      if (!token) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
-      window.location.href = '/fasttrack/index.html?mode=multi';
-    }
+  <!-- Create Tournament Modal (Guildmaster only) -->
+  <div class="modal-overlay" id="create-tournament-modal">
+    <div class="modal" style="max-width: 520px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🏆 Create Guild Tournament</h2>
+        <button class="modal-close" onclick="closeModal('create-tournament-modal')">×</button>
+      </div>
 
-    function togglePrivate() {
-      const p = document.getElementById('priv-panel');
-      p.classList.toggle('open');
-      if (p.classList.contains('open')) generateCode();
-    }
+      <form onsubmit="createGuildTournament(event)">
+        <div class="input-group">
+          <label>Tournament Name</label>
+          <input type="text" class="input" id="tournament-name" placeholder="e.g., Championship 2026" required>
+        </div>
 
-    function privTab(tab) {
-      document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab));
-      document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none';
-      document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none';
-    }
+        <div class="input-group">
+          <label>Invite Guilds</label>
+          <input type="text" class="input" id="tournament-guild-search" placeholder="Search guilds to invite..."
+            oninput="searchGuildsForTournament()">
+        </div>
+        <div id="tournament-guild-results" style="max-height: 150px; overflow-y: auto; margin-bottom: 1rem;">
+        </div>
 
-    let _code = '';
-    function generateCode() {
-      if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
-      _code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      document.getElementById('room-code').textContent = _code;
-      document.getElementById('launch-btn').disabled = false;
-      document.getElementById('priv-status').textContent = 'Share code with friends. You start the game.';
-    }
+        <div id="invited-guilds-list" style="display: none; margin-bottom: 1rem;">
+          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Invited
+            Guilds:</div>
+          <div id="invited-guilds-tags"></div>
+        </div>
 
-    function copyCode() {
-      if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; }
-    }
+        <div
+          style="background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="font-weight: 600; color: #ffd700; margin-bottom: 0.5rem;">📜 Tournament Rules</div>
+          <ul
+            style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.5;">
+            <li>All participating guildmasters must approve</li>
+            <li>Only guild members can participate</li>
+            <li>No bots allowed in any match</li>
+            <li>Orphaned guilds (no guildmaster) cannot participate</li>
+          </ul>
+        </div>
 
-    function launchPrivate() {
-      if (!token) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
-      window.location.href = `/fasttrack/index.html?mode=private&code=${_code}&host=1`;
-    }
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Send Invitations</button>
+      </form>
+    </div>
+  </div>
 
-    function joinPrivate() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('guest-name').value.trim() || 'Guest';
-      const msg = document.getElementById('join-msg');
-      if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      if (!localStorage.getItem('user_token')) {
-        localStorage.setItem('username', name);
-        localStorage.setItem('user_token', 'guest-' + Date.now());
-      }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      window.location.href = `/fasttrack/index.html?mode=private&code=${code}`;
-    }
-  </script>
+  <!-- Disband Guild Confirmation Modal -->
+  <div class="modal-overlay" id="disband-guild-modal">
+    <div class="modal" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2 class="modal-title">☠️ Disband Guild</h2>
+        <button class="modal-close" onclick="closeModal('disband-guild-modal')">×</button>
+      </div>
+
+      <div style="text-align: center;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
+        <p style="color: var(--text-primary); margin-bottom: 1rem;">
+          Are you sure you want to <strong>permanently disband</strong> your guild?
+        </p>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
+          All members will be removed.<br>This action cannot be undone.
+        </p>
+
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('disband-guild-modal')">Cancel</button>
+          <button class="btn" style="flex: 1; background: #ef4444; color: #fff;" onclick="disbandGuild()">Disband
+            Guild</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leave Guild Confirmation Modal -->
+  <div class="modal-overlay" id="leave-guild-modal">
+    <div class="modal" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🚪 Leave Guild</h2>
+        <button class="modal-close" onclick="closeModal('leave-guild-modal')">×</button>
+      </div>
+
+      <div style="text-align: center;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">👋</div>
+        <p style="color: var(--text-primary); margin-bottom: 1.5rem;">
+          Are you sure you want to leave <strong id="leave-guild-name">this guild</strong>?
+        </p>
+
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('leave-guild-modal')">Cancel</button>
+          <button class="btn" style="flex: 1; background: #ef4444; color: #fff;" onclick="leaveGuild()">Leave
+            Guild</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Settings Modal -->
+  <div class="modal-overlay" id="chat-settings-modal">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ Chat Settings</h2>
+        <button class="modal-close" onclick="closeModal('chat-settings-modal')">×</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+          <div>
+            <div style="font-weight: 500; color: var(--text-primary);">Opt Out of Chat</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">Disable all chat messages</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="chat-opt-out-toggle" onchange="toggleChatOptOut()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <button class="btn btn-secondary" onclick="showBlockedUsers()" style="width: 100%;">
+          🚫 Manage Blocked Users
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Approvals Modal (Guildmaster only) -->
+  <div class="modal-overlay" id="chat-approvals-modal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 class="modal-title">📋 Chat Approval Requests</h2>
+        <button class="modal-close" onclick="closeModal('chat-approvals-modal')">×</button>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Members must be approved before they can participate in guild chat.
+      </p>
+
+      <div id="chat-approval-list" style="max-height: 400px; overflow-y: auto;">
+        <p style="color: var(--text-secondary); text-align: center;">No pending approvals</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blocked Users Modal -->
+  <div class="modal-overlay" id="blocked-users-modal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🚫 Blocked Users</h2>
+        <button class="modal-close" onclick="closeModal('blocked-users-modal')">×</button>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Blocked users cannot see you or interact with you. Blocks are silent.<br>
+        <span style="color: #ffd700;">⚠️ After unblocking, you must wait 24 hours to block again.</span>
+      </p>
+
+      <div id="blocked-users-list" style="max-height: 400px; overflow-y: auto;">
+        <p style="color: var(--text-secondary); text-align: center;">No blocked users</p>
+      </div>
+
+      <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+        <div style="font-size: 0.9rem; color: var(--text-primary); margin-bottom: 0.75rem;">Block a User</div>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" class="input" id="block-user-search" placeholder="Search username to block..."
+            style="flex: 1;" oninput="searchUsersToBlock()">
+        </div>
+        <div id="block-user-results" style="margin-top: 0.5rem; max-height: 150px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waiting Room Modal (for public games / join-by-code) -->
+  <div class="modal-overlay" id="waiting-room-modal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 class="modal-title">⏳ Waiting Room</h2>
+        <button class="modal-close" onclick="leaveWaitingRoom()">×</button>
+      </div>
+
+      <div class="waiting-room">
+        <p>Share this code with friends:</p>
+        <div class="waiting-code" id="waiting-room-code">ABC123</div>
+
+        <div class="share-url">
+          <input type="text" class="input" id="share-url" readonly>
+          <button class="btn btn-secondary" onclick="copyShareUrl()">📋 Copy</button>
+          <button class="btn btn-secondary" onclick="shareViaMessenger()">📤 Share</button>
+        </div>
+
+        <div class="waiting-players" id="waiting-players"></div>
+
+        <div id="game-setup-options"
+          style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span style="font-size: 0.9rem; color: var(--text-secondary);">Add Bots:</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-small btn-secondary" onclick="addAIPlayer()" id="add-ai-btn">🤖 +1
+                Bot</button>
+              <button class="btn btn-small btn-secondary" onclick="removeAIPlayer()" id="remove-ai-btn"
+                style="display: none;">➖ Remove</button>
+            </div>
+          </div>
+          <div id="bot-count-info" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center;"></div>
+          <div id="bot-limit-warning"
+            style="display: none; font-size: 0.75rem; color: var(--warning); margin-top: 0.5rem; text-align: center;">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+          <button class="btn btn-primary" onclick="startGame()" id="start-game-btn" disabled>🎮 Start
+            Game</button>
+        </div>
+
+        <p id="waiting-room-note" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 1rem;">
+          Minimum 2 players required to start
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Private Game Wizard Modal -->
+  <div class="modal-overlay" id="private-wizard-modal">
+    <div class="modal wizard-modal" style="max-width: 520px;">
+      <!-- Wizard Header -->
+      <div class="modal-header">
+        <h2 class="modal-title" id="wizard-title">🔒 Create Private Game</h2>
+        <button class="modal-close" onclick="closePrivateWizard()">×</button>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="wizard-steps">
+        <div class="wizard-step active" data-step="1"><span>1</span></div>
+        <div class="wizard-step-line"></div>
+        <div class="wizard-step" data-step="2"><span>2</span></div>
+        <div class="wizard-step-line"></div>
+        <div class="wizard-step" data-step="3"><span>3</span></div>
+        <div class="wizard-step-line"></div>
+        <div class="wizard-step" data-step="4"><span>4</span></div>
+      </div>
+
+      <!-- Step 1: Room Code & Share -->
+      <div class="wizard-panel active" id="wizard-step-1">
+        <div class="wizard-content">
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">Share this code
+            with friends:</p>
+          <div class="waiting-code" id="wizard-room-code">------</div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" class="input" id="wizard-share-url" readonly style="flex: 1; font-size: 0.8rem;">
+            <button class="btn btn-secondary" onclick="copyShareUrl()" title="Copy link">📋 Copy</button>
+            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-1">Next →</button>
+          </div>
+
+          <div class="wizard-share-icons">
+            <button class="wizard-share-btn" onclick="shareViaMessenger()" title="Share">📤</button>
+            <button class="wizard-share-btn" onclick="shareToWhatsApp()" title="WhatsApp">💬</button>
+            <button class="wizard-share-btn" onclick="shareToTwitter()" title="Twitter / X">🐦</button>
+            <button class="wizard-share-btn" onclick="shareToEmail()" title="Email">✉️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Username & Avatar -->
+      <div class="wizard-panel" id="wizard-step-2">
+        <div class="wizard-content">
+          <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+            <div class="wizard-avatar-preview" id="wizard-avatar-preview">😊</div>
+            <input type="text" class="input" id="wizard-username" placeholder="Choose your name..." style="flex: 1;"
+              oninput="wizardCheckUsername()" maxlength="20">
+            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-2" disabled>Next
+              →</button>
+          </div>
+
+          <div class="wizard-avatar-cats" id="wizard-avatar-cats"></div>
+          <div class="wizard-avatar-grid" id="wizard-avatar-grid"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Game Settings -->
+      <div class="wizard-panel" id="wizard-step-3">
+        <div class="wizard-content">
+          <div class="wizard-settings">
+            <label class="wizard-toggle">
+              <span>🎵 Music</span>
+              <input type="checkbox" id="wiz-music" checked>
+            </label>
+            <label class="wizard-toggle">
+              <span>🤖 Allow AI Players</span>
+              <input type="checkbox" id="wiz-allow-ai" checked>
+            </label>
+            <label class="wizard-toggle">
+              <span>⏱️ Turn Timer</span>
+              <input type="checkbox" id="wiz-turn-timer">
+            </label>
+            <label class="wizard-toggle">
+              <span>🚪 Late Arrivals OK</span>
+              <input type="checkbox" id="wiz-late-arrivals" checked>
+            </label>
+            <div class="wizard-toggle" style="cursor: default;">
+              <span>👥 Max Players</span>
+              <select class="input" id="wiz-max-players"
+                style="width: 80px; padding: 0.3rem 0.5rem; font-size: 0.9rem;">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </div>
+          </div>
+          <div style="text-align: center; margin-top: 1rem;">
+            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-3">Open Lobby →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Waiting Lobby -->
+      <div class="wizard-panel" id="wizard-step-4">
+        <div class="wizard-content">
+          <button class="btn btn-primary btn-enter-game" onclick="startGame()" id="wizard-start-btn" disabled>🎮 Enter
+            Game</button>
+          <p id="wizard-start-note"
+            style="color: var(--text-secondary); font-size: 0.8rem; text-align: center; margin: 0.5rem 0;">
+            Add at least 1 bot or invite a friend to start
+          </p>
+
+          <div class="waiting-players" id="wizard-waiting-players"></div>
+
+          <div id="wizard-bot-controls"
+            style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.75rem;">
+            <button class="btn btn-small btn-secondary" onclick="addAIPlayer()" id="wizard-add-ai">🤖 + Add
+              Bot</button>
+            <button class="btn btn-small btn-secondary" onclick="removeAIPlayer()" id="wizard-remove-ai"
+              style="display: none;">➖ Remove Bot</button>
+          </div>
+          <div id="wizard-bot-info"
+            style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Public Game Modal -->
+  <div class="modal-overlay" id="create-public-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">🌐 Quick Match Settings</h2>
+        <button class="modal-close" onclick="closeModal('create-public-modal')">×</button>
+      </div>
+
+      <form onsubmit="createPublicGameWithSettings(event)">
+        <div class="input-group">
+          <label>Number of Players</label>
+          <select class="input" id="public-player-count">
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players (Preferred)</option>
+          </select>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Public Game
+            Rules</div>
+          <ul
+            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.6;">
+            <li>3-4 players only, no bots at start</li>
+            <li>Bots only replace players who leave/timeout</li>
+            <li>If game starts with 3, stays 3 (no 4th bot)</li>
+            <li>⏱️ Turn timer: 2 min + 1 min warning</li>
+          </ul>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          🏅 Medallion points are awarded in public matches!
+        </p>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Find Match</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="lobby-speakeasy.js"></script>
+  <script src="avatars.js"></script>
+  <script src="lobby_client.js"></script>
 </body>
 
 </html>

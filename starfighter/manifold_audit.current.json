@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-04-13T20:12:31.485Z",
+  "files": {
+    "core.js": {
+      "lines": 3185,
+      "manifoldCalls": 28,
+      "directEntityWrites": 35,
+      "directStateWrites": 106,
+      "directPhysicsOps": 181,
+      "directTotal": 322,
+      "manifoldBias": -294,
+      "manifoldSignalDensityPct": 0.88
+    },
+    "3d.js": {
+      "lines": 1903,
+      "manifoldCalls": 2,
+      "directEntityWrites": 0,
+      "directStateWrites": 0,
+      "directPhysicsOps": 57,
+      "directTotal": 57,
+      "manifoldBias": -55,
+      "manifoldSignalDensityPct": 0.11
+    },
+    "input.js": {
+      "lines": 521,
+      "manifoldCalls": 0,
+      "directEntityWrites": 0,
+      "directStateWrites": 0,
+      "directPhysicsOps": 6,
+      "directTotal": 6,
+      "manifoldBias": -6,
+      "manifoldSignalDensityPct": 0
+    },
+    "audio.js": {
+      "lines": 1397,
+      "manifoldCalls": 0,
+      "directEntityWrites": 0,
+      "directStateWrites": 0,
+      "directPhysicsOps": 1,
+      "directTotal": 1,
+      "manifoldBias": -1,
+      "manifoldSignalDensityPct": 0
+    },
+    "music.js": {
+      "lines": 823,
+      "manifoldCalls": 6,
+      "directEntityWrites": 0,
+      "directStateWrites": 0,
+      "directPhysicsOps": 0,
+      "directTotal": 0,
+      "manifoldBias": 6,
+      "manifoldSignalDensityPct": 0.73
+    }
+  },
+  "overall": {
+    "lines": 7829,
+    "manifoldCalls": 36,
+    "directEntityWrites": 35,
+    "directStateWrites": 106,
+    "directPhysicsOps": 245,
+    "directTotal": 386,
+    "manifoldSignalDensityPct": 0.46,
+    "manifoldPressureIndex": 0.093
+  }
+}

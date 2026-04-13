@@ -25,6 +25,68 @@
       user-select: none
     }
 
+    body.immersed,
+    body.immersed * {
+      cursor: none !important
+    }
+
+    /* Fullscreen resume button — appears when ESC exits immersion */
+    #fs-resume {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9990;
+      padding: 20px 48px;
+      font-family: 'Courier New', monospace;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: #0ff;
+      background: rgba(0, 20, 30, 0.92);
+      border: 2px solid rgba(0, 255, 255, 0.6);
+      border-radius: 8px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+      text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.15);
+      animation: fsResumePulse 2s ease-in-out infinite
+    }
+
+    #fs-resume:hover {
+      background: rgba(0, 40, 60, 0.95);
+      border-color: #0ff;
+      box-shadow: 0 0 60px rgba(0, 255, 255, 0.4);
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.8)
+    }
+
+    /* Dim the game when paused / un-immersed */
+    #fs-resume-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9989;
+      pointer-events: none
+    }
+
+    @keyframes fsResumePulse {
+
+      0%,
+      100% {
+        opacity: 0.9
+      }
+
+      50% {
+        opacity: 1
+      }
+    }
+
     /* ── Canvas fills entire viewport ── */
     #game-canvas {
       display: block;
@@ -187,6 +249,190 @@
     }
 
     /* ═══════════════════════════════════════
+       MOBILE TOUCH HUD
+       ═══════════════════════════════════════ */
+    #mobile-hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Nav Sphere — bottom center */
+    #mob-nav-sphere {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(0, 255, 255, 0.4);
+      background: radial-gradient(circle at 40% 35%, rgba(0, 80, 120, 0.4), rgba(0, 20, 40, 0.6));
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 30px rgba(0, 255, 255, 0.05);
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #mob-nav-sphere.active {
+      border-color: rgba(0, 255, 255, 0.7);
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 40px rgba(0, 255, 255, 0.1);
+    }
+
+    #mob-nav-knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 44px;
+      height: 44px;
+      margin: -22px 0 0 -22px;
+      background: radial-gradient(circle, rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.15));
+      border: 2px solid rgba(0, 255, 255, 0.7);
+      border-radius: 50%;
+      transition: transform 0.06s ease-out;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    }
+
+    .mob-nav-label {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: rgba(0, 255, 255, 0.5);
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      pointer-events: none;
+    }
+
+    .mob-nav-thrust-label {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      color: rgba(0, 255, 200, 0.4);
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    /* Action button group — top-right, compact */
+    #mob-btn-group {
+      position: absolute;
+      right: 10px;
+      top: 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .mob-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 255, 255, 0.4);
+      background: rgba(0, 20, 40, 0.5);
+      color: #0ff;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      font-weight: bold;
+      text-align: center;
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mob-btn:active,
+    .mob-btn.active {
+      background: rgba(0, 255, 255, 0.2);
+      border-color: #0ff;
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+    }
+
+    .mob-btn:focus-visible {
+      outline: 1px solid #0ff;
+      outline-offset: 2px;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    }
+
+    .mob-btn:focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    .mob-lock {
+      border-color: rgba(255, 0, 255, 0.5);
+      color: #f0f;
+    }
+
+    .mob-ab {
+      border-color: rgba(255, 255, 0, 0.5);
+      color: #ff0;
+    }
+
+    .mob-boost {
+      border-color: rgba(0, 160, 255, 0.5);
+      color: #0af;
+    }
+
+    .mob-rtb {
+      border-color: rgba(255, 68, 68, 0.6);
+      color: #f44;
+    }
+
+    /* Hint bar — fades out after 5s */
+    .mob-hint {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 14px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 4px;
+      color: rgba(0, 255, 255, 0.7);
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: hintFade 6s ease forwards;
+    }
+
+    @keyframes hintFade {
+
+      0%,
+      70% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    /* Hide desktop console buttons on mobile */
+    @media (max-width: 1023px) and (hover: none) and (pointer: coarse) {
+      #console-buttons {
+        display: none !important;
+      }
+
+      #ctrl-overlay,
+      #ctrl-hamburger {
+        display: none !important;
+      }
+    }
+
+    /* ═══════════════════════════════════════
        CONSOLE TOGGLE BUTTONS — always-visible white rocket console style
        ═══════════════════════════════════════ */
     #console-buttons {
@@ -201,33 +447,275 @@
     }
 
     #console-buttons .console-btn {
-      padding: 8px 16px;
+      padding: 10px 18px;
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       font-weight: bold;
-      letter-spacing: 1px;
-      color: #fff;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-radius: 4px;
+      letter-spacing: 1.5px;
+      color: #c8e0f0;
+      background: linear-gradient(180deg, rgba(40, 50, 65, 0.95) 0%, rgba(20, 28, 38, 0.98) 100%);
+      border: 2px solid rgba(100, 130, 170, 0.5);
+      border-top-color: rgba(140, 180, 220, 0.6);
+      border-bottom-color: rgba(40, 60, 80, 0.8);
+      border-radius: 3px;
       cursor: pointer;
       text-transform: uppercase;
-      transition: all 0.2s ease;
-      text-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.05)
+      transition: all 0.15s ease;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 1px rgba(100, 160, 220, 0.3);
+      position: relative
     }
 
-    #console-buttons .console-btn:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.6);
-      box-shadow: 0 0 14px rgba(255, 255, 255, 0.15)
+    #console-buttons .console-btn::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      right: 4px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(180, 210, 240, 0.2), transparent);
+      border-radius: 1px
+    }
+
+    #console-buttons .console-btn:hover,
+    #console-buttons .console-btn:focus-visible {
+      background: linear-gradient(180deg, rgba(50, 65, 85, 0.95) 0%, rgba(30, 40, 55, 0.98) 100%);
+      border-color: rgba(100, 200, 255, 0.6);
+      color: #e0f0ff;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        0 0 12px rgba(0, 180, 255, 0.15);
+      outline: 1px solid rgba(0, 200, 255, 0.5);
+      outline-offset: 2px
+    }
+
+    #console-buttons .console-btn:active {
+      background: linear-gradient(180deg, rgba(20, 28, 38, 0.98) 0%, rgba(40, 50, 65, 0.95) 100%);
+      border-top-color: rgba(40, 60, 80, 0.8);
+      border-bottom-color: rgba(140, 180, 220, 0.6);
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.4),
+        0 1px 2px rgba(0, 0, 0, 0.3);
+      transform: translateY(1px)
+    }
+
+    #console-buttons .console-btn:focus:not(:focus-visible) {
+      outline: none
     }
 
     #console-buttons .console-btn.active {
-      background: rgba(255, 255, 255, 0.18);
-      border-color: rgba(255, 255, 255, 0.7);
-      color: #fff;
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.2)
+      background: linear-gradient(180deg, rgba(0, 50, 80, 0.95) 0%, rgba(0, 30, 50, 0.98) 100%);
+      border-color: rgba(0, 200, 255, 0.6);
+      color: #0ff;
+      box-shadow:
+        inset 0 1px 0 rgba(0, 255, 255, 0.1),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        0 0 10px rgba(0, 200, 255, 0.2)
+    }
+
+    /* ═══════════════════════════════════════
+       AVIATION-STYLE BUTTONS — tutorial / prompt overlays
+       ═══════════════════════════════════════ */
+    .avtn-btn {
+      padding: 12px 28px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 2px solid;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+        0 2px 6px rgba(0, 0, 0, 0.5)
+    }
+
+    .avtn-btn::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 6px;
+      right: 6px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+      border-radius: 1px
+    }
+
+    .avtn-btn-green {
+      color: #b0ffc0;
+      background: linear-gradient(180deg, rgba(20, 70, 40, 0.95) 0%, rgba(10, 40, 20, 0.98) 100%);
+      border-color: rgba(80, 200, 120, 0.6);
+      border-top-color: rgba(120, 240, 160, 0.5);
+      border-bottom-color: rgba(30, 80, 40, 0.8)
+    }
+
+    .avtn-btn-green:hover,
+    .avtn-btn-green:focus-visible {
+      background: linear-gradient(180deg, rgba(30, 90, 50, 0.95) 0%, rgba(15, 55, 30, 0.98) 100%);
+      border-color: rgba(100, 255, 140, 0.7);
+      color: #d0ffe0;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        0 0 14px rgba(80, 255, 120, 0.2);
+      outline: 1px solid rgba(80, 255, 120, 0.4);
+      outline-offset: 2px
+    }
+
+    .avtn-btn-green:active {
+      background: linear-gradient(180deg, rgba(10, 40, 20, 0.98) 0%, rgba(20, 70, 40, 0.95) 100%);
+      transform: translateY(1px)
+    }
+
+    .avtn-btn-red {
+      color: #ffc0b0;
+      background: linear-gradient(180deg, rgba(80, 30, 20, 0.95) 0%, rgba(45, 15, 10, 0.98) 100%);
+      border-color: rgba(200, 80, 60, 0.6);
+      border-top-color: rgba(240, 120, 100, 0.5);
+      border-bottom-color: rgba(80, 30, 20, 0.8)
+    }
+
+    .avtn-btn-red:hover,
+    .avtn-btn-red:focus-visible {
+      background: linear-gradient(180deg, rgba(100, 40, 28, 0.95) 0%, rgba(60, 22, 15, 0.98) 100%);
+      border-color: rgba(255, 100, 80, 0.7);
+      color: #ffe0d0;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        0 0 14px rgba(255, 80, 60, 0.2);
+      outline: 1px solid rgba(255, 100, 80, 0.4);
+      outline-offset: 2px
+    }
+
+    .avtn-btn-red:active {
+      background: linear-gradient(180deg, rgba(45, 15, 10, 0.98) 0%, rgba(80, 30, 20, 0.95) 100%);
+      transform: translateY(1px)
+    }
+
+    .avtn-btn-dim {
+      color: #889;
+      background: linear-gradient(180deg, rgba(35, 35, 40, 0.9) 0%, rgba(20, 20, 25, 0.95) 100%);
+      border-color: rgba(80, 80, 100, 0.4);
+      border-top-color: rgba(100, 100, 120, 0.3);
+      border-bottom-color: rgba(30, 30, 40, 0.6)
+    }
+
+    .avtn-btn-dim:hover,
+    .avtn-btn-dim:focus-visible {
+      background: linear-gradient(180deg, rgba(45, 45, 55, 0.9) 0%, rgba(28, 28, 35, 0.95) 100%);
+      border-color: rgba(120, 120, 150, 0.5);
+      color: #aab;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 8px rgba(100, 100, 150, 0.1);
+      outline: 1px solid rgba(100, 100, 150, 0.3);
+      outline-offset: 2px
+    }
+
+    .avtn-select {
+      padding: 6px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #c8e0f0;
+      background: linear-gradient(180deg, rgba(30, 40, 55, 0.95) 0%, rgba(15, 22, 32, 0.98) 100%);
+      border: 1px solid rgba(80, 120, 170, 0.4);
+      border-radius: 2px;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.4)
+    }
+
+    .avtn-select:focus {
+      border-color: rgba(0, 200, 255, 0.6);
+      outline: 1px solid rgba(0, 200, 255, 0.3);
+      outline-offset: 1px
+    }
+
+    .avtn-select option {
+      background: #0a1520;
+      color: #c8e0f0
+    }
+
+    /* ═══════════════════════════════════════
+       TUTORIAL LAYOUT CLASSES — used by JS tutorial overlay
+       ═══════════════════════════════════════ */
+    .tut-section {
+      background: rgba(0, 20, 40, 0.5);
+      border: 1px solid rgba(0, 150, 200, 0.15);
+      border-radius: 4px;
+      padding: 14px;
+      margin-bottom: 12px
+    }
+
+    .tut-section-title {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: #ffd24a;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255, 210, 74, 0.3)
+    }
+
+    .tut-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px
+    }
+
+    .tut-key-group {
+      background: rgba(0, 10, 25, 0.4);
+      border: 1px solid rgba(0, 100, 150, 0.12);
+      border-radius: 3px;
+      padding: 10px
+    }
+
+    .tut-key-label {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: #0ff;
+      margin-bottom: 6px;
+      text-transform: uppercase
+    }
+
+    .tut-binding {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #99bbcc;
+      margin-bottom: 3px;
+      line-height: 1.6
+    }
+
+    .tut-key {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #e0f0ff;
+      background: linear-gradient(180deg, rgba(40, 55, 75, 0.9) 0%, rgba(25, 35, 50, 0.95) 100%);
+      border: 1px solid rgba(80, 130, 180, 0.4);
+      border-radius: 2px;
+      margin-right: 3px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)
     }
 
     /* ═══════════════════════════════════════
@@ -817,14 +1305,48 @@
     </div>
   </div>
 
-  <!-- ═══ CONSOLE TOGGLE BUTTONS — always-visible white rocket console style ═══ -->
+  <!-- ═══ CONSOLE TOGGLE BUTTONS — aviation rocket module style ═══ -->
   <div id="console-buttons">
-    <button class="console-btn" id="btn-mission"
+    <button class="console-btn" id="btn-pause" tabindex="1"
+      onclick="if(window.Starfighter&&Starfighter.togglePause)Starfighter.togglePause()">&#10074;&#10074; PAUSE</button>
+    <button class="console-btn" id="btn-mission" tabindex="2"
       onclick="document.getElementById('mission-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('tutorial-panel').classList.remove('open');document.getElementById('btn-tutorial').classList.remove('active')">&#9733;
       MISSION</button>
-    <button class="console-btn" id="btn-tutorial"
+    <button class="console-btn" id="btn-tutorial" tabindex="3"
       onclick="document.getElementById('tutorial-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('mission-panel').classList.remove('open');document.getElementById('btn-mission').classList.remove('active')">&#9881;
       CONTROLS</button>
+    <button class="console-btn" id="btn-tutorial-open" tabindex="4"
+      onclick="if(window.Starfighter&&Starfighter.openTutorial)Starfighter.openTutorial()">&#10022; TUTORIAL</button>
+    <button class="console-btn" id="btn-music" tabindex="5"
+      onclick="if(window.SFMusic){const on=SFMusic.toggle();this.classList.toggle('active',on);this.innerHTML=on?'&#9835; MUSIC ON':'&#9835; MUSIC OFF'}">&#9835;
+      MUSIC ON</button>
+    <button class="console-btn" id="btn-exit" tabindex="6"
+      style="background:linear-gradient(180deg,rgba(80,55,20,0.95),rgba(50,30,10,0.98));border-color:rgba(200,150,60,0.5);color:#ffcc88"
+      onclick="if(window.Starfighter&&Starfighter.exitGame)Starfighter.exitGame()">&#10162; EXIT GAME</button>
+    <button class="console-btn" id="btn-rtb" tabindex="7"
+      style="background:linear-gradient(180deg,rgba(80,20,15,0.95),rgba(50,10,8,0.98));border-color:rgba(200,60,50,0.5);color:#ff4444;display:none"
+      onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()">⚠ EMERGENCY RTB</button>
+  </div>
+
+  <!-- ═══ MOBILE TOUCH HUD — shown only on phones/tablets ═══ -->
+  <div id="mobile-hud" style="display:none">
+    <!-- Nav Sphere — bottom center, drag to steer, hold for thrust -->
+    <div id="mob-nav-sphere">
+      <div id="mob-nav-knob"></div>
+      <div class="mob-nav-label">STEER</div>
+      <div class="mob-nav-thrust-label">HOLD = THRUST</div>
+    </div>
+    <!-- Minimal action buttons (top-right corner) -->
+    <div id="mob-btn-group">
+      <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
+      <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
+      <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
+      <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
+    </div>
+    <!-- Hint overlay (shown briefly on first load) -->
+    <div id="mob-hint" class="mob-hint">
+      TAP SCREEN = LASERS &nbsp;|&nbsp; TAP ✛ = TORPEDO &nbsp;|&nbsp; SPHERE = STEER + THRUST
+    </div>
   </div>
 
   <!-- ═══ MISSION BRIEFING PANEL ═══ -->
@@ -836,7 +1358,8 @@
       They don't negotiate. <span style="color:#f44">They consume.</span></p>
     <p style="color:#8cf;line-height:1.7;margin-bottom:8px">You fly a <span style="color:#0ff">UEDF Mk-IV
         Starfighter</span> — twin laser cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the
-      <span style="color:#48f">UEDF Battleship Resolute</span> — Earth's last heavy carrier.</p>
+      <span style="color:#48f">UEDF Battleship Resolute</span> — Earth's last heavy carrier.
+    </p>
     <p style="color:#ff4;font-weight:bold;line-height:1.7;margin-bottom:12px">If the Resolute falls, the orbital defense
       line collapses. Protect her at all costs.</p>
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
@@ -857,6 +1380,7 @@
       <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
       <li><kbd>R-Click</kbd> Torpedo</li>
       <li><kbd>T</kbd> Lock Target</li>
+      <li><kbd>R</kbd> Emergency RTB (return to base)</li>
     </ul>
     <h3 style="margin-top:12px">GAMEPAD</h3>
     <ul>
@@ -870,6 +1394,24 @@
       <li><kbd>X</kbd> Flight Assist</li>
       <li><kbd>Y</kbd> Lock Target</li>
     </ul>
+    <h3 style="margin-top:12px">MOBILE / TOUCH</h3>
+    <ul>
+      <li><kbd>Sphere</kbd> Drag to steer (pitch / yaw)</li>
+      <li><kbd>Hold</kbd> Touch sphere centre = thrust</li>
+      <li><kbd>Tap</kbd> Tap empty space = lasers</li>
+      <li><kbd>Tap ✛</kbd> Tap crosshair = torpedo</li>
+      <li><kbd>LOCK</kbd> Lock Target</li>
+      <li><kbd>AB</kbd> Afterburner (hold)</li>
+      <li><kbd>BOOST</kbd> Speed burst</li>
+      <li><kbd>RTB</kbd> Emergency return to base</li>
+    </ul>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);">
+      <h3 style="margin-top:0;color:#ffaa00">WAVE 1 TIP</h3>
+      <p style="font-size:11px;color:#99aabb;margin:4px 0;line-height:1.4">
+        First wave is light patrol &mdash; use it to practice steering, firing lasers, and locking targets. Clear all
+        enemies, then return to base for the next wave.
+      </p>
+    </div>
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
       Press CONTROLS button to close</div>
   </div>
@@ -981,19 +1523,17 @@
       <rect x="10" y="5" width="160" height="90" rx="10" class="ctrl-wire-fill" />
       <rect x="16" y="10" width="148" height="75" rx="4"
         style="fill:rgba(0,0,0,0.3);stroke:rgba(0,255,255,0.3);stroke-width:0.5" />
-      <!-- Left zone -->
-      <circle cx="50" cy="55" r="18" class="ctrl-btn-wire" style="stroke-dasharray:3,2" />
-      <text x="50" y="50" class="ctrl-label" font-size="5">THROTTLE</text>
-      <text x="50" y="58" class="ctrl-label" font-size="5">STRAFE</text>
-      <!-- Right zone -->
-      <circle cx="130" cy="55" r="18" class="ctrl-btn-wire" style="stroke-dasharray:3,2" />
-      <text x="130" y="50" class="ctrl-label" font-size="5">PITCH</text>
-      <text x="130" y="58" class="ctrl-label" font-size="5">YAW</text>
-      <!-- Action buttons -->
-      <circle cx="150" cy="25" r="8" class="ctrl-btn-wire" />
-      <text x="150" y="26" class="ctrl-label" font-size="5">FIRE</text>
-      <circle cx="130" cy="25" r="8" class="ctrl-btn-wire" />
-      <text x="130" y="26" class="ctrl-label" font-size="5">TORP</text>
+      <!-- Nav sphere (bottom center) -->
+      <circle cx="90" cy="65" r="18" class="ctrl-btn-wire" />
+      <circle cx="90" cy="65" r="6" class="ctrl-dot" />
+      <text x="90" y="55" class="ctrl-label" font-size="4">DRAG=STEER</text>
+      <text x="90" y="88" class="ctrl-label" font-size="4">HOLD=THRUST</text>
+      <!-- Crosshair (center) -->
+      <line x1="87" y1="38" x2="93" y2="38" stroke="rgba(0,255,255,0.5)" stroke-width="0.5" />
+      <line x1="90" y1="35" x2="90" y2="41" stroke="rgba(0,255,255,0.5)" stroke-width="0.5" />
+      <text x="90" y="30" class="ctrl-label" font-size="4">TAP ✛ = TORPEDO</text>
+      <!-- Tap anywhere -->
+      <text x="90" y="18" class="ctrl-label" font-size="4" fill="rgba(0,255,255,0.5)">TAP SCREEN = LASERS</text>
     </svg>
   </div>
 
@@ -1101,7 +1641,7 @@
   <div id="countdown-display">5</div>
   <div id="launch-prompt">
     <b>READY TO LAUNCH</b>
-    <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR OR PUSH JOYSTICK FORWARD</div>
+    <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR, PUSH JOYSTICK FORWARD, OR TAP SCREEN</div>
   </div>
   <div id="launch-overlay" class="launch-overlay-full" style="background:rgba(0,0,0,0.6)">
     <div style="text-align:center;color:#0ff;font-size:2.5em;margin-bottom:30px;text-shadow:0 0 20px #0ff">⚡ LAUNCH
@@ -1117,8 +1657,14 @@
   </div>
 
   <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
+  <!-- Fullscreen resume overlay + button (hidden until ESC exits immersion) -->
+  <div id="fs-resume-overlay"></div>
+  <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO RESUME</div>
+
   <div id="loading-screen"
     style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
+    <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
+      style="max-width:320px;width:80%;margin-bottom:32px;filter:drop-shadow(0 0 20px rgba(0,255,255,0.4))">
     <div
       style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
     </div>
@@ -1173,12 +1719,16 @@
   <script src="../../js/substrates/manifold_ingestor.js"></script>
   <script src="manifold.js"></script>
 
+  <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
+  <script src="native/bridge.js"></script>
+
   <!-- Three.js -->
   <script src="../../lib/three/three.min.js"></script>
   <script src="../../lib/three/GLTFLoader.js"></script>
 
   <!-- Game Logic -->
   <script src="audio.js"></script>
+  <script src="music.js"></script>
   <script src="core.js"></script>
   <script src="input.js"></script>
   <script src="3d.js"></script>
