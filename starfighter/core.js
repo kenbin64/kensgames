@@ -3932,6 +3932,9 @@ const Starfighter = (function () {
     let _lastRadarPx = 0, _lastRadarPy = 0, _lastRadarPz = 0;
     let _lastRadarQx = 0, _lastRadarQy = 0, _lastRadarQz = 0, _lastRadarQw = 1;
     let _lastRadarLockId = '';
+    let radarSweepGroup;          // rotating sweep beam group
+    let radarRangeRings = [];     // equatorial range ring meshes
+    const radarContacts = new Map(); // entity → {t, wx, wy, wz, type, dist}
 
     function initRadar() {
         const canvas = document.getElementById('radar-canvas');
@@ -4102,6 +4105,47 @@ const Starfighter = (function () {
             radarBlipPool.push(blip);
         }
 
+        // ── Sweep beam — rotating great-circle meridian (3D radar scan line) ──
+        radarSweepGroup = new THREE.Group();
+        // Full great-circle arc on sphere surface (in YZ plane, rotates around Y)
+        const sweepArcPts = [];
+        for (let i = 0; i <= 48; i++) {
+            const a = (i / 48) * Math.PI * 2;
+            sweepArcPts.push(new THREE.Vector3(0, Math.sin(a) * 0.94, Math.cos(a) * 0.94));
+        }
+        radarSweepGroup.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(sweepArcPts),
+            new THREE.LineBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.55 })
+        ));
+        // Sweep disc — transparent scanning plane for 3D depth
+        const sweepDiscGeo = new THREE.CircleGeometry(0.94, 48);
+        radarSweepGroup.add(new THREE.Mesh(sweepDiscGeo, new THREE.MeshBasicMaterial({
+            color: 0x00ff88, transparent: true, opacity: 0.06,
+            side: THREE.DoubleSide, depthWrite: false
+        })));
+        // Radial spoke — center to equatorial rim (clock hand)
+        radarSweepGroup.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.94, 0, 0)
+            ]),
+            new THREE.LineBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.6 })
+        ));
+        radarScene.add(radarSweepGroup);
+
+        // ── Range rings — equatorial circles at 1/3 and 2/3 radar range ──
+        radarRangeRings = [];
+        for (const frac of [0.33, 0.66]) {
+            const r = frac * 0.92;
+            const rrGeo = new THREE.RingGeometry(r - 0.004, r + 0.004, 48);
+            const rrMat = new THREE.MeshBasicMaterial({
+                color: 0x00ffff, transparent: true, opacity: 0.08, side: THREE.DoubleSide
+            });
+            const rr = new THREE.Mesh(rrGeo, rrMat);
+            rr.rotation.x = Math.PI / 2;
+            radarScene.add(rr);
+            radarRangeRings.push(rr);
+        }
+
         // ── Level Ring — baseship's orientation horizon ──
         const lvlGeo = new THREE.RingGeometry(0.96, 0.98, 48);
         const lvlMat = new THREE.MeshBasicMaterial({
@@ -4210,95 +4254,148 @@ const Starfighter = (function () {
             }
         }
 
-        // ── Update entity blips ──
-        radarBlipPool.forEach(b => b.visible = false);
+        // ── Rotating sweep — 3D radar scan beam ──
+        const SWEEP_PERIOD = dim('radar.sweepPeriod');
+        const BEAM_HALF = THREE.MathUtils.degToRad(dim('radar.beamWidth') / 2);
+        const PERSISTENCE = dim('radar.persistence');
+        const nowSec = performance.now() / 1000;
+        const sweepAngle = ((nowSec / SWEEP_PERIOD) % 1.0) * Math.PI * 2;
+        if (radarSweepGroup) radarSweepGroup.rotation.y = sweepAngle;
 
+        // ── Sweep detection — paint contacts when beam passes their azimuth ──
+        const TWO_PI = Math.PI * 2;
+        state.entities.forEach(e => {
+            if (e === state.player || e.type === 'laser' || e.type === 'baseship') return;
+            const rx = e.position.x - pPos.x;
+            const ry = e.position.y - pPos.y;
+            const rz = e.position.z - pPos.z;
+            const dist = Math.sqrt(rx * rx + ry * ry + rz * rz);
+            if (dist < 1 || dist > RADAR_RANGE * 1.2) return;
+
+            // Azimuth of entity in world XZ plane
+            let az = Math.atan2(rx, rz);
+            if (az < 0) az += TWO_PI;
+            let sw = sweepAngle % TWO_PI;
+            if (sw < 0) sw += TWO_PI;
+            let diff = Math.abs(az - sw);
+            if (diff > Math.PI) diff = TWO_PI - diff;
+
+            if (diff < BEAM_HALF) {
+                radarContacts.set(e, {
+                    t: nowSec,
+                    wx: e.position.x, wy: e.position.y, wz: e.position.z,
+                    type: e.type, dist: dist
+                });
+            }
+        });
+
+        // ── Render contacts as fading phosphor blips ──
+        radarBlipPool.forEach(b => b.visible = false);
         let blipIdx = 0;
         const lockedTarget = state.player.lockedTarget;
-        // FOV check threshold — half-angle of vertical FOV
         const cosHalfFov = Math.cos(THREE.MathUtils.degToRad(75 / 2));
         const fwdDir = playerForwardWorld;
 
-        state.entities.forEach(e => {
-            if (e === state.player || e.type === 'laser' || e.type === 'baseship') return;
+        // Locked target always tracked (not subject to sweep gating)
+        if (lockedTarget && lockedTarget !== state.player &&
+            lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship') {
+            const lx = lockedTarget.position.x - pPos.x;
+            const ly = lockedTarget.position.y - pPos.y;
+            const lz = lockedTarget.position.z - pPos.z;
+            const ld = Math.sqrt(lx * lx + ly * ly + lz * lz);
+            if (ld > 1) {
+                const existing = radarContacts.get(lockedTarget);
+                if (!existing || (nowSec - existing.t) > SWEEP_PERIOD * 0.5) {
+                    radarContacts.set(lockedTarget, {
+                        t: nowSec,
+                        wx: lockedTarget.position.x, wy: lockedTarget.position.y,
+                        wz: lockedTarget.position.z,
+                        type: lockedTarget.type, dist: ld
+                    });
+                }
+            }
+        }
+
+        radarContacts.forEach((c, entity) => {
+            const age = nowSec - c.t;
+            if (age > SWEEP_PERIOD) { radarContacts.delete(entity); return; }
             if (blipIdx >= radarBlipPool.length) return;
 
-            // Relative position in world radar space.
-            const relPos = e.position.clone().sub(pPos);
-            const dist = relPos.length();
-
-            if (dist < 1) return;
-
-            const normalizedDir = relPos.clone().normalize();
-            const t = Math.min(dist / RADAR_RANGE, 1.0);
+            // Direction from current player pos to last-known world pos
+            const dx = c.wx - pPos.x, dy = c.wy - pPos.y, dz = c.wz - pPos.z;
+            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (d < 1) return;
+            const inv = 1 / d;
+            const nx = dx * inv, ny = dy * inv, nz = dz * inv;
+            const t = Math.min(c.dist / RADAR_RANGE, 1.0);
             const radarR = t * 0.92;
 
             const blip = radarBlipPool[blipIdx++];
-            blip.position.copy(normalizedDir).multiplyScalar(radarR).add(shipOff);
+            blip.position.set(
+                nx * radarR + shipOff.x,
+                ny * radarR + shipOff.y,
+                nz * radarR + shipOff.z
+            );
             blip.visible = true;
 
-            // Red = enemy, Magenta = alien baseship, Cyan = torpedo, Blue = ally
-            // GDD §6: IFF colors — hostile=red, friendly=green
-            if (e.type === 'enemy') {
+            // Phosphor fade — bright on detection, dims over sweep period
+            const sweepFrac = age / SWEEP_PERIOD;
+            const fadeAlpha = PERSISTENCE * (1.0 - sweepFrac);
+
+            // IFF color coding (GDD §6)
+            if (c.type === 'enemy') {
                 blip.material.color.setHex(0xff2222);
                 blip.scale.setScalar(1.0);
-            } else if (e.type === 'interceptor') {
-                blip.material.color.setHex(0xff4444); // bright red — fast mover
+            } else if (c.type === 'interceptor') {
+                blip.material.color.setHex(0xff4444);
                 blip.scale.setScalar(0.8);
-            } else if (e.type === 'bomber') {
-                blip.material.color.setHex(0xff8800); // orange-red — priority target
+            } else if (c.type === 'bomber') {
+                blip.material.color.setHex(0xff8800);
                 blip.scale.setScalar(1.4);
-            } else if (e.type === 'dreadnought') {
-                blip.material.color.setHex(0xff0044); // deep red — boss
+            } else if (c.type === 'dreadnought') {
+                blip.material.color.setHex(0xff0044);
                 blip.scale.setScalar(2.5);
-            } else if (e.type === 'alien-baseship') {
+            } else if (c.type === 'alien-baseship') {
                 blip.material.color.setHex(0xff00ff);
                 blip.scale.setScalar(2.0);
-            } else if (e.type === 'predator') {
-                blip.material.color.setHex(0xcc0000); // dark red — dangerous
+            } else if (c.type === 'predator') {
+                blip.material.color.setHex(0xcc0000);
                 blip.scale.setScalar(1.3);
-            } else if (e.type === 'torpedo') {
+            } else if (c.type === 'torpedo') {
                 blip.material.color.setHex(0x00ffff);
                 blip.scale.setScalar(0.7);
-            } else if (e.type === 'wingman') {
-                blip.material.color.setHex(0x44ff44); // green — friendly
+            } else if (c.type === 'wingman') {
+                blip.material.color.setHex(0x44ff44);
                 blip.scale.setScalar(1.0);
-            } else if (e.type === 'tanker') {
-                blip.material.color.setHex(0x00ff88); // green — friendly support
+            } else if (c.type === 'tanker') {
+                blip.material.color.setHex(0x00ff88);
                 blip.scale.setScalar(1.2);
-            } else if (e.type === 'medic') {
-                blip.material.color.setHex(0x44ffff); // cyan-white — medical frigate
+            } else if (c.type === 'medic') {
+                blip.material.color.setHex(0x44ffff);
                 blip.scale.setScalar(1.3);
             } else {
                 blip.material.color.setHex(0x4488ff);
                 blip.scale.setScalar(1.0);
             }
 
-            // GDD §7: Locked target pulses on radar
-            if (lockedTarget && e === lockedTarget) {
+            // Locked target — always visible, pulses yellow
+            if (lockedTarget && entity === lockedTarget) {
+                blip.material.color.setHex(0xffff00);
                 const pulse = 1.0 + Math.sin(performance.now() * 0.01) * 0.5;
                 blip.scale.multiplyScalar(pulse);
-                blip.material.color.setHex(0xffff00); // Yellow for locked
+                blip.material.transparent = true;
+                blip.material.opacity = Math.max(fadeAlpha, 0.7);
+                return;
             }
 
-            // GDD §7: Edge-pinning at 50% opacity for entities outside range
-            if (t >= 1.0) {
-                blip.material.transparent = true;
-                blip.material.opacity = 0.5;
-            } else {
-                blip.material.transparent = true;
-                blip.material.opacity = 1.0;
-            }
+            blip.material.transparent = true;
+            blip.material.opacity = fadeAlpha;
 
-            // ── FOV highlight — brighten blips inside camera view ──
-            const dot = normalizedDir.dot(fwdDir);
+            // FOV highlight — brighten contacts inside camera view
+            const dot = nx * fwdDir.x + ny * fwdDir.y + nz * fwdDir.z;
             if (dot > cosHalfFov) {
-                // Inside FOV — bright ring effect via emissive-like brightness boost
-                blip.material.opacity = 1.0;
-                blip.scale.multiplyScalar(1.3);
-            } else {
-                // Outside FOV — dim slightly
-                blip.material.opacity = Math.min(blip.material.opacity, 0.5);
+                blip.material.opacity = Math.min(fadeAlpha + 0.3, 1.0);
+                blip.scale.multiplyScalar(1.2);
             }
         });
 

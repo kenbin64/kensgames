@@ -158,6 +158,9 @@ const SpaceManifold = (function () {
 
     // ── Radar ──
     'radar.range': 5000,   // detection range meters
+    'radar.sweepPeriod': 4.0,    // seconds per full rotation
+    'radar.beamWidth': 12,       // degrees — angular detection band
+    'radar.persistence': 0.85,   // blip opacity retention over sweep period
 
     // ── Lives ──
     'lives.max': 3,
