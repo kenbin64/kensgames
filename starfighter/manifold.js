@@ -155,14 +155,16 @@ const SpaceManifold = (function () {
     'entity.predator.radius': 40,
     'entity.dreadnought.radius': 300,
     'entity.alien-base.radius': 500,
-    'entity.tanker.hull': 200,
-    'entity.tanker.shields': 50,
+    'entity.tanker.hull': 5000,
+    'entity.tanker.shields': 2000,
     'entity.tanker.maxSpeed': 60,
     'entity.tanker.radius': 30,
     'entity.tanker.fuelRepairRate': 30,
     'entity.tanker.hullRepairRate': 5,
     'entity.tanker.shieldRepairRate': 15,
     'entity.tanker.dockRange': 100,
+    'entity.tanker.orbitDist': 2500,      // safe orbit distance from combat center
+    'entity.tanker.dockDuration': 5,      // seconds to resupply
     'entity.medic.hull': 9999,
     'entity.medic.shields': 9999,
     'entity.medic.maxSpeed': 75,
@@ -170,6 +172,17 @@ const SpaceManifold = (function () {
     'entity.medic.hullRepairRate': 12,
     'entity.medic.shieldRepairRate': 20,
     'entity.medic.dockRange': 110,
+    'entity.medic.orbitDist': 2800,       // safe orbit distance from combat center
+    'entity.medic.dockDuration': 6,       // seconds to repair
+
+    // Support call eligibility thresholds
+    'support.tanker.fuelThreshold': 25,   // fuel % below which tanker call is valid
+    'support.tanker.hullThreshold': 60,   // hull % below which tanker call is valid
+    'support.tanker.shieldThreshold': 30, // shield % — needs BOTH hull+shield low
+    'support.medic.hullThreshold': 50,    // hull % below which medic call is valid
+    'support.medic.shieldThreshold': 10,  // shields % below which medic call is valid (dire)
+    'support.autopilotSpeed': 180,        // m/s cruise speed to support ship
+    'support.returnSpeed': 150,           // m/s cruise speed back to combat
     'entity.egg.radius': 6,
     'entity.egg.hull': 30,
     'entity.egg.hatchTime': 4,

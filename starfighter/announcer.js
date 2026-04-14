@@ -304,6 +304,39 @@ const SFAnnouncer = (function () {
     _addComm(callsign, `${_cs()}, repair complete. Hull ${snap.hullPct}%, shields ${snap.shieldPct}%. Returning to station.`, 'ally');
   }
 
+  // ── Support Call System ──
+
+  function onSupportDenied(type) {
+    const ship = type === 'tanker' ? 'tanker' : 'medical frigate';
+    _addComm(_crew('ops'), `${_cs()}, ${ship} request denied. Conditions not critical enough. Keep fighting.`, 'base');
+  }
+
+  function onSupportAccepted(type, name) {
+    const snap = _snap();
+    if (type === 'tanker') {
+      _addComm(name, `${_cs()}, copy. Fueling and rearm standing by. Engaging your autopilot. ${V.fuelStatus(snap.fuelPct)}.`, 'ally');
+    } else {
+      _addComm(name, `${_cs()}, acknowledged. Emergency repair authorized. Taking helm control. ${V.hullStatus(snap.hullPct)}.`, 'ally');
+    }
+  }
+
+  function onSupportDock(type, name) {
+    const snap = _snap();
+    if (type === 'tanker') {
+      _addComm(name, `${_cs()}, hard dock. Beginning fuel transfer and ordnance load. Hull ${snap.hullPct}%, fuel ${snap.fuelPct}%.`, 'ally');
+    } else {
+      _addComm(name, `${_cs()}, locked on. Hull repair underway. Hull ${snap.hullPct}%, shields ${snap.shieldPct}%.`, 'ally');
+    }
+  }
+
+  function onSupportReturn(type) {
+    _addComm(_crew('ops'), `${_cs()}, ${type === 'tanker' ? 'resupply' : 'repair'} complete. Autopilot returning you to combat zone.`, 'base');
+  }
+
+  function onSupportComplete() {
+    _addComm(_crew('ops'), `${_cs()}, controls released. You have the stick. Good hunting.`, 'base');
+  }
+
   function onHeavyOrdnance() {
     const snap = _snap();
     _addComm(_crew('sensor'), `${_cs()}, heavy ordnance incoming! ${_composePlayerStatus(snap)}. Brace!`, 'warning');
@@ -671,6 +704,7 @@ const SFAnnouncer = (function () {
     onAutopilotEngage, onDock,
     onTankerDeploy, onTankerDock, onTankerDone,
     onMedicDeploy, onMedicDock, onMedicProgress, onMedicDone,
+    onSupportDenied, onSupportAccepted, onSupportDock, onSupportReturn, onSupportComplete,
     onHeavyOrdnance, onGoodHit, onPlasmaHit,
     onDisabled, onSystemsRestore,
     onHullBreach, onOrganismClear, onOrganismDeep,

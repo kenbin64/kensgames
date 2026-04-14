@@ -1824,10 +1824,11 @@ const Starfighter = (function () {
             SFAnnouncer.onHiveDiscovered(hive);
         }
 
-        // Fuel Tanker — friendly support, spawns between waves 3+ to resupply player
-        if (state.wave >= 3 && state.wave % 2 === 1) { // odd waves from 3+
-            _spawnTanker();
-        }
+        // Support ships — deploy into safe orbit (available for player calls)
+        // Despawn old ones first, then spawn fresh for the wave
+        _despawnSupportShips();
+        if (state.wave >= 3) _spawnTanker();    // tanker from wave 3+
+        if (state.wave >= 2) _spawnMedic();     // medic from wave 2+
 
         // AI Wingmen: spawn 2-3 allies if enabled (they fight enemies for you)
         if (state.aiWingmen) {
@@ -1857,6 +1858,8 @@ const Starfighter = (function () {
     function checkWave() {
         const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling') && !e.markedForDeletion);
         if (enemies.length === 0 && state.phase === 'combat') {
+            // Cancel any active support call 
+            _clearSupport();
             // All enemies cleared - time to return to baseship
             state.phase = 'land-approach';
             state.autopilotActive = false; // Reset autopilot for fresh approach
@@ -2268,7 +2271,7 @@ const Starfighter = (function () {
             _updateEggs(safeDt);
             _updateYounglings(safeDt);
 
-            if (window.SFInput && !state._playerDisabled) {
+            if (window.SFInput && !state._playerDisabled && !_isPlayerInSupportAutopilot()) {
                 SFInput.update(safeDt);
                 SFInput.updateLivePanel();
             }
@@ -2288,7 +2291,7 @@ const Starfighter = (function () {
             }
 
             // ── INTENT PHASE: entities declare what they want to do ──
-            if (state.player && !state.player.markedForDeletion) {
+            if (state.player && !state.player.markedForDeletion && !_isPlayerInSupportAutopilot()) {
                 state.player.resolveIntent(safeDt);
             }
 
@@ -2401,6 +2404,13 @@ const Starfighter = (function () {
                     continue;
                 }
 
+                // Skip player collisions during support autopilot (protected while docking)
+                if (_isPlayerInSupportAutopilot() &&
+                    ((a.type === 'player' && _isHostile(b.type)) ||
+                        (_isHostile(a.type) && b.type === 'player'))) {
+                    continue;
+                }
+
                 // Skip player-baseship collision during landing
                 if ((state.phase === 'land-approach' || state.phase === 'landing') &&
                     ((a.type === 'player' && b.type === 'baseship') ||
@@ -2442,8 +2452,9 @@ const Starfighter = (function () {
             }
             if (M) M.reap();
 
-            // ── Auto-dispatch support ships when player is in trouble ──
-            _checkMedicDispatch(safeDt);
+            // ── Support ship system: autopilot + dock + repair ──
+            _updateSupportSystem(safeDt);
+            _updateSupportButtons();
 
             // ── Dynamic music intensity — proximity & threat level ──
             if (window.SFMusic && state.player && !state.player.markedForDeletion) {
@@ -2927,121 +2938,66 @@ const Starfighter = (function () {
     }
 
     // ══════════════════════════════════════
-    // FUEL TANKER — friendly resupply ship, docks with player
+    // SUPPORT SHIPS — tanker & medic frigate
+    // Call-based system: ships orbit safely, player calls when in need,
+    // autopilot flies player TO the ship, repairs/refuels, sends player back.
     // ══════════════════════════════════════
 
+    let _tankerEntity = null;   // live tanker entity (null = not spawned)
+    let _medicEntity = null;    // live medic entity (null = not spawned)
+
+    // Support call state
+    state._supportCall = null;      // 'tanker' | 'medic' | null
+    state._supportTarget = null;    // the entity we're flying to
+    state._supportPhase = null;     // 'approach' | 'docking' | 'return' | null
+    state._supportDockTimer = 0;
+    state._supportReturnPos = null; // THREE.Vector3 — where player was when called
+
+    // ── SPAWN: deploy support ship into safe orbit ──
+
     function _spawnTanker() {
-        // Spawn from behind the baseship
+        if (_tankerEntity) return;
         if (!state.baseship) return;
+        const orbitDist = dim('entity.tanker.orbitDist');
+        const angle = Math.random() * Math.PI * 2;
         const spawnPos = state.baseship.position.clone().add(
-            new THREE.Vector3((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 200, 500)
+            new THREE.Vector3(Math.cos(angle) * orbitDist, (Math.random() - 0.5) * 400, Math.sin(angle) * orbitDist)
         );
         const tk = new Entity('tanker', spawnPos.x, spawnPos.y, spawnPos.z);
         tk.hull = dim('entity.tanker.hull');
         tk.shields = dim('entity.tanker.shields');
         tk.maxSpeed = dim('entity.tanker.maxSpeed');
         tk.radius = dim('entity.tanker.radius');
-        tk._docked = false;
-        tk._dockTimer = 0;
-        tk._dockDuration = 5.0;  // 5s to resupply
-        tk._resupplied = false;
+        tk._orbitAngle = angle;
+        tk._orbitTimer = 0;
+        tk._evadeTimer = 0;
+        tk._evadeDir = new THREE.Vector3(0, 0, 0);
+        tk._called = false;
         state.entities.push(tk);
+        _tankerEntity = tk;
         SFAnnouncer.onTankerDeploy();
     }
 
-    function updateTankerAI(tk, dt) {
-        if (!state.player || state.player.markedForDeletion) {
-            // Player dead — RTB immediately
-            tk._docked = false;
-            tk._resupplied = true;
-        }
-        if (tk._docked) {
-            // Stay with player during dock
-            tk._dockTimer += dt;
-            _v1.copy(state.player.position).add(new THREE.Vector3(40, 10, 30));
-            tk.position.lerp(_v1, dt * 2.0);
-            tk.velocity.set(0, 0, 0);
-
-            // Resupply over time
-            if (!tk._resupplied) {
-                state.player.fuel = Math.min(100, state.player.fuel + dt * dim('entity.tanker.fuelRepairRate'));
-                state.player.torpedoes = Math.min(8, state.player.torpedoes + (dt > 0.5 ? 1 : 0));
-                state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.tanker.hullRepairRate'));
-                state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.tanker.shieldRepairRate'));
-            }
-
-            if (tk._dockTimer >= tk._dockDuration) {
-                tk._resupplied = true;
-                tk._docked = false;
-                SFAnnouncer.onTankerDone();
-            }
-            return;
-        }
-
-        if (tk._resupplied) {
-            // RTB — fly back to baseship and despawn
-            if (state.baseship) {
-                _v1.copy(state.baseship.position).sub(tk.position);
-                if (_v1.lengthSq() < 160000) { // within 400m of baseship
-                    tk.markedForDeletion = true;
-                    if (M) M.remove(tk.id);
-                    return;
-                }
-                _v1.normalize();
-                _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
-                tk.quaternion.slerp(_q1, dt * 1.5);
-            }
-            const fwd = _v2.set(0, 0, -1).applyQuaternion(tk.quaternion);
-            tk.velocity.copy(fwd).multiplyScalar(tk.maxSpeed);
-            return;
-        }
-
-        // Approach player for docking
-        _v1.copy(state.player.position).sub(tk.position);
-        const dist2 = _v1.lengthSq();
-
-        if (dist2 < dim('entity.tanker.dockRange') ** 2) {
-            tk._docked = true;
-            tk._dockTimer = 0;
-            SFAnnouncer.onTankerDock();
-            if (window.SFAudio) SFAudio.playSound('comm_beep');
-            return;
-        }
-
-        _v1.normalize();
-        _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
-        tk.quaternion.slerp(_q1, dt * 1.5);
-
-        const fwd = _v2.set(0, 0, -1).applyQuaternion(tk.quaternion);
-        tk.velocity.copy(fwd).multiplyScalar(tk.maxSpeed);
-    }
-
-    // ══════════════════════════════════════
-    // MEDICAL FRIGATE — indestructible, dispatched when player hull/shields critical
-    // Repairs hull + shields on docking. Autonomous: reacts to real-time damage.
-    // ══════════════════════════════════════
-
-    let _medicActive = false; // only one medic in the field at a time
-    let _medicCooldownTimer = 0; // prevent spam-dispatching
-
     function _spawnMedic() {
-        if (_medicActive) return;
-        if (!state.baseship || !state.player || state.player.markedForDeletion) return;
-        _medicActive = true;
-
+        if (_medicEntity) return;
+        if (!state.baseship) return;
+        const orbitDist = dim('entity.medic.orbitDist');
+        const angle = Math.random() * Math.PI * 2 + Math.PI; // opposite side from tanker
         const spawnPos = state.baseship.position.clone().add(
-            new THREE.Vector3((Math.random() - 0.5) * 300, 80 + Math.random() * 100, 400)
+            new THREE.Vector3(Math.cos(angle) * orbitDist, 80 + (Math.random() - 0.5) * 300, Math.sin(angle) * orbitDist)
         );
         const med = new Entity('medic', spawnPos.x, spawnPos.y, spawnPos.z);
         med.hull = dim('entity.medic.hull');
         med.shields = dim('entity.medic.shields');
         med.maxSpeed = dim('entity.medic.maxSpeed');
         med.radius = dim('entity.medic.radius');
-        med._docked = false;
-        med._dockTimer = 0;
-        med._dockDuration = 6.0; // 6s heal cycle
-        med._healed = false;
+        med._orbitAngle = angle;
+        med._orbitTimer = 0;
+        med._evadeTimer = 0;
+        med._evadeDir = new THREE.Vector3(0, 0, 0);
+        med._called = false;
         state.entities.push(med);
+        _medicEntity = med;
 
         const callsigns = ['Mercy', 'Nightingale', 'Caduceus', 'Aegis'];
         med._callsign = callsigns[(state.wave + state.kills) % callsigns.length];
@@ -3049,95 +3005,338 @@ const Starfighter = (function () {
         SFAnnouncer.onMedicDeploy(med._callsign);
     }
 
-    function updateMedicAI(med, dt) {
-        if (!state.player || state.player.markedForDeletion) {
-            med._docked = false;
-            med._healed = true;
+    // ── ORBIT AI: evasive safe-zone orbit, stay clear of fighting ──
+
+    function _updateSupportOrbit(ship, dt, orbitDistKey) {
+        if (!state.baseship) return;
+
+        // Evasive jinking every 2-4 seconds
+        ship._evadeTimer -= dt;
+        if (ship._evadeTimer <= 0) {
+            ship._evadeTimer = 2.0 + Math.random() * 2.0;
+            ship._evadeDir.set(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 1.5,
+                (Math.random() - 0.5) * 2
+            ).normalize();
         }
 
-        if (med._docked) {
-            med._dockTimer += dt;
-            // Stay alongside player
+        // Orbit around baseship at safe distance
+        const orbitDist = dim(orbitDistKey);
+        ship._orbitAngle += dt * 0.08; // slow orbit
+        const targetX = state.baseship.position.x + Math.cos(ship._orbitAngle) * orbitDist;
+        const targetY = state.baseship.position.y + ship._evadeDir.y * 200;
+        const targetZ = state.baseship.position.z + Math.sin(ship._orbitAngle) * orbitDist;
+
+        _v1.set(targetX, targetY, targetZ).sub(ship.position);
+        // Add evasive jink
+        _v1.add(_v2.copy(ship._evadeDir).multiplyScalar(150));
+        _v1.normalize();
+
+        _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
+        ship.quaternion.slerp(_q1, dt * 1.2);
+
+        const fwd = _v2.set(0, 0, -1).applyQuaternion(ship.quaternion);
+        ship.velocity.copy(fwd).multiplyScalar(ship.maxSpeed * 0.7);
+    }
+
+    function updateTankerAI(tk, dt) {
+        if (!tk || tk.markedForDeletion) return;
+        // If called and docking → stay alongside player (handled by support dock system)
+        if (state._supportPhase === 'docking' && state._supportTarget === tk) {
+            _v1.copy(state.player.position).add(_v2.set(40, 10, 30));
+            tk.position.lerp(_v1, dt * 2.0);
+            tk.velocity.set(0, 0, 0);
+            return;
+        }
+        // Otherwise: evasive orbit
+        _updateSupportOrbit(tk, dt, 'entity.tanker.orbitDist');
+    }
+
+    function updateMedicAI(med, dt) {
+        if (!med || med.markedForDeletion) return;
+        // If called and docking → stay alongside player (handled by support dock system)
+        if (state._supportPhase === 'docking' && state._supportTarget === med) {
             _v1.copy(state.player.position).add(_v2.set(-45, 15, 25));
             med.position.lerp(_v1, dt * 2.0);
             med.velocity.set(0, 0, 0);
-
-            if (!med._healed) {
-                state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.medic.hullRepairRate'));
-                state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.medic.shieldRepairRate'));
-
-                // Periodic status comms
-                if (!med._lastCommTime) med._lastCommTime = 0;
-                med._lastCommTime -= dt;
-                if (med._lastCommTime <= 0) {
-                    med._lastCommTime = 2.5;
-                    SFAnnouncer.onMedicProgress(med._callsign);
-                }
-            }
-
-            if (med._dockTimer >= med._dockDuration) {
-                med._healed = true;
-                med._docked = false;
-                SFAnnouncer.onMedicDone(med._callsign);
-            }
             return;
         }
-
-        if (med._healed) {
-            // RTB — fly back to baseship and despawn
-            if (state.baseship) {
-                _v1.copy(state.baseship.position).sub(med.position);
-                if (_v1.lengthSq() < 160000) {
-                    med.markedForDeletion = true;
-                    if (M) M.remove(med.id);
-                    _medicActive = false;
-                    _medicCooldownTimer = 30; // 30s before another can dispatch
-                    return;
-                }
-                _v1.normalize();
-                _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
-                med.quaternion.slerp(_q1, dt * 1.5);
-            }
-            const fwd = _v2.set(0, 0, -1).applyQuaternion(med.quaternion);
-            med.velocity.copy(fwd).multiplyScalar(med.maxSpeed);
-            return;
-        }
-
-        // Approach player for docking
-        _v1.copy(state.player.position).sub(med.position);
-        const dist2 = _v1.lengthSq();
-
-        if (dist2 < dim('entity.medic.dockRange') ** 2) {
-            med._docked = true;
-            med._dockTimer = 0;
-            SFAnnouncer.onMedicDock(med._callsign);
-            if (window.SFAudio) SFAudio.playSound('comm_beep');
-            return;
-        }
-
-        _v1.normalize();
-        _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
-        med.quaternion.slerp(_q1, dt * 1.5);
-
-        const fwd = _v2.set(0, 0, -1).applyQuaternion(med.quaternion);
-        med.velocity.copy(fwd).multiplyScalar(med.maxSpeed);
+        // Otherwise: evasive orbit
+        _updateSupportOrbit(med, dt, 'entity.medic.orbitDist');
     }
 
-    // Auto-dispatch: check during combat if player needs medical aid
-    function _checkMedicDispatch(dt) {
-        if (state.phase !== 'combat') return;
-        if (_medicActive) return;
-        if (!state.player || state.player.markedForDeletion) return;
+    // ── ELIGIBILITY: dire conditions required to call support ──
 
-        _medicCooldownTimer = Math.max(0, _medicCooldownTimer - dt);
-        if (_medicCooldownTimer > 0) return;
+    function _canCallTanker() {
+        if (!_tankerEntity || _tankerEntity.markedForDeletion) return false;
+        if (state._supportPhase) return false; // already in a support call
+        if (state.phase !== 'combat') return false;
+        if (!state.player || state.player.markedForDeletion) return false;
+        const p = state.player;
+        // Low fuel OR (low hull AND low shields) OR zero torpedoes with hull damage
+        if (p.fuel < dim('support.tanker.fuelThreshold')) return true;
+        if (p.hull < dim('support.tanker.hullThreshold') && p.shields < dim('support.tanker.shieldThreshold')) return true;
+        if (p.torpedoes <= 0 && p.hull < 70) return true;
+        return false;
+    }
 
-        // Dispatch when hull < 40% or shields gone and hull < 60%
-        const hullPct = state.player.hull;
-        const shieldPct = state.player.shields;
-        if (hullPct < 40 || (shieldPct <= 0 && hullPct < 60)) {
-            _spawnMedic();
+    function _canCallMedic() {
+        if (!_medicEntity || _medicEntity.markedForDeletion) return false;
+        if (state._supportPhase) return false; // already in a support call
+        if (state.phase !== 'combat') return false;
+        if (!state.player || state.player.markedForDeletion) return false;
+        const p = state.player;
+        // Hull critical OR shields gone
+        if (p.hull < dim('support.medic.hullThreshold')) return true;
+        if (p.shields <= dim('support.medic.shieldThreshold') && p.hull < 70) return true;
+        return false;
+    }
+
+    // ── CALL: player initiates support request ──
+
+    function _callSupport(type) {
+        const canCall = type === 'tanker' ? _canCallTanker() : _canCallMedic();
+        if (!canCall) {
+            // Denied — not in enough danger
+            SFAnnouncer.onSupportDenied(type);
+            if (window.SFAudio) SFAudio.playSound('warning');
+            return;
         }
+
+        const target = type === 'tanker' ? _tankerEntity : _medicEntity;
+        state._supportCall = type;
+        state._supportTarget = target;
+        state._supportPhase = 'approach';
+        state._supportDockTimer = 0;
+        state._supportReturnPos = state.player.position.clone();
+
+        const name = type === 'tanker' ? 'Lifeline' : (target._callsign || 'Medic');
+        SFAnnouncer.onSupportAccepted(type, name);
+        if (window.SFAudio) SFAudio.playSound('comm_beep');
+
+        // Show autopilot HUD
+        const cdEl = document.getElementById('countdown-display');
+        cdEl.style.display = 'block';
+        cdEl.style.fontSize = '2em';
+        cdEl.style.color = type === 'tanker' ? '#00ff88' : '#ff6666';
+        cdEl.innerHTML = `AUTOPILOT ENGAGED<br><span style="font-size:0.35em;color:#88ccff">En route to ${type === 'tanker' ? 'FUEL TANKER' : 'MEDICAL FRIGATE'}</span>`;
+    }
+
+    // ── SUPPORT UPDATE: runs each frame during active support call ──
+
+    function _updateSupportSystem(dt) {
+        if (!state._supportPhase) return;
+        if (!state.player || state.player.markedForDeletion) {
+            _clearSupport();
+            return;
+        }
+        if (!state._supportTarget || state._supportTarget.markedForDeletion) {
+            _clearSupport();
+            return;
+        }
+
+        const target = state._supportTarget;
+        const cdEl = document.getElementById('countdown-display');
+
+        // ── APPROACH: autopilot player toward support ship ──
+        if (state._supportPhase === 'approach') {
+            _v1.copy(target.position).sub(state.player.position);
+            const dist = _v1.length();
+
+            // Steer toward target
+            _v1.normalize();
+            _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
+            state.player.quaternion.slerp(_q1, dt * 2.5);
+
+            // Speed profile: accelerate then cruise
+            const apSpeed = dim('support.autopilotSpeed');
+            const fwd = _v2.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+            state.player.velocity.copy(fwd).multiplyScalar(Math.min(apSpeed, dist * 0.5 + 20));
+
+            // HUD distance countdown
+            cdEl.style.display = 'block';
+            cdEl.innerHTML = `AUTOPILOT<br><span style="font-size:0.35em;color:#88ccff">Distance to ${state._supportCall === 'tanker' ? 'TANKER' : 'MEDIC'}: ${Math.floor(dist)}m</span>`;
+
+            // Dock when in range
+            const dockRange = state._supportCall === 'tanker'
+                ? dim('entity.tanker.dockRange')
+                : dim('entity.medic.dockRange');
+            if (dist < dockRange) {
+                state._supportPhase = 'docking';
+                state._supportDockTimer = 0;
+                const name = state._supportCall === 'tanker' ? 'Lifeline' : (target._callsign || 'Medic');
+                SFAnnouncer.onSupportDock(state._supportCall, name);
+                if (window.SFAudio) SFAudio.playSound('hud_power_up');
+            }
+            return;
+        }
+
+        // ── DOCKING: repair/refuel/rearm while parked alongside ──
+        if (state._supportPhase === 'docking') {
+            state._supportDockTimer += dt;
+
+            // Player stays alongside support ship
+            const offset = state._supportCall === 'tanker'
+                ? _v2.set(-30, -5, 10)
+                : _v2.set(30, -5, 10);
+            _v1.copy(target.position).add(offset);
+            state.player.position.lerp(_v1, dt * 3.0);
+            state.player.velocity.set(0, 0, 0);
+
+            const duration = state._supportCall === 'tanker'
+                ? dim('entity.tanker.dockDuration')
+                : dim('entity.medic.dockDuration');
+            const progress = Math.min(state._supportDockTimer / duration, 1.0);
+
+            // Apply repairs based on type
+            if (state._supportCall === 'tanker') {
+                // Tanker: fuel + hull + shields + rearm
+                state.player.fuel = Math.min(100, state.player.fuel + dt * dim('entity.tanker.fuelRepairRate'));
+                state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.tanker.hullRepairRate'));
+                state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.tanker.shieldRepairRate'));
+                // Rearm torpedoes gradually
+                if (state._supportDockTimer > 1.0 && state.player.torpedoes < 2) {
+                    state.player.torpedoes = Math.min(2, state.player.torpedoes + 1);
+                }
+            } else {
+                // Medic: hull + shields only — NO rearm, NO refuel
+                state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.medic.hullRepairRate'));
+                state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.medic.shieldRepairRate'));
+            }
+
+            // HUD progress
+            cdEl.style.display = 'block';
+            const op = state._supportCall === 'tanker' ? 'RESUPPLY' : 'REPAIR';
+            cdEl.style.color = state._supportCall === 'tanker' ? '#00ff88' : '#ff6666';
+            cdEl.innerHTML = `${op} IN PROGRESS<br>` +
+                `<span style="font-size:0.35em;color:#88ccff">${Math.floor(progress * 100)}% — ` +
+                `Hull: ${Math.floor(state.player.hull)}% | Shields: ${Math.floor(state.player.shields)}%` +
+                (state._supportCall === 'tanker' ? ` | Fuel: ${Math.floor(state.player.fuel)}%` : '') +
+                `</span>`;
+
+            // Periodic status comms
+            if (!state._supportLastComm) state._supportLastComm = 0;
+            state._supportLastComm -= dt;
+            if (state._supportLastComm <= 0) {
+                state._supportLastComm = 2.5;
+                if (state._supportCall === 'medic') {
+                    SFAnnouncer.onMedicProgress(target._callsign || 'Medic');
+                }
+            }
+
+            // Complete
+            if (state._supportDockTimer >= duration) {
+                state._supportPhase = 'return';
+                const name = state._supportCall === 'tanker' ? 'Lifeline' : (target._callsign || 'Medic');
+                if (state._supportCall === 'tanker') {
+                    SFAnnouncer.onTankerDone();
+                } else {
+                    SFAnnouncer.onMedicDone(target._callsign || 'Medic');
+                }
+                SFAnnouncer.onSupportReturn(state._supportCall);
+            }
+            return;
+        }
+
+        // ── RETURN: autopilot player back to combat zone ──
+        if (state._supportPhase === 'return') {
+            const returnTo = state._supportReturnPos || state.baseship.position;
+            _v1.copy(returnTo).sub(state.player.position);
+            const dist = _v1.length();
+
+            _v1.normalize();
+            _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
+            state.player.quaternion.slerp(_q1, dt * 2.0);
+
+            const retSpeed = dim('support.returnSpeed');
+            const fwd = _v2.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+            state.player.velocity.copy(fwd).multiplyScalar(Math.min(retSpeed, dist * 0.5 + 20));
+
+            cdEl.style.display = 'block';
+            cdEl.style.color = '#00ffff';
+            cdEl.innerHTML = `RETURNING TO COMBAT<br><span style="font-size:0.35em;color:#88ccff">Distance: ${Math.floor(dist)}m</span>`;
+
+            // Return control when close or after max time
+            if (dist < 300) {
+                _clearSupport();
+                SFAnnouncer.onSupportComplete();
+                if (window.SFAudio) SFAudio.playSound('hud_power_up');
+            }
+            return;
+        }
+    }
+
+    function _clearSupport() {
+        state._supportCall = null;
+        state._supportTarget = null;
+        state._supportPhase = null;
+        state._supportDockTimer = 0;
+        state._supportReturnPos = null;
+        state._supportLastComm = 0;
+        const cdEl = document.getElementById('countdown-display');
+        if (cdEl) cdEl.style.display = 'none';
+
+        // Update button visibility
+        _updateSupportButtons();
+    }
+
+    function _isPlayerInSupportAutopilot() {
+        return state._supportPhase === 'approach' || state._supportPhase === 'docking' || state._supportPhase === 'return';
+    }
+
+    // ── BUTTON VISIBILITY: show/hide based on eligibility ──
+
+    function _updateSupportButtons() {
+        const btnTanker = document.getElementById('btn-call-tanker');
+        const btnMedic = document.getElementById('btn-call-medic');
+        const mobTanker = document.getElementById('mob-call-tanker');
+        const mobMedic = document.getElementById('mob-call-medic');
+        if (btnTanker) {
+            const canCall = _canCallTanker();
+            btnTanker.style.display = (state.phase === 'combat' && _tankerEntity && !_tankerEntity.markedForDeletion) ? '' : 'none';
+            btnTanker.disabled = !canCall;
+            btnTanker.style.opacity = canCall ? '1' : '0.4';
+            if (canCall) btnTanker.classList.add('pulse-alert');
+            else btnTanker.classList.remove('pulse-alert');
+        }
+        if (btnMedic) {
+            const canCall = _canCallMedic();
+            btnMedic.style.display = (state.phase === 'combat' && _medicEntity && !_medicEntity.markedForDeletion) ? '' : 'none';
+            btnMedic.disabled = !canCall;
+            btnMedic.style.opacity = canCall ? '1' : '0.4';
+            if (canCall) btnMedic.classList.add('pulse-alert');
+            else btnMedic.classList.remove('pulse-alert');
+        }
+        // Mobile buttons
+        if (mobTanker) {
+            const canCall = _canCallTanker();
+            mobTanker.style.display = (state.phase === 'combat' && _tankerEntity && !_tankerEntity.markedForDeletion) ? '' : 'none';
+            mobTanker.disabled = !canCall;
+            mobTanker.style.opacity = canCall ? '1' : '0.4';
+        }
+        if (mobMedic) {
+            const canCall = _canCallMedic();
+            mobMedic.style.display = (state.phase === 'combat' && _medicEntity && !_medicEntity.markedForDeletion) ? '' : 'none';
+            mobMedic.disabled = !canCall;
+            mobMedic.style.opacity = canCall ? '1' : '0.4';
+        }
+    }
+
+    // ── CLEANUP: remove support ships between waves ──
+
+    function _despawnSupportShips() {
+        if (_tankerEntity && !_tankerEntity.markedForDeletion) {
+            _tankerEntity.markedForDeletion = true;
+            if (M) M.remove(_tankerEntity.id);
+        }
+        if (_medicEntity && !_medicEntity.markedForDeletion) {
+            _medicEntity.markedForDeletion = true;
+            if (M) M.remove(_medicEntity.id);
+        }
+        _tankerEntity = null;
+        _medicEntity = null;
+        _clearSupport();
     }
 
     // ══════════════════════════════════════
@@ -4521,6 +4720,8 @@ const Starfighter = (function () {
         tryLockOnTarget: () => tryLockOnTarget(state.player),
         emergencyRTB: _triggerEmergencyRTB,
         requestDock: _requestDock,
+        callTanker: () => _callSupport('tanker'),
+        callMedic: () => _callSupport('medic'),
         togglePause,
         pause: () => _setPaused(true),
         resume: () => _setPaused(false),

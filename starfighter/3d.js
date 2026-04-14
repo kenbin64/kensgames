@@ -74,6 +74,9 @@ const SF3D = (function () {
         tanker: [
             { path: 'assets/models/friendlyfueltanker.glb', distance: 0 },
         ],
+        medic: [
+            { path: 'assets/models/emergencyMedicalSpaceFrigate.glb', distance: 0 },
+        ],
         // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [
             { path: 'assets/models/Earth.glb', distance: 0 },
@@ -91,6 +94,7 @@ const SF3D = (function () {
         baseship: 800,         // human carrier ~1200m — Galactica-scale, towering on approach
         ally: 16,              // human fighter ~13m wingspan
         tanker: 40,            // fuel tanker ~50m — chunky support craft
+        medic: 60,             // medical frigate ~80m — larger support vessel
         station: 400,          // space station ~600m
         earth: 8000,  // massive planet — far beyond arena, fills the sky impressively
     };
@@ -103,7 +107,7 @@ const SF3D = (function () {
         : new Set(['earth', 'baseship', 'station', 'ally']);
     const LOD_GLOW_DIST = {
         enemy: 2000, predator: 2500, interceptor: 1800, bomber: 2500,
-        dreadnought: 5000, 'alien-baseship': 4000, tanker: 2000,
+        dreadnought: 5000, 'alien-baseship': 4000, tanker: 2000, medic: 2500,
         ally: 2000, baseship: 6000, station: 8000, earth: 50000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
@@ -514,6 +518,7 @@ const SF3D = (function () {
         const cfg = ALIEN_GLOW_COLORS[key];
         const color = cfg ? cfg.emissive :
             (key === 'tanker' ? 0x00ff88 :
+                key === 'medic' ? 0xff4444 :
                 key === 'ally' ? 0x4488ff :
                     key === 'baseship' ? 0x4488ff :
                         key === 'station' ? 0x4488ff : 0xffffff);
@@ -1441,6 +1446,7 @@ const SF3D = (function () {
             if (type === 'wingman') mesh.userData.isWingman = true;
             if (type === 'baseship') mesh.userData.isBaseship = true;
             if (type === 'tanker') mesh.userData.isTanker = true;
+            if (type === 'medic') mesh.userData.isMedic = true;
             // Add bioluminescent point light to alien types
             if (ALIEN_GLOW_COLORS[glbKey]) {
                 _addGlowLight(mesh, glbKey);
@@ -1527,6 +1533,23 @@ const SF3D = (function () {
             // Beacon light
             const beacon = new THREE.PointLight(0x00ff88, 2, 100);
             beacon.position.set(0, 8, -25);
+            mesh.add(beacon);
+        } else if (type === 'medic') {
+            // Medical frigate fallback: white-red medical vessel
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.4, roughness: 0.4 });
+            const bodyGeo = new THREE.BoxGeometry(25, 14, 45);
+            mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
+            // Red cross markings (horizontal + vertical bars)
+            const crossMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+            const crossH = new THREE.Mesh(new THREE.BoxGeometry(12, 0.5, 4), crossMat);
+            crossH.position.set(0, 7.1, 5);
+            mesh.add(crossH);
+            const crossV = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 12), crossMat);
+            crossV.position.set(0, 7.1, 5);
+            mesh.add(crossV);
+            // Medical beacon
+            const beacon = new THREE.PointLight(0xff4444, 2, 120);
+            beacon.position.set(0, 10, 0);
             mesh.add(beacon);
         } else if (type === 'plasma') {
             // Toxic green plasma bolt

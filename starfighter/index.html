@@ -518,6 +518,15 @@
         0 0 10px rgba(0, 200, 255, 0.2)
     }
 
+    #console-buttons .console-btn.pulse-alert {
+      animation: supportPulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes supportPulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(0,0,0,0.5); }
+      50% { box-shadow: 0 0 14px rgba(255,255,255,0.4), 0 0 24px currentColor; }
+    }
+
     /* ═══════════════════════════════════════
        AVIATION-STYLE BUTTONS — tutorial / prompt overlays
        ═══════════════════════════════════════ */
@@ -1324,6 +1333,12 @@
     <button class="console-btn" id="btn-rtb" tabindex="7"
       style="background:linear-gradient(180deg,rgba(80,20,15,0.95),rgba(50,10,8,0.98));border-color:rgba(200,60,50,0.5);color:#ff4444;display:none"
       onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()">⚠ EMERGENCY RTB</button>
+    <button class="console-btn" id="btn-call-tanker" tabindex="8"
+      style="background:linear-gradient(180deg,rgba(15,60,30,0.95),rgba(8,40,18,0.98));border-color:rgba(0,200,100,0.5);color:#00ff88;display:none"
+      onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽ CALL TANKER</button>
+    <button class="console-btn" id="btn-call-medic" tabindex="9"
+      style="background:linear-gradient(180deg,rgba(60,15,15,0.95),rgba(40,8,8,0.98));border-color:rgba(200,60,60,0.5);color:#ff6666;display:none"
+      onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚ CALL MEDIC</button>
   </div>
 
   <!-- ═══ MOBILE TOUCH HUD — shown only on phones/tablets ═══ -->
@@ -1340,6 +1355,10 @@
       <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
       <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
       <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
+      <button id="mob-call-tanker" class="mob-btn" style="display:none;background:rgba(0,80,40,0.8);color:#00ff88"
+        onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽</button>
+      <button id="mob-call-medic" class="mob-btn" style="display:none;background:rgba(80,15,15,0.8);color:#ff6666"
+        onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚</button>
     </div>
     <!-- Hint overlay (shown briefly on first load) -->
     <div id="mob-hint" class="mob-hint">
@@ -1713,9 +1732,9 @@
   </div>
 
   <!-- Manifold Architecture -->
-  <script src="../../js/manifold.js?v=8"></script>
+  <script src="../../js/manifold.js?v=9"></script>
   <script src="../../js/substrates/manifold_ingestor.js"></script>
-  <script src="manifold.js?v=8"></script>
+  <script src="manifold.js?v=9"></script>
 
   <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
   <script src="native/bridge.js"></script>
@@ -1725,12 +1744,12 @@
   <script src="../../lib/three/GLTFLoader.js"></script>
 
   <!-- Game Logic -->
-  <script src="audio.js?v=8"></script>
-  <script src="music.js?v=8"></script>
-  <script src="announcer.js?v=8"></script>
-  <script src="core.js?v=8"></script>
-  <script src="input.js?v=8"></script>
-  <script src="3d.js?v=8"></script>
+  <script src="audio.js?v=9"></script>
+  <script src="music.js?v=9"></script>
+  <script src="announcer.js?v=9"></script>
+  <script src="core.js?v=9"></script>
+  <script src="input.js?v=9"></script>
+  <script src="3d.js?v=9"></script>
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
