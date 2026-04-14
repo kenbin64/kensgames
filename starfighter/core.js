@@ -368,18 +368,9 @@ const Starfighter = (function () {
     }
 
     function _queueAdaptiveLaunchBriefing() {
-        const replacement = state._replacementVariant || replacementAnnouncements[(state.wave + state.kills) % replacementAnnouncements.length];
         const brief = _makeDynamicBattleBrief();
-
         const deckOfficer = _crew('deck');
-        addComm(deckOfficer, replacement, 'base');
-        addComm(_crew('sensor'), brief, 'warning');
-
-        if (window.SFAudio && SFAudio.speakAs) {
-            setTimeout(() => {
-                SFAudio.speakAs(deckOfficer, `${replacement} ${brief} ${_cs()}, launch window is open. Intercept immediately.`);
-            }, 450);
-        }
+        addComm(deckOfficer, brief, 'warning');
     }
 
     function _onPlayerDestroyed(causeText) {
@@ -389,30 +380,24 @@ const Starfighter = (function () {
         state.livesRemaining = Math.max(0, state.livesRemaining - 1);
 
         if (state.livesRemaining <= 0) {
-            addComm(_crew('command'), `Final interceptor lost. No reserve pilots. ${_countActiveHostiles()} hostiles still active.`, 'warning');
+            if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, 0, state.maxLives);
             if (window.SFAudio) SFAudio.playSound('warning');
             setTimeout(() => gameOver(`MISSION FAILED — ${reason}`), 1200);
             return;
         }
 
-        state._replacementVariant = replacementAnnouncements[(state.maxLives - state.livesRemaining + state.wave + state.kills) % replacementAnnouncements.length];
         state._replacementBriefing = _makeDynamicBattleBrief();
         state.respawning = true;
         state.respawnTimer = dim('timing.respawn');
         state.respawnReason = reason;
 
-        const cmdOfficer = _crew('command');
-        addComm(cmdOfficer, `Ship destroyed. Life ${state.maxLives - state.livesRemaining}/${state.maxLives} lost. Initiating replacement ${state.maxLives - state.livesRemaining + 1}/${state.maxLives}.`, 'warning');
-        addComm(_crew('sensor'), state._replacementBriefing, 'base');
+        if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, state.livesRemaining, state.maxLives);
 
         if (window.SFAudio) {
             SFAudio.playSound('warning');
             SFAudio.stopCockpitHum();
             SFAudio.stopThrustRumble();
             SFAudio.stopStrafeHiss();
-            if (SFAudio.speakAs) {
-                SFAudio.speakAs(cmdOfficer, `${reason}. ${state._replacementVariant} ${state._replacementBriefing}`);
-            }
         }
 
         _showRespawnScreen();
@@ -473,12 +458,14 @@ const Starfighter = (function () {
                 cd.style.fontSize = '2.6em';
                 cd.style.color = '#ffd24a';
             }
-            addComm('System', 'Game paused.', 'info');
+            if (window.SFAnnouncer) SFAnnouncer.onPause();
+            else addComm('System', 'Game paused.', 'info');
         } else {
             if (window.SFAudio && SFAudio.resumeAll) SFAudio.resumeAll();
             if (cd && state.phase === 'combat') cd.style.display = 'none';
             state.lastTime = performance.now();
-            addComm('System', 'Game resumed.', 'info');
+            if (window.SFAnnouncer) SFAnnouncer.onResume();
+            else addComm('System', 'Game resumed.', 'info');
         }
         _setPauseButtonUI(next);
         return state.paused;
@@ -567,10 +554,9 @@ const Starfighter = (function () {
             if (this.type === 'enemy') {
                 state.score += dim('score.enemy');
                 state.kills++;
-                // Credit kill to the player who fired
                 if (this.killedBy === 'player') state.playerKills++;
                 if (this.killedBy === 'player' && (state.kills % 3 === 0 || _countActiveHostiles() <= 2)) {
-                    addComm(_crew('tactical'), _killComm('enemy'), 'base');
+                    if (window.SFAnnouncer) SFAnnouncer.onKill('enemy');
                 }
                 checkWave();
 
@@ -578,55 +564,50 @@ const Starfighter = (function () {
                 state.score += dim('score.predator');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
-                addComm(_crew('tactical'), _killComm('predator'), 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onKill('predator');
                 checkWave();
 
             } else if (this.type === 'interceptor') {
                 state.score += dim('score.interceptor');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
-                addComm(_crew('tactical'), _killComm('interceptor'), 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onKill('interceptor');
                 checkWave();
 
             } else if (this.type === 'bomber') {
                 state.score += dim('score.bomber');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
-                addComm(_crew('tactical'), _killComm('bomber'), 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onKill('bomber');
                 checkWave();
 
             } else if (this.type === 'dreadnought') {
                 state.score += dim('score.dreadnought');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
-                addComm(_crew('command'), _killComm('dreadnought'), 'base');
-                addComm(_crew('sensor'), `Hive Throne signal lost. ${_snap().totalHostile} contacts remain on scope.`, 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onKill('dreadnought');
                 checkWave();
 
             } else if (this.type === 'tanker' || this.type === 'medic') {
-                // Support ships are indestructible — this should never fire
                 return;
 
             } else if (this.type === 'alien-base') {
-                // ── VICTORY ──
                 state.score += dim('score.victory');
-                addComm(_crew('command'), `ENEMY BASE DESTROYED! Score ${state.score}. MISSION COMPLETE!`, 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onVictory();
                 setTimeout(() => gameOver('VICTORY — Enemy Station Destroyed!', true), 2000);
 
             } else if (this.type === 'military-ship') {
-                // No more fuel — civilian station now undefended
                 state.militaryAlive = false;
-                { const s = _snap(); addComm(_crew('command'), `MILITARY SHIP LOST — base hull ${s.basePct}%. No refuels until repaired!`, 'base'); }
+                if (window.SFAnnouncer) SFAnnouncer.onMilitaryLost();
                 if (window.SFAudio) SFAudio.playSound('warning');
 
             } else if (this.type === 'civilian-station') {
-                // ── GAME OVER ──
-                addComm(_crew('command'), `CIVILIAN STATION DESTROYED — ${state.kills} kills, score ${state.score}. MISSION FAILED.`, 'base');
+                if (window.SFAnnouncer) SFAnnouncer.onCivilianLost();
                 setTimeout(() => gameOver('DEFEAT — Civilian Station Destroyed'), 2000);
 
             } else if (this.type === 'ally') {
                 state.score -= Math.abs(dim('score.friendlyKill'));
-                { const s = _snap(); addComm(`Alpha-${Math.floor(Math.random() * 3) + 1}`, `Going down! ${s.totalHostile} hostiles still out there — cover the base!`, 'ally'); }
+                if (window.SFAnnouncer) SFAnnouncer.onAllyDown();
             }
         }
     }
@@ -661,7 +642,8 @@ const Starfighter = (function () {
             this.selectedWeapon = (this.selectedWeapon + 1) % Player.WEAPONS.length;
             const name = Player.WEAPONS[this.selectedWeapon];
             if (window.SFAudio) SFAudio.playSound('click');
-            addComm(_crew('tactical'), `Weapon: ${name}`, 'base');
+            if (window.SFAnnouncer) SFAnnouncer.onWeaponSwitch(name);
+            else addComm(_crew('tactical'), `Weapon: ${name}`, 'base');
         }
 
         // resolveIntent: pilot controls set velocity and orientation on the manifold point.
@@ -785,6 +767,12 @@ const Starfighter = (function () {
         }
         if (window.SFInput) SFInput.init(state.player);
 
+        // Init autonomous announcer — crew observe and report game state
+        if (window.SFAnnouncer) SFAnnouncer.init({
+            state, addComm, snap: _snap, crew: _crew, cs: _cs,
+            bearing: _bearing, bearingOf: _bearingOf, dim, countHostiles: _countActiveHostiles
+        });
+
         // Cockpit always visible — even during loading/bay
         if (window.SF3D) SF3D.showCockpit(true);
 
@@ -833,7 +821,8 @@ const Starfighter = (function () {
         document.getElementById('countdown-display').style.display = 'block';
         document.getElementById('countdown-display').innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
 
-        addComm(_crew('deck'), `${_cs()}, fighter secured in bay. Wave ${state.wave} standing by.`, 'base');
+        if (window.SFAnnouncer) SFAnnouncer.onSecured();
+        else addComm(_crew('deck'), `${_cs()}, fighter secured in bay. Wave ${state.wave} standing by.`, 'base');
         _setPauseButtonUI(false);
 
         // First wave: offer tutorial if player hasn't declined permanently
@@ -1052,16 +1041,8 @@ const Starfighter = (function () {
         }
         _attachTutorialHandlers();
 
-        // Announcer narrates the briefing — game-state aware
-        if (window.SFAudio && SFAudio.speakAs) {
-            const s = _snap();
-            const baseLine = `${_cs()}, welcome aboard the Resolute.`;
-            const stateLine = state.wave > 1
-                ? ` We're on wave ${state.wave}. Base hull is at ${s.basePct}percent. ${s.totalHostile > 0 ? s.totalHostile + ' hostiles still on scope.' : 'Sector is momentarily clear.'}`
-                : ' This is your first deployment.';
-            const actionLine = ' Review your controls on screen. Select practice flight to warm up, or skip to launch directly.';
-            SFAudio.speakAs('Cdr. Vasquez', baseLine + stateLine + actionLine);
-        }
+        // Announcer narrates the briefing — game-state aware (text only, no bot TTS)
+        // The tutorial overlay itself provides all the controls info visually
 
         // Keyboard: Escape to skip
         overlay.addEventListener('keydown', (e) => {
@@ -1131,10 +1112,8 @@ const Starfighter = (function () {
         {
             const s = _snap();
             const waveLine = state.wave > 1 ? ` Wave ${state.wave} is standing by — ${s.totalHostile > 0 ? s.totalHostile + ' contacts on scope' : 'sector quiet'}.` : '';
-            addComm(_crew('command'), `${_cs()}, practice range active. Three target drones deployed.${waveLine} Press Escape when ready.`, 'base');
-            if (window.SFAudio && SFAudio.speakAs) {
-                SFAudio.speakAs('CPO Okafor', `${_cs()}, you are now in the practice range. Three target drones around you.${waveLine} Steer with your mouse, scroll wheel for throttle, left click or spacebar to fire lasers. Press Escape when you're ready to launch.`);
-            }
+            if (window.SFAnnouncer) SFAnnouncer.onPracticeStart();
+            else addComm(_crew('command'), `${_cs()}, practice range active. Targets deployed. Press Escape when ready.`, 'base');
         }
 
         // ── Practice Input Wireframe + Command Chart overlay ──
@@ -1371,7 +1350,8 @@ const Starfighter = (function () {
             SFAudio.stopThrustRumble && SFAudio.stopThrustRumble();
             SFAudio.startBayAmbience();
         }
-        addComm(_crew('deck'), `${_cs()}, practice complete. Preparing for combat launch.`, 'base');
+        if (window.SFAnnouncer) SFAnnouncer.onPracticeEnd();
+        else addComm(_crew('deck'), `${_cs()}, practice complete. Preparing for combat launch.`, 'base');
         setTimeout(() => {
             if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
             _beginLaunchSequence();
@@ -1392,7 +1372,8 @@ const Starfighter = (function () {
 
         state.phase = 'launching';
         state.launchTimer = 0;
-        state.launchDuration = fullBriefing ? 25.0 : 11.0;
+        // Shorter launch — get to the action fast
+        state.launchDuration = fullBriefing ? 11.0 : 8.0;
 
         // Klaxon on launch commit
         if (window.SFAudio) {
@@ -1426,53 +1407,12 @@ const Starfighter = (function () {
         }
         skipBtn.style.display = 'block';
 
-        // GDD §3.1: PA announcer mission briefing — full only once, adaptive thereafter.
-        addComm(_crew('deck'), `${_cs()}, launch sequence initiating. Wave ${state.wave}.`, 'base');
-        if (fullBriefing && window.SFAudio && SFAudio.speak) {
-            state._briefingShownOnce = true;
+        // Autonomous announcer — crew observe game state and report
+        if (window.SFAnnouncer) SFAnnouncer.onLaunchStart();
+        else addComm(_crew('deck'), `${_cs()}, launching. Wave ${state.wave}.`, 'base');
 
-            // PA 1: Situational awareness (0.5s — during dock) — Commander
-            setTimeout(() => {
-                const basePct = state.baseship ? Math.floor((state.baseship.hull / dim('baseship.hull')) * 100) : 100;
-                SFAudio.speakAs('Cdr. Vasquez', `Attention all hands. This is Resolute command. Ship status: hull at ${basePct} percent. Launch operations are now commencing.`);
-            }, 500);
-
-            // PA 2: Threat intel (4s — during dock) — Sensor officer
-            setTimeout(() => {
-                const sensorOfficer = _crew('sensor');
-                const s = _snap();
-                addComm(sensorOfficer, `Hive Sigma contact — organic-metallic signatures, wave ${state.wave} approach vector.`, 'base');
-                const threatDetail = s.dreadnoughts > 0 ? ' Dreadnought class vessels detected in their formation.'
-                    : s.predators > 0 ? ' Predator drones among their advance scouts.'
-                        : s.bombers > 0 ? ' Bomber wings are forming up for attack runs.' : '';
-                SFAudio.speakAs(sensorOfficer, `Intelligence update. Alien force designation Hive Sigma, wave ${state.wave}, advancing on Earth orbit. Their ships are organic metallic hybrids. They do not negotiate. They consume.${threatDetail}`);
-            }, 4000);
-
-            // PA 3: The stakes (9s — during dock) — XO
-            setTimeout(() => {
-                const basePct = Math.floor(((state.baseship ? state.baseship.hull : dim('baseship.hull')) / dim('baseship.hull')) * 100);
-                addComm(_crew('command'), `The Resolute is Earth's last heavy carrier. Base hull ${basePct}%. She must not fall.`, 'base');
-                const urgency = basePct < 40 ? ` She's taken heavy damage — hull at ${basePct} percent. We cannot afford another hit like that.`
-                    : basePct < 70 ? ` Hull integrity is at ${basePct} percent. Keep those bombers off her.`
-                        : ` Hull holding strong at ${basePct} percent.`;
-                SFAudio.speakAs('XO Tanaka', `All pilots be advised. The Resolute is one of Earth's last heavy carriers.${urgency} If she falls, the orbital defense line collapses. Protect her at all costs.`);
-            }, 9000);
-
-            // PA 4: Mission brief (14s — still in dock, just before countdown starts at 16s) — Tactical
-            setTimeout(() => {
-                const tacOfficer = _crew('sensor');
-                const s = _snap();
-                const expected = 5 + state.wave * 2;
-                const basePct = Math.floor(((state.baseship ? state.baseship.hull : dim('baseship.hull')) / dim('baseship.hull')) * 100);
-                addComm(tacOfficer, `Wave ${state.wave}: ${expected} hostile contacts expected. Base hull ${basePct}%.`, 'base');
-                const capWarn = state.wave >= 2 ? ' Warning. Enemy capital ship detected in the sector.' : '';
-                const torpLine = state.player.torpedoes > 0 ? ` ${state.player.torpedoes} torpedoes loaded.` : ' Torpedo bay empty — resupply on landing.';
-                const hullLine = state.player.hull < 80 ? ` Your hull is reading ${Math.floor(state.player.hull)} percent — fly smart out there.` : '';
-                SFAudio.speakAs('Lt. Chen', `Mission briefing. Wave ${state.wave}. Expect ${expected} hostile fighters.${capWarn}${hullLine} ${_cs()}, you are cleared for departure.${torpLine} Good hunting.`);
-            }, 14000);
-        } else {
-            _queueAdaptiveLaunchBriefing();
-        }
+        // Adaptive briefing (text ticker only — no bot TTS)
+        _queueAdaptiveLaunchBriefing();
     }
 
     function completeLaunch() {
@@ -1539,11 +1479,11 @@ const Starfighter = (function () {
             SF3D.showCockpit(true); // Show 3D cockpit
         }
 
-        { const s = _snap(); addComm(_crew('deck'), `${_cs()}, clear of bay. ${s.totalHostile} contacts on scope. Weapons free.`, 'base'); }
-        addComm(`Alpha-${Math.floor(Math.random() * 3) + 1}`, `New bird on the wing. ${_snap().totalHostile} hostiles — forming up.`, 'ally');
-        addComm(`Alpha-${Math.floor(Math.random() * 3) + 1}`, `Weapons hot. Closest contact ${_snap().closestM}m.`, 'ally');
-
+        // Spawn enemies BEFORE announcement so announcer sees them on scope
         spawnWave();
+
+        if (window.SFAnnouncer) SFAnnouncer.onLaunchClear();
+        else { const s = _snap(); addComm(_crew('deck'), `${_cs()}, clear of bay. ${s.totalHostile} contacts on scope.`, 'base'); }
     }
 
     function completeLanding() {
@@ -1570,7 +1510,7 @@ const Starfighter = (function () {
             }
         }
         if (purgedOrganisms) {
-            addComm(_crew('deck'), `Decontamination complete. Organisms purged. Hull at ${Math.floor(state.player.hull)}%.`, 'info');
+            SFAnnouncer.onDecontamination();
             if (window.SFAudio) SFAudio.playSound('comm_beep');
         }
         state._emergencyRTB = false; // reset emergency state
@@ -1590,31 +1530,14 @@ const Starfighter = (function () {
             `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
 
         // PA debrief
-        addComm(_crew('deck'), `${_cs()}, ${_landingDebriefComm()}`, 'base');
+        SFAnnouncer.onWaveComplete(prevWave);
 
         // GDD §9.3: Music intensity drops to ambient, rebuilds next wave
         if (window.SFMusic) SFMusic.setIntensity(0.1);
 
-        if (window.SFAudio && SFAudio.speakAs) {
-            const hullPct = Math.floor(state.player.hull);
-            const bPct = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
-            const perfLine = state.kills > 10 ? ' Outstanding work out there.' : state.kills > 5 ? ' Solid flying.' : '';
-            const hullLine = hullPct < 50 ? ` Your hull took a beating — ${hullPct} percent. Repair crews are on it.` : '';
-            const baseLine = bPct < 50 ? ` Resolute hull at ${bPct} percent — she needs better cover next wave.` : '';
-            SFAudio.speakAs('CPO Okafor', `Wave ${prevWave} complete. ${state.kills} confirmed kills.${perfLine}${hullLine}${baseLine} Rearming for wave ${state.wave}.`);
-        }
-
         if (state.wave >= 2) {
             setTimeout(() => {
-                const sensorOfficer = _crew('sensor');
-                { const s = _snap(); addComm(sensorOfficer, `Wave ${state.wave} intel: ${s.dreadnoughts > 0 ? 'dreadnought' : 'capital ship'} signature detected. Base hull ${s.basePct}%.`, 'warning'); }
-                if (window.SFAudio && SFAudio.speakAs) {
-                    const bPct2 = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
-                    const capLine = bPct2 < 50
-                        ? `Intelligence reports an enemy capital ship inbound. Resolute hull at ${bPct2} percent — we cannot take a direct hit. Focus fire on that ship.`
-                        : `Intelligence reports an enemy capital ship inbound. Destroy it before it reaches the Resolute.`;
-                    SFAudio.speakAs(sensorOfficer, capLine);
-                }
+                SFAnnouncer.onNextWaveIntel();
             }, 3000);
         }
 
@@ -1661,7 +1584,7 @@ const Starfighter = (function () {
             document.getElementById('countdown-display').style.display = 'block';
             document.getElementById('countdown-display').innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
 
-            addComm(_crew('deck'), `${_cs()}, wave ${state.wave} standing by. Hull ${Math.floor(state.player.hull)}%, torpedoes loaded. Launch when ready.`, 'base');
+            SFAnnouncer.onBayReady();
 
             document.getElementById('ship-panel').style.display = 'none';
             document.getElementById('gameplay-hud').style.display = 'none';
@@ -1716,7 +1639,7 @@ const Starfighter = (function () {
         // ── Wave 1: Training wave — gentle introduction for new players ──
         if (state.wave === 1) {
             for (let i = 0; i < 3; i++) {
-                const r = 5500 + Math.random() * 1500; // spawn farther out — more time to orient
+                const r = 1200 + Math.random() * 600; // spawn close — immediate action
                 const theta = (Math.PI * 2 / 3) * i + Math.random() * 0.4; // spread evenly, slight jitter
                 const phi = Math.PI / 2 + (Math.random() - 0.5) * 0.6; // cluster near horizon, easier to spot
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1730,8 +1653,7 @@ const Starfighter = (function () {
                 e._manifoldDerivation = profile.trace;
                 state.entities.push(e);
             }
-            addComm(_crew('tactical'), `Wave 1 — ${_snap().totalHostile} light contacts. Good chance to calibrate weapons.`, 'base');
-            addComm(_crew('sensor'), `Three drones on approach. Base hull ${_snap().basePct}%. Use them for target practice.`, 'info');
+            SFAnnouncer.onWaveStart();
             return; // skip all advanced enemy types for wave 1
         }
 
@@ -1739,7 +1661,7 @@ const Starfighter = (function () {
         // Drones (basic enemies)
         const droneCount = Math.max(2, count - Math.floor(state.wave * 0.5));
         for (let i = 0; i < droneCount; i++) {
-            const r = 4000 + Math.random() * 1000;
+            const r = 1200 + Math.random() * 800;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1758,7 +1680,7 @@ const Starfighter = (function () {
         if (state.wave >= 2) {
             const intCount = Math.min(4, Math.floor(state.wave / 2));
             for (let i = 0; i < intCount; i++) {
-                const r = 4000 + Math.random() * 1500;
+                const r = 1500 + Math.random() * 800;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1774,14 +1696,13 @@ const Starfighter = (function () {
                 int.radius = dim('entity.interceptor.radius');
                 state.entities.push(int);
             }
-            if (state.wave === 2) addComm(_crew('sensor'), `New contact — ${_snap().interceptors} interceptor${_snap().interceptors > 1 ? 's' : ''}! Fast movers, check your six!`, 'warning');
         }
 
         // Bombers spawn wave 3+ — slow, beeline for baseship
         if (state.wave >= 3) {
             const bombCount = Math.min(4, Math.floor((state.wave - 2) / 1));
             for (let i = 0; i < bombCount; i++) {
-                const r = 5000 + Math.random() * 1500;
+                const r = 2000 + Math.random() * 800;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1799,12 +1720,11 @@ const Starfighter = (function () {
                 bm._bombInterval = dim('enemy.bomber.bombInterval');
                 state.entities.push(bm);
             }
-            if (state.wave === 3) addComm(_crew('tactical'), `${_snap().bombers} bombers inbound, heading for the Resolute! Base hull ${_snap().basePct}% — intercept!`, 'warning');
         }
 
         // Alien Baseship spawns on wave 2+, attacks friendly baseship
         if (state.wave >= 2) {
-            const r = 5000 + Math.random() * 1000;
+            const r = 2500 + Math.random() * 1000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1818,16 +1738,13 @@ const Starfighter = (function () {
             ab._manifoldDerivation = profile.trace;
             ab.radius = dim('entity.alien-baseship.radius');
             state.entities.push(ab);
-
-            addComm(_crew('sensor'), `Enemy capital ship detected! ${_snap().totalHostile} total contacts. Base hull ${_snap().basePct}%.`, 'warning');
-            addComm(_crew('tactical'), `Destroy it before it reaches us! Hull ${_snap().hullPct}%, torpedoes ${_snap().torpCount}.`, 'warning');
         }
 
         // Predator Drones spawn on wave 4+ — fast, armored, plasma-spewing hunters
         if (state.wave >= 4) {
             const predCount = Math.min(3, Math.floor((state.wave - 3) / 2) + 1); // 1 at wave 4, 2 at wave 6, 3 at wave 8+
             for (let i = 0; i < predCount; i++) {
-                const r = 5000 + Math.random() * 1500;
+                const r = 2000 + Math.random() * 1000;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1850,13 +1767,11 @@ const Starfighter = (function () {
                 pred._eggTimer = 8 + Math.random() * 5; // time until first egg lay
                 state.entities.push(pred);
             }
-            addComm(_crew('sensor'), `${_snap().predators} Predator Drone${_snap().predators > 1 ? 's' : ''} detected! Heavy armor — target the underbelly!`, 'warning');
-            addComm(_crew('science'), `Plasma vents from beneath. That's the weak point. Hull ${_snap().hullPct}%, shields ${_snap().shieldPct}%.`, 'warning');
         }
 
         // Dreadnought spawns on wave 6+ (boss wave) — GDD: every 5th wave after W6
         if (state.wave >= 6 && (state.wave === 6 || (state.wave - 6) % 5 === 0)) {
-            const r = 6000 + Math.random() * 2000;
+            const r = 3000 + Math.random() * 1000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1875,9 +1790,6 @@ const Starfighter = (function () {
             dn._beamCooldown = dim('enemy.dreadnought.beamCooldown');
             dn._beamCharging = false;
             state.entities.push(dn);
-
-            addComm(_crew('sensor'), `DREADNOUGHT CLASS CONTACT! ${_snap().totalHostile} hostiles on scope. All fighters focus fire!`, 'warning');
-            addComm(_crew('tactical'), `Hive Throne — use torpedoes. You have ${_snap().torpCount}. Guns won't cut it!`, 'warning');
         }
 
         // Alien Hive Base — stationary enemy structure, cooperative objective
@@ -1885,7 +1797,7 @@ const Starfighter = (function () {
         if (state.wave === 5 && !state.alienBaseSpawned) {
             // Place far from the Resolute, opposite side of the arena
             const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
-            const hivePos = baseDir.multiplyScalar(6500);
+            const hivePos = baseDir.multiplyScalar(5000);
             const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
             hive.hull = dim('hive.hull');
             hive.maxSpeed = 0; // stationary
@@ -1894,8 +1806,7 @@ const Starfighter = (function () {
             state.entities.push(hive);
             state.alienBaseSpawned = true;
 
-            addComm(_crew('sensor'), `CONTACT — ${_cs()}, we've located the alien hive! Bearing ${_bearingOf(hive)}. Distance 6500 meters.`, 'warning');
-            addComm(_crew('command'), `All fighters — that's our primary objective. Destroy the hive and we end this. Clear the escorts first.`, 'warning');
+            SFAnnouncer.onHiveDiscovered(hive);
         }
 
         // Fuel Tanker — friendly support, spawns between waves 3+ to resupply player
@@ -1923,10 +1834,9 @@ const Starfighter = (function () {
                 w.quaternion.copy(state.player.quaternion);
                 state.entities.push(w);
             }
-            addComm(`Alpha-${Math.floor(Math.random() * 3) + 1}`, `Wingmen on station. ${_snap().totalHostile} hostiles — engaging.`, 'ally');
         }
 
-        addComm(_crew('command'), _waveArrivalComm(), 'base');
+        SFAnnouncer.onWaveStart();
     }
 
     function checkWave() {
@@ -1936,7 +1846,7 @@ const Starfighter = (function () {
             state.phase = 'land-approach';
             state.autopilotActive = false; // Reset autopilot for fresh approach
             state.autopilotTimer = 0;
-            addComm(_crew('tactical'), `${_cs()}, sector clear. ${state.kills} kills this sortie. Return to base for resupply.`, 'base');
+            SFAnnouncer.onWaveClear();
 
             // GDD §9.3: Music intensity drops on wave clear
             if (window.SFMusic) SFMusic.setIntensity(0.2);
@@ -2030,7 +1940,7 @@ const Starfighter = (function () {
             if (launchBtn) launchBtn.style.display = 'block';
             document.getElementById('ship-panel').style.display = 'none';
 
-            addComm(_crew('deck'), `${_cs()}, replacement fighter on rail. Wave ${state.wave}, ${_countActiveHostiles()} hostiles active. Launch when ready.`, 'base');
+            SFAnnouncer.onRespawnReady();
         }
         return true; // signal: still in respawn phase, skip normal game logic
     }
@@ -2105,9 +2015,9 @@ const Starfighter = (function () {
                         state._launchAudioPlayed = true;
                     }
 
-                    // PA: "Launch! Launch! Launch!" at end of countdown
-                    if (!state._paBriefingDone && preProgress > 0.85 && window.SFAudio && SFAudio.speakAs) {
-                        SFAudio.speakAs('Cdr. Vasquez', "Launch! Launch! Launch!");
+                    // Launch call — text comm only, no bot TTS
+                    if (!state._paBriefingDone && preProgress > 0.85) {
+                        addComm(_crew('deck'), `Launch! Launch! Launch!`, 'warning');
                         state._paBriefingDone = true;
                     }
                 }
@@ -2180,14 +2090,14 @@ const Starfighter = (function () {
                     cdEl.innerHTML = 'WAVE CLEAR!<br><span style="font-size:0.4em;color:#00ff88">Press <b>SPACE</b> to engage autopilot<br>or fly manually to base</span>';
                     cdEl.style.fontSize = '2.5em';
                     cdEl.style.color = '#00ffff';
-                    addComm(_crew('tactical'), `${_cs()}, sector clear. Autopilot available — press SPACE, or fly manual. Base at ${_snap().basePct}% hull.`, 'base');
+                    SFAnnouncer.onWaveClear();
                 }
 
                 // Check for autopilot activation
                 if (!state.autopilotActive && window.SFInput && SFInput.isKeyDown('Space')) {
                     state.autopilotActive = true;
                     state.autopilotTimer = 0;
-                    addComm(_crew('ops'), `${_cs()}, autopilot engaged. ${Math.floor(state.player.position.distanceTo(state.baseship.position))}m to base.`, 'base');
+                    SFAnnouncer.onAutopilotEngage();
                     if (window.SFAudio) SFAudio.playSound('hud_power_up');
                 }
 
@@ -2233,7 +2143,7 @@ const Starfighter = (function () {
                         state.landingTimer = 0;
                         state.autopilotActive = false;
                         cdEl.style.display = 'none';
-                        addComm(_crew('deck'), _landingDebriefComm(), 'base');
+                        SFAnnouncer.onDock();
                         state.score += 500 * state.wave;
                     }
                 } else {
@@ -2258,7 +2168,7 @@ const Starfighter = (function () {
                             state.phase = 'landing';
                             state.landingTimer = 0;
                             landPrompt.style.display = 'none';
-                            addComm(_crew('deck'), _landingDebriefComm(), 'base');
+                            SFAnnouncer.onDock();
                             state.score += 500 * state.wave;
                         }
                     } else {
@@ -2350,19 +2260,13 @@ const Starfighter = (function () {
                 state.player.lockedTarget = null;
             }
 
-            // Reactive communications — generated from live battle state
+            // Autonomous announcer — observe game state and generate chatter
+            SFAnnouncer.observe(safeDt);
             state.commTimer += safeDt;
             if (state.commTimer >= state.commInterval) {
                 state.commTimer = 0;
-                const roll = Math.random();
-                if (roll < 0.4) {
-                    addComm(_crew('tactical'), _generateBaseComm(), "base");
-                } else if (roll < 0.8) {
-                    const ally = _generateAllyComm();
-                    addComm(ally.sender, ally.msg, "ally");
-                } else {
-                    addComm(_crew('sensor'), _generateWarningComm(), "warning");
-                }
+                const chat = SFAnnouncer.generateChatter();
+                if (chat) addComm(chat.sender, chat.msg, chat.type);
                 state.commInterval = 5 + Math.random() * 8;
             }
 
@@ -2781,7 +2685,7 @@ const Starfighter = (function () {
         t.launchTime = performance.now() / 1000;
         state.entities.push(t);
         if (window.SFAudio) SFAudio.playSound('torpedo');
-        addComm(_crew('tactical'), `${_cs()}, HEAVY ORDNANCE INCOMING! Hull ${_snap().hullPct}%, shields ${_snap().shieldPct}%. Brace!`, 'warning');
+        SFAnnouncer.onHeavyOrdnance();
     }
 
     // ── The unified combat AI engine: one function, all combat types ──
@@ -2984,7 +2888,7 @@ const Starfighter = (function () {
         tk._dockDuration = 5.0;  // 5s to resupply
         tk._resupplied = false;
         state.entities.push(tk);
-        addComm(_crew('ops'), `${_cs()}, Support Tanker 'Lifeline' deployed. Fuel ${Math.floor(state.player.fuel)}%, hull ${Math.floor(state.player.hull)}%. Fly close for resupply.`, 'base');
+        SFAnnouncer.onTankerDeploy();
     }
 
     function updateTankerAI(tk, dt) {
@@ -3011,7 +2915,7 @@ const Starfighter = (function () {
             if (tk._dockTimer >= tk._dockDuration) {
                 tk._resupplied = true;
                 tk._docked = false;
-                addComm('Lifeline', `${_cs()}, resupply complete. Fuel ${Math.floor(state.player.fuel)}%, hull ${Math.floor(state.player.hull)}%. Good hunting.`, 'ally');
+                SFAnnouncer.onTankerDone();
             }
             return;
         }
@@ -3041,7 +2945,7 @@ const Starfighter = (function () {
         if (dist2 < dim('entity.tanker.dockRange') ** 2) {
             tk._docked = true;
             tk._dockTimer = 0;
-            addComm('Lifeline', `${_cs()}, docking clamp engaged. Fuel ${Math.floor(state.player.fuel)}%, hull ${Math.floor(state.player.hull)}%. Resupplying now.`, 'ally');
+            SFAnnouncer.onTankerDock();
             if (window.SFAudio) SFAudio.playSound('comm_beep');
             return;
         }
@@ -3084,15 +2988,7 @@ const Starfighter = (function () {
         const callsigns = ['Mercy', 'Nightingale', 'Caduceus', 'Aegis'];
         med._callsign = callsigns[(state.wave + state.kills) % callsigns.length];
 
-        const opsOfficer = _crew('ops');
-        addComm(opsOfficer, `${_cs()}, Medical Frigate '${med._callsign}' dispatched. Hull ${Math.floor(state.player.hull)}%, shields ${Math.floor(state.player.shields)}%. Hold for repair.`, 'base');
-        if (window.SFAudio && SFAudio.speakAs) {
-            const hPct = Math.floor(state.player.hull);
-            const sPct = Math.floor(state.player.shields);
-            const urgency = hPct < 25 ? `Hull critical at ${hPct} percent.` : `Hull at ${hPct} percent, shields ${sPct}.`;
-            const battleCtx = _snap().totalHostile > 0 ? ` ${_snap().totalHostile} hostiles still active — watch your six.` : '';
-            SFAudio.speakAs(opsOfficer, `Medical frigate ${med._callsign} is inbound. ${urgency}${battleCtx} Hold position for emergency repair.`);
-        }
+        SFAnnouncer.onMedicDeploy(med._callsign);
     }
 
     function updateMedicAI(med, dt) {
@@ -3117,23 +3013,14 @@ const Starfighter = (function () {
                 med._lastCommTime -= dt;
                 if (med._lastCommTime <= 0) {
                     med._lastCommTime = 2.5;
-                    const hullPct = Math.floor(state.player.hull);
-                    const shieldPct = Math.floor(state.player.shields);
-                    if (hullPct < 100 || shieldPct < 100) {
-                        addComm(med._callsign, `Hull ${hullPct}%, shields ${shieldPct}%. Repair in progress.`, "ally");
-                    }
+                    SFAnnouncer.onMedicProgress(med._callsign);
                 }
             }
 
             if (med._dockTimer >= med._dockDuration) {
                 med._healed = true;
                 med._docked = false;
-                addComm(med._callsign, `${_cs()}, repair cycle complete. Hull ${Math.floor(state.player.hull)}%, shields ${Math.floor(state.player.shields)}%. Returning to station.`, 'ally');
-                if (window.SFAudio && SFAudio.speakAs) {
-                    const hFinal = Math.floor(state.player.hull);
-                    const sFinal = Math.floor(state.player.shields);
-                    SFAudio.speakAs('Lt. Cruz', `${med._callsign} repairs complete. Hull ${hFinal} percent, shields ${sFinal}. Returning to station. Stay safe out there, ${_cs()}.`);
-                }
+                SFAnnouncer.onMedicDone(med._callsign);
             }
             return;
         }
@@ -3165,7 +3052,7 @@ const Starfighter = (function () {
         if (dist2 < dim('entity.medic.dockRange') ** 2) {
             med._docked = true;
             med._dockTimer = 0;
-            addComm(med._callsign, `${_cs()}, docking clamp engaged. Hull ${Math.floor(state.player.hull)}%, shields ${Math.floor(state.player.shields)}%. Beginning emergency repair.`, 'ally');
+            SFAnnouncer.onMedicDock(med._callsign);
             if (window.SFAudio) SFAudio.playSound('comm_beep');
             return;
         }
@@ -3278,9 +3165,8 @@ const Starfighter = (function () {
                     e._boreProgress = 0;
                     e.velocity.set(0, 0, 0);
                     if (target.type === 'player') {
-                        addComm(_crew('sensor'), `HULL BREACH! Organism attached! Hull ${Math.floor(state.player.hull)}%.`, 'warning');
+                        SFAnnouncer.onHullBreach();
                         if (window.SFAudio) SFAudio.playSound('hull_alarm');
-                        addComm(_crew('tactical'), `${_cs()}, full afterburner NOW! Hull ${Math.floor(state.player.hull)}%. Shake it off or press R for emergency RTB!`, 'warning');
                         // Show emergency RTB button
                         const rtbBtn = document.getElementById('btn-rtb');
                         if (rtbBtn) rtbBtn.style.display = '';
@@ -3322,7 +3208,7 @@ const Starfighter = (function () {
                                 const fwd = _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
                                 e.position.copy(state.player.position).add(fwd.multiplyScalar(-30));
                                 e.velocity.copy(fwd).multiplyScalar(-80);
-                                addComm(_crew('tactical'), `${_cs()}, organism clear! Hull ${Math.floor(state.player.hull)}%. Keep moving!`, 'info');
+                                SFAnnouncer.onOrganismClear();
                                 if (window.SFAudio) SFAudio.playSound('comm_beep');
                                 // Hide RTB button if no more attached
                                 _checkHideRTBButton();
@@ -3331,7 +3217,7 @@ const Starfighter = (function () {
                         } else if (e._boreProgress >= 0.7) {
                             // Too deep — can't shake it off anymore
                             if (!e._tooDeepWarned) {
-                                addComm(_crew('sensor'), `${_cs()}, too deep to dislodge! Hull ${Math.floor(state.player.hull)}%. RTB NOW!`, 'warning');
+                                SFAnnouncer.onOrganismDeep();
                                 if (window.SFAudio) SFAudio.playSound('hull_alarm');
                                 e._tooDeepWarned = true;
                             }
@@ -3359,7 +3245,7 @@ const Starfighter = (function () {
                     if (target.type === 'player' && e._boreProgress >= 1.0) {
                         e._insideShip = true;
                         e._cockpitProgress = 0;
-                        addComm(_crew('sensor'), `HULL BREACHED! Organism inside the ship! Hull ${Math.floor(state.player.hull)}%. Emergency RTB!`, 'warning');
+                        SFAnnouncer.onOrganismInside();
                         if (window.SFAudio) SFAudio.playSound('hull_alarm');
                     }
                 } else {
@@ -3372,13 +3258,7 @@ const Starfighter = (function () {
                     if (e._cockpitAlarmTimer <= 0) {
                         if (window.SFAudio) SFAudio.playSound('hull_alarm');
                         const pct = Math.floor(e._cockpitProgress * 100);
-                        if (pct < 50) {
-                            addComm("SHIP AI", "Organism in ventilation shaft. " + pct + "% to cockpit.", "warning");
-                        } else if (pct < 80) {
-                            addComm("SHIP AI", "CRITICAL — organism at " + pct + "%. Seal cockpit FAILED.", "warning");
-                        } else {
-                            addComm("SHIP AI", "IMMINENT BREACH — " + pct + "%! LAND NOW OR DIE!", "warning");
-                        }
+                        SFAnnouncer.onOrganismProgress(pct);
                         e._cockpitAlarmTimer = 2.0; // faster alerts as it gets closer
                     }
 
@@ -3411,7 +3291,7 @@ const Starfighter = (function () {
         state.phase = 'land-approach';
         state.autopilotActive = true;
         state.autopilotTimer = 0;
-        addComm("SHIP AI", "EMERGENCY RETURN ENGAGED! All power to engines!", "warning");
+        SFAnnouncer.onEmergencyRTB();
         if (window.SFAudio) SFAudio.playSound('warning');
         if (window.SFMusic) SFMusic.setIntensity(0.9); // high tension
 
@@ -3429,7 +3309,7 @@ const Starfighter = (function () {
         state.phase = 'land-approach';
         state.autopilotActive = false;
         state.autopilotTimer = 0;
-        addComm(_crew('command'), `${_cs()}, dock request approved. Fly to base — autopilot available via SPACE.`, 'base');
+        SFAnnouncer.onDockRequest();
 
         const cdEl = document.getElementById('countdown-display');
         cdEl.style.display = 'block';
@@ -3460,7 +3340,7 @@ const Starfighter = (function () {
 
         if (bellyDot > 0.5) {
             // Underbelly hit — full damage (vulnerable spot)
-            if (Math.random() < 0.3) { const s = _snap(); addComm(_crew('tactical'), `Good hit, ${_cs()}! Hull at ${s.hullPct}%. Keep targeting below.`, 'info'); }
+            if (Math.random() < 0.3) { SFAnnouncer.onGoodHit(); }
             return baseDamage;
         } else if (bellyDot > 0.0) {
             // Glancing angle — 50% reduction
@@ -3489,7 +3369,7 @@ const Starfighter = (function () {
             }
             // Shield held — ship has time to recover/escape
             if (victim.type === 'player' && victim.shields > 0) {
-                addComm(_crew('tactical'), `${_cs()}, plasma impact on shields! Shields ${Math.floor(victim.shields)}%. Break contact!`, 'warning');
+                SFAnnouncer.onPlasmaHit();
             }
         } else {
             // No shields — plasma hits hull directly
@@ -3503,7 +3383,7 @@ const Starfighter = (function () {
                     state.player.throttle = 0;
                     victim.markedForDeletion = true;
                     if (M) M.remove(victim.id);
-                    addComm(_crew('command'), `Fighter consumed by Predator Drone. Pilot lost. ${_countActiveHostiles()} hostiles remain.`, 'warning');
+                    SFAnnouncer.onPredatorConsume();
                     if (window.SFAudio) SFAudio.playSound('warning');
                     _onPlayerDestroyed('HULL INTEGRITY FAIL — PREDATOR BOARDING');
                 } else {
@@ -3513,7 +3393,7 @@ const Starfighter = (function () {
                     if (window.SF3D) SF3D.spawnExplosion(victim.position);
                     // Flavor comms when predator attacks its own side
                     if (victim.type === 'enemy' && Math.random() < 0.5) {
-                        addComm(_crew('science'), `Predator turned on its own — Hive control breakdown. ${_snap().totalHostile} hostiles remain.`, 'info');
+                        SFAnnouncer.onPredatorMalfunction();
                     }
                     // Predator enters consume state
                     if (plasma._sourceEntity && !plasma._sourceEntity.markedForDeletion) {
@@ -3529,7 +3409,7 @@ const Starfighter = (function () {
             if (victim.type === 'player' && !state._playerDisabled) {
                 state._playerDisabled = true;
                 state._disableTimer = 2.5; // 2.5s of no controls
-                addComm(_crew('ops'), `${_cs()}, systems disabled! Hull ${Math.floor(victim.hull)}%. Countermeasures deploying!`, 'warning');
+                SFAnnouncer.onDisabled();
                 if (window.SFAudio) SFAudio.playSound('warning');
             } else if (victim.type === 'enemy') {
                 // Enemy ships also get stunned — velocity zeroed briefly
@@ -3559,7 +3439,7 @@ const Starfighter = (function () {
 
         if (state._disableTimer <= 0) {
             state._playerDisabled = false;
-            addComm(_crew('ops'), `${_cs()}, systems online! Hull ${_snap().hullPct}%, shields ${_snap().shieldPct}%. Move!`, 'base');
+            SFAnnouncer.onSystemsRestore();
             if (window.SFAudio) SFAudio.playSound('hud_power_up');
         }
     }
@@ -3807,11 +3687,7 @@ const Starfighter = (function () {
         }
         if (window.SF3D && SF3D.spawnEMPBurst) SF3D.spawnEMPBurst(source.position, pulseRange);
         if (window.SFAudio) SFAudio.playSound('emp');
-        if (stunCount > 0) {
-            addComm(_crew('tactical'), `EMP pulse — ${stunCount} contact${stunCount > 1 ? 's' : ''} disabled for ${stunDur}s.`, 'base');
-        } else {
-            addComm(_crew('tactical'), `EMP pulse — no contacts in range.`, 'base');
-        }
+        SFAnnouncer.onEMP(stunCount, stunDur);
     }
 
     // ── Fire primary — dispatches based on selected weapon ──
