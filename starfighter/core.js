@@ -2423,10 +2423,7 @@ const Starfighter = (function () {
                 if (isAProj && a.owner === 'enemy' && _isHostile(b.type)) continue;
                 if (isBProj && b.owner === 'enemy' && _isHostile(a.type)) continue;
 
-                const _dx = a.position.x - b.position.x;
-                const _dy = a.position.y - b.position.y;
-                const _dz = a.position.z - b.position.z;
-                const distSq = _dx * _dx + _dy * _dy + _dz * _dz;
+                const distSq = a.position.distanceToSquared(b.position);
                 const rSum = a.radius + b.radius;
                 if (distSq < rSum * rSum) {
                     handleCollision(a, b);

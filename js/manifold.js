@@ -300,12 +300,12 @@ const Manifold = (() => {
 
     // Store velocity/radius/type as compact metadata if entity has them
     // These are the ONLY extra fields games actually mutate at runtime
-    if (entity.velocity || entity.radius || entity.type || entity.owner || entity.markedForDeletion !== undefined) {
+    if (entity.velocity || entity.radius || entity.type || entity.markedForDeletion !== undefined) {
       _meta.set(id, {
+        ref: entity,         // live reference for collision callbacks
         velocity: entity.velocity || null,
         radius: entity.radius || 10,
         type: entity.type || null,
-        owner: entity.owner || null,
         markedForDeletion: entity.markedForDeletion || false,
       });
     }
@@ -367,7 +367,6 @@ const Manifold = (() => {
       velocity: m?.velocity || null,
       radius: m?.radius || 10,
       type: m?.type || null,
-      owner: m?.owner || null,
       markedForDeletion: m?.markedForDeletion || false,
     };
   }
@@ -472,9 +471,16 @@ const Manifold = (() => {
 
     for (const id of s) {
       const m = _meta.get(id);
-      if (m?.markedForDeletion) continue;
+      // Check live entity ref for markedForDeletion (stays in sync with game state)
+      if (m?.ref?.markedForDeletion || m?.markedForDeletion) continue;
       const idx = _ids.get(id);
+      if (idx === undefined) continue;
       const off = idx * 2;
+      // Sync stored position from live entity ref (game moves entities in 3D)
+      if (m?.ref?.position) {
+        _xy[off] = m.ref.position.x;
+        _xy[off + 1] = m.ref.position.y;
+      }
       ids[count] = id;
       xs[count] = _xy[off];
       ys[count] = _xy[off + 1];
@@ -507,7 +513,10 @@ const Manifold = (() => {
             const key = ids[ai] < ids[bi] ? ids[ai] + ids[bi] : ids[bi] + ids[ai];
             if (!_pairSet.has(key)) {
               _pairSet.add(key);
-              _pairs.push([_reconstruct(ids[ai]), _reconstruct(ids[bi])]);
+              // Return actual entity refs when available (preserves Vector3 methods)
+              const aRef = _meta.get(ids[ai])?.ref || _reconstruct(ids[ai]);
+              const bRef = _meta.get(ids[bi])?.ref || _reconstruct(ids[bi]);
+              _pairs.push([aRef, bRef]);
             }
           }
         }
