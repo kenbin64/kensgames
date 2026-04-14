@@ -1775,12 +1775,16 @@ const SF3D = (function () {
             _animateManifoldCockpit(state.player);
         }
 
-        // Sync Entities
+        // Sync Entities — acquire dining philosopher forks before touching
+        const DP = window.SpaceManifold && window.SpaceManifold.DiningPhilosophers;
         _activeIds.clear();
 
         for (let i = 0, len = state.entities.length; i < len; i++) {
             const e = state.entities[i];
             if (e.type === 'player') continue; // Handled by camera
+
+            // 🍴 Acquire fork — skip entity if destroyed (fork revoked)
+            if (DP && !DP.acquire(e.id, 'render')) continue;
 
             // Skip baseship during launch phase - don't even create or show it
             if (e.type === 'baseship' && launchPhaseActive) {
@@ -1833,12 +1837,13 @@ const SF3D = (function () {
             }
         }
 
-        // Target Lock Reticle
-        if (state.player && state.player.lockedTarget && state.player.lockedTarget.position) {
+        // Target Lock Reticle — check fork before accessing locked target
+        const lt = state.player && state.player.lockedTarget;
+        if (lt && lt.position && (!DP || DP.acquire(lt.id, 'render'))) {
             targetLockMesh.visible = true;
-            targetLockMesh.position.copy(state.player.lockedTarget.position);
+            targetLockMesh.position.copy(lt.position);
             // Scale reticle to fit the target's radius
-            const r = state.player.lockedTarget.radius * 2.5;
+            const r = lt.radius * 2.5;
             targetLockMesh.scale.set(r / 20, r / 20, r / 20);
             // Face camera then spin slowly on local Z
             targetLockMesh.quaternion.copy(camera.quaternion);
@@ -1854,6 +1859,9 @@ const SF3D = (function () {
                 entityMeshes.delete(id);
             }
         }
+
+        // 🍴 Release all render forks — philosophers put down their forks
+        if (DP) DP.releaseAll('render');
 
         // Rotate Earth slowly, clouds slightly faster
         // Static scenery: animate only intermittently and only when potentially visible.

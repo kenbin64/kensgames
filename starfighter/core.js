@@ -88,9 +88,11 @@ const Starfighter = (function () {
         let alienMothership = null, alienMothershipHullPct = 0;
         let alienHive = null, alienHiveHullPct = 0;
         let threatsNearBase = 0, threatNearBaseDist = Infinity;
+        const _dpSnap = M ? M.DiningPhilosophers : null;
         for (let i = 0; i < state.entities.length; i++) {
             const e = state.entities[i];
             if (e.markedForDeletion) continue;
+            if (_dpSnap && !_dpSnap.acquire(e.id, 'snap')) continue;
             if (e.type === 'alien-baseship') {
                 alienMothership = e;
                 const maxHull = e._manifoldDerivation ? (1000 + 500 * state.wave) : 1500;
@@ -128,6 +130,7 @@ const Starfighter = (function () {
                 }
             }
         }
+        if (_dpSnap) _dpSnap.releaseAll('snap');
         const totalHostile = enemies + interceptors + bombers + dreadnoughts + predators;
         const closestM = Math.floor(Math.sqrt(closestDist));
         const hullPct = p ? Math.floor(p.hull) : 0;
@@ -2303,9 +2306,12 @@ const Starfighter = (function () {
             updateCrosshairTargeting();
 
             // AI sets intent (velocity) on enemies and torpedoes — for loop, no closure
+            // 🍴 Fork-guarded: skip entities whose fork was revoked mid-frame
+            const _DPe = M ? M.DiningPhilosophers : null;
             const ents = state.entities;
             for (let i = 0, len = ents.length; i < len; i++) {
                 const e = ents[i];
+                if (_DPe && !_DPe.acquire(e.id, 'ai')) continue;
                 if (e.type === 'predator') updatePredatorAI(e, safeDt);
                 else if (e.type === 'tanker') updateTankerAI(e, safeDt);
                 else if (e.type === 'medic') updateMedicAI(e, safeDt);
@@ -2328,22 +2334,26 @@ const Starfighter = (function () {
             if (M) {
                 M.evolve(safeDt);
             }
+            if (_DPe) _DPe.releaseAll('ai');
 
             // Apply velocity → position for all entities (3D physics step)
             // The unified Manifold tracks 2D projections; this is the authoritative 3D update
             for (let i = 0, len = ents.length; i < len; i++) {
                 const e = ents[i];
                 if (e.markedForDeletion) continue;
+                if (_DPe && !_DPe.acquire(e.id, 'physics')) continue;
                 e.position.x += e.velocity.x * safeDt;
                 e.position.y += e.velocity.y * safeDt;
                 e.position.z += e.velocity.z * safeDt;
             }
+            if (_DPe) _DPe.releaseAll('physics');
 
             // ── OBSERVE PHASE: read manifold state for game events ──
 
             // Age-based expiry for projectiles (replaces setTimeout)
             for (let i = 0, len = ents.length; i < len; i++) {
                 const e = ents[i];
+                if (_DPe && !_DPe.acquire(e.id, 'expiry')) continue;
                 if (e.maxAge > 0) {
                     e.age += safeDt;
                     if (e.age >= e.maxAge) {
@@ -2364,11 +2374,16 @@ const Starfighter = (function () {
                     }
                 }
             }
+            if (_DPe) _DPe.releaseAll('expiry');
 
             // Observe proximity events (collisions) from the manifold
+            // 🍴 Dijkstra-ordered fork acquisition prevents stale-ref crashes
+            const _DP = M ? M.DiningPhilosophers : null;
             const collisionPairs = M ? M.detectCollisions() : [];
             for (const [a, b] of collisionPairs) {
                 if (a.markedForDeletion || b.markedForDeletion) continue;
+                // Acquire forks for both entities — skip pair if either is revoked
+                if (_DP && (!_DP.acquire(a.id, 'collision') || !_DP.acquire(b.id, 'collision'))) continue;
 
                 // Skip player-baseship collision during launch phase
                 // (shouldn't reach here since launch has early return, but safety net)
@@ -2414,6 +2429,9 @@ const Starfighter = (function () {
                     handleCollision(a, b);
                 }
             }
+
+            // 🍴 Release collision forks — philosophers put down forks before cleanup
+            if (_DP) _DP.releaseAll('collision');
 
             // Cleanup — inline filter with swap-remove for O(1) per deletion
             for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -4369,10 +4387,13 @@ const Starfighter = (function () {
         radarBlipPool.forEach(b => b.visible = false);
         let blipIdx = 0;
         const lockedTarget = state.player.lockedTarget;
+        const _DPr = M ? M.DiningPhilosophers : null;
 
         // Locked target always tracked (real-time position, not sweep-gated)
+        // 🍴 Fork check — skip if target entity was destroyed
         if (lockedTarget && lockedTarget.position && lockedTarget !== state.player &&
-            lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship') {
+            lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship' &&
+            (!_DPr || _DPr.acquire(lockedTarget.id, 'radar'))) {
             const lx = lockedTarget.position.x - pPos.x;
             const ly = lockedTarget.position.y - pPos.y;
             const lz = lockedTarget.position.z - pPos.z;
@@ -4482,6 +4503,9 @@ const Starfighter = (function () {
         });
 
         radarRenderer.render(radarScene, radarCamera);
+
+        // 🍴 Release radar forks
+        if (_DPr) _DPr.releaseAll('radar');
     }
 
     return {

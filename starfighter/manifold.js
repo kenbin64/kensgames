@@ -271,14 +271,134 @@ const SpaceManifold = (function () {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // 🍴 DINING PHILOSOPHERS — Fork-based race condition eliminator
+  //
+  // Every entity is a "philosopher" at the table. To be read or mutated by
+  // ANY subsystem (physics, collision, render, announcer, AI), the entity must
+  // hold a valid fork. When an entity is destroyed its fork is revoked — all
+  // subsequent acquire() calls return false, making stale references harmless.
+  //
+  // Fork states:
+  //   AVAILABLE  — entity is alive, fork can be acquired
+  //   HELD       — fork is currently acquired by a subsystem
+  //   REVOKED    — entity is dead, fork permanently unavailable
+  //
+  // The manifold surface determines fork priority: entities closer to the
+  // Schwartz Diamond zero-set (|field| → 0) have higher resource priority,
+  // breaking symmetry the way Dijkstra's original solution uses fork ordering.
+  // ════════════════════════════════════════════════════════════════════════════
+
+  const FORK_AVAILABLE = 0;
+  const FORK_HELD = 1;
+  const FORK_REVOKED = 2;
+
+  const _forks = new Map();     // entityId → { state, holder, priority }
+  let _forkGeneration = 0;      // monotonic generation counter for ordering
+
+  const DiningPhilosophers = {
+
+    // Grant a fork to a newly created entity
+    grant(entityId, fieldValue) {
+      const priority = 1.0 / (Math.abs(fieldValue || 1) + 0.01); // closer to 0 → higher
+      _forks.set(entityId, {
+        state: FORK_AVAILABLE,
+        holder: null,
+        priority,
+        gen: ++_forkGeneration,
+      });
+    },
+
+    // Acquire a fork — returns true if entity is alive and fork obtained.
+    // This is the philosopher's "pick up fork" — if revoked, returns false
+    // and the caller must skip this entity entirely.
+    acquire(entityId, subsystem) {
+      const fork = _forks.get(entityId);
+      if (!fork || fork.state === FORK_REVOKED) return false;
+      if (fork.state === FORK_HELD) {
+        // Already held — in single-threaded JS this means same-frame re-entry.
+        // Allow it (re-entrant acquire) since we're cooperative, not preemptive.
+        return true;
+      }
+      fork.state = FORK_HELD;
+      fork.holder = subsystem;
+      return true;
+    },
+
+    // Release a fork back to the table — philosopher puts fork down
+    release(entityId) {
+      const fork = _forks.get(entityId);
+      if (!fork || fork.state === FORK_REVOKED) return;
+      fork.state = FORK_AVAILABLE;
+      fork.holder = null;
+    },
+
+    // Revoke a fork permanently — entity destroyed, no process may touch it
+    revoke(entityId) {
+      const fork = _forks.get(entityId);
+      if (fork) {
+        fork.state = FORK_REVOKED;
+        fork.holder = null;
+      }
+    },
+
+    // Batch release all held forks — called at end of each subsystem phase
+    releaseAll(subsystem) {
+      for (const [id, fork] of _forks) {
+        if (fork.state === FORK_HELD && fork.holder === subsystem) {
+          fork.state = FORK_AVAILABLE;
+          fork.holder = null;
+        }
+      }
+    },
+
+    // Reap revoked forks — garbage collect dead entries
+    reapForks() {
+      for (const [id, fork] of _forks) {
+        if (fork.state === FORK_REVOKED) _forks.delete(id);
+      }
+    },
+
+    // Check if entity is alive (fork not revoked)
+    isValid(entityId) {
+      const fork = _forks.get(entityId);
+      return fork ? fork.state !== FORK_REVOKED : false;
+    },
+
+    // Dijkstra ordering — sort entity IDs by fork priority (manifold field proximity)
+    // to prevent deadlock in multi-entity operations (collision pairs, etc.)
+    ordered(entityIds) {
+      return entityIds.slice().sort((a, b) => {
+        const fa = _forks.get(a), fb = _forks.get(b);
+        if (!fa || !fb) return 0;
+        return fb.priority - fa.priority || fa.gen - fb.gen;
+      });
+    },
+
+    // Stats for diagnostics
+    stats() {
+      let available = 0, held = 0, revoked = 0;
+      for (const [, f] of _forks) {
+        if (f.state === FORK_AVAILABLE) available++;
+        else if (f.state === FORK_HELD) held++;
+        else revoked++;
+      }
+      return { available, held, revoked, total: _forks.size };
+    },
+  };
+
+  // ════════════════════════════════════════════════════════════════════════════
   // DELEGATED API — all calls route through unified Manifold
   // ════════════════════════════════════════════════════════════════════════════
 
   function place(entity) {
     if (M) M.place(entity, REGION);
+    // Grant a fork — stamp the entity first so we have its field value
+    const s = stamp(entity);
+    DiningPhilosophers.grant(entity.id, s.field);
   }
 
   function remove(id) {
+    DiningPhilosophers.revoke(id);
     if (M) M.remove(id);
   }
 
@@ -288,6 +408,7 @@ const SpaceManifold = (function () {
 
   function reap() {
     if (M) M.reap(REGION);
+    DiningPhilosophers.reapForks();
   }
 
   function observe(id) {
@@ -340,6 +461,7 @@ const SpaceManifold = (function () {
     setDim,
     resetDim,
     allDims,
+    DiningPhilosophers,
     SCALE,
     K,
   };
