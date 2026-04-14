@@ -54,25 +54,25 @@ const SFANPC = (function () {
 
   // Scenario vector: [Threat, Opportunity, Ambiguity, SocialPressure, TimePressure]
   const MISSION_TEMPLATES = {
-    patrol:       [0.2, 0.3, 0.5, 0.2, 0.1],
-    escort:       [0.4, 0.2, 0.3, 0.6, 0.3],
-    assault:      [0.7, 0.6, 0.2, 0.4, 0.5],
-    defense:      [0.6, 0.2, 0.3, 0.7, 0.7],
-    recon:        [0.3, 0.5, 0.7, 0.1, 0.2],
-    boss:         [0.9, 0.4, 0.1, 0.5, 0.8],
+    patrol: [0.2, 0.3, 0.5, 0.2, 0.1],
+    escort: [0.4, 0.2, 0.3, 0.6, 0.3],
+    assault: [0.7, 0.6, 0.2, 0.4, 0.5],
+    defense: [0.6, 0.2, 0.3, 0.7, 0.7],
+    recon: [0.3, 0.5, 0.7, 0.1, 0.2],
+    boss: [0.9, 0.4, 0.1, 0.5, 0.8],
   };
 
   // Dynamic event modifiers: [dT, dO, dA, dS, dTP]
   const EVENT_MODIFIERS = {
-    new_contacts:       [+0.1, 0,    +0.2, 0,    0   ],
-    contacts_hostile:   [+0.3, 0,    -0.2, +0.1, +0.2],
-    ambush_detected:    [+0.4, 0,    -0.3, +0.1, +0.3],
-    ally_destroyed:     [+0.2, -0.1, 0,    +0.2, +0.1],
-    enemy_destroyed:    [-0.1, +0.2, -0.1, 0,    -0.05],
-    hull_critical:      [+0.1, -0.2, 0,    +0.1, +0.3],
-    base_critical:      [+0.3, -0.1, 0,    +0.4, +0.4],
-    reinforcements:     [-0.2, +0.3, -0.1, -0.1, -0.1],
-    boss_spawn:         [+0.4, +0.2, -0.2, +0.2, +0.3],
+    new_contacts: [+0.1, 0, +0.2, 0, 0],
+    contacts_hostile: [+0.3, 0, -0.2, +0.1, +0.2],
+    ambush_detected: [+0.4, 0, -0.3, +0.1, +0.3],
+    ally_destroyed: [+0.2, -0.1, 0, +0.2, +0.1],
+    enemy_destroyed: [-0.1, +0.2, -0.1, 0, -0.05],
+    hull_critical: [+0.1, -0.2, 0, +0.1, +0.3],
+    base_critical: [+0.3, -0.1, 0, +0.4, +0.4],
+    reinforcements: [-0.2, +0.3, -0.1, -0.1, -0.1],
+    boss_spawn: [+0.4, +0.2, -0.2, +0.2, +0.3],
     objective_complete: [-0.3, +0.1, -0.2, -0.2, -0.3],
   };
 
@@ -153,7 +153,7 @@ const SFANPC = (function () {
     // y derives from scenario: weighted combination of vector components
     // Threat and TimePressure drive urgency; Opportunity opens action space
     let y = scenario.threat * 0.4 + scenario.opportunity * 0.3 +
-            scenario.timePressure * 0.2 + scenario.socialPressure * 0.1;
+      scenario.timePressure * 0.2 + scenario.socialPressure * 0.1;
 
     return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
   }
@@ -206,17 +206,17 @@ const SFANPC = (function () {
   // ══════════════════════════════════════════════════════════════════
 
   const MORALE_MODIFIERS = {
-    kill_scored:         +0.10,
-    ally_kill:           +0.05,
-    ally_destroyed:      -0.15,
-    taking_fire:         -0.02, // per second
-    heavy_damage:        -0.10,
-    outnumbered:         -0.05, // per second when outnumbered
-    reinforcements:      +0.15,
-    leader_down:         -0.25,
-    player_saves:        +0.15,
-    order_received:      +0.05,
-    victory:             +0.20,
+    kill_scored: +0.10,
+    ally_kill: +0.05,
+    ally_destroyed: -0.15,
+    taking_fire: -0.02, // per second
+    heavy_damage: -0.10,
+    outnumbered: -0.05, // per second when outnumbered
+    reinforcements: +0.15,
+    leader_down: -0.25,
+    player_saves: +0.15,
+    order_received: +0.05,
+    victory: +0.20,
   };
 
   // Contagion factor: how much one ANPC's morale affects nearby allies
@@ -228,52 +228,64 @@ const SFANPC = (function () {
 
   /**
    * Tone vector: [Formality, Warmth, Humor, Aggression]
-   * Derived from OCEAN personality + combat state + morale
+   * Derived from OCEAN personality × manifold surfaces.
+   * z_linear modulates warmth/formality (proportional response).
+   * z_asymmetric modulates aggression/humor (escalation response).
+   * Personality sets the base; manifold amplifies or dampens.
    */
   function computeToneVector(anpc) {
     const p = anpc.personality;
     const moraleNorm = anpc.morale;
-    const inCombat = anpc.combatState === COMBAT_STATES.ENGAGED ||
-                     anpc.combatState === COMBAT_STATES.EVASIVE;
+    const m = anpc.getManifoldValues(_scenario);
 
-    // Formality: high C + low E → formal; low C + high E → informal
-    const formality = Math.max(0, Math.min(1, p.C * 0.6 + (1 - p.E) * 0.4));
+    // Formality: high C + low E → formal; dampened by z_linear (high intensity → less formal)
+    const formality = Math.max(0, Math.min(1,
+      (p.C * 0.6 + (1 - p.E) * 0.4) * (1 - m.linear * 0.3)));
 
-    // Warmth: high A + high E → warm; low A + low E → cold
-    const warmth = Math.max(0, Math.min(1, p.A * 0.5 + p.E * 0.3 + moraleNorm * 0.2));
+    // Warmth: high A + high E → warm; amplified by low z_asymmetric (calm = warmer)
+    const warmth = Math.max(0, Math.min(1,
+      (p.A * 0.5 + p.E * 0.3 + moraleNorm * 0.2) * (1 - m.asymmetric * 0.4)));
 
-    // Humor: high O + high E + high morale → humorous
+    // Humor: high O + high E + high morale; suppressed by z_asymmetric (escalation kills humor)
     const humor = Math.max(0, Math.min(1,
-      p.O * 0.3 + p.E * 0.3 + moraleNorm * 0.3 - (inCombat ? 0.2 : 0)));
+      (p.O * 0.3 + p.E * 0.3 + moraleNorm * 0.3) * (1 - m.asymmetric * 0.6)));
 
-    // Aggression: low A + high scenario threat + combat state
+    // Aggression: low A + manifold escalation; z_asymmetric directly amplifies aggression
     const aggression = Math.max(0, Math.min(1,
-      (1 - p.A) * 0.4 + (inCombat ? 0.3 : 0) + (1 - moraleNorm) * 0.2));
-
-    return { formality, warmth, humor, aggression };
+      (1 - p.A) * 0.4 + m.asymmetric * 0.4 + (1 - moraleNorm) * 0.2));
   }
 
   /**
-   * Compute urgency from scenario + combat state
-   * Range: 0.0 (casual) to 1.0 (emergency)
+   * Compute urgency via manifold z-surfaces.
+   * z_linear (z=xy) = proportional response intensity
+   * z_asymmetric (z=xy²) = escalation/panic intensity
+   * Urgency = weighted blend of both surfaces + combat state offset.
+   *
+   * This is THE core manifold decision: personality × scenario → intensity.
    */
   function computeUrgency(anpc, scenario) {
-    let urgency = scenario.threat * 0.4 + scenario.timePressure * 0.3;
+    const m = anpc.getManifoldValues(scenario);
 
-    // Combat state escalation
-    switch (anpc.combatState) {
-      case COMBAT_STATES.PATROL: urgency += 0; break;
-      case COMBAT_STATES.ALERT: urgency += 0.1; break;
-      case COMBAT_STATES.ENGAGED: urgency += 0.25; break;
-      case COMBAT_STATES.EVASIVE: urgency += 0.4; break;
-      case COMBAT_STATES.DAMAGED: urgency += 0.5; break;
-      case COMBAT_STATES.RETREATING: urgency += 0.35; break;
-      case COMBAT_STATES.DISABLED: urgency += 0.6; break;
-    }
+    // Blend: 60% linear (proportional) + 40% asymmetric (escalation)
+    let urgency = m.linear * 0.6 + m.asymmetric * 0.4;
 
-    // Hull state
-    if (anpc.hull < 0.25) urgency += 0.2;
-    else if (anpc.hull < 0.5) urgency += 0.1;
+    // Combat state adds manifold-weighted offset (not raw addition)
+    // Higher z amplifies the state contribution — manifold modulates everything
+    const stateWeight = {
+      [COMBAT_STATES.PATROL]: 0,
+      [COMBAT_STATES.ALERT]: 0.08,
+      [COMBAT_STATES.ENGAGED]: 0.15,
+      [COMBAT_STATES.EVASIVE]: 0.25,
+      [COMBAT_STATES.DAMAGED]: 0.30,
+      [COMBAT_STATES.RETREATING]: 0.20,
+      [COMBAT_STATES.DISABLED]: 0.40,
+      [COMBAT_STATES.DESTROYED]: 0,
+    };
+    urgency += (stateWeight[anpc.combatState] || 0) * (1 + m.asymmetric);
+
+    // Hull crisis amplified by asymmetric surface (z=xy² → panic escalation)
+    if (anpc.hull < 0.25) urgency += 0.15 * (1 + m.asymmetric);
+    else if (anpc.hull < 0.5) urgency += 0.08 * (1 + m.linear);
 
     return Math.max(0, Math.min(1, urgency));
   }
@@ -320,6 +332,47 @@ const SFANPC = (function () {
       { id: 'UNI-EM-001', template: 'Mayday, mayday!', urgMin: 0.8, urgMax: 1.0 },
       { id: 'UNI-EM-002', template: 'Going down!', urgMin: 0.9, urgMax: 1.0 },
       { id: 'UNI-EM-003', template: 'Eject, eject!', urgMin: 0.9, urgMax: 1.0 },
+    ],
+    launch_prep: [
+      { id: 'UNI-LP-001', template: 'All boards green. Wave {wave} standing by.', urgMin: 0.0, urgMax: 0.4 },
+      { id: 'UNI-LP-002', template: 'Pre-flight complete. Ready to launch.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-LP-003', template: 'Launch checklist nominal. {callsign}, you are go.', urgMin: 0.0, urgMax: 0.4 },
+    ],
+    hazard_warning: [
+      { id: 'UNI-HW-001', template: '{callsign}, {hazard}! Evasive action!', urgMin: 0.6, urgMax: 1.0 },
+      { id: 'UNI-HW-002', template: '{hazard}. Take action immediately.', urgMin: 0.5, urgMax: 0.9 },
+      { id: 'UNI-HW-003', template: 'Warning — {hazard}!', urgMin: 0.7, urgMax: 1.0 },
+    ],
+    status_update: [
+      { id: 'UNI-SU-001', template: '{callsign}, {status}. Standing by.', urgMin: 0.0, urgMax: 0.4 },
+      { id: 'UNI-SU-002', template: '{status}. All stations nominal.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-SU-003', template: 'Confirmed. {status}.', urgMin: 0.0, urgMax: 0.5 },
+    ],
+    support_ops: [
+      { id: 'UNI-SO-001', template: '{supportShip} dispatched. {status}.', urgMin: 0.2, urgMax: 0.6 },
+      { id: 'UNI-SO-002', template: 'Support authorized. {supportShip} en route.', urgMin: 0.2, urgMax: 0.5 },
+      { id: 'UNI-SO-003', template: '{supportShip} returning to station. {status}.', urgMin: 0.1, urgMax: 0.4 },
+      { id: 'UNI-SO-004', template: '{callsign}, {supportShip} request denied. Conditions not met.', urgMin: 0.3, urgMax: 0.6 },
+    ],
+    sector_clear: [
+      { id: 'UNI-SC-001', template: 'Sector clear. {kills} kills. Return to base.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-SC-002', template: 'All hostiles neutralized. Well done.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-SC-003', template: 'Wave {wave} complete. {kills} confirmed kills. Rearming.', urgMin: 0.0, urgMax: 0.3 },
+    ],
+    launch_go: [
+      { id: 'UNI-LG-001', template: 'Launch! Launch! Launch!', urgMin: 0.3, urgMax: 0.7 },
+      { id: 'UNI-LG-002', template: 'All ahead — punch it!', urgMin: 0.3, urgMax: 0.7 },
+      { id: 'UNI-LG-003', template: 'Clear the rail — full military!', urgMin: 0.3, urgMax: 0.7 },
+    ],
+    launch_sendoff: [
+      { id: 'UNI-LS-001', template: 'Good hunting.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-LS-002', template: 'Bring them home.', urgMin: 0.0, urgMax: 0.3 },
+      { id: 'UNI-LS-003', template: 'The Resolute is counting on you.', urgMin: 0.0, urgMax: 0.3 },
+    ],
+    threat_brief: [
+      { id: 'UNI-TB-001', template: 'Threat assessment: {threats}. {watchPhrase}.', urgMin: 0.2, urgMax: 0.6 },
+      { id: 'UNI-TB-002', template: 'Scope shows {threats}. Stay sharp.', urgMin: 0.2, urgMax: 0.5 },
+      { id: 'UNI-TB-003', template: 'Intel reports {threats} in sector.', urgMin: 0.2, urgMax: 0.6 },
     ],
   };
 
@@ -380,6 +433,41 @@ const SFANPC = (function () {
       emergency: [
         { id: 'SF-CO-EM-001', template: '{callsign}, get out of there! {reason}!', urgMin: 0.8, urgMax: 1.0 },
         { id: 'SF-CO-EM-002', template: 'Emergency — all ships break {direction}! {reason}!', urgMin: 0.9, urgMax: 1.0 },
+      ],
+      launch_prep: [
+        { id: 'SF-CO-LP-001', template: 'Pilot {pilotSlot} of {maxLives}, wave {wave}. {missionBrief}', urgMin: 0.0, urgMax: 0.4 },
+        { id: 'SF-CO-LP-002', template: 'Wave {wave}. {missionBrief} {callsign}, you are cleared hot.', urgMin: 0.1, urgMax: 0.5 },
+      ],
+      launch_go: [
+        { id: 'SF-CO-LG-001', template: 'Launch! Launch! Launch!', urgMin: 0.3, urgMax: 0.7 },
+        { id: 'SF-CO-LG-002', template: 'All ahead — punch it!', urgMin: 0.3, urgMax: 0.7 },
+        { id: 'SF-CO-LG-003', template: 'Catapult engaged — godspeed!', urgMin: 0.3, urgMax: 0.7 },
+      ],
+      launch_sendoff: [
+        { id: 'SF-CO-LS-001', template: 'Good hunting, {callsign}.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'SF-CO-LS-002', template: 'Bring them home.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'SF-CO-LS-003', template: 'The Resolute is counting on you.', urgMin: 0.0, urgMax: 0.3 },
+      ],
+      sector_clear: [
+        { id: 'SF-CO-SC-001', template: 'Wave {wave} complete. {kills} confirmed. Outstanding work.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'SF-CO-SC-002', template: 'All contacts neutralized. {kills} kills. Return to base.', urgMin: 0.0, urgMax: 0.3 },
+      ],
+      hazard_warning: [
+        { id: 'SF-CO-HW-001', template: '{callsign}, {hazard}! All hands brace!', urgMin: 0.7, urgMax: 1.0 },
+        { id: 'SF-CO-HW-002', template: 'CIC — {hazard}! {callsign}, take evasive action!', urgMin: 0.7, urgMax: 1.0 },
+      ],
+      support_ops: [
+        { id: 'SF-CO-SO-001', template: '{supportShip} dispatched. {status}. Engaging autopilot.', urgMin: 0.2, urgMax: 0.5 },
+        { id: 'SF-CO-SO-002', template: '{callsign}, support request denied. {reason}. Keep fighting.', urgMin: 0.3, urgMax: 0.6 },
+        { id: 'SF-CO-SO-003', template: 'Support complete. Controls released. Good hunting.', urgMin: 0.1, urgMax: 0.4 },
+      ],
+      status_update: [
+        { id: 'SF-CO-SU-001', template: '{callsign}, {status}. Standing by for orders.', urgMin: 0.0, urgMax: 0.4 },
+        { id: 'SF-CO-SU-002', template: 'Dock confirmed. {status}. Score {score}.', urgMin: 0.0, urgMax: 0.3 },
+      ],
+      threat_brief: [
+        { id: 'SF-CO-TB-001', template: 'Threat intel: {threats}. {tacticalAdvice}. Stay sharp.', urgMin: 0.2, urgMax: 0.6 },
+        { id: 'SF-CO-TB-002', template: 'Scope shows {threats}. Recommend {tacticalAdvice}.', urgMin: 0.2, urgMax: 0.5 },
       ],
     },
     'SF-EACE': { // Enemy Ace
@@ -503,6 +591,24 @@ const SFANPC = (function () {
       emergency: [
         { id: 'LH-EM-001', template: '{callsign}, get out NOW! {reason}!', urgMin: 0.9, urgMax: 1.0 },
       ],
+      launch_prep: [
+        { id: 'LH-LP-001', template: '{callsign}, all systems green. Launching wave {wave}. Lighthouse standing by.', urgMin: 0.0, urgMax: 0.4 },
+        { id: 'LH-LP-002', template: 'Catapult charged. {callsign}, you are cleared for launch.', urgMin: 0.0, urgMax: 0.3 },
+      ],
+      status_update: [
+        { id: 'LH-SU-001', template: '{callsign}, {status}. Lighthouse monitors all bands. You\'re in good hands.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'LH-SU-002', template: 'Docking confirmed. {status}. Welcome home, {callsign}.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'LH-SU-003', template: 'Decontamination complete. {status}. All clear.', urgMin: 0.0, urgMax: 0.3 },
+        { id: 'LH-SU-004', template: 'Wave {wave} standing by. {status}. Launch when ready, {callsign}.', urgMin: 0.0, urgMax: 0.3 },
+      ],
+      support_ops: [
+        { id: 'LH-SO-001', template: '{supportShip} dispatched. {status}. Autopilot engaged.', urgMin: 0.2, urgMax: 0.5 },
+        { id: 'LH-SO-002', template: '{callsign}, {supportShip} request denied. {reason}. Keep fighting, you\'re doing well.', urgMin: 0.3, urgMax: 0.5 },
+        { id: 'LH-SO-003', template: 'Support complete. Controls released. Good hunting, {callsign}.', urgMin: 0.1, urgMax: 0.3 },
+      ],
+      hazard_warning: [
+        { id: 'LH-HW-001', template: '{callsign}, {hazard}! Lighthouse concurs — break off immediately!', urgMin: 0.7, urgMax: 1.0 },
+      ],
     },
     'Nightshade': {
       combat_engage: [
@@ -534,8 +640,8 @@ const SFANPC = (function () {
 
   // Opener stems by urgency range
   const OPENERS = {
-    low:  ['', '', ''],  // low urgency: often no opener
-    mid:  ['{callsign}, ', 'Heads up — ', 'Be advised — ', ''],
+    low: ['', '', ''],  // low urgency: often no opener
+    mid: ['{callsign}, ', 'Heads up — ', 'Be advised — ', ''],
     high: ['{callsign}! ', 'Warning! ', '', 'Break! '],
     crit: ['MAYDAY — ', '{callsign}! ', ''],
   };
@@ -543,37 +649,56 @@ const SFANPC = (function () {
   // Modifiers by tone
   const MODIFIERS = {
     formal: [' Over.', ' Acknowledge.', ' Copy?', ''],
-    warm:   [' Stay safe.', ' We\'ve got you.', ' You\'re doing great.', ''],
-    humor:  [' Easy money.', ' Almost too easy.', ''],
-    aggro:  [' No mercy.', ' Make them pay.', ' End them.', ''],
+    warm: [' Stay safe.', ' We\'ve got you.', ' You\'re doing great.', ''],
+    humor: [' Easy money.', ' Almost too easy.', ''],
+    aggro: [' No mercy.', ' Make them pay.', ' End them.', ''],
     neutral: ['', '', ''],
   };
 
   /**
-   * Assemble a composite string from phrase template + context
+   * Assemble a composite string from phrase template + context.
    * Structure: [Opener] + Core + [Modifier]
+   * All selection driven by manifold z-surfaces:
+   *   - Opener intensity: z_asymmetric (escalation surface)
+   *   - Modifier tone: z_linear (proportional surface) × personality tone vector
    */
   function assemblePhrase(phrase, context, anpc, urgency) {
-    // Pick opener based on urgency
+    // Get manifold values for this ANPC
+    let zLinear = urgency, zAsymmetric = urgency;
+    if (anpc) {
+      const m = anpc.getManifoldValues(_scenario);
+      zLinear = m.linear;
+      zAsymmetric = m.asymmetric;
+    }
+
+    // Opener: driven by z_asymmetric (escalation surface = panic/urgency)
     let opener = '';
-    if (urgency >= 0.8) opener = _pick(OPENERS.crit);
-    else if (urgency >= 0.5) opener = _pick(OPENERS.high);
-    else if (urgency >= 0.25) opener = _pick(OPENERS.mid);
+    if (zAsymmetric >= 0.6 || urgency >= 0.8) opener = _pick(OPENERS.crit);
+    else if (zAsymmetric >= 0.35 || urgency >= 0.5) opener = _pick(OPENERS.high);
+    else if (zAsymmetric >= 0.15 || urgency >= 0.25) opener = _pick(OPENERS.mid);
     else opener = _pick(OPENERS.low);
 
     // Core: fill template variables
     let core = phrase.template;
     core = _fillTemplate(core, context);
 
-    // Modifier based on dominant tone
+    // Modifier: driven by z_linear (proportional surface) × tone vector
+    // Higher z_linear intensifies the dominant tone axis
     let modifier = '';
     if (anpc) {
       const tone = computeToneVector(anpc);
-      if (urgency < 0.5) { // only add modifier in non-urgent situations
-        if (tone.humor > 0.6) modifier = _pick(MODIFIERS.humor);
-        else if (tone.warmth > 0.6) modifier = _pick(MODIFIERS.warm);
-        else if (tone.aggression > 0.6) modifier = _pick(MODIFIERS.aggro);
-        else if (tone.formality > 0.6) modifier = _pick(MODIFIERS.formal);
+      // Scale tone axes by z_linear — manifold modulates which tone dominates
+      const scaledHumor = tone.humor * (1 + zLinear);
+      const scaledWarmth = tone.warmth * (1 + zLinear * 0.5);
+      const scaledAggro = tone.aggression * (1 + zLinear);
+      const scaledFormal = tone.formality * (1 + zLinear * 0.3);
+
+      // Only add modifier when z_asymmetric is low (not in escalation)
+      if (zAsymmetric < 0.4) {
+        if (scaledHumor > 0.8) modifier = _pick(MODIFIERS.humor);
+        else if (scaledWarmth > 0.7) modifier = _pick(MODIFIERS.warm);
+        else if (scaledAggro > 0.8) modifier = _pick(MODIFIERS.aggro);
+        else if (scaledFormal > 0.7) modifier = _pick(MODIFIERS.formal);
         else modifier = _pick(MODIFIERS.neutral);
       }
     }
@@ -716,13 +841,18 @@ const SFANPC = (function () {
       return 'WPN-EMP'; // EMP Burst — maximum escalation
     }
 
-    // ── Communication frequency (based on urgency) ──
-    canSpeak(now, urgency) {
+    // ── Communication frequency (manifold-driven) ──
+    // Doc #2 §6.3: comm frequency driven by manifold z, not raw thresholds
+    canSpeak(now, urgency, scenario) {
       if (!this.active) return false;
-      // Higher urgency → shorter cooldown
-      const minInterval = urgency > 0.7 ? 2.0 :
-                          urgency > 0.4 ? 4.0 :
-                          urgency > 0.2 ? 8.0 : 15.0;
+      // Use manifold linear surface to modulate comm interval
+      // High z = high personality×scenario product = more talkative
+      const m = scenario ? this.getManifoldValues(scenario) : null;
+      const zLinear = m ? m.linear : urgency; // fallback to urgency if no scenario
+      // Extraversion directly modulates: high-E characters speak more often
+      const extraversionMod = 1.0 - (this.personality.E - 0.5) * 0.4;
+      // Base interval: inverse of z_linear. z=0 → 18s, z=1 → 1.5s
+      const minInterval = Math.max(1.5, (1 - zLinear) * 18) * extraversionMod;
       return (now - this.lastCommTime) >= minInterval;
     }
 
@@ -740,7 +870,7 @@ const SFANPC = (function () {
       }
       // Accumulate fatigue in combat
       if (this.combatState === COMBAT_STATES.ENGAGED ||
-          this.combatState === COMBAT_STATES.EVASIVE) {
+        this.combatState === COMBAT_STATES.EVASIVE) {
         this.fatigue = Math.min(1, this.fatigue + dt * (1 - this.fatigueResistance) * 0.01);
       }
     }
@@ -767,39 +897,72 @@ const SFANPC = (function () {
   /**
    * Select a phrase from the 3-tier system:
    * Character Pool → Title Pool → Universal Pool
-   * Filtered by urgency range match
+   *
+   * Filtering uses BOTH manifold surfaces:
+   *   - z_linear gates phrase eligibility (urgency range matching)
+   *   - z_asymmetric biases toward escalated phrases when escalation is high
+   * This ensures personality × scenario → which phrases are reachable.
    */
   function selectPhrase(anpc, category, urgency) {
+    // Manifold z-values for escalation bias
+    const m = anpc.getManifoldValues(_scenario);
+    const zEsc = m.asymmetric; // escalation surface
+
     // Tier 1: Character Pool
     const charPool = CHARACTER_POOLS[anpc.callsign];
     if (charPool && charPool[category]) {
-      const match = _filterByUrgency(charPool[category], urgency, anpc.lastPhraseIds);
+      const match = _filterByManifold(charPool[category], urgency, zEsc, anpc.lastPhraseIds);
       if (match) return match;
     }
 
     // Tier 2: Title Pool (role-specific)
     const titlePool = TITLE_POOLS[anpc.role];
     if (titlePool && titlePool[category]) {
-      const match = _filterByUrgency(titlePool[category], urgency, anpc.lastPhraseIds);
+      const match = _filterByManifold(titlePool[category], urgency, zEsc, anpc.lastPhraseIds);
       if (match) return match;
     }
 
     // Tier 3: Universal Pool
     if (UNIVERSAL_POOL[category]) {
-      const match = _filterByUrgency(UNIVERSAL_POOL[category], urgency, anpc.lastPhraseIds);
+      const match = _filterByManifold(UNIVERSAL_POOL[category], urgency, zEsc, anpc.lastPhraseIds);
       if (match) return match;
     }
 
     return null;
   }
 
-  function _filterByUrgency(phrases, urgency, recentIds) {
-    // Filter by urgency range, exclude recent IDs
+  /**
+   * Filter phrases using manifold-derived values.
+   * z_escalation biases selection toward higher-urgMax phrases
+   * when the asymmetric surface is elevated — personality-driven escalation.
+   */
+  function _filterByManifold(phrases, urgency, zEscalation, recentIds) {
+    // Primary: filter by urgency range, exclude recent
     const eligible = phrases.filter(p =>
       urgency >= p.urgMin && urgency <= p.urgMax &&
       !recentIds.includes(p.id)
     );
-    if (eligible.length > 0) return _pick(eligible);
+
+    if (eligible.length > 0) {
+      // When escalation surface is high, bias toward higher-urgMax phrases
+      // This makes aggressive personalities reach for more intense lines
+      if (zEscalation > 0.3 && eligible.length > 1) {
+        // Weight by proximity to urgMax × escalation
+        const weighted = eligible.map(p => ({
+          phrase: p,
+          weight: 1 + (p.urgMax * zEscalation * 2),
+        }));
+        const totalWeight = weighted.reduce((s, w) => s + w.weight, 0);
+        let roll = Math.random() * totalWeight;
+        for (const w of weighted) {
+          roll -= w.weight;
+          if (roll <= 0) return w.phrase;
+        }
+        return weighted[weighted.length - 1].phrase;
+      }
+      return _pick(eligible);
+    }
+
     // Fallback: include recent if nothing else matches
     const fallback = phrases.filter(p => urgency >= p.urgMin && urgency <= p.urgMax);
     return fallback.length > 0 ? _pick(fallback) : null;
@@ -868,7 +1031,7 @@ const SFANPC = (function () {
     // Determine manifold calculation interval
     const anyInCombat = [..._registry.values()].some(a =>
       a.active && (a.combatState === COMBAT_STATES.ENGAGED ||
-                   a.combatState === COMBAT_STATES.EVASIVE));
+        a.combatState === COMBAT_STATES.EVASIVE));
     const interval = anyInCombat ? MANIFOLD_INTERVAL_COMBAT : MANIFOLD_INTERVAL_PATROL;
 
     const shouldCalcManifold = (_gameTime - _lastManifoldCalc) >= interval;
@@ -903,15 +1066,15 @@ const SFANPC = (function () {
 
   // ── Disposition shifts ──
   const DISPOSITION_DELTAS = {
-    player_saves:          +0.15,
-    cooperative_kill:      +0.04,
-    survived_together:     +0.03,
+    player_saves: +0.15,
+    cooperative_kill: +0.04,
+    survived_together: +0.03,
     player_ignores_danger: -0.08,
-    friendly_fire:         -0.20,
-    follows_order:         +0.05,
-    ignores_order:         -0.10,
-    reckless_play:         -0.05,
-    impressive_kill:       +0.06,
+    friendly_fire: -0.20,
+    follows_order: +0.05,
+    ignores_order: -0.10,
+    reckless_play: -0.05,
+    impressive_kill: +0.06,
   };
 
   function shiftDisposition(anpcId, reason) {
@@ -922,30 +1085,36 @@ const SFANPC = (function () {
   }
 
   // ── Generate a line of dialog from an ANPC ──
+  // Full manifold pipeline: personality × scenario → z-surfaces → urgency →
+  // phrase selection (z-weighted) → composite assembly (z-modulated tone)
   function speak(anpcId, category, context) {
     const anpc = _registry.get(anpcId);
     if (!anpc || !anpc.active) return null;
 
+    // Step 1: Manifold-derived urgency (z=xy + z=xy² blend)
     const urgency = computeUrgency(anpc, _scenario);
 
-    // Check communication cooldown
-    if (!anpc.canSpeak(_gameTime, urgency)) return null;
+    // Step 2: Manifold-driven communication frequency check
+    if (!anpc.canSpeak(_gameTime, urgency, _scenario)) return null;
 
-    // Select phrase from 3-tier system
+    // Step 3: Manifold-weighted phrase selection (z_asymmetric biases intensity)
     const phrase = selectPhrase(anpc, category, urgency);
     if (!phrase) return null;
 
-    // Assemble composite string
+    // Step 4: Manifold-modulated composite assembly (z-surfaces drive opener/modifier)
     const assembled = assemblePhrase(phrase, context || {}, anpc, urgency);
 
-    // Mark as spoken
+    // Step 5: Record and return
     anpc.markSpoke(_gameTime, phrase.id);
+    const m = anpc.getManifoldValues(_scenario);
 
     return {
       sender: anpc.callsign || anpc.displayName,
       text: assembled,
       channel: anpc.faction === 'enemy' ? CHANNELS.ENEMY : CHANNELS.SQUADRON,
       urgency,
+      zLinear: m.linear,
+      zAsymmetric: m.asymmetric,
       anpcId: anpc.id,
     };
   }
@@ -961,12 +1130,15 @@ const SFANPC = (function () {
 
     const assembled = assemblePhrase(phrase, context || {}, anpc, urgency);
     anpc.markSpoke(_gameTime, phrase.id);
+    const m = anpc.getManifoldValues(_scenario);
 
     return {
       sender: anpc.callsign || anpc.displayName,
       text: assembled,
       channel: anpc.faction === 'enemy' ? CHANNELS.ENEMY : CHANNELS.SQUADRON,
       urgency,
+      zLinear: m.linear,
+      zAsymmetric: m.asymmetric,
       anpcId: anpc.id,
     };
   }
@@ -974,15 +1146,15 @@ const SFANPC = (function () {
   // ── Difficulty scaling ──
   const DIFFICULTY_SCALES = {
     allied: {
-      easy:    { accuracy: 0.70, reaction: 0.3, evasion: 0.70, moraleSens: 0.7, damageThreshold: 0.25, aggrMult: 1.2, commFreq: 1.3 },
-      normal:  { accuracy: 0.60, reaction: 0.5, evasion: 0.50, moraleSens: 1.0, damageThreshold: 0.35, aggrMult: 1.0, commFreq: 1.0 },
-      hard:    { accuracy: 0.50, reaction: 0.7, evasion: 0.35, moraleSens: 1.3, damageThreshold: 0.45, aggrMult: 0.8, commFreq: 0.8 },
+      easy: { accuracy: 0.70, reaction: 0.3, evasion: 0.70, moraleSens: 0.7, damageThreshold: 0.25, aggrMult: 1.2, commFreq: 1.3 },
+      normal: { accuracy: 0.60, reaction: 0.5, evasion: 0.50, moraleSens: 1.0, damageThreshold: 0.35, aggrMult: 1.0, commFreq: 1.0 },
+      hard: { accuracy: 0.50, reaction: 0.7, evasion: 0.35, moraleSens: 1.3, damageThreshold: 0.45, aggrMult: 0.8, commFreq: 0.8 },
       veteran: { accuracy: 0.40, reaction: 1.0, evasion: 0.25, moraleSens: 1.6, damageThreshold: 0.55, aggrMult: 0.7, commFreq: 0.6 },
     },
     enemy: {
-      easy:    { accuracy: 0.30, reaction: 1.2, evasion: 0.20, moraleSens: 1.5, aggrMult: 0.7, formTight: 0.3 },
-      normal:  { accuracy: 0.50, reaction: 0.7, evasion: 0.40, moraleSens: 1.0, aggrMult: 1.0, formTight: 0.5 },
-      hard:    { accuracy: 0.70, reaction: 0.4, evasion: 0.60, moraleSens: 0.7, aggrMult: 1.3, formTight: 0.7 },
+      easy: { accuracy: 0.30, reaction: 1.2, evasion: 0.20, moraleSens: 1.5, aggrMult: 0.7, formTight: 0.3 },
+      normal: { accuracy: 0.50, reaction: 0.7, evasion: 0.40, moraleSens: 1.0, aggrMult: 1.0, formTight: 0.5 },
+      hard: { accuracy: 0.70, reaction: 0.4, evasion: 0.60, moraleSens: 0.7, aggrMult: 1.3, formTight: 0.7 },
       veteran: { accuracy: 0.85, reaction: 0.2, evasion: 0.80, moraleSens: 0.5, aggrMult: 1.6, formTight: 0.9 },
     },
   };

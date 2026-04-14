@@ -286,11 +286,15 @@ const SFAnnouncer = (function () {
 
   function onMilitaryLost() {
     const snap = _snap();
-    _addComm(_crew('command'), `Military ship lost. Base ${V.hullStatus(snap.basePct)} at ${snap.basePct}%. No resupply available.`, 'base');
+    _updateScenario('ally_destroyed');
+    const line = _anpcSpeak('command', 'emergency', { reason: `military ship lost, base ${V.hullStatus(snap.basePct)}` });
+    _addComm(_crew('command'), line || `Military ship lost. Base ${V.hullStatus(snap.basePct)} at ${snap.basePct}%. No resupply available.`, 'base');
   }
 
   function onCivilianLost() {
-    _addComm(_crew('command'), `Civilian station ${_pick(V.destroyed)}. ${_state.kills} kills, score ${_state.score}. Mission failed.`, 'base');
+    _updateScenario('ally_destroyed');
+    const line = _anpcSpeak('command', 'emergency', { reason: `civilian station destroyed, mission failed` });
+    _addComm(_crew('command'), line || `Civilian station ${_pick(V.destroyed)}. ${_state.kills} kills, score ${_state.score}. Mission failed.`, 'base');
   }
 
   function onAllyDown() {
@@ -336,28 +340,34 @@ const SFAnnouncer = (function () {
   function onRespawnReady() {
     const snap = _snap();
     const hostiles = _countHostiles();
-    _addComm(_crew('deck'), `${_cs()}, replacement on rail. ${hostiles} ${_pick(V.contacts)} active. Wave ${_state.wave}.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: `replacement on rail, ${hostiles} hostiles active, wave ${_state.wave}` });
+    _addComm(_crew('deck'), line || `${_cs()}, replacement on rail. ${hostiles} ${_pick(V.contacts)} active. Wave ${_state.wave}.`, 'base');
   }
 
   function onWaveClear() {
     const snap = _snap();
-    _addComm(_crew('tactical'), `${_cs()}, sector clear. ${_state.kills} kills. Return to base.`, 'base');
+    _updateScenario('objective_complete');
+    const line = _anpcSpeak('tactical', 'sector_clear', { kills: _state.kills, wave: _state.wave });
+    _addComm(_crew('tactical'), line || `${_cs()}, sector clear. ${_state.kills} kills. Return to base.`, 'base');
   }
 
   function onAutopilotEngage() {
     const snap = _snap();
     const dist = Math.floor(_state.player.position.distanceTo(_state.baseship.position));
-    _addComm(_crew('ops'), `${_cs()}, autopilot engaged. ${dist}m to base.`, 'base');
+    const line = _anpcSpeak('ops', 'status_update', { status: `autopilot engaged, ${dist}m to base` });
+    _addComm(_crew('ops'), line || `${_cs()}, autopilot engaged. ${dist}m to base.`, 'base');
   }
 
   function onDock(who) {
     const snap = _snap();
-    _addComm(_crew('deck'), `${_cs()}, docking confirmed. ${_state.kills} kills, score ${_state.score}. ${V.hullStatus(snap.hullPct)}.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: `docking confirmed, ${_state.kills} kills, score ${_state.score}, ${V.hullStatus(snap.hullPct)}`, score: _state.score });
+    _addComm(_crew('deck'), line || `${_cs()}, docking confirmed. ${_state.kills} kills, score ${_state.score}. ${V.hullStatus(snap.hullPct)}.`, 'base');
   }
 
   function onTankerDeploy() {
     const snap = _snap();
-    _addComm(_crew('ops'), `${_cs()}, tanker deployed. ${V.fuelStatus(snap.fuelPct)}, ${V.hullStatus(snap.hullPct)}.`, 'base');
+    const line = _anpcSpeak('ops', 'support_ops', { supportShip: 'tanker', status: `${V.fuelStatus(snap.fuelPct)}, ${V.hullStatus(snap.hullPct)}` });
+    _addComm(_crew('ops'), line || `${_cs()}, tanker deployed. ${V.fuelStatus(snap.fuelPct)}, ${V.hullStatus(snap.hullPct)}.`, 'base');
   }
 
   function onTankerDock() {
@@ -372,7 +382,8 @@ const SFAnnouncer = (function () {
 
   function onMedicDeploy(callsign) {
     const snap = _snap();
-    _addComm(_crew('ops'), `${_cs()}, medical frigate '${callsign}' dispatched. ${V.hullStatus(snap.hullPct)}, ${V.shieldStatus(snap.shieldPct)}.`, 'base');
+    const line = _anpcSpeak('ops', 'support_ops', { supportShip: `medical frigate '${callsign}'`, status: `${V.hullStatus(snap.hullPct)}, ${V.shieldStatus(snap.shieldPct)}` });
+    _addComm(_crew('ops'), line || `${_cs()}, medical frigate '${callsign}' dispatched. ${V.hullStatus(snap.hullPct)}, ${V.shieldStatus(snap.shieldPct)}.`, 'base');
   }
 
   function onMedicDock(callsign) {
@@ -396,7 +407,8 @@ const SFAnnouncer = (function () {
 
   function onSupportDenied(type) {
     const ship = type === 'tanker' ? 'tanker' : 'medical frigate';
-    _addComm(_crew('ops'), `${_cs()}, ${ship} request denied. Conditions not critical enough. Keep fighting.`, 'base');
+    const line = _anpcSpeak('ops', 'support_ops', { supportShip: ship, reason: 'conditions not critical enough', status: 'request denied' });
+    _addComm(_crew('ops'), line || `${_cs()}, ${ship} request denied. Conditions not critical enough. Keep fighting.`, 'base');
   }
 
   function onSupportAccepted(type, name) {
@@ -418,11 +430,13 @@ const SFAnnouncer = (function () {
   }
 
   function onSupportReturn(type) {
-    _addComm(_crew('ops'), `${_cs()}, ${type === 'tanker' ? 'resupply' : 'repair'} complete. Autopilot returning you to combat zone.`, 'base');
+    const line = _anpcSpeak('ops', 'support_ops', { supportShip: type, status: `${type === 'tanker' ? 'resupply' : 'repair'} complete, returning to combat zone` });
+    _addComm(_crew('ops'), line || `${_cs()}, ${type === 'tanker' ? 'resupply' : 'repair'} complete. Autopilot returning you to combat zone.`, 'base');
   }
 
   function onSupportComplete() {
-    _addComm(_crew('ops'), `${_cs()}, controls released. You have the stick. Good hunting.`, 'base');
+    const line = _anpcSpeak('ops', 'support_ops', { supportShip: 'support', status: 'controls released' });
+    _addComm(_crew('ops'), line || `${_cs()}, controls released. You have the stick. Good hunting.`, 'base');
   }
 
   function onHeavyOrdnance() {
@@ -443,72 +457,105 @@ const SFAnnouncer = (function () {
 
   function onPlasmaHit() {
     const snap = _snap();
-    _addComm(_crew('sensor'), `${_cs()}, plasma impact! ${V.shieldStatus(snap.shieldPct)}. ${_pick(V.move)}!`, 'warning');
+    _updateScenario('hull_critical');
+    const line = _anpcSpeak('sensor', 'hazard_warning', { hazard: `plasma impact, ${V.shieldStatus(snap.shieldPct)}` });
+    _addComm(_crew('sensor'), line || `${_cs()}, plasma impact! ${V.shieldStatus(snap.shieldPct)}. ${_pick(V.move)}!`, 'warning');
   }
 
   function onDisabled() {
     const snap = _snap();
-    _addComm(_crew('tactical'), `${_cs()}, systems disabled! Hull ${snap.hullPct}%. Countermeasures deploying!`, 'warning');
+    _updateScenario('hull_critical');
+    const line = _anpcSpeak('tactical', 'hazard_warning', { hazard: `systems disabled, hull ${snap.hullPct}%` });
+    _addComm(_crew('tactical'), line || `${_cs()}, systems disabled! Hull ${snap.hullPct}%. Countermeasures deploying!`, 'warning');
   }
 
   function onSystemsRestore() {
     const snap = _snap();
-    _addComm(_crew('tactical'), `${_cs()}, systems back online! ${_composePlayerStatus(snap)}. ${_pick(V.move)}!`, 'base');
+    const line = _anpcSpeak('tactical', 'status_update', { status: `systems back online, ${_composePlayerStatus(snap)}` });
+    _addComm(_crew('tactical'), line || `${_cs()}, systems back online! ${_composePlayerStatus(snap)}. ${_pick(V.move)}!`, 'base');
   }
 
   function onHullBreach() {
     const snap = _snap();
-    _addComm(_crew('sensor'), `Hull breach! Organism attached! Hull ${snap.hullPct}%.`, 'warning');
-    _addComm(_crew('tactical'), `${_cs()}, afterburner ${_pick(V.urgent)}! Shake it off or RTB!`, 'warning');
+    _updateScenario('hull_critical');
+    const sLine = _anpcSpeak('sensor', 'hazard_warning', { hazard: `hull breach, organism attached, hull ${snap.hullPct}%` });
+    _addComm(_crew('sensor'), sLine || `Hull breach! Organism attached! Hull ${snap.hullPct}%.`, 'warning');
+    const tLine = _anpcSpeak('tactical', 'emergency', { reason: `organism on hull — afterburner or RTB` });
+    _addComm(_crew('tactical'), tLine || `${_cs()}, afterburner ${_pick(V.urgent)}! Shake it off or RTB!`, 'warning');
   }
 
   function onOrganismClear() {
     const snap = _snap();
-    _addComm(_crew('tactical'), `${_cs()}, organism clear! Hull ${snap.hullPct}%. Keep moving!`, 'base');
+    const line = _anpcSpeak('tactical', 'status_update', { status: `organism clear, hull ${snap.hullPct}%` });
+    _addComm(_crew('tactical'), line || `${_cs()}, organism clear! Hull ${snap.hullPct}%. Keep moving!`, 'base');
   }
 
   function onOrganismDeep() {
     const snap = _snap();
-    _addComm(_crew('sensor'), `${_cs()}, too deep to dislodge! Hull ${snap.hullPct}%. RTB ${_pick(V.urgent)}!`, 'warning');
+    _updateScenario('hull_critical');
+    const line = _anpcSpeak('sensor', 'emergency', { reason: `organism too deep, hull ${snap.hullPct}% — RTB now` });
+    _addComm(_crew('sensor'), line || `${_cs()}, too deep to dislodge! Hull ${snap.hullPct}%. RTB ${_pick(V.urgent)}!`, 'warning');
   }
 
   function onOrganismInside() {
     const snap = _snap();
-    _addComm(_crew('sensor'), `Hull breached! Organism inside the ship! Hull ${snap.hullPct}%.`, 'warning');
+    _updateScenario('hull_critical');
+    const line = _anpcSpeak('sensor', 'emergency', { reason: `hull breached, organism inside the ship, hull ${snap.hullPct}%` });
+    _addComm(_crew('sensor'), line || `Hull breached! Organism inside the ship! Hull ${snap.hullPct}%.`, 'warning');
   }
 
   function onOrganismProgress(pct) {
-    if (pct > 80) _addComm(_crew('tactical'), `Imminent breach — ${pct}%! Land ${_pick(V.urgent)}!`, 'warning');
-    else if (pct > 50) _addComm(_crew('sensor'), `Organism at ${pct}%. Cockpit seal failing.`, 'warning');
-    else _addComm(_crew('sensor'), `Organism in ventilation — ${pct}% to cockpit.`, 'warning');
+    _updateScenario('hull_critical');
+    if (pct > 80) {
+      const line = _anpcSpeak('tactical', 'emergency', { reason: `imminent breach — ${pct}%` });
+      _addComm(_crew('tactical'), line || `Imminent breach — ${pct}%! Land ${_pick(V.urgent)}!`, 'warning');
+    } else if (pct > 50) {
+      const line = _anpcSpeak('sensor', 'hazard_warning', { hazard: `organism at ${pct}%, cockpit seal failing` });
+      _addComm(_crew('sensor'), line || `Organism at ${pct}%. Cockpit seal failing.`, 'warning');
+    } else {
+      const line = _anpcSpeak('sensor', 'hazard_warning', { hazard: `organism in ventilation — ${pct}% to cockpit` });
+      _addComm(_crew('sensor'), line || `Organism in ventilation — ${pct}% to cockpit.`, 'warning');
+    }
   }
 
   function onEmergencyRTB() {
-    _addComm(_crew('command'), `Emergency RTB engaged! All power to engines!`, 'warning');
+    _updateScenario('hull_critical');
+    const line = _anpcSpeak('command', 'emergency', { reason: 'emergency RTB, all power to engines' });
+    _addComm(_crew('command'), line || `Emergency RTB engaged! All power to engines!`, 'warning');
   }
 
   function onEMP(count, duration) {
-    if (count > 0) _addComm(_crew('tactical'), `EMP — ${count} ${count === 1 ? _pick(V.contact) : _pick(V.contacts)} disabled. ${duration}s.`, 'base');
-    else _addComm(_crew('tactical'), `EMP fired — no ${_pick(V.contacts)} in range.`, 'base');
+    if (count > 0) {
+      const line = _anpcSpeak('tactical', 'tactical_coord', { remaining: count, intel: `EMP — ${count} disabled for ${duration}s` });
+      _addComm(_crew('tactical'), line || `EMP — ${count} ${count === 1 ? _pick(V.contact) : _pick(V.contacts)} disabled. ${duration}s.`, 'base');
+    } else {
+      const line = _anpcSpeak('tactical', 'status_update', { status: `EMP fired, no contacts in range` });
+      _addComm(_crew('tactical'), line || `EMP fired — no ${_pick(V.contacts)} in range.`, 'base');
+    }
   }
 
   function onWeaponSwitch(name) {
-    _addComm(_crew('tactical'), `Weapon: ${name}`, 'base');
+    const line = _anpcSpeak('tactical', 'status_update', { status: `weapon: ${name}` });
+    _addComm(_crew('tactical'), line || `Weapon: ${name}`, 'base');
   }
 
   function onDockRequest() {
     const snap = _snap();
-    _addComm(_crew('ops'), `${_cs()}, dock request approved. Fly to base. ${_composePlayerStatus(snap)}.`, 'base');
+    const line = _anpcSpeak('ops', 'status_update', { status: `dock request approved, ${_composePlayerStatus(snap)}` });
+    _addComm(_crew('ops'), line || `${_cs()}, dock request approved. Fly to base. ${_composePlayerStatus(snap)}.`, 'base');
   }
 
   function onPredatorConsume() {
     const snap = _snap();
-    _addComm(_crew('sensor'), `Fighter consumed by ${_pick(V.predator)}. Pilot lost. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'warning');
+    _updateScenario('ally_destroyed');
+    const line = _anpcSpeak('sensor', 'emergency', { reason: `fighter consumed by Predator, pilot lost, ${snap.totalHostile} remain` });
+    _addComm(_crew('sensor'), line || `Fighter consumed by ${_pick(V.predator)}. Pilot lost. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'warning');
   }
 
   function onPredatorMalfunction() {
     const snap = _snap();
-    _addComm(_crew('science'), `${_pick(V.predator)} turned on its own — hive control breakdown. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'base');
+    const line = _anpcSpeak('science', 'tactical_coord', { intel: `Predator turned on its own — hive control breakdown`, remaining: snap.totalHostile });
+    _addComm(_crew('science'), line || `${_pick(V.predator)} turned on its own — hive control breakdown. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'base');
   }
 
   function onHiveDiscovered(hive) {
@@ -523,12 +570,14 @@ const SFAnnouncer = (function () {
 
   function onDecontamination() {
     const snap = _snap();
-    _addComm(_crew('deck'), `Decontamination complete. Hull ${snap.hullPct}%.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: `decontamination complete, hull ${snap.hullPct}%` });
+    _addComm(_crew('deck'), line || `Decontamination complete. Hull ${snap.hullPct}%.`, 'base');
   }
 
   function onBayReady() {
     const snap = _snap();
-    _addComm(_crew('deck'), `${_cs()}, wave ${_state.wave} standing by. ${_composePlayerStatus(snap)}. Launch when ready.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: `wave ${_state.wave} standing by, ${_composePlayerStatus(snap)}`, wave: _state.wave });
+    _addComm(_crew('deck'), line || `${_cs()}, wave ${_state.wave} standing by. ${_composePlayerStatus(snap)}. Launch when ready.`, 'base');
   }
 
   function onLaunchStart() {
@@ -536,85 +585,104 @@ const SFAnnouncer = (function () {
     const snap = _snap();
     const basePct = snap.basePct;
 
-    // ── Phase 1 (0s): Deck officer — launch commit ──
-    _addComm(_crew('deck'), `${_cs()}, ${_pick(V.launchReady)}. Launching wave ${wave}.`, 'base');
+    // ── Phase 1 (0s): Deck officer — launch commit (ANPC: Lighthouse) ──
+    const deckLine = _anpcForceSpeak('deck', 'launch_prep', { wave, status: `launching wave ${wave}` });
+    _addComm(_crew('deck'), deckLine || `${_cs()}, ${_pick(V.launchReady)}. Launching wave ${wave}.`, 'base');
 
-    // ── Phase 2 (~1.5s): Command — mission context ──
+    // ── Phase 2 (~1.5s): Command — mission context (ANPC: Resolute Actual) ──
     setTimeout(() => {
       const s = _snap();
       const pilotSlot = Math.max(1, _state.maxLives - _state.livesRemaining + 1);
       const baseNote = basePct < 50 ? ` Resolute hull at ${basePct}% — she needs cover.` : '';
+      let brief;
       if (wave === 1) {
-        _addComm(_crew('command'), `Pilot ${pilotSlot} of ${_state.maxLives}, wave ${wave}. First sortie — calibrate weapons on initial ${_pick(V.contacts)}.${baseNote}`, 'base');
+        brief = `First sortie — calibrate weapons on initial contacts.${baseNote}`;
       } else {
         const intensity = s.totalHostile > 10 ? 'Heavy resistance expected.' : s.totalHostile > 5 ? 'Moderate opposition.' : 'Manageable numbers.';
-        _addComm(_crew('command'), `Pilot ${pilotSlot} of ${_state.maxLives}, wave ${wave}. ${intensity}${baseNote}`, 'base');
+        brief = `${intensity}${baseNote}`;
       }
+      const cmdLine = _anpcForceSpeak('command', 'launch_prep', { wave, pilotSlot, maxLives: _state.maxLives, missionBrief: brief });
+      _addComm(_crew('command'), cmdLine || `Pilot ${pilotSlot} of ${_state.maxLives}, wave ${wave}. ${brief}`, 'base');
     }, 1500);
 
-    // ── Phase 3 (~3.5s): Sensor — threat briefing (what's out there) ──
+    // ── Phase 3 (~3.5s): Sensor — threat briefing (ANPC: Scope) ──
     setTimeout(() => {
       const s = _snap();
-      // Build threat manifest from previous wave knowledge for waves 2+
+      let threats, watchLine;
       if (wave >= 2) {
-        const threats = [];
-        if (wave >= 6 && (wave === 6 || (wave - 6) % 5 === 0)) threats.push(_pick(V.dreadnought));
-        if (wave >= 4) threats.push(`${_pick(V.predator)}s`);
-        if (wave >= 3) threats.push(`${_pick(V.bomber)}s`);
-        if (wave >= 2) threats.push(`${_pick(V.interceptor)}s`);
-        threats.push(`${_pick(V.drone)}s`);
-        const manifest = threats.join(', ');
-        _addComm(_crew('sensor'), `${_pick(V.threat)}: ${_pick(V.sensorReading)} ${manifest}. ${_pick(V.watch)}.`, 'warning');
+        const tList = [];
+        if (wave >= 6 && (wave === 6 || (wave - 6) % 5 === 0)) tList.push(_pick(V.dreadnought));
+        if (wave >= 4) tList.push(`${_pick(V.predator)}s`);
+        if (wave >= 3) tList.push(`${_pick(V.bomber)}s`);
+        if (wave >= 2) tList.push(`${_pick(V.interceptor)}s`);
+        tList.push(`${_pick(V.drone)}s`);
+        threats = tList.join(', ');
+        watchLine = _pick(V.watch);
       } else {
-        _addComm(_crew('sensor'), `Scope shows light contacts only. Training-weight targets for initial calibration.`, 'info');
+        threats = 'light contacts only';
+        watchLine = 'training-weight targets';
       }
+      const sensLine = _anpcForceSpeak('sensor', 'threat_brief', { threats, watchPhrase: watchLine });
+      _addComm(_crew('sensor'), sensLine || `${_pick(V.threat)}: ${_pick(V.sensorReading)} ${threats}. ${watchLine}.`, wave >= 2 ? 'warning' : 'info');
     }, 3500);
 
-    // ── Phase 4 (~5.5s): Tactical — advice for this wave's threats ──
+    // ── Phase 4 (~5.5s): Tactical — advice (ANPC: XO Tanaka) ──
     setTimeout(() => {
+      let advice;
       if (wave >= 6 && (wave === 6 || (wave - 6) % 5 === 0)) {
-        _addComm(_crew('tactical'), `${_pick(V.dreadnought)} intel on file. ${_pick(V.useTorps)}. ${_pick(V.combatReady)}.`, 'warning');
+        advice = `${_pick(V.dreadnought)} intel on file. ${_pick(V.useTorps)}.`;
       } else if (wave >= 4) {
-        _addComm(_crew('tactical'), `${_pick(V.predator)} expected. ${_pick(V.targetWeak)}. ${_pick(V.combatReady)}.`, 'warning');
+        advice = `${_pick(V.predator)} expected. ${_pick(V.targetWeak)}.`;
       } else if (wave >= 3) {
-        _addComm(_crew('tactical'), `${_pick(V.bomber)}s will target the Resolute. ${_pick(V.protect)}. ${_pick(V.combatReady)}.`, 'warning');
+        advice = `${_pick(V.bomber)}s will target the Resolute. ${_pick(V.protect)}.`;
       } else if (wave >= 2) {
-        _addComm(_crew('tactical'), `${_pick(V.interceptor)}s inbound — they're fast. ${_pick(V.watch)}. ${_pick(V.combatReady)}.`, 'base');
+        advice = `${_pick(V.interceptor)}s inbound — they're fast. ${_pick(V.watch)}.`;
       } else {
-        _addComm(_crew('tactical'), `Weapons free on all targets. ${_pick(V.combatReady)}.`, 'base');
+        advice = `Weapons free on all targets.`;
       }
+      const tacLine = _anpcForceSpeak('tactical', 'tactical_coord', {
+        intel: advice, tacticalAdvice: advice, remaining: 0,
+      });
+      _addComm(_crew('tactical'), tacLine || `${advice} ${_pick(V.combatReady)}.`, wave >= 3 ? 'warning' : 'base');
     }, 5500);
 
-    // ── Phase 5 (~7.5s): XO — launch call ──
+    // ── Phase 5 (~7.5s): XO — launch call (ANPC: Resolute Actual) ──
     setTimeout(() => {
-      _addComm(_crew('command'), `${_pick(V.launchGo)}`, 'warning');
+      const goLine = _anpcForceSpeak('command', 'launch_go', {});
+      _addComm(_crew('command'), goLine || `${_pick(V.launchGo)}`, 'warning');
     }, 7500);
 
-    // ── Phase 6 (~9s): Command — send-off ──
+    // ── Phase 6 (~9s): Command — send-off (ANPC: Resolute Actual) ──
     setTimeout(() => {
-      _addComm(_crew('command'), `${_pick(V.launchGodspeed)}`, 'base');
+      const sendLine = _anpcForceSpeak('command', 'launch_sendoff', {});
+      _addComm(_crew('command'), sendLine || `${_pick(V.launchGodspeed)}`, 'base');
     }, 9000);
   }
 
   function onPracticeStart() {
     const snap = _snap();
-    _addComm(_crew('deck'), `${_cs()}, practice range active. Targets deployed. Press Escape when ready.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: 'practice range active, targets deployed' });
+    _addComm(_crew('deck'), line || `${_cs()}, practice range active. Targets deployed. Press Escape when ready.`, 'base');
   }
 
   function onPracticeEnd() {
-    _addComm(_crew('deck'), `${_cs()}, practice complete. Preparing for launch.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: 'practice complete, preparing for launch' });
+    _addComm(_crew('deck'), line || `${_cs()}, practice complete. Preparing for launch.`, 'base');
   }
 
   function onPause() { _addComm('SYSTEM', 'Game paused.', 'base'); }
   function onResume() { _addComm('SYSTEM', 'Game resumed.', 'base'); }
 
   function onSecured() {
-    _addComm(_crew('deck'), `${_cs()}, fighter secured. Wave ${_state.wave} standing by.`, 'base');
+    const line = _anpcSpeak('deck', 'status_update', { status: `fighter secured, wave ${_state.wave} standing by` });
+    _addComm(_crew('deck'), line || `${_cs()}, fighter secured. Wave ${_state.wave} standing by.`, 'base');
   }
 
   function onWaveComplete(prevWave) {
     const snap = _snap();
-    _addComm(_crew('command'), `Wave ${prevWave} complete. ${_state.kills} kills. Rearming for wave ${_state.wave}.`, 'base');
+    _updateScenario('objective_complete');
+    const line = _anpcSpeak('command', 'sector_clear', { kills: _state.kills, wave: prevWave });
+    _addComm(_crew('command'), line || `Wave ${prevWave} complete. ${_state.kills} kills. Rearming for wave ${_state.wave}.`, 'base');
   }
 
   function onNextWaveIntel() {
@@ -624,8 +692,14 @@ const SFAnnouncer = (function () {
     if (_state.wave >= 4) threats.push(_pick(V.predator));
     if (_state.wave >= 3) threats.push(_pick(V.bomber));
     if (_state.wave >= 2) threats.push(_pick(V.baseship));
-    const intel = threats.length ? `${threats[0]} signature ${_pick(V.detected)}.` : `Standard formation expected.`;
-    _addComm(_crew('sensor'), `Wave ${_state.wave} intel: ${intel} Base ${V.hullStatus(snap.basePct)}.`, 'warning');
+    const threatStr = threats.length ? threats.join(', ') : 'standard formation';
+    const line = _anpcSpeak('sensor', 'threat_brief', { threats: threatStr, watchPhrase: `base ${V.hullStatus(snap.basePct)}` });
+    if (line) {
+      _addComm(_crew('sensor'), line, 'warning');
+    } else {
+      const intel = threats.length ? `${threats[0]} signature ${_pick(V.detected)}.` : `Standard formation expected.`;
+      _addComm(_crew('sensor'), `Wave ${_state.wave} intel: ${intel} Base ${V.hullStatus(snap.basePct)}.`, 'warning');
+    }
   }
 
   // ── Autonomous observation — runs every frame, watches for changes ──
@@ -697,7 +771,8 @@ const SFAnnouncer = (function () {
     const hullDrop = _mem.lastHullPct - snap.hullPct;
     if (hullDrop >= 15 && !_onCooldown('hull_warn', 5.0)) {
       _updateScenario('hull_critical');
-      _addComm(_crew('ops'), _composeDamageReport(snap, 'hull'), 'warning');
+      const line = _anpcSpeak('ops', 'damage_report', { hullPct: snap.hullPct });
+      _addComm(_crew('ops'), line || _composeDamageReport(snap, 'hull'), 'warning');
     }
     // Hull critical threshold
     if (snap.hullPct < 25 && _mem.lastHullPct >= 25 && !_onCooldown('hull_crit', 8.0)) {
@@ -707,13 +782,16 @@ const SFAnnouncer = (function () {
     }
     // Shields just went down
     if (snap.shieldPct <= 0 && _mem.lastShieldPct > 0 && !_onCooldown('shields_down', 6.0)) {
-      _addComm(_crew('ops'), _composeDamageReport(snap, 'shields'), 'warning');
+      _updateScenario('hull_critical');
+      const line = _anpcSpeak('ops', 'damage_report', { hullPct: snap.hullPct, shieldStatus: 'down' });
+      _addComm(_crew('ops'), line || _composeDamageReport(snap, 'shields'), 'warning');
     }
   }
 
   function _observeFuel(snap) {
     if (snap.fuelPct < 15 && _mem.lastFuelPct >= 15 && !_onCooldown('fuel_warn', 10.0)) {
-      _addComm(_crew('ops'), `${_cs()}, ${V.fuelStatus(snap.fuelPct)} at ${snap.fuelPct}%. Conserve afterburner.`, 'warning');
+      const line = _anpcSpeak('ops', 'hazard_warning', { hazard: `fuel critical at ${snap.fuelPct}% — conserve afterburner` });
+      _addComm(_crew('ops'), line || `${_cs()}, ${V.fuelStatus(snap.fuelPct)} at ${snap.fuelPct}%. Conserve afterburner.`, 'warning');
     }
   }
 
@@ -721,7 +799,8 @@ const SFAnnouncer = (function () {
     const baseDrop = _mem.lastBasePct - snap.basePct;
     if (baseDrop >= 10 && !_onCooldown('base_warn', 6.0)) {
       _updateScenario('base_critical');
-      _addComm(_crew('command'), _composeDamageReport(snap, 'base'), 'warning');
+      const line = _anpcSpeak('command', 'hazard_warning', { hazard: `base hull dropping, ${snap.basePct}%` });
+      _addComm(_crew('command'), line || _composeDamageReport(snap, 'base'), 'warning');
     }
     if (snap.basePct < 15 && _mem.lastBasePct >= 15 && !_onCooldown('base_crit', 10.0)) {
       _updateScenario('base_critical');
@@ -852,12 +931,12 @@ const SFAnnouncer = (function () {
    * Falls back to legacy compose system if ANPC unavailable.
    */
   const _roleToAnpc = {
-    sensor:    'ANPC-SF-0005', // Ens. Park "Scope"
-    command:   'ANPC-SF-0001', // Cdr. Vasquez "Resolute Actual"
-    tactical:  'ANPC-SF-0004', // XO Tanaka
-    ops:       'ANPC-SF-0003', // Dr. Okafor "Lighthouse"
-    deck:      'ANPC-SF-0003', // Lighthouse (base ops)
-    science:   'ANPC-SF-0005', // Ens. Park
+    sensor: 'ANPC-SF-0005', // Ens. Park "Scope"
+    command: 'ANPC-SF-0001', // Cdr. Vasquez "Resolute Actual"
+    tactical: 'ANPC-SF-0004', // XO Tanaka
+    ops: 'ANPC-SF-0003', // Dr. Okafor "Lighthouse"
+    deck: 'ANPC-SF-0003', // Lighthouse (base ops)
+    science: 'ANPC-SF-0005', // Ens. Park
   };
 
   /**
@@ -887,6 +966,36 @@ const SFAnnouncer = (function () {
     };
 
     const result = SFANPC.speak(anpcId, category, context);
+    return result ? result.text : null;
+  }
+
+  /**
+   * Force ANPC dialog (bypass cooldown). For critical/timed events.
+   * Returns assembled text or null.
+   */
+  function _anpcForceSpeak(role, category, extraContext) {
+    if (!_anpcReady) return null;
+    const anpcId = _roleToAnpc[role];
+    if (!anpcId) return null;
+
+    const snap = _snap();
+    const context = {
+      playerCallsign: _cs(),
+      target: snap.closestType || 'hostile',
+      count: snap.totalHostile || 0,
+      bearing: snap.closestPos ? _bearing(snap.closestPos) : '000',
+      distance: snap.closestM || '?',
+      hullPct: snap.hullPct,
+      shieldStatus: V.shieldStatus(snap.shieldPct),
+      remaining: snap.totalHostile,
+      direction: Math.random() > 0.5 ? 'left' : 'right',
+      position: 'wing',
+      callsign: _cs(),
+      formation: 'V-Formation',
+      ...(extraContext || {}),
+    };
+
+    const result = SFANPC.forceSpeak(anpcId, category, context);
     return result ? result.text : null;
   }
 
