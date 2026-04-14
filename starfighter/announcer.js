@@ -499,7 +499,7 @@ const SFAnnouncer = (function () {
   // ── Autonomous observation — runs every frame, watches for changes ──
 
   function observe(dt) {
-    if (!_state || !_state.player || _state.phase !== 'combat') return;
+    if (!_state || !_state.player || _state.player.markedForDeletion || _state.phase !== 'combat') return;
     _tickCooldowns(dt);
 
     const snap = _snap();
@@ -584,6 +584,7 @@ const SFAnnouncer = (function () {
   // ── Periodic chatter — autonomous situational reports ──
 
   function generateChatter() {
+    if (!_state || !_state.player || _state.phase !== 'combat') return null;
     const snap = _snap();
     const roll = Math.random();
     if (roll < 0.4) {

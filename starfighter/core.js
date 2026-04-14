@@ -1901,12 +1901,11 @@ const Starfighter = (function () {
 
         if (state.respawnTimer <= 0) {
             state.respawning = false;
-            // Recreate player
+            // Recreate player (Entity constructor already calls M.place)
             state.player = new Player();
             state.player.hull = dim('player.hull');
             state.player.shields = dim('player.shields');
             state.entities.push(state.player);
-            if (M) M.add(state.player);
             if (window.SFInput) SFInput.init(state.player);
 
             // Reset to launch bay
@@ -2271,10 +2270,12 @@ const Starfighter = (function () {
             }
 
             // ── INTENT PHASE: entities declare what they want to do ──
-            state.player.resolveIntent(safeDt);
+            if (state.player && !state.player.markedForDeletion) {
+                state.player.resolveIntent(safeDt);
+            }
 
             // Feed engine audio with current thrust state
-            if (window.SFAudio) {
+            if (window.SFAudio && state.player && !state.player.markedForDeletion) {
                 SFAudio.setThrustLevel(
                     state.player.throttle,
                     state.player.afterburnerActive,
@@ -2337,7 +2338,7 @@ const Starfighter = (function () {
                     }
                 }
                 // Range-based expiry for projectiles far from player
-                if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo') {
+                if ((e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo') && state.player && !state.player.markedForDeletion) {
                     const dx = e.position.x - state.player.position.x;
                     const dy = e.position.y - state.player.position.y;
                     const dz = e.position.z - state.player.position.z;
@@ -2474,6 +2475,17 @@ const Starfighter = (function () {
 
         } catch (err) {
             console.error('Starfighter gameLoop error (recovered):', err);
+            // Show first error on-screen so silent freezes never hide bugs
+            if (!state._errorShown) {
+                state._errorShown = true;
+                const cdEl = document.getElementById('countdown-display');
+                if (cdEl) {
+                    cdEl.style.display = 'block';
+                    cdEl.innerHTML = `<span style="color:#ff4444;font-size:0.4em">ERROR: ${err.message}</span>`;
+                }
+            }
+            // Still render so screen doesn't freeze
+            try { if (window.SF3D) SF3D.render(state); } catch (_) { }
         }
     }
 
