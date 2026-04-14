@@ -1797,6 +1797,7 @@ const SF3D = (function () {
 
             // Delta-only transform updates.
             const ud = mesh.userData;
+            if (!e.position || !e.quaternion) continue;
             if (ud._px !== e.position.x || ud._py !== e.position.y || ud._pz !== e.position.z) {
                 mesh.position.copy(e.position);
                 ud._px = e.position.x; ud._py = e.position.y; ud._pz = e.position.z;
@@ -1833,7 +1834,7 @@ const SF3D = (function () {
         }
 
         // Target Lock Reticle
-        if (state.player && state.player.lockedTarget) {
+        if (state.player && state.player.lockedTarget && state.player.lockedTarget.position) {
             targetLockMesh.visible = true;
             targetLockMesh.position.copy(state.player.lockedTarget.position);
             // Scale reticle to fit the target's radius

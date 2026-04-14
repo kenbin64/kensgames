@@ -4371,7 +4371,7 @@ const Starfighter = (function () {
         const lockedTarget = state.player.lockedTarget;
 
         // Locked target always tracked (real-time position, not sweep-gated)
-        if (lockedTarget && lockedTarget !== state.player &&
+        if (lockedTarget && lockedTarget.position && lockedTarget !== state.player &&
             lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship') {
             const lx = lockedTarget.position.x - pPos.x;
             const ly = lockedTarget.position.y - pPos.y;
