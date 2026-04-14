@@ -353,35 +353,213 @@ const SFAudio = (function () {
     }
   }
 
-  // GDD §10.1: Sci-fi pulse cannon — layered zap with punch
+  // GDD §10.1: Cinematic sci-fi laser — 3-layer SHEWWW with manifold modulation
   function _playLaser(t) {
-    // Classic arcade laser — sharp "pew" with quick pitch sweep
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.14, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    g.connect(masterGain);
+    // ── Manifold modulation parameters ──
+    // Query player position for z=xy curvature and Schwartz Diamond timing
+    const SM = window.SpaceManifold;
+    let curvMod = 1.0, latticeTick = 0;
+    if (SM && SM.diamond) {
+      const px = (Math.random() - 0.5) * 4000; // approximate spread
+      const py = (Math.random() - 0.5) * 4000;
+      const pz = px * py * 0.001; // z = xy projection
+      const field = SM.diamond(px, py, pz);
+      curvMod = 0.7 + Math.abs(field) * 0.6; // 0.7–1.3 range
+      if (SM.diamondGrad) {
+        const g = SM.diamondGrad(px, py, pz);
+        latticeTick = Math.abs(g.x) + Math.abs(g.y); // |∂z/∂x| + |∂z/∂y|
+      }
+    }
+    const rampSpeed = 0.012 * curvMod; // charge pitch ramp speed
+    const dissDecay = 0.06 / Math.max(0.3, curvMod); // decay = 1/curvature
 
-    const osc = ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(1800, t);
-    osc.frequency.exponentialRampToValueAtTime(200, t + 0.08);
-    osc.connect(g);
-    osc.start(t);
-    osc.stop(t + 0.09);
+    // ── Stereo panner helper ──
+    function pan(val) {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, val));
+      return p;
+    }
 
-    // Bright harmonic — gives the classic "pew" overtone
-    const pewG = ctx.createGain();
-    pewG.gain.setValueAtTime(0.08, t);
-    pewG.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    pewG.connect(masterGain);
+    // ════════════════════════════════════════════
+    // LAYER 1 — CHARGE (5–18 ms)     -12 dB
+    // Sine + triangle 50/50, pitch 900→2600 Hz
+    // ════════════════════════════════════════════
+    const chargeDur = 0.005 + rampSpeed;
+    const chargeVol = 0.06; // -12 dB relative to release
 
-    const pew = ctx.createOscillator();
-    pew.type = 'sine';
-    pew.frequency.setValueAtTime(3600, t);
-    pew.frequency.exponentialRampToValueAtTime(400, t + 0.06);
-    pew.connect(pewG);
-    pew.start(t);
-    pew.stop(t + 0.07);
+    // Sine half
+    const chSineG = ctx.createGain();
+    chSineG.gain.setValueAtTime(chargeVol, t);
+    chSineG.gain.linearRampToValueAtTime(chargeVol * 0.2, t + 0.004);
+    chSineG.gain.setValueAtTime(chargeVol * 0.2, t + chargeDur - 0.002);
+    chSineG.gain.exponentialRampToValueAtTime(0.001, t + chargeDur + 0.01);
+
+    const chSine = ctx.createOscillator();
+    chSine.type = 'sine';
+    chSine.frequency.setValueAtTime(900, t);
+    chSine.frequency.exponentialRampToValueAtTime(2600, t + chargeDur);
+
+    // Triangle half
+    const chTriG = ctx.createGain();
+    chTriG.gain.setValueAtTime(chargeVol, t);
+    chTriG.gain.linearRampToValueAtTime(chargeVol * 0.2, t + 0.004);
+    chTriG.gain.exponentialRampToValueAtTime(0.001, t + chargeDur + 0.01);
+
+    const chTri = ctx.createOscillator();
+    chTri.type = 'triangle';
+    chTri.frequency.setValueAtTime(900, t);
+    chTri.frequency.exponentialRampToValueAtTime(2600, t + chargeDur);
+
+    // Band-pass 1.2 kHz Q=3
+    const chBP = ctx.createBiquadFilter();
+    chBP.type = 'bandpass';
+    chBP.frequency.value = 1200;
+    chBP.Q.value = 3;
+
+    // Stereo: slight inward pan L→C→R over 10ms
+    const chPan = ctx.createStereoPanner();
+    chPan.pan.setValueAtTime(-0.4, t);
+    chPan.pan.linearRampToValueAtTime(0.4, t + 0.01);
+
+    chSine.connect(chBP);
+    chTri.connect(chBP);
+    chBP.connect(chSineG);
+    chBP.connect(chTriG);
+    chSineG.connect(chPan);
+    chTriG.connect(chPan);
+    chPan.connect(masterGain);
+
+    chSine.start(t);
+    chTri.start(t);
+    chSine.stop(t + chargeDur + 0.015);
+    chTri.stop(t + chargeDur + 0.015);
+
+    // ════════════════════════════════════════════
+    // LAYER 2 — RELEASE "SHEWWW" (120–240 ms)  0 dB
+    // Triangle + bright noise 70/30
+    // Pitch: fast 2.6kHz → 850Hz
+    // Formant sweep: 3.2kHz → 1.1kHz
+    // ════════════════════════════════════════════
+    const relStart = t + chargeDur * 0.8; // slight overlap
+    const relDur = 0.16 + curvMod * 0.06; // 120-240ms manifold-scaled
+    const relVol = 0.18; // 0 dB (dominant)
+
+    // 2ms onset click (filtered transient)
+    const clickNoise = ctx.createBufferSource();
+    clickNoise.buffer = _getNoiseBuffer();
+    const clickBP = ctx.createBiquadFilter();
+    clickBP.type = 'bandpass';
+    clickBP.frequency.value = 2800;
+    clickBP.Q.value = 8;
+    const clickG = ctx.createGain();
+    clickG.gain.setValueAtTime(relVol * 0.5, relStart);
+    clickG.gain.exponentialRampToValueAtTime(0.001, relStart + 0.002);
+    clickNoise.connect(clickBP);
+    clickBP.connect(clickG);
+    clickG.connect(masterGain);
+    clickNoise.start(relStart);
+    clickNoise.stop(relStart + 0.003);
+
+    // Triangle oscillator (70% of release)
+    const relTriG = ctx.createGain();
+    relTriG.gain.setValueAtTime(relVol * 0.7, relStart);
+    relTriG.gain.linearRampToValueAtTime(relVol * 0.6, relStart + 0.035);
+    relTriG.gain.exponentialRampToValueAtTime(0.001, relStart + relDur);
+
+    const relTri = ctx.createOscillator();
+    relTri.type = 'triangle';
+    relTri.frequency.setValueAtTime(2600, relStart);
+    relTri.frequency.exponentialRampToValueAtTime(850, relStart + relDur * 0.7);
+
+    // Bright noise (30% of release)
+    const relNoiseG = ctx.createGain();
+    relNoiseG.gain.setValueAtTime(relVol * 0.3, relStart);
+    relNoiseG.gain.linearRampToValueAtTime(relVol * 0.2, relStart + 0.035);
+    relNoiseG.gain.exponentialRampToValueAtTime(0.001, relStart + relDur * 0.9);
+
+    const relNoise = ctx.createBufferSource();
+    relNoise.buffer = _getNoiseBuffer();
+
+    // Formant sweep: resonant band-pass 3.2kHz → 1.1kHz, Q=6
+    const relBP = ctx.createBiquadFilter();
+    relBP.type = 'bandpass';
+    relBP.frequency.setValueAtTime(3200, relStart);
+    relBP.frequency.exponentialRampToValueAtTime(1100, relStart + relDur * 0.8);
+    relBP.Q.value = 6;
+
+    // Secondary resonant band-pass 1.8kHz Q=6
+    const relBP2 = ctx.createBiquadFilter();
+    relBP2.type = 'bandpass';
+    relBP2.frequency.value = 1800;
+    relBP2.Q.value = 6;
+
+    // Doppler-style stereo sweep L→R (or R→L based on manifold)
+    const relPan = ctx.createStereoPanner();
+    const panDir = latticeTick > 0.5 ? 1 : -1;
+    relPan.pan.setValueAtTime(-0.5 * panDir, relStart);
+    relPan.pan.linearRampToValueAtTime(0.5 * panDir, relStart + relDur);
+
+    relTri.connect(relBP);
+    relNoise.connect(relBP);
+    relBP.connect(relBP2);
+    relBP2.connect(relTriG);
+    relBP2.connect(relNoiseG);
+    relTriG.connect(relPan);
+    relNoiseG.connect(relPan);
+    relPan.connect(masterGain);
+
+    relTri.start(relStart);
+    relNoise.start(relStart);
+    relTri.stop(relStart + relDur + 0.01);
+    relNoise.stop(relStart + relDur + 0.01);
+
+    // ════════════════════════════════════════════
+    // LAYER 3 — DISSIPATION (50–110 ms)  -18 dB
+    // High-passed noise + faint crackle
+    // ════════════════════════════════════════════
+    const dissStart = relStart + relDur * 0.6; // overlap tail
+    const dissDur = 0.05 + dissDecay;
+    const dissVol = 0.025; // -18 dB
+
+    const dissNoise = ctx.createBufferSource();
+    dissNoise.buffer = _getNoiseBuffer();
+
+    const dissHP = ctx.createBiquadFilter();
+    dissHP.type = 'highpass';
+    dissHP.frequency.value = 3500;
+
+    const dissG = ctx.createGain();
+    dissG.gain.setValueAtTime(dissVol, dissStart);
+    dissG.gain.linearRampToValueAtTime(dissVol * 0.8, dissStart + 0.02);
+    dissG.gain.exponentialRampToValueAtTime(0.001, dissStart + dissDur);
+
+    // Stereo: widen then fade to center
+    const dissPan = ctx.createStereoPanner();
+    dissPan.pan.setValueAtTime(0.6 * panDir, dissStart);
+    dissPan.pan.linearRampToValueAtTime(0, dissStart + dissDur * 0.8);
+
+    dissNoise.connect(dissHP);
+    dissHP.connect(dissG);
+    dissG.connect(dissPan);
+    dissPan.connect(masterGain);
+    dissNoise.start(dissStart);
+    dissNoise.stop(dissStart + dissDur + 0.01);
+
+    // Faint crackle — rapid micro-clicks at Diamond lattice intersections
+    const crackleCount = 2 + Math.floor(latticeTick * 3);
+    for (let c = 0; c < crackleCount; c++) {
+      const cTime = dissStart + (c / crackleCount) * dissDur * 0.7;
+      const crk = ctx.createOscillator();
+      crk.type = 'square';
+      crk.frequency.value = 6000 + Math.random() * 4000;
+      const crkG = ctx.createGain();
+      crkG.gain.setValueAtTime(dissVol * 0.3, cTime);
+      crkG.gain.exponentialRampToValueAtTime(0.001, cTime + 0.003);
+      crk.connect(crkG);
+      crkG.connect(masterGain);
+      crk.start(cTime);
+      crk.stop(cTime + 0.004);
+    }
   }
 
   // GDD §10.1: Lock tone (escalating beeps), launch whoosh

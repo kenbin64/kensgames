@@ -1418,8 +1418,8 @@ const SF3D = (function () {
             alienShield: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.08 }),
             // Laser — GDD §10.1: green-cyan #00FFAA energy bolts
             laserCore: new THREE.MeshBasicMaterial({ color: 0x00ffaa }),
-            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }),
-            laserTrail: new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }),
+            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending }),
+            laserTrail: new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending }),
             // Torpedo — GDD §10.1: bright warhead + orange #FF8800 exhaust trail
             torpCore: new THREE.MeshBasicMaterial({ color: 0xffffff }),
             torpGlow: new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending }),
@@ -1557,10 +1557,10 @@ const SF3D = (function () {
             mesh.add(eye2);
         } else if (type === 'laser') {
             // Slim laser bolts — thin bright streaks with subtle glow
-            const boltLen = 24, boltR = 0.15, glowR = 0.5, sep = 2.5;
+            const boltLen = 24, boltR = 0.12, glowR = 0.28, sep = 2.5;
             const boltGeo = new THREE.CylinderGeometry(boltR, boltR, boltLen, 4);
             boltGeo.rotateX(Math.PI / 2);
-            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.3, boltLen + 2, 4);
+            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.25, boltLen + 2, 6);
             glowGeo.rotateX(Math.PI / 2);
             // Left bolt
             const boltL = new THREE.Mesh(boltGeo, m.laserCore);
