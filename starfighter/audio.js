@@ -355,63 +355,33 @@ const SFAudio = (function () {
 
   // GDD §10.1: Sci-fi pulse cannon — layered zap with punch
   function _playLaser(t) {
-    // Main tone — bright descending zap
+    // Classic arcade laser — sharp "pew" with quick pitch sweep
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.18, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
     g.connect(masterGain);
 
     const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(2200, t);
-    osc.frequency.exponentialRampToValueAtTime(300, t + 0.1);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1800, t);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.08);
     osc.connect(g);
     osc.start(t);
-    osc.stop(t + 0.15);
+    osc.stop(t + 0.09);
 
-    // Sub-bass thump — muzzle kick felt through hull
-    const subG = ctx.createGain();
-    subG.gain.setValueAtTime(0.12, t);
-    subG.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-    subG.connect(masterGain);
+    // Bright harmonic — gives the classic "pew" overtone
+    const pewG = ctx.createGain();
+    pewG.gain.setValueAtTime(0.08, t);
+    pewG.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    pewG.connect(masterGain);
 
-    const sub = ctx.createOscillator();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(120, t);
-    sub.frequency.exponentialRampToValueAtTime(40, t + 0.06);
-    sub.connect(subG);
-    sub.start(t);
-    sub.stop(t + 0.08);
-
-    // Sizzle layer — high-frequency noise burst
-    const noise = ctx.createBufferSource();
-    noise.buffer = _getNoiseBuffer();
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 5000;
-    noiseFilter.Q.value = 1.5;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.1, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(masterGain);
-    noise.start(t);
-    noise.stop(t + 0.08);
-
-    // Resonant ping — the "pew" character
-    const pingG = ctx.createGain();
-    pingG.gain.setValueAtTime(0.06, t);
-    pingG.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    pingG.connect(masterGain);
-
-    const ping = ctx.createOscillator();
-    ping.type = 'sine';
-    ping.frequency.setValueAtTime(3200, t);
-    ping.frequency.exponentialRampToValueAtTime(800, t + 0.12);
-    ping.connect(pingG);
-    ping.start(t);
-    ping.stop(t + 0.12);
+    const pew = ctx.createOscillator();
+    pew.type = 'sine';
+    pew.frequency.setValueAtTime(3600, t);
+    pew.frequency.exponentialRampToValueAtTime(400, t + 0.06);
+    pew.connect(pewG);
+    pew.start(t);
+    pew.stop(t + 0.07);
   }
 
   // GDD §10.1: Lock tone (escalating beeps), launch whoosh

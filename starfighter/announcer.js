@@ -684,3 +684,5 @@ const SFAnnouncer = (function () {
   };
 
 })();
+
+window.SFAnnouncer = SFAnnouncer;

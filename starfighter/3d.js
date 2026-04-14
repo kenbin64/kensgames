@@ -1556,15 +1556,12 @@ const SF3D = (function () {
             eye2.position.set(-1.2, 0.5, -2.5);
             mesh.add(eye2);
         } else if (type === 'laser') {
-            // GDD §10.1: Dual linked pulse cannons — two parallel energy bolts
-            const boltLen = 18, boltR = 0.6, glowR = 1.8, sep = 3.5;
-            const boltGeo = new THREE.CylinderGeometry(boltR, boltR * 0.3, boltLen, 8);
+            // Slim laser bolts — thin bright streaks with subtle glow
+            const boltLen = 24, boltR = 0.15, glowR = 0.5, sep = 2.5;
+            const boltGeo = new THREE.CylinderGeometry(boltR, boltR, boltLen, 4);
             boltGeo.rotateX(Math.PI / 2);
-            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.5, boltLen + 4, 8);
+            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.3, boltLen + 2, 4);
             glowGeo.rotateX(Math.PI / 2);
-            const trailGeo = new THREE.CylinderGeometry(glowR * 1.5, 0.1, boltLen * 2, 6);
-            trailGeo.rotateX(Math.PI / 2);
-            trailGeo.translate(0, 0, boltLen * 0.6);
             // Left bolt
             const boltL = new THREE.Mesh(boltGeo, m.laserCore);
             boltL.position.x = -sep;
@@ -1572,9 +1569,6 @@ const SF3D = (function () {
             const glowL = new THREE.Mesh(glowGeo, m.laserGlow);
             glowL.position.x = -sep;
             mesh.add(glowL);
-            const trailL = new THREE.Mesh(trailGeo, m.laserTrail);
-            trailL.position.x = -sep;
-            mesh.add(trailL);
             // Right bolt
             const boltR2 = new THREE.Mesh(boltGeo, m.laserCore);
             boltR2.position.x = sep;
@@ -1582,9 +1576,6 @@ const SF3D = (function () {
             const glowR2 = new THREE.Mesh(glowGeo, m.laserGlow);
             glowR2.position.x = sep;
             mesh.add(glowR2);
-            const trailR2 = new THREE.Mesh(trailGeo, m.laserTrail);
-            trailR2.position.x = sep;
-            mesh.add(trailR2);
         } else if (type === 'torpedo') {
             // GDD §10.1: Bright warhead + orange sparkler trail
             // Warhead — bright white-hot core
