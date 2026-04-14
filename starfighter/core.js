@@ -807,6 +807,7 @@ const Starfighter = (function () {
         // Procedural orchestral music — ambient intensity in bay
         if (window.SFMusic && window.SFAudio) {
             SFMusic.init(SFAudio.getCtx(), SFAudio.getMasterGain());
+            SFMusic.setSection('launch-bay');
             SFMusic.setIntensity(0.18);
             SFMusic.start();
         }
@@ -1092,7 +1093,10 @@ const Starfighter = (function () {
             SFAudio.startCockpitHum();
             SFAudio.startThrustRumble();
         }
-        if (window.SFMusic) SFMusic.setIntensity(0.3);
+        if (window.SFMusic) {
+            SFMusic.setSection('exploration');
+            SFMusic.setIntensity(0.3);
+        }
 
         // Enter immersive
         if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
@@ -1382,6 +1386,7 @@ const Starfighter = (function () {
 
         // GDD §3: Fanfare on launch — triumphant brass + timpani
         if (window.SFMusic) {
+            SFMusic.setSection('opening-theme');
             SFMusic.setIntensity(0.72);
             SFMusic.triggerFanfare();
         }
@@ -1443,7 +1448,10 @@ const Starfighter = (function () {
         }
 
         // Music: combat cruise intensity
-        if (window.SFMusic) SFMusic.setIntensity(0.58);
+        if (window.SFMusic) {
+            SFMusic.setSection('heat-of-battle');
+            SFMusic.setIntensity(0.58);
+        }
 
         // Place player at combat starting position: safely outside baseship, facing away
         const launchDir = new THREE.Vector3(0, 0, -1); // default launch direction
@@ -1533,7 +1541,10 @@ const Starfighter = (function () {
         SFAnnouncer.onWaveComplete(prevWave);
 
         // GDD §9.3: Music intensity drops to ambient, rebuilds next wave
-        if (window.SFMusic) SFMusic.setIntensity(0.1);
+        if (window.SFMusic) {
+            SFMusic.setSection('closing-theme');
+            SFMusic.setIntensity(0.1);
+        }
 
         if (state.wave >= 2) {
             setTimeout(() => {
@@ -1551,6 +1562,7 @@ const Starfighter = (function () {
             state.player.yaw = 0;
             state.player.roll = 0;
             state.phase = 'bay-ready';  // Wait for player to push launch button again
+            if (window.SFMusic) SFMusic.setSection('launch-bay');
             state.launchTimer = 0;
             state._launchAudioPlayed = false;
             state._launchBlastPlayed = false;
@@ -1849,7 +1861,10 @@ const Starfighter = (function () {
             SFAnnouncer.onWaveClear();
 
             // GDD §9.3: Music intensity drops on wave clear
-            if (window.SFMusic) SFMusic.setIntensity(0.2);
+            if (window.SFMusic) {
+                SFMusic.setSection('exploration');
+                SFMusic.setIntensity(0.2);
+            }
         }
     }
 
@@ -2437,6 +2452,19 @@ const Starfighter = (function () {
                 const basePct = state.baseship ? state.baseship.hull / dim('baseship.hull') : 1;
                 if (basePct < 0.3) musicIntensity += 0.15; // baseship in danger
                 SFMusic.setIntensity(Math.min(1, musicIntensity));
+
+                // Dynamic section switching based on combat proximity
+                if (state.phase === 'combat') {
+                    if (nearCount > 3 || closestDist < 800 * 800) {
+                        SFMusic.setSection('heat-of-battle');
+                    } else if (nearCount > 0 || closestDist < 1500 * 1500) {
+                        SFMusic.setSection('enemy-nearby');
+                    } else if (enemyCount > 0) {
+                        SFMusic.setSection('foreboding');
+                    } else {
+                        SFMusic.setSection('exploration');
+                    }
+                }
 
                 if (SFMusic.setManifoldState) {
                     const pxn = px / 2000;
