@@ -4227,58 +4227,49 @@ const Starfighter = (function () {
 
         const pPos = state.player.position;
         const pQuat = state.player.quaternion;
-        const playerForwardWorld = new THREE.Vector3(0, 0, -1).applyQuaternion(pQuat).normalize();
 
-        // Sphere wireframe doesn't rotate — fixed reference
+        // Inverse quaternion — transforms world directions into ship-local space
+        // Forward (-Z) is always "ahead" on the radar display
+        const invQuat = pQuat.clone().invert();
+
+        // Sphere wireframe doesn't rotate — fixed reference frame
         radarSphere.quaternion.set(0, 0, 0, 1);
 
-        // Offset vector — player is at (0,0,OFFSET), everything else is relative to origin
+        // Ship marker stays at fixed center offset
         const shipOff = new THREE.Vector3(0, 0, RADAR_SHIP_OFFSET);
 
-        // GDD §7: Forward direction indicator on sphere edge
-        radarForwardMarker.position.copy(playerForwardWorld).multiplyScalar(1.05);
+        // Forward marker — fixed position (always points "ahead" in ship-local = -Z)
+        const localFwd = new THREE.Vector3(0, 0, -1); // always -Z in ship frame
+        radarForwardMarker.position.copy(localFwd).multiplyScalar(1.05);
         radarForwardMarker.lookAt(shipOff);
         radarForwardMarker.rotateX(Math.PI / 2);
 
-        // Viewport indicator rotates with player heading in world-referenced radar space.
+        // FOV cone — fixed orientation (always points forward in ship-local space)
         if (radarFovCone) {
-            const coneQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, -1),
-                playerForwardWorld
-            );
-            radarFovCone.quaternion.copy(coneQuat);
+            radarFovCone.quaternion.set(0, 0, 0, 1); // identity — forward is -Z
         }
 
-        // ── Vector Meter — rotate world axes into player-local space ──
+        // Vector Meter — show world axes in ship-local space
         if (radarVectorMeter) {
-            // Player frame axes in world radar space.
-            const playerFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(pQuat);
-            const playerUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pQuat);
-            const playerRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pQuat);
+            // World up in ship-local frame
+            const worldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(invQuat);
+            const worldFwd = new THREE.Vector3(0, 0, -1); // always local forward
+            const worldRight = new THREE.Vector3(1, 0, 0); // always local right
 
-            // Orient each arrow to point along its world axis (arrows built along +Y)
             const upRef = new THREE.Vector3(0, 1, 0);
-
-            const fwdQuat = new THREE.Quaternion().setFromUnitVectors(upRef, playerFwd);
-            radarAxisFwd.quaternion.copy(fwdQuat);
-
-            const upQuat = new THREE.Quaternion().setFromUnitVectors(upRef, playerUp);
-            radarAxisUp.quaternion.copy(upQuat);
-
-            const rightQuat = new THREE.Quaternion().setFromUnitVectors(upRef, playerRight);
-            radarAxisRight.quaternion.copy(rightQuat);
+            radarAxisFwd.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(upRef, worldFwd));
+            radarAxisUp.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(upRef, worldUp));
+            radarAxisRight.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(upRef, worldRight));
         }
 
-        // ── Level Ring — baseship's horizon plane projected into player-local space ──
+        // Level Ring — baseship's horizon in ship-local space
         if (radarLevelRing && state.baseship) {
             const baseQuat = state.baseship.quaternion || new THREE.Quaternion();
-            const baseUp = new THREE.Vector3(0, 1, 0).applyQuaternion(baseQuat);
-            // Orient ring so its normal aligns with baseship's up in world radar space.
+            const baseUp = new THREE.Vector3(0, 1, 0).applyQuaternion(baseQuat).applyQuaternion(invQuat);
             const ringQuat = new THREE.Quaternion().setFromUnitVectors(
                 new THREE.Vector3(0, 0, 1), baseUp
             );
             radarLevelRing.quaternion.copy(ringQuat);
-            // Position the "up" tick at the top of the ring
             if (radarLevelUp) {
                 radarLevelUp.position.copy(baseUp).multiplyScalar(0.97);
                 radarLevelUp.lookAt(0, 0, 0);
@@ -4286,19 +4277,18 @@ const Starfighter = (function () {
             }
         }
 
-        // GDD §7: Base marker — always show where baseship is relative to player
+        // Base marker — transform world direction into ship-local space
         if (state.baseship) {
             const baseRel = state.baseship.position.clone().sub(pPos);
             const baseDist = baseRel.length();
             if (baseDist > 1) {
-                const baseDir = baseRel.clone().normalize();
+                // Transform to ship-local
+                const baseLocal = baseRel.normalize().applyQuaternion(invQuat);
                 const baseT = Math.min(baseDist / RADAR_RANGE, 1.0);
-                radarBaseMarker.position.copy(baseDir).multiplyScalar(baseT * 0.92).add(shipOff);
+                radarBaseMarker.position.copy(baseLocal).multiplyScalar(baseT * 0.92).add(shipOff);
                 radarBaseMarker.visible = true;
-                // Dim if far, bright if close
                 radarBaseMarker.material.opacity = baseT > 0.9 ? 0.5 : 1.0;
                 radarBaseMarker.material.transparent = true;
-                // Pulse when in landing approach
                 if (state.phase === 'land-approach') {
                     const pulse = 0.08 + Math.sin(performance.now() * 0.008) * 0.03;
                     radarBaseMarker.scale.setScalar(pulse / 0.08);
@@ -4310,7 +4300,7 @@ const Starfighter = (function () {
             }
         }
 
-        // ── Rotating sweep — 3D radar scan beam ──
+        // Sweep beam — rotates in ship-local space
         const SWEEP_PERIOD = dim('radar.sweepPeriod');
         const BEAM_HALF = THREE.MathUtils.degToRad(dim('radar.beamWidth') / 2);
         const PERSISTENCE = dim('radar.persistence');
@@ -4318,7 +4308,7 @@ const Starfighter = (function () {
         const sweepAngle = ((nowSec / SWEEP_PERIOD) % 1.0) * Math.PI * 2;
         if (radarSweepGroup) radarSweepGroup.rotation.y = sweepAngle;
 
-        // ── Sweep detection — paint contacts when beam passes their azimuth ──
+        // Sweep detection — check entity azimuth in ship-local space
         const TWO_PI = Math.PI * 2;
         state.entities.forEach(e => {
             if (e === state.player || e.type === 'laser' || e.type === 'machinegun' || e.type === 'baseship') return;
@@ -4328,8 +4318,9 @@ const Starfighter = (function () {
             const dist = Math.sqrt(rx * rx + ry * ry + rz * rz);
             if (dist < 1 || dist > RADAR_RANGE * 1.2) return;
 
-            // Azimuth of entity in world XZ plane
-            let az = Math.atan2(rx, rz);
+            // Transform to ship-local for azimuth check
+            const localDir = new THREE.Vector3(rx, ry, rz).normalize().applyQuaternion(invQuat);
+            let az = Math.atan2(localDir.x, -localDir.z); // -Z is forward
             if (az < 0) az += TWO_PI;
             let sw = sweepAngle % TWO_PI;
             if (sw < 0) sw += TWO_PI;
@@ -4339,20 +4330,19 @@ const Starfighter = (function () {
             if (diff < BEAM_HALF) {
                 radarContacts.set(e, {
                     t: nowSec,
-                    wx: e.position.x, wy: e.position.y, wz: e.position.z,
+                    // Store ship-local direction for rendering
+                    lx: localDir.x, ly: localDir.y, lz: localDir.z,
                     type: e.type, dist: dist
                 });
             }
         });
 
-        // ── Render contacts as fading phosphor blips ──
+        // Render contacts as fading phosphor blips
         radarBlipPool.forEach(b => b.visible = false);
         let blipIdx = 0;
         const lockedTarget = state.player.lockedTarget;
-        const cosHalfFov = Math.cos(THREE.MathUtils.degToRad(75 / 2));
-        const fwdDir = playerForwardWorld;
 
-        // Locked target always tracked (not subject to sweep gating)
+        // Locked target always tracked (real-time position, not sweep-gated)
         if (lockedTarget && lockedTarget !== state.player &&
             lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship') {
             const lx = lockedTarget.position.x - pPos.x;
@@ -4360,12 +4350,12 @@ const Starfighter = (function () {
             const lz = lockedTarget.position.z - pPos.z;
             const ld = Math.sqrt(lx * lx + ly * ly + lz * lz);
             if (ld > 1) {
+                const localDir = new THREE.Vector3(lx, ly, lz).normalize().applyQuaternion(invQuat);
                 const existing = radarContacts.get(lockedTarget);
                 if (!existing || (nowSec - existing.t) > SWEEP_PERIOD * 0.5) {
                     radarContacts.set(lockedTarget, {
                         t: nowSec,
-                        wx: lockedTarget.position.x, wy: lockedTarget.position.y,
-                        wz: lockedTarget.position.z,
+                        lx: localDir.x, ly: localDir.y, lz: localDir.z,
                         type: lockedTarget.type, dist: ld
                     });
                 }
@@ -4377,12 +4367,20 @@ const Starfighter = (function () {
             if (age > SWEEP_PERIOD) { radarContacts.delete(entity); return; }
             if (blipIdx >= radarBlipPool.length) return;
 
-            // Direction from current player pos to last-known world pos
-            const dx = c.wx - pPos.x, dy = c.wy - pPos.y, dz = c.wz - pPos.z;
-            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (d < 1) return;
-            const inv = 1 / d;
-            const nx = dx * inv, ny = dy * inv, nz = dz * inv;
+            // Re-compute ship-local direction for live entities (smooth tracking)
+            let nx = c.lx, ny = c.ly, nz = c.lz;
+            if (entity.position && !entity.markedForDeletion) {
+                const dx = entity.position.x - pPos.x;
+                const dy = entity.position.y - pPos.y;
+                const dz = entity.position.z - pPos.z;
+                const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (d > 1) {
+                    const live = new THREE.Vector3(dx, dy, dz).normalize().applyQuaternion(invQuat);
+                    nx = live.x; ny = live.y; nz = live.z;
+                    c.dist = d;
+                }
+            }
+
             const t = Math.min(c.dist / RADAR_RANGE, 1.0);
             const radarR = t * 0.92;
 
@@ -4394,7 +4392,7 @@ const Starfighter = (function () {
             );
             blip.visible = true;
 
-            // Phosphor fade — bright on detection, dims over sweep period
+            // Phosphor fade
             const sweepFrac = age / SWEEP_PERIOD;
             const fadeAlpha = PERSISTENCE * (1.0 - sweepFrac);
 
@@ -4447,9 +4445,9 @@ const Starfighter = (function () {
             blip.material.transparent = true;
             blip.material.opacity = fadeAlpha;
 
-            // FOV highlight — brighten contacts inside camera view
-            const dot = nx * fwdDir.x + ny * fwdDir.y + nz * fwdDir.z;
-            if (dot > cosHalfFov) {
+            // FOV highlight — in ship-local space, forward is -Z, so dot = -nz
+            const cosHalfFov = Math.cos(THREE.MathUtils.degToRad(75 / 2));
+            if (-nz > cosHalfFov) {
                 blip.material.opacity = Math.min(fadeAlpha + 0.3, 1.0);
                 blip.scale.multiplyScalar(1.2);
             }
