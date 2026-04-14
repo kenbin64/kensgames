@@ -84,6 +84,13 @@ const SFAnnouncer = (function () {
     hullStatus: (pct) => pct < 20 ? 'hull critical' : pct < 40 ? 'hull damaged' : pct < 60 ? 'hull holding' : pct < 80 ? 'hull stable' : 'hull strong',
     shieldStatus: (pct) => pct <= 0 ? 'shields down' : pct < 30 ? 'shields failing' : pct < 60 ? 'shields weakened' : 'shields holding',
     fuelStatus: (pct) => pct < 10 ? 'fuel critical' : pct < 25 ? 'fuel low' : pct < 50 ? 'fuel half' : 'fuel nominal',
+    // Launch sequence
+    launchReady: ['all systems green', 'boards are green', 'pre-flight nominal', 'launch checks complete', 'all stations report ready'],
+    launchGo: ['Launch! Launch! Launch!', 'All ahead — punch it!', 'Light the fires — go go go!', 'Clear the rail — full military!', 'Catapult engaged — godspeed!'],
+    launchGodspeed: ['Good hunting.', 'Bring them home.', 'Give them hell.', 'Stay frosty out there.', 'The Resolute is counting on you.'],
+    threat: ['threat assessment', 'threat intel', 'tactical picture', 'battlefield report', 'combat intel'],
+    sensorReading: ['reading', 'tracking', 'picking up', 'showing', 'registering'],
+    combatReady: ['combat ready', 'weapons hot', 'armed and ready', 'standing by for combat', 'all systems nominal'],
   };
 
   function _pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -393,7 +400,68 @@ const SFAnnouncer = (function () {
   }
 
   function onLaunchStart() {
-    _addComm(_crew('deck'), `${_cs()}, launching. Wave ${_state.wave}.`, 'base');
+    const wave = _state.wave;
+    const snap = _snap();
+    const basePct = snap.basePct;
+
+    // ── Phase 1 (0s): Deck officer — launch commit ──
+    _addComm(_crew('deck'), `${_cs()}, ${_pick(V.launchReady)}. Launching wave ${wave}.`, 'base');
+
+    // ── Phase 2 (~1.5s): Command — mission context ──
+    setTimeout(() => {
+      const s = _snap();
+      const pilotSlot = Math.max(1, _state.maxLives - _state.livesRemaining + 1);
+      const baseNote = basePct < 50 ? ` Resolute hull at ${basePct}% — she needs cover.` : '';
+      if (wave === 1) {
+        _addComm(_crew('command'), `Pilot ${pilotSlot} of ${_state.maxLives}, wave ${wave}. First sortie — calibrate weapons on initial ${_pick(V.contacts)}.${baseNote}`, 'base');
+      } else {
+        const intensity = s.totalHostile > 10 ? 'Heavy resistance expected.' : s.totalHostile > 5 ? 'Moderate opposition.' : 'Manageable numbers.';
+        _addComm(_crew('command'), `Pilot ${pilotSlot} of ${_state.maxLives}, wave ${wave}. ${intensity}${baseNote}`, 'base');
+      }
+    }, 1500);
+
+    // ── Phase 3 (~3.5s): Sensor — threat briefing (what's out there) ──
+    setTimeout(() => {
+      const s = _snap();
+      // Build threat manifest from previous wave knowledge for waves 2+
+      if (wave >= 2) {
+        const threats = [];
+        if (wave >= 6 && (wave === 6 || (wave - 6) % 5 === 0)) threats.push(_pick(V.dreadnought));
+        if (wave >= 4) threats.push(`${_pick(V.predator)}s`);
+        if (wave >= 3) threats.push(`${_pick(V.bomber)}s`);
+        if (wave >= 2) threats.push(`${_pick(V.interceptor)}s`);
+        threats.push(`${_pick(V.drone)}s`);
+        const manifest = threats.join(', ');
+        _addComm(_crew('sensor'), `${_pick(V.threat)}: ${_pick(V.sensorReading)} ${manifest}. ${_pick(V.watch)}.`, 'warning');
+      } else {
+        _addComm(_crew('sensor'), `Scope shows light contacts only. Training-weight targets for initial calibration.`, 'info');
+      }
+    }, 3500);
+
+    // ── Phase 4 (~5.5s): Tactical — advice for this wave's threats ──
+    setTimeout(() => {
+      if (wave >= 6 && (wave === 6 || (wave - 6) % 5 === 0)) {
+        _addComm(_crew('tactical'), `${_pick(V.dreadnought)} intel on file. ${_pick(V.useTorps)}. ${_pick(V.combatReady)}.`, 'warning');
+      } else if (wave >= 4) {
+        _addComm(_crew('tactical'), `${_pick(V.predator)} expected. ${_pick(V.targetWeak)}. ${_pick(V.combatReady)}.`, 'warning');
+      } else if (wave >= 3) {
+        _addComm(_crew('tactical'), `${_pick(V.bomber)}s will target the Resolute. ${_pick(V.protect)}. ${_pick(V.combatReady)}.`, 'warning');
+      } else if (wave >= 2) {
+        _addComm(_crew('tactical'), `${_pick(V.interceptor)}s inbound — they're fast. ${_pick(V.watch)}. ${_pick(V.combatReady)}.`, 'base');
+      } else {
+        _addComm(_crew('tactical'), `Weapons free on all targets. ${_pick(V.combatReady)}.`, 'base');
+      }
+    }, 5500);
+
+    // ── Phase 5 (~7.5s): XO — launch call ──
+    setTimeout(() => {
+      _addComm(_crew('command'), `${_pick(V.launchGo)}`, 'warning');
+    }, 7500);
+
+    // ── Phase 6 (~9s): Command — send-off ──
+    setTimeout(() => {
+      _addComm(_crew('command'), `${_pick(V.launchGodspeed)}`, 'base');
+    }, 9000);
   }
 
   function onPracticeStart() {
