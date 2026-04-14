@@ -156,7 +156,121 @@ const Manifold = (() => {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PLACE / REMOVE — store (x, y). Derive the rest.
+  // 🍴 DINING PHILOSOPHERS — Fork-based race condition eliminator
+  //
+  // Every entity across every app is a "philosopher" at the table. To be
+  // read or mutated by ANY subsystem, the entity must hold a valid fork.
+  // When an entity is destroyed its fork is revoked — all subsequent
+  // acquire() calls return false, making stale references harmless.
+  //
+  // This lives in the UNIFIED manifold so every game and app gets it
+  // automatically — no duplication. Same manifold, same substrates,
+  // same fork table.
+  //
+  // Fork states:
+  //   AVAILABLE  — entity alive, fork can be acquired
+  //   HELD       — fork currently acquired by a subsystem
+  //   REVOKED    — entity dead, fork permanently unavailable
+  //
+  // Dijkstra ordering: entities closer to the Schwartz Diamond zero-set
+  // (|field| → 0) get higher priority, breaking symmetry to prevent
+  // deadlock in multi-entity operations (collision pairs, etc.)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const FORK_AVAILABLE = 0;
+  const FORK_HELD = 1;
+  const FORK_REVOKED = 2;
+
+  const _forks = new Map();     // entityId → { state, holder, priority }
+  let _forkGeneration = 0;      // monotonic generation counter for ordering
+
+  const DiningPhilosophers = {
+
+    // Grant a fork to a newly created entity
+    grant(entityId, fieldValue) {
+      const priority = 1.0 / (Math.abs(fieldValue || 1) + 0.01);
+      _forks.set(entityId, {
+        state: FORK_AVAILABLE,
+        holder: null,
+        priority,
+        gen: ++_forkGeneration,
+      });
+    },
+
+    // Acquire a fork — returns true if entity is alive and fork obtained.
+    // If revoked, returns false — caller must skip this entity entirely.
+    acquire(entityId, subsystem) {
+      const fork = _forks.get(entityId);
+      if (!fork || fork.state === FORK_REVOKED) return false;
+      if (fork.state === FORK_HELD) return true; // re-entrant (cooperative)
+      fork.state = FORK_HELD;
+      fork.holder = subsystem;
+      return true;
+    },
+
+    // Release a fork back to the table
+    release(entityId) {
+      const fork = _forks.get(entityId);
+      if (!fork || fork.state === FORK_REVOKED) return;
+      fork.state = FORK_AVAILABLE;
+      fork.holder = null;
+    },
+
+    // Revoke a fork permanently — entity destroyed, no process may touch it
+    revoke(entityId) {
+      const fork = _forks.get(entityId);
+      if (fork) {
+        fork.state = FORK_REVOKED;
+        fork.holder = null;
+      }
+    },
+
+    // Batch release all held forks for a subsystem — end of phase
+    releaseAll(subsystem) {
+      for (const [, fork] of _forks) {
+        if (fork.state === FORK_HELD && fork.holder === subsystem) {
+          fork.state = FORK_AVAILABLE;
+          fork.holder = null;
+        }
+      }
+    },
+
+    // Reap revoked forks — garbage collect dead entries
+    reapForks() {
+      for (const [id, fork] of _forks) {
+        if (fork.state === FORK_REVOKED) _forks.delete(id);
+      }
+    },
+
+    // Check if entity fork is still valid (not revoked)
+    isValid(entityId) {
+      const fork = _forks.get(entityId);
+      return fork ? fork.state !== FORK_REVOKED : false;
+    },
+
+    // Dijkstra ordering — sort by fork priority to prevent deadlock
+    ordered(entityIds) {
+      return entityIds.slice().sort((a, b) => {
+        const fa = _forks.get(a), fb = _forks.get(b);
+        if (!fa || !fb) return 0;
+        return fb.priority - fa.priority || fa.gen - fb.gen;
+      });
+    },
+
+    // Stats for diagnostics
+    stats() {
+      let available = 0, held = 0, revoked = 0;
+      for (const [, f] of _forks) {
+        if (f.state === FORK_AVAILABLE) available++;
+        else if (f.state === FORK_HELD) held++;
+        else revoked++;
+      }
+      return { available, held, revoked, total: _forks.size };
+    },
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PLACE / REMOVE — store (x, y). Derive the rest. Grant/revoke forks.
   // ══════════════════════════════════════════════════════════════════════════
 
   function place(entity, regionName) {
@@ -196,12 +310,21 @@ const Manifold = (() => {
     }
 
     _emit('place', rName, entity);
+
+    // 🍴 Grant fork — compute field value at entity position for Dijkstra priority
+    const z = _z(x, y);
+    const sx = x * Math.PI / 10, sy = y * Math.PI / 10, sz = z * Math.PI / 100;
+    const fieldVal = diamond(sx, sy, sz);
+    DiningPhilosophers.grant(id, fieldVal);
   }
 
   // Runtime-mutable metadata — only for entities that need physics
   const _meta = new Map();
 
   function remove(id) {
+    // 🍴 Revoke fork FIRST — no subsystem can touch this entity after this
+    DiningPhilosophers.revoke(id);
+
     const idx = _ids.get(id);
     if (idx === undefined) return;
 
@@ -402,9 +525,11 @@ const Manifold = (() => {
       if (!s) continue;
       for (const id of s) {
         const m = _meta.get(id);
-        if (m?.markedForDeletion) remove(id);
+        if (m?.markedForDeletion) remove(id); // remove() revokes fork
       }
     }
+    // 🍴 Garbage collect dead forks
+    DiningPhilosophers.reapForks();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -608,6 +733,7 @@ const Manifold = (() => {
       reductionFactor: pointCount ? (280 / 16).toFixed(1) + 'x' : '∞',
       typedArrayCapacity: _capacity,
       recycledSlots: _free.length,
+      forks: DiningPhilosophers.stats(),
     };
   }
 
@@ -660,6 +786,10 @@ const Manifold = (() => {
 
     // Surface math (pure functions, zero storage)
     surface: { gyroid, diamond, blend, diamondGrad },
+
+    // 🍴 Dining Philosophers — fork-based race condition eliminator
+    // Every app/game shares this. No duplication.
+    DiningPhilosophers,
 
     // Events
     on,
