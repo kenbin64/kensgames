@@ -76,7 +76,7 @@ const SFInput = (function () {
             if (document.pointerLockElement !== document.body) {
                 enterImmersive();
             } else {
-                if (e.button === 0) window.Starfighter.fireLaser();   // Left click — primary
+                if (e.button === 0) window.Starfighter.firePrimary();   // Left click — selected weapon
                 if (e.button === 2) window.Starfighter.fireTorpedo(); // Right click — torpedo (GDD §10.1)
                 if (e.button === 1) window.Starfighter.fireTorpedo(); // Middle click — torpedo alt
             }
@@ -186,8 +186,8 @@ const SFInput = (function () {
             }
             // Ignore touches on nav sphere, crosshair, buttons, panels
             if (e.target.closest('#mob-nav-sphere, #crosshair, #console-buttons, #mobile-hud .mob-btn, #mob-btn-group, #mission-panel, #tutorial-panel, #loading-screen')) return;
-            // Tap anywhere else = fire lasers
-            if (window.Starfighter) window.Starfighter.fireLaser();
+            // Tap anywhere else = fire selected weapon
+            if (window.Starfighter) window.Starfighter.firePrimary();
         }, { passive: true });
 
         // ── Remaining action buttons (lock, boost, afterburner, RTB) ──
@@ -335,11 +335,26 @@ const SFInput = (function () {
             this.vPressed = false;
         }
 
-        // Fire primary — left mouse button handled in mousedown, Space fires lasers
-        if (keys['Space']) window.Starfighter.fireLaser();
+        // Fire primary — left mouse button handled in mousedown, Space fires selected weapon
+        if (keys['Space']) window.Starfighter.firePrimary();
 
         // GDD §10.1: Torpedo — right mouse button handled in mousedown
         // Middle mouse also fires torpedo (legacy compat)
+
+        // Weapon select (1-4 keys) — direct select, no cycling
+        if (keys['Digit1']) { if (window.Starfighter) { const s = window.Starfighter.getState(); if (s && s.player) s.player.selectedWeapon = 0; } }
+        if (keys['Digit2']) { if (window.Starfighter) { const s = window.Starfighter.getState(); if (s && s.player) s.player.selectedWeapon = 1; } }
+        if (keys['Digit3']) { if (window.Starfighter) { const s = window.Starfighter.getState(); if (s && s.player) s.player.selectedWeapon = 2; } }
+        if (keys['Digit4']) { if (window.Starfighter) { const s = window.Starfighter.getState(); if (s && s.player) s.player.selectedWeapon = 3; } }
+        // Mouse wheel click cycles weapons
+        if (keys['WheelClick']) {
+            if (!this.wheelClickPressed) {
+                window.Starfighter.cycleWeapon();
+                this.wheelClickPressed = true;
+            }
+        } else {
+            this.wheelClickPressed = false;
+        }
 
         // Target lock (T key)
         if (keys['KeyT']) {
@@ -361,6 +376,18 @@ const SFInput = (function () {
             }
         } else {
             this.rPressed = false;
+        }
+
+        // Request Dock (G key) — manual redock request
+        if (keys['KeyG']) {
+            if (!this.gPressed) {
+                if (window.Starfighter && window.Starfighter.requestDock) {
+                    window.Starfighter.requestDock();
+                }
+                this.gPressed = true;
+            }
+        } else {
+            this.gPressed = false;
         }
 
         // Gamepad API — GDD §12.4
@@ -385,7 +412,7 @@ const SFInput = (function () {
             if (pad.buttons[5] && pad.buttons[5].pressed) player.roll -= dt * 2.0; // RB
 
             // GDD §12.4: RT = fire primary (hold), LT = fire secondary (tap when locked)
-            if (pad.buttons[7] && pad.buttons[7].pressed) window.Starfighter.fireLaser(); // RT
+            if (pad.buttons[7] && pad.buttons[7].pressed) window.Starfighter.firePrimary(); // RT
             if (pad.buttons[6] && pad.buttons[6].pressed) { // LT = torpedo
                 if (!this.padLTPressed) {
                     window.Starfighter.fireTorpedo();

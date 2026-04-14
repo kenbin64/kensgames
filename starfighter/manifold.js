@@ -121,16 +121,64 @@ const SpaceManifold = (function () {
     'weapon.laser.maxAge': 2.5,    // seconds (range = speed × age)
     'weapon.laser.fireRate': 6,      // rounds per second
     'weapon.laser.radius': 2,      // collision radius
+    'weapon.laser.fuelCost': 0.3,    // fuel per shot
+    'weapon.gun.speed': 600,      // m/s — slower but more spread
+    'weapon.gun.damage': 6,       // low damage per round
+    'weapon.gun.maxAge': 1.8,     // shorter range than laser
+    'weapon.gun.fireRate': 18,    // rounds per second (rapid)
+    'weapon.gun.radius': 1.5,    // smaller projectile
+    'weapon.gun.fuelCost': 0.15,  // fuel per round (cheap per shot, adds up)
+    'weapon.gun.spread': 0.04,   // radians max spread per axis
+    'weapon.pulse.speed': 0,      // no projectile — spherical burst
+    'weapon.pulse.damage': 0,     // no damage — disables instead
+    'weapon.pulse.range': 200,    // effective radius meters
+    'weapon.pulse.stunDuration': 3.0,  // seconds target disabled
+    'weapon.pulse.fireRate': 0.25,     // 1 shot per 4 seconds
+    'weapon.pulse.fuelCost': 20,  // expensive — strategic use
     'weapon.torpedo.speed': 200,    // initial m/s
     'weapon.torpedo.damage': 80,     // per hit
     'weapon.torpedo.maxAge': 20,     // seconds
     'weapon.torpedo.accelTime': 1.5,    // seconds to reach max speed
     'weapon.torpedo.radius': 8,      // collision radius
+    'weapon.torpedo.fuelCost': 5,    // fuel per torpedo launch
 
     // ── Entity Caps ──
     'cap.lasers': 60,
+    'cap.machinegun': 80,
     'cap.plasma': 20,
     'cap.torpedoes': 12,
+
+    // ── Entity Stats ──
+    'entity.interceptor.radius': 8,
+    'entity.bomber.radius': 20,
+    'entity.alien-baseship.radius': 350,
+    'entity.predator.radius': 40,
+    'entity.dreadnought.radius': 300,
+    'entity.alien-base.radius': 500,
+    'entity.tanker.hull': 200,
+    'entity.tanker.shields': 50,
+    'entity.tanker.maxSpeed': 60,
+    'entity.tanker.radius': 30,
+    'entity.tanker.fuelRepairRate': 30,
+    'entity.tanker.hullRepairRate': 5,
+    'entity.tanker.shieldRepairRate': 15,
+    'entity.tanker.dockRange': 100,
+    'entity.medic.hull': 9999,
+    'entity.medic.shields': 9999,
+    'entity.medic.maxSpeed': 75,
+    'entity.medic.radius': 35,
+    'entity.medic.hullRepairRate': 12,
+    'entity.medic.shieldRepairRate': 20,
+    'entity.medic.dockRange': 110,
+    'entity.egg.radius': 6,
+    'entity.egg.hull': 30,
+    'entity.egg.hatchTime': 4,
+    'entity.egg.hatchRandom': 3,
+    'entity.youngling.radius': 4,
+    'entity.youngling.hull': 15,
+    'entity.youngling.maxSpeed': 200,
+    'entity.youngling.boreRate': 0.15,
+    'entity.youngling.damageRate': 3,
 
     // ── Enemy Cooldowns ──
     'enemy.fireCooldown': 1.5,    // seconds between shots
