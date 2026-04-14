@@ -300,11 +300,12 @@ const Manifold = (() => {
 
     // Store velocity/radius/type as compact metadata if entity has them
     // These are the ONLY extra fields games actually mutate at runtime
-    if (entity.velocity || entity.radius || entity.type || entity.markedForDeletion !== undefined) {
+    if (entity.velocity || entity.radius || entity.type || entity.owner || entity.markedForDeletion !== undefined) {
       _meta.set(id, {
         velocity: entity.velocity || null,
         radius: entity.radius || 10,
         type: entity.type || null,
+        owner: entity.owner || null,
         markedForDeletion: entity.markedForDeletion || false,
       });
     }
@@ -366,6 +367,7 @@ const Manifold = (() => {
       velocity: m?.velocity || null,
       radius: m?.radius || 10,
       type: m?.type || null,
+      owner: m?.owner || null,
       markedForDeletion: m?.markedForDeletion || false,
     };
   }

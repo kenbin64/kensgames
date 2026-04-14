@@ -2423,7 +2423,10 @@ const Starfighter = (function () {
                 if (isAProj && a.owner === 'enemy' && _isHostile(b.type)) continue;
                 if (isBProj && b.owner === 'enemy' && _isHostile(a.type)) continue;
 
-                const distSq = a.position.distanceToSquared(b.position);
+                const _dx = a.position.x - b.position.x;
+                const _dy = a.position.y - b.position.y;
+                const _dz = a.position.z - b.position.z;
+                const distSq = _dx * _dx + _dy * _dy + _dz * _dz;
                 const rSum = a.radius + b.radius;
                 if (distSq < rSum * rSum) {
                     handleCollision(a, b);
@@ -4050,7 +4053,7 @@ const Starfighter = (function () {
         radarCamera.lookAt(0, -0.1, 0);
 
         radarRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-        radarRenderer.setSize(400, 400, false);
+        radarRenderer.setSize(324, 324, false);
         radarRenderer.setClearColor(0x000000, 0.3);
 
         // Wireframe sphere shell (the radar globe)
