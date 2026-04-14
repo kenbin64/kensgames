@@ -53,17 +53,21 @@ const SpaceManifold = (function () {
   function manifoldCoord(pos) {
     const mx = pos.x * K;
     const my = pos.y * K;
-    return { u: mx, v: my, w: mx * my };
+    return { u: mx, v: my, w: mx * my * my }; // z = xy²
   }
 
   function stamp(e) {
     const p = e.position;
-    const mx = p.x * K, my = p.y * K;
+    const u = p.x * K, v = p.y * K, wz = p.z * K;
+    // z = xy² (quadratic projection), m = xyz (full coupling)
+    const w = u * v * v;
+    const m = u * v * wz;
     e._m = {
-      u: mx, v: my, w: mx * my,
-      field: Math.cos(mx) * Math.cos(my) * Math.cos(p.z * K)
-        - Math.sin(mx) * Math.sin(my) * Math.sin(p.z * K),
-      phase: Math.atan2(my, mx),
+      u, v, w,
+      m,                                             // manifold value: xyz
+      field: Math.cos(u) * Math.cos(v) * Math.cos(wz)
+        - Math.sin(u) * Math.sin(v) * Math.sin(wz), // Schwartz Diamond
+      phase: Math.atan2(v, u),
     };
     return e._m;
   }
@@ -135,6 +139,12 @@ const SpaceManifold = (function () {
     'enemy.bomber.bombInterval': 6.0,
     'enemy.dreadnought.turretInterval': 2.0,
     'enemy.dreadnought.beamCooldown': 15,
+
+    // ── Enemy AI ──
+    'enemy.turnRate': 2.0,         // base turn rate (rad/s)
+    'enemy.fireRange': 800,        // base fire range (meters)
+    'enemy.heavyRange': 3000,      // dreadnought heavy torp range
+    'enemy.heavyCooldown': 15,     // dreadnought heavy torp cooldown (s)
 
     // ── Score ──
     'score.enemy': 100,

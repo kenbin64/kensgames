@@ -3,7 +3,8 @@
  * 🜂 THE MANIFOLD — Dimensional Reducer
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- * PRIMITIVE: z = x · y
+ * PRIMITIVE: z = x · y²    (two inputs → one derived, quadratic multiplier)
+ *      EVAL: m = x · y · z  (three coordinates → one manifold value)
  *
  * PRINCIPLE: Store two numbers. Derive everything.
  *
@@ -11,6 +12,11 @@
  * floats. Position, surface, color, physics, audio — all computed on demand
  * from (x, y) through lenses. Nothing is cached. Nothing is stored.
  * The manifold holds coordinates, not copies.
+ *
+ * z = xy² means small changes in y produce quadratic change in z.
+ * Minimal input → maximum multiplied output. The Schwartz Diamond
+ * surface lives at the points where cos(x)sin(y)+cos(y)sin(z)+cos(z)sin(x)=0
+ * and every entity's manifold value m = xyz is pure multiplicative coupling.
  *
  * STORAGE: 16 bytes per point (two Float64s in a typed array)
  * SURFACE: Schwarz Diamond + Gyroid blend — computed, never stored
@@ -94,18 +100,27 @@ const Manifold = (() => {
 
   const PI_10 = Math.PI / 10;
 
-  function _z(x, y) { return x * y; }
+  // CORE EQUATIONS
+  // z = x · y²   — 2D→3D projection (quadratic multiplier: small y → big z)
+  // m = x · y · z — manifold value (full multiplicative coupling of all 3 axes)
+  function _z(x, y) { return x * y * y; }
+  function _m(x, y, z) { return x * y * z; }
 
   function _surface(x, y) {
-    const z = x * y;
+    const z = _z(x, y);
     const sx = (x / 10) * Math.PI;
     const sy = (y / 10) * Math.PI;
     const sz = (z / 100) * Math.PI;
-    return { gyroid: gyroid(sx, sy, sz), diamond: diamond(sx, sy, sz), blend: blend(sx, sy, sz) };
+    return {
+      gyroid: gyroid(sx, sy, sz),
+      diamond: diamond(sx, sy, sz),
+      blend: blend(sx, sy, sz),
+      m: _m(x, y, z),  // manifold value at this point
+    };
   }
 
   function _position3d(x, y) {
-    const z = x * y;
+    const z = _z(x, y);
     return {
       x: Math.cos(x * PI_10) * (x * 10),
       y: z / 10,
@@ -114,7 +129,8 @@ const Manifold = (() => {
   }
 
   function _color(x, y) {
-    return `hsl(${Math.abs((x * y) * 3.6) % 360}, 80%, 60%)`;
+    const z = _z(x, y);
+    return `hsl(${Math.abs(_m(x, y, z) * 0.036) % 360}, 80%, 60%)`;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -213,7 +229,7 @@ const Manifold = (() => {
     const off = idx * 2;
     const x = _xy[off];
     const y = _xy[off + 1];
-    const z = x * y;
+    const z = _z(x, y);
     const m = _meta.get(id);
     const pos = _position3d(x, y);
     return {
@@ -423,7 +439,7 @@ const Manifold = (() => {
     if (!fn) return null;
     const x = entity.manifold?.x ?? entity.x ?? 0;
     const y = entity.manifold?.y ?? entity.y ?? 0;
-    return fn(x, y, x * y, entity);
+    return fn(x, y, _z(x, y), entity);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -469,7 +485,7 @@ const Manifold = (() => {
     const { x: xExpr = 1, y: yExpr = 1, id: schemaId, label: schemaLabel } = schema;
     const mx = resolveAxis(xExpr, data);
     const my = resolveAxis(yExpr, data);
-    const mz = mx * my;
+    const mz = _z(mx, my);
     const id = schemaId || data?.id || (Date.now().toString(36) + (Math.random() * 1000 | 0));
 
     // Return a LIVE object — properties derived on access, not stored
@@ -622,6 +638,12 @@ const Manifold = (() => {
     // Lenses (pure projections from coordinates)
     lens,
     project,
+
+    // Core equations (exposed for game-side derivations)
+    z: _z,               // z = xy²  — two inputs, one quadratic output
+    m: _m,               // m = xyz  — three inputs, one multiplicative output
+    surface: _surface,    // Schwartz Diamond + gyroid + blend at (x,y)
+    position3d: _position3d,
 
     // Ingestion (data → two numbers, source dropped)
     ingest,

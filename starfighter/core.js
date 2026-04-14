@@ -1671,7 +1671,7 @@ const Starfighter = (function () {
         const o = opts || {};
         const x = arch.x + wave * arch.waveX;
         const y = arch.y + wave * arch.waveY;
-        const z = x * y;
+        const z = x * y * y;  // z = xy² — manifold projection
 
         const fieldRaw = (M && M.diamond) ? M.diamond(x * 420, y * 420, z * 420) : Math.sin(z);
         const field = Math.min(1, Math.max(0, Math.abs(fieldRaw)));
@@ -2566,44 +2566,77 @@ const Starfighter = (function () {
     // One engine, many personalities — compact as a Schwartz diamond surface
     // ══════════════════════════════════════════════════════════════
 
-    const AI_PROFILES = {
-        enemy: {
-            targetMode: 'mixed',       // 70% baseship, 30% player
-            turnRate: 2.0,
-            weapon: 'laser', fireRange: 800, cooldownMul: 1.0,
-            traits: ['evade_locked', 'avoid_predator'],
-        },
-        interceptor: {
-            targetMode: 'player',
-            turnRate: 3.5,
-            weapon: 'laser', fireRange: 900, cooldownMul: 0.7,
-            traits: ['jink_close'], jinkDist: 300,
-        },
-        bomber: {
-            targetMode: 'baseship',
-            turnRate: 1.0,
-            weapon: 'torpedo', fireRange: 2000, cooldownMul: 1.0,
-            traits: [],
-        },
-        dreadnought: {
-            targetMode: 'baseship',
-            turnRate: 0.3,
-            weapon: 'turret', fireRange: 4000, cooldownMul: 1.0,
-            traits: ['heavy_torpedo'], heavyRange: 3000, heavyCooldown: 15,
-        },
-        wingman: {
-            targetMode: 'nearest_enemy',
-            turnRate: 2.5,
-            weapon: 'laser', fireRange: 800, cooldownMul: 1.2,
-            traits: ['orbit_idle'],
-        },
-        'alien-baseship': {
-            targetMode: 'baseship',
-            turnRate: 0.5,
-            weapon: 'torpedo', fireRange: 3000, cooldownMul: 1.0,
-            traits: [],
-        },
+    // ── AI PROFILES — Derived from Schwartz Diamond stamp, not hardcoded ──
+    // stamp(entity) → {u, v, w, m, field, phase}
+    //   field: diamond surface value → behavioral regime
+    //   phase: angular position → tactical preference (weapon/target mode)
+    //   w: z = xy² → power multiplier (quadratic amplifier)
+    //   m: xyz → overall intensity
+    //
+    // Minimal input (entity 3D position) → maximum multiplied output (full combat profile)
+    // No state machines. Behavior emerges from position on the surface.
+
+    const _TRAIT_SEEDS = {
+        enemy: { baseTraits: ['evade_locked', 'avoid_predator'] },
+        interceptor: { baseTraits: ['jink_close'] },
+        bomber: { baseTraits: [] },
+        dreadnought: { baseTraits: ['heavy_torpedo'] },
+        wingman: { baseTraits: ['orbit_idle'] },
+        'alien-baseship': { baseTraits: [] },
     };
+
+    function _deriveAIProfile(entity) {
+        const s = M.stamp(entity) || { u: 0, v: 0, w: 0, m: 0, field: 0, phase: 0 };
+        const absField = Math.abs(s.field);
+        const absM = Math.min(Math.abs(s.m), 500);
+        const seeds = _TRAIT_SEEDS[entity.type] || { baseTraits: [] };
+
+        // field > 0 → aggressive regime (attack player)
+        // field < 0 → defensive regime (attack baseship/structure)
+        // field ≈ 0 → transitional (mixed targeting)
+        const aggression = (s.field + 1) * 0.5;   // 0..1
+        const targetMode = aggression > 0.6 ? 'player'
+            : aggression < 0.3 ? 'baseship'
+                : entity.type === 'wingman' ? 'nearest_enemy' : 'mixed';
+
+        // phase → weapon preference: 0..π = laser/turret, π..2π = torpedo
+        const weaponPhase = (s.phase + Math.PI) / (2 * Math.PI);  // 0..1
+        const weapon = entity.type === 'dreadnought' ? 'turret'
+            : entity.type === 'bomber' ? 'torpedo'
+                : entity.type === 'alien-baseship' ? 'torpedo'
+                    : weaponPhase > 0.7 ? 'torpedo' : 'laser';
+
+        // w (z = xy²) → quadratic power multiplier: turnRate, fireRange, cooldown
+        const wNorm = Math.min(Math.abs(s.w), 100) / 100;   // 0..1
+
+        return {
+            targetMode,
+            turnRate: dim('enemy.turnRate') * (0.6 + absField * 2.0 + wNorm),
+            weapon,
+            fireRange: dim('enemy.fireRange') * (0.7 + absM * 0.002 + wNorm * 0.5),
+            cooldownMul: 1.0 - absField * 0.3,           // more extreme field → faster firing
+            traits: seeds.baseTraits,
+            jinkDist: 200 + wNorm * 200,
+            heavyRange: dim('enemy.heavyRange') || 3000,
+            heavyCooldown: dim('enemy.heavyCooldown') || 15,
+        };
+    }
+
+    // Compatibility shim — cache per-entity, refresh every 2s (stamp changes with position)
+    function _getAIProfile(entity) {
+        const now = performance.now();
+        if (!entity._aiProfile || now - (entity._aiProfileTime || 0) > 2000) {
+            entity._aiProfile = _deriveAIProfile(entity);
+            entity._aiProfileTime = now;
+        }
+        return entity._aiProfile;
+    }
+
+    // Backward-compat: anything that reads AI_PROFILES[type] still works
+    const AI_PROFILES = new Proxy({}, {
+        get(_, type) { return _TRAIT_SEEDS[type] ? { traits: _TRAIT_SEEDS[type].baseTraits } : undefined; },
+        has(_, type) { return type in _TRAIT_SEEDS; }
+    });
 
     // ── Target acquisition dimension ──
     function _acquireTarget(entity, mode) {
@@ -2740,7 +2773,7 @@ const Starfighter = (function () {
 
     // ── The unified combat AI engine: one function, all combat types ──
     function updateCombatAI(entity, dt) {
-        const prof = AI_PROFILES[entity.type];
+        const prof = _getAIProfile(entity);
         if (!prof) return;
 
         // Plasma stun check

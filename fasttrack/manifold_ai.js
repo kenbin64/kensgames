@@ -60,7 +60,7 @@
  * Licensed under CC BY 4.0
  */
 
-window.ManifoldAI = (function() {
+window.ManifoldAI = (function () {
     'use strict';
 
     // ═══════════════════════════════════════════════════════════════
@@ -72,19 +72,19 @@ window.ManifoldAI = (function() {
 
     // Fibonacci-aligned weight tiers for move evaluation
     const WEIGHT_TIERS = {
-        existential:  FIB[10],  // 89  — win condition
-        strategic:    FIB[9],   // 55  — safe zone progress
-        tactical:     FIB[8],   // 34  — cut opponent
+        existential: FIB[10],  // 89  — win condition
+        strategic: FIB[9],   // 55  — safe zone progress
+        tactical: FIB[8],   // 34  — cut opponent
         opportunistic: FIB[7],  // 21  — fasttrack / bullseye
         developmental: FIB[6],  // 13  — enter from holding
-        positional:   FIB[5],   // 8   — positioning advantage
-        noise:        FIB[4],   // 5   — random tiebreaker
+        positional: FIB[5],   // 8   — positioning advantage
+        noise: FIB[4],   // 5   — random tiebreaker
     };
 
     // The two canonical manifold types
     const MANIFOLD_TYPE = {
         RELATION: 'z=xy',    // Layer 3 — balanced / logical
-        FORM:     'z=xy2',   // Layer 4 — aggressive / amplified
+        FORM: 'z=xy2',   // Layer 4 — aggressive / amplified
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -101,11 +101,11 @@ window.ManifoldAI = (function() {
     function evaluateSurface(type, x, y) {
         switch (type) {
             case MANIFOLD_TYPE.RELATION:
-                return x * y;                 // z = xy (AND gate / truth table)
+                return x * y * y;             // z = xy² (quadratic multiplier)
             case MANIFOLD_TYPE.FORM:
                 return x * y * y;             // z = xy² (quadratic amplifier)
             default:
-                return x * y;
+                return x * y * y;             // z = xy² — manifold primitive
         }
     }
 
@@ -116,13 +116,13 @@ window.ManifoldAI = (function() {
     function gradient(type, x, y) {
         switch (type) {
             case MANIFOLD_TYPE.RELATION:
-                // ∇(xy) = (y, x)
-                return { dx: y, dy: x };
+                // ∇(xy²) = (y², 2xy)
+                return { dx: y * y, dy: 2 * x * y };
             case MANIFOLD_TYPE.FORM:
                 // ∇(xy²) = (y², 2xy)
                 return { dx: y * y, dy: 2 * x * y };
             default:
-                return { dx: y, dy: x };
+                return { dx: y * y, dy: 2 * x * y };
         }
     }
 
@@ -134,9 +134,12 @@ window.ManifoldAI = (function() {
     function curvature(type, x, y) {
         switch (type) {
             case MANIFOLD_TYPE.RELATION: {
-                // For z=xy, Gaussian curvature K = -1 / (1 + x² + y²)²
-                const denom = (1 + x * x + y * y);
-                return -1 / (denom * denom);
+                // For z=xy², K = (fxx·fyy - fxy²) / (1 + fx² + fy²)²
+                // fx=y², fy=2xy, fxx=0, fyy=2x, fxy=2y
+                const fx = y * y, fy = 2 * x * y;
+                const fxx = 0, fyy = 2 * x, fxy = 2 * y;
+                const denom = (1 + fx * fx + fy * fy);
+                return (fxx * fyy - fxy * fxy) / (denom * denom);
             }
             case MANIFOLD_TYPE.FORM: {
                 // For z=xy², K involves second partials
@@ -247,10 +250,10 @@ window.ManifoldAI = (function() {
         const y = archetype.radius * Math.sin(archetype.theta);
 
         // Evaluate surface properties at this point
-        const z   = evaluateSurface(manifoldType, x, y);
-        const g   = gradient(manifoldType, x, y);
+        const z = evaluateSurface(manifoldType, x, y);
+        const g = gradient(manifoldType, x, y);
         const gMag = gradientMagnitude(manifoldType, x, y);
-        const K   = curvature(manifoldType, x, y);
+        const K = curvature(manifoldType, x, y);
 
         // Difficulty modulates the radius (how far from origin = how extreme)
         const difficultyScale = { easy: 0.5, normal: 1.0, intermediate: 1.0, hard: 1.5 };
@@ -348,7 +351,7 @@ window.ManifoldAI = (function() {
             archetype: archetype.name,
             emoji: archetype.emoji,
             name: archetype.name,
-            
+
             // Manifold position
             manifoldType,
             theta: archetype.theta,
@@ -532,7 +535,7 @@ window.ManifoldAI = (function() {
                                 manifoldScore: manifoldCombined,
                                 combinedScore: simpleSum + manifoldCombined * 0.1,
                                 hasCut: gameHelpers.findCutTargetAtHole?.(m1.toHoleId) ||
-                                        gameHelpers.findCutTargetAtHole?.(m2.toHoleId)
+                                    gameHelpers.findCutTargetAtHole?.(m2.toHoleId)
                             });
                         }
                     }
@@ -614,11 +617,11 @@ window.ManifoldAI = (function() {
 
         // Shift angle based on event (emotional adaptation on the manifold)
         const shifts = {
-            'was_cut':           Math.PI / 12,   // Rotate toward Q3 (survivor mode)
-            'made_cut':         -Math.PI / 12,   // Rotate toward Q1 (confidence)
-            'entered_safe':     -Math.PI / 8,    // Shift toward defensive
+            'was_cut': Math.PI / 12,   // Rotate toward Q3 (survivor mode)
+            'made_cut': -Math.PI / 12,   // Rotate toward Q1 (confidence)
+            'entered_safe': -Math.PI / 8,    // Shift toward defensive
             'entered_fasttrack': Math.PI / 8,    // Shift toward aggressive
-            'no_legal_moves':    Math.PI / 6,    // Major frustration shift
+            'no_legal_moves': Math.PI / 6,    // Major frustration shift
         };
 
         const shift = shifts[event] || 0;
