@@ -75,7 +75,7 @@ const SF3D = (function () {
             { path: 'assets/models/friendlyfueltanker.glb', distance: 0 },
         ],
         medic: [
-            { path: 'assets/models/emergencyMedicalSpaceFrigate.glb', distance: 0 },
+            { path: 'assets/models/freindly_medical_frigate.glb', distance: 0 },
         ],
         // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [
@@ -519,9 +519,9 @@ const SF3D = (function () {
         const color = cfg ? cfg.emissive :
             (key === 'tanker' ? 0x00ff88 :
                 key === 'medic' ? 0xff4444 :
-                key === 'ally' ? 0x4488ff :
-                    key === 'baseship' ? 0x4488ff :
-                        key === 'station' ? 0x4488ff : 0xffffff);
+                    key === 'ally' ? 0x4488ff :
+                        key === 'baseship' ? 0x4488ff :
+                            key === 'station' ? 0x4488ff : 0xffffff);
 
         // Core sphere — bright, visible at distance
         group.add(new THREE.Mesh(
@@ -1599,6 +1599,17 @@ const SF3D = (function () {
             const glowR2 = new THREE.Mesh(glowGeo, m.laserGlow);
             glowR2.position.x = sep;
             mesh.add(glowR2);
+        } else if (type === 'machinegun') {
+            // Machine gun rounds — short golden tracer streaks
+            const tracerLen = 10, tracerR = 0.08;
+            const tracerGeo = new THREE.CylinderGeometry(tracerR, tracerR, tracerLen, 4);
+            tracerGeo.rotateX(Math.PI / 2);
+            const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+            const glowGeo = new THREE.CylinderGeometry(tracerR * 2.5, tracerR * 0.5, tracerLen + 1, 4);
+            glowGeo.rotateX(Math.PI / 2);
+            mesh.add(new THREE.Mesh(tracerGeo, tracerMat));
+            mesh.add(new THREE.Mesh(glowGeo, glowMat));
         } else if (type === 'torpedo') {
             // GDD §10.1: Bright warhead + orange sparkler trail
             // Warhead — bright white-hot core

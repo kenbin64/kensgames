@@ -1858,7 +1858,7 @@ const Starfighter = (function () {
     function checkWave() {
         const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling') && !e.markedForDeletion);
         if (enemies.length === 0 && state.phase === 'combat') {
-            // Cancel any active support call 
+            // Cancel any active support call
             _clearSupport();
             // All enemies cleared - time to return to baseship
             state.phase = 'land-approach';
@@ -2227,6 +2227,25 @@ const Starfighter = (function () {
                     e.position.x += e.velocity.x * safeDt;
                     e.position.y += e.velocity.y * safeDt;
                     e.position.z += e.velocity.z * safeDt;
+                }
+
+                // Expiry for in-flight projectiles during approach phase
+                for (let i = state.entities.length - 1; i >= 0; i--) {
+                    const e = state.entities[i];
+                    if (e.maxAge > 0) {
+                        e.age += safeDt;
+                        if (e.age >= e.maxAge) {
+                            e.markedForDeletion = true;
+                            if (M) M.remove(e.id);
+                        }
+                    }
+                }
+                // Cleanup marked entities
+                for (let i = state.entities.length - 1; i >= 0; i--) {
+                    if (state.entities[i].markedForDeletion) {
+                        state.entities[i] = state.entities[state.entities.length - 1];
+                        state.entities.pop();
+                    }
                 }
 
                 checkWave();

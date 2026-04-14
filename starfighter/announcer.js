@@ -1,16 +1,20 @@
 /**
  * Autonomous Announcer System — Starfighter
  * ──────────────────────────────────────────
- * Zero hardcoded dialog. Every line is composed from vocabulary pools
- * and live game state observation. Crew members observe their domain
- * and report what they actually see — no scripts, no canned lines.
+ * ANPC-driven dialog system. Every line is produced by the ButterflyFX™
+ * ANPC manifold pipeline: personality vectors → scenario vectors →
+ * manifold surfaces (z=xy, z=xy²) → 3-tier phrase pools → composite
+ * string assembly.
  *
- * Each crew role has:
- *   - observation domain (what they watch)
- *   - vocabulary pools (word options for variety)
- *   - compose functions (build sentences from state + vocab)
- *   - cooldowns (don't spam)
- *   - memory (track what's been said to avoid repetition)
+ * Each crew member is a full ANPC with:
+ *   - OCEAN personality vector
+ *   - Combat state machine (8 states)
+ *   - Manifold-driven urgency/tone calculation
+ *   - 3-tier phrase selection (Character → Title → Universal)
+ *   - Morale with contagion
+ *   - Disposition tracking toward player
+ *
+ * Backwards-compatible: all existing on*() event handlers preserved.
  */
 
 const SFAnnouncer = (function () {
@@ -24,6 +28,7 @@ const SFAnnouncer = (function () {
   let _bearingOf = null;
   let _dim = null;
   let _countHostiles = null;
+  let _anpcReady = false; // true once SFANPC system loaded
 
   // ── Observation memory — what the announcer has seen ──
   const _mem = {
@@ -176,12 +181,25 @@ const SFAnnouncer = (function () {
     _mem.lastWave = _state.wave;
     _mem.waveTypesAnnounced.clear();
 
+    // Update scenario vector
+    _updateScenario('contacts_hostile');
+    _transitionWingmen('hostiles_confirmed');
+
     // Sensor officer reports what's on scope
-    _addComm(_crew('sensor'), _composeWaveStart(snap), 'warning');
+    const anpcLine = _anpcSpeak('sensor', 'combat_engage', { count: snap.totalHostile });
+    if (anpcLine) {
+      _addComm(_crew('sensor'), anpcLine, 'warning');
+    } else {
+      _addComm(_crew('sensor'), _composeWaveStart(snap), 'warning');
+    }
 
     // Tactical gives advice based on what's out there
     const advice = _composeTacticalAdvice(snap);
     if (advice) _addComm(_crew('tactical'), advice, 'base');
+
+    // Wingman acknowledge
+    const wingAck = _wingmanSpeak('mission_comm');
+    if (wingAck) _addComm(wingAck.sender, wingAck.msg, wingAck.type);
 
     _mem.lastHostileCount = snap.totalHostile;
   }
@@ -190,32 +208,80 @@ const SFAnnouncer = (function () {
     const snap = _snap();
     _addComm(_crew('deck'), `${_cs()}, ${_composeLaunchClear(snap)}`, 'base');
 
-    // Wingman check-in — they report what they see
+    // Wingman check-in — ANPC personality-driven
     if (_state.aiWingmen) {
-      const callsign = `Alpha-${Math.floor(Math.random() * 3) + 1}`;
-      const close = snap.closestM < 5000 && snap.closestPos
-        ? `Contact at ${_bearing(snap.closestPos)}. ${_pick(V.engaging)}.`
-        : `${snap.totalHostile} ${_pick(V.contacts)}. Forming up.`;
-      _addComm(callsign, close, 'ally');
+      const wingLine = _wingmanSpeak('tactical_coord');
+      if (wingLine) {
+        _addComm(wingLine.sender, wingLine.msg, wingLine.type);
+      } else {
+        const callsign = `Alpha-${Math.floor(Math.random() * 3) + 1}`;
+        const close = snap.closestM < 5000 && snap.closestPos
+          ? `Contact at ${_bearing(snap.closestPos)}. ${_pick(V.engaging)}.`
+          : `${snap.totalHostile} ${_pick(V.contacts)}. Forming up.`;
+        _addComm(callsign, close, 'ally');
+      }
     }
+
+    // Transition wingmen to alert
+    _transitionWingmen('contacts_detected');
   }
 
   function onKill(type) {
     const snap = _snap();
+    _updateScenario('enemy_destroyed');
+
+    // Update wingmen morale on kill
+    if (_anpcReady) {
+      const wingmen = SFANPC.getByRole('SF-WING');
+      for (const w of wingmen) {
+        w.adjustMorale(SFANPC.MORALE_MODIFIERS.ally_kill);
+      }
+    }
+
     if (snap.totalHostile === 0) {
       // Sector clear — command announces
-      _addComm(_crew('command'), _composeKill(type, snap), 'base');
+      _transitionWingmen('hostiles_cleared');
+      const cmdLine = _anpcSpeak('command', 'tactical_coord', { remaining: 0 });
+      _addComm(_crew('command'), cmdLine || _composeKill(type, snap), 'base');
+      // Wingman celebration
+      const wingCel = _wingmanSpeak('morale_banter');
+      if (wingCel) _addComm(wingCel.sender, wingCel.msg, wingCel.type);
     } else if (type === 'dreadnought') {
       _addComm(_crew('command'), _composeKill(type, snap), 'base');
-      _addComm(_crew('sensor'), `${_pick(V.dreadnought)} signal lost. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'base');
+      const sensLine = _anpcSpeak('sensor', 'kill_confirm', { remaining: snap.totalHostile, target: _pick(V.dreadnought) });
+      _addComm(_crew('sensor'), sensLine || `${_pick(V.dreadnought)} signal lost. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'base');
     } else {
-      _addComm(_crew('tactical'), _composeKill(type, snap), 'base');
+      // Wingman gets kill confirm if ANPC available
+      const wingKill = _wingmanSpeak('kill_confirm', { remaining: snap.totalHostile });
+      if (wingKill && Math.random() < 0.4) {
+        _addComm(wingKill.sender, wingKill.msg, wingKill.type);
+      } else {
+        _addComm(_crew('tactical'), _composeKill(type, snap), 'base');
+      }
     }
   }
 
   function onVictory() {
     const snap = _snap();
-    _addComm(_crew('command'), `${_pick(V.hive)} ${_pick(V.destroyed)}! Score ${_state.score}. Mission complete.`, 'base');
+    _updateScenario('objective_complete');
+
+    // Boost all morale on victory
+    if (_anpcReady) {
+      for (const anpc of SFANPC.getAllied()) {
+        anpc.adjustMorale(SFANPC.MORALE_MODIFIERS.victory);
+      }
+    }
+
+    // Commander announces
+    const cmdLine = _anpcSpeak('command', 'mission_comm', {
+      intel: `all contacts neutralized. Score ${_state.score}. Mission complete`,
+      missionBrief: `Hive destroyed. Score ${_state.score}. All ships return to base`
+    });
+    _addComm(_crew('command'), cmdLine || `${_pick(V.hive)} ${_pick(V.destroyed)}! Score ${_state.score}. Mission complete.`, 'base');
+
+    // Wingman celebration
+    const wingCel = _wingmanSpeak('morale_banter');
+    if (wingCel) _addComm(wingCel.sender, wingCel.msg, wingCel.type);
   }
 
   function onMilitaryLost() {
@@ -229,19 +295,41 @@ const SFAnnouncer = (function () {
 
   function onAllyDown() {
     const snap = _snap();
-    const callsign = `Alpha-${Math.floor(Math.random() * 3) + 1}`;
-    _addComm(callsign, `Going down! ${snap.totalHostile} ${_pick(V.contacts)} still active. ${_pick(V.protect)}!`, 'ally');
+    _updateScenario('ally_destroyed');
+
+    // Propagate morale loss
+    if (_anpcReady) {
+      const wingmen = SFANPC.getByRole('SF-WING');
+      for (const w of wingmen) {
+        w.adjustMorale(SFANPC.MORALE_MODIFIERS.ally_destroyed);
+      }
+      SFANPC.propagateMorale(wingmen[0], SFANPC.MORALE_MODIFIERS.ally_destroyed);
+    }
+
+    // Wingman emergency call
+    const wingEmerg = _wingmanSpeak('emergency');
+    if (wingEmerg) {
+      _addComm(wingEmerg.sender, wingEmerg.msg, wingEmerg.type);
+    } else {
+      const callsign = `Alpha-${Math.floor(Math.random() * 3) + 1}`;
+      _addComm(callsign, `Going down! ${snap.totalHostile} ${_pick(V.contacts)} still active. ${_pick(V.protect)}!`, 'ally');
+    }
   }
 
   function onPlayerDestroyed(reason, livesLeft, maxLives) {
     const snap = _snap();
     const hostiles = _countHostiles();
+    _updateScenario('ally_destroyed');
+
     if (livesLeft <= 0) {
       _addComm(_crew('command'), `Final interceptor lost. ${hostiles} ${_pick(V.contacts)} still active.`, 'warning');
     } else {
       const slot = maxLives - livesLeft;
       _addComm(_crew('command'), `Pilot ${slot} of ${maxLives} lost. ${reason}. Replacement launching.`, 'warning');
       _addComm(_crew('sensor'), `${hostiles} ${_pick(V.contacts)} active. Wave ${_state.wave}. Base ${V.hullStatus(snap.basePct)}.`, 'base');
+      // Wingman reacts to player death
+      const wingReact = _wingmanSpeak('damage_report');
+      if (wingReact) _addComm(wingReact.sender, wingReact.msg, wingReact.type);
     }
   }
 
@@ -339,11 +427,17 @@ const SFAnnouncer = (function () {
 
   function onHeavyOrdnance() {
     const snap = _snap();
+    _updateScenario('hull_critical');
     _addComm(_crew('sensor'), `${_cs()}, heavy ordnance incoming! ${_composePlayerStatus(snap)}. Brace!`, 'warning');
+    // Wingman warns
+    const wingWarn = _wingmanSpeak('tactical_coord', { direction: 'hard' });
+    if (wingWarn) _addComm(wingWarn.sender, wingWarn.msg, wingWarn.type);
   }
 
   function onGoodHit() {
     const snap = _snap();
+    // Disposition boost: impressive kill
+    if (_anpcReady) SFANPC.shiftDisposition('ANPC-SF-0042', 'impressive_kill');
     _addComm(_crew('tactical'), `${_pick(V.good)}, ${_cs()}! Hull ${snap.hullPct}%.`, 'base');
   }
 
@@ -418,8 +512,13 @@ const SFAnnouncer = (function () {
   }
 
   function onHiveDiscovered(hive) {
+    _updateScenario('boss_spawn');
+    _transitionWingmen('hostiles_confirmed');
     _addComm(_crew('sensor'), `${_pick(V.hive)} ${_pick(V.detected)}! Bearing ${_bearingOf(hive)}.`, 'warning');
     _addComm(_crew('command'), `Primary objective located. ${_pick(V.clearEscorts)}.`, 'warning');
+    // Wingman reacts to boss
+    const wingReact = _wingmanSpeak('combat_engage');
+    if (wingReact) _addComm(wingReact.sender, wingReact.msg, wingReact.type);
   }
 
   function onDecontamination() {
@@ -535,6 +634,9 @@ const SFAnnouncer = (function () {
     if (!_state || !_state.player || _state.player.markedForDeletion || _state.phase !== 'combat') return;
     _tickCooldowns(dt);
 
+    // Update ANPC system
+    if (_anpcReady) SFANPC.update(dt);
+
     const snap = _snap();
 
     // ── New enemy types appearing this wave ──
@@ -568,7 +670,15 @@ const SFAnnouncer = (function () {
     if (snap.alienMothership && !_mem.waveTypesAnnounced.has('alien-baseship')) { types.push('alien-baseship'); _mem.waveTypesAnnounced.add('alien-baseship'); }
 
     if (types.length > 0 && !_onCooldown('newtype', 3.0)) {
-      _addComm(_crew('sensor'), _composeNewContacts(snap, snap.totalHostile - _mem.lastHostileCount, types), 'warning');
+      _updateScenario('new_contacts');
+
+      // ANPC sensor operator reports
+      const anpcLine = _anpcSpeak('sensor', 'combat_engage', {
+        count: snap.totalHostile - _mem.lastHostileCount,
+        target: types[0],
+      });
+      _addComm(_crew('sensor'), anpcLine || _composeNewContacts(snap, snap.totalHostile - _mem.lastHostileCount, types), 'warning');
+
       // Tactical advice for dangerous types
       if (types.includes('dreadnought') && snap.torpCount > 0) {
         _addComm(_crew('tactical'), `${_pick(V.dreadnought)} class. ${_pick(V.useTorps)}.`, 'warning');
@@ -586,11 +696,14 @@ const SFAnnouncer = (function () {
     // Hull took a big hit
     const hullDrop = _mem.lastHullPct - snap.hullPct;
     if (hullDrop >= 15 && !_onCooldown('hull_warn', 5.0)) {
+      _updateScenario('hull_critical');
       _addComm(_crew('ops'), _composeDamageReport(snap, 'hull'), 'warning');
     }
     // Hull critical threshold
     if (snap.hullPct < 25 && _mem.lastHullPct >= 25 && !_onCooldown('hull_crit', 8.0)) {
-      _addComm(_crew('ops'), `${_cs()}, hull ${snap.hullPct}%! ${_pick(V.critical)}! RTB or seek medical frigate.`, 'warning');
+      _updateScenario('hull_critical');
+      const emergLine = _anpcSpeak('ops', 'emergency', { reason: `hull at ${snap.hullPct}%` });
+      _addComm(_crew('ops'), emergLine || `${_cs()}, hull ${snap.hullPct}%! ${_pick(V.critical)}! RTB or seek medical frigate.`, 'warning');
     }
     // Shields just went down
     if (snap.shieldPct <= 0 && _mem.lastShieldPct > 0 && !_onCooldown('shields_down', 6.0)) {
@@ -607,10 +720,13 @@ const SFAnnouncer = (function () {
   function _observeBase(snap) {
     const baseDrop = _mem.lastBasePct - snap.basePct;
     if (baseDrop >= 10 && !_onCooldown('base_warn', 6.0)) {
+      _updateScenario('base_critical');
       _addComm(_crew('command'), _composeDamageReport(snap, 'base'), 'warning');
     }
     if (snap.basePct < 15 && _mem.lastBasePct >= 15 && !_onCooldown('base_crit', 10.0)) {
-      _addComm(_crew('command'), `Base hull ${snap.basePct}%! ${_pick(V.critical)}! All fighters ${_pick(V.protect)} ${_pick(V.urgent)}!`, 'warning');
+      _updateScenario('base_critical');
+      const emergLine = _anpcSpeak('command', 'emergency', { reason: 'base hull critical' });
+      _addComm(_crew('command'), emergLine || `Base hull ${snap.basePct}%! ${_pick(V.critical)}! All fighters ${_pick(V.protect)} ${_pick(V.urgent)}!`, 'warning');
     }
   }
 
@@ -620,12 +736,29 @@ const SFAnnouncer = (function () {
     if (!_state || !_state.player || _state.phase !== 'combat') return null;
     const snap = _snap();
     const roll = Math.random();
-    if (roll < 0.4) {
+
+    // Update ANPC system tick
+    if (_anpcReady) SFANPC.update(0.1);
+
+    if (roll < 0.3) {
+      // Tactical chatter from CIC
+      const anpcTac = _anpcSpeak('tactical', 'tactical_coord', { remaining: snap.totalHostile });
+      if (anpcTac) return { sender: _crew('tactical'), msg: anpcTac, type: 'base' };
       return { sender: _crew('tactical'), msg: _composeTacticalChatter(snap), type: 'base' };
-    } else if (roll < 0.8) {
+    } else if (roll < 0.6) {
+      // Wingman combat chatter (ANPC personality-driven)
+      const wingChat = _wingmanSpeak(Math.random() < 0.5 ? 'combat_engage' : 'morale_banter');
+      if (wingChat) return wingChat;
       return _composeAllyChatter(snap);
-    } else {
+    } else if (roll < 0.8) {
+      // Sensor warnings
       return { sender: _crew('sensor'), msg: _composeWarningChatter(snap), type: 'warning' };
+    } else {
+      // Enemy ace intercepted comms (rare, only if active)
+      const aceChat = _enemyAceSpeak('morale_banter');
+      if (aceChat) return { sender: aceChat.sender, msg: aceChat.msg, type: 'warning' };
+      // Fallback to ally chatter
+      return _composeAllyChatter(snap);
     }
   }
 
@@ -653,6 +786,11 @@ const SFAnnouncer = (function () {
   }
 
   function _composeAllyChatter(snap) {
+    // Try ANPC wingman dialog first
+    const wingChat = _wingmanSpeak(Math.random() < 0.6 ? 'combat_engage' : 'morale_banter');
+    if (wingChat) return wingChat;
+
+    // Legacy fallback
     const callsign = `Alpha-${Math.floor(Math.random() * 3) + 1}`;
     const type = snap.closestType;
     const pos = snap.closestPos;
@@ -688,11 +826,143 @@ const SFAnnouncer = (function () {
     _bearingOf = deps.bearingOf;
     _dim = deps.dim;
     _countHostiles = deps.countHostiles;
+
+    // Initialize ANPC system if available
+    if (window.SFANPC) {
+      SFANPC.initCharacters();
+      _anpcReady = true;
+    }
   }
 
   function resetWave() {
     _mem.waveTypesAnnounced.clear();
     _mem.phaseAnnounced = {};
+    if (_anpcReady) {
+      // Reset scenario toward patrol between waves
+      SFANPC.resetScenario('patrol');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ANPC-DRIVEN DIALOG LAYER
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Map crew role to ANPC character for personality-driven dialog.
+   * Falls back to legacy compose system if ANPC unavailable.
+   */
+  const _roleToAnpc = {
+    sensor:    'ANPC-SF-0005', // Ens. Park "Scope"
+    command:   'ANPC-SF-0001', // Cdr. Vasquez "Resolute Actual"
+    tactical:  'ANPC-SF-0004', // XO Tanaka
+    ops:       'ANPC-SF-0003', // Dr. Okafor "Lighthouse"
+    deck:      'ANPC-SF-0003', // Lighthouse (base ops)
+    science:   'ANPC-SF-0005', // Ens. Park
+  };
+
+  /**
+   * Try to generate ANPC-driven dialog for a given event category.
+   * Returns assembled text or null (falls back to legacy compose).
+   */
+  function _anpcSpeak(role, category, extraContext) {
+    if (!_anpcReady) return null;
+    const anpcId = _roleToAnpc[role];
+    if (!anpcId) return null;
+
+    const snap = _snap();
+    const context = {
+      playerCallsign: _cs(),
+      target: snap.closestType || 'hostile',
+      count: snap.totalHostile || 0,
+      bearing: snap.closestPos ? _bearing(snap.closestPos) : '000',
+      distance: snap.closestM || '?',
+      hullPct: snap.hullPct,
+      shieldStatus: V.shieldStatus(snap.shieldPct),
+      remaining: snap.totalHostile,
+      direction: Math.random() > 0.5 ? 'left' : 'right',
+      position: 'wing',
+      callsign: _cs(),
+      formation: 'V-Formation',
+      ...(extraContext || {}),
+    };
+
+    const result = SFANPC.speak(anpcId, category, context);
+    return result ? result.text : null;
+  }
+
+  /**
+   * Try wingman ANPC dialog (Hotshot or Frostbite).
+   */
+  function _wingmanSpeak(category, extraContext) {
+    if (!_anpcReady) return null;
+    // Alternate between wingmen
+    const wingmenIds = ['ANPC-SF-0042', 'ANPC-SF-0043']; // Hotshot, Frostbite
+    const pick = wingmenIds[Math.floor(Math.random() * wingmenIds.length)];
+    const anpc = SFANPC.get(pick);
+    if (!anpc || !anpc.active) return null;
+
+    const snap = _snap();
+    const context = {
+      playerCallsign: _cs(),
+      target: snap.closestType || 'hostile',
+      count: snap.totalHostile || 0,
+      bearing: snap.closestPos ? _bearing(snap.closestPos) : '000',
+      distance: snap.closestM || '?',
+      hullPct: Math.round(anpc.hull * 100),
+      shieldStatus: anpc.shields > 0 ? 'holding' : 'gone',
+      remaining: snap.totalHostile,
+      killCount: anpc.missionKills,
+      ...(extraContext || {}),
+    };
+
+    const result = SFANPC.speak(pick, category, context);
+    if (result) {
+      return { sender: result.sender, msg: result.text, type: 'ally' };
+    }
+    return null;
+  }
+
+  /**
+   * Enemy ace dialog (intercepted comms on CH-ENM).
+   */
+  function _enemyAceSpeak(category, extraContext) {
+    if (!_anpcReady) return null;
+    const nightshade = SFANPC.get('ANPC-SF-E-0001');
+    if (!nightshade || !nightshade.active) return null;
+
+    const snap = _snap();
+    const context = {
+      playerCallsign: _cs(),
+      target: 'you',
+      count: snap.totalHostile,
+      hullPct: Math.round(nightshade.hull * 100),
+      remaining: snap.totalHostile,
+      ...(extraContext || {}),
+    };
+
+    const result = SFANPC.forceSpeak('ANPC-SF-E-0001', category, context);
+    if (result) {
+      return { sender: `[INTERCEPTED] ${result.sender}`, msg: result.text, type: 'enemy' };
+    }
+    return null;
+  }
+
+  /**
+   * Update ANPC scenario vector based on game events.
+   */
+  function _updateScenario(eventName) {
+    if (_anpcReady) SFANPC.applyEvent(eventName);
+  }
+
+  /**
+   * Transition all active wingman ANPCs to a new combat state.
+   */
+  function _transitionWingmen(condition) {
+    if (!_anpcReady) return;
+    const wingmen = SFANPC.getByRole('SF-WING');
+    for (const w of wingmen) {
+      w.transition(condition);
+    }
   }
 
   return {

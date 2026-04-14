@@ -523,8 +523,15 @@
     }
 
     @keyframes supportPulse {
-      0%, 100% { box-shadow: 0 0 4px rgba(0,0,0,0.5); }
-      50% { box-shadow: 0 0 14px rgba(255,255,255,0.4), 0 0 24px currentColor; }
+
+      0%,
+      100% {
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+      }
+
+      50% {
+        box-shadow: 0 0 14px rgba(255, 255, 255, 0.4), 0 0 24px currentColor;
+      }
     }
 
     /* ═══════════════════════════════════════
@@ -1744,12 +1751,13 @@
   <script src="../../lib/three/GLTFLoader.js"></script>
 
   <!-- Game Logic -->
-  <script src="audio.js?v=9"></script>
+  <script src="audio.js?v=11"></script>
   <script src="music.js?v=9"></script>
-  <script src="announcer.js?v=9"></script>
-  <script src="core.js?v=9"></script>
+  <script src="anpc.js?v=11"></script>
+  <script src="announcer.js?v=11"></script>
+  <script src="core.js?v=11"></script>
   <script src="input.js?v=9"></script>
-  <script src="3d.js?v=9"></script>
+  <script src="3d.js?v=11"></script>
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {

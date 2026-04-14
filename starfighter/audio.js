@@ -164,6 +164,15 @@ const SFAudio = (function () {
     'PO2 Ruiz': 'au_female',         // Australian female deck
     'Lt. Cruz': 'in_female',         // Indian female ops
     'Dr. Hollis': 'uk_female',         // British female science
+    // ANPC Characters
+    'Hotshot': 'us_male',             // Marcus Chen — young energetic male
+    'Frostbite': 'us_male_deep',      // Viktor Kozlov — calm precise male
+    'Lighthouse': 'uk_female',         // Dr. Amara Okafor — calm authoritative female
+    'Resolute Actual': 'us_female',   // Cdr. Vasquez — commanding female
+    'Resolute XO': 'uk_male',         // XO Tanaka — precise
+    'Scope': 'us_female_bright',      // Ens. Park — alert young female
+    'Nightshade': 'us_male_deep',     // Enemy ace — calm menacing male
+    '[INTERCEPTED] Nightshade': 'us_male_deep',
   };
 
   // ── Engine thrust rumble system ──
