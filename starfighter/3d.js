@@ -112,21 +112,23 @@ const SF3D = (function () {
         ? new Set(Object.keys(GLB_LOD))
         : new Set(['earth', 'moon', 'baseship', 'station', 'ally']);
     const LOD_GLOW_DIST = {
-        enemy: 5000, predator: 8000, interceptor: 5000, bomber: 7000,
-        dreadnought: 15000, 'alien-baseship': 12000, tanker: 5000, medic: 6000,
-        ally: 4000, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
+        enemy: 1800, predator: 2500, interceptor: 1800, bomber: 2200,
+        dreadnought: 6000, 'alien-baseship': 8000, tanker: 1800, medic: 2000,
+        ally: 1500, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
 
     // ── Distance-based dot rendering ──
     // Beyond DOT_DIST, entities render as simple glowing sprites instead of full models.
     // Beyond CULL_DIST, entities are not rendered at all (data-only).
+    // RULE: 3D models should appear well before enemies are close enough to attack.
+    // Combat range is ~500-1500 units, so 3D models must be visible by ~1500-2000.
     const DOT_DIST = {
-        enemy: 3000, predator: 5000, interceptor: 3000, bomber: 4000,
-        dreadnought: 10000, 'alien-baseship': 8000, tanker: 3000, medic: 4000,
-        ally: 2500, baseship: 8000, station: 15000, earth: 200000, moon: 150000,
-        laser: 1500, machinegun: 1000, torpedo: 2000, plasma: 1500,
-        egg: 1500, youngling: 1000,
+        enemy: 800, predator: 1200, interceptor: 800, bomber: 1000,
+        dreadnought: 3000, 'alien-baseship': 4000, tanker: 800, medic: 1000,
+        ally: 700, baseship: 8000, station: 15000, earth: 200000, moon: 150000,
+        laser: 600, machinegun: 400, torpedo: 800, plasma: 600,
+        egg: 500, youngling: 400,
     };
     const CULL_DIST = 50000; // beyond this, skip entirely (except celestials)
     const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship']);
@@ -186,13 +188,36 @@ const SF3D = (function () {
     const STAR_RADIUS = 200000;
     let starfieldVerts = null; // Float32Array — filled once, read by radar
 
-    // ── Particle pool (reuse sprites instead of allocating) ──
-    const MAX_PARTICLES = 500;
+    // ═══════════════════════════════════════════════════════════════════════
+    // PARTICLE ENGINE — 2026 quality: large softbody sprites, bloom fade
+    // ═══════════════════════════════════════════════════════════════════════
+    const MAX_PARTICLES = 2000;
     const particlePool = [];
     let activeParticles = 0;
     let particlePoints = null;
     let particlePositions, particleColors, particleSizes, particleAges, particleLifetimes;
-    let particleVelocities; // Float32Array for vel xyz
+    let particleVelocities;
+    let particleInitSizes; // per-particle initial size (NOT a fixed 4px)
+    let particleAlphas;    // per-particle initial alpha
+
+    // Soft circular gradient texture — eliminates hard-edged square sprites
+    function _createSoftCircleTexture() {
+        const sz = 64;
+        const c = document.createElement('canvas');
+        c.width = sz; c.height = sz;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.15, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.4, 'rgba(255,255,255,0.4)');
+        g.addColorStop(0.7, 'rgba(255,255,255,0.08)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, sz, sz);
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+    }
 
     function _initParticleSystem() {
         particlePositions = new Float32Array(MAX_PARTICLES * 3);
@@ -201,22 +226,27 @@ const SF3D = (function () {
         particleAges = new Float32Array(MAX_PARTICLES);
         particleLifetimes = new Float32Array(MAX_PARTICLES);
         particleVelocities = new Float32Array(MAX_PARTICLES * 3);
+        particleInitSizes = new Float32Array(MAX_PARTICLES);
+        particleAlphas = new Float32Array(MAX_PARTICLES);
         particleSizes.fill(0);
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
         geo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
         geo.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
         const mat = new THREE.PointsMaterial({
-            size: 4, vertexColors: true, transparent: true,
-            opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
-            sizeAttenuation: true
+            size: 32, vertexColors: true, transparent: true,
+            opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false,
+            sizeAttenuation: true,
+            map: _createSoftCircleTexture(),
+            alphaTest: 0.001,
         });
         particlePoints = new THREE.Points(geo, mat);
+        particlePoints.frustumCulled = false;
         scene.add(particlePoints);
         activeParticles = 0;
     }
 
-    function _emitParticle(px, py, pz, vx, vy, vz, r, g, b, lifetime) {
+    function _emitParticle(px, py, pz, vx, vy, vz, r, g, b, lifetime, size, alpha) {
         if (activeParticles >= MAX_PARTICLES) return;
         const i = activeParticles++;
         const i3 = i * 3;
@@ -229,7 +259,10 @@ const SF3D = (function () {
         particleColors[i3] = r;
         particleColors[i3 + 1] = g;
         particleColors[i3 + 2] = b;
-        particleSizes[i] = 4;
+        const sz = size || 30;
+        particleSizes[i] = sz;
+        particleInitSizes[i] = sz;
+        particleAlphas[i] = alpha || 1.0;
         particleAges[i] = 0;
         particleLifetimes[i] = lifetime;
     }
@@ -242,14 +275,13 @@ const SF3D = (function () {
             if (f.timer > 0) {
                 f.timer -= dt;
                 if (f.timer <= 0) f.light.intensity = 0;
-                else f.light.intensity = 3.0 * (f.timer / 0.1);
+                else f.light.intensity = f.baseIntensity * (f.timer / f.baseDuration);
             }
         }
         let write = 0;
         for (let read = 0; read < activeParticles; read++) {
             particleAges[read] += dt;
             if (particleAges[read] >= particleLifetimes[read]) continue;
-            // Copy surviving particle to write position (compact)
             if (write !== read) {
                 const r3 = read * 3, w3 = write * 3;
                 particlePositions[w3] = particlePositions[r3];
@@ -262,24 +294,31 @@ const SF3D = (function () {
                 particleColors[w3 + 1] = particleColors[r3 + 1];
                 particleColors[w3 + 2] = particleColors[r3 + 2];
                 particleSizes[write] = particleSizes[read];
+                particleInitSizes[write] = particleInitSizes[read];
+                particleAlphas[write] = particleAlphas[read];
                 particleAges[write] = particleAges[read];
                 particleLifetimes[write] = particleLifetimes[read];
             }
-            // Advance position
             const w3 = write * 3;
             particlePositions[w3] += particleVelocities[w3] * dt;
             particlePositions[w3 + 1] += particleVelocities[w3 + 1] * dt;
             particlePositions[w3 + 2] += particleVelocities[w3 + 2] * dt;
-            // Drag
-            particleVelocities[w3] *= 0.98;
-            particleVelocities[w3 + 1] *= 0.98;
-            particleVelocities[w3 + 2] *= 0.98;
-            // Fade size
+            // Slight drag
+            particleVelocities[w3] *= 0.985;
+            particleVelocities[w3 + 1] *= 0.985;
+            particleVelocities[w3 + 2] *= 0.985;
+            // ── Bloom fade: bright burst → rapid dim → slow ember glow ──
+            // Exponential curve: size peaks at 20% life then fades, color stays hot
             const t = particleAges[write] / particleLifetimes[write];
-            particleSizes[write] = 4 * (1 - t);
+            const bloom = t < 0.15 ? (t / 0.15) : Math.pow(1 - (t - 0.15) / 0.85, 1.5);
+            particleSizes[write] = particleInitSizes[write] * Math.max(0.08, bloom);
+            // Color fade: stays bright then dims toward end (multiply RGB)
+            const colorFade = t < 0.4 ? 1.0 : Math.pow(1 - (t - 0.4) / 0.6, 0.8);
+            particleColors[w3] *= (0.97 + colorFade * 0.03);
+            particleColors[w3 + 1] *= (0.95 + colorFade * 0.05);
+            particleColors[w3 + 2] *= (0.93 + colorFade * 0.07);
             write++;
         }
-        // Zero out dead slots
         for (let i = write; i < activeParticles; i++) particleSizes[i] = 0;
         activeParticles = write;
         particlePoints.geometry.attributes.position.needsUpdate = true;
@@ -1510,14 +1549,17 @@ const SF3D = (function () {
             alienCapSpike: new THREE.MeshPhysicalMaterial({ color: 0x664488, metalness: 1.0, roughness: 0.05, clearcoat: 1.0 }),
             alienCapGlow: new THREE.MeshBasicMaterial({ color: 0xff00ff }),
             alienShield: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.08 }),
-            // Laser — GDD §10.1: green-cyan #00FFAA energy bolts
-            laserCore: new THREE.MeshBasicMaterial({ color: 0x00ffaa }),
-            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending }),
+            // ── Laser — brilliant green-cyan beam with hot white core ──
+            laserCore: new THREE.MeshBasicMaterial({ color: 0xccffee }),
+            laserGlow: new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }),
+            laserHalo: new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
             laserTrail: new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending }),
-            // Torpedo — GDD §10.1: bright warhead + orange #FF8800 exhaust trail
+            // ── Torpedo — white-hot warhead, deep orange-red exhaust ──
             torpCore: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-            torpGlow: new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending }),
-            torpTrail: new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending }),
+            torpInner: new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }),
+            torpGlow: new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }),
+            torpTrail: new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending }),
+            torpHalo: new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, side: THREE.BackSide }),
         };
         return sharedMats;
     }
@@ -1677,17 +1719,26 @@ const SF3D = (function () {
             eye2.position.set(-3, 1.2, -6);
             mesh.add(eye2);
         } else if (type === 'laser') {
-            // ── Sleek dual laser bolts — hair-thin bright lines with soft additive glow ──
-            const boltLen = 32, sep = 2.5;
-            // Core: ultra-thin bright line (3-segment cylinder for minimal geometry)
-            const coreGeo = new THREE.CylinderGeometry(0.06, 0.06, boltLen, 3, 1);
+            // ═══════════════════════════════════════════════════════════════
+            // LASER BOLT — bright twin beams, hot white core + cyan glow halo
+            // Looks like a real laser cannon — visible, bright, satisfying
+            // ═══════════════════════════════════════════════════════════════
+            const boltLen = 48, sep = 3.0;
+            // Hot white-green core beam — thick enough to see
+            const coreGeo = new THREE.CylinderGeometry(0.4, 0.4, boltLen, 6, 1);
             coreGeo.rotateX(Math.PI / 2);
-            // Glow: tapered soft halo around the core
-            const glowGeo = new THREE.CylinderGeometry(0.35, 0.08, boltLen + 4, 4, 1);
+            // Primary glow: tapered energy envelope
+            const glowGeo = new THREE.CylinderGeometry(1.8, 0.5, boltLen + 6, 6, 1);
             glowGeo.rotateX(Math.PI / 2);
-            // Tip flash: bright point at the leading edge
-            const tipGeo = new THREE.SphereGeometry(0.25, 4, 4);
+            // Outer halo: wide soft bloom
+            const haloGeo = new THREE.CylinderGeometry(4.0, 1.0, boltLen + 10, 6, 1);
+            haloGeo.rotateX(Math.PI / 2);
+            // Leading tip: bright sphere flash
+            const tipGeo = new THREE.SphereGeometry(1.5, 6, 6);
             tipGeo.translate(0, 0, -boltLen / 2);
+            // Rear spark
+            const rearGeo = new THREE.SphereGeometry(0.8, 4, 4);
+            rearGeo.translate(0, 0, boltLen / 2);
             for (const xOff of [-sep, sep]) {
                 const core = new THREE.Mesh(coreGeo, m.laserCore);
                 core.position.x = xOff;
@@ -1695,54 +1746,82 @@ const SF3D = (function () {
                 const glow = new THREE.Mesh(glowGeo, m.laserGlow);
                 glow.position.x = xOff;
                 mesh.add(glow);
+                const halo = new THREE.Mesh(haloGeo, m.laserHalo);
+                halo.position.x = xOff;
+                mesh.add(halo);
                 const tip = new THREE.Mesh(tipGeo, m.laserCore);
                 tip.position.x = xOff;
                 mesh.add(tip);
+                const rear = new THREE.Mesh(rearGeo, m.laserGlow);
+                rear.position.x = xOff;
+                mesh.add(rear);
             }
         } else if (type === 'machinegun') {
-            // ── Tracer rounds — tiny bright dashes with subtle streak ──
-            const tracerLen = 8;
-            const coreGeo = new THREE.CylinderGeometry(0.04, 0.04, tracerLen, 3, 1);
+            // ═══════════════════════════════════════════════════════════════
+            // TRACER ROUNDS — bright hot yellow-white dashes with streak
+            // ═══════════════════════════════════════════════════════════════
+            const tracerLen = 14;
+            const coreGeo = new THREE.CylinderGeometry(0.2, 0.15, tracerLen, 4, 1);
             coreGeo.rotateX(Math.PI / 2);
-            const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
-            const streakGeo = new THREE.CylinderGeometry(0.15, 0.02, tracerLen + 2, 3, 1);
+            const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+            const streakGeo = new THREE.CylinderGeometry(0.8, 0.1, tracerLen + 4, 4, 1);
             streakGeo.rotateX(Math.PI / 2);
-            const streakMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending });
+            const streakMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending });
+            const haloGeo = new THREE.CylinderGeometry(2.0, 0.3, tracerLen + 2, 4, 1);
+            haloGeo.rotateX(Math.PI / 2);
+            const haloMat = new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending });
             mesh.add(new THREE.Mesh(coreGeo, tracerMat));
             mesh.add(new THREE.Mesh(streakGeo, streakMat));
+            mesh.add(new THREE.Mesh(haloGeo, haloMat));
+            // Bright tip
+            const tipGeo = new THREE.SphereGeometry(0.6, 4, 4);
+            tipGeo.translate(0, 0, -tracerLen / 2);
+            mesh.add(new THREE.Mesh(tipGeo, tracerMat));
         } else if (type === 'torpedo') {
-            // ── Sleek torpedo — small bright warhead with sparkler exhaust trail ──
-            // Warhead: compact white-hot point
-            const headGeo = new THREE.SphereGeometry(1.2, 8, 8);
-            mesh.add(new THREE.Mesh(headGeo, m.torpCore));
-            // Inner orange glow envelope
-            const innerGeo = new THREE.SphereGeometry(2.5, 6, 6);
-            mesh.add(new THREE.Mesh(innerGeo, m.torpGlow));
-            // Exhaust plume: tapered cone trail (narrow tip → wide base)
-            const plumeGeo = new THREE.ConeGeometry(2.0, 16, 6);
+            // ═══════════════════════════════════════════════════════════════
+            // PROTON TORPEDO — white-hot warhead, deep orange firework exhaust
+            // Multi-layer: core → inner glow → flame cone → wide halo → sparkler ring
+            // ═══════════════════════════════════════════════════════════════
+            // Warhead: brilliant white-hot core
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2.0, 8, 8), m.torpCore));
+            // Inner yellow-white glow
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4.0, 8, 8), m.torpInner));
+            // Orange glow envelope
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(7.0, 6, 6), m.torpGlow));
+            // Wide outer halo — visible at distance
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(14, 6, 6), m.torpHalo));
+            // Exhaust flame cone — long tapered trail
+            const plumeGeo = new THREE.ConeGeometry(5.0, 30, 8);
             plumeGeo.rotateX(-Math.PI / 2);
-            plumeGeo.translate(0, 0, 10);
+            plumeGeo.translate(0, 0, 18);
             mesh.add(new THREE.Mesh(plumeGeo, m.torpTrail));
-            // Sparkler ring — ring of tiny points around exhaust
+            // Secondary wider exhaust
+            const plume2Geo = new THREE.ConeGeometry(8.0, 20, 6);
+            plume2Geo.rotateX(-Math.PI / 2);
+            plume2Geo.translate(0, 0, 14);
+            mesh.add(new THREE.Mesh(plume2Geo, m.torpHalo));
+            // Sparkler ring — bright points around exhaust (firework look)
             const sparkGeo = new THREE.BufferGeometry();
-            const sparkCount = 12;
+            const sparkCount = 24;
             const sparkPos = new Float32Array(sparkCount * 3);
             for (let s = 0; s < sparkCount; s++) {
                 const a = (s / sparkCount) * Math.PI * 2;
-                sparkPos[s * 3] = Math.cos(a) * 3;
-                sparkPos[s * 3 + 1] = Math.sin(a) * 3;
-                sparkPos[s * 3 + 2] = 8 + Math.random() * 6;
+                const r = 4 + Math.random() * 4;
+                sparkPos[s * 3] = Math.cos(a) * r;
+                sparkPos[s * 3 + 1] = Math.sin(a) * r;
+                sparkPos[s * 3 + 2] = 10 + Math.random() * 12;
             }
             sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sparkPos, 3));
             const sparkMat = new THREE.PointsMaterial({
-                color: 0xffcc44, size: 1.5, transparent: true, opacity: 0.8,
-                blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+                color: 0xffdd66, size: 6, transparent: true, opacity: 0.9,
+                blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+                map: _createSoftCircleTexture(),
             });
             mesh.add(new THREE.Points(sparkGeo, sparkMat));
             mesh.userData.isTorpedo = true;
         } else {
-            // Fallback: small glowing point instead of blocky cube
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+            // Fallback: glowing point
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })));
         }
 
         scene.add(mesh);
@@ -1755,115 +1834,232 @@ const SF3D = (function () {
     }
 
     function spawnExplosion(pos) {
-        // ── Space explosion: bright white flash, expanding debris, NO sustained fire ──
-        // Only a brief fuel flash (white/blue), then grey-white debris particles
-        const light = new THREE.PointLight(0xffffff, 12, 800);
+        // ═══════════════════════════════════════════════════════════════
+        // EXPLOSION — 2026 quality: multi-phase volumetric detonation
+        // Phase 1: Brilliant white flash sphere (blinding burst)
+        // Phase 2: Expanding shockwave ring (visible pressure wave)
+        // Phase 3: Hot debris cloud (orange-white fragments)
+        // Phase 4: Fast sparks (streaking metal shards)
+        // ═══════════════════════════════════════════════════════════════
+
+        // Dynamic point light — intense white flash
+        const light = new THREE.PointLight(0xffffff, 30, 1500);
         light.position.copy(pos);
         scene.add(light);
-        // Rapid flash decay: bright white → dim orange → gone
         let flashTimer = 0;
         const flashInterval = setInterval(() => {
-            flashTimer += 30;
-            const t = flashTimer / 200;
-            light.intensity = 12 * Math.max(0, 1 - t * t);
+            flashTimer += 16;
+            const t = flashTimer / 350;
+            // Fast quadratic decay with orange shift
+            light.intensity = 30 * Math.max(0, 1 - t * t);
+            if (t > 0.3) light.color.setHex(0xff8844);
             if (t >= 1) { scene.remove(light); clearInterval(flashInterval); }
-        }, 30);
+        }, 16);
 
-        // Phase 1: Initial fuel flash (white-blue, very brief — the only "fire" moment)
-        const flashColors = [[1, 1, 1], [0.7, 0.85, 1], [1, 0.95, 0.8]];
-        for (let i = 0; i < 15; i++) {
-            const a = Math.random() * Math.PI * 2;
-            const el = (Math.random() - 0.5) * Math.PI;
-            const sp = 200 + Math.random() * 400;
-            const c = flashColors[(Math.random() * 3) | 0];
-            _emitParticle(pos.x, pos.y, pos.z,
-                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
-                c[0], c[1], c[2], 0.3 + Math.random() * 0.2); // very short-lived
-        }
+        // Expanding flash sphere mesh (brief bright ball that grows and fades)
+        const flashGeo = new THREE.SphereGeometry(1, 12, 12);
+        const flashMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.95,
+            blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const flashSphere = new THREE.Mesh(flashGeo, flashMat);
+        flashSphere.position.copy(pos);
+        scene.add(flashSphere);
+        let sphereTimer = 0;
+        const sphereInterval = setInterval(() => {
+            sphereTimer += 16;
+            const t = sphereTimer / 250;
+            const scale = 20 + t * 80;
+            flashSphere.scale.setScalar(scale);
+            flashMat.opacity = Math.max(0, 0.9 * (1 - t * t));
+            if (t > 0.4) flashMat.color.setHex(0xffaa44);
+            if (t >= 1) {
+                scene.remove(flashSphere);
+                flashGeo.dispose(); flashMat.dispose();
+                clearInterval(sphereInterval);
+            }
+        }, 16);
 
-        // Phase 2: Expanding debris cloud (grey-white chunks, no fire — vacuum)
-        const debrisColors = [[0.6, 0.6, 0.65], [0.4, 0.4, 0.45], [0.8, 0.8, 0.75], [0.3, 0.3, 0.35]];
+        // Shockwave ring — expanding torus (visible pressure wave)
+        const ringGeo = new THREE.TorusGeometry(1, 0.3, 6, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xaaddff, transparent: true, opacity: 0.6,
+            blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(pos);
+        ring.lookAt(camera.position);
+        scene.add(ring);
+        let ringTimer = 0;
+        const ringInterval = setInterval(() => {
+            ringTimer += 16;
+            const t = ringTimer / 500;
+            ring.scale.setScalar(15 + t * 150);
+            ringMat.opacity = Math.max(0, 0.5 * (1 - t));
+            if (t >= 1) {
+                scene.remove(ring);
+                ringGeo.dispose(); ringMat.dispose();
+                clearInterval(ringInterval);
+            }
+        }, 16);
+
+        // Phase 1: Initial flash burst — large bright white-blue particles
+        const flashColors = [[1, 1, 1], [0.8, 0.9, 1], [1, 0.97, 0.85], [1, 1, 0.9]];
         for (let i = 0; i < 30; i++) {
             const a = Math.random() * Math.PI * 2;
             const el = (Math.random() - 0.5) * Math.PI;
-            const sp = 60 + Math.random() * 250;
-            const c = debrisColors[(Math.random() * 4) | 0];
+            const sp = 150 + Math.random() * 350;
+            const c = flashColors[(Math.random() * 4) | 0];
             _emitParticle(pos.x, pos.y, pos.z,
                 Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
-                c[0], c[1], c[2], 1.5 + Math.random() * 1.0);
+                c[0], c[1], c[2], 0.25 + Math.random() * 0.2, 50 + Math.random() * 40);
         }
 
-        // Phase 3: Sparks — hot metal fragments (orange-white, fast, small, brief)
-        for (let i = 0; i < 12; i++) {
+        // Phase 2: Hot debris cloud — orange-white expanding chunks
+        for (let i = 0; i < 40; i++) {
             const a = Math.random() * Math.PI * 2;
             const el = (Math.random() - 0.5) * Math.PI;
-            const sp = 300 + Math.random() * 500;
+            const sp = 40 + Math.random() * 200;
+            const heat = Math.random();
             _emitParticle(pos.x, pos.y, pos.z,
                 Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
-                1, 0.7 + Math.random() * 0.3, 0.3 * Math.random(), 0.4 + Math.random() * 0.3);
+                0.8 + heat * 0.2, 0.4 + heat * 0.4, heat * 0.15,
+                0.8 + Math.random() * 1.2, 20 + Math.random() * 35);
         }
 
-        cameraShakeIntensity = Math.max(cameraShakeIntensity, 2.5);
+        // Phase 3: Fast sparks — bright streaking metal fragments
+        for (let i = 0; i < 25; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 400 + Math.random() * 800;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
+                1, 0.8 + Math.random() * 0.2, 0.3 + Math.random() * 0.3,
+                0.3 + Math.random() * 0.4, 8 + Math.random() * 12);
+        }
+
+        // Phase 4: Secondary ember glow — slow dim particles that linger
+        for (let i = 0; i < 15; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 20 + Math.random() * 60;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp,
+                1, 0.3, 0.05, 1.5 + Math.random() * 1.5, 35 + Math.random() * 25);
+        }
+
+        cameraShakeIntensity = Math.max(cameraShakeIntensity, 4.0);
     }
 
     function spawnImpactEffect(pos, color = 0xff00ff) {
+        // ── Weapon impact — bright burst with radial sparks ──
         const [r, g, b] = _hexRGB(color);
-        for (let i = 0; i < 8; i++) {
+        // Central flash
+        _emitParticle(pos.x, pos.y, pos.z, 0, 0, 0, 1, 1, 1, 0.1, 40);
+        // Radial sparks
+        for (let i = 0; i < 16; i++) {
             const a = Math.random() * Math.PI * 2;
-            const sp = 80 + Math.random() * 150;
+            const el = (Math.random() - 0.5) * Math.PI;
+            const sp = 100 + Math.random() * 250;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp * 0.6, Math.sin(a) * Math.cos(el) * sp,
+                r, g, b, 0.3 + Math.random() * 0.4, 12 + Math.random() * 18);
+        }
+        // Bright core particles
+        for (let i = 0; i < 6; i++) {
+            const sp = 30 + Math.random() * 60;
+            const a = Math.random() * Math.PI * 2;
             _emitParticle(pos.x, pos.y, pos.z,
                 Math.cos(a) * sp, (Math.random() - 0.5) * sp, Math.sin(a) * sp,
-                r, g, b, 0.6 + Math.random() * 0.3);
+                1, 1, 0.9, 0.15 + Math.random() * 0.1, 25 + Math.random() * 15);
         }
+        cameraShakeIntensity = Math.max(cameraShakeIntensity, 0.8);
     }
 
-    // ── Muzzle flash point light pool (reusable, no allocation in hot path) ──
+    // ── Muzzle flash point light pool ──
     const _muzzleFlashPool = [];
     let _muzzleFlashIdx = 0;
     function _getMuzzleFlash() {
-        if (_muzzleFlashPool.length < 4) {
-            const light = new THREE.PointLight(0x00ffaa, 3.0, 50);
+        if (_muzzleFlashPool.length < 6) {
+            const light = new THREE.PointLight(0x00ffaa, 8.0, 120);
             scene.add(light);
-            _muzzleFlashPool.push({ light, timer: 0 });
+            _muzzleFlashPool.push({ light, timer: 0, baseIntensity: 8, baseDuration: 0.12 });
             return _muzzleFlashPool[_muzzleFlashPool.length - 1];
         }
-        const flash = _muzzleFlashPool[_muzzleFlashIdx % 4];
+        const flash = _muzzleFlashPool[_muzzleFlashIdx % 6];
         _muzzleFlashIdx++;
         return flash;
     }
 
     function spawnLaser(laserEntity) {
         const p = laserEntity.position;
-        // GDD §8.3: Muzzle flash — point light #00FFAA, intensity 3.0, decay 0.1s, range 50
+        // Bright muzzle flash
         const flash = _getMuzzleFlash();
         flash.light.position.copy(p);
-        flash.light.intensity = 3.0;
-        flash.timer = 0.1;
-        // Green-cyan muzzle spark particles (dual cannon)
-        for (let i = 0; i < 6; i++) {
+        flash.light.color.setHex(0x00ffaa);
+        flash.light.intensity = 8.0;
+        flash.baseIntensity = 8.0;
+        flash.baseDuration = 0.12;
+        flash.timer = 0.12;
+        // Bright muzzle spark burst
+        for (let i = 0; i < 10; i++) {
             const a = Math.random() * Math.PI * 2;
-            const sp = 60 + Math.random() * 80;
+            const sp = 80 + Math.random() * 120;
             _emitParticle(p.x, p.y, p.z,
-                Math.cos(a) * sp * 0.3, (Math.random() - 0.5) * sp * 0.2, Math.sin(a) * sp * 0.3 - sp,
-                0, 1, 0.67, 0.15 + Math.random() * 0.1);
+                Math.cos(a) * sp * 0.4, (Math.random() - 0.5) * sp * 0.3, Math.sin(a) * sp * 0.4 - sp,
+                0.3, 1, 0.75, 0.12 + Math.random() * 0.08, 15 + Math.random() * 10);
         }
+        // Central bright flash particle
+        _emitParticle(p.x, p.y, p.z, 0, 0, -40, 0.7, 1, 0.9, 0.08, 35);
     }
 
     function spawnTorpedoTrail(torpEntity) {
-        // GDD §10.1: Orange sparkler exhaust — continuous particle stream
+        // ═══════════════════════════════════════════════════════════════
+        // TORPEDO TRAIL — dense streaming firework exhaust
+        // Multiple layers: core flame + sparks + smoke wisps
+        // ═══════════════════════════════════════════════════════════════
         const p = torpEntity.position;
         const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(torpEntity.quaternion);
-        for (let i = 0; i < 5; i++) {
-            const spread = 40;
+        // Core flame particles — bright orange-white
+        for (let i = 0; i < 8; i++) {
+            const spread = 30;
+            const heat = Math.random();
             _emitParticle(
-                p.x + (Math.random() - 0.5) * 2,
-                p.y + (Math.random() - 0.5) * 2,
-                p.z + (Math.random() - 0.5) * 2,
-                fwd.x * 60 + (Math.random() - 0.5) * spread,
-                fwd.y * 60 + (Math.random() - 0.5) * spread,
-                fwd.z * 60 + (Math.random() - 0.5) * spread,
-                1, 0.5 + Math.random() * 0.3, Math.random() * 0.2,
-                0.4 + Math.random() * 0.4
+                p.x + (Math.random() - 0.5) * 3,
+                p.y + (Math.random() - 0.5) * 3,
+                p.z + (Math.random() - 0.5) * 3,
+                fwd.x * 80 + (Math.random() - 0.5) * spread,
+                fwd.y * 80 + (Math.random() - 0.5) * spread,
+                fwd.z * 80 + (Math.random() - 0.5) * spread,
+                1, 0.6 + heat * 0.4, heat * 0.3,
+                0.3 + Math.random() * 0.4, 18 + Math.random() * 22
+            );
+        }
+        // Sparkler particles — fast bright tiny specks (firework look)
+        for (let i = 0; i < 6; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const r = 5 + Math.random() * 8;
+            _emitParticle(
+                p.x + Math.cos(a) * r * 0.3,
+                p.y + Math.sin(a) * r * 0.3,
+                p.z + fwd.z * 4,
+                fwd.x * 40 + Math.cos(a) * 60 + (Math.random() - 0.5) * 80,
+                fwd.y * 40 + Math.sin(a) * 60 + (Math.random() - 0.5) * 80,
+                fwd.z * 40 + (Math.random() - 0.5) * 80,
+                1, 0.9, 0.4 + Math.random() * 0.3,
+                0.15 + Math.random() * 0.2, 6 + Math.random() * 8
+            );
+        }
+        // Dim smoke wisps — darker, slower, fade slowly
+        if (Math.random() < 0.4) {
+            _emitParticle(
+                p.x + (Math.random() - 0.5) * 4,
+                p.y + (Math.random() - 0.5) * 4,
+                p.z + fwd.z * 6,
+                fwd.x * 15 + (Math.random() - 0.5) * 20,
+                fwd.y * 15 + (Math.random() - 0.5) * 20,
+                fwd.z * 15 + (Math.random() - 0.5) * 20,
+                0.5, 0.25, 0.1, 0.8 + Math.random() * 0.6, 30 + Math.random() * 20
             );
         }
         // Bright white sparks (sparkler effect)

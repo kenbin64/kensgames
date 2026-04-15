@@ -2721,15 +2721,26 @@ const Starfighter = (function () {
                         continue;
                     }
                 }
-                // Range-based expiry for projectiles far from player
-                if ((e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo') && state.player && !state.player.markedForDeletion) {
-                    const dx = e.position.x - state.player.position.x;
-                    const dy = e.position.y - state.player.position.y;
-                    const dz = e.position.z - state.player.position.z;
-                    const rr = dim('radar.range');
-                    if (dx * dx + dy * dy + dz * dz > rr * rr) {
+                // Projectile expiry: TTL (maxAge) + range-based
+                if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo') {
+                    // Time-based expiry: lasers 2s, machinegun 1.5s, torpedoes 6s
+                    if (!e._spawnTime) e._spawnTime = state.elapsed;
+                    const age = state.elapsed - e._spawnTime;
+                    const maxAge = e.maxAge || (e.type === 'torpedo' ? 6 : e.type === 'machinegun' ? 1.5 : 2);
+                    if (age > maxAge) {
                         e.markedForDeletion = true;
                         if (M) M.remove(e.id);
+                    }
+                    // Also range-based expiry from player
+                    if (!e.markedForDeletion && state.player && !state.player.markedForDeletion) {
+                        const dx = e.position.x - state.player.position.x;
+                        const dy = e.position.y - state.player.position.y;
+                        const dz = e.position.z - state.player.position.z;
+                        const rr = dim('radar.range');
+                        if (dx * dx + dy * dy + dz * dz > rr * rr) {
+                            e.markedForDeletion = true;
+                            if (M) M.remove(e.id);
+                        }
                     }
                 }
             }
@@ -4247,7 +4258,8 @@ const Starfighter = (function () {
         l.owner = ownerType;
         l._ownerCallsign = source.callsign || ownerType;
         l.radius = dim('weapon.laser.radius');
-        l.maxAge = dim('weapon.laser.maxAge');
+        l.maxAge = dim('weapon.laser.maxAge') || 2;
+        l._spawnTime = state.elapsed;
         l.damage = dim('weapon.laser.damage');
         state.entities.push(l);
         if (ownerType === 'player') state.missionStats.shotsFired++;
@@ -4281,7 +4293,8 @@ const Starfighter = (function () {
         t._ownerCallsign = source.callsign || ownerType;
         t.radius = dim('weapon.torpedo.radius');
         t.target = source.lockedTarget;
-        t.maxAge = dim('weapon.torpedo.maxAge');
+        t.maxAge = dim('weapon.torpedo.maxAge') || 6;
+        t._spawnTime = state.elapsed;
         t.damage = dim('weapon.torpedo.damage');
         t.launchTime = performance.now() / 1000;
         state.entities.push(t);
@@ -4320,7 +4333,8 @@ const Starfighter = (function () {
         g.velocity.copy(_v1);
         g.owner = ownerType;
         g.radius = dim('weapon.gun.radius');
-        g.maxAge = dim('weapon.gun.maxAge');
+        g.maxAge = dim('weapon.gun.maxAge') || 1.5;
+        g._spawnTime = state.elapsed;
         g.damage = dim('weapon.gun.damage');
         state.entities.push(g);
         if (window.SF3D) SF3D.spawnLaser(g); // reuse laser visual, tinted differently
