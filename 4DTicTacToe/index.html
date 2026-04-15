@@ -4,23 +4,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>4D TicTacToe — KensGames</title>
+  <title>Connect 4D — KensGames</title>
   <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <style>
     :root {
-      --cyan: #00FFFF;
-      --pink: #FF00FF;
-      --green: #00FF41;
-      --yellow: #FFE800;
-      --orange: #FF6600;
-      --purple: #9900FF;
       --bg: #04040C;
-      --card: rgba(4, 4, 20, 0.94);
-      --text: #E0E0FF;
-      --dim: #8888AA;
+      --cyan: #00FFFF;
+      --green: #00FF88;
+      --purple: #AA00FF;
       --p1: #00FFFF;
-      --p2: #FF00FF;
+      --p2: #FF00AA;
+      --dim: #8888AA;
+      --text: #E0E0FF;
     }
 
     * {
@@ -33,1193 +29,804 @@
       background: var(--bg);
       color: var(--text);
       font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-      overflow-x: hidden;
-      min-height: 100vh;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
       display: flex;
-      flex-direction: column;
       align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px;
+      background: rgba(4, 4, 20, 0.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 255, 255, 0.2);
     }
 
-    /* ─── HEADER ─── */
-    .header {
-      text-align: center;
-      padding: 20px 0 10px;
-      width: 100%;
-    }
-
-    .header h1 {
-      font-size: 2.2em;
-      font-weight: 700;
-      letter-spacing: 4px;
+    .nav-logo {
       color: var(--cyan);
-      text-shadow: 0 0 12px #00ffff80;
-      margin-bottom: 2px;
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-decoration: none;
     }
 
-    .header .sub {
-      font-size: 0.85em;
-      color: var(--dim);
-      letter-spacing: 2px;
-    }
-
-    /* ─── SCREENS ─── */
-    .screen {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-      max-width: 1100px;
-      padding: 0 16px;
-    }
-
-    .screen.active {
+    .nav-links {
       display: flex;
+      gap: 18px;
+      list-style: none;
     }
 
-    /* ─── MENU ─── */
-    .menu-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      justify-content: center;
-      margin-top: 30px;
-    }
-
-    .menu-btn {
-      width: 220px;
-      padding: 24px 16px;
-      background: var(--card);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 12px;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.3s;
-    }
-
-    .menu-btn:hover {
-      border-color: var(--cyan);
-      box-shadow: 0 0 20px #00ffff30;
-      transform: translateY(-3px);
-    }
-
-    .menu-btn .icon {
-      font-size: 2.4em;
-      margin-bottom: 8px;
-    }
-
-    .menu-btn .label {
-      font-size: 1.1em;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .menu-btn .desc {
-      font-size: 0.75em;
+    .nav-links a {
       color: var(--dim);
-      margin-top: 4px;
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: color .2s;
     }
 
-    /* ─── HUD ─── */
-    .hud {
+    .nav-links a:hover {
+      color: var(--cyan);
+    }
+
+    #c {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #hud {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      max-width: 1000px;
-      padding: 12px 0;
-      margin-bottom: 8px;
+      align-items: flex-start;
+      padding: 12px 20px;
+      pointer-events: none;
     }
 
     .hud-player {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      font-size: 1.1em;
-      font-weight: 600;
+      gap: 4px;
+      padding: 10px 18px;
+      background: rgba(4, 4, 20, 0.78);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.12);
+      min-width: 110px;
+      transition: border-color .3s, box-shadow .3s;
     }
 
-    .hud-player.p1 {
-      color: var(--p1);
-      text-shadow: 0 0 8px #00ffff60;
+    .hud-player.active {
+      border-color: var(--p1);
+      box-shadow: 0 0 14px rgba(0, 255, 255, 0.28);
     }
 
     .hud-player.p2 {
-      color: var(--p2);
-      text-shadow: 0 0 8px #ff00ff60;
+      border-color: rgba(255, 0, 170, 0.12);
     }
 
-    .hud-turn {
-      font-size: 0.95em;
-      color: var(--yellow);
-      text-shadow: 0 0 8px #ffe80060;
+    .hud-player.p2.active {
+      border-color: var(--p2);
+      box-shadow: 0 0 14px rgba(255, 0, 170, 0.28);
+    }
+
+    .hud-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
       letter-spacing: 2px;
     }
 
     .hud-score {
-      font-size: 0.85em;
-      color: var(--dim);
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
     }
 
-    /* ─── 4D BOARD — CSS 3D ─── */
-    .board-wrapper {
-      perspective: 1200px;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      padding: 10px 0;
+    .p1c {
+      color: var(--p1);
+      text-shadow: 0 0 10px var(--p1);
     }
 
-    .board-4d {
-      display: flex;
-      gap: 40px;
-      justify-content: center;
-      align-items: flex-start;
-      transform-style: preserve-3d;
-      transition: transform 0.4s ease;
+    .p2c {
+      color: var(--p2);
+      text-shadow: 0 0 10px var(--p2);
     }
 
-    .hyper-label {
-      text-align: center;
-      font-size: 0.7em;
-      color: var(--dim);
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-    }
-
-    /* Each W-layer is a 3×3×3 cube */
-    .cube-layer {
+    .hud-center {
       display: flex;
       flex-direction: column;
       align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      background: rgba(4, 4, 20, 0.78);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.1);
     }
 
-    .cube {
-      transform-style: preserve-3d;
-      width: 180px;
-      height: 180px;
-      position: relative;
-      transform: rotateX(-25deg) rotateY(30deg);
-      transition: transform 0.5s ease;
+    #turn-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
     }
 
-    /* Each Z-plane is a 3×3 grid */
-    .z-plane {
-      position: absolute;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      width: 180px;
-      height: 180px;
-      transform-style: preserve-3d;
-      border: 1px solid rgba(0, 255, 255, 0.08);
+    #status-msg {
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      min-height: 16px;
     }
 
-    .z-plane[data-z="0"] {
-      transform: translateZ(90px);
-    }
-
-    .z-plane[data-z="1"] {
-      transform: translateZ(0px);
-    }
-
-    .z-plane[data-z="2"] {
-      transform: translateZ(-90px);
-    }
-
-    /* Individual cell */
-    .cell {
-      width: 60px;
-      height: 60px;
-      border: 1px solid rgba(0, 255, 255, 0.12);
+    #col-selector {
+      position: fixed;
+      bottom: 58px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      pointer-events: auto;
+      background: rgba(4, 4, 20, 0.82);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 255, 255, 0.15);
+    }
+
+    .col-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .col-btn {
+      width: 44px;
+      height: 40px;
+      background: rgba(0, 255, 255, 0.05);
+      border: 1px solid rgba(0, 255, 255, 0.18);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 8px;
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: 1px;
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: rgba(0, 10, 20, 0.6);
-      font-size: 1.6em;
-      font-weight: 700;
-      position: relative;
+      gap: 1px;
     }
 
-    .cell:hover {
-      background: rgba(0, 255, 255, 0.08);
-      border-color: rgba(0, 255, 255, 0.3);
+    .col-btn:hover:not(:disabled) {
+      background: rgba(0, 255, 255, 0.14);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.22);
     }
 
-    .cell.p1 {
-      color: var(--p1);
-      text-shadow: 0 0 12px #00ffffaa;
-      background: rgba(0, 255, 255, 0.06);
+    .col-btn:disabled {
+      opacity: .25;
+      cursor: not-allowed;
     }
 
-    .cell.p2 {
+    .col-btn.p2b {
       color: var(--p2);
-      text-shadow: 0 0 12px #ff00ffaa;
-      background: rgba(255, 0, 255, 0.06);
+      border-color: rgba(255, 0, 170, 0.18);
     }
 
-    .cell.p3 {
-      color: var(--green);
-      text-shadow: 0 0 12px #00ff4180;
-      background: rgba(0, 255, 65, 0.06);
+    .col-btn.p2b:hover:not(:disabled) {
+      background: rgba(255, 0, 170, 0.12);
+      border-color: var(--p2);
+      box-shadow: 0 0 10px rgba(255, 0, 170, 0.22);
     }
 
-    .cell.p4 {
-      color: var(--orange);
-      text-shadow: 0 0 12px #ff660080;
-      background: rgba(255, 102, 0, 0.06);
+    .col-lbl {
+      font-size: 7px;
+      color: var(--dim);
+      letter-spacing: 0;
     }
 
-    .cell.win {
-      animation: winPulse 0.6s ease infinite alternate;
-    }
-
-    .cell.disabled {
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
-    @keyframes winPulse {
-      from {
-        box-shadow: inset 0 0 10px rgba(255, 232, 0, 0.3);
-      }
-
-      to {
-        box-shadow: inset 0 0 25px rgba(255, 232, 0, 0.7);
-        border-color: var(--yellow);
-      }
-    }
-
-    /* ─── CONTROLS ─── */
-    .controls {
+    #controls {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      gap: 12px;
-      margin: 16px 0;
-      flex-wrap: wrap;
-      justify-content: center;
+      gap: 10px;
+      pointer-events: auto;
     }
 
     .ctrl-btn {
-      padding: 8px 18px;
-      background: rgba(0, 255, 255, 0.08);
+      padding: 7px 16px;
+      background: rgba(0, 255, 255, 0.06);
       border: 1px solid rgba(0, 255, 255, 0.2);
       border-radius: 6px;
       color: var(--cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
       cursor: pointer;
-      font-family: inherit;
-      font-size: 0.85em;
-      transition: all 0.2s;
+      transition: all .2s;
     }
 
     .ctrl-btn:hover {
-      background: rgba(0, 255, 255, 0.15);
+      background: rgba(0, 255, 255, 0.14);
       border-color: var(--cyan);
     }
 
     .ctrl-btn.danger {
-      border-color: rgba(255, 0, 100, 0.3);
-      color: #ff6688;
+      color: #ff4466;
+      border-color: rgba(255, 50, 80, 0.25);
     }
 
     .ctrl-btn.danger:hover {
-      background: rgba(255, 0, 100, 0.1);
+      background: rgba(255, 50, 80, 0.1);
+      border-color: #ff4466;
     }
 
-    /* ─── RESULT OVERLAY ─── */
-    .result-overlay {
+    #result-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      z-index: 100;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.84);
+      backdrop-filter: blur(12px);
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 16px;
     }
 
-    .result-overlay.active {
+    #result-overlay.show {
       display: flex;
     }
 
-    .result-text {
-      font-size: 2.5em;
-      font-weight: 700;
+    #result-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 2.6em;
       letter-spacing: 4px;
-      margin-bottom: 16px;
-    }
-
-    .result-sub {
-      font-size: 1em;
-      color: var(--dim);
-      margin-bottom: 24px;
-    }
-
-    /* ─── LOBBY PANEL ─── */
-    .lobby-panel {
-      background: var(--card);
-      border: 1px solid rgba(0, 255, 255, 0.12);
-      border-radius: 12px;
-      padding: 24px;
-      width: 100%;
-      max-width: 420px;
-      margin-top: 20px;
-    }
-
-    .lobby-panel h3 {
-      color: var(--cyan);
-      margin-bottom: 12px;
-      letter-spacing: 2px;
-    }
-
-    .lobby-input {
-      width: 100%;
-      padding: 10px 14px;
-      background: rgba(0, 20, 40, 0.7);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-radius: 6px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 1em;
-      margin-bottom: 10px;
       text-align: center;
-      letter-spacing: 4px;
     }
 
-    .lobby-input::placeholder {
+    #result-sub {
+      font-size: 1em;
       color: var(--dim);
+    }
+
+    .result-btns {
+      display: flex;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    #cam-hint {
+      position: fixed;
+      bottom: 110px;
+      right: 16px;
+      font-size: 10px;
+      color: rgba(80, 100, 120, 0.55);
       letter-spacing: 1px;
-    }
-
-    .lobby-msg {
-      font-size: 0.85em;
-      color: var(--dim);
-      margin-top: 6px;
-      min-height: 1.2em;
-    }
-
-    .lobby-msg.err {
-      color: #ff4466;
-    }
-
-    .lobby-msg.ok {
-      color: var(--green);
-    }
-
-    /* ─── DIM SELECTOR ─── */
-    .dim-select {
-      display: flex;
-      gap: 10px;
-      margin: 16px 0;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .dim-opt {
-      padding: 12px 20px;
-      background: var(--card);
-      border: 1px solid rgba(0, 255, 255, 0.12);
-      border-radius: 8px;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.3s;
-      min-width: 90px;
-    }
-
-    .dim-opt:hover {
-      border-color: var(--cyan);
-    }
-
-    .dim-opt.active {
-      border-color: var(--cyan);
-      box-shadow: 0 0 15px #00ffff30;
-    }
-
-    .dim-opt .d-label {
-      font-size: 1.2em;
-      font-weight: 700;
-      color: var(--cyan);
-    }
-
-    .dim-opt .d-sub {
-      font-size: 0.7em;
-      color: var(--dim);
+      text-align: right;
+      line-height: 1.9;
+      pointer-events: none;
     }
   </style>
 </head>
 
 <body>
+  <nav class="nav">
+    <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
+    <ul class="nav-links">
+      <li><a href="/">&#8592; Portal</a></li>
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
+    </ul>
+  </nav>
 
-  <div class="header">
-    <h1>4D TICTACTOE</h1>
-    <div class="sub">MULTI-DIMENSIONAL STRATEGY</div>
-  </div>
+  <canvas id="c"></canvas>
 
-  <!-- ═══════════ MENU / LOBBY SCREEN ═══════════ -->
-  <div id="menu-screen" class="screen active">
-    <!-- Step 1: Dimension + Mode Selection -->
-    <div id="setup-step1">
-      <div style="color:var(--dim);letter-spacing:2px;font-size:0.8em;margin-top:10px;">BOARD TYPE</div>
-      <div class="dim-select">
-        <div class="dim-opt active" data-dim="3" onclick="selectDim(3)">
-          <div class="d-label">3D</div>
-          <div class="d-sub">3×3×3 = 27 cells</div>
-        </div>
-        <div class="dim-opt" data-dim="4" onclick="selectDim(4)">
-          <div class="d-label">4D</div>
-          <div class="d-sub">3×3×3×3 = 81 cells</div>
-        </div>
-      </div>
-      <div style="color:var(--dim);letter-spacing:2px;font-size:0.8em;margin-top:18px;">GAME MODE</div>
-      <div class="menu-grid">
-        <div class="menu-btn" onclick="enterSetup('solo')">
-          <div class="icon">🧠</div>
-          <div class="label">Solo</div>
-          <div class="desc">You vs AI opponents</div>
-        </div>
-        <div class="menu-btn" onclick="enterSetup('local')">
-          <div class="icon">👥</div>
-          <div class="label">Local</div>
-          <div class="desc">Pass & play, 2-4 players</div>
-        </div>
-        <div class="menu-btn" onclick="enterSetup('host')">
-          <div class="icon">🌐</div>
-          <div class="label">Host Online</div>
-          <div class="desc">Private room with invite code</div>
-        </div>
-        <div class="menu-btn" onclick="enterSetup('join')">
-          <div class="icon">🔗</div>
-          <div class="label">Join Game</div>
-          <div class="desc">Enter a code or find a match</div>
-        </div>
-      </div>
+  <div id="hud">
+    <div class="hud-player active" id="hud-p1">
+      <div class="hud-name p1c">PLAYER 1</div>
+      <div class="hud-score p1c" id="score-p1">0</div>
     </div>
-
-    <!-- Step 2: Player Setup / Lobby -->
-    <div id="setup-step2" style="display:none;width:100%;max-width:520px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <button class="ctrl-btn" onclick="backToStep1()">← Back</button>
-        <div style="color:var(--cyan);font-size:1.1em;font-weight:700;letter-spacing:2px;" id="setup-title">GAME SETUP
-        </div>
-        <div style="width:60px;"></div>
-      </div>
-
-      <!-- Online: Code Display / Input -->
-      <div id="online-panel" style="display:none;">
-        <div id="code-display"
-          style="font-size:2.2em;letter-spacing:8px;text-align:center;color:var(--cyan);text-shadow:0 0 12px #00ffff60;margin:12px 0;display:none;">
-        </div>
-        <div id="code-copy-row" style="text-align:center;margin-bottom:10px;display:none;">
-          <button class="ctrl-btn" onclick="copyCode()" style="font-size:0.8em;">📋 Copy Code</button>
-          <span id="copy-msg" style="color:var(--green);font-size:0.8em;margin-left:8px;"></span>
-        </div>
-        <input id="join-code-input" class="lobby-input" placeholder="ENTER 6-LETTER CODE" maxlength="6"
-          style="display:none;">
-        <div id="join-row" style="text-align:center;margin-bottom:12px;display:none;">
-          <button class="ctrl-btn" onclick="doJoinCode()">JOIN</button>
-          <span style="color:var(--dim);margin:0 8px;">or</span>
-          <button class="ctrl-btn" onclick="doMatchmake()">QUICK MATCH</button>
-        </div>
-        <!-- Browse Games -->
-        <div id="browse-panel" style="display:none;margin-top:10px;">
-          <div style="color:var(--dim);font-size:0.75em;letter-spacing:1px;margin-bottom:6px;">OPEN GAMES</div>
-          <div id="game-list" style="max-height:150px;overflow-y:auto;"></div>
-          <button class="ctrl-btn" onclick="refreshGameList()" style="margin-top:6px;font-size:0.75em;">↻
-            Refresh</button>
-        </div>
-      </div>
-
-      <!-- Player Slots -->
-      <div style="color:var(--dim);font-size:0.75em;letter-spacing:2px;margin:10px 0 6px;">PLAYER SLOTS</div>
-      <div id="player-slots" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;"></div>
-
-      <!-- Player count (local/solo only) -->
-      <div id="player-count-row" style="display:none;text-align:center;margin-bottom:12px;">
-        <span style="color:var(--dim);font-size:0.8em;margin-right:8px;">Players:</span>
-        <button class="ctrl-btn" onclick="setPlayerCount(2)" id="pc-2">2</button>
-        <button class="ctrl-btn" onclick="setPlayerCount(3)" id="pc-3">3</button>
-        <button class="ctrl-btn" onclick="setPlayerCount(4)" id="pc-4">4</button>
-      </div>
-
-      <div id="lobby-status" class="lobby-msg"></div>
-
-      <div style="text-align:center;margin-top:10px;">
-        <button class="ctrl-btn" id="start-btn" onclick="launchGame()" style="font-size:1.1em;padding:12px 36px;">▶
-          START GAME</button>
-      </div>
+    <div class="hud-center">
+      <div id="turn-label" class="p1c">&#9679; PLAYER 1'S TURN</div>
+      <div id="status-msg">Pick a column to drop your ball</div>
+    </div>
+    <div class="hud-player p2" id="hud-p2">
+      <div class="hud-name p2c">PLAYER 2</div>
+      <div class="hud-score p2c" id="score-p2">0</div>
     </div>
   </div>
 
-  <!-- ═══════════ GAME SCREEN ═══════════ -->
-  <div id="game-screen" class="screen">
-    <div class="hud" id="game-hud"></div>
-    <div class="board-wrapper">
-      <div class="board-4d" id="board-4d"></div>
-    </div>
-    <div class="controls">
-      <button class="ctrl-btn" onclick="rotateCubes(-15, 0)">◀ Rotate</button>
-      <button class="ctrl-btn" onclick="rotateCubes(15, 0)">Rotate ▶</button>
-      <button class="ctrl-btn" onclick="rotateCubes(0, -10)">▲ Tilt</button>
-      <button class="ctrl-btn" onclick="rotateCubes(0, 10)">▼ Tilt</button>
-      <button class="ctrl-btn" onclick="resetView()">⟳ Reset View</button>
-      <button class="ctrl-btn danger" onclick="backToMenu()">✕ Quit</button>
-    </div>
+  <div id="col-selector"><!-- built by JS --></div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="cam-btn" onclick="toggleCamFollow()">CAM: FOLLOW</button>
+    <button class="ctrl-btn" onclick="resetView()">RESET VIEW</button>
+    <button class="ctrl-btn danger" onclick="resetGame()">NEW GAME</button>
   </div>
 
-  <!-- ═══════════ RESULT OVERLAY ═══════════ -->
-  <div id="result-overlay" class="result-overlay">
-    <div class="result-text" id="result-text">PLAYER 1 WINS</div>
-    <div class="result-sub" id="result-sub">3 in a row across the 4th dimension</div>
-    <div style="display:flex;gap:12px;">
+  <div id="result-overlay">
+    <div id="result-title"></div>
+    <div id="result-sub"></div>
+    <div class="result-btns">
       <button class="ctrl-btn" onclick="rematch()">REMATCH</button>
-      <button class="ctrl-btn danger" onclick="backToMenu()">MENU</button>
+      <button class="ctrl-btn danger" onclick="resetGame()">NEW GAME</button>
     </div>
   </div>
 
-  <script src="/js/multiplayer-client.js"></script>
+  <div id="cam-hint">Drag to orbit &nbsp;|&nbsp; Scroll to zoom<br>Auto-cam follows ball</div>
+
+  <script src="/lib/three/three.min.js"></script>
   <script>
     'use strict';
+    // ═══════════════════════════════════════════════════════════════
+    // CONNECT 4D  —  4x4x4 Schwartz-diamond lattice, gravity ball drop
+    // ═══════════════════════════════════════════════════════════════
+    const GRID = 4, CELL = 2.8, BALL_R = 0.38;
+    const GRAVITY = -30, RESTITUTION = 0.44, DAMPEN = 0.76, SETTLE_V = 0.20;
+    const LATTICE_SADDLE_SCALE = 0.8;
+    const P1 = 1, P2 = 2;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // GAME STATE — supports 1-4 players
-    // ═══════════════════════════════════════════════════════════════════════
-    const S = 3; // board size per dimension
-    let DIM = 4; // 3 or 4 dimensions
-    let grid = null; // flat array, values 0=empty, 1-4=player
-    let currentPlayer = 1;
-    let numPlayers = 2; // 1-4
-    let gameMode = 'local'; // 'solo', 'local', 'online'
-    let gameOver = false;
-    let myPlayer = 1; // which player am I (for online)
-    let scores = [0, 0, 0, 0];
-    let rotY = 30, rotX = -25;
-    let mp = null; // KGMultiplayer instance
-    let winLine = [];
-    let playerSlots = []; // { name, type: 'human'|'ai'|'online'|'empty', color, symbol }
-    let eliminated = new Set(); // players eliminated (no more moves possible)
+    const board = new Array(GRID * GRID * GRID).fill(0);
+    let scores = [0, 0], currentPlayer = P1, gameOver = false, dropping = false;
 
-    // Per-player visuals
-    const PLAYER_COLORS = ['var(--cyan)', 'var(--pink)', 'var(--green)', 'var(--orange)'];
-    const PLAYER_GLOWS = ['#00ffff60', '#ff00ff60', '#00ff4160', '#ff660060'];
-    const PLAYER_SYMBOLS = ['✕', '◯', '◆', '▲'];
-    const PLAYER_CSS = ['p1', 'p2', 'p3', 'p4'];
-    const PLAYER_BG = ['rgba(0,255,255,0.06)', 'rgba(255,0,255,0.06)', 'rgba(0,255,65,0.06)', 'rgba(255,102,0,0.06)'];
+    // ── THREE.JS ──────────────────────────────────────────────────
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = false;
 
-    const $ = id => document.getElementById(id);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x04040C);
+    scene.fog = new THREE.FogExp2(0x04040C, 0.0085);
 
-    function totalCells() { return Math.pow(S, DIM); }
-    function idx(coords) {
-      // coords = [x, y, z] or [x, y, z, w]
-      let i = 0;
-      for (let d = coords.length - 1; d >= 0; d--) i = i * S + coords[d];
-      return i;
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 800);
+    camera.position.set(14, 18, 22);
+    camera.lookAt(0, 4, 0);
+
+    // ── LIGHTING ──────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x112233, 1.5));
+    const sunLight = new THREE.DirectionalLight(0x88aaff, 1.3);
+    sunLight.position.set(10, 20, 14); scene.add(sunLight);
+    const ptCyan = new THREE.PointLight(0x00ffcc, 2.2, 55); ptCyan.position.set(-8, 10, -8); scene.add(ptCyan);
+    const ptPurp = new THREE.PointLight(0xaa00ff, 1.5, 45); ptPurp.position.set(8, 2, -10); scene.add(ptPurp);
+
+    // ── MATERIALS ─────────────────────────────────────────────────
+    function saddleMat(hex, emHex, op) {
+      return new THREE.MeshPhysicalMaterial({
+        color: hex, emissive: emHex, metalness: 0.25, roughness: 0.18,
+        transparent: true, opacity: op, side: THREE.DoubleSide,
+        depthWrite: false,
+      });
     }
-    function coordsOf(i) {
-      const c = [];
-      for (let d = 0; d < DIM; d++) { c.push(i % S); i = Math.floor(i / S); }
-      return c;
-    }
+    const MAT_CYAN = saddleMat(0x00ccff, 0x002233, 0.32);
+    const MAT_GREEN = saddleMat(0x00ff88, 0x003322, 0.28);
+    const MAT_PURPLE = saddleMat(0xaa00ff, 0x220033, 0.26);
+    const MAT_TUBE = new THREE.MeshPhysicalMaterial({
+      color: 0x223344, emissive: 0x0a0a22, transparent: true, opacity: 0.26,
+      metalness: 0.55, roughness: 0.35, depthWrite: false,
+    });
+    const MAT_P1_PLACED = new THREE.MeshPhysicalMaterial({
+      color: 0x00eeff, emissive: 0x004455, metalness: 0.4, roughness: 0.1,
+      transparent: true, opacity: 0.92,
+    });
+    const MAT_P2_PLACED = new THREE.MeshPhysicalMaterial({
+      color: 0xff0088, emissive: 0x440022, metalness: 0.4, roughness: 0.1,
+      transparent: true, opacity: 0.92,
+    });
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // WIN DETECTION — all possible lines in N dimensions
-    // ═══════════════════════════════════════════════════════════════════════
-    let allLines = []; // precomputed: array of [idx0, idx1, idx2]
-
-    function precomputeLines() {
-      allLines = [];
-      const dirs = [];
-      // Generate all direction vectors with components in {-1, 0, 1}
-      // excluding the zero vector, and only "positive" directions (to avoid duplicates)
-      const total = Math.pow(3, DIM);
-      for (let i = 0; i < total; i++) {
-        const d = [];
-        let v = i;
-        for (let j = 0; j < DIM; j++) { d.push((v % 3) - 1); v = Math.floor(v / 3); }
-        // Only keep "positive" direction: first nonzero component must be +1
-        let first = true, valid = false;
-        for (let j = 0; j < DIM; j++) {
-          if (d[j] !== 0) {
-            if (first) { valid = d[j] === 1; first = false; }
-          }
-        }
-        if (valid) dirs.push(d);
-      }
-
-      // For each starting cell, try each direction
-      const n = totalCells();
-      for (let ci = 0; ci < n; ci++) {
-        const start = coordsOf(ci);
-        for (const dir of dirs) {
-          const line = [ci];
-          let ok = true;
-          for (let step = 1; step < S; step++) {
-            const pt = start.map((c, d) => c + dir[d] * step);
-            if (pt.some(c => c < 0 || c >= S)) { ok = false; break; }
-            line.push(idx(pt));
-          }
-          if (ok && line.length === S) allLines.push(line);
+    // ── GEOMETRY BUILDERS ─────────────────────────────────────────
+    // z = x·y  saddle surface — the lattice primitive
+    function buildSaddleGeo(segs, scale, flipY) {
+      const verts = [], idx = [];
+      const N = segs, hs = scale;
+      for (let i = 0; i <= N; i++) {
+        for (let j = 0; j <= N; j++) {
+          const x = (i / N * 2 - 1) * hs;
+          const z = (j / N * 2 - 1) * hs;
+          const y = x * z * 0.55 * (flipY ? -1 : 1);
+          verts.push(x, y, z);
         }
       }
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          const a = i * (N + 1) + j, b = a + 1, c = a + (N + 1), d = c + 1;
+          idx.push(a, b, c, b, d, c);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    }
+    const SADDLE_A = buildSaddleGeo(12, LATTICE_SADDLE_SCALE, false);
+    const SADDLE_B = buildSaddleGeo(12, LATTICE_SADDLE_SCALE, true);
+
+    const BALL_GEO = new THREE.SphereGeometry(BALL_R, 22, 22);
+    const RING_GEO = new THREE.TorusGeometry(BALL_R * 1.4, 0.026, 8, 28);
+    const HALO_GEO = new THREE.SphereGeometry(BALL_R * 2.1, 12, 12);
+
+    // ── WORLD POSITION ────────────────────────────────────────────
+    function nodePos(gx, gy, gz) {
+      return new THREE.Vector3(
+        (gx - 1.5) * CELL,
+        (gy - 1.5) * CELL * 0.9 + 0.5,
+        (gz - 1.5) * CELL
+      );
     }
 
+    // ── LATTICE BUILD ─────────────────────────────────────────────
+    const latticeGroup = new THREE.Group();
+    scene.add(latticeGroup);
+
+    for (let gx = 0; gx < GRID; gx++) {
+      for (let gy = 0; gy < GRID; gy++) {
+        for (let gz = 0; gz < GRID; gz++) {
+          const pos = nodePos(gx, gy, gz);
+          const parity = (gx + gy + gz) % 2;
+          const matIdx = (gx + gy + gz) % 3;
+          const mat = [MAT_CYAN, MAT_GREEN, MAT_PURPLE][matIdx];
+          const saddle = new THREE.Mesh(parity ? SADDLE_B : SADDLE_A, mat);
+
+          // Alternate 90° rotation around Y — creates the 3D alternating lattice
+          saddle.rotation.y = parity ? Math.PI * 0.5 : 0;
+          saddle.position.copy(pos);
+          latticeGroup.add(saddle);
+
+          // Connecting tubes to +X, +Y, +Z neighbours
+          if (gx < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx + 1, gy, gz)));
+          if (gy < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx, gy + 1, gz)));
+          if (gz < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx, gy, gz + 1)));
+        }
+      }
+    }
+
+    function makeTube(a, b) {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const len = dir.length();
+      const geo = new THREE.CylinderGeometry(0.042, 0.042, len, 6, 1);
+      const mesh = new THREE.Mesh(geo, MAT_TUBE);
+      mesh.position.copy(a).addScaledVector(dir, 0.5);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      return mesh;
+    }
+
+    // ── SLOT RINGS ────────────────────────────────────────────────
+    const slotRings = [];
+    for (let gx = 0; gx < GRID; gx++) {
+      for (let gy = 0; gy < GRID; gy++) {
+        for (let gz = 0; gz < GRID; gz++) {
+          const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
+            color: 0x112233, transparent: true, opacity: 0.20,
+          }));
+          ring.position.copy(nodePos(gx, gy, gz));
+          ring.rotation.x = Math.PI / 2;
+          ring.userData = { gx, gy, gz };
+          slotRings.push(ring);
+          scene.add(ring);
+        }
+      }
+    }
+
+    // ── PLACED BALLS ──────────────────────────────────────────────
+    const placedBalls = [];
+    function addPlacedBall(gx, gy, gz, player) {
+      const mat = (player === P1 ? MAT_P1_PLACED : MAT_P2_PLACED).clone();
+      const mesh = new THREE.Mesh(BALL_GEO, mat);
+      mesh.position.copy(nodePos(gx, gy, gz));
+      scene.add(mesh);
+      // inner glow
+      const gm = new THREE.Mesh(HALO_GEO, new THREE.MeshBasicMaterial({
+        color: player === P1 ? 0x00ffff : 0xff0088,
+        transparent: true, opacity: 0.12, side: THREE.BackSide,
+      }));
+      gm.position.copy(mesh.position);
+      scene.add(gm);
+      placedBalls.push({ mesh, gm, gx, gy, gz, player });
+    }
+
+    // ── WIN GLOWS ─────────────────────────────────────────────────
+    const winGlows = [];
+    function showWinGlows(line) {
+      const winGeo = new THREE.SphereGeometry(BALL_R * 1.85, 16, 16);
+      line.forEach(([gx, gy, gz]) => {
+        const m = new THREE.Mesh(winGeo, new THREE.MeshBasicMaterial({
+          color: 0xffee00, transparent: true, opacity: 0.40, side: THREE.BackSide,
+        }));
+        m.position.copy(nodePos(gx, gy, gz));
+        scene.add(m); winGlows.push(m);
+      });
+    }
+    function clearWinGlows() { winGlows.forEach(m => scene.remove(m)); winGlows.length = 0; }
+
+    // ── PHYSICS BALL ──────────────────────────────────────────────
+    let physBall = null;
+
+    function spawnPhysBall(gx, gz, player) {
+      if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); }
+      // Find lowest free slot
+      let targetGY = -1;
+      for (let gy = 0; gy < GRID; gy++) {
+        if (getCell(gx, gy, gz) === 0) { targetGY = gy; break; }
+      }
+      if (targetGY === -1) return false;
+
+      const ballMat = new THREE.MeshPhysicalMaterial({
+        color: player === P1 ? 0x00eeff : 0xff0088,
+        emissive: player === P1 ? 0x005566 : 0x660033,
+        emissiveIntensity: 0.65, metalness: 0.3, roughness: 0.08,
+        transparent: true, opacity: 0.97,
+      });
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: player === P1 ? 0x00ffff : 0xff0088,
+        transparent: true, opacity: 0.22, side: THREE.BackSide,
+      });
+      const mesh = new THREE.Mesh(BALL_GEO, ballMat);
+      const halo = new THREE.Mesh(HALO_GEO, haloMat);
+      const startY = nodePos(gx, GRID + 1, gz).y + 1.5;
+      mesh.position.set(nodePos(gx, 0, gz).x, startY, nodePos(gx, 0, gz).z);
+      halo.position.copy(mesh.position);
+      scene.add(mesh); scene.add(halo);
+
+      physBall = {
+        mesh, halo,
+        pos: mesh.position.clone(),
+        vy: -0.5,
+        tx: nodePos(gx, 0, gz).x, tz: nodePos(gx, 0, gz).z,
+        targetSlot: { gx, gy: targetGY, gz },
+        player, settled: false,
+      };
+      return true;
+    }
+
+    // ── BOARD HELPERS ─────────────────────────────────────────────
+    function cellIdx(gx, gy, gz) { return gz * GRID * GRID + gy * GRID + gx; }
+    function getCell(gx, gy, gz) { return board[cellIdx(gx, gy, gz)]; }
+    function setCell(gx, gy, gz, v) { board[cellIdx(gx, gy, gz)] = v; }
+    function lowestFree(gx, gz) { for (let y = 0; y < GRID; y++) if (getCell(gx, y, gz) === 0) return y; return -1; }
+    function colFull(gx, gz) { return lowestFree(gx, gz) === -1; }
+
+    // ── WIN CHECK ────────────────────────────────────────────────
+    const WIN_DIRS = [
+      [1, 0, 0], [0, 1, 0], [0, 0, 1],
+      [1, 1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [1, 0, 1], [1, 0, -1],
+      [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+    ];
     function checkWin(player) {
-      for (const line of allLines) {
-        if (line.every(i => grid[i] === player)) return line;
+      for (const [dx, dy, dz] of WIN_DIRS) {
+        for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) for (let z = 0; z < GRID; z++) {
+          const line = [];
+          for (let s = 0; s < 4; s++) {
+            const nx = x + dx * s, ny = y + dy * s, nz = z + dz * s;
+            if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || nz < 0 || nz >= GRID) break;
+            if (getCell(nx, ny, nz) !== player) break;
+            line.push([nx, ny, nz]);
+          }
+          if (line.length === 4) return line;
+        }
       }
       return null;
     }
+    function boardFull() { return board.every(v => v !== 0); }
 
-    function checkDraw() {
-      return grid.every(c => c !== 0);
+    // ── ORBIT CAMERA ─────────────────────────────────────────────
+    let camFollow = true, camTheta = 0.88, camPhi = 0.52, camRadius = 30;
+    let camTarget = new THREE.Vector3(0, 4, 0);
+    let cDrag = false, cLX = 0, cLY = 0;
+
+    function orbitCam() {
+      camera.position.set(
+        camTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta),
+        camTarget.y + camRadius * Math.cos(camPhi),
+        camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta)
+      );
+      camera.lookAt(camTarget);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // BOARD RENDERER — CSS 3D cubes
-    // ═══════════════════════════════════════════════════════════════════════
-    function buildBoard() {
-      const board = $('board-4d');
-      board.innerHTML = '';
-      const wCount = DIM === 4 ? S : 1;
-      for (let w = 0; w < wCount; w++) {
-        const layer = document.createElement('div');
-        layer.className = 'cube-layer';
-        if (DIM === 4) {
-          const label = document.createElement('div');
-          label.className = 'hyper-label';
-          label.textContent = ['W=0 (Near)', 'W=1 (Mid)', 'W=2 (Far)'][w];
-          layer.appendChild(label);
+    canvas.addEventListener('mousedown', e => { cDrag = true; cLX = e.clientX; cLY = e.clientY; camFollow = false; updateCamBtn(); });
+    canvas.addEventListener('mouseup', () => cDrag = false);
+    canvas.addEventListener('mouseleave', () => cDrag = false);
+    canvas.addEventListener('mousemove', e => { if (!cDrag) return; camTheta -= (e.clientX - cLX) * 0.008; camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi + (e.clientY - cLY) * 0.008)); cLX = e.clientX; cLY = e.clientY; orbitCam(); });
+    canvas.addEventListener('wheel', e => { camRadius = Math.max(9, Math.min(65, camRadius + e.deltaY * 0.04)); orbitCam(); }, { passive: true });
+    canvas.addEventListener('touchstart', e => { cDrag = true; cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; camFollow = false; updateCamBtn(); }, { passive: true });
+    canvas.addEventListener('touchend', () => cDrag = false);
+    canvas.addEventListener('touchmove', e => { if (!cDrag) return; camTheta -= (e.touches[0].clientX - cLX) * 0.008; camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi + (e.touches[0].clientY - cLY) * 0.008)); cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; orbitCam(); }, { passive: true });
+
+    function toggleCamFollow() { camFollow = !camFollow; updateCamBtn(); }
+    function updateCamBtn() { document.getElementById('cam-btn').textContent = 'CAM: ' + (camFollow ? 'FOLLOW' : 'MANUAL'); }
+    function resetView() { camTheta = 0.88; camPhi = 0.52; camRadius = 30; camTarget.set(0, 4, 0); camFollow = false; updateCamBtn(); orbitCam(); }
+
+    // ── COLUMN SELECTOR UI ───────────────────────────────────────
+    const colSel = document.getElementById('col-selector');
+    const colBtns = [];
+
+    function buildColUI() {
+      colSel.innerHTML = '';
+      colBtns.length = 0;
+      const header = document.createElement('div');
+      header.style.cssText = 'font-family:Orbitron,monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-align:center;margin-bottom:2px;';
+      header.textContent = 'DROP COLUMN  (X → Z ↓)';
+      colSel.appendChild(header);
+      for (let gz = 0; gz < GRID; gz++) {
+        const row = document.createElement('div');
+        row.className = 'col-row';
+        for (let gx = 0; gx < GRID; gx++) {
+          const btn = document.createElement('button');
+          btn.className = 'col-btn';
+          btn.innerHTML = `<span style="font-size:14px;">&#8595;</span><div class="col-lbl">X${gx + 1}&middot;Z${gz + 1}</div>`;
+          btn.dataset.gx = gx; btn.dataset.gz = gz;
+          btn.onclick = () => dropBall(gx, gz);
+          colBtns.push(btn); row.appendChild(btn);
         }
-        const cube = document.createElement('div');
-        cube.className = 'cube';
-        cube.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
-        for (let z = 0; z < S; z++) {
-          const plane = document.createElement('div');
-          plane.className = 'z-plane';
-          plane.dataset.z = z;
-          for (let y = 0; y < S; y++) {
-            for (let x = 0; x < S; x++) {
-              const cell = document.createElement('div');
-              cell.className = 'cell';
-              const coords = DIM === 4 ? [x, y, z, w] : [x, y, z];
-              const ci = idx(coords);
-              cell.dataset.ci = ci;
-              cell.onclick = () => makeMove(ci);
-              plane.appendChild(cell);
-            }
-          }
-          cube.appendChild(plane);
-        }
-        layer.appendChild(cube);
-        board.appendChild(layer);
-      }
-      updateBoardDisplay();
-    }
-
-    function updateBoardDisplay() {
-      document.querySelectorAll('.cell').forEach(cell => {
-        const ci = parseInt(cell.dataset.ci);
-        const v = grid[ci];
-        cell.textContent = v > 0 ? PLAYER_SYMBOLS[v - 1] : '';
-        cell.className = 'cell' + (v > 0 ? ' ' + PLAYER_CSS[v - 1] : '')
-          + (winLine.includes(ci) ? ' win' : '')
-          + (gameOver ? ' disabled' : '');
-      });
-      updateHUD();
-    }
-
-    function buildHUD() {
-      const hud = $('game-hud');
-      let html = '';
-      for (let i = 0; i < numPlayers; i++) {
-        const s = playerSlots[i];
-        html += `<div class="hud-player" style="color:${PLAYER_COLORS[i]};text-shadow:0 0 8px ${PLAYER_GLOWS[i]};">
-          <span>${PLAYER_SYMBOLS[i]}</span>
-          <span id="pn-${i}">${s ? s.name : 'P' + (i + 1)}</span>
-          <span id="ps-${i}" class="hud-score"></span>
-        </div>`;
-        if (i < numPlayers - 1) html += '<div class="hud-turn" id="turn-indicator" style="flex-shrink:0;"></div>';
-      }
-      hud.innerHTML = html;
-    }
-
-    function updateHUD() {
-      const ti = $('turn-indicator');
-      if (!ti) return;
-      if (gameOver) {
-        ti.textContent = '';
-      } else if (gameMode === 'online' && currentPlayer !== myPlayer) {
-        ti.textContent = 'WAITING...';
-        ti.style.color = 'var(--dim)';
-      } else {
-        const slot = playerSlots[currentPlayer - 1];
-        if (slot && slot.type === 'ai') {
-          ti.textContent = 'AI THINKING...';
-          ti.style.color = 'var(--dim)';
-        } else {
-          ti.textContent = PLAYER_SYMBOLS[currentPlayer - 1] + ' YOUR TURN';
-          ti.style.color = PLAYER_COLORS[currentPlayer - 1];
-        }
-      }
-      for (let i = 0; i < numPlayers; i++) {
-        const el = $('ps-' + i);
-        if (el && scores[i]) el.textContent = '(' + scores[i] + ')';
+        colSel.appendChild(row);
       }
     }
 
-    function rotateCubes(dy, dx) {
-      rotY += dy; rotX += dx;
-      document.querySelectorAll('.cube').forEach(c => {
-        c.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    function refreshColBtns() {
+      const isp2 = currentPlayer === P2;
+      colBtns.forEach(btn => {
+        const gx = parseInt(btn.dataset.gx), gz = parseInt(btn.dataset.gz);
+        btn.disabled = dropping || gameOver || colFull(gx, gz);
+        btn.className = 'col-btn' + (isp2 ? ' p2b' : '');
       });
     }
-    function resetView() { rotY = 30; rotX = -25; rotateCubes(0, 0); }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // SETUP FLOW — lobby, player slots, mode selection
-    // ═══════════════════════════════════════════════════════════════════════
-    let setupMode = 'solo'; // solo, local, host, join
-
-    function selectDim(d) {
-      DIM = d;
-      document.querySelectorAll('.dim-opt').forEach(el => el.classList.toggle('active', parseInt(el.dataset.dim) === d));
-    }
-
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      $(id).classList.add('active');
-    }
-
-    function enterSetup(mode) {
-      setupMode = mode;
-      $('setup-step1').style.display = 'none';
-      $('setup-step2').style.display = 'flex';
-      $('online-panel').style.display = (mode === 'host' || mode === 'join') ? 'block' : 'none';
-      $('player-count-row').style.display = (mode === 'solo' || mode === 'local') ? 'block' : 'none';
-      $('lobby-status').textContent = '';
-      $('start-btn').style.display = (mode === 'host' || mode === 'join') ? 'none' : 'inline-block';
-
-      if (mode === 'solo') {
-        $('setup-title').textContent = 'SOLO — VS AI';
-        numPlayers = 2;
-        setPlayerCount(2);
-      } else if (mode === 'local') {
-        $('setup-title').textContent = 'LOCAL MULTIPLAYER';
-        numPlayers = 2;
-        setPlayerCount(2);
-      } else if (mode === 'host') {
-        $('setup-title').textContent = 'HOST ONLINE GAME';
-        $('code-display').style.display = 'none';
-        $('code-copy-row').style.display = 'none';
-        $('join-code-input').style.display = 'none';
-        $('join-row').style.display = 'none';
-        $('browse-panel').style.display = 'none';
-        numPlayers = 2;
-        initPlayerSlots();
-        connectAndHost();
-      } else if (mode === 'join') {
-        $('setup-title').textContent = 'JOIN GAME';
-        $('code-display').style.display = 'none';
-        $('code-copy-row').style.display = 'none';
-        $('join-code-input').style.display = 'block';
-        $('join-row').style.display = 'block';
-        $('browse-panel').style.display = 'block';
-        numPlayers = 2;
-        initPlayerSlots();
-        connectForJoin();
+    // ── DROP BALL ────────────────────────────────────────────────
+    function dropBall(gx, gz) {
+      if (dropping || gameOver || colFull(gx, gz)) return;
+      dropping = true; refreshColBtns();
+      const ok = spawnPhysBall(gx, gz, currentPlayer);
+      if (!ok) { dropping = false; refreshColBtns(); return; }
+      document.getElementById('status-msg').textContent = 'Dropping...';
+      if (camFollow) {
+        const tp = nodePos(gx, 2, gz);
+        camTarget.set(tp.x * 0.4, 6, tp.z * 0.4);
+        camRadius = 17; camPhi = 0.7; orbitCam();
       }
     }
 
-    function backToStep1() {
-      $('setup-step1').style.display = 'block';
-      $('setup-step2').style.display = 'none';
-      if (mp) { mp.leave(); }
-    }
-
-    function setPlayerCount(n) {
-      numPlayers = n;
-      [2, 3, 4].forEach(v => {
-        const btn = $('pc-' + v);
-        if (btn) btn.style.borderColor = v === n ? 'var(--cyan)' : 'rgba(0,255,255,0.2)';
-      });
-      initPlayerSlots();
-    }
-
-    function initPlayerSlots() {
-      playerSlots = [];
-      const username = localStorage.getItem('username') || 'You';
-      for (let i = 0; i < numPlayers; i++) {
-        if (i === 0) {
-          playerSlots.push({ name: username, type: 'human', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
-        } else if (setupMode === 'solo') {
-          playerSlots.push({ name: 'AI ' + i, type: 'ai', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
-        } else if (setupMode === 'local') {
-          playerSlots.push({ name: 'Player ' + (i + 1), type: 'human', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
-        } else {
-          playerSlots.push({ name: 'Waiting...', type: 'empty', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
+    // ── PHYSICS STEP ─────────────────────────────────────────────
+    function physStep(dt) {
+      if (!physBall || physBall.settled) return;
+      // Lock X/Z to column
+      physBall.pos.x = physBall.tx;
+      physBall.pos.z = physBall.tz;
+      // Gravity
+      physBall.vy += GRAVITY * dt;
+      physBall.pos.y += physBall.vy * dt;
+      // Target floor Y
+      const floorY = nodePos(physBall.targetSlot.gx, physBall.targetSlot.gy, physBall.targetSlot.gz).y;
+      if (physBall.pos.y <= floorY + BALL_R) {
+        if (Math.abs(physBall.vy) < SETTLE_V) {
+          physBall.pos.y = floorY; physBall.vy = 0; physBall.settled = true;
+          onBallSettled(); return;
         }
+        physBall.pos.y = floorY + BALL_R;
+        physBall.vy = -physBall.vy * RESTITUTION;
+        physBall.vy *= DAMPEN;
       }
-      renderSlots();
-    }
-
-    function renderSlots() {
-      const container = $('player-slots');
-      container.innerHTML = '';
-      for (let i = 0; i < playerSlots.length; i++) {
-        const s = playerSlots[i];
-        const div = document.createElement('div');
-        div.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--card);border:1px solid ${s.type === 'empty' ? 'rgba(100,100,100,0.2)' : PLAYER_GLOWS[i].replace('60', '30')};border-radius:8px;`;
-        div.innerHTML = `
-          <span style="font-size:1.4em;color:${PLAYER_COLORS[i]};text-shadow:0 0 8px ${PLAYER_GLOWS[i]};">${PLAYER_SYMBOLS[i]}</span>
-          <span style="flex:1;color:${s.type === 'empty' ? 'var(--dim)' : PLAYER_COLORS[i]};font-weight:600;">${s.name}</span>
-          <span style="font-size:0.7em;color:var(--dim);letter-spacing:1px;">${s.type.toUpperCase()}</span>
-          ${(setupMode === 'solo' && i > 0) ? `<button class="ctrl-btn" style="font-size:0.7em;padding:3px 8px;" onclick="toggleSlotType(${i})">${s.type === 'ai' ? '🧠' : '👤'}</button>` : ''}
-        `;
-        container.appendChild(div);
+      physBall.mesh.position.copy(physBall.pos);
+      physBall.halo.position.copy(physBall.pos);
+      if (camFollow) {
+        camTarget.y += (physBall.pos.y - 1.5 - camTarget.y) * 0.12;
+        orbitCam();
       }
     }
 
-    function toggleSlotType(i) {
-      if (playerSlots[i].type === 'ai') {
-        playerSlots[i].type = 'human';
-        playerSlots[i].name = 'Player ' + (i + 1);
-      } else {
-        playerSlots[i].type = 'ai';
-        playerSlots[i].name = 'AI ' + i;
-      }
-      renderSlots();
-    }
+    function onBallSettled() {
+      const { gx, gy, gz } = physBall.targetSlot, player = physBall.player;
+      scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
+      setCell(gx, gy, gz, player);
+      addPlacedBall(gx, gy, gz, player);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // GAME LAUNCH + MOVE LOGIC
-    // ═══════════════════════════════════════════════════════════════════════
-    function launchGame() {
-      if (setupMode === 'host' || setupMode === 'join') return;
-      gameMode = (setupMode === 'solo') ? 'solo' : 'local';
-      grid = new Array(totalCells()).fill(0);
-      currentPlayer = 1; gameOver = false; winLine = []; myPlayer = 1;
-      eliminated.clear();
-      precomputeLines(); buildBoard(); buildHUD();
-      showScreen('game-screen');
-      updateBoardDisplay();
-      scheduleAiTurn();
-    }
+      // Flash ring
+      const ring = slotRings.find(r => r.userData.gx === gx && r.userData.gy === gy && r.userData.gz === gz);
+      if (ring) { ring.material.color.setHex(player === P1 ? 0x00ffff : 0xff0088); ring.material.opacity = 0.55; setTimeout(() => { ring.material.color.setHex(0x112233); ring.material.opacity = 0.20; }, 700); }
 
-    function nextPlayer() {
-      for (let t = 0; t < numPlayers; t++) {
-        currentPlayer = (currentPlayer % numPlayers) + 1;
-        if (!eliminated.has(currentPlayer)) return;
-      }
-    }
-
-    function makeMove(ci) {
-      if (gameOver || grid[ci] !== 0) return;
-      const slot = playerSlots[currentPlayer - 1];
-      if (slot && slot.type === 'ai') return;
-      if (gameMode === 'online' && currentPlayer !== myPlayer) return;
-      applyMove(ci, currentPlayer);
-    }
-
-    function applyMove(ci, player) {
-      grid[ci] = player;
-      updateBoardDisplay();
-      if (gameMode === 'online' && mp && player === myPlayer) {
-        mp.sendAction('place', { ci, player });
-      }
+      // Check win / draw
       const wl = checkWin(player);
-      if (wl) { winLine = wl; scores[player - 1]++; endGame(player); return; }
-      if (checkDraw()) { endGame(0); return; }
-      nextPlayer(); updateBoardDisplay(); scheduleAiTurn();
-    }
-
-    function scheduleAiTurn() {
-      if (gameOver) return;
-      const slot = playerSlots[currentPlayer - 1];
-      if (slot && slot.type === 'ai') {
-        setTimeout(() => {
-          if (gameOver) return;
-          const best = findBestMove(currentPlayer);
-          if (best !== -1) applyMove(best, currentPlayer);
-        }, 300 + Math.random() * 400);
+      if (wl) {
+        gameOver = true; scores[player - 1]++;
+        document.getElementById('score-p' + (player)).textContent = scores[player - 1];
+        showWinGlows(wl);
+        showResult(player === P1 ? 'PLAYER 1 WINS' : 'PLAYER 2 WINS', dirLabel(wl), player === P1 ? '#00ffff' : '#ff0088');
+        dropping = false; refreshColBtns(); return;
       }
-    }
-
-    function endGame(winner) {
-      gameOver = true; updateBoardDisplay();
-      $('result-overlay').classList.add('active');
-      if (winner === 0) {
-        $('result-text').textContent = 'DRAW';
-        $('result-text').style.color = 'var(--yellow)';
-        $('result-sub').textContent = 'The hypercube is full.';
-      } else {
-        const slot = playerSlots[winner - 1];
-        $('result-text').textContent = (slot ? slot.name : 'Player ' + winner).toUpperCase() + ' WINS!';
-        $('result-text').style.color = PLAYER_COLORS[winner - 1];
-        $('result-sub').textContent = winDimensionLabel(winLine);
+      if (boardFull()) {
+        gameOver = true; showResult('DRAW', 'The lattice is full.', '#ffee00');
+        dropping = false; refreshColBtns(); return;
       }
-      if (gameMode === 'online' && mp) mp.sendGameOver(winner === myPlayer ? 'win' : 'loss');
+      currentPlayer = currentPlayer === P1 ? P2 : P1;
+      updateHUD(); dropping = false; refreshColBtns();
+      if (camFollow) setTimeout(() => { camTarget.set(0, 4, 0); camRadius = 30; camPhi = 0.52; orbitCam(); }, 700);
     }
 
-    function winDimensionLabel(line) {
+    function dirLabel(line) {
       if (!line || line.length < 2) return '';
-      const c0 = coordsOf(line[0]), c1 = coordsOf(line[1]);
-      const labels = ['X', 'Y', 'Z', 'W'];
-      const changing = [];
-      for (let d = 0; d < DIM; d++) { if (c0[d] !== c1[d]) changing.push(labels[d]); }
-      if (changing.length === 1) return '3 in a row along ' + changing[0] + ' axis';
-      return '3 in a row — ' + changing.join('/') + ' diagonal';
+      const [x0, y0, z0] = line[0], [x1, y1, z1] = line[1], parts = [];
+      if (x1 !== x0) parts.push('X'); if (y1 !== y0) parts.push('Y'); if (z1 !== z0) parts.push('Z');
+      return parts.length === 1 ? '4 in a row — ' + parts[0] + ' axis' : '4 in a row — ' + parts.join('/') + ' diagonal';
     }
 
+    // ── HUD ───────────────────────────────────────────────────────
+    function updateHUD() {
+      const lbl = document.getElementById('turn-label');
+      if (currentPlayer === P1) {
+        lbl.textContent = '&#9679; PLAYER 1\'S TURN'; lbl.style.color = 'var(--p1)';
+        document.getElementById('hud-p1').classList.add('active');
+        document.getElementById('hud-p2').classList.remove('active');
+      } else {
+        lbl.textContent = '&#9679; PLAYER 2\'S TURN'; lbl.style.color = 'var(--p2)';
+        document.getElementById('hud-p1').classList.remove('active');
+        document.getElementById('hud-p2').classList.add('active');
+      }
+      document.getElementById('status-msg').textContent = 'Pick a column (X \u00B7 Z) to drop';
+    }
+
+    function showResult(title, sub, color) {
+      document.getElementById('result-title').textContent = title;
+      document.getElementById('result-title').style.color = color;
+      document.getElementById('result-sub').textContent = sub;
+      document.getElementById('result-overlay').classList.add('show');
+    }
+
+    // ── GAME CONTROL ─────────────────────────────────────────────
+    function resetGame() {
+      board.fill(0); currentPlayer = P1; gameOver = false; dropping = false;
+      placedBalls.forEach(b => { scene.remove(b.mesh); scene.remove(b.gm); }); placedBalls.length = 0;
+      clearWinGlows();
+      if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
+      document.getElementById('result-overlay').classList.remove('show');
+      updateHUD(); refreshColBtns();
+      camFollow = true; updateCamBtn(); camTarget.set(0, 4, 0); camRadius = 30; camPhi = 0.52; orbitCam();
+    }
     function rematch() {
-      $('result-overlay').classList.remove('active');
-      grid = new Array(totalCells()).fill(0);
-      currentPlayer = 1; gameOver = false; winLine = []; eliminated.clear();
-      buildBoard(); buildHUD(); scheduleAiTurn();
+      scores = [0, 0];
+      document.getElementById('score-p1').textContent = '0';
+      document.getElementById('score-p2').textContent = '0';
+      resetGame();
     }
 
-    function backToMenu() {
-      $('result-overlay').classList.remove('active');
-      showScreen('menu-screen');
-      $('setup-step1').style.display = 'block';
-      $('setup-step2').style.display = 'none';
-      if (mp) { mp.leave(); }
+    // ── RENDER LOOP ───────────────────────────────────────────────
+    let lastT = 0, idleRot = 0;
+    function animate(t) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t;
+      // Gentle idle rotation of the whole lattice when no ball in flight
+      if (!dropping) { idleRot += dt * 0.05; latticeGroup.rotation.y = Math.sin(idleRot) * 0.045; }
+      physStep(dt);
+      if (!camFollow) orbitCam();
+      renderer.render(scene, camera);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // AI — threat/opportunity heuristic (supports N players)
-    // ═══════════════════════════════════════════════════════════════════════
-    function findBestMove(player) {
-      // 1. Win immediately
-      for (let i = 0; i < grid.length; i++) {
-        if (grid[i] !== 0) continue;
-        grid[i] = player;
-        if (checkWin(player)) { grid[i] = 0; return i; }
-        grid[i] = 0;
-      }
-      // 2. Block ANY opponent's win
-      for (let p = 1; p <= numPlayers; p++) {
-        if (p === player) continue;
-        for (let i = 0; i < grid.length; i++) {
-          if (grid[i] !== 0) continue;
-          grid[i] = p;
-          if (checkWin(p)) { grid[i] = 0; return i; }
-          grid[i] = 0;
-        }
-      }
-      // 3. Score by line potential
-      const cellScores = new Float32Array(grid.length);
-      for (const line of allLines) {
-        let mine = 0, blocked = false;
-        for (const ci of line) {
-          if (grid[ci] === player) mine++;
-          else if (grid[ci] !== 0) { blocked = true; break; }
-        }
-        if (!blocked && mine > 0) {
-          const bonus = mine === 2 ? 50 : mine === 1 ? 5 : 1;
-          for (const ci of line) { if (grid[ci] === 0) cellScores[ci] += bonus; }
-        }
-        for (let p = 1; p <= numPlayers; p++) {
-          if (p === player) continue;
-          let theirs = 0; let myBlock = false;
-          for (const ci of line) {
-            if (grid[ci] === p) theirs++;
-            else if (grid[ci] !== 0 && grid[ci] !== p) { myBlock = true; break; }
-          }
-          if (!myBlock && theirs > 0) {
-            const threat = theirs === 2 ? 30 : theirs === 1 ? 3 : 0;
-            for (const ci of line) { if (grid[ci] === 0) cellScores[ci] += threat; }
-          }
-        }
-      }
-      for (let i = 0; i < grid.length; i++) {
-        if (grid[i] !== 0) continue;
-        const c = coordsOf(i);
-        let centrality = 0;
-        for (let d = 0; d < DIM; d++) centrality += (1 - Math.abs(c[d] - 1));
-        cellScores[i] += centrality * 2;
-      }
-      let best = -1, bestScore = -1;
-      for (let i = 0; i < grid.length; i++) {
-        if (grid[i] !== 0) continue;
-        const s = cellScores[i] + Math.random() * 0.5;
-        if (s > bestScore) { bestScore = s; best = i; }
-      }
-      return best;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // MULTIPLAYER — via unified KGMultiplayer
-    // ═══════════════════════════════════════════════════════════════════════
-    function ensureMp() {
-      if (mp) return;
-      mp = new KGMultiplayer('tictactoe');
-      mp.on('authenticated', () => onMpReady());
-      mp.on('session_update', (s) => onSessionUpdate(s));
-      mp.on('session_list', (list) => onSessionList(list));
-      mp.on('game_started', () => onGameStarted());
-      mp.on('game_action', (d) => onGameAction(d));
-      mp.on('game_over', () => { });
-      mp.on('error', (msg) => { $('lobby-status').textContent = msg; $('lobby-status').className = 'lobby-msg err'; });
-      mp.connect({
-        username: localStorage.getItem('username') || 'Player',
-        token: localStorage.getItem('user_token'),
-      });
-    }
-
-    function connectAndHost() {
-      ensureMp();
-      if (mp.connected) onMpReady();
-    }
-
-    function connectForJoin() {
-      ensureMp();
-      if (mp.connected) refreshGameList();
-    }
-
-    function onMpReady() {
-      if (setupMode === 'host') {
-        mp.createGame({ private: true, maxPlayers: numPlayers, settings: { dim: DIM } });
-        $('lobby-status').textContent = 'Creating room...';
-      } else if (setupMode === 'join') {
-        refreshGameList();
-      }
-    }
-
-    function doJoinCode() {
-      ensureMp();
-      const code = $('join-code-input').value.trim().toUpperCase();
-      if (code.length < 4) { $('lobby-status').textContent = 'Enter a valid code'; $('lobby-status').className = 'lobby-msg err'; return; }
-      mp.joinByCode(code);
-      $('lobby-status').textContent = 'Joining...';
-    }
-
-    function doMatchmake() {
-      ensureMp();
-      mp.matchmake();
-      $('lobby-status').textContent = 'Finding a game...';
-    }
-
-    function refreshGameList() {
-      if (mp) mp.listGames('tictactoe');
-    }
-
-    function copyCode() {
-      const code = mp ? mp.sessionCode : '';
-      if (code) { navigator.clipboard.writeText(code); $('copy-msg').textContent = 'Copied!'; setTimeout(() => $('copy-msg').textContent = '', 2000); }
-    }
-
-    function onSessionUpdate(session) {
-      // Show code
-      $('code-display').textContent = session.session_code;
-      $('code-display').style.display = 'block';
-      $('code-copy-row').style.display = 'block';
-
-      // Update player slots from session
-      numPlayers = session.max_players;
-      playerSlots = [];
-      for (let i = 0; i < numPlayers; i++) {
-        const sp = session.players[i];
-        if (sp) {
-          playerSlots.push({ name: sp.username, type: sp.is_ai ? 'ai' : 'online', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
-        } else {
-          playerSlots.push({ name: 'Waiting...', type: 'empty', color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i] });
-        }
-      }
-      renderSlots();
-
-      $('lobby-status').textContent = session.player_count + '/' + session.max_players + ' players — ' +
-        (session.player_count >= numPlayers ? 'Ready! Starting...' : 'Waiting for players...');
-      $('lobby-status').className = 'lobby-msg ok';
-
-      // Host auto-starts when full
-      if (mp.isHost && session.player_count >= numPlayers) {
-        $('start-btn').style.display = 'inline-block';
-        $('start-btn').textContent = '▶ START NOW';
-        $('start-btn').onclick = () => mp.startGame();
-      }
-    }
-
-    function onSessionList(list) {
-      const el = $('game-list');
-      if (!list.length) { el.innerHTML = '<div style="color:var(--dim);font-size:0.8em;padding:8px;">No open games. Try Quick Match.</div>'; return; }
-      el.innerHTML = list.map(s => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1px solid rgba(0,255,255,0.1);border-radius:6px;margin-bottom:4px;background:var(--card);">
-          <span style="color:var(--cyan);font-size:0.9em;">${s.host_username}'s game</span>
-          <span style="color:var(--dim);font-size:0.75em;">${s.player_count}/${s.max_players}</span>
-          <button class="ctrl-btn" style="font-size:0.7em;padding:3px 10px;" onclick="mp.joinById('${s.session_id}')">JOIN</button>
-        </div>`).join('');
-    }
-
-    function onGameStarted() {
-      // Determine my player number from position in session
-      const players = mp.players || [];
-      myPlayer = 1;
-      for (let i = 0; i < players.length; i++) {
-        if (players[i].user_id === mp.userId) { myPlayer = i + 1; break; }
-      }
-      gameMode = 'online';
-      numPlayers = players.length;
-      playerSlots = players.map((p, i) => ({
-        name: p.user_id === mp.userId ? 'You' : p.username,
-        type: p.user_id === mp.userId ? 'human' : 'online',
-        color: PLAYER_COLORS[i], symbol: PLAYER_SYMBOLS[i],
-      }));
-      grid = new Array(totalCells()).fill(0);
-      currentPlayer = 1; gameOver = false; winLine = []; eliminated.clear();
-      precomputeLines(); buildBoard(); buildHUD();
-      showScreen('game-screen');
-      updateBoardDisplay();
-    }
-
-    function onGameAction(data) {
-      if (data.action === 'place' && data.payload) {
-        const { ci, player } = data.payload;
-        if (grid[ci] === 0) {
-          grid[ci] = player;
-          const wl = checkWin(player);
-          if (wl) { winLine = wl; scores[player - 1]++; endGame(player); return; }
-          if (checkDraw()) { endGame(0); return; }
-          nextPlayer(); updateBoardDisplay();
-        }
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // DRAG TO ROTATE
-    // ═══════════════════════════════════════════════════════════════════════
-    let dragging = false, dragX = 0, dragY = 0;
-    const bw = document.querySelector('.board-wrapper');
-    document.addEventListener('mousedown', e => {
-      if (e.target.closest('.board-wrapper') && !e.target.closest('.cell')) {
-        dragging = true; dragX = e.clientX; dragY = e.clientY; e.preventDefault();
-      }
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      rotateCubes((e.clientX - dragX) * 0.5, (e.clientY - dragY) * 0.5);
-      dragX = e.clientX; dragY = e.clientY;
-    });
-    document.addEventListener('mouseup', () => dragging = false);
 
-    // Touch support
-    document.addEventListener('touchstart', e => {
-      if (e.target.closest('.board-wrapper') && !e.target.closest('.cell')) {
-        dragging = true; dragX = e.touches[0].clientX; dragY = e.touches[0].clientY;
-      }
-    }, { passive: true });
-    document.addEventListener('touchmove', e => {
-      if (!dragging) return;
-      rotateCubes((e.touches[0].clientX - dragX) * 0.5, (e.touches[0].clientY - dragY) * 0.5);
-      dragX = e.touches[0].clientX; dragY = e.touches[0].clientY;
-    }, { passive: true });
-    document.addEventListener('touchend', () => dragging = false);
-
-    // ── URL code join (from invite link) ──
-    const urlCode = new URLSearchParams(location.search).get('code');
-    if (urlCode) {
-      selectDim(4);
-      enterSetup('join');
-      $('join-code-input').value = urlCode;
-      setTimeout(() => doJoinCode(), 500);
-    }
+    // ── INIT ─────────────────────────────────────────────────────
+    buildColUI(); updateHUD(); refreshColBtns(); orbitCam();
+    requestAnimationFrame(animate);
   </script>
 </body>
 
