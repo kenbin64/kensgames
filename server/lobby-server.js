@@ -1,12 +1,24 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * FAST TRACK LOBBY SERVER
+ * KENSGAMES UNIFIED GAME SERVER
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * WebSocket server for real-time lobby, private games, matchmaking.
+ * WebSocket server for ALL games: FastTrack, BrickBreaker3D, Starfighter,
+ * ConnectIV, SwartzDiamond, and future titles.
+ *
  * Listens on port 8765 — nginx proxies wss://kensgames.com/ws here.
  *
- * Message protocol matches fasttrack/lobby_client.js exactly.
+ * Features:
+ *   - Game-agnostic session management (game_id on every session)
+ *   - Invite codes that resolve to the correct game automatically
+ *   - Real-time state relay for action games (Starfighter, BrickBreaker)
+ *   - Turn-based state relay for board games (FastTrack, ConnectIV)
+ *   - Matchmaking by game type
+ *   - Guest + authenticated auth
+ *   - AI bot slots
+ *   - Chat + guilds
+ *
+ * Protocol: JSON over WebSocket. Every message has { type: '...' }.
  */
 
 const WebSocket = require('ws');
@@ -111,11 +123,23 @@ function getWsByUserId(userId) {
   return null;
 }
 
-function getPublicSessions() {
+// ── Registered game types ──
+const GAME_REGISTRY = {
+  fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', maxPlayers: 6, type: 'turn' },
+  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/index.html', maxPlayers: 4, type: 'realtime' },
+  starfighter: { name: 'Starfighter', path: '/starfighter/index.html', maxPlayers: 6, type: 'realtime' },
+  connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', maxPlayers: 2, type: 'turn' },
+  swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', maxPlayers: 4, type: 'turn' },
+  cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', maxPlayers: 4, type: 'turn' },
+  tictactoe: { name: 'Multi-D TicTacToe', path: '/tictactoe/index.html', maxPlayers: 2, type: 'turn' },
+};
+
+function getPublicSessions(gameId) {
   const result = [];
   for (const [, session] of sessions) {
     if (session.status !== 'waiting') continue;
     if (session.is_private) continue;
+    if (gameId && session.game_id !== gameId) continue; // filter by game
     result.push(sanitizeSession(session));
   }
   return result;
@@ -125,6 +149,8 @@ function sanitizeSession(s) {
   return {
     session_id: s.session_id,
     session_code: s.session_code,
+    game_id: s.game_id || 'fasttrack',
+    game_name: (GAME_REGISTRY[s.game_id] || {}).name || s.game_id,
     host_id: s.host_id,
     host_username: s.host_username,
     is_private: s.is_private,
@@ -375,11 +401,15 @@ handlers.create_session = (ws, data) => {
 
   const sessionId = generateId('session');
   const code = generateCode();
-  const maxPlayers = Math.min(Math.max(data.max_players || 4, 2), 6);
+  // Game ID: which game is this session for? Defaults to fasttrack for backward compat.
+  const gameId = data.game_id || 'fasttrack';
+  const gameInfo = GAME_REGISTRY[gameId] || {};
+  const maxPlayers = Math.min(Math.max(data.max_players || gameInfo.maxPlayers || 4, 2), gameInfo.maxPlayers || 6);
 
   const session = {
     session_id: sessionId,
     session_code: code,
+    game_id: gameId,
     host_id: conn.user_id,
     host_username: conn.user.username,
     is_private: !!data.private,
@@ -401,7 +431,8 @@ handlers.create_session = (ws, data) => {
   sessions.set(sessionId, session);
   codeIndex.set(code, sessionId);
 
-  const shareUrl = `/fasttrack/join.html?code=${code}`;
+  // Game-agnostic share URL — portal join page resolves the game from the code
+  const shareUrl = `/lobby/join.html?code=${code}`;
 
   send(ws, {
     type: 'session_created',
@@ -413,8 +444,101 @@ handlers.create_session = (ws, data) => {
   broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: sessionId });
 };
 
-handlers.list_sessions = (ws) => {
-  send(ws, { type: 'session_list', sessions: getPublicSessions() });
+handlers.list_sessions = (ws, data) => {
+  const gameId = (data && data.game_id) || null; // optional filter
+  send(ws, { type: 'session_list', sessions: getPublicSessions(gameId) });
+};
+
+// ── Quick Matchmaking ──
+// Finds or creates a public game for the requested game_id
+handlers.matchmake = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const gameId = data.game_id || 'fasttrack';
+  const existing = findSessionByPlayer(conn.user_id);
+  if (existing) removePlayerFromSession(conn.user_id);
+
+  // Find a waiting public session for this game
+  for (const [, session] of sessions) {
+    if (session.game_id !== gameId) continue;
+    if (session.status !== 'waiting') continue;
+    if (session.is_private) continue;
+    if (session.players.length >= session.max_players) continue;
+
+    // Join this session
+    const slot = session.players.length;
+    session.players.push({
+      user_id: conn.user_id,
+      username: conn.user.username,
+      avatar_id: conn.user.avatar_id,
+      is_host: false,
+      is_ai: false,
+      slot,
+      ready: false
+    });
+    broadcast(session.session_id, {
+      type: 'player_joined',
+      session: sanitizeSession(session),
+      username: conn.user.username
+    });
+    return;
+  }
+
+  // No match found — create a new public session
+  const gameInfo = GAME_REGISTRY[gameId] || {};
+  const sessionId = generateId('session');
+  const code = generateCode();
+  const session = {
+    session_id: sessionId,
+    session_code: code,
+    game_id: gameId,
+    host_id: conn.user_id,
+    host_username: conn.user.username,
+    is_private: false,
+    max_players: gameInfo.maxPlayers || 4,
+    settings: {},
+    status: 'waiting',
+    created_at: Date.now(),
+    players: [{
+      user_id: conn.user_id,
+      username: conn.user.username,
+      avatar_id: conn.user.avatar_id,
+      is_host: true,
+      is_ai: false,
+      slot: 0,
+      ready: true
+    }]
+  };
+  sessions.set(sessionId, session);
+  codeIndex.set(code, sessionId);
+  send(ws, { type: 'matchmake_result', action: 'created', session: sanitizeSession(session) });
+  broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: sessionId });
+};
+
+// ── Resolve Code → Game ──
+// Client sends a code, server responds with which game it belongs to + session info
+handlers.resolve_code = (ws, data) => {
+  const code = (data.code || '').toUpperCase().trim();
+  const sessionId = codeIndex.get(code);
+  if (!sessionId) {
+    send(ws, { type: 'resolve_code_result', found: false, code });
+    return;
+  }
+  const session = sessions.get(sessionId);
+  if (!session) {
+    send(ws, { type: 'resolve_code_result', found: false, code });
+    return;
+  }
+  const gameInfo = GAME_REGISTRY[session.game_id] || {};
+  send(ws, {
+    type: 'resolve_code_result',
+    found: true,
+    code,
+    game_id: session.game_id,
+    game_name: gameInfo.name || session.game_id,
+    game_path: gameInfo.path || '/',
+    session: sanitizeSession(session),
+  });
 };
 
 handlers.join_session = (ws, data) => {
@@ -714,6 +838,111 @@ handlers.start_game = (ws) => {
   }
 
   broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: session.session_id });
+};
+
+// --- Real-Time Game State Relay ---
+// These handlers support both real-time (Starfighter, BrickBreaker)
+// and turn-based (FastTrack, ConnectIV, TicTacToe) games.
+// The server is a RELAY — it doesn't understand game logic, just forwards state.
+
+// Player state — high-frequency position/velocity updates (action games, ~20 Hz)
+handlers.player_state = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.status !== 'playing') return;
+
+  // Relay to all other players in the session
+  const payload = {
+    type: 'player_state',
+    user_id: conn.user_id,
+    username: conn.user.username,
+    ...data // x, y, z, qx, qy, qz, qw, vx, vy, vz, hull, shields, etc.
+  };
+  delete payload.type; // re-add clean
+  const msg = JSON.stringify({ type: 'player_state', ...payload });
+  for (const [clientWs, clientConn] of connections) {
+    if (clientConn.user_id === conn.user_id) continue;
+    if (session.players.some(p => p.user_id === clientConn.user_id)) {
+      if (clientWs.readyState === 1) clientWs.send(msg);
+    }
+  }
+};
+
+// Game action — any discrete game event (fire weapon, play card, move piece)
+handlers.game_action = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.status !== 'playing') return;
+
+  const payload = JSON.stringify({
+    type: 'game_action',
+    user_id: conn.user_id,
+    username: conn.user.username,
+    action: data.action,    // e.g. 'fire', 'move_piece', 'play_card'
+    payload: data.payload,  // game-specific data
+    seq: data.seq || 0,     // sequence number for ordering
+    timestamp: Date.now(),
+  });
+  for (const [clientWs, clientConn] of connections) {
+    if (clientConn.user_id === conn.user_id) continue;
+    if (session.players.some(p => p.user_id === clientConn.user_id)) {
+      if (clientWs.readyState === 1) clientWs.send(payload);
+    }
+  }
+};
+
+// Game state — authoritative state snapshot from host (periodic or on key events)
+handlers.game_state = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.status !== 'playing') return;
+  // Only host can broadcast authoritative state
+  if (session.host_id !== conn.user_id) return;
+
+  const payload = JSON.stringify({
+    type: 'game_state',
+    state: data.state,      // game-specific state blob
+    seq: data.seq || 0,
+    timestamp: Date.now(),
+  });
+  for (const [clientWs, clientConn] of connections) {
+    if (clientConn.user_id === conn.user_id) continue;
+    if (session.players.some(p => p.user_id === clientConn.user_id)) {
+      if (clientWs.readyState === 1) clientWs.send(payload);
+    }
+  }
+};
+
+// Game over — any player can signal, but only host's is authoritative
+handlers.game_over = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.status !== 'playing') return;
+
+  session.status = 'finished';
+
+  const payload = JSON.stringify({
+    type: 'game_over',
+    result: data.result,    // 'win', 'loss', 'draw', etc.
+    winner: data.winner,    // user_id or null
+    scores: data.scores,    // { user_id: score, ... }
+    message: data.message,
+  });
+  for (const [clientWs, clientConn] of connections) {
+    if (session.players.some(p => p.user_id === clientConn.user_id)) {
+      if (clientWs.readyState === 1) clientWs.send(payload);
+    }
+  }
+
+  // Clean up session after 30 seconds
+  setTimeout(() => {
+    sessions.delete(session.session_id);
+    codeIndex.delete(session.session_code);
+  }, 30000);
 };
 
 // --- Chat ---

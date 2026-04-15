@@ -37,7 +37,40 @@ const Starfighter = (function () {
         _replacementBriefing: '',
         callsign: localStorage.getItem('sf_callsign') || '',
         alienBaseSpawned: false, // alien hive base spawned flag
+        // Multiplayer state (populated by URL params in init)
+        gameMode: 'solo',
+        roomCode: null,
+        isMultiplayer: false,
+        // Kill feed + mission stats
+        killFeed: [],        // { text, color, time } — max 6, fades out after 4s
+        missionStats: { kills: 0, deaths: 0, accuracy: 0, shotsFired: 0, shotsHit: 0, damageDealt: 0, damageTaken: 0, waveReached: 0, wingmenSaved: 0, wingmenLost: 0, startTime: 0 },
+        playerKills: 0,
     };
+
+    // ── Kill Feed ──
+    function _addKillFeedEntry(text, color) {
+        state.killFeed.push({ text, color: color || '#0ff', time: performance.now() });
+        if (state.killFeed.length > 6) state.killFeed.shift();
+    }
+
+    function _renderKillFeed() {
+        let container = document.getElementById('kill-feed');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'kill-feed';
+            container.style.cssText = 'position:fixed;top:80px;right:16px;z-index:200;pointer-events:none;font-family:monospace;font-size:11px;text-align:right;';
+            document.body.appendChild(container);
+        }
+        const now = performance.now();
+        const FADE_DURATION = 4000;
+        container.innerHTML = state.killFeed
+            .filter(e => now - e.time < FADE_DURATION)
+            .map(e => {
+                const age = now - e.time;
+                const opacity = Math.max(0, 1 - age / FADE_DURATION);
+                return '<div style="color:' + e.color + ';opacity:' + opacity.toFixed(2) + ';margin-bottom:3px;text-shadow:0 0 6px ' + e.color + ';">' + e.text + '</div>';
+            }).join('');
+    }
 
     // Communication system — fully reactive, no canned dialog
     // Every message is generated from live game state at the moment it fires.
@@ -532,6 +565,7 @@ const Starfighter = (function () {
             } else {
                 this.hull -= amt;
             }
+            if (this.type === 'player') state.missionStats.damageTaken += amt;
             if (this.hull <= 0) this.explode();
         }
 
@@ -558,6 +592,10 @@ const Starfighter = (function () {
                 state.score += dim('score.enemy');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → Splash Enemy Drone [' + (this._killedByWeapon || 'Laser') + ']',
+                    this.killedBy === 'player' ? '#00ffaa' : '#88aacc'
+                );
                 if (this.killedBy === 'player' && (state.kills % 3 === 0 || _countActiveHostiles() <= 2)) {
                     if (window.SFAnnouncer) SFAnnouncer.onKill('enemy');
                 }
@@ -567,6 +605,10 @@ const Starfighter = (function () {
                 state.score += dim('score.predator');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → Splash Predator [' + (this._killedByWeapon || 'Laser') + ']',
+                    '#ff4400'
+                );
                 if (window.SFAnnouncer) SFAnnouncer.onKill('predator');
                 checkWave();
 
@@ -574,6 +616,10 @@ const Starfighter = (function () {
                 state.score += dim('score.interceptor');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → Splash Interceptor [' + (this._killedByWeapon || 'Laser') + ']',
+                    this.killedBy === 'player' ? '#00ffcc' : '#88aacc'
+                );
                 if (window.SFAnnouncer) SFAnnouncer.onKill('interceptor');
                 checkWave();
 
@@ -581,6 +627,10 @@ const Starfighter = (function () {
                 state.score += dim('score.bomber');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → Splash Bomber [' + (this._killedByWeapon || 'Torpedo') + ']',
+                    '#ff6600'
+                );
                 if (window.SFAnnouncer) SFAnnouncer.onKill('bomber');
                 checkWave();
 
@@ -588,6 +638,10 @@ const Starfighter = (function () {
                 state.score += dim('score.dreadnought');
                 state.kills++;
                 if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → DREADNOUGHT DESTROYED [' + (this._killedByWeapon || 'Torpedo') + ']',
+                    '#ff0044'
+                );
                 if (window.SFAnnouncer) SFAnnouncer.onKill('dreadnought');
                 checkWave();
 
@@ -611,6 +665,38 @@ const Starfighter = (function () {
             } else if (this.type === 'ally') {
                 state.score -= Math.abs(dim('score.friendlyKill'));
                 if (window.SFAnnouncer) SFAnnouncer.onAllyDown();
+            } else if (this.type === 'wingman') {
+                state.missionStats.wingmenLost++;
+                const cs = this.callsign || 'Wingman';
+                _addKillFeedEntry('✖ ' + cs + ' — KIA', '#ff4444');
+                if (this._anpc && window.SFAnpc) {
+                    SFAnpc.setState(this._anpcKey, 'DESTROYED');
+                    // Morale hit to all surviving wingmen
+                    state.entities.forEach(e => {
+                        if (e.type === 'wingman' && !e.markedForDeletion && e._anpc) {
+                            SFAnpc.adjustMorale(e._anpcKey, -0.15);
+                        }
+                    });
+                }
+            }
+
+            // ── Progression: award XP/credits on hostile kills ──
+            const HOSTILE_TYPES = ['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'egg', 'youngling'];
+            if (HOSTILE_TYPES.includes(this.type) && this.killedBy === 'player' && window.SFProgression) {
+                const result = SFProgression.awardKill(this.type);
+                // Rank-up notification
+                if (result.ranked && result.newRank) {
+                    const msg = '★ PROMOTED TO ' + result.newRank.name.toUpperCase() + ' ★';
+                    _addKillFeedEntry(msg, '#ffdd00');
+                    if (window.SFAnnouncer && SFAnnouncer.addComm) {
+                        SFAnnouncer.addComm('FLEET', 'Congratulations, pilot. You\'ve been promoted to ' + result.newRank.name + '.', 'base');
+                    }
+                }
+                // Check achievements
+                const achievements = SFProgression.checkAchievements();
+                for (const a of achievements) {
+                    _addKillFeedEntry('🏆 ' + a.name + ' — ' + a.desc, '#ffaa00');
+                }
             }
         }
     }
@@ -634,6 +720,11 @@ const Starfighter = (function () {
             this.boostActive = false;
             this.boostTimer = 0;         // remaining boost duration
             this.boostCooldown = 0;      // cooldown timer
+            this.hyperdriveActive = false;
+            this.hyperdriveSpooling = false;
+            this.hyperdriveSpoolTimer = 0;
+            this.hyperdriveCooldown = 0;
+            this.hyperdriveSpeed = dim('player.hyperdriveSpeed');
             this.flightAssist = true;    // GDD §4.1: FA ON by default
             // Weapon selector — cycle with Q
             this.selectedWeapon = 0;     // 0=laser, 1=gun, 2=pulse, 3=torpedo
@@ -659,7 +750,28 @@ const Starfighter = (function () {
 
             // Determine current max speed
             let currentMax = this.maxSpeed;
-            if (this.boostActive && this.boostTimer > 0) {
+
+            // Hyperdrive spooling
+            if (this.hyperdriveSpooling) {
+                this.hyperdriveSpoolTimer -= dt;
+                if (this.hyperdriveSpoolTimer <= 0) {
+                    this.hyperdriveSpooling = false;
+                    this.hyperdriveActive = true;
+                    if (window.SFAudio) SFAudio.playSound('boost');
+                    if (window.SFAnnouncer) SFAnnouncer.addComm && SFAnnouncer.addComm('NAV', 'Hyperdrive engaged.', 'base');
+                }
+            }
+
+            // Hyperdrive active — burns fuel fast, overrides all other speed modes
+            if (this.hyperdriveActive) {
+                if (this.fuel > 0) {
+                    currentMax = this.hyperdriveSpeed;
+                    this.fuel = Math.max(0, this.fuel - dt * dim('player.hyperdriveBurn'));
+                    if (this.fuel <= 0) this.disengageHyperdrive();
+                } else {
+                    this.disengageHyperdrive();
+                }
+            } else if (this.boostActive && this.boostTimer > 0) {
                 currentMax = this.boostSpeed;
                 this.boostTimer -= dt;
                 if (this.boostTimer <= 0) {
@@ -673,6 +785,8 @@ const Starfighter = (function () {
 
             // Boost cooldown tick
             if (this.boostCooldown > 0) this.boostCooldown -= dt;
+            // Hyperdrive cooldown tick
+            if (this.hyperdriveCooldown > 0) this.hyperdriveCooldown -= dt;
 
             // Forward velocity
             const targetVel = _v1.clone().multiplyScalar(this.throttle * currentMax);
@@ -703,8 +817,8 @@ const Starfighter = (function () {
                 }
             }
 
-            // Fuel regen when not using afterburner
-            if (!this.afterburnerActive && !this.boostActive) {
+            // Fuel regen when not using afterburner or hyperdrive
+            if (!this.afterburnerActive && !this.boostActive && !this.hyperdriveActive) {
                 this.fuel = Math.min(dim('player.fuel'), this.fuel + dt * dim('player.fuelRegen'));
             }
 
@@ -724,6 +838,23 @@ const Starfighter = (function () {
             this.boostTimer = dim('player.boostDuration');
             this.fuel -= cost;
             if (window.SFAudio) SFAudio.playSound('boost');
+        }
+
+        // Hyperdrive — H key to engage/disengage, spools up before activating
+        activateHyperdrive() {
+            const cost = dim('player.hyperdriveFuelCost');
+            if (this.hyperdriveCooldown > 0 || this.hyperdriveActive || this.hyperdriveSpooling || this.fuel < cost) return;
+            this.hyperdriveSpooling = true;
+            this.hyperdriveSpoolTimer = dim('player.hyperdriveSpoolTime');
+            this.fuel -= cost;
+            if (window.SFAudio) SFAudio.playSound('boost');
+        }
+
+        disengageHyperdrive() {
+            this.hyperdriveActive = false;
+            this.hyperdriveSpooling = false;
+            this.hyperdriveSpoolTimer = 0;
+            this.hyperdriveCooldown = dim('player.hyperdriveCooldown');
         }
 
         // GDD §4.1: Toggle Flight Assist
@@ -753,15 +884,71 @@ const Starfighter = (function () {
         state.player = new Player();
         state.player.hull = dim('player.hull');
         state.player.shields = dim('player.shields');
+
+        // ── Load career and apply purchased upgrades ──
+        if (window.SFProgression) {
+            SFProgression.load();
+            const career = SFProgression.career();
+            // Apply persistent upgrade effects (hull plating, shield cap, etc.)
+            SFProgression.applyUpgradesToPlayer(state.player, function (key, addVal) {
+                // Additive boost to manifold dimensions
+                if (key.startsWith('player.')) {
+                    const prop = key.replace('player.', '');
+                    if (state.player[prop] !== undefined) {
+                        state.player[prop] += addVal;
+                    }
+                } else if (key.startsWith('weapon.')) {
+                    // Weapon upgrades stored for later application at fire-time
+                    if (!state._weaponBoosts) state._weaponBoosts = {};
+                    state._weaponBoosts[key] = (state._weaponBoosts[key] || 0) + addVal;
+                }
+            });
+            // Set initial rank display
+            const rank = SFProgression.getRank();
+            state._currentRank = rank;
+            console.log('[CAREER] Rank:', rank.name, '| XP:', career.xp, '| Credits:', career.credits, '| Kills:', career.totalKills);
+        }
+
         state.baseship = new Baseship();
         state.entities.push(state.player, state.baseship);
         state.phase = 'loading';
         state.launchTimer = 0;
         state.arenaRadius = dim('arena.radius');
 
-        // Parse URL params: ?ai=0 disables AI wingmen (on by default)
+        // Parse URL params: ?ai=0 disables AI wingmen, ?mode=multi/private activates MP
         const params = new URLSearchParams(window.location.search);
         state.aiWingmen = params.get('ai') !== '0';
+        state.gameMode = params.get('mode') || 'solo';     // solo | multi | private
+        state.roomCode = params.get('code') || null;        // invite code for private games
+        state.isMultiplayer = state.gameMode !== 'solo';
+
+        // Connect to multiplayer server if multiplayer mode
+        if (state.isMultiplayer && window.SFMultiplayer) {
+            const storedCallsign = localStorage.getItem('username') || 'Pilot';
+            SFMultiplayer.connect(storedCallsign, function (event, data) {
+                if (event === 'game_start') {
+                    console.log('[MP] Game started — room:', data.room.id);
+                } else if (event === 'remote_fire') {
+                    // Spawn visual for remote player fire events
+                    if (data.weapon === 'laser' && window.SF3D) {
+                        SF3D.spawnLaser({ position: { x: data.x, y: data.y, z: data.z }, quaternion: new THREE.Quaternion() });
+                    }
+                } else if (event === 'game_over') {
+                    console.log('[MP] Game over:', data.result);
+                } else if (event === 'comm') {
+                    addComm(data.sender, data.message, data.commType);
+                } else if (event === 'chat') {
+                    addComm(data.callsign, data.message, 'info');
+                }
+            });
+
+            // Auto-join: private with code, or matchmake
+            if (state.gameMode === 'private' && state.roomCode) {
+                SFMultiplayer.joinRoom(state.roomCode);
+            } else if (state.gameMode === 'multi') {
+                SFMultiplayer.matchmake();
+            }
+        }
 
         // Init 3D system immediately so models start loading
         if (window.SF3D) {
@@ -933,6 +1120,7 @@ const Starfighter = (function () {
                             <div class="tut-key-label">SYSTEMS</div>
                             <div class="tut-binding"><span class="tut-key">Shift</span> Afterburner</div>
                             <div class="tut-binding"><span class="tut-key">F</span> Boost (burst)</div>
+                            <div class="tut-binding"><span class="tut-key">H</span> Hyperdrive</div>
                             <div class="tut-binding"><span class="tut-key">V</span> Flight Assist</div>
                             <div class="tut-binding"><span class="tut-key">G</span> Request Dock</div>
                             <div class="tut-binding"><span class="tut-key">R</span> Emergency RTB</div>
@@ -1426,6 +1614,7 @@ const Starfighter = (function () {
     function completeLaunch() {
         // ── Cutscene ends: hand off to combat as a separate entity ──
         state.phase = 'combat';
+        if (!state.missionStats.startTime) state.missionStats.startTime = performance.now();
         state._replacementVariant = '';
         state._replacementBriefing = '';
 
@@ -1533,11 +1722,41 @@ const Starfighter = (function () {
         countdownDisplay.style.display = 'block';
         countdownDisplay.style.fontSize = '1.8em';
         countdownDisplay.style.color = '#00ff88';
+        // ── Progression: award wave-complete XP ──
+        if (window.SFProgression) {
+            SFProgression.awardEvent('wave_complete');
+            // Check for no-damage bonus
+            if (state.missionStats.damageTaken === 0) SFProgression.awardEvent('wave_no_damage');
+        }
+
+        // Build upgrade shop HTML for between-wave screen
+        let shopHTML = '';
+        if (window.SFProgression) {
+            const upgrades = SFProgression.getPurchasableUpgrades();
+            const cr = SFProgression.career().credits;
+            if (upgrades.length > 0) {
+                shopHTML = '<div style="margin-top:8px;font-size:0.4em;color:#88ccee;letter-spacing:1px;">UPGRADE BAY</div>';
+                shopHTML += '<div style="font-size:0.35em;color:#556;margin-bottom:6px;">Credits: ₡' + cr + '</div>';
+                shopHTML += '<div id="upgrade-shop" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:600px;margin:0 auto;">';
+                for (const u of upgrades.slice(0, 6)) { // max 6 shown
+                    const canAfford = cr >= u.cost;
+                    shopHTML += '<div onclick="window._sfBuyUpgrade && window._sfBuyUpgrade(\'' + u.id + '\')" '
+                        + 'style="cursor:' + (canAfford ? 'pointer' : 'not-allowed') + ';padding:6px 10px;background:rgba(0,20,40,' + (canAfford ? '0.85' : '0.5') + ');border:1px solid ' + (canAfford ? 'rgba(0,255,255,0.3)' : 'rgba(100,100,100,0.3)') + ';border-radius:4px;font-size:0.4em;text-align:left;min-width:120px;">'
+                        + '<div style="color:' + (canAfford ? '#0ff' : '#556') + ';font-weight:bold;">' + u.name + '</div>'
+                        + '<div style="color:#88aacc;font-size:0.9em;">' + u.desc + '</div>'
+                        + '<div style="color:' + (canAfford ? '#ffaa00' : '#664433') + ';margin-top:3px;">₡' + u.cost + '</div>'
+                        + '</div>';
+                }
+                shopHTML += '</div>';
+            }
+        }
+
         countdownDisplay.innerHTML = `WAVE ${prevWave} COMPLETE<br>` +
             `<span style="font-size:0.5em;color:#88ccff">` +
             `Kills: ${state.kills} | Score: ${state.score}<br>` +
             `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / dim('baseship.hull')) * 100)}%` +
             `</span><br>` +
+            shopHTML +
             `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
 
         // PA debrief
@@ -1830,14 +2049,20 @@ const Starfighter = (function () {
         if (state.wave >= 3) _spawnTanker();    // tanker from wave 3+
         if (state.wave >= 2) _spawnMedic();     // medic from wave 2+
 
-        // AI Wingmen: spawn 2-3 allies if enabled (they fight enemies for you)
+        // AI Wingmen: named ANPC wingmen with full personality
         if (state.aiWingmen) {
-            const wingmenCount = 2 + (state.wave >= 3 ? 1 : 0);
-            const callsigns = ['Alpha-2', 'Alpha-3', 'Alpha-4'];
-            for (let i = 0; i < wingmenCount; i++) {
+            const ANPC = window.SFAnpc;
+            // Determine roster: waves 1-2 get 2 wingmen, wave 3+ get 3
+            const rosterKeys = state.wave >= 5
+                ? ['hotshot', 'ice', 'motherhen', 'nightshade']
+                : state.wave >= 3
+                    ? ['hotshot', 'ice', 'motherhen']
+                    : ['hotshot', 'ice'];
+
+            for (let i = 0; i < rosterKeys.length; i++) {
                 const offset = new THREE.Vector3(
-                    (i === 0 ? -150 : i === 1 ? 150 : 0),
-                    (i === 2 ? 80 : 0),
+                    (i === 0 ? -150 : i === 1 ? 150 : i === 2 ? 0 : -200),
+                    (i === 2 ? 80 : i === 3 ? -40 : 0),
                     200 + Math.random() * 100
                 );
                 const spawnPos = state.player.position.clone().add(offset);
@@ -1846,7 +2071,22 @@ const Starfighter = (function () {
                 w.hull = profile.hull;
                 w.maxSpeed = profile.maxSpeed;
                 w._manifoldDerivation = profile.trace;
-                w.callsign = callsigns[i];
+
+                // Attach ANPC personality
+                const key = rosterKeys[i];
+                if (ANPC) {
+                    const npc = ANPC.spawn(key);
+                    w.callsign = npc.callsign;
+                    w._anpc = npc;
+                    w._anpcKey = key;
+                    // Personality-tuned combat: aggressive ANPCs fly faster, defensive ones have more hull
+                    const p = npc.personality;
+                    w.maxSpeed = Math.round(w.maxSpeed * (0.85 + p.E * 0.3)); // extraversion → speed
+                    w.hull = Math.round(w.hull * (0.9 + p.C * 0.2));          // conscientiousness → durability
+                } else {
+                    w.callsign = ['Alpha-2', 'Alpha-3', 'Alpha-4', 'Alpha-5'][i];
+                }
+
                 w.quaternion.copy(state.player.quaternion);
                 state.entities.push(w);
             }
@@ -1874,12 +2114,70 @@ const Starfighter = (function () {
         }
     }
 
-    function gameOver(reason) {
+    function gameOver(reason, isVictory) {
         state.running = false;
-        document.getElementById('death-screen').style.display = 'flex';
+        const deathScreen = document.getElementById('death-screen');
+        deathScreen.style.display = 'flex';
         document.getElementById('death-reason').innerText = reason;
         document.getElementById('gameplay-hud').style.display = 'none';
         document.getElementById('radar-overlay').style.display = 'none';
+
+        // ── After-Action Report ──
+        const ms = state.missionStats;
+        ms.waveReached = state.wave;
+        const elapsed = Math.floor((performance.now() - ms.startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        ms.accuracy = ms.shotsFired > 0 ? Math.round((ms.shotsHit / ms.shotsFired) * 100) : 0;
+
+        // Count surviving wingmen
+        const wingmenAlive = state.entities.filter(e => e.type === 'wingman' && !e.markedForDeletion).length;
+        ms.wingmenSaved = wingmenAlive;
+
+        let aar = document.getElementById('after-action-report');
+        if (!aar) {
+            aar = document.createElement('div');
+            aar.id = 'after-action-report';
+            aar.style.cssText = 'margin-top:24px;padding:16px 24px;background:rgba(0,20,40,0.85);border:1px solid rgba(0,255,255,0.2);border-radius:6px;font-family:monospace;font-size:12px;color:#88ccee;max-width:400px;text-align:left;';
+            deathScreen.appendChild(aar);
+        }
+        aar.innerHTML =
+            '<div style="font-size:14px;color:#0ff;margin-bottom:10px;letter-spacing:2px;text-transform:uppercase;">'
+            + (isVictory ? '★ MISSION COMPLETE ★' : '▸ AFTER-ACTION REPORT') + '</div>'
+            + '<table style="width:100%;border-collapse:collapse;">'
+            + _aarRow('Waves Survived', ms.waveReached)
+            + _aarRow('Total Kills', state.kills)
+            + _aarRow('Player Kills', state.playerKills)
+            + _aarRow('Score', state.score.toLocaleString())
+            + _aarRow('Accuracy', ms.accuracy + '%')
+            + _aarRow('Shots Fired', ms.shotsFired)
+            + _aarRow('Damage Dealt', Math.round(ms.damageDealt))
+            + _aarRow('Damage Taken', Math.round(ms.damageTaken))
+            + _aarRow('Wingmen Saved', ms.wingmenSaved + '/' + (ms.wingmenSaved + ms.wingmenLost))
+            + _aarRow('Flight Time', minutes + 'm ' + seconds + 's')
+            + '</table>';
+
+        // ── Persist career stats ──
+        if (window.SFProgression) {
+            SFProgression.endMission({
+                deaths: 1,
+                waveReached: ms.waveReached,
+                flightTime: elapsed,
+                score: state.score,
+            });
+            // Show career kill tally on death screen
+            const tallyHtml = SFProgression.renderKillTallyHTML();
+            const rank = SFProgression.getRank();
+            aar.innerHTML += '<div style="margin-top:12px;border-top:1px solid rgba(0,255,255,0.15);padding-top:8px;">'
+                + '<div style="color:#ffdd44;font-size:11px;">' + rank.icon + ' ' + rank.name + ' — Career Kills: ' + SFProgression.career().totalKills + '</div>'
+                + '<div style="font-size:14px;margin-top:4px;">' + tallyHtml + '</div>'
+                + '</div>';
+        }
+    }
+
+    function _aarRow(label, value) {
+        return '<tr><td style="padding:2px 0;color:#88aacc;">' + label + '</td>'
+            + '<td style="padding:2px 0;color:#0ff;text-align:right;font-weight:bold;">' + value + '</td></tr>';
     }
 
     // ── Respawn system: countdown overlay, then reset player into bay ──
@@ -2205,7 +2503,10 @@ const Starfighter = (function () {
                     if (e.type === 'predator') updatePredatorAI(e, safeDt);
                     else if (e.type === 'tanker') updateTankerAI(e, safeDt);
                     else if (e.type === 'medic') updateMedicAI(e, safeDt);
-                    else if (AI_PROFILES[e.type]) updateCombatAI(e, safeDt);
+                    else if (AI_PROFILES[e.type]) {
+                        updateCombatAI(e, safeDt);
+                        if (e.type === 'wingman') _updateANPCState(e, safeDt);
+                    }
                     // Torpedo acceleration: 200→350 m/s over 1.5s (GDD §10.1)
                     else if (e.type === 'torpedo') {
                         const age = (performance.now() / 1000) - (e.launchTime || 0);
@@ -2314,6 +2615,39 @@ const Starfighter = (function () {
                 state.player.resolveIntent(safeDt);
             }
 
+            // ── Multiplayer state sync (20 Hz) ──
+            const MP = window.SFMultiplayer;
+            if (MP && MP.isMultiplayer && state.player && !state.player.markedForDeletion) {
+                MP.sendPlayerState(state.player);
+
+                // Render remote players as wingman entities
+                for (const [pid, rp] of MP.remotePlayers) {
+                    let remote = state.entities.find(e => e._remotePlayerId === pid);
+                    if (!remote) {
+                        remote = new Entity('wingman', rp.x, rp.y, rp.z);
+                        remote.callsign = rp.callsign || 'Remote';
+                        remote._remotePlayerId = pid;
+                        remote._isRemotePlayer = true;
+                        state.entities.push(remote);
+                    }
+                    // Interpolate to latest server position
+                    remote.position.set(rp.x, rp.y, rp.z);
+                    remote.quaternion.set(rp.qx, rp.qy, rp.qz, rp.qw);
+                    remote.velocity.set(rp.vx || 0, rp.vy || 0, rp.vz || 0);
+                    remote.hull = rp.hull || 100;
+                    remote.shields = rp.shields || 100;
+                }
+
+                // Remove stale remote players (disconnected)
+                for (let i = state.entities.length - 1; i >= 0; i--) {
+                    const e = state.entities[i];
+                    if (e._isRemotePlayer && !MP.remotePlayers.has(e._remotePlayerId)) {
+                        e.markedForDeletion = true;
+                        if (M) M.remove(e.id);
+                    }
+                }
+            }
+
             // Feed engine audio with current thrust state
             if (window.SFAudio && state.player && !state.player.markedForDeletion) {
                 SFAudio.setThrustLevel(
@@ -2337,7 +2671,10 @@ const Starfighter = (function () {
                 if (e.type === 'predator') updatePredatorAI(e, safeDt);
                 else if (e.type === 'tanker') updateTankerAI(e, safeDt);
                 else if (e.type === 'medic') updateMedicAI(e, safeDt);
-                else if (AI_PROFILES[e.type]) updateCombatAI(e, safeDt);
+                else if (AI_PROFILES[e.type]) {
+                    updateCombatAI(e, safeDt);
+                    if (e.type === 'wingman') _updateANPCState(e, safeDt);
+                }
                 // Torpedo acceleration: 200→350 m/s over 1.5s (GDD §10.1)
                 else if (e.type === 'torpedo') {
                     const age = (performance.now() / 1000) - (e.launchTime || 0);
@@ -2861,6 +3198,65 @@ const Starfighter = (function () {
                 entity._beamCooldown = prof.heavyCooldown || 15;
             }
         }
+    }
+
+    // ── ANPC Combat State Manager ──
+    // Updates combat state, morale, and triggers personality-driven comms
+    function _updateANPCState(entity, dt) {
+        if (!entity._anpc || !window.SFAnpc) return;
+        const ANPC = window.SFAnpc;
+        const npc = entity._anpc;
+        const hullMax = 100; // wingman baseline
+        const hullPct = entity.hull / hullMax;
+
+        // Update combat state based on hull and engagement
+        if (entity.markedForDeletion) {
+            ANPC.setState(entity._anpcKey, 'DESTROYED');
+            return;
+        }
+        if (hullPct < 0.15) {
+            ANPC.setState(entity._anpcKey, 'RETREATING');
+        } else if (hullPct < 0.35) {
+            if (npc.combatState !== 'DAMAGED' && npc.combatState !== 'RETREATING') {
+                ANPC.setState(entity._anpcKey, 'DAMAGED');
+                // Personality-driven comms: callout when damaged
+                const line = ANPC.speak(entity._anpcKey, 'shields_down');
+                if (line) SFAnnouncer.addComm && SFAnnouncer.addComm(npc.callsign, line, npc.voiceTag);
+            }
+        } else if (entity._evading) {
+            ANPC.setState(entity._anpcKey, 'EVASIVE');
+        } else if (entity._fireCooldown !== undefined && entity._fireCooldown > 0) {
+            ANPC.setState(entity._anpcKey, 'ENGAGED');
+        } else {
+            ANPC.setState(entity._anpcKey, 'PATROL');
+        }
+
+        // Morale drift — proximity to enemies decreases morale, kills increase it
+        const nearbyHostiles = state.entities.filter(e =>
+            !e.markedForDeletion && (e.type === 'enemy' || e.type === 'predator' || e.type === 'dreadnought') &&
+            e.position.distanceToSquared(entity.position) < 2000 * 2000
+        ).length;
+        const moraleDelta = (nearbyHostiles > 3 ? -0.02 : nearbyHostiles > 0 ? -0.005 : 0.01) * dt;
+        ANPC.adjustMorale(entity._anpcKey, moraleDelta);
+
+        // Disposition: if player is nearby and helping, disposition increases
+        if (state.player && !state.player.markedForDeletion) {
+            const playerDist = entity.position.distanceToSquared(state.player.position);
+            if (playerDist < 800 * 800) {
+                ANPC.adjustDisposition(entity._anpcKey, 0.002 * dt); // proximity bond
+            }
+        }
+    }
+
+    // Track wingman kills for ANPC splash comms
+    function _onWingmanKill(entity, victim) {
+        if (!entity._anpc || !window.SFAnpc) return;
+        const ANPC = window.SFAnpc;
+        const npc = entity._anpc;
+        ANPC.adjustMorale(entity._anpcKey, 0.05);
+        ANPC.adjustDisposition(entity._anpcKey, 0.01);
+        const line = ANPC.speak(entity._anpcKey, 'splash', { target: victim.type });
+        if (line) SFAnnouncer.addComm && SFAnnouncer.addComm(npc.callsign, line, npc.voiceTag);
     }
 
     function updatePredatorAI(pred, dt) {
@@ -3849,10 +4245,12 @@ const Starfighter = (function () {
         _v1.set(0, 0, -dim('weapon.laser.speed')).applyQuaternion(l.quaternion);
         l.velocity.copy(_v1);
         l.owner = ownerType;
+        l._ownerCallsign = source.callsign || ownerType;
         l.radius = dim('weapon.laser.radius');
         l.maxAge = dim('weapon.laser.maxAge');
         l.damage = dim('weapon.laser.damage');
         state.entities.push(l);
+        if (ownerType === 'player') state.missionStats.shotsFired++;
         if (window.SF3D) SF3D.spawnLaser(l);
         if (window.SFAudio) SFAudio.playSound('laser');
     }
@@ -3880,12 +4278,14 @@ const Starfighter = (function () {
         _v1.set(0, 0, -dim('weapon.torpedo.speed')).applyQuaternion(t.quaternion);
         t.velocity.copy(_v1);
         t.owner = ownerType;
+        t._ownerCallsign = source.callsign || ownerType;
         t.radius = dim('weapon.torpedo.radius');
         t.target = source.lockedTarget;
         t.maxAge = dim('weapon.torpedo.maxAge');
         t.damage = dim('weapon.torpedo.damage');
         t.launchTime = performance.now() / 1000;
         state.entities.push(t);
+        if (ownerType === 'player') state.missionStats.shotsFired++;
         if (window.SFAudio) SFAudio.playSound('torpedo');
     }
 
@@ -4019,25 +4419,48 @@ const Starfighter = (function () {
 
         if (a.type === 'laser' || a.type === 'machinegun' || a.type === 'torpedo') {
             const damage = a.damage || (a.type === 'torpedo' ? 80 : 15);
+            const weaponLabel = a.type === 'torpedo' ? 'Torpedo' : a.type === 'machinegun' ? 'MG' : 'Laser';
             if (window.SF3D) {
-                // GDD §8.3: Pulse = #00FFAA, Torpedo = #4488FF shield flash
                 const color = a.type === 'torpedo' ? 0x4488ff : a.type === 'machinegun' ? 0xffcc00 : 0x00ffaa;
                 SF3D.spawnImpactEffect(a.position, color);
             }
             if (!(b.type === 'player' && state.phase === 'launching')) {
                 const effectiveDmg = b.type === 'predator' ? _predatorArmorDamage(damage, a, b) : damage;
+                b._killedByWeapon = weaponLabel;
+                if (a.owner === 'player') b.killedBy = 'player';
+                else if (a.owner === 'wingman') b.killedBy = a._ownerCallsign || 'Wingman';
+                else b.killedBy = a.owner || 'Enemy';
                 b.takeDamage(effectiveDmg);
+                state.missionStats.damageDealt += effectiveDmg;
+                if (a.owner === 'player') state.missionStats.shotsHit++;
+                // ANPC kill tracking: if a wingman's projectile killed an enemy
+                if (b.markedForDeletion && a.owner === 'wingman') {
+                    const shooter = state.entities.find(e => e.type === 'wingman' && !e.markedForDeletion && e._anpc);
+                    if (shooter) _onWingmanKill(shooter, b);
+                }
             }
             a.markedForDeletion = true;
         } else if (b.type === 'laser' || b.type === 'machinegun' || b.type === 'torpedo') {
             const damage = b.damage || (b.type === 'torpedo' ? 80 : 15);
+            const weaponLabel = b.type === 'torpedo' ? 'Torpedo' : b.type === 'machinegun' ? 'MG' : 'Laser';
             if (window.SF3D) {
                 const color = b.type === 'torpedo' ? 0x4488ff : b.type === 'machinegun' ? 0xffcc00 : 0x00ffaa;
                 SF3D.spawnImpactEffect(b.position, color);
             }
             if (!(a.type === 'player' && state.phase === 'launching')) {
                 const effectiveDmg = a.type === 'predator' ? _predatorArmorDamage(damage, b, a) : damage;
+                a._killedByWeapon = weaponLabel;
+                if (b.owner === 'player') a.killedBy = 'player';
+                else if (b.owner === 'wingman') a.killedBy = b._ownerCallsign || 'Wingman';
+                else a.killedBy = b.owner || 'Enemy';
                 a.takeDamage(effectiveDmg);
+                state.missionStats.damageDealt += effectiveDmg;
+                if (b.owner === 'player') state.missionStats.shotsHit++;
+                // ANPC kill tracking
+                if (a.markedForDeletion && b.owner === 'wingman') {
+                    const shooter = state.entities.find(e => e.type === 'wingman' && !e.markedForDeletion && e._anpc);
+                    if (shooter) _onWingmanKill(shooter, a);
+                }
             }
             b.markedForDeletion = true;
         } else {
@@ -4060,15 +4483,18 @@ const Starfighter = (function () {
 
     function updateHUD() {
         if (!state.player || state.player.markedForDeletion) return;
+        // Kill feed overlay — render every frame for fade animation
+        _renderKillFeed();
         const speed = Math.floor(state.player.velocity.length());
         const throttle = Math.floor(state.player.throttle * 100);
         const fuel = Math.floor(state.player.fuel);
         const hullPct = Math.floor((state.player.hull / dim('player.hull')) * 100);
         const shieldPct = Math.floor((state.player.shields / dim('player.shields')) * 100);
         const basePct = Math.floor((state.baseship.hull / dim('baseship.hull')) * 100);
-        const maxSpd = state.player.boostActive ? state.player.boostSpeed
-            : state.player.afterburnerActive ? state.player.afterburnerSpeed
-                : state.player.maxSpeed;
+        const maxSpd = state.player.hyperdriveActive ? state.player.hyperdriveSpeed
+            : state.player.boostActive ? state.player.boostSpeed
+                : state.player.afterburnerActive ? state.player.afterburnerSpeed
+                    : state.player.maxSpeed;
 
         const hudSignature = [
             speed, throttle, fuel, hullPct, shieldPct, basePct,
@@ -4076,7 +4502,10 @@ const Starfighter = (function () {
             state.player.boostActive ? 1 : 0,
             Math.ceil(state.player.boostCooldown || 0),
             state.player.flightAssist ? 1 : 0,
-            state.player.afterburnerActive ? 1 : 0
+            state.player.afterburnerActive ? 1 : 0,
+            state.player.hyperdriveActive ? 1 : 0,
+            state.player.hyperdriveSpooling ? 1 : 0,
+            Math.ceil(state.player.hyperdriveCooldown || 0)
         ].join('|');
         const hudChanged = hudSignature !== _lastHudSignature;
         if (hudChanged) _lastHudSignature = hudSignature;
@@ -4188,17 +4617,56 @@ const Starfighter = (function () {
             // Speed mode indicator
             const modeEl = gh('ghud-speed-mode');
             if (modeEl) {
-                if (state.player.boostActive) {
+                if (state.player.hyperdriveActive) {
+                    modeEl.innerText = 'HYPERDRIVE';
+                    modeEl.style.color = '#ff00ff';
+                } else if (state.player.hyperdriveSpooling) {
+                    modeEl.innerText = 'SPOOLING...';
+                    modeEl.style.color = '#cc44ff';
+                } else if (state.player.boostActive) {
                     modeEl.innerText = 'BOOST';
                     modeEl.style.color = '#ff8800';
                 } else if (state.player.afterburnerActive) {
                     modeEl.innerText = 'AFTERBURN';
                     modeEl.style.color = '#ffcc00';
+                } else if (state.player.hyperdriveCooldown > 0) {
+                    modeEl.innerText = 'HYPER CD ' + Math.ceil(state.player.hyperdriveCooldown) + 's';
+                    modeEl.style.color = '#884488';
                 } else {
                     modeEl.innerText = 'CRUISE';
                     modeEl.style.color = '#0ff';
                 }
             }
+        }
+
+        // ── Rank insignia + kill tally display ──
+        if (hudChanged && window.SFProgression) {
+            let rankEl = gh('ghud-rank');
+            if (!rankEl) {
+                // Create rank + tally container dynamically (bottom-left of HUD)
+                const container = document.createElement('div');
+                container.id = 'ghud-rank-container';
+                container.style.cssText = 'position:fixed;bottom:16px;left:16px;z-index:200;pointer-events:none;font-family:monospace;';
+                container.innerHTML =
+                    '<div id="ghud-rank" style="font-size:11px;color:#ffdd44;text-shadow:0 0 6px #ff8800;margin-bottom:4px;"></div>' +
+                    '<div id="ghud-rank-bar" style="width:140px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;margin-bottom:6px;"><div id="ghud-rank-fill" style="height:100%;border-radius:2px;background:linear-gradient(90deg,#ff8800,#ffdd44);width:0%;"></div></div>' +
+                    '<div id="ghud-credits" style="font-size:10px;color:#88ccee;margin-bottom:6px;"></div>' +
+                    '<div id="ghud-tally" style="font-size:13px;line-height:1.4;"></div>';
+                document.body.appendChild(container);
+                rankEl = gh('ghud-rank');
+            }
+            const rank = SFProgression.getRank();
+            const nextRank = SFProgression.getNextRank();
+            const progress = SFProgression.getRankProgress();
+            const career = SFProgression.career();
+
+            rankEl.innerHTML = rank.icon + ' ' + rank.name + (nextRank ? ' <span style="color:#556;font-size:9px;">→ ' + nextRank.name + '</span>' : ' <span style="color:#ffaa00;font-size:9px;">MAX RANK</span>');
+            const fill = gh('ghud-rank-fill');
+            if (fill) fill.style.width = (progress * 100) + '%';
+            const creditsEl = gh('ghud-credits');
+            if (creditsEl) creditsEl.innerText = '₡ ' + career.credits + '  |  XP: ' + career.xp;
+            const tallyEl = gh('ghud-tally');
+            if (tallyEl) tallyEl.innerHTML = SFProgression.renderKillTallyHTML();
         }
 
         // Radar delta updates: only when player moved/rotated, lock changed, or budget elapsed.
@@ -4242,8 +4710,12 @@ const Starfighter = (function () {
     let radarFovCone;        // camera FOV wedge group
     let radarFovEdges;       // wireframe edges of FOV pyramid
     let radarFovFaces;       // semi-transparent faces of FOV pyramid
+    let radarFovRangeTicks;  // range tick groups inside FOV cone
+    let radarFovRangeLabels; // distance text labels inside FOV cone
     let radarVectorMeter;    // 3-axis orientation gizmo group
     let radarAxisFwd, radarAxisUp, radarAxisRight; // axis arrow meshes
+    let radarCardinalLabels; // F/B/U/D/L/R orientation markers on sphere surface
+    let radarOrientGroup;    // group that holds cardinal labels (rotates with inverse ship quat)
     let radarBlipPool = [];
     const RADAR_RANGE = dim('radar.range');
     const RADAR_SHIP_OFFSET = 0.35; // player dot offset toward rear (+Z) for depth perception
@@ -4372,6 +4844,107 @@ const Starfighter = (function () {
         });
         radarFovFaces = new THREE.Mesh(wedgeFaceGeo, wedgeFaceMat);
         radarFovCone.add(radarFovFaces);
+
+        // ── Range Ticks inside FOV Cone ──
+        // Small perpendicular marks at 1/3 and 2/3 distance along each FOV edge
+        // with distance labels (shows how far objects in your view are)
+        radarFovRangeTicks = new THREE.Group();
+        radarFovRangeLabels = [];
+        {
+            const apex = new THREE.Vector3(0, 0, SHIP_OFFSET);
+            const halfH = Math.tan(THREE.MathUtils.degToRad(75 / 2));
+            const halfW = halfH * 1.5;
+            const corners = [
+                new THREE.Vector3(-halfW, halfH, SHIP_OFFSET - 0.92),  // top-left
+                new THREE.Vector3(halfW, halfH, SHIP_OFFSET - 0.92),   // top-right
+                new THREE.Vector3(halfW, -halfH, SHIP_OFFSET - 0.92),  // bottom-right
+                new THREE.Vector3(-halfW, -halfH, SHIP_OFFSET - 0.92), // bottom-left
+            ];
+            const tickMat = new THREE.LineBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.5 });
+
+            for (const frac of [0.33, 0.66]) {
+                // Draw tick across each edge at this fraction
+                const tickPts = [];
+                for (const corner of corners) {
+                    const pt = apex.clone().lerp(corner, frac);
+                    tickPts.push(pt);
+                }
+                // Connect the 4 tick points to form a rectangle at this distance
+                tickPts.push(tickPts[0].clone()); // close the loop
+                const tickGeo = new THREE.BufferGeometry().setFromPoints(tickPts);
+                const tickLine = new THREE.Line(tickGeo, tickMat);
+                radarFovRangeTicks.add(tickLine);
+
+                // Distance label — create a tiny canvas texture for text
+                const rangeKm = Math.round(RADAR_RANGE * frac / 1000);
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 64;
+                labelCanvas.height = 24;
+                const lctx = labelCanvas.getContext('2d');
+                lctx.fillStyle = '#00ffcc';
+                lctx.font = 'bold 16px monospace';
+                lctx.textAlign = 'center';
+                lctx.fillText(rangeKm + 'km', 32, 16);
+                const labelTex = new THREE.CanvasTexture(labelCanvas);
+                const labelMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, opacity: 0.7, depthTest: false });
+                const labelSprite = new THREE.Sprite(labelMat);
+                // Position at the bottom edge midpoint of this range ring
+                const bottomMid = apex.clone().lerp(
+                    new THREE.Vector3(0, -halfH, SHIP_OFFSET - 0.92), frac
+                );
+                labelSprite.position.copy(bottomMid);
+                labelSprite.position.y -= 0.04;
+                labelSprite.scale.set(0.12, 0.05, 1);
+                radarFovRangeTicks.add(labelSprite);
+                radarFovRangeLabels.push(labelSprite);
+            }
+        }
+        radarFovCone.add(radarFovRangeTicks);
+
+        // ── Cardinal Orientation Labels (F/B/U/D/L/R) on Sphere Surface ──
+        // These rotate with the INVERSE of the ship quaternion, so they show
+        // world-space directions. Player always knows which way is "up" in the arena.
+        radarOrientGroup = new THREE.Group();
+        radarCardinalLabels = {};
+        {
+            const LABEL_R = 0.97; // just inside sphere surface
+            const cardinals = [
+                { key: 'F', text: 'FWD', color: '#00ff88', pos: [0, 0, -LABEL_R] },
+                { key: 'B', text: 'AFT', color: '#ff4444', pos: [0, 0, LABEL_R] },
+                { key: 'U', text: 'UP', color: '#00ccff', pos: [0, LABEL_R, 0] },
+                { key: 'D', text: 'DWN', color: '#ff8800', pos: [0, -LABEL_R, 0] },
+                { key: 'L', text: 'PRT', color: '#cc88ff', pos: [-LABEL_R, 0, 0] },
+                { key: 'R', text: 'STB', color: '#ffcc44', pos: [LABEL_R, 0, 0] },
+            ];
+            for (const c of cardinals) {
+                const cvs = document.createElement('canvas');
+                cvs.width = 64;
+                cvs.height = 32;
+                const ctx = cvs.getContext('2d');
+                // Background pill
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.beginPath();
+                ctx.roundRect(2, 2, 60, 28, 6);
+                ctx.fill();
+                // Text
+                ctx.fillStyle = c.color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(c.text, 32, 17);
+                const tex = new THREE.CanvasTexture(cvs);
+                const mat = new THREE.SpriteMaterial({
+                    map: tex, transparent: true, opacity: 0.75,
+                    depthTest: false, sizeAttenuation: true
+                });
+                const sprite = new THREE.Sprite(mat);
+                sprite.position.set(c.pos[0], c.pos[1], c.pos[2]);
+                sprite.scale.set(0.16, 0.08, 1);
+                radarOrientGroup.add(sprite);
+                radarCardinalLabels[c.key] = sprite;
+            }
+        }
+        radarScene.add(radarOrientGroup);
 
         // ── 3-Axis Vector Meter — shows ship orientation relative to world frame ──
         // Forward (green), Up (cyan), Right (red) arrows from ship marker
@@ -4511,6 +5084,13 @@ const Starfighter = (function () {
         // FOV cone — fixed orientation (always points forward in ship-local space)
         if (radarFovCone) {
             radarFovCone.quaternion.set(0, 0, 0, 1); // identity — forward is -Z
+        }
+
+        // Cardinal orientation labels — rotate with INVERSE ship quaternion
+        // so they show WORLD-SPACE directions on the sphere surface
+        // Player can always see which way is "up" in the arena regardless of roll/pitch
+        if (radarOrientGroup) {
+            radarOrientGroup.quaternion.copy(invQuat);
         }
 
         // Vector Meter — show world axes in ship-local space
@@ -4751,3 +5331,29 @@ const Starfighter = (function () {
 })();
 
 window.Starfighter = Starfighter;
+
+// Global upgrade purchase handler (called by between-wave shop onclick)
+window._sfBuyUpgrade = function (id) {
+    if (!window.SFProgression) return;
+    const result = SFProgression.purchaseUpgrade(id);
+    if (result.success) {
+        if (window.SFAudio) SFAudio.playSound('click');
+        // Refresh the shop display
+        const shop = document.getElementById('upgrade-shop');
+        if (shop) {
+            const career = SFProgression.career();
+            shop.querySelectorAll('div[onclick]').forEach(function (el) {
+                const onclick = el.getAttribute('onclick');
+                if (onclick && onclick.includes(id)) {
+                    el.style.borderColor = 'rgba(0,255,100,0.5)';
+                    el.innerHTML = '<div style="color:#00ff88;font-weight:bold;">' + result.upgrade.name + '</div><div style="color:#00ff88;">✓ Installed</div>';
+                }
+            });
+            // Update credits display
+            const creditsDiv = shop.previousElementSibling;
+            if (creditsDiv) creditsDiv.textContent = 'Credits: ₡' + career.credits;
+        }
+    } else {
+        if (window.SFAudio) SFAudio.playSound('warning');
+    }
+};

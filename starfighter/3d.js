@@ -26,7 +26,7 @@ const SF3D = (function () {
     let targetLockMesh;
     let launchBayGroup;
     let cameraShakeIntensity = 0;
-    const STRICT_MODEL_BASELINE = true;
+    const STRICT_MODEL_BASELINE = false;
     const _viewProj = new THREE.Matrix4();
     const _viewFrustum = new THREE.Frustum();
     const _tmpSphere = new THREE.Sphere();
@@ -117,6 +117,69 @@ const SF3D = (function () {
         ally: 4000, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
+
+    // ── Distance-based dot rendering ──
+    // Beyond DOT_DIST, entities render as simple glowing sprites instead of full models.
+    // Beyond CULL_DIST, entities are not rendered at all (data-only).
+    const DOT_DIST = {
+        enemy: 3000, predator: 5000, interceptor: 3000, bomber: 4000,
+        dreadnought: 10000, 'alien-baseship': 8000, tanker: 3000, medic: 4000,
+        ally: 2500, baseship: 8000, station: 15000, earth: 200000, moon: 150000,
+        laser: 1500, machinegun: 1000, torpedo: 2000, plasma: 1500,
+        egg: 1500, youngling: 1000,
+    };
+    const CULL_DIST = 50000; // beyond this, skip entirely (except celestials)
+    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship']);
+    const DOT_COLORS = {
+        enemy: 0x22ff44, predator: 0x44ff00, interceptor: 0x00ffcc, bomber: 0xff6600,
+        dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0xffaa44, medic: 0xff4444,
+        ally: 0x4488ff, baseship: 0x88ccff, station: 0xaaaaff, earth: 0x4488ff, moon: 0xcccccc,
+        laser: 0x00ffaa, machinegun: 0xffcc00, torpedo: 0xff8800, plasma: 0x44ff00,
+        egg: 0x99cc33, youngling: 0x332211,
+    };
+    const _dotSprites = new Map(); // entity id → sprite
+    let _dotMaterialCache = {};
+
+    function _getDotSprite(type) {
+        const color = DOT_COLORS[type] || 0xffffff;
+        if (!_dotMaterialCache[color]) {
+            _dotMaterialCache[color] = new THREE.SpriteMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+        }
+        const sprite = new THREE.Sprite(_dotMaterialCache[color]);
+        sprite.scale.setScalar(8);
+        scene.add(sprite);
+        return sprite;
+    }
+
+    function _showAsDot(entityId, type, position) {
+        let dot = _dotSprites.get(entityId);
+        if (!dot) {
+            dot = _getDotSprite(type);
+            _dotSprites.set(entityId, dot);
+        }
+        dot.position.copy(position);
+        dot.visible = true;
+    }
+
+    function _hideDot(entityId) {
+        const dot = _dotSprites.get(entityId);
+        if (dot) dot.visible = false;
+    }
+
+    function _cleanupDots(activeIds) {
+        for (const [id, dot] of _dotSprites) {
+            if (!activeIds.has(id)) {
+                scene.remove(dot);
+                _dotSprites.delete(id);
+            }
+        }
+    }
 
     // ── Shared starfield vertex data (world-space positions, shared with radar) ──
     const STAR_COUNT = 6000;
@@ -1614,53 +1677,72 @@ const SF3D = (function () {
             eye2.position.set(-3, 1.2, -6);
             mesh.add(eye2);
         } else if (type === 'laser') {
-            // Slim laser bolts — thin bright streaks with subtle glow
-            const boltLen = 24, boltR = 0.12, glowR = 0.28, sep = 2.5;
-            const boltGeo = new THREE.CylinderGeometry(boltR, boltR, boltLen, 4);
-            boltGeo.rotateX(Math.PI / 2);
-            const glowGeo = new THREE.CylinderGeometry(glowR, glowR * 0.25, boltLen + 2, 6);
+            // ── Sleek dual laser bolts — hair-thin bright lines with soft additive glow ──
+            const boltLen = 32, sep = 2.5;
+            // Core: ultra-thin bright line (3-segment cylinder for minimal geometry)
+            const coreGeo = new THREE.CylinderGeometry(0.06, 0.06, boltLen, 3, 1);
+            coreGeo.rotateX(Math.PI / 2);
+            // Glow: tapered soft halo around the core
+            const glowGeo = new THREE.CylinderGeometry(0.35, 0.08, boltLen + 4, 4, 1);
             glowGeo.rotateX(Math.PI / 2);
-            // Left bolt
-            const boltL = new THREE.Mesh(boltGeo, m.laserCore);
-            boltL.position.x = -sep;
-            mesh.add(boltL);
-            const glowL = new THREE.Mesh(glowGeo, m.laserGlow);
-            glowL.position.x = -sep;
-            mesh.add(glowL);
-            // Right bolt
-            const boltR2 = new THREE.Mesh(boltGeo, m.laserCore);
-            boltR2.position.x = sep;
-            mesh.add(boltR2);
-            const glowR2 = new THREE.Mesh(glowGeo, m.laserGlow);
-            glowR2.position.x = sep;
-            mesh.add(glowR2);
+            // Tip flash: bright point at the leading edge
+            const tipGeo = new THREE.SphereGeometry(0.25, 4, 4);
+            tipGeo.translate(0, 0, -boltLen / 2);
+            for (const xOff of [-sep, sep]) {
+                const core = new THREE.Mesh(coreGeo, m.laserCore);
+                core.position.x = xOff;
+                mesh.add(core);
+                const glow = new THREE.Mesh(glowGeo, m.laserGlow);
+                glow.position.x = xOff;
+                mesh.add(glow);
+                const tip = new THREE.Mesh(tipGeo, m.laserCore);
+                tip.position.x = xOff;
+                mesh.add(tip);
+            }
         } else if (type === 'machinegun') {
-            // Machine gun rounds — short golden tracer streaks
-            const tracerLen = 10, tracerR = 0.08;
-            const tracerGeo = new THREE.CylinderGeometry(tracerR, tracerR, tracerLen, 4);
-            tracerGeo.rotateX(Math.PI / 2);
-            const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
-            const glowGeo = new THREE.CylinderGeometry(tracerR * 2.5, tracerR * 0.5, tracerLen + 1, 4);
-            glowGeo.rotateX(Math.PI / 2);
-            mesh.add(new THREE.Mesh(tracerGeo, tracerMat));
-            mesh.add(new THREE.Mesh(glowGeo, glowMat));
+            // ── Tracer rounds — tiny bright dashes with subtle streak ──
+            const tracerLen = 8;
+            const coreGeo = new THREE.CylinderGeometry(0.04, 0.04, tracerLen, 3, 1);
+            coreGeo.rotateX(Math.PI / 2);
+            const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
+            const streakGeo = new THREE.CylinderGeometry(0.15, 0.02, tracerLen + 2, 3, 1);
+            streakGeo.rotateX(Math.PI / 2);
+            const streakMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(coreGeo, tracerMat));
+            mesh.add(new THREE.Mesh(streakGeo, streakMat));
         } else if (type === 'torpedo') {
-            // GDD §10.1: Bright warhead + orange sparkler trail
-            // Warhead — bright white-hot core
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2, 12, 12), m.torpCore));
-            // Inner glow — orange
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 10, 10), m.torpGlow));
-            // Outer sparkle halo
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(6, 8, 8), m.torpTrail));
-            // Exhaust cone trail behind torpedo
-            const coneGeo = new THREE.ConeGeometry(3.5, 20, 8);
-            coneGeo.rotateX(-Math.PI / 2);
-            coneGeo.translate(0, 0, 14);
-            mesh.add(new THREE.Mesh(coneGeo, m.torpTrail));
+            // ── Sleek torpedo — small bright warhead with sparkler exhaust trail ──
+            // Warhead: compact white-hot point
+            const headGeo = new THREE.SphereGeometry(1.2, 8, 8);
+            mesh.add(new THREE.Mesh(headGeo, m.torpCore));
+            // Inner orange glow envelope
+            const innerGeo = new THREE.SphereGeometry(2.5, 6, 6);
+            mesh.add(new THREE.Mesh(innerGeo, m.torpGlow));
+            // Exhaust plume: tapered cone trail (narrow tip → wide base)
+            const plumeGeo = new THREE.ConeGeometry(2.0, 16, 6);
+            plumeGeo.rotateX(-Math.PI / 2);
+            plumeGeo.translate(0, 0, 10);
+            mesh.add(new THREE.Mesh(plumeGeo, m.torpTrail));
+            // Sparkler ring — ring of tiny points around exhaust
+            const sparkGeo = new THREE.BufferGeometry();
+            const sparkCount = 12;
+            const sparkPos = new Float32Array(sparkCount * 3);
+            for (let s = 0; s < sparkCount; s++) {
+                const a = (s / sparkCount) * Math.PI * 2;
+                sparkPos[s * 3] = Math.cos(a) * 3;
+                sparkPos[s * 3 + 1] = Math.sin(a) * 3;
+                sparkPos[s * 3 + 2] = 8 + Math.random() * 6;
+            }
+            sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sparkPos, 3));
+            const sparkMat = new THREE.PointsMaterial({
+                color: 0xffcc44, size: 1.5, transparent: true, opacity: 0.8,
+                blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+            });
+            mesh.add(new THREE.Points(sparkGeo, sparkMat));
             mesh.userData.isTorpedo = true;
         } else {
-            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+            // Fallback: small glowing point instead of blocky cube
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })));
         }
 
         scene.add(mesh);
@@ -1861,8 +1943,45 @@ const SF3D = (function () {
             }
 
             _activeIds.add(e.id);
-            let mesh = entityMeshes.get(e.id);
 
+            if (!e.position || !e.quaternion) continue;
+
+            // ── Distance-based rendering: dot / full model / cull ──
+            _tmpVec.copy(e.position).sub(camera.position);
+            const distSq = _tmpVec.lengthSq();
+            const dotThresh = DOT_DIST[e.type] || 3000;
+            const isFar = distSq > dotThresh * dotThresh;
+            const isCulled = !_NO_CULL_TYPES.has(e.type) && distSq > CULL_DIST * CULL_DIST;
+
+            // Beyond cull distance: entity is data-only, no rendering at all
+            if (isCulled) {
+                const mesh = entityMeshes.get(e.id);
+                if (mesh) mesh.visible = false;
+                _hideDot(e.id);
+                continue;
+            }
+
+            // Far but not culled: render as a simple glowing dot
+            if (isFar) {
+                // Check frustum for the dot position
+                _tmpSphere.center.copy(e.position);
+                _tmpSphere.radius = 10;
+                const dotOnScreen = _viewFrustum.intersectsSphere(_tmpSphere);
+                if (dotOnScreen) {
+                    _showAsDot(e.id, e.type, e.position);
+                } else {
+                    _hideDot(e.id);
+                }
+                // Hide full model
+                const mesh = entityMeshes.get(e.id);
+                if (mesh) mesh.visible = false;
+                continue;
+            }
+
+            // Close enough for full model rendering
+            _hideDot(e.id); // hide dot if transitioning from far to close
+
+            let mesh = entityMeshes.get(e.id);
             if (!mesh) {
                 mesh = createEntityMesh(e.type);
                 entityMeshes.set(e.id, mesh);
@@ -1870,7 +1989,6 @@ const SF3D = (function () {
 
             // Delta-only transform updates.
             const ud = mesh.userData;
-            if (!e.position || !e.quaternion) continue;
             if (ud._px !== e.position.x || ud._py !== e.position.y || ud._pz !== e.position.z) {
                 mesh.position.copy(e.position);
                 ud._px = e.position.x; ud._py = e.position.y; ud._pz = e.position.z;
@@ -1905,6 +2023,9 @@ const SF3D = (function () {
                 spawnTorpedoTrail(e);
             }
         }
+
+        // Cleanup dots for entities no longer active
+        _cleanupDots(_activeIds);
 
         // Target Lock Reticle — check fork before accessing locked target
         const lt = state.player && state.player.lockedTarget;
@@ -2052,7 +2173,78 @@ const SF3D = (function () {
         flash.timer = 0.2;
     }
 
-    return { init, render, spawnExplosion, spawnLaser, spawnPlasma, spawnEgg, spawnEggHatch, spawnTorpedoTrail, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, getCockpitDebugState, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
+    // ── EMP Burst — expanding electromagnetic wave ring ──
+    function spawnEMPBurst(pos, range) {
+        // Create an expanding ring of purple-white energy
+        const ringGeo = new THREE.RingGeometry(1, 3, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xcc44ff, transparent: true, opacity: 0.8,
+            blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(pos);
+        // Face the camera
+        ring.lookAt(camera.position);
+        scene.add(ring);
+
+        // Second ring — offset for depth
+        const ring2Geo = new THREE.RingGeometry(1, 5, 32);
+        const ring2Mat = new THREE.MeshBasicMaterial({
+            color: 0x8822ff, transparent: true, opacity: 0.5,
+            blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+        });
+        const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+        ring2.position.copy(pos);
+        ring2.lookAt(camera.position);
+        scene.add(ring2);
+
+        // Flash light
+        const flash = new THREE.PointLight(0xcc44ff, 8, range * 1.5);
+        flash.position.copy(pos);
+        scene.add(flash);
+
+        // Animate expansion
+        const startTime = performance.now();
+        const duration = 600; // ms
+        const maxScale = range / 2;
+        function animateEMP() {
+            const elapsed = performance.now() - startTime;
+            const t = Math.min(elapsed / duration, 1);
+            const scale = t * maxScale;
+            const fade = 1 - t;
+            ring.scale.setScalar(scale);
+            ring.material.opacity = 0.8 * fade;
+            ring2.scale.setScalar(scale * 0.7);
+            ring2.material.opacity = 0.5 * fade;
+            flash.intensity = 8 * fade * fade;
+            if (t < 1) {
+                requestAnimationFrame(animateEMP);
+            } else {
+                scene.remove(ring);
+                scene.remove(ring2);
+                scene.remove(flash);
+                ring.geometry.dispose();
+                ring.material.dispose();
+                ring2.geometry.dispose();
+                ring2.material.dispose();
+            }
+        }
+        requestAnimationFrame(animateEMP);
+
+        // Spark particles — scattered purple-white sparks
+        for (let i = 0; i < 20; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const el = (Math.random() - 0.5) * Math.PI * 0.5;
+            const sp = 100 + Math.random() * 200;
+            _emitParticle(pos.x, pos.y, pos.z,
+                Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp * 0.5, Math.sin(a) * Math.cos(el) * sp,
+                0.8, 0.3, 1, 0.4 + Math.random() * 0.3);
+        }
+
+        cameraShakeIntensity = Math.max(cameraShakeIntensity, 1.5);
+    }
+
+    return { init, render, spawnExplosion, spawnLaser, spawnPlasma, spawnEgg, spawnEggHatch, spawnTorpedoTrail, spawnEMPBurst, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, getCockpitDebugState, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
 })();
 
 window.SF3D = SF3D;

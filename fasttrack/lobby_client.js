@@ -662,6 +662,7 @@ function showCreatePrivateGame() {
     // Create session immediately to get a room code
     send({
         type: 'create_session',
+        game_id: 'fasttrack',
         private: true,
         max_players: 4,
         settings: {
@@ -871,6 +872,7 @@ function createPublicGameWithSettings(event) {
 
     send({
         type: 'create_session',
+        game_id: 'fasttrack',
         private: false,
         max_players: playerCount,
         settings: {

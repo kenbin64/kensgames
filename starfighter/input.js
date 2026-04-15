@@ -335,6 +335,20 @@ const SFInput = (function () {
             this.vPressed = false;
         }
 
+        // Hyperdrive (H key) — toggle engage/disengage
+        if (keys['KeyH']) {
+            if (!this.hPressed) {
+                if (player.hyperdriveActive || player.hyperdriveSpooling) {
+                    player.disengageHyperdrive();
+                } else {
+                    player.activateHyperdrive();
+                }
+                this.hPressed = true;
+            }
+        } else {
+            this.hPressed = false;
+        }
+
         // Fire primary — left mouse button handled in mousedown, Space fires selected weapon
         if (keys['Space']) window.Starfighter.firePrimary();
 

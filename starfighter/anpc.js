@@ -145,15 +145,18 @@ const SFANPC = (function () {
   function computeManifoldXY(anpc, scenario) {
     // x derives from personality: base aggression = 1.0 - Agreeableness
     // Modified by Extraversion (amplifies) and Conscientiousness (dampens impulse)
-    const baseAggression = 1.0 - anpc.personality.A;
-    const extraversionBoost = (anpc.personality.E - 0.5) * 0.2;
-    const conscientiousnessControl = (anpc.personality.C - 0.5) * -0.15;
+    const p = anpc.personality;
+    if (!p) return { x: 0.5, y: 0.5 };
+    const baseAggression = 1.0 - p.A;
+    const extraversionBoost = (p.E - 0.5) * 0.2;
+    const conscientiousnessControl = (p.C - 0.5) * -0.15;
     let x = baseAggression + extraversionBoost + conscientiousnessControl;
 
     // y derives from scenario: weighted combination of vector components
     // Threat and TimePressure drive urgency; Opportunity opens action space
-    let y = scenario.threat * 0.4 + scenario.opportunity * 0.3 +
-      scenario.timePressure * 0.2 + scenario.socialPressure * 0.1;
+    if (!scenario) return { x: Math.max(0, Math.min(1, x)), y: 0.5 };
+    let y = (scenario.threat || 0) * 0.4 + (scenario.opportunity || 0) * 0.3 +
+      (scenario.timePressure || 0) * 0.2 + (scenario.socialPressure || 0) * 0.1;
 
     return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
   }
@@ -235,7 +238,8 @@ const SFANPC = (function () {
    */
   function computeToneVector(anpc) {
     const p = anpc.personality;
-    const moraleNorm = anpc.morale;
+    if (!p) return { formality: 0.5, warmth: 0.5, humor: 0.3, aggression: 0.3 };
+    const moraleNorm = anpc.morale || 0.5;
     const m = anpc.getManifoldValues(_scenario);
 
     // Formality: high C + low E → formal; dampened by z_linear (high intensity → less formal)
@@ -253,6 +257,8 @@ const SFANPC = (function () {
     // Aggression: low A + manifold escalation; z_asymmetric directly amplifies aggression
     const aggression = Math.max(0, Math.min(1,
       (1 - p.A) * 0.4 + m.asymmetric * 0.4 + (1 - moraleNorm) * 0.2));
+
+    return { formality, warmth, humor, aggression };
   }
 
   /**
@@ -686,7 +692,7 @@ const SFANPC = (function () {
     // Higher z_linear intensifies the dominant tone axis
     let modifier = '';
     if (anpc) {
-      const tone = computeToneVector(anpc);
+      const tone = computeToneVector(anpc) || { formality: 0.5, warmth: 0.5, humor: 0.3, aggression: 0.3 };
       // Scale tone axes by z_linear — manifold modulates which tone dominates
       const scaledHumor = tone.humor * (1 + zLinear);
       const scaledWarmth = tone.warmth * (1 + zLinear * 0.5);

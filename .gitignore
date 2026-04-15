@@ -23,3 +23,10 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# Manifold deploy artifacts (z = xy² — built, not committed)
+starfighter/starfighter.bundle.js
+starfighter/starfighter.bundle.js.gz
+starfighter/index.html.gz
+starfighter/index.src.html
+starfighter/nginx_starfighter.conf

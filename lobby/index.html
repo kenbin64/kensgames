@@ -763,6 +763,7 @@
   </footer>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════
     // GAMES CATALOG
@@ -920,13 +921,35 @@
         msg.style.color = '#ff4444';
         return;
       }
-      // Codes are game-agnostic. The game server resolves which game it belongs to.
-      // For now, default to starfighter lobby with code
-      msg.textContent = 'Joining...';
+      // Resolve code → game via the unified server
+      msg.textContent = 'Looking up game...';
       msg.style.color = 'var(--green)';
-      setTimeout(() => {
-        window.location.href = '/starfighter/lobby.html?code=' + code;
-      }, 400);
+      const resolver = new KGMultiplayer('portal');
+      resolver.on('authenticated', () => resolver.resolveCode(code));
+      resolver.on('code_resolved', (d) => {
+        resolver.disconnect();
+        if (d.found) {
+          msg.textContent = 'Found: ' + (d.game_name || d.game_id) + ' — joining...';
+          setTimeout(() => {
+            // Redirect to the correct game with the code
+            const gamePath = d.game_path || '/';
+            const sep = gamePath.includes('?') ? '&' : '?';
+            window.location.href = gamePath + sep + 'code=' + code;
+          }, 500);
+        } else {
+          msg.textContent = 'No game found with that code';
+          msg.style.color = '#ff4444';
+        }
+      });
+      resolver.on('error', () => {
+        msg.textContent = 'Server error — try again';
+        msg.style.color = '#ff4444';
+        resolver.disconnect();
+      });
+      resolver.connect({
+        username: localStorage.getItem('username') || 'Guest',
+        token: localStorage.getItem('user_token'),
+      });
     }
 
     function quickPlay() {

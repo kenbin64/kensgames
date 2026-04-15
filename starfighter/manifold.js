@@ -89,6 +89,11 @@ const SpaceManifold = (function () {
     'player.maxSpeed': 250,    // base thrust m/s
     'player.afterburnerSpeed': 600,    // afterburner max m/s
     'player.boostSpeed': 800,    // boost max m/s
+    'player.hyperdriveSpeed': 2500,  // hyperdrive max m/s
+    'player.hyperdriveFuelCost': 40, // fuel units to engage
+    'player.hyperdriveBurn': 12,     // fuel units/second while active
+    'player.hyperdriveCooldown': 15, // seconds cooldown after disengage
+    'player.hyperdriveSpoolTime': 2.0, // seconds to spool up
     'player.hull': 100,    // starting hull
     'player.shields': 100,    // starting shields
     'player.torpedoes': 8,      // torpedo magazine
@@ -241,6 +246,14 @@ const SpaceManifold = (function () {
 
     // ── Hive ──
     'hive.hull': 5000,
+
+    // ── Deploy — manifold asset tiers ──
+    // Tier 0: preload (visible at spawn), Tier 1: lazy (first encounter), Tier 2: deferred (late waves)
+    'deploy.tier0.budget': 170000000,  // ~160MB budget for preloaded models
+    'deploy.tier1.triggerWave': 1,     // wave at which tier 1 lazy-loads begin
+    'deploy.tier2.triggerWave': 5,     // wave at which tier 2 deferred models stream
+    'deploy.bundle.cacheSeconds': 86400, // 24h cache for JS bundle
+    'deploy.gzip.level': 9,           // max compression for pre-gzip
   };
 
   // Runtime overrides layer — setDim writes here, dim reads overlay first

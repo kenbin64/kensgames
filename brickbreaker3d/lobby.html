@@ -392,6 +392,7 @@
     </div>
   </div>
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
   <script>
     const token = localStorage.getItem('user_token');
     const username = localStorage.getItem('username') || 'Guest';
@@ -403,16 +404,78 @@
     if (!av) badge.style.color = 'var(--np)';
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
 
-    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding opponent...';
+    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Ready';
+
+    // Shared multiplayer client for BrickBreaker3D
+    const bbmp = new KGMultiplayer('brickbreaker');
+    let _bbConnected = false;
+
+    function ensureMpConnected(cb) {
+      if (_bbConnected) { cb(); return; }
+      bbmp.on('authenticated', () => { _bbConnected = true; cb(); });
+      bbmp.connect({ username, token });
+    }
+
     function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/brickbreaker3d/index.html?mode=solo'; }
-    function startMatchmaker() { if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; } if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; } window.location.href = '/brickbreaker3d/index.html?mode=multi'; }
+
+    function startMatchmaker() {
+      if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
+      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
+      ensureMpConnected(() => {
+        bbmp.on('session_update', (s) => {
+          if (s.player_count >= 2) {
+            window.location.href = `/brickbreaker3d/index.html?mode=multi&session=${s.session_id}`;
+          } else {
+            document.getElementById('mm-avail').textContent = 'Searching for opponent...';
+          }
+        });
+        bbmp.matchmake();
+      });
+    }
+
     function togglePrivate() { const p = document.getElementById('priv-panel'); p.classList.toggle('open'); if (p.classList.contains('open')) generateCode(); }
     function privTab(tab) { document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab)); document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none'; document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none'; }
+
     let _code = '';
-    function generateCode() { if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; } _code = Math.random().toString(36).substring(2, 8).toUpperCase(); document.getElementById('room-code').textContent = _code; document.getElementById('launch-btn').disabled = false; document.getElementById('priv-status').textContent = 'Share code with opponent. You start the match.'; }
+    function generateCode() {
+      if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
+      ensureMpConnected(() => {
+        bbmp.on('session_update', (s) => {
+          _code = s.session_code;
+          document.getElementById('room-code').textContent = _code;
+          document.getElementById('launch-btn').disabled = false;
+          document.getElementById('priv-status').textContent = 'Share code with opponent. You start the match.';
+        });
+        bbmp.createGame({ private: true, maxPlayers: 4 });
+      });
+    }
+
     function copyCode() { if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; } }
-    function launchPrivate() { if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; } window.location.href = `/brickbreaker3d/index.html?mode=private&code=${_code}&host=1`; }
-    function joinPrivate() { const code = document.getElementById('join-code').value.trim().toUpperCase(); const name = document.getElementById('guest-name').value.trim() || 'Guest'; const msg = document.getElementById('join-msg'); if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; } if (!localStorage.getItem('user_token')) { localStorage.setItem('username', name); localStorage.setItem('user_token', 'guest-' + Date.now()); } if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; } window.location.href = `/brickbreaker3d/index.html?mode=private&code=${code}`; }
+
+    function launchPrivate() {
+      if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
+      window.location.href = `/brickbreaker3d/index.html?mode=private&code=${_code}&host=1`;
+    }
+
+    function joinPrivate() {
+      const code = document.getElementById('join-code').value.trim().toUpperCase();
+      const name = document.getElementById('guest-name').value.trim() || 'Guest';
+      const msg = document.getElementById('join-msg');
+      if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
+      if (!localStorage.getItem('user_token')) { localStorage.setItem('username', name); localStorage.setItem('user_token', 'guest-' + Date.now()); }
+      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
+      // Use unified server to resolve code and join
+      ensureMpConnected(() => {
+        bbmp.on('code_resolved', (d) => {
+          if (d.found) {
+            window.location.href = `/brickbreaker3d/index.html?mode=private&code=${code}`;
+          } else {
+            msg.textContent = 'Room not found. Check the code.'; msg.className = 'arc-msg err';
+          }
+        });
+        bbmp.resolveCode(code);
+      });
+    }
   </script>
 </body>
 
