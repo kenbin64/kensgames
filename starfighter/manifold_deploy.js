@@ -23,6 +23,7 @@ const X = [
   ['js/analytics.js', ROOT], ['js/manifold.js', ROOT],
   ['js/substrates/manifold_ingestor.js', ROOT],
   ['manifold.js', SF], ['native/bridge.js', SF],
+  ['manifold_native_substrate.js', SF],
   ['lib/three/three.min.js', ROOT], ['lib/three/GLTFLoader.js', ROOT],
   ['audio.js', SF], ['music.js', SF], ['anpc.js', SF], ['progression.js', SF],
   ['js/multiplayer-client.js', ROOT], ['multiplayer.js', SF],

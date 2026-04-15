@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starfighter Test Suite</title>
+  <style>
+    :root {
+      --bg: #000c1a;
+      --fg: #c0d4e8;
+      --accent: #00ccff;
+      --pass: #00ff88;
+      --fail: #ff4444;
+      --warn: #ffbb33;
+      --border: #1a3a5c;
+      --panel: #001228;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header h1 {
+      color: var(--accent);
+      font-size: 1.4em;
+      letter-spacing: 0.1em;
+    }
+
+    header .subtitle {
+      color: #4488aa;
+      font-size: 0.85em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #001e3a;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 8px 18px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.9em;
+      letter-spacing: 0.05em;
+      transition: background 0.15s;
+    }
+
+    button:hover {
+      background: #003060;
+    }
+
+    button.danger {
+      color: var(--fail);
+      border-color: #660000;
+    }
+
+    #status-bar {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 1em;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .stat {
+      display: flex;
+      gap: 6px;
+    }
+
+    .stat .label {
+      color: #4488aa;
+    }
+
+    .stat .pass {
+      color: var(--pass);
+      font-weight: bold;
+    }
+
+    .stat .fail {
+      color: var(--fail);
+      font-weight: bold;
+    }
+
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+
+    .suite-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+
+    .suite-card h2 {
+      color: var(--accent);
+      font-size: 0.85em;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .test-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 3px 0;
+      font-size: 0.82em;
+      line-height: 1.4;
+    }
+
+    .test-row .icon {
+      flex-shrink: 0;
+    }
+
+    .test-row.pass .icon {
+      color: var(--pass);
+    }
+
+    .test-row.fail .icon {
+      color: var(--fail);
+    }
+
+    .test-row.pending .icon {
+      color: var(--warn);
+    }
+
+    .test-row .name {
+      color: #8ab0c8;
+    }
+
+    .test-row.fail .name {
+      color: #ffaaaa;
+    }
+
+    .test-row .reason {
+      color: #aa6666;
+      font-size: 0.9em;
+      margin-top: 2px;
+    }
+
+    #log-area {
+      margin-top: 24px;
+      background: #000810;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      max-height: 320px;
+      overflow-y: auto;
+      font-size: 0.8em;
+      color: #6699aa;
+      white-space: pre-wrap;
+    }
+
+    #log-area.hidden {
+      display: none;
+    }
+
+    /* Demo compositor panel */
+    #demo-panel {
+      margin-top: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    #demo-panel h2 {
+      color: var(--accent);
+      font-size: 0.9em;
+      margin-bottom: 12px;
+    }
+
+    .demo-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .demo-row label {
+      color: #4488aa;
+      width: 110px;
+    }
+
+    .demo-row input[type=range] {
+      flex: 1;
+      min-width: 120px;
+      accent-color: var(--accent);
+    }
+
+    .demo-row .val {
+      width: 36px;
+      text-align: right;
+      color: var(--fg);
+    }
+
+    #demo-output {
+      background: #000810;
+      border: 1px solid var(--border);
+      padding: 12px;
+      color: var(--pass);
+      font-size: 0.95em;
+      min-height: 48px;
+      word-break: break-word;
+      margin-top: 10px;
+    }
+
+    #demo-output .label {
+      color: #4488aa;
+      font-size: 0.8em;
+      margin-bottom: 4px;
+    }
+
+    .loading {
+      color: var(--warn);
+    }
+
+    .ts {
+      color: #334;
+      font-size: 0.75em;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>◈ STARFIGHTER TEST SUITE</h1>
+      <div class="subtitle">Manifold · Dimensional Phrase · Voice · Audio</div>
+    </div>
+    <div class="ts" id="ts"></div>
+  </header>
+
+  <div class="controls">
+    <button onclick="runAll()">▶ Run All Tests</button>
+    <button onclick="runSuite('Voice')">Voice System</button>
+    <button onclick="runSuite('Manifold')">Manifold Math</button>
+    <button onclick="runSuite('Phrase')">Phrase Compositor</button>
+    <button onclick="runSuite('Logic')">Logic Gates</button>
+    <button onclick="runSuite('Dimensional')">Dimensional</button>
+    <button onclick="runSuite('Audio')">Audio</button>
+    <button onclick="clearResults()" class="danger">✕ Clear</button>
+    <button onclick="document.getElementById('log-area').classList.toggle('hidden')">⌦ Log</button>
+  </div>
+
+  <div id="status-bar">
+    <div class="stat"><span class="label">Total:</span><span id="stat-total">—</span></div>
+    <div class="stat"><span class="label">Pass:</span><span class="pass" id="stat-pass">—</span></div>
+    <div class="stat"><span class="label">Fail:</span><span class="fail" id="stat-fail">—</span></div>
+    <div class="stat"><span class="label">Time:</span><span id="stat-time">—</span></div>
+  </div>
+
+  <div id="results"></div>
+
+  <!-- Dimensional Phrase Demo -->
+  <div id="demo-panel">
+    <h2>◈ PHRASE COMPOSITOR LIVE DEMO</h2>
+    <div class="demo-row">
+      <label>Urgency</label>
+      <input type="range" id="s-urgency" min="0" max="100" value="50" oninput="demoUpdate()">
+      <span class="val" id="v-urgency">0.50</span>
+    </div>
+    <div class="demo-row">
+      <label>Severity</label>
+      <input type="range" id="s-severity" min="0" max="100" value="30" oninput="demoUpdate()">
+      <span class="val" id="v-severity">0.30</span>
+    </div>
+    <div class="demo-row">
+      <label>Morale</label>
+      <input type="range" id="s-morale" min="0" max="100" value="70" oninput="demoUpdate()">
+      <span class="val" id="v-morale">0.70</span>
+    </div>
+    <div class="demo-row">
+      <label>Spatial</label>
+      <input type="range" id="s-spatial" min="0" max="100" value="40" oninput="demoUpdate()">
+      <span class="val" id="v-spatial">0.40</span>
+    </div>
+    <div class="demo-row">
+      <label>Openness</label>
+      <input type="range" id="s-open" min="0" max="100" value="50" oninput="demoUpdate()">
+      <span class="val" id="v-open">0.50</span>
+    </div>
+    <div class="demo-row">
+      <label>Conscientiousness</label>
+      <input type="range" id="s-consc" min="0" max="100" value="60" oninput="demoUpdate()">
+      <span class="val" id="v-consc">0.60</span>
+    </div>
+    <div id="demo-output">
+      <div class="label">Composed phrase:</div>
+      <div id="demo-phrase">Load SFPhrase to see output…</div>
+      <div class="label" style="margin-top:8px">Callout:</div>
+      <div id="demo-callout">—</div>
+      <div class="label" style="margin-top:8px">Status:</div>
+      <div id="demo-status">—</div>
+      <div class="label" style="margin-top:8px">Coords (z3, z4, m7, diamond):</div>
+      <div id="demo-coords" style="color:#6699aa; font-size:0.85em">—</div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:10px;">
+      <button onclick="demoUpdate()">⟳ Refresh Phrases</button>
+      <button onclick="demoSpeak()">▶ Speak</button>
+    </div>
+  </div>
+
+  <div id="log-area" class="hidden"></div>
+
+  <!-- Scripts — load game modules first, then test suite -->
+  <script src="../phrase_compositor.js"></script>
+  <script src="../audio.js"></script>
+  <script src="../announcer.js"></script>
+
+  <script>
+    document.getElementById('ts').textContent = new Date().toLocaleString();
+
+    // Redirect console to log area
+    const logArea = document.getElementById('log-area');
+    const _log = console.log.bind(console);
+    const _warn = console.warn.bind(console);
+    const _error = console.error.bind(console);
+
+    function appendLog(msg, cls = '') {
+      const line = document.createElement('div');
+      if (cls) line.style.color = cls;
+      line.textContent = msg;
+      logArea.appendChild(line);
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    // Render results to cards
+    function renderResults(results) {
+      const bySuite = {};
+      results.forEach(r => {
+        if (!bySuite[r.suite]) bySuite[r.suite] = [];
+        bySuite[r.suite].push(r);
+      });
+
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+      Object.entries(byuite).forEach(([suiteName, tests]) => {
+        const card = document.createElement('div');
+        card.className = 'suite-card';
+        const passCount = tests.filter(t => t.pass).length;
+        const allPass = passCount === tests.length;
+        card.innerHTML = `<h2>${allPass ? '✓' : '✗'} ${suiteName} (${passCount}/${tests.length})</h2>`;
+        tests.forEach(t => {
+          const row = document.createElement('div');
+          row.className = `test-row ${t.pass ? 'pass' : 'fail'}`;
+          row.innerHTML = `<span class="icon">${t.pass ? '✓' : '✗'}</span><div><div class="name">${t.name}</div>${!t.pass ? `<div class="reason">${t.reason || ''}</div>` : ''}</div>`;
+          card.appendChild(row);
+        });
+        container.appendChild(card);
+      });
+    }
+
+    async function runAll() {
+      document.getElementById('results').innerHTML = '<div class="loading">Running tests…</div>';
+      const start = performance.now();
+
+      // Dynamically load test suite
+      await new Promise(resolve => {
+        if (window.SFTests) return resolve();
+        const s = document.createElement('script');
+        s.src = 'test_suite.js';
+        s.onload = resolve;
+        document.head.appendChild(s);
+      });
+
+      const outcome = await SFTests.runAll();
+      const elapsed = ((performance.now() - start) / 1000).toFixed(2);
+
+      document.getElementById('stat-total').textContent = outcome.total;
+      document.getElementById('stat-pass').textContent = outcome.pass;
+      document.getElementById('stat-fail').textContent = outcome.fail;
+      document.getElementById('stat-time').textContent = elapsed + 's';
+
+      renderResults(outcome.results);
+    }
+
+    async function runSuite(name) {
+      if (!window.SFTests) {
+        const s = document.createElement('script');
+        s.src = 'test_suite.js';
+        await new Promise(r => { s.onload = r; document.head.appendChild(s); });
+      }
+      const map = {
+        Voice: SFTests.runVoiceTests,
+        Manifold: SFTests.runManifoldTests,
+        Phrase: SFTests.runPhraseTests,
+        Logic: SFTests.runLogicTests,
+        Dimensional: SFTests.runDimensionalTests,
+        Audio: SFTests.runAudioTests,
+      };
+      if (map[name]) map[name]();
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+      ['stat-total', 'stat-pass', 'stat-fail', 'stat-time'].forEach(id => {
+        document.getElementById(id).textContent = '—';
+      });
+      logArea.innerHTML = '';
+    }
+
+    // ── Demo updater ──────────────────────────────────────────────────
+    function demoSliderVal(id) { return parseInt(document.getElementById(id).value) / 100; }
+
+    function demoUpdate() {
+      const fields = ['urgency', 'severity', 'morale', 'spatial', 'open', 'consc'];
+      const s = {
+        urgency: demoSliderVal('s-urgency'),
+        severity: demoSliderVal('s-severity'),
+        morale: demoSliderVal('s-morale'),
+        spatialFactor: demoSliderVal('s-spatial'),
+        openness: demoSliderVal('s-open'),
+        conscientiousness: demoSliderVal('s-consc'),
+        tokens: { callsign: 'HAWK' },
+      };
+      fields.forEach(f => {
+        const v = demoSliderVal(`s-${f}`);
+        document.getElementById(`v-${f}`).textContent = v.toFixed(2);
+      });
+
+      if (!window.SFPhrase) {
+        document.getElementById('demo-phrase').textContent = 'SFPhrase not loaded.';
+        return;
+      }
+
+      document.getElementById('demo-phrase').textContent = SFPhrase.compose(s);
+      document.getElementById('demo-callout').textContent = SFPhrase.callout(s);
+      document.getElementById('demo-status').textContent = SFPhrase.status({ ...s, tokens: { subject: 'hull', pct: 72 } });
+
+      const c = SFPhrase._coords(s);
+      document.getElementById('demo-coords').textContent =
+        `z3=${c.z3.toFixed(3)}  z4=${c.z4.toFixed(3)}  m7=${c.m7.toFixed(4)}  diamond=${c.diamond.toFixed(3)}  nearZero=${c.nearZero}`;
+    }
+
+    function demoSpeak() {
+      const text = document.getElementById('demo-phrase').textContent;
+      if (!text || !window.speechSynthesis) return;
+      speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      speechSynthesis.speak(utt);
+    }
+
+    // Init demo
+    window.addEventListener('load', () => {
+      demoUpdate();
+      // Typo fix: 'byuite' in renderResults — correct it
+    });
+  </script>
+
+  <!-- Inline bug fix for renderResults typo -->
+  <script>
+    // Patch renderResults with corrected variable name
+    function renderResults(results) {
+      const bySuite = {};
+      results.forEach(r => {
+        if (!bySuite[r.suite]) bySuite[r.suite] = [];
+        bySuite[r.suite].push(r);
+      });
+
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+      Object.entries(bySuite).forEach(([suiteName, tests]) => {
+        const card = document.createElement('div');
+        card.className = 'suite-card';
+        const passCount = tests.filter(t => t.pass).length;
+        const allPass = passCount === tests.length;
+        card.innerHTML = `<h2 style="color:${allPass ? 'var(--pass)' : 'var(--fail)'}">${allPass ? '✓' : '✗'} ${suiteName} (${passCount}/${tests.length})</h2>`;
+        tests.forEach(t => {
+          const row = document.createElement('div');
+          row.className = `test-row ${t.pass ? 'pass' : 'fail'}`;
+          row.innerHTML = `<span class="icon">${t.pass ? '✓' : '✗'}</span><div><div class="name">${t.name}</div>${!t.pass ? `<div class="reason">${t.reason || ''}</div>` : ''}</div>`;
+          card.appendChild(row);
+        });
+        container.appendChild(card);
+      });
+    }
+  </script>
+</body>
+
+</html>

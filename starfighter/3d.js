@@ -564,12 +564,12 @@ const SF3D = (function () {
         const group = new THREE.Group();
         // Outer ring
         const ringGeo = new THREE.RingGeometry(9, 10, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, side: THREE.FrontSide, transparent: true, opacity: 0.6 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         group.add(ring);
         // Inner ring (thinner, brighter)
         const innerRingGeo = new THREE.RingGeometry(6.5, 7, 32);
-        const innerRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
+        const innerRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.FrontSide, transparent: true, opacity: 0.35 });
         group.add(new THREE.Mesh(innerRingGeo, innerRingMat));
         // Corner brackets (four L-shaped lines)
         const bracketMat = new THREE.LineBasicMaterial({ color: 0x00ffcc });
@@ -586,7 +586,7 @@ const SF3D = (function () {
         });
         // Diamond center pip
         const dotGeo = new THREE.RingGeometry(0, 1.5, 4);
-        const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.FrontSide, transparent: true, opacity: 0.5 });
         group.add(new THREE.Mesh(dotGeo, dotMat));
         return group;
     }
@@ -1375,7 +1375,7 @@ const SF3D = (function () {
             metalness: 0.55,
             transparent: true,
             opacity: 0.92,
-            side: THREE.DoubleSide,
+            side: THREE.FrontSide,
             depthWrite: false,
             depthTest: false,
         });
@@ -2460,7 +2460,7 @@ const SF3D = (function () {
         // Update Camera to Player Position/Rotation
         if (state.player) {
             // ── Docking cutscene: use cinematographer camera override ──
-            if (state.cutsceneCamPos && phase === 'landing') {
+            if (state.cutsceneCamPos && (phase === 'landing' || phase === 'land-approach')) {
                 camera.position.copy(state.cutsceneCamPos);
                 camera.quaternion.copy(state.cutsceneCamQuat);
                 // No cockpit arms animation needed for external cam

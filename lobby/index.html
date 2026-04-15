@@ -676,6 +676,10 @@
     .game-card:nth-child(3) {
       animation-delay: .2s
     }
+
+    .game-card:nth-child(4) {
+      animation-delay: .3s
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -804,6 +808,18 @@
         multiplayer: true,
         url: '/starfighter/',
         lobbyUrl: '/starfighter/lobby.html',
+      },
+      {
+        id: 'tictactoe',
+        title: '4D TicTacToe',
+        emoji: '&#10060;&#11093;&#10060;&#11093;&#10060;&#11093;&#10060;&#11093;',
+        bg: 'linear-gradient(135deg,#0d0a2d,#14081a)',
+        icon: '&#x1F9CA;',
+        tags: ['1-4 Players', 'Strategy', '3D / 4D'],
+        desc: 'Multi-dimensional TicTacToe across 3D and 4D hypercubes. CSS 3D rendered boards you can rotate. Win across any axis — including the 4th dimension.',
+        multiplayer: true,
+        url: '/4DTicTacToe/',
+        lobbyUrl: '/4DTicTacToe/',
       }
     ];
 

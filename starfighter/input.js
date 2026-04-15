@@ -109,7 +109,10 @@ const SFInput = (function () {
         document.addEventListener('contextmenu', e => e.preventDefault());
 
         // ── Fullscreen + Pointer Lock immersion system ──
-        // When pointer lock is lost (ESC), show resume button, restore cursor
+        // Electron: pointer lock is never forcibly broken by ESC — ESC is a pause key.
+        // Browser: ESC exits pointer lock and shows a resume button.
+        const _isElectron = !!(window.NativeApp && window.NativeApp.isElectron);
+
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement === document.body) {
                 // Locked — hide cursor, hide resume btn + overlay
@@ -119,21 +122,28 @@ const SFInput = (function () {
                 if (btn) btn.style.display = 'none';
                 if (overlay) overlay.style.display = 'none';
             } else {
-                // Unlocked (ESC pressed) — show cursor + resume button in any game phase
                 document.body.classList.remove('immersed');
-                const phase = window.Starfighter && Starfighter.getPhase ? Starfighter.getPhase() : '';
-                if (phase && phase !== 'loading') {
-                    const btn = document.getElementById('fs-resume');
-                    const overlay = document.getElementById('fs-resume-overlay');
-                    if (btn) btn.style.display = 'block';
-                    if (overlay) overlay.style.display = 'block';
+                if (_isElectron) {
+                    // Electron: pointer lock lost = window lost focus (alt-tab etc.)
+                    // Re-acquire on next click; don't show browser-style resume overlay
+                    // Just pause the game if it's running
+                    if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(true);
+                } else {
+                    // Browser: ESC breaks pointer lock — show resume prompt
+                    const phase = window.Starfighter && Starfighter.getPhase ? Starfighter.getPhase() : '';
+                    if (phase && phase !== 'loading') {
+                        const btn = document.getElementById('fs-resume');
+                        const overlay = document.getElementById('fs-resume-overlay');
+                        if (btn) btn.style.display = 'block';
+                        if (overlay) overlay.style.display = 'block';
+                    }
                 }
             }
         });
 
         document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                // Fullscreen exited — also lose pointer lock
+            if (!_isElectron && !document.fullscreenElement) {
+                // Browser only: fullscreen exited — also lose pointer lock
                 if (document.pointerLockElement) document.exitPointerLock();
             }
         });
@@ -561,21 +571,26 @@ const SFInput = (function () {
 
     // ── Immersive mode: fullscreen + pointer lock + cursor hidden ──
     function enterImmersive() {
-        const el = document.documentElement;
-        const fsReq = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        const _isElectron = !!(window.NativeApp && window.NativeApp.isElectron);
 
-        const _lockPointer = () => {
-            // Small delay — browsers need fullscreen to settle before pointer lock
-            setTimeout(() => document.body.requestPointerLock(), 100);
-        };
-
-        if (!document.fullscreenElement && fsReq) {
-            fsReq.call(el).then(_lockPointer).catch(_lockPointer);
-        } else {
-            // Already fullscreen or can't fullscreen — just lock pointer
+        if (_isElectron) {
+            // Electron: window is already fullscreen and frameless — just grab pointer lock
             document.body.requestPointerLock();
+        } else {
+            const el = document.documentElement;
+            const fsReq = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+            const _lockPointer = () => {
+                // Small delay — browsers need fullscreen to settle before pointer lock
+                setTimeout(() => document.body.requestPointerLock(), 100);
+            };
+            if (!document.fullscreenElement && fsReq) {
+                fsReq.call(el).then(_lockPointer).catch(_lockPointer);
+            } else {
+                document.body.requestPointerLock();
+            }
         }
         document.body.classList.add('immersed');
+        if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(false);
         const btn = document.getElementById('fs-resume');
         const overlay = document.getElementById('fs-resume-overlay');
         if (btn) btn.style.display = 'none';

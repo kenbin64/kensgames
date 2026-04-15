@@ -2107,11 +2107,20 @@ const Starfighter = (function () {
         // ── Populate debrief overlay ──
         const overlay = document.getElementById('bay-debrief');
         if (overlay) {
+            // Reset rank-up banner from previous wave
+            const bdrRankup = document.getElementById('bdr-rankup');
+            if (bdrRankup) bdrRankup.classList.remove('visible');
             // Header
             const titleInfo = WAVE_TITLES[prevWave] || { name: 'MISSION', obj: 'Sortie complete.' };
             const el = (id) => document.getElementById(id);
             el('bdr-wave-title').textContent = `WAVE ${prevWave} COMPLETE`;
             el('bdr-mission-name').textContent = titleInfo.name;
+
+            // Callsign acknowledgment
+            const cs = state.callsign || 'PILOT';
+            const waveKills = state._waveClearKills != null ? state._waveClearKills : state.kills;
+            el('bdr-callsign-ack').textContent =
+                `${cs.toUpperCase()}, you fulfilled your mission — ${waveKills} hostile${waveKills !== 1 ? 's' : ''} eliminated.`;
 
             // Stats rows
             el('bdr-stats-rows').innerHTML =
@@ -2141,6 +2150,19 @@ const Starfighter = (function () {
             if (rankedUp) {
                 el('bdr-rankup').classList.add('visible');
                 el('bdr-rankup-name').textContent = newRankName.toUpperCase();
+                // Announce promotion via announcer
+                if (window.SFAnnouncer && SFAnnouncer.onRankPromotion) SFAnnouncer.onRankPromotion(newRankName);
+                // Persist rank badge to localStorage for lobby display
+                if (window.SFProgression) {
+                    const rank = SFProgression.getRank();
+                    try {
+                        localStorage.setItem('sf_rank_id', rank.id);
+                        localStorage.setItem('sf_rank_name', rank.name);
+                        localStorage.setItem('sf_rank_abbr', rank.abbr);
+                        localStorage.setItem('sf_rank_icon', rank.icon);
+                        localStorage.setItem('sf_rank_pips', rank.pips);
+                    } catch (e) { /* quota */ }
+                }
             }
 
             // Animate XP bar after short delay
@@ -2242,6 +2264,9 @@ const Starfighter = (function () {
             state.missionStats.wingmenSaved = 0;
             state.missionStats.wingmenLost = 0;
             state.missionStats.startTime = 0;
+            // Reset wave-clear snapshot
+            state._waveClearKills = null;
+            state._waveClearPlayerKills = null;
         }
 
         window._bdrLaunch = function () {
@@ -2704,15 +2729,11 @@ const Starfighter = (function () {
         if (enemies.length === 0 && state.phase === 'combat') {
             // Cancel any active support call
             _clearSupport();
-            // BFXG-009 §1.6 — Phase 5: auto-engage autopilot immediately, no player prompt
-            state.phase = 'land-approach';
-            state.autopilotActive = true;   // always auto, no waiting
-            state.autopilotTimer = 0;
-            state._returnFlightInit = false; // reset cinematic init flag
+            // Capture wave-kill snapshot
+            state._waveClearKills = state.kills;
+            state._waveClearPlayerKills = state.playerKills;
+            state._waveClearAutopilot = true; // flag: show "MISSION COMPLETE" title card
             SFAnnouncer.onWaveClear();
-            // Hide HUD overlays; AUTOPILOT indicator shown in the phase block
-            const rtbBtn = document.getElementById('rtb-btn');
-            if (rtbBtn) rtbBtn.style.display = 'none';
             // GDD §1.6: Victory fanfare (3-4s musical sting)
             if (window.SFAudio) SFAudio.playSound('victory_fanfare');
             // GDD §9.3: Music intensity drops on wave clear, transition to cinematic feel
@@ -2720,7 +2741,66 @@ const Starfighter = (function () {
                 SFMusic.setSection('exploration');
                 SFMusic.setIntensity(0.15);
             }
+            // Show wave-clear overlay; player clicks "Return to Base" to proceed
+            _showWaveClearScreen();
         }
+    }
+
+    // ── Wave-clear blue flash overlay ──
+    function _showWaveClearScreen() {
+        const overlay = document.getElementById('waveclear-overlay');
+        if (!overlay) {
+            // Fallback: engage autopilot immediately if overlay element missing
+            state.phase = 'land-approach';
+            state.autopilotActive = true;
+            state.autopilotTimer = 0;
+            state._returnFlightInit = false;
+            return;
+        }
+
+        const cs = state.callsign ? state.callsign.toUpperCase() : 'PILOT';
+        const kills = state._waveClearKills || state.kills;
+        const wave = state.wave;
+
+        overlay.innerHTML = `
+            <div class="waveclear-headline">WAVE ${wave} CLEARED</div>
+            <div class="waveclear-congrats">CONGRATULATIONS, ${cs}</div>
+            <div class="waveclear-kills">${kills} ENEMY FIGHTER${kills !== 1 ? 'S' : ''} DESTROYED THIS MISSION</div>
+            <button class="waveclear-btn" id="waveclear-rtb-btn">RETURN TO BASE</button>
+        `;
+        overlay.classList.add('active');
+
+        // Pause phase at combat (prevents normal game loop from advancing)
+        state.phase = 'land-approach';
+        state.autopilotActive = false; // Wait for button click
+        state._returnFlightInit = false;
+
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) hud.style.opacity = '0.15';
+        const xhair = document.getElementById('crosshair');
+        if (xhair) xhair.style.display = 'none';
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '0';
+
+        document.getElementById('waveclear-rtb-btn').addEventListener('click', _doWaveClearRTB);
+    }
+
+    // ── Instant bay return on wave-clear button click ──
+    function _doWaveClearRTB() {
+        const overlay = document.getElementById('waveclear-overlay');
+        if (overlay) overlay.classList.remove('active');
+
+        // Score bonus for returning (same as docking)
+        state.score += 500 * state.wave;
+
+        // Restore UI before completeLanding tears it down
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) hud.style.opacity = '1';
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '1';
+
+        // Jump directly to bay debrief (skip 17s autopilot + 28s docking cutscene)
+        completeLanding();
     }
 
     function gameOver(reason, isVictory) {
@@ -2789,86 +2869,91 @@ const Starfighter = (function () {
             + '<td style="padding:2px 0;color:#0ff;text-align:right;font-weight:bold;">' + value + '</td></tr>';
     }
 
-    // ── Respawn system: countdown overlay, then reset player into bay ──
+    // ── Respawn system: button-based fighter-lost overlay ──
     function _showRespawnScreen() {
+        const overlay = document.getElementById('respawn-overlay');
+        if (!overlay) return;
+
+        const lives = state.livesRemaining;
+        const maxLives = state.maxLives;
+        const reason = state.respawnReason || 'HULL INTEGRITY FAIL';
+        const pips = Array.from({ length: maxLives }, (_, i) =>
+            `<span class="lives-pip ${i < lives ? 'active' : 'lost'}">&#9733;</span>`
+        ).join('');
+
+        overlay.innerHTML = `
+            <div class="respawn-reason-text">${reason}</div>
+            <div class="respawn-headline">FIGHTER LOST</div>
+            <div class="lives-meter-row">${pips}</div>
+            <div class="respawn-turns-text">You have <strong>${lives}</strong> turn${lives !== 1 ? 's' : ''} remaining</div>
+            <button class="respawn-btn" id="respawn-launch-btn">LAUNCH NEW FIGHTER</button>
+        `;
+        overlay.classList.add('active');
+
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) { hud.style.opacity = '0'; hud.style.display = 'none'; }
+        const cross = document.getElementById('crosshair');
+        if (cross) cross.style.display = 'none';
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '0';
+        const cdEl = document.getElementById('countdown-display');
+        if (cdEl) cdEl.style.display = 'none';
+
+        document.getElementById('respawn-launch-btn').addEventListener('click', _doRespawnLaunch);
+    }
+
+    function _doRespawnLaunch() {
+        const overlay = document.getElementById('respawn-overlay');
+        if (overlay) overlay.classList.remove('active');
+
+        state.respawning = false;
+        state.respawnTimer = 0;
+
+        // Recreate player
+        state.player = new Player();
+        state.player.hull = dim('player.hull');
+        state.player.shields = dim('player.shields');
+        state.entities.push(state.player);
+        if (window.SFInput) SFInput.init(state.player);
+        if (window.SFProgression) SFProgression.applyUpgradesToPlayer(state.player, () => { });
+
+        // Reset to launch bay
+        state.phase = 'bay-ready';
+        state.launchTimer = 0;
+        state._launchAudioPlayed = false;
+        state._launchBlastPlayed = false;
+        state._paBriefingDone = false;
+
+        if (window.SF3D) { SF3D.setLaunchPhase(true); SF3D.showLaunchBay(); SF3D.showCockpit(true); }
+        if (window.SFAudio) {
+            SFAudio.stopCockpitHum();
+            SFAudio.stopThrustRumble();
+            SFAudio.stopStrafeHiss();
+            SFAudio.startBayAmbience();
+        }
+
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) { hud.style.display = 'block'; hud.style.opacity = '1'; }
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '1';
         const cdEl = document.getElementById('countdown-display');
         if (cdEl) {
             cdEl.style.display = 'block';
-            cdEl.style.fontSize = '3em';
-            cdEl.style.color = '#ff4444';
-            cdEl.style.textShadow = '0 0 16px rgba(255, 40, 40, 0.75)';
+            cdEl.style.fontSize = '';
+            cdEl.style.color = '';
+            cdEl.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
         }
-        // Hide gameplay HUD during respawn countdown
-        const hud = document.getElementById('gameplay-hud');
-        if (hud) hud.style.opacity = '0.3';
-        const cross = document.getElementById('crosshair');
-        if (cross) cross.style.display = 'none';
+        const launchBtn = document.getElementById('launch-btn');
+        if (launchBtn) launchBtn.style.display = 'block';
+        const shipPanel = document.getElementById('ship-panel');
+        if (shipPanel) shipPanel.style.display = 'none';
+
+        if (window.SFAnnouncer) SFAnnouncer.onRespawnReady();
     }
 
     function _updateRespawn(dt) {
         if (!state.respawning) return false;
-        state.respawnTimer -= dt;
-
-        const cdEl = document.getElementById('countdown-display');
-        if (cdEl) {
-            const sec = Math.max(0, Math.ceil(state.respawnTimer));
-            const currentLife = Math.max(1, state.maxLives - state.livesRemaining);
-            const nextLife = Math.min(state.maxLives, currentLife + 1);
-            const inBriefPhase = state.respawnTimer <= 3.8;
-
-            if (!inBriefPhase) {
-                cdEl.innerHTML = `<span style="color:#ff3030">${state.respawnReason || 'HULL INTEGRITY FAIL'}</span><br>` +
-                    `<span style="font-size:0.44em;color:#ffaa44">SHIP DESTROYED — LIFE ${currentLife}/${state.maxLives} LOST</span><br>` +
-                    `<span style="font-size:0.38em;color:#ffdd99">INITIATING PILOT ${nextLife}/${state.maxLives}...</span>`;
-            } else {
-                cdEl.innerHTML = `<span style="color:#ff8844">${state._replacementVariant || 'Replacement frame online.'}</span><br>` +
-                    `<span style="font-size:0.36em;color:#aee8ff">${state._replacementBriefing || _makeDynamicBattleBrief()}</span><br>` +
-                    `<span style="font-size:0.34em;color:#ffdd99">LAUNCH BAY SYNC IN ${sec}s</span>`;
-            }
-        }
-
-        if (state.respawnTimer <= 0) {
-            state.respawning = false;
-            // Recreate player (Entity constructor already calls M.place)
-            state.player = new Player();
-            state.player.hull = dim('player.hull');
-            state.player.shields = dim('player.shields');
-            state.entities.push(state.player);
-            if (window.SFInput) SFInput.init(state.player);
-
-            // Reset to launch bay
-            state.phase = 'bay-ready';
-            state.launchTimer = 0;
-            state._launchAudioPlayed = false;
-            state._launchBlastPlayed = false;
-            state._paBriefingDone = false;
-
-            if (window.SF3D) {
-                SF3D.setLaunchPhase(true);
-                SF3D.showLaunchBay();
-                SF3D.showCockpit(true);
-            }
-            if (window.SFAudio) {
-                SFAudio.stopCockpitHum();
-                SFAudio.stopThrustRumble();
-                SFAudio.stopStrafeHiss();
-                SFAudio.startBayAmbience();
-            }
-
-            // Restore UI
-            const hud = document.getElementById('gameplay-hud');
-            if (hud) hud.style.opacity = '1';
-            const cdEl2 = document.getElementById('countdown-display');
-            if (cdEl2) {
-                cdEl2.style.display = 'block';
-                cdEl2.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
-            }
-            const launchBtn = document.getElementById('launch-btn');
-            if (launchBtn) launchBtn.style.display = 'block';
-            document.getElementById('ship-panel').style.display = 'none';
-
-            SFAnnouncer.onRespawnReady();
-        }
+        // Button-based: just keep scene rendering, overlay waits for click
         return true; // signal: still in respawn phase, skip normal game logic
     }
 
@@ -3009,168 +3094,186 @@ const Starfighter = (function () {
             // 17-second cinematic return. Controls disabled. Player can look around (camera rotation).
             // Autopilot always active — no manual option. AUTOPILOT indicator amber centre-screen.
             if (state.phase === 'land-approach') {
-                // ── First-frame init ──
-                if (!state._returnFlightInit) {
-                    state._returnFlightInit = true;
-                    state.autopilotTimer = 0;
+                // ── SPACE key — engage autopilot on manual-dock approach ──
+                if (!state.autopilotActive && window.SFInput && SFInput.isKeyDown('Space')) {
+                    _engageAutopilotRTB();
+                }
 
-                    // Hide live combat overlays
-                    const hud = document.getElementById('gameplay-hud');
-                    const rad = document.getElementById('radar-overlay');
-                    const xhair = document.getElementById('crosshair');
-                    if (hud) hud.style.opacity = '0.15';  // dim but visible
-                    if (rad) rad.style.opacity = '0';
-                    if (xhair) xhair.style.display = 'none';
+                // ── If autopilot not yet engaged, let player fly manually ──
+                if (!state.autopilotActive) {
+                    // Player controls active — just update the countdown hint
+                    const cdEl = document.getElementById('countdown-display');
+                    if (cdEl && cdEl.style.display !== 'none') {
+                        // Keep the docking hint visible; nothing else to do this frame
+                    }
+                    // Skip the cinematic autopilot block below
+                } else {
 
-                    // BFXG-009: Show letterbox + "MISSION COMPLETE" title card
-                    const dco = document.getElementById('dock-cutscene-overlay');
-                    if (dco) {
-                        const titleEl = document.getElementById('dock-wave-title');
-                        if (titleEl) titleEl.textContent = 'WAVE ' + state.wave + ' CLEARED — RETURNING TO BASE';
-                        dco.style.display = 'block';
-                        requestAnimationFrame(() => dco.classList.add('active'));
+                    // ── First-frame init ──
+                    if (!state._returnFlightInit) {
+                        state._returnFlightInit = true;
+                        state.autopilotTimer = 0;
+
+                        // Hide live combat overlays
+                        const hud = document.getElementById('gameplay-hud');
+                        const rad = document.getElementById('radar-overlay');
+                        const xhair = document.getElementById('crosshair');
+                        if (hud) hud.style.opacity = '0.15';  // dim but visible
+                        if (rad) rad.style.opacity = '0';
+                        if (xhair) xhair.style.display = 'none';
+
+                        // Only show "MISSION COMPLETE" title card on wave-clear (not manual mid-wave dock)
+                        if (state._waveClearAutopilot) {
+                            const dco = document.getElementById('dock-cutscene-overlay');
+                            if (dco) {
+                                const titleEl = document.getElementById('dock-wave-title');
+                                if (titleEl) titleEl.textContent = 'WAVE ' + state.wave + ' CLEARED — RETURNING TO BASE';
+                                dco.style.display = 'block';
+                                requestAnimationFrame(() => dco.classList.add('active'));
+                            }
+                            addComm(_crew('command'),
+                                'Mission complete! Outstanding work, pilot. Autopilot engaged — returning to base.',
+                                'success');
+                        } else {
+                            addComm(_crew('command'), 'Autopilot engaged. Returning to base.', 'base');
+                        }
+
+                        // Fade music to cinematic ambient
+                        if (window.SFMusic) { SFMusic.setSection('exploration'); SFMusic.setIntensity(0.1); }
                     }
 
-                    // Announcement: BFXG-009 §1.6 line 38
-                    addComm(_crew('command'),
-                        'Mission complete! Outstanding work, pilot. Autopilot engaged — returning to base.',
-                        'success');
+                    const RETURN_DURATION = 17.0;   // BFXG-009 §1.6: 15-20s return flight
+                    state.autopilotTimer += safeDt;
+                    const apProgress = Math.min(state.autopilotTimer / RETURN_DURATION, 1.0);
 
-                    // Fade music to cinematic ambient
-                    if (window.SFMusic) { SFMusic.setSection('exploration'); SFMusic.setIntensity(0.1); }
-                }
-
-                const RETURN_DURATION = 17.0;   // BFXG-009 §1.6: 15-20s return flight
-                state.autopilotTimer += safeDt;
-                const apProgress = Math.min(state.autopilotTimer / RETURN_DURATION, 1.0);
-
-                // ── AUTOPILOT amber indicator (center screen) ──
-                const cdEl = document.getElementById('countdown-display');
-                if (cdEl) {
-                    cdEl.style.display = 'block';
-                    cdEl.style.fontSize = '1.8em';
-                    cdEl.style.color = '#FFAA00';
-                    cdEl.innerHTML = 'AUTOPILOT<br><span style="font-size:0.38em;color:#88ccff">'
-                        + 'RETURNING TO BASE — ' + Math.ceil(RETURN_DURATION * (1 - apProgress)) + 's</span>';
-                }
-
-                // ── Ship flight: bank toward baseship ──
-                const bayApproach = _v1.copy(state.baseship.position).add(_v2.set(0, 0, 450));
-                const toBase = _v2.copy(bayApproach).sub(state.player.position);
-                const distToBase = toBase.length();
-
-                // Speed profile per BFXG-009: accelerate → cruise → decelerate
-                let apSpeed;
-                if (apProgress < 0.18) {
-                    apSpeed = (apProgress / 0.18) * 320;
-                } else if (apProgress < 0.72) {
-                    apSpeed = 320;
-                } else {
-                    apSpeed = Math.max(35, 320 * (1.0 - (apProgress - 0.72) / 0.28));
-                }
-
-                if (distToBase > 5) {
-                    _q1.setFromUnitVectors(
-                        _v1.set(0, 0, -1),
-                        _v2.copy(toBase).normalize()
-                    );
-                    state.player.quaternion.slerp(_q1, safeDt * 1.8);
-                }
-                _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
-                state.player.velocity.copy(_v1.multiplyScalar(apSpeed));
-
-                // ── Cinematic camera — BFXG-009 §1.6 line 44: player can look around ──
-                // We give a slow drifting "cinematic sweep" so the space environment
-                // fills the view — debris from battle, allied ships, Earth below.
-                const WORLD_UP = new THREE.Vector3(0, 1, 0);
-                const shipFwd = _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
-                const _mat4 = new THREE.Matrix4();
-
-                if (!state.cutsceneCamPos) {
-                    state.cutsceneCamPos = state.player.position.clone();
-                    state.cutsceneCamQuat = state.player.quaternion.clone();
-                    state.cutsceneVelocity = new THREE.Vector3();
-                }
-
-                if (apProgress < 0.35) {
-                    // A — Behind and above: classic "hero flying home" chase shot
-                    const camPos = state.player.position.clone()
-                        .addScaledVector(shipFwd, -180)
-                        .addScaledVector(WORLD_UP, 55);
-                    state.cutsceneCamPos.lerp(camPos, 0.06);
-                    _mat4.lookAt(state.cutsceneCamPos,
-                        state.player.position.clone().addScaledVector(shipFwd, 80),
-                        WORLD_UP);
-                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
-
-                } else if (apProgress < 0.65) {
-                    // B — Slow orbit sweep around the ship: shows Earth, debris, stars
-                    const sweepAngle = ((apProgress - 0.35) / 0.30) * Math.PI * 0.6;
-                    const orbitR = 200;
-                    const camPos = state.player.position.clone()
-                        .addScaledVector(new THREE.Vector3(Math.sin(sweepAngle), 0, -Math.cos(sweepAngle)), orbitR)
-                        .addScaledVector(WORLD_UP, 30);
-                    state.cutsceneCamPos.lerp(camPos, 0.04);
-                    _mat4.lookAt(state.cutsceneCamPos, state.player.position, WORLD_UP);
-                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
-
-                } else {
-                    // C — Low-front wide: carrier visible ahead, ship silhouetted against it
-                    const T = (apProgress - 0.65) / 0.35;
-                    const camPos = state.player.position.clone()
-                        .addScaledVector(shipFwd, -260 + T * 80)
-                        .addScaledVector(WORLD_UP, 18 - T * 12);
-                    state.cutsceneCamPos.lerp(camPos, 0.05);
-                    _mat4.lookAt(state.cutsceneCamPos, state.baseship.position, WORLD_UP);
-                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
-                }
-
-                // ── Transition to docking cutscene ──
-                if (distToBase < 450 || apProgress >= 1.0) {
-                    // BFXG-009 §1.7: Begin Phase 6 — Docking Cut Scene
-                    state.phase = 'landing';
-                    state.landingTimer = 0;
-                    state._returnFlightInit = false;
-                    state.cutsceneCamPos = null;
-                    state.cutsceneCamQuat = null;
-                    state.cutsceneVelocity = null;
-                    state._dockAudioFlags = {}; // reset per-shot audio triggers
-                    if (window.SFAudio) SFAudio.playSound('klaxon'); // landing lights on
-                    SFAnnouncer.onDock();
-                    state.score += 500 * state.wave;
-
-                    const cdHide = document.getElementById('countdown-display');
-                    if (cdHide) cdHide.style.display = 'none';
-                }
-
-                // Pass cinematic cam to renderer
-                if (state.cutsceneCamPos) {
-                    // Override with cutscene cam rather than player camera
-                    state._cutsceneCamOverride = {
-                        pos: state.cutsceneCamPos,
-                        quat: state.cutsceneCamQuat,
-                    };
-                } else {
-                    state._cutsceneCamOverride = null;
-                }
-
-                // Keep projectile AI ticking (shouldn't be any, but safety)
-                for (let i = 0, len = state.entities.length; i < len; i++) {
-                    const e = state.entities[i];
-                    if (e.markedForDeletion) continue;
-                    e.position.x += e.velocity.x * safeDt;
-                    e.position.y += e.velocity.y * safeDt;
-                    e.position.z += e.velocity.z * safeDt;
-                }
-                for (let i = state.entities.length - 1; i >= 0; i--) {
-                    if (state.entities[i].markedForDeletion) {
-                        state.entities[i] = state.entities[state.entities.length - 1];
-                        state.entities.pop();
+                    // ── AUTOPILOT amber indicator (center screen) ──
+                    const cdEl = document.getElementById('countdown-display');
+                    if (cdEl) {
+                        cdEl.style.display = 'block';
+                        cdEl.style.fontSize = '1.8em';
+                        cdEl.style.color = '#FFAA00';
+                        cdEl.innerHTML = 'AUTOPILOT<br><span style="font-size:0.38em;color:#88ccff">'
+                            + 'RETURNING TO BASE — ' + Math.ceil(RETURN_DURATION * (1 - apProgress)) + 's</span>';
                     }
-                }
 
-                updateHUD();
-                if (window.SF3D) SF3D.render(state);
+                    // ── Ship flight: bank toward baseship ──
+                    const bayApproach = _v1.copy(state.baseship.position).add(_v2.set(0, 0, 450));
+                    const toBase = _v2.copy(bayApproach).sub(state.player.position);
+                    const distToBase = toBase.length();
+
+                    // Speed profile per BFXG-009: accelerate → cruise → decelerate
+                    let apSpeed;
+                    if (apProgress < 0.18) {
+                        apSpeed = (apProgress / 0.18) * 320;
+                    } else if (apProgress < 0.72) {
+                        apSpeed = 320;
+                    } else {
+                        apSpeed = Math.max(35, 320 * (1.0 - (apProgress - 0.72) / 0.28));
+                    }
+
+                    if (distToBase > 5) {
+                        _q1.setFromUnitVectors(
+                            _v1.set(0, 0, -1),
+                            _v2.copy(toBase).normalize()
+                        );
+                        state.player.quaternion.slerp(_q1, safeDt * 1.8);
+                    }
+                    _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+                    state.player.velocity.copy(_v1.multiplyScalar(apSpeed));
+
+                    // ── Cinematic camera — BFXG-009 §1.6 line 44: player can look around ──
+                    // We give a slow drifting "cinematic sweep" so the space environment
+                    // fills the view — debris from battle, allied ships, Earth below.
+                    const WORLD_UP = new THREE.Vector3(0, 1, 0);
+                    const shipFwd = _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+                    const _mat4 = new THREE.Matrix4();
+
+                    if (!state.cutsceneCamPos) {
+                        state.cutsceneCamPos = state.player.position.clone();
+                        state.cutsceneCamQuat = state.player.quaternion.clone();
+                        state.cutsceneVelocity = new THREE.Vector3();
+                    }
+
+                    if (apProgress < 0.35) {
+                        // A — Behind and above: classic "hero flying home" chase shot
+                        const camPos = state.player.position.clone()
+                            .addScaledVector(shipFwd, -180)
+                            .addScaledVector(WORLD_UP, 55);
+                        state.cutsceneCamPos.lerp(camPos, 0.06);
+                        _mat4.lookAt(state.cutsceneCamPos,
+                            state.player.position.clone().addScaledVector(shipFwd, 80),
+                            WORLD_UP);
+                        state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    } else if (apProgress < 0.65) {
+                        // B — Slow orbit sweep around the ship: shows Earth, debris, stars
+                        const sweepAngle = ((apProgress - 0.35) / 0.30) * Math.PI * 0.6;
+                        const orbitR = 200;
+                        const camPos = state.player.position.clone()
+                            .addScaledVector(new THREE.Vector3(Math.sin(sweepAngle), 0, -Math.cos(sweepAngle)), orbitR)
+                            .addScaledVector(WORLD_UP, 30);
+                        state.cutsceneCamPos.lerp(camPos, 0.04);
+                        _mat4.lookAt(state.cutsceneCamPos, state.player.position, WORLD_UP);
+                        state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    } else {
+                        // C — Low-front wide: carrier visible ahead, ship silhouetted against it
+                        const T = (apProgress - 0.65) / 0.35;
+                        const camPos = state.player.position.clone()
+                            .addScaledVector(shipFwd, -260 + T * 80)
+                            .addScaledVector(WORLD_UP, 18 - T * 12);
+                        state.cutsceneCamPos.lerp(camPos, 0.05);
+                        _mat4.lookAt(state.cutsceneCamPos, state.baseship.position, WORLD_UP);
+                        state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+                    }
+
+                    // ── Transition to docking cutscene ──
+                    if (distToBase < 450 || apProgress >= 1.0) {
+                        // BFXG-009 §1.7: Begin Phase 6 — Docking Cut Scene
+                        state.phase = 'landing';
+                        state.landingTimer = 0;
+                        state._returnFlightInit = false;
+                        state.cutsceneCamPos = null;
+                        state.cutsceneCamQuat = null;
+                        state.cutsceneVelocity = null;
+                        state._dockAudioFlags = {}; // reset per-shot audio triggers
+                        if (window.SFAudio) SFAudio.playSound('klaxon'); // landing lights on
+                        SFAnnouncer.onDock();
+                        state.score += 500 * state.wave;
+
+                        const cdHide = document.getElementById('countdown-display');
+                        if (cdHide) cdHide.style.display = 'none';
+                    }
+
+                    // Pass cinematic cam to renderer
+                    if (state.cutsceneCamPos) {
+                        // Override with cutscene cam rather than player camera
+                        state._cutsceneCamOverride = {
+                            pos: state.cutsceneCamPos,
+                            quat: state.cutsceneCamQuat,
+                        };
+                    } else {
+                        state._cutsceneCamOverride = null;
+                    }
+
+                    // Keep projectile AI ticking (shouldn't be any, but safety)
+                    for (let i = 0, len = state.entities.length; i < len; i++) {
+                        const e = state.entities[i];
+                        if (e.markedForDeletion) continue;
+                        e.position.x += e.velocity.x * safeDt;
+                        e.position.y += e.velocity.y * safeDt;
+                        e.position.z += e.velocity.z * safeDt;
+                    }
+                    for (let i = state.entities.length - 1; i >= 0; i--) {
+                        if (state.entities[i].markedForDeletion) {
+                            state.entities[i] = state.entities[state.entities.length - 1];
+                            state.entities.pop();
+                        }
+                    }
+
+                    updateHUD();
+                    if (window.SF3D) SF3D.render(state);
+                } // end autopilotActive else
                 return;
             }
 
@@ -4831,6 +4934,8 @@ const Starfighter = (function () {
         state.phase = 'land-approach';
         state.autopilotActive = false;
         state.autopilotTimer = 0;
+        state._returnFlightInit = false;
+        state._waveClearAutopilot = false; // manual dock — no title card
         SFAnnouncer.onDockRequest();
 
         const cdEl = document.getElementById('countdown-display');
@@ -5438,6 +5543,17 @@ const Starfighter = (function () {
             gh('ghud-kills').innerText = state.kills;
             gh('ghud-score').innerText = state.score;
             gh('ghud-wave').innerText = state.wave;
+
+            // Lives pips
+            const livesEl = gh('ghud-lives');
+            if (livesEl) {
+                const pips = Array.from({ length: state.maxLives }, (_, i) =>
+                    i < state.livesRemaining ? '★' : '☆'
+                ).join('');
+                livesEl.textContent = pips;
+                livesEl.style.color = state.livesRemaining <= 1 ? '#ff2222'
+                    : state.livesRemaining === 2 ? '#ffaa00' : '#ff4444';
+            }
 
             // GDD §11: Boost cooldown indicator
             const boostEl = gh('ghud-boost');

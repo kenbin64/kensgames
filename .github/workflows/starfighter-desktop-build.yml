@@ -1,0 +1,134 @@
+name: Starfighter Desktop Build
+
+on:
+  push:
+    tags:
+      - 'starfighter-v*'        # trigger on tags like starfighter-v1.0.0
+  workflow_dispatch:             # also allow manual runs from GitHub Actions tab
+    inputs:
+      version:
+        description: 'Version label (e.g. 1.0.0)'
+        required: false
+        default: 'dev'
+
+permissions:
+  contents: write               # needed to upload release assets
+
+jobs:
+  # ── Windows & Linux — runs on ubuntu, cross-compiles Windows via Wine ──
+  build-win-linux:
+    name: Build Windows + Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: starfighter/electron/package-lock.json
+
+      - name: Install dependencies
+        working-directory: starfighter/electron
+        run: npm ci
+
+      - name: Build Windows installer
+        working-directory: starfighter/electron
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Linux packages
+        working-directory: starfighter/electron
+        run: npm run build:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-installer
+          path: starfighter/downloads/*.exe
+          if-no-files-found: warn
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            starfighter/downloads/*.AppImage
+            starfighter/downloads/*.deb
+          if-no-files-found: warn
+
+  # ── macOS — must run on macos runner for codesign + dmg tools ──
+  build-mac:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: starfighter/electron/package-lock.json
+
+      - name: Install dependencies
+        working-directory: starfighter/electron
+        run: npm ci
+
+      - name: Build macOS DMG
+        working-directory: starfighter/electron
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: set these secrets in GitHub repo settings for code signing
+          # CSC_LINK: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          # CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: starfighter/downloads/*.dmg
+          if-no-files-found: warn
+
+  # ── Deploy: download all artifacts and SCP to VPS ──
+  deploy:
+    name: Deploy to VPS
+    needs: [build-win-linux, build-mac]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloads/
+
+      - name: Flatten artifact directories
+        run: find downloads/ -type f | xargs -I{} mv {} downloads/ 2>/dev/null; true
+
+      - name: Deploy to VPS via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: 'downloads/*.exe,downloads/*.dmg,downloads/*.AppImage,downloads/*.deb'
+          target: '/var/www/kensgames.com/starfighter/downloads/'
+          strip_components: 1
+
+      - name: Reload nginx on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: sudo nginx -s reload

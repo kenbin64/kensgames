@@ -19,6 +19,7 @@ const SFAudio = (function () {
   let _cachedVoice = null;
   const _voiceCacheByModule = {};
   let _activeVoiceModule = 'au_female';
+  const _pendingSpeechQueue = []; // deferred speaks awaiting voice load
 
   const VOICE_MODULES = {
     au_female: {
@@ -427,6 +428,11 @@ const SFAudio = (function () {
     const voices = speechSynthesis.getVoices();
     if (!voices.length) return;
     Object.keys(VOICE_MODULES).forEach(id => _resolveVoice(id));
+    // Drain any speaks that arrived before voices were ready
+    if (_pendingSpeechQueue.length) {
+      const queued = _pendingSpeechQueue.splice(0);
+      queued.forEach(({ text, opts }) => speak(text, opts));
+    }
   }
 
   // Known-female and known-male voice name fragments used across TTS vendors
@@ -509,14 +515,15 @@ const SFAudio = (function () {
   function _resolveVoice(moduleId = _activeVoiceModule) {
     const voices = speechSynthesis.getVoices();
     if (!voices.length) return;
+    // Never cache voices[0] — only accept a real match or en-* fallback
     const chosen = _pickVoice(moduleId, voices)
-      || voices.find(v => v.lang && v.lang.startsWith('en'))
-      || voices[0];
+      || voices.find(v => v.lang && v.lang.startsWith('en-'));
 
-    _voiceCacheByModule[moduleId] = chosen || null;
-    if (moduleId === _activeVoiceModule) _cachedVoice = _voiceCacheByModule[moduleId];
+    if (!chosen) return; // no acceptable voice yet — don't cache garbage
+    _voiceCacheByModule[moduleId] = chosen;
+    if (moduleId === _activeVoiceModule) _cachedVoice = chosen;
 
-    if (chosen) console.log(`PA Voice selected [${moduleId}]:`, chosen.name, chosen.lang);
+    console.log(`PA Voice selected [${moduleId}]:`, chosen.name, chosen.lang);
   }
 
   function setVoiceModule(moduleId) {
@@ -1643,27 +1650,32 @@ const SFAudio = (function () {
     if (!_voiceCacheByModule[moduleId]) _resolveVoice(moduleId);
     const moduleVoice = _voiceCacheByModule[moduleId] || _cachedVoice;
 
+    // If voices haven't loaded yet, defer — never speak with the bot fallback voice
+    if (!moduleVoice) {
+      const rawVoices = speechSynthesis.getVoices();
+      if (!rawVoices.length) {
+        _pendingSpeechQueue.push({ text, opts });
+        return;
+      }
+      // Voices are loaded but this module isn't cached yet — resolve now
+      _resolveAllVoices();
+      if (!_voiceCacheByModule[moduleId] && !_cachedVoice) {
+        // Still nothing useful — queue and wait
+        _pendingSpeechQueue.push({ text, opts });
+        return;
+      }
+    }
+
+    const resolvedVoice = _voiceCacheByModule[moduleId] || _cachedVoice;
+
     const utter = new SpeechSynthesisUtterance(text);
     utter.rate = (opts.rate !== undefined ? opts.rate : voiceCfg.rate);
     utter.pitch = (opts.pitch !== undefined ? opts.pitch : voiceCfg.pitch);
     utter.volume = (opts.volume !== undefined ? opts.volume : voiceCfg.volume);
 
-    // Module-selected voice
-    if (moduleVoice) {
-      utter.voice = moduleVoice;
-      _cachedVoice = moduleVoice;
-    } else {
-      // Voices may not have loaded yet — resolve and retry
-      _resolveVoice(moduleId);
-      const voices = speechSynthesis.getVoices();
-      const preferred = _pickVoice(moduleId, voices)
-        || voices.find(v => v.lang && v.lang.startsWith('en'))
-        || voices[0];
-      if (preferred) {
-        utter.voice = preferred;
-        _voiceCacheByModule[moduleId] = preferred;
-        _cachedVoice = preferred;
-      }
+    if (resolvedVoice) {
+      utter.voice = resolvedVoice;
+      _cachedVoice = resolvedVoice;
     }
 
     // Route speech through PA processing chain via MediaStreamDestination

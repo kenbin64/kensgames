@@ -3,7 +3,7 @@
  * Wraps the web game in a native chromeless window for Steam/Desktop
  * No browser chrome, auto-fullscreen, pointer lock works natively
  */
-const { app, BrowserWindow, globalShortcut, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, screen, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -34,13 +34,6 @@ function createWindow() {
   // Fullscreen + no cursor by default
   mainWindow.setFullScreen(true);
 
-  // F11 toggles fullscreen
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'F11') {
-      mainWindow.setFullScreen(!mainWindow.isFullScreen());
-    }
-  });
-
   // Pointer lock is auto-allowed in Electron (no browser permission prompt)
   mainWindow.webContents.session.setPermissionCheckHandler(() => true);
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -48,10 +41,33 @@ function createWindow() {
     callback(true);
   });
 
+  // F11 toggles fullscreen; ESC is passed through to game as a pause key
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F11') {
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    }
+    // Suppress ESC propagating to Electron window manager (would release focus)
+    if (input.key === 'Escape' && input.type === 'keyDown') {
+      // Don't suppress — let the renderer handle it — but prevent window blur
+      // by not doing anything at the native level
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
+
+// IPC handlers
+ipcMain.on('toggle-fullscreen', () => {
+  if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
+});
+
+// Re-acquire pointer lock when window regains focus after alt-tab
+// (The renderer's click handler will re-lock on next click)
+ipcMain.on('request-pointer-lock', () => {
+  // No-op: pointer lock is managed by the renderer
+});
 
 app.whenReady().then(createWindow);
 

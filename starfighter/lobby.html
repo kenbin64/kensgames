@@ -352,6 +352,83 @@
       justify-content: center;
       flex-wrap: wrap;
     }
+
+    /* ── Desktop Download Banner ── */
+    .download-banner {
+      width: 100%;
+      max-width: 740px;
+      background: rgba(2, 8, 20, .92);
+      border: 1px solid rgba(0, 255, 255, .18);
+      border-radius: 6px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .dl-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .dl-icon {
+      font-size: 28px;
+      filter: drop-shadow(0 0 8px #00FFFF);
+    }
+
+    .dl-title {
+      font-family: var(--fa);
+      font-size: 12px;
+      color: var(--accent);
+      text-shadow: 0 0 8px var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .dl-sub {
+      font-size: 11px;
+      color: var(--txm);
+      margin-top: 2px;
+      line-height: 1.6;
+    }
+
+    .dl-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      font-family: var(--fa);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 255, 255, .35);
+      color: var(--accent);
+      background: rgba(0, 255, 255, .04);
+      transition: all .2s;
+      cursor: pointer;
+    }
+
+    .dl-btn:hover {
+      border-color: var(--accent);
+      background: rgba(0, 255, 255, .10);
+      box-shadow: 0 0 12px rgba(0, 255, 255, .25);
+    }
+
+    .dl-btn.unavail {
+      opacity: .35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -422,6 +499,27 @@
         <div class="mode-title">Browse Games</div>
         <div class="mode-desc">See active squads waiting for pilots. Join an open game with one click.</div>
         <div class="mode-avail" id="browse-avail">Available</div>
+      </div>
+    </div>
+    <!-- Desktop Client Download Banner -->
+    <div class="download-banner" id="dl-banner">
+      <div class="dl-header">
+        <span class="dl-icon">&#128187;</span>
+        <div>
+          <div class="dl-title">Desktop Client</div>
+          <div class="dl-sub">Better performance &bull; Native fullscreen &bull; No browser required</div>
+        </div>
+      </div>
+      <div class="dl-buttons" id="dl-buttons">
+        <a class="dl-btn" href="/starfighter/downloads/Starfighter-Setup.exe" id="dl-win">
+          <span>&#x229E;</span> Windows
+        </a>
+        <a class="dl-btn" href="/starfighter/downloads/Starfighter.dmg" id="dl-mac">
+          &#63743; macOS
+        </a>
+        <a class="dl-btn" href="/starfighter/downloads/Starfighter.AppImage" id="dl-linux">
+          &#128039; Linux
+        </a>
       </div>
     </div>
     <!-- Browse Games Panel -->
@@ -497,6 +595,24 @@
     // Show post-game prompt if URL has ?postgame=1 (set by game after session ends for guests)
     if (new URLSearchParams(location.search).get('postgame') === '1' && !token) {
       document.getElementById('postgame').classList.add('open');
+    }
+
+    // ── Desktop download banner ──────────────────────────────────
+    // Hide entirely when already running inside Electron
+    if (window.electronAPI && window.electronAPI.isDesktop) {
+      document.getElementById('dl-banner').style.display = 'none';
+    } else {
+      // Probe each installer with HEAD; grey out files not yet published
+      const dlFiles = [
+        { id: 'dl-win', url: '/starfighter/downloads/Starfighter-Setup.exe' },
+        { id: 'dl-mac', url: '/starfighter/downloads/Starfighter.dmg' },
+        { id: 'dl-linux', url: '/starfighter/downloads/Starfighter.AppImage' },
+      ];
+      dlFiles.forEach(({ id, url }) => {
+        fetch(url, { method: 'HEAD' }).then(r => {
+          if (!r.ok) document.getElementById(id).classList.add('unavail');
+        }).catch(() => document.getElementById(id).classList.add('unavail'));
+      });
     }
 
     function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/starfighter/index.html?mode=solo'; }

@@ -30,3 +30,4 @@ starfighter/starfighter.bundle.js.gz
 starfighter/index.html.gz
 starfighter/index.src.html
 starfighter/nginx_starfighter.conf
+4DTicTacToe/assets/models/*.glb

@@ -131,7 +131,7 @@ const GAME_REGISTRY = {
   connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', maxPlayers: 2, type: 'turn' },
   swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', maxPlayers: 4, type: 'turn' },
   cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: 'Multi-D TicTacToe', path: '/tictactoe/index.html', maxPlayers: 2, type: 'turn' },
+  tictactoe: { name: '4D TicTacToe', path: '/4DTicTacToe/index.html', maxPlayers: 4, type: 'turn' },
 };
 
 function getPublicSessions(gameId) {
