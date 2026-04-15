@@ -81,22 +81,28 @@ const SF3D = (function () {
         earth: [
             { path: 'assets/models/Earth.glb', distance: 0 },
         ],
+        // Moon uses full model — visible from combat area
+        moon: [
+            { path: 'assets/models/moon.glb', distance: 0 },
+        ],
     };
-    // Scale factors — Galactica-scale capital ships, proportional fighters
-    // Fighter wingspan ~15m, Baseship ~1200m (80× fighter), Mothership ~800m
+    // Scale factors — proportional to real ship sizes, forced perspective for celestials
+    // Player ~F-16 (16m), Baseship ~aircraft carrier (400m), Alien ships 3× human
+    // Earth/Moon use forced perspective: sized for apparent angular size from player, not real scale
     const GLB_SCALES = {
-        enemy: 18,             // alien fighter ~15m wingspan
-        predator: 35,          // predator drone ~30m — larger, menacing hunter
-        interceptor: 14,       // interceptor ~12m — sleek, smaller than drone
-        bomber: 30,            // bomber ~25m — bulbous heavy craft
-        dreadnought: 500,      // dreadnought ~400m — massive boss capital
-        'alien-baseship': 500, // alien mothership ~800m — massive capital ship
-        baseship: 800,         // human carrier ~1200m — Galactica-scale, towering on approach
-        ally: 16,              // human fighter ~13m wingspan
-        tanker: 40,            // fuel tanker ~50m — chunky support craft
-        medic: 60,             // medical frigate ~80m — larger support vessel
-        station: 400,          // space station ~600m
-        earth: 8000,  // massive planet — far beyond arena, fills the sky impressively
+        enemy: 50,             // alien fighter ~48m (3× human)
+        predator: 200,         // predator drone ~240m — massive alien hunter
+        interceptor: 50,       // interceptor ~48m — 3× human, fast
+        bomber: 120,           // bomber ~120m — 3× heavy craft
+        dreadnought: 1800,     // dreadnought ~1800m — alien capital
+        'alien-baseship': 2100,// alien mothership ~2100m — 3× human carrier
+        baseship: 400,         // human carrier ~400m — aircraft carrier class
+        ally: 16,              // human fighter ~16m wingspan
+        tanker: 60,            // fuel tanker ~80m — support craft
+        medic: 80,             // medical frigate ~90m — larger support vessel
+        station: 3000,         // space station ~massive, thousands of people
+        earth: 18000,  // forced perspective — fills ~27° of sky at distance 60000
+        moon: 4000,    // forced perspective — fills ~4.5° of sky at distance 80000 (1/4.5 Earth ratio)
     };
 
     // ── Dimensional LOD Manifold: z = xy ──
@@ -104,17 +110,17 @@ const SF3D = (function () {
     // Tier 0 (near): Full GLB model — Tier 1 (mid): Procedural mesh — Tier 2 (far): Glow sphere
     const PRELOAD_MODELS = STRICT_MODEL_BASELINE
         ? new Set(Object.keys(GLB_LOD))
-        : new Set(['earth', 'baseship', 'station', 'ally']);
+        : new Set(['earth', 'moon', 'baseship', 'station', 'ally']);
     const LOD_GLOW_DIST = {
-        enemy: 2000, predator: 2500, interceptor: 1800, bomber: 2500,
-        dreadnought: 5000, 'alien-baseship': 4000, tanker: 2000, medic: 2500,
-        ally: 2000, baseship: 6000, station: 8000, earth: 50000,
+        enemy: 5000, predator: 8000, interceptor: 5000, bomber: 7000,
+        dreadnought: 15000, 'alien-baseship': 12000, tanker: 5000, medic: 6000,
+        ally: 4000, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
 
     // ── Shared starfield vertex data (world-space positions, shared with radar) ──
-    const STAR_COUNT = 4000;
-    const STAR_RADIUS = 30000;
+    const STAR_COUNT = 6000;
+    const STAR_RADIUS = 200000;
     let starfieldVerts = null; // Float32Array — filled once, read by radar
 
     // ── Particle pool (reuse sprites instead of allocating) ──
@@ -232,10 +238,10 @@ const SF3D = (function () {
 
         // Scene setup
         scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, 0.00005);
+        scene.fog = new THREE.FogExp2(0x000000, 0.000008);
 
         // Camera setup
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 80000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 300000);
 
         // Renderer setup
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -248,8 +254,8 @@ const SF3D = (function () {
         container.appendChild(renderer.domElement);
 
         // ── Sun direction — all lighting derives from this ──
-        const SUN_POS = new THREE.Vector3(30000, 16000, 12000);
-        const EARTH_POS = new THREE.Vector3(-6000, -18000, -12000);
+        const SUN_POS = new THREE.Vector3(200000, 100000, 80000);
+        const EARTH_POS = new THREE.Vector3(-15000, -55000, -25000);
 
         // Ambient — very dim base so deep-shadow side isn't pitch black
         const ambient = new THREE.AmbientLight(0x060610, 0.08);
@@ -272,31 +278,46 @@ const SF3D = (function () {
         fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
         scene.add(fillLight);
 
-        // ── Visible Sun — bright, layered corona, animated ──
+        // ── Visible Sun — pure corona expanding outward, no solid sphere ──
+        // In space without atmosphere, the sun has no defined edge — just a
+        // blindingly bright point with corona radiating outward indefinitely
         const sunGroup = new THREE.Group();
         sunGroup.name = 'sun-group';
 
-        // Inner core — blindingly bright white-yellow
-        const sunCoreGeo = new THREE.SphereGeometry(800, 48, 48);
-        const sunCoreMat = new THREE.MeshBasicMaterial({ color: 0xfffff0 });
+        // Tiny blazing core — point-like, overwhelmingly bright
+        const sunCoreGeo = new THREE.SphereGeometry(200, 16, 16);
+        const sunCoreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 1.0,
+            blending: THREE.AdditiveBlending
+        });
         sunGroup.add(new THREE.Mesh(sunCoreGeo, sunCoreMat));
 
-        // Inner photosphere glow
-        const photoGeo = new THREE.SphereGeometry(830, 32, 32);
-        const photoMat = new THREE.MeshBasicMaterial({
-            color: 0xffeeaa, transparent: true, opacity: 0.7,
-            blending: THREE.AdditiveBlending, side: THREE.BackSide
+        // Inner corona — intense white-yellow glow radiating from core
+        const innerCoronaLayers = [
+            { r: 600, color: 0xffffff, opacity: 0.8 },
+            { r: 1200, color: 0xffffee, opacity: 0.5 },
+            { r: 2500, color: 0xffeeaa, opacity: 0.25 },
+            { r: 4000, color: 0xffdd66, opacity: 0.12 },
+        ];
+        innerCoronaLayers.forEach((layer, i) => {
+            const geo = new THREE.SphereGeometry(layer.r, 24, 24);
+            const mat = new THREE.MeshBasicMaterial({
+                color: layer.color, transparent: true, opacity: layer.opacity,
+                blending: THREE.AdditiveBlending, side: THREE.BackSide
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.name = 'inner-corona-' + i;
+            sunGroup.add(mesh);
         });
-        sunGroup.add(new THREE.Mesh(photoGeo, photoMat));
 
-        // Multi-layer corona — fades from yellow-white to deep orange/red
-        const coronaColors = [0xffee88, 0xffaa22, 0xff5500, 0xcc1100];
-        for (let i = 0; i < coronaColors.length; i++) {
-            const r = 850 + i * 250;
+        // Outer corona — expands far outward, fading from orange to deep red
+        const outerCoronaColors = [0xffaa22, 0xff7711, 0xff4400, 0xcc2200, 0x881100, 0x440800];
+        for (let i = 0; i < outerCoronaColors.length; i++) {
+            const r = 6000 + i * 3000;
             const coronaGeo = new THREE.SphereGeometry(r, 24, 24);
             const coronaMat = new THREE.MeshBasicMaterial({
-                color: coronaColors[i],
-                transparent: true, opacity: 0.08 / (1 + i * 0.4),
+                color: outerCoronaColors[i],
+                transparent: true, opacity: 0.06 / (1 + i * 0.5),
                 blending: THREE.AdditiveBlending, side: THREE.BackSide
             });
             const corona = new THREE.Mesh(coronaGeo, coronaMat);
@@ -304,16 +325,16 @@ const SF3D = (function () {
             sunGroup.add(corona);
         }
 
-        // Outermost halo — very large, barely visible
-        const haloGeo = new THREE.SphereGeometry(3500, 16, 16);
+        // Outermost halo — barely perceptible, extends very far
+        const haloGeo = new THREE.SphereGeometry(30000, 16, 16);
         const haloMat = new THREE.MeshBasicMaterial({
-            color: 0xff6622, transparent: true, opacity: 0.015,
+            color: 0xff4400, transparent: true, opacity: 0.008,
             blending: THREE.AdditiveBlending, side: THREE.BackSide
         });
         sunGroup.add(new THREE.Mesh(haloGeo, haloMat));
 
         // Sun point light — the actual light source for nearby objects
-        const sunPLight = new THREE.PointLight(0xfff5e0, 5, 60000);
+        const sunPLight = new THREE.PointLight(0xfff5e0, 5, 400000);
         sunGroup.add(sunPLight);
 
         sunGroup.position.copy(SUN_POS);
@@ -476,7 +497,8 @@ const SF3D = (function () {
 
                         console.log(`GLB LOD ready: ${key} (${levels.length} detail + glow)`);
                         if (!countProgress) _lazyState[key] = 'loaded';
-                        if (key === 'earth') { _placeEarth(lod); _placeMoon(); }
+                        if (key === 'earth') _placeEarth(lod);
+                        if (key === 'moon') _placeMoon(lod);
                         if (key === 'station') _placeStation(lod);
                     }
                 },
@@ -504,12 +526,12 @@ const SF3D = (function () {
     // ── Bioluminescent glow for alien species from Brown Giant ──
     // They glow like deep-sea creatures in the vacuum of space
     const ALIEN_GLOW_COLORS = {
-        enemy: { emissive: 0x22ff44, intensity: 0.6, pointColor: 0x44ff66, pointIntensity: 2.5, pointDist: 120 },
-        predator: { emissive: 0x44ff00, intensity: 0.8, pointColor: 0x66ff22, pointIntensity: 4.0, pointDist: 200 },
-        interceptor: { emissive: 0x00ffcc, intensity: 0.7, pointColor: 0x22ffdd, pointIntensity: 3.0, pointDist: 100 },
-        bomber: { emissive: 0xff6600, intensity: 0.6, pointColor: 0xff8800, pointIntensity: 3.5, pointDist: 180 },
-        dreadnought: { emissive: 0xff0044, intensity: 0.7, pointColor: 0xff2266, pointIntensity: 8.0, pointDist: 800 },
-        'alien-baseship': { emissive: 0xff00ff, intensity: 0.5, pointColor: 0xff44ff, pointIntensity: 6.0, pointDist: 600 },
+        enemy: { emissive: 0x22ff44, intensity: 0.6, pointColor: 0x44ff66, pointIntensity: 2.5, pointDist: 300 },
+        predator: { emissive: 0x44ff00, intensity: 0.8, pointColor: 0x66ff22, pointIntensity: 4.0, pointDist: 600 },
+        interceptor: { emissive: 0x00ffcc, intensity: 0.7, pointColor: 0x22ffdd, pointIntensity: 3.0, pointDist: 300 },
+        bomber: { emissive: 0xff6600, intensity: 0.6, pointColor: 0xff8800, pointIntensity: 3.5, pointDist: 500 },
+        dreadnought: { emissive: 0xff0044, intensity: 0.7, pointColor: 0xff2266, pointIntensity: 8.0, pointDist: 3000 },
+        'alien-baseship': { emissive: 0xff00ff, intensity: 0.5, pointColor: 0xff44ff, pointIntensity: 6.0, pointDist: 2000 },
     };
 
     // ── Glow Sphere: far-distance LOD tier — minimal geometry, maximum visibility ──
@@ -594,7 +616,7 @@ const SF3D = (function () {
             uniforms: {
                 glowColor: { value: new THREE.Color(0x4488ff) },
                 viewVector: { value: new THREE.Vector3() },
-                sunDirection: { value: new THREE.Vector3(15000, 8000, 6000).normalize() }
+                sunDirection: { value: new THREE.Vector3(200000, 100000, 80000).normalize() }
             },
             vertexShader: [
                 'varying vec3 vNormal;',
@@ -630,7 +652,7 @@ const SF3D = (function () {
         const limbGeo = new THREE.SphereGeometry(earthRadius * 1.01, 32, 32);
         const limbMat = new THREE.ShaderMaterial({
             uniforms: {
-                sunDirection: { value: new THREE.Vector3(15000, 8000, 6000).normalize() }
+                sunDirection: { value: new THREE.Vector3(200000, 100000, 80000).normalize() }
             },
             vertexShader: [
                 'varying vec3 vNormal;',
@@ -671,36 +693,33 @@ const SF3D = (function () {
         clouds.name = 'earth-clouds';
         earthGroup.add(clouds);
 
-        // Position Earth far beyond arena boundary (8000) — unreachable but impressive
-        // At scale 8000 with radius ~6400, the planet fills a huge chunk of the sky
-        earthGroup.position.set(-6000, -18000, -12000);
+        // Position Earth — forced perspective backdrop below the combat area
+        // At scale 18000 with radius ~14400, fills ~27° of sky from 60000 distance
+        earthGroup.position.set(-15000, -55000, -25000);
         scene.add(earthGroup);
     }
 
-    // ── Place Moon — illuminated by sun, slight Earth-shine on near side ──
-    function _placeMoon() {
+    // ── Place Moon — real GLB model, oriented toward Earth, forced perspective ──
+    function _placeMoon(model) {
         const moonGroup = new THREE.Group();
         moonGroup.name = 'moon-scenery';
 
-        const moonRadius = 1200; // ~1/5 Earth visual radius (6400), realistic ratio is ~1/4
+        // Use the GLB model instead of a procedural sphere
+        const moon = _cloneLOD('moon') || model.clone();
+        moon.scale.setScalar(GLB_SCALES.moon);
+        moonGroup.add(moon);
 
-        // Moon surface — grey regolith with subtle bump texture feel
-        const moonGeo = new THREE.SphereGeometry(moonRadius, 48, 48);
-        const moonMat = new THREE.MeshStandardMaterial({
-            color: 0x888888,
-            roughness: 0.95,
-            metalness: 0.0,
-            // Simulate cratered terrain with a bumpMap-like normal perturbation
-            flatShading: false
-        });
-        const moonMesh = new THREE.Mesh(moonGeo, moonMat);
-        moonGroup.add(moonMesh);
+        const moonRadius = GLB_SCALES.moon * 0.8; // ~3200
 
         // Subtle Earth-shine glow on the Earth-facing hemisphere
+        const EARTH_POS_LOCAL = new THREE.Vector3(-15000, -55000, -25000);
+        const MOON_POS = new THREE.Vector3(35000, -25000, -85000);
+        const earthDir = EARTH_POS_LOCAL.clone().sub(MOON_POS).normalize();
+
         const earthGlowGeo = new THREE.SphereGeometry(moonRadius * 1.005, 32, 32);
         const earthGlowMat = new THREE.ShaderMaterial({
             uniforms: {
-                earthDir: { value: new THREE.Vector3(6000, 18000, 12000).normalize() }
+                earthDir: { value: earthDir }
             },
             vertexShader: [
                 'varying vec3 vNormal;',
@@ -725,9 +744,14 @@ const SF3D = (function () {
         });
         moonGroup.add(new THREE.Mesh(earthGlowGeo, earthGlowMat));
 
-        // Position moon offset from Earth — 45° ahead in orbit, slightly above
-        // Earth is at (-6000, -18000, -12000); moon orbits ~25000 units from Earth center
-        moonGroup.position.set(12000, -10000, -20000);
+        // Position moon on opposite side from Earth — forced perspective
+        // Earth at (-15000,-55000,-25000), Moon at (35000,-25000,-85000)
+        // Station sits between them
+        moonGroup.position.copy(MOON_POS);
+
+        // Orient moon's near side toward Earth (tidal locking)
+        moonGroup.lookAt(EARTH_POS_LOCAL);
+
         scene.add(moonGroup);
     }
 
@@ -735,7 +759,9 @@ const SF3D = (function () {
     function _placeStation(model) {
         const station = _cloneLOD('station') || model.clone();
         station.scale.setScalar(GLB_SCALES.station);
-        station.position.set(3000, 500, -5000);
+        // Civilian station between Earth and Moon — forced perspective corridor
+        // Earth at (-15000,-55000,-25000), Moon at (35000,-25000,-85000)
+        station.position.set(8000, -12000, -18000);
         station.name = 'station-scenery';
         scene.add(station);
     }
@@ -743,11 +769,11 @@ const SF3D = (function () {
     function createLaunchBay() {
         launchBayGroup = new THREE.Group();
 
-        const tubeLength = 400;
-        const halfW = 20;   // half-width (total width 40)
-        const halfH = 12;   // half-height (total height 24)
-        const ribSpacing = 40;
-        const ribDepth = 1.5;
+        const tubeLength = 600;
+        const halfW = 25;   // half-width (total width 50)
+        const halfH = 15;   // half-height (total height 30)
+        const ribSpacing = 50;
+        const ribDepth = 2.0;
 
         // ── Shared materials ──
         const wallMat = new THREE.MeshStandardMaterial({
@@ -948,7 +974,7 @@ const SF3D = (function () {
         else {
             const launchPhase = (progress - 0.625) / 0.375;
             // Move bay backward away from camera
-            launchBayGroup.position.z = 50 + launchPhase * 1000;
+            launchBayGroup.position.z = 50 + launchPhase * 2000;
             // Fade out opacity gradually
             const opacity = Math.max(0, 1.0 - launchPhase * 2);
             launchBayGroup.children.forEach(child => {
@@ -1466,117 +1492,126 @@ const SF3D = (function () {
         if (type === 'enemy') {
             // Fallback: bioluminescent organic form (glow worm from Brown Giant)
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0x22ff44, transparent: true, opacity: 0.85 });
-            const body = new THREE.Mesh(new THREE.IcosahedronGeometry(10, 1), bodyMat);
+            const body = new THREE.Mesh(new THREE.IcosahedronGeometry(25, 1), bodyMat);
             mesh.add(body);
             // Inner glow core
             const coreMat = new THREE.MeshBasicMaterial({ color: 0xaaffaa, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(6, 8, 8), coreMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(16, 8, 8), coreMat));
             // Outer glow halo
             const haloMat = new THREE.MeshBasicMaterial({ color: 0x22ff44, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, side: THREE.BackSide });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(16, 8, 8), haloMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(40, 8, 8), haloMat));
             // Point light
             _addGlowLight(mesh, 'enemy');
             mesh.userData.alienGlow = true;
         } else if (type === 'baseship') {
             mesh.userData.isBaseship = true;
-            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(120, 50, 600), m.hull));
+            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(60, 30, 300), m.hull));
         } else if (type === 'alien-baseship') {
-            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(80, 1), m.alienCap));
+            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(200, 1), m.alienCap));
+        } else if (type === 'alien-base') {
+            // Hive: massive glowing organic structure
+            const hiveMat = new THREE.MeshBasicMaterial({ color: 0x880088, transparent: true, opacity: 0.8 });
+            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(400, 2), hiveMat));
+            const hiveGlow = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.BackSide });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(600, 16, 16), hiveGlow));
+            const hiveLight = new THREE.PointLight(0xff44ff, 8, 15000);
+            mesh.add(hiveLight);
+            mesh.userData.alienGlow = true;
         } else if (type === 'predator') {
             // Predator Drone fallback: intense bioluminescent hunter
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0x44ff00, transparent: true, opacity: 0.9 });
-            mesh.add(new THREE.Mesh(new THREE.DodecahedronGeometry(20, 0), bodyMat));
+            mesh.add(new THREE.Mesh(new THREE.DodecahedronGeometry(60, 0), bodyMat));
             // Blazing plasma core
             const coreMat = new THREE.MeshBasicMaterial({ color: 0x88ff22, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(10, 8, 8), coreMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), coreMat));
             // Outer glow halo
             const haloMat = new THREE.MeshBasicMaterial({ color: 0x66ff00, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, side: THREE.BackSide });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(30, 8, 8), haloMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(80, 8, 8), haloMat));
             _addGlowLight(mesh, 'predator');
             mesh.userData.alienGlow = true;
         } else if (type === 'interceptor') {
             // Interceptor fallback: sleek cyan glowing form
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.85 });
-            mesh.add(new THREE.Mesh(new THREE.ConeGeometry(6, 20, 6), bodyMat));
+            mesh.add(new THREE.Mesh(new THREE.ConeGeometry(16, 50, 6), bodyMat));
             const coreMat = new THREE.MeshBasicMaterial({ color: 0x88ffee, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), coreMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(10, 8, 8), coreMat));
             _addGlowLight(mesh, 'interceptor');
             mesh.userData.alienGlow = true;
         } else if (type === 'bomber') {
             // Bomber fallback: bulbous orange-glowing form
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.85 });
-            const bodyGeo = new THREE.SphereGeometry(14, 8, 8);
+            const bodyGeo = new THREE.SphereGeometry(35, 8, 8);
             bodyGeo.scale(1.3, 0.8, 1.0);
             mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
             const coreMat = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8), coreMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(20, 8, 8), coreMat));
             _addGlowLight(mesh, 'bomber');
             mesh.userData.alienGlow = true;
         } else if (type === 'dreadnought') {
             // Dreadnought fallback: massive red-glowing form
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0xff0044, transparent: true, opacity: 0.85 });
-            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(60, 1), bodyMat));
+            mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(160, 1), bodyMat));
             const coreMat = new THREE.MeshBasicMaterial({ color: 0xff4488, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(40, 8, 8), coreMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(100, 8, 8), coreMat));
             _addGlowLight(mesh, 'dreadnought');
             mesh.userData.alienGlow = true;
         } else if (type === 'tanker') {
             // Tanker fallback: white-orange utility craft
             const bodyMat = new THREE.MeshStandardMaterial({ color: 0xccbbaa, metalness: 0.5, roughness: 0.5 });
-            const bodyGeo = new THREE.BoxGeometry(20, 12, 35);
+            const bodyGeo = new THREE.BoxGeometry(40, 20, 60);
             mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
             const boomMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
-            const boom = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 20, 6), boomMat);
+            const boom = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 35, 6), boomMat);
             boom.rotation.x = Math.PI / 2;
-            boom.position.z = -17;
+            boom.position.z = -30;
             mesh.add(boom);
             // Beacon light
-            const beacon = new THREE.PointLight(0x00ff88, 2, 100);
-            beacon.position.set(0, 8, -25);
+            const beacon = new THREE.PointLight(0x00ff88, 2, 200);
+            beacon.position.set(0, 14, -40);
             mesh.add(beacon);
         } else if (type === 'medic') {
             // Medical frigate fallback: white-red medical vessel
             const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.4, roughness: 0.4 });
-            const bodyGeo = new THREE.BoxGeometry(25, 14, 45);
+            const bodyGeo = new THREE.BoxGeometry(45, 24, 75);
             mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
             // Red cross markings (horizontal + vertical bars)
             const crossMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
-            const crossH = new THREE.Mesh(new THREE.BoxGeometry(12, 0.5, 4), crossMat);
-            crossH.position.set(0, 7.1, 5);
+            const crossH = new THREE.Mesh(new THREE.BoxGeometry(20, 0.8, 7), crossMat);
+            crossH.position.set(0, 12.2, 8);
             mesh.add(crossH);
-            const crossV = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 12), crossMat);
-            crossV.position.set(0, 7.1, 5);
+            const crossV = new THREE.Mesh(new THREE.BoxGeometry(7, 0.8, 20), crossMat);
+            crossV.position.set(0, 12.2, 8);
             mesh.add(crossV);
             // Medical beacon
-            const beacon = new THREE.PointLight(0xff4444, 2, 120);
-            beacon.position.set(0, 10, 0);
+            const beacon = new THREE.PointLight(0xff4444, 2, 250);
+            beacon.position.set(0, 16, 0);
             mesh.add(beacon);
         } else if (type === 'plasma') {
             // Toxic green plasma bolt
             const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x44ff00, transparent: true, opacity: 0.8 });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), plasmaMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(10, 8, 8), plasmaMat));
             const glowMat = new THREE.MeshBasicMaterial({ color: 0x88ff44, transparent: true, opacity: 0.3 });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 6, 6), glowMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(20, 6, 6), glowMat));
         } else if (type === 'egg') {
             // Organic egg — yellowish-green translucent ovoid
             const eggMat = new THREE.MeshBasicMaterial({ color: 0x99cc33, transparent: true, opacity: 0.75 });
-            const eggGeo = new THREE.SphereGeometry(5, 8, 8);
+            const eggGeo = new THREE.SphereGeometry(14, 8, 8);
             eggGeo.scale(1, 1.3, 1); // elongated
             mesh.add(new THREE.Mesh(eggGeo, eggMat));
             // Inner glow (something growing inside)
             const innerMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.4 });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 6), innerMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(7, 6, 6), innerMat));
         } else if (type === 'youngling') {
             // Small spidery creature — dark with red eyes
             const bodyMat = new THREE.MeshBasicMaterial({ color: 0x332211, transparent: true, opacity: 0.9 });
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 6, 6), bodyMat));
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 6, 6), bodyMat));
             // Red eyes
             const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.6, 4, 4), eyeMat);
-            eye1.position.set(1.2, 0.5, -2.5);
+            const eye1 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 4, 4), eyeMat);
+            eye1.position.set(3, 1.2, -6);
             mesh.add(eye1);
-            const eye2 = new THREE.Mesh(new THREE.SphereGeometry(0.6, 4, 4), eyeMat);
-            eye2.position.set(-1.2, 0.5, -2.5);
+            const eye2 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 4, 4), eyeMat);
+            eye2.position.set(-3, 1.2, -6);
             mesh.add(eye2);
         } else if (type === 'laser') {
             // Slim laser bolts — thin bright streaks with subtle glow
@@ -1905,7 +1940,7 @@ const SF3D = (function () {
         if (earth && _staticAnimFrame === 0) {
             earth.getWorldPosition(_tmpVec);
             _tmpSphere.center.copy(_tmpVec);
-            _tmpSphere.radius = 9000;
+            _tmpSphere.radius = 22000;
             if (_viewFrustum.intersectsSphere(_tmpSphere)) {
                 earth.rotation.y += 0.0003;
                 const clouds = earth.getObjectByName('earth-clouds');
@@ -1918,7 +1953,7 @@ const SF3D = (function () {
         if (station && _staticAnimFrame === 0) {
             station.getWorldPosition(_tmpVec);
             _tmpSphere.center.copy(_tmpVec);
-            _tmpSphere.radius = 900;
+            _tmpSphere.radius = 5000;
             if (_viewFrustum.intersectsSphere(_tmpSphere)) {
                 station.rotation.y += 0.001;
                 if (station.isLOD) station.update(camera);
@@ -1930,7 +1965,7 @@ const SF3D = (function () {
         if (moon && _staticAnimFrame === 0) {
             moon.getWorldPosition(_tmpVec);
             _tmpSphere.center.copy(_tmpVec);
-            _tmpSphere.radius = 1600;
+            _tmpSphere.radius = 5000;
             if (_viewFrustum.intersectsSphere(_tmpSphere)) moon.rotation.y += 0.00008;
         }
 
@@ -1939,7 +1974,7 @@ const SF3D = (function () {
         if (sunGrp && _staticAnimFrame === 0) {
             sunGrp.getWorldPosition(_tmpVec);
             _tmpSphere.center.copy(_tmpVec);
-            _tmpSphere.radius = 4200;
+            _tmpSphere.radius = 35000;
             if (_viewFrustum.intersectsSphere(_tmpSphere)) {
                 const t = _frameTime * 0.001;
                 sunGrp.children.forEach(child => {

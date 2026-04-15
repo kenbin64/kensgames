@@ -86,9 +86,9 @@ const SpaceManifold = (function () {
 
   const _dims = {
     // ── Player Flight ──
-    'player.maxSpeed': 120,    // base thrust m/s
-    'player.afterburnerSpeed': 280,    // afterburner max m/s
-    'player.boostSpeed': 400,    // boost max m/s
+    'player.maxSpeed': 250,    // base thrust m/s
+    'player.afterburnerSpeed': 600,    // afterburner max m/s
+    'player.boostSpeed': 800,    // boost max m/s
     'player.hull': 100,    // starting hull
     'player.shields': 100,    // starting shields
     'player.torpedoes': 8,      // torpedo magazine
@@ -98,7 +98,7 @@ const SpaceManifold = (function () {
     'player.boostCooldown': 8.0,    // seconds after boost expires
     'player.afterburnerBurn': 5,      // fuel units/second
     'player.fuelRegen': 2,      // fuel units/second when idle
-    'player.strafeSpeed': 60,     // lateral m/s
+    'player.strafeSpeed': 120,     // lateral m/s
     'player.faDamping': 2.0,    // FA-ON velocity→0 seconds
     'player.faLerp': 0.08,   // FA-ON smooth factor
     'player.pitchDamp': 0.9,    // per-frame pitch decay
@@ -106,23 +106,23 @@ const SpaceManifold = (function () {
     'player.rollDamp': 0.9,    // per-frame roll decay
     'player.strafeHDamp': 0.8,    // per-frame horizontal strafe decay
     'player.strafeVDamp': 0.8,    // per-frame vertical strafe decay
-    'player.radius': 10,     // collision radius
+    'player.radius': 8,     // collision radius (~F-16 class, 16m diameter)
 
     // ── Baseship ──
     'baseship.hull': 5000,
     'baseship.shields': 2000,
-    'baseship.radius': 500,
+    'baseship.radius': 160,    // aircraft carrier class (~320m)
     'baseship.repairHull': 1000,   // hull restored between waves
     'baseship.repairShields': 500,    // shields restored between waves
 
     // ── Weapons ──
-    'weapon.laser.speed': 800,    // m/s projectile velocity
+    'weapon.laser.speed': 1600,    // m/s projectile velocity
     'weapon.laser.damage': 15,     // per hit
     'weapon.laser.maxAge': 2.5,    // seconds (range = speed × age)
     'weapon.laser.fireRate': 6,      // rounds per second
     'weapon.laser.radius': 2,      // collision radius
     'weapon.laser.fuelCost': 0.3,    // fuel per shot
-    'weapon.gun.speed': 600,      // m/s — slower but more spread
+    'weapon.gun.speed': 1200,      // m/s — slower but more spread
     'weapon.gun.damage': 6,       // low damage per round
     'weapon.gun.maxAge': 1.8,     // shorter range than laser
     'weapon.gun.fireRate': 18,    // rounds per second (rapid)
@@ -131,11 +131,11 @@ const SpaceManifold = (function () {
     'weapon.gun.spread': 0.04,   // radians max spread per axis
     'weapon.pulse.speed': 0,      // no projectile — spherical burst
     'weapon.pulse.damage': 0,     // no damage — disables instead
-    'weapon.pulse.range': 200,    // effective radius meters
+    'weapon.pulse.range': 400,    // effective radius meters
     'weapon.pulse.stunDuration': 3.0,  // seconds target disabled
     'weapon.pulse.fireRate': 0.25,     // 1 shot per 4 seconds
     'weapon.pulse.fuelCost': 20,  // expensive — strategic use
-    'weapon.torpedo.speed': 200,    // initial m/s
+    'weapon.torpedo.speed': 400,    // initial m/s
     'weapon.torpedo.damage': 80,     // per hit
     'weapon.torpedo.maxAge': 20,     // seconds
     'weapon.torpedo.accelTime': 1.5,    // seconds to reach max speed
@@ -148,31 +148,31 @@ const SpaceManifold = (function () {
     'cap.plasma': 20,
     'cap.torpedoes': 12,
 
-    // ── Entity Stats ──
-    'entity.interceptor.radius': 8,
-    'entity.bomber.radius': 20,
-    'entity.alien-baseship.radius': 350,
-    'entity.predator.radius': 40,
-    'entity.dreadnought.radius': 300,
-    'entity.alien-base.radius': 500,
+    // ── Entity Stats ── (alien ships 3× human — larger alien race)
+    'entity.interceptor.radius': 24,    // 3× human fighter (~48m)
+    'entity.bomber.radius': 60,         // 3× human bomber (~120m)
+    'entity.alien-baseship.radius': 1050, // 3× human carrier (~2100m)
+    'entity.predator.radius': 120,      // 3× large hunter (~240m)
+    'entity.dreadnought.radius': 900,   // alien capital (~1800m)
+    'entity.alien-base.radius': 5000,   // massive hive structure (~10km)
     'entity.tanker.hull': 5000,
     'entity.tanker.shields': 2000,
-    'entity.tanker.maxSpeed': 60,
-    'entity.tanker.radius': 30,
+    'entity.tanker.maxSpeed': 120,
+    'entity.tanker.radius': 40,         // support craft (~80m)
     'entity.tanker.fuelRepairRate': 30,
     'entity.tanker.hullRepairRate': 5,
     'entity.tanker.shieldRepairRate': 15,
-    'entity.tanker.dockRange': 100,
-    'entity.tanker.orbitDist': 2500,      // safe orbit distance from combat center
+    'entity.tanker.dockRange': 200,
+    'entity.tanker.orbitDist': 5000,      // safe orbit distance from combat center
     'entity.tanker.dockDuration': 5,      // seconds to resupply
     'entity.medic.hull': 9999,
     'entity.medic.shields': 9999,
-    'entity.medic.maxSpeed': 75,
-    'entity.medic.radius': 35,
+    'entity.medic.maxSpeed': 150,
+    'entity.medic.radius': 45,          // medical frigate (~90m)
     'entity.medic.hullRepairRate': 12,
     'entity.medic.shieldRepairRate': 20,
-    'entity.medic.dockRange': 110,
-    'entity.medic.orbitDist': 2800,       // safe orbit distance from combat center
+    'entity.medic.dockRange': 220,
+    'entity.medic.orbitDist': 5600,       // safe orbit distance from combat center
     'entity.medic.dockDuration': 6,       // seconds to repair
 
     // Support call eligibility thresholds
@@ -181,15 +181,15 @@ const SpaceManifold = (function () {
     'support.tanker.shieldThreshold': 30, // shield % — needs BOTH hull+shield low
     'support.medic.hullThreshold': 50,    // hull % below which medic call is valid
     'support.medic.shieldThreshold': 10,  // shields % below which medic call is valid (dire)
-    'support.autopilotSpeed': 180,        // m/s cruise speed to support ship
-    'support.returnSpeed': 150,           // m/s cruise speed back to combat
-    'entity.egg.radius': 6,
+    'support.autopilotSpeed': 360,        // m/s cruise speed to support ship
+    'support.returnSpeed': 300,           // m/s cruise speed back to combat
+    'entity.egg.radius': 18,    // 3× human scale
     'entity.egg.hull': 30,
     'entity.egg.hatchTime': 4,
     'entity.egg.hatchRandom': 3,
-    'entity.youngling.radius': 4,
+    'entity.youngling.radius': 12,  // 3× human scale
     'entity.youngling.hull': 15,
-    'entity.youngling.maxSpeed': 200,
+    'entity.youngling.maxSpeed': 400,
     'entity.youngling.boreRate': 0.15,
     'entity.youngling.damageRate': 3,
 
@@ -203,8 +203,8 @@ const SpaceManifold = (function () {
 
     // ── Enemy AI ──
     'enemy.turnRate': 2.0,         // base turn rate (rad/s)
-    'enemy.fireRange': 800,        // base fire range (meters)
-    'enemy.heavyRange': 3000,      // dreadnought heavy torp range
+    'enemy.fireRange': 1600,        // base fire range (meters)
+    'enemy.heavyRange': 6000,      // dreadnought heavy torp range
     'enemy.heavyCooldown': 15,     // dreadnought heavy torp cooldown (s)
 
     // ── Score ──
@@ -225,10 +225,10 @@ const SpaceManifold = (function () {
     'timing.landing': 5.0,    // landing sequence seconds
     'timing.comm': 8.0,    // random comm interval
     'timing.respawn': 7.0,    // respawn countdown
-    'timing.entrySpeed': 100,    // speed exiting bay into combat
+    'timing.entrySpeed': 200,    // speed exiting bay into combat
 
     // ── Radar ──
-    'radar.range': 5000,   // detection range meters
+    'radar.range': 15000,   // detection range meters
     'radar.sweepPeriod': 4.0,    // seconds per full rotation
     'radar.beamWidth': 12,       // degrees — angular detection band
     'radar.persistence': 0.85,   // blip opacity retention over sweep period
@@ -237,7 +237,7 @@ const SpaceManifold = (function () {
     'lives.max': 3,
 
     // ── Arena ──
-    'arena.radius': 8000,
+    'arena.radius': 25000,
 
     // ── Hive ──
     'hive.hull': 5000,

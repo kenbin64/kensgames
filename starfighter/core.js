@@ -1070,7 +1070,7 @@ const Starfighter = (function () {
 
         // Spawn player safely
         if (state.player) {
-            state.player.position.set(0, 0, -1500);
+            state.player.position.set(0, 0, -3000);
             state.player.quaternion.set(0, 0, 0, 1);
             state.player.velocity.set(0, 0, 0);
             state.player.hull = dim('player.hull');
@@ -1458,7 +1458,7 @@ const Starfighter = (function () {
 
         // Place player at combat starting position: safely outside baseship, facing away
         const launchDir = new THREE.Vector3(0, 0, -1); // default launch direction
-        const combatStartPos = state.baseship.position.clone().add(launchDir.clone().multiplyScalar(1500));
+        const combatStartPos = state.baseship.position.clone().add(launchDir.clone().multiplyScalar(800));
         state.player.position.copy(combatStartPos);
         state.player.quaternion.set(0, 0, 0, 1); // facing -Z (away from baseship)
 
@@ -1608,13 +1608,13 @@ const Starfighter = (function () {
     }
 
     const MANIFOLD_ARCHETYPES = {
-        enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 30, hullWave: 5, hullField: 4, speedBase: 80, speedWave: 5, speedField: 6, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
-        interceptor: { x: 1.45, y: 1.7, waveX: 0.1, waveY: 0.16, hullBase: 60, hullWave: 8, hullField: 6, speedBase: 160, speedWave: 8, speedField: 10, shieldsBase: 30, shieldsWave: 5, shieldsField: 5 },
-        bomber: { x: 1.7, y: 1.2, waveX: 0.12, waveY: 0.11, hullBase: 80, hullWave: 10, hullField: 8, speedBase: 50, speedWave: 3, speedField: 4, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
-        predator: { x: 2.2, y: 1.9, waveX: 0.1, waveY: 0.12, hullBase: 500, hullWave: 60, hullField: 20, speedBase: 160, speedWave: 5, speedField: 8, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
-        dreadnought: { x: 3.6, y: 2.8, waveX: 0.08, waveY: 0.1, hullBase: 2000, hullWave: 200, hullField: 60, speedBase: 15, speedWave: 1, speedField: 2, shieldsBase: 1000, shieldsWave: 100, shieldsField: 40 },
-        'alien-baseship': { x: 3.1, y: 2.4, waveX: 0.09, waveY: 0.11, hullBase: 1000, hullWave: 500, hullField: 80, speedBase: 20, speedWave: 2, speedField: 3, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
-        wingman: { x: 1.05, y: 1.1, waveX: 0.06, waveY: 0.09, hullBase: 60, hullWave: 5, hullField: 3, speedBase: 90, speedWave: 3, speedField: 4, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 30, hullWave: 5, hullField: 4, speedBase: 160, speedWave: 10, speedField: 10, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        interceptor: { x: 1.45, y: 1.7, waveX: 0.1, waveY: 0.16, hullBase: 60, hullWave: 8, hullField: 6, speedBase: 320, speedWave: 15, speedField: 15, shieldsBase: 30, shieldsWave: 5, shieldsField: 5 },
+        bomber: { x: 1.7, y: 1.2, waveX: 0.12, waveY: 0.11, hullBase: 80, hullWave: 10, hullField: 8, speedBase: 100, speedWave: 6, speedField: 6, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        predator: { x: 2.2, y: 1.9, waveX: 0.1, waveY: 0.12, hullBase: 500, hullWave: 60, hullField: 20, speedBase: 280, speedWave: 10, speedField: 12, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        dreadnought: { x: 3.6, y: 2.8, waveX: 0.08, waveY: 0.1, hullBase: 2000, hullWave: 200, hullField: 60, speedBase: 30, speedWave: 2, speedField: 3, shieldsBase: 1000, shieldsWave: 100, shieldsField: 40 },
+        'alien-baseship': { x: 3.1, y: 2.4, waveX: 0.09, waveY: 0.11, hullBase: 1000, hullWave: 500, hullField: 80, speedBase: 40, speedWave: 3, speedField: 5, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        wingman: { x: 1.05, y: 1.1, waveX: 0.06, waveY: 0.09, hullBase: 60, hullWave: 5, hullField: 3, speedBase: 180, speedWave: 6, speedField: 8, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
     };
 
     function deriveCombatProfile(type, wave, opts) {
@@ -1654,7 +1654,7 @@ const Starfighter = (function () {
         // ── Wave 1: Training wave — gentle introduction for new players ──
         if (state.wave === 1) {
             for (let i = 0; i < 3; i++) {
-                const r = 1200 + Math.random() * 600; // spawn close — immediate action
+                const r = 3000 + Math.random() * 1500; // spawn close — immediate action
                 const theta = (Math.PI * 2 / 3) * i + Math.random() * 0.4; // spread evenly, slight jitter
                 const phi = Math.PI / 2 + (Math.random() - 0.5) * 0.6; // cluster near horizon, easier to spot
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1676,7 +1676,7 @@ const Starfighter = (function () {
         // Drones (basic enemies)
         const droneCount = Math.max(2, count - Math.floor(state.wave * 0.5));
         for (let i = 0; i < droneCount; i++) {
-            const r = 1200 + Math.random() * 800;
+            const r = 3000 + Math.random() * 2000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1695,7 +1695,7 @@ const Starfighter = (function () {
         if (state.wave >= 2) {
             const intCount = Math.min(4, Math.floor(state.wave / 2));
             for (let i = 0; i < intCount; i++) {
-                const r = 1500 + Math.random() * 800;
+                const r = 4000 + Math.random() * 2000;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1717,7 +1717,7 @@ const Starfighter = (function () {
         if (state.wave >= 3) {
             const bombCount = Math.min(4, Math.floor((state.wave - 2) / 1));
             for (let i = 0; i < bombCount; i++) {
-                const r = 2000 + Math.random() * 800;
+                const r = 5000 + Math.random() * 2000;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1739,7 +1739,7 @@ const Starfighter = (function () {
 
         // Alien Baseship spawns on wave 2+, attacks friendly baseship
         if (state.wave >= 2) {
-            const r = 2500 + Math.random() * 1000;
+            const r = 7000 + Math.random() * 3000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1759,7 +1759,7 @@ const Starfighter = (function () {
         if (state.wave >= 4) {
             const predCount = Math.min(3, Math.floor((state.wave - 3) / 2) + 1); // 1 at wave 4, 2 at wave 6, 3 at wave 8+
             for (let i = 0; i < predCount; i++) {
-                const r = 2000 + Math.random() * 1000;
+                const r = 5000 + Math.random() * 3000;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1786,7 +1786,7 @@ const Starfighter = (function () {
 
         // Dreadnought spawns on wave 6+ (boss wave) — GDD: every 5th wave after W6
         if (state.wave >= 6 && (state.wave === 6 || (state.wave - 6) % 5 === 0)) {
-            const r = 3000 + Math.random() * 1000;
+            const r = 8000 + Math.random() * 3000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             const x = r * Math.sin(phi) * Math.cos(theta);
@@ -1812,7 +1812,7 @@ const Starfighter = (function () {
         if (state.wave === 5 && !state.alienBaseSpawned) {
             // Place far from the Resolute, opposite side of the arena
             const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
-            const hivePos = baseDir.multiplyScalar(5000);
+            const hivePos = baseDir.multiplyScalar(15000);
             const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
             hive.hull = dim('hive.hull');
             hive.maxSpeed = 0; // stationary
@@ -1836,9 +1836,9 @@ const Starfighter = (function () {
             const callsigns = ['Alpha-2', 'Alpha-3', 'Alpha-4'];
             for (let i = 0; i < wingmenCount; i++) {
                 const offset = new THREE.Vector3(
-                    (i === 0 ? -80 : i === 1 ? 80 : 0),
-                    (i === 2 ? 40 : 0),
-                    100 + Math.random() * 50
+                    (i === 0 ? -150 : i === 1 ? 150 : 0),
+                    (i === 2 ? 80 : 0),
+                    200 + Math.random() * 100
                 );
                 const spawnPos = state.player.position.clone().add(offset);
                 const w = new Entity('wingman', spawnPos.x, spawnPos.y, spawnPos.z);
@@ -2057,7 +2057,7 @@ const Starfighter = (function () {
                     }
 
                     const accelProgress = (progress - 0.80) / 0.12;
-                    const launchSpeed = accelProgress * accelProgress * 1200;
+                    const launchSpeed = accelProgress * accelProgress * 2400;
                     _v1.set(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
                     state.cutsceneCamPos.addScaledVector(_v1, launchSpeed * safeDt);
                     state.cutsceneVelocity.copy(_v1).multiplyScalar(launchSpeed);
@@ -2069,7 +2069,7 @@ const Starfighter = (function () {
                     cdEl.style.fontSize = '3em';
 
                     const exitProgress = (progress - 0.92) / 0.08;
-                    const exitSpeed = 1200 * (1.0 - exitProgress * 0.5);
+                    const exitSpeed = 2400 * (1.0 - exitProgress * 0.5);
                     _v1.set(0, 0, -1).applyQuaternion(state.cutsceneCamQuat);
                     state.cutsceneCamPos.addScaledVector(_v1, exitSpeed * safeDt);
                     state.cutsceneVelocity.copy(_v1).multiplyScalar(exitSpeed);
@@ -2127,7 +2127,7 @@ const Starfighter = (function () {
                     const apProgress = Math.min(state.autopilotTimer / 12.0, 1.0); // 12s travel, 3s dock
 
                     // Calculate direction and distance to baseship bay entrance
-                    _v1.copy(state.baseship.position).add(_v2.set(0, 0, 800));
+                    _v1.copy(state.baseship.position).add(_v2.set(0, 0, 400));
                     _v2.copy(_v1).sub(state.player.position);
                     const distToBase = _v2.length();
 
@@ -2139,12 +2139,12 @@ const Starfighter = (function () {
                     // Speed profile: accelerate, cruise, decelerate
                     let apSpeed;
                     if (apProgress < 0.2) {
-                        apSpeed = apProgress / 0.2 * 150; // accelerate
+                        apSpeed = apProgress / 0.2 * 300; // accelerate
                     } else if (apProgress < 0.7) {
-                        apSpeed = 150; // cruise
+                        apSpeed = 300; // cruise
                     } else {
-                        apSpeed = 150 * (1.0 - (apProgress - 0.7) / 0.3); // decelerate
-                        apSpeed = Math.max(20, apSpeed);
+                        apSpeed = 300 * (1.0 - (apProgress - 0.7) / 0.3); // decelerate
+                        apSpeed = Math.max(40, apSpeed);
                     }
 
                     _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
@@ -2158,7 +2158,7 @@ const Starfighter = (function () {
                     cdEl.style.color = '#00ff88';
 
                     // Auto-dock when close enough or timer expires
-                    if (distToBase < 800 || state.autopilotTimer >= 15.0) {
+                    if (distToBase < 400 || state.autopilotTimer >= 15.0) {
                         state.phase = 'landing';
                         state.landingTimer = 0;
                         state.autopilotActive = false;
@@ -2177,7 +2177,7 @@ const Starfighter = (function () {
                     const playerSpeed = state.player.velocity.length();
 
                     // Manual dock when close and slow
-                    if (distToBaseship < 800 && playerSpeed < 50) {
+                    if (distToBaseship < 400 && playerSpeed < 80) {
                         const landPrompt = document.getElementById('countdown-display');
                         landPrompt.style.display = 'block';
                         landPrompt.innerHTML = 'PRESS <b>SPACE</b> TO LAND';
@@ -2493,7 +2493,7 @@ const Starfighter = (function () {
                 }
                 // Intensity formula: base 0.3 in combat, +proximity, +crowd, +baseship danger
                 let musicIntensity = 0.3;
-                if (closestDist < 800 * 800) musicIntensity += 0.3; // fighter very close — urgency
+                if (closestDist < 1600 * 1600) musicIntensity += 0.3; // fighter very close — urgency
                 else if (closestDist < 1500 * 1500) musicIntensity += 0.15;
                 if (nearCount > 3) musicIntensity += 0.15; // multiple threats — crescendo
                 if (nearCount > 6) musicIntensity += 0.15; // major battle
@@ -2503,7 +2503,7 @@ const Starfighter = (function () {
 
                 // Dynamic section switching based on combat proximity
                 if (state.phase === 'combat') {
-                    if (nearCount > 3 || closestDist < 800 * 800) {
+                    if (nearCount > 3 || closestDist < 1600 * 1600) {
                         SFMusic.setSection('heat-of-battle');
                     } else if (nearCount > 0 || closestDist < 1500 * 1500) {
                         SFMusic.setSection('enemy-nearby');
@@ -2622,7 +2622,7 @@ const Starfighter = (function () {
             cooldownMul: 1.0 - absField * 0.3,           // more extreme field → faster firing
             traits: seeds.baseTraits,
             jinkDist: 200 + wNorm * 200,
-            heavyRange: dim('enemy.heavyRange') || 3000,
+            heavyRange: dim('enemy.heavyRange') || 6000,
             heavyCooldown: dim('enemy.heavyCooldown') || 15,
         };
     }
@@ -2740,7 +2740,7 @@ const Starfighter = (function () {
     // ── Torpedo fire dimension ──
     function _combatFireTorpedo(entity, target) {
         if (_countType('torpedo') >= dim('cap.torpedoes')) return;
-        _v1.set(0, -10, -20).applyQuaternion(entity.quaternion);
+        _v1.set(0, -30, -60).applyQuaternion(entity.quaternion);
         const t = new Entity('torpedo',
             entity.position.x + _v1.x, entity.position.y + _v1.y, entity.position.z + _v1.z);
         t.quaternion.copy(entity.quaternion);
@@ -2759,14 +2759,14 @@ const Starfighter = (function () {
     // ── Heavy torpedo dimension (dreadnought special) ──
     function _combatFireHeavyTorp(entity, target) {
         if (_countType('torpedo') >= dim('cap.torpedoes')) return;
-        _v1.set(0, 0, -40).applyQuaternion(entity.quaternion);
+        _v1.set(0, 0, -80).applyQuaternion(entity.quaternion);
         const t = new Entity('torpedo',
             entity.position.x + _v1.x, entity.position.y + _v1.y, entity.position.z + _v1.z);
         t.quaternion.copy(entity.quaternion);
-        _v1.set(0, 0, -180).applyQuaternion(t.quaternion);
+        _v1.set(0, 0, -360).applyQuaternion(t.quaternion);
         t.velocity.copy(_v1);
         t.owner = 'enemy';
-        t.radius = 12;
+        t.radius = 18;
         t.target = target;
         t.maxAge = 25;
         t.damage = 150;
@@ -2856,7 +2856,7 @@ const Starfighter = (function () {
         if (prof.traits.includes('heavy_torpedo')) {
             if (!entity._beamCooldown) entity._beamCooldown = prof.heavyCooldown || 15;
             entity._beamCooldown -= dt;
-            if (entity._beamCooldown <= 0 && dist2 < (prof.heavyRange || 3000) ** 2) {
+            if (entity._beamCooldown <= 0 && dist2 < (prof.heavyRange || 6000) ** 2) {
                 _combatFireHeavyTorp(entity, target);
                 entity._beamCooldown = prof.heavyCooldown || 15;
             }
@@ -2907,12 +2907,12 @@ const Starfighter = (function () {
         const fwd = _v2.set(0, 0, -1).applyQuaternion(pred.quaternion);
         pred.velocity.copy(fwd).multiplyScalar(pred.maxSpeed);
 
-        // Plasma attack — fires when target is roughly ahead and in range (300m)
+        // Plasma attack — fires when target is roughly ahead and in range (1000m)
         pred._plasmaTimer -= dt;
         if (pred._plasmaTimer <= 0) {
             const toTarget = _v1.copy(target.position).sub(pred.position);
             const dist = toTarget.length();
-            if (dist < 500) { // can spew plasma several hundred meters
+            if (dist < 1000) { // can spew plasma several hundred meters
                 toTarget.normalize();
                 const facingDot = fwd.dot(toTarget);
                 if (facingDot > 0.7) { // roughly facing target (wider than lasers — it's a spray)
@@ -2934,7 +2934,7 @@ const Starfighter = (function () {
     function _firePlasma(source, target) {
         if (_countType('plasma') >= dim('cap.plasma')) return;
         // Plasma emits from the underbelly (-Y local) — that's where its vulnerable
-        const spawnOffset = _v1.set(0, -15, -10).applyQuaternion(source.quaternion);
+        const spawnOffset = _v1.set(0, -45, -30).applyQuaternion(source.quaternion);
         const p = new Entity('plasma',
             source.position.x + spawnOffset.x,
             source.position.y + spawnOffset.y,
@@ -2943,10 +2943,10 @@ const Starfighter = (function () {
 
         // Aim toward target with slight spread
         const dir = _v2.copy(target.position).sub(p.position).normalize();
-        p.velocity.copy(dir.multiplyScalar(250)); // plasma velocity — slower than lasers
+        p.velocity.copy(dir.multiplyScalar(500)); // plasma velocity — slower than lasers
         p.owner = 'predator';
-        p.radius = 8;
-        p.maxAge = 3.0;  // ~750m max range at 250m/s
+        p.radius = 16;
+        p.maxAge = 3.0;  // ~1500m max range at 500m/s
         p.damage = 60;   // base damage (reduced with distance)
         p._sourcePos = source.position.clone(); // track origin for falloff
         p._sourceEntity = source; // track which predator fired it
@@ -3770,7 +3770,7 @@ const Starfighter = (function () {
 
             _v2.copy(e.position).sub(p.position);
             const dist = _v2.length();
-            if (dist > 2000) continue; // weapon range — close enough to fire
+            if (dist > 4000) continue; // weapon range — close enough to fire
 
             _v2.multiplyScalar(1 / dist);
             const dot = _v1.dot(_v2);
