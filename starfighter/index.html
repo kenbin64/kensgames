@@ -732,6 +732,75 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)
     }
 
+    /* ── Tutorial interactive hardware diagram ── */
+    .tut-hw-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(0, 140, 200, 0.3);
+      border-radius: 4px;
+      background: rgba(0, 8, 22, 0.75);
+      color: #5a7a9a;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.2;
+      transition: background 0.07s, box-shadow 0.07s, color 0.07s, border-color 0.07s;
+      user-select: none;
+      pointer-events: none
+    }
+
+    div.tut-hw-btn.active {
+      background: rgba(0, 180, 255, 0.2) !important;
+      border-color: #0cf !important;
+      color: #e0f8ff !important;
+      box-shadow: 0 0 10px rgba(0, 200, 255, 0.5) !important;
+      text-shadow: 0 0 7px rgba(0, 200, 255, 0.7)
+    }
+
+    g.tut-hw-btn.active .tut-hw-rect {
+      fill: rgba(0, 180, 255, 0.2) !important;
+      stroke: #0cf !important;
+      filter: url(#tglow)
+    }
+
+    g.tut-hw-btn.active .tut-hw-text {
+      fill: #e0f8ff !important
+    }
+
+    .tut-action-callout {
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      min-height: 22px;
+      padding: 4px 0 6px;
+      transition: color 0.2s, opacity 0.2s
+    }
+
+    .tut-voice-chip {
+      border: 1px solid rgba(0, 160, 200, 0.25);
+      border-radius: 3px;
+      background: rgba(0, 12, 28, 0.85);
+      padding: 3px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      color: #4a6a7a;
+      transition: color 0.15s, border-color 0.15s
+    }
+
+    .tut-voice-chip:hover {
+      color: #0cf;
+      border-color: rgba(0, 200, 255, 0.5)
+    }
+
+    .tut-voice-chip.active {
+      color: #0ff;
+      border-color: rgba(0, 255, 255, 0.4)
+    }
+
     /* ═══════════════════════════════════════
        MISSION BRIEFING PANEL — standalone toggle panel
        ═══════════════════════════════════════ */
@@ -1227,7 +1296,7 @@
       display: none !important
     }
   </style>
-  </head>
+</head>
 
 <body>
 
@@ -1695,10 +1764,14 @@
       style="color:#0ff;font-family:'Courier New',monospace;margin-top:24px;font-size:14px;letter-spacing:2px">
       INITIALIZING MANIFOLD...</div>
     <div id="loading-progress"
-      style="width:220px;height:4px;background:rgba(0,255,255,0.1);margin-top:16px;border-radius:2px;overflow:hidden">
-      <div id="loading-bar" style="width:0%;height:100%;background:#0ff;transition:width 0.3s ease;border-radius:2px">
+      style="position:relative;width:280px;height:10px;background:rgba(0,255,255,0.1);margin-top:18px;border-radius:5px;overflow:hidden;box-shadow:0 0 8px rgba(0,255,255,0.15)">
+      <div id="loading-bar"
+        style="width:0%;height:100%;background:linear-gradient(90deg,#0af,#0ff);transition:width 0.25s ease;border-radius:5px;box-shadow:0 0 6px #0ff">
       </div>
     </div>
+    <div id="loading-pct"
+      style="color:rgba(0,255,255,0.55);font-family:'Courier New',monospace;margin-top:8px;font-size:11px;letter-spacing:1px">
+      0%</div>
   </div>
   <style>
     @keyframes spin {
@@ -1746,7 +1819,15 @@
       if (window.Starfighter) Starfighter.init();
     });
   </script>
-<script src="starfighter.bundle.js?v=960e0dff4e644362"></script>
+  <script src="phrase_compositor.js"></script>
+  <script src="hive_queen_manifold.js"></script>
+  <script src="spectrum_manifold.js"></script>
+  <script src="sfx_compositor.js"></script>
+  <script src="music_compositor.js"></script>
+  <script src="visual_compositor.js"></script>
+  <script src="manifold_kernel.js"></script>
+  <script src="starfighter.bundle.js?v=e482c925a010f41a"></script>
+  <script src="anpc_manifold.js"></script>
 </body>
 
 </html>

@@ -27,7 +27,7 @@ const Starfighter = (function () {
         commTimer: 0,
         commInterval: 8.0, // seconds between random comms
         landingTimer: 0,
-        landingDuration: 5.0, // landing sequence duration
+        landingDuration: 28.0, // BFXG-009 Phase 6: 28s docking cutscene
         _briefingShownOnce: false, // first-time auto-deploy of mission panel
         aiWingmen: true, // AI wingmen always present in solo play
         maxLives: 3,
@@ -45,6 +45,8 @@ const Starfighter = (function () {
         killFeed: [],        // { text, color, time } — max 6, fades out after 4s
         missionStats: { kills: 0, deaths: 0, accuracy: 0, shotsFired: 0, shotsHit: 0, damageDealt: 0, damageTaken: 0, waveReached: 0, wingmenSaved: 0, wingmenLost: 0, startTime: 0 },
         playerKills: 0,
+        clusters: [],           // [{id, label, center:{x,y,z}, total, alive}] active enemy clusters
+        _clusterCallTimer: 0,   // countdown to next wingman cluster guidance callout
     };
 
     // ── Kill Feed ──
@@ -89,7 +91,7 @@ const Starfighter = (function () {
             if (e.markedForDeletion) continue;
             if (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' ||
                 e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' ||
-                e.type === 'egg' || e.type === 'youngling') {
+                e.type === 'egg' || e.type === 'youngling' || e.type === 'hive-queen') {
                 hostiles++;
             }
         }
@@ -112,7 +114,7 @@ const Starfighter = (function () {
         // Snapshot current battle state for comm generation
         const p = state.player;
         const b = state.baseship;
-        let enemies = 0, interceptors = 0, bombers = 0, dreadnoughts = 0, predators = 0;
+        let enemies = 0, interceptors = 0, bombers = 0, dreadnoughts = 0, predators = 0, hiveQueens = 0;
         let closestDist = Infinity, closestType = '', closestPos = null;
         // Track priority threats with positions for directional comms
         let priorityTarget = null, priorityDist = Infinity, priorityType = '';
@@ -140,6 +142,7 @@ const Starfighter = (function () {
             else if (e.type === 'bomber') bombers++;
             else if (e.type === 'dreadnought') dreadnoughts++;
             else if (e.type === 'predator') predators++;
+            else if (e.type === 'hive-queen') hiveQueens++;
             else continue;
             if (p && !p.markedForDeletion) {
                 const d = e.position.distanceToSquared(p.position);
@@ -164,7 +167,7 @@ const Starfighter = (function () {
             }
         }
         if (_dpSnap) _dpSnap.releaseAll('snap');
-        const totalHostile = enemies + interceptors + bombers + dreadnoughts + predators;
+        const totalHostile = enemies + interceptors + bombers + dreadnoughts + predators + hiveQueens;
         const closestM = Math.floor(Math.sqrt(closestDist));
         const hullPct = p ? Math.floor(p.hull) : 0;
         const shieldPct = p ? Math.floor(p.shields) : 0;
@@ -173,7 +176,7 @@ const Starfighter = (function () {
         const torpCount = p ? p.torpedoes : 0;
         const speed = p ? Math.floor(p.velocity.length()) : 0;
         return {
-            enemies, interceptors, bombers, dreadnoughts, predators, totalHostile,
+            enemies, interceptors, bombers, dreadnoughts, predators, hiveQueens, totalHostile,
             closestM, closestType, closestPos, hullPct, shieldPct, basePct, fuelPct, torpCount, speed,
             priorityTarget, priorityType, bomberNearBase,
             alienMothership, alienMothershipHullPct, threatsNearBase,
@@ -381,6 +384,7 @@ const Starfighter = (function () {
         if (type === 'predator') return `${_cs()}, Predator Drone down. ${left} hostile${left !== 1 ? 's' : ''} on scope.${nextDir}`;
         if (type === 'bomber') return `Bomber neutralized, ${_cs()}. Base hull ${s.basePct}%. ${left} remaining.${nextDir}`;
         if (type === 'dreadnought') return `DREADNOUGHT DESTROYED! Outstanding, ${_cs()}. ${left} hostiles remain.${nextDir}`;
+        if (type === 'hive-queen') return `HIVE QUEEN DESTROYED! Remarkable flying, ${_cs()}. The Hive is leaderless. ${left} contacts remaining.${nextDir}`;
         if (type === 'interceptor') return `Interceptor eliminated, ${_cs()}. ${left} contacts active.${nextDir}`;
         return `Kill confirmed, ${_cs()}. ${left} remaining.${nextDir}`;
     }
@@ -393,6 +397,7 @@ const Starfighter = (function () {
         if (s.bombers > 0) parts.push(`${s.bombers} bomber${s.bombers > 1 ? 's' : ''}`);
         if (s.predators > 0) parts.push(`${s.predators} predator${s.predators > 1 ? 's' : ''}`);
         if (s.dreadnoughts > 0) parts.push(`${s.dreadnoughts} dreadnought${s.dreadnoughts > 1 ? 's' : ''}`);
+        if (s.hiveQueens > 0) parts.push(`HIVE QUEEN`);
         const manifest = parts.length ? parts.join(', ') : `${s.totalHostile} contacts`;
         return `Wave ${state.wave}: ${manifest} on scope. Base hull ${s.basePct}%. All stations combat ready.`;
     }
@@ -442,6 +447,9 @@ const Starfighter = (function () {
     function addComm(sender, message, type) {
         // Audio: comm beep on each message
         if (window.SFAudio) SFAudio.playSound('comm_beep');
+
+        // Voice synthesis — character-specific tactical radio voice (generic bot voice forbidden)
+        if (window.SFAudio && SFAudio.speakAnpc) SFAudio.speakAnpc(sender, message);
 
         // Feed the scrolling marquee ticker at the top of the screen
         const ticker = document.getElementById('comm-ticker-inner');
@@ -584,6 +592,11 @@ const Starfighter = (function () {
 
             this.markedForDeletion = true;
             if (M) M.remove(this.id);
+            // Decrement cluster alive count when a clustered enemy is destroyed
+            if (this._clusterId !== undefined) {
+                const _cl = state.clusters.find(c => c.id === this._clusterId);
+                if (_cl && _cl.alive > 0) { _cl.alive--; _updateClusterHUD(); }
+            }
             if (window.SF3D) SF3D.spawnExplosion(this.position);
             if (window.SFAudio) SFAudio.playSound('explosion');
             if (window.SFAudio) SFAudio.playSound('shockwave');
@@ -645,6 +658,17 @@ const Starfighter = (function () {
                 if (window.SFAnnouncer) SFAnnouncer.onKill('dreadnought');
                 checkWave();
 
+            } else if (this.type === 'hive-queen') {
+                state.score += 10000;
+                state.kills++;
+                if (this.killedBy === 'player') state.playerKills++;
+                _addKillFeedEntry(
+                    (this.killedBy === 'player' ? 'You' : (this.killedBy || '?')) + ' → ⚠ HIVE QUEEN DESTROYED [' + (this._killedByWeapon || 'Torpedo') + ']',
+                    '#ff00ff'
+                );
+                if (window.SFAnnouncer) SFAnnouncer.onKill('hive-queen');
+                checkWave();
+
             } else if (this.type === 'tanker' || this.type === 'medic') {
                 return;
 
@@ -681,7 +705,7 @@ const Starfighter = (function () {
             }
 
             // ── Progression: award XP/credits on hostile kills ──
-            const HOSTILE_TYPES = ['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'egg', 'youngling'];
+            const HOSTILE_TYPES = ['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'egg', 'youngling', 'hive-queen'];
             if (HOSTILE_TYPES.includes(this.type) && this.killedBy === 'player' && window.SFProgression) {
                 const result = SFProgression.awardKill(this.type);
                 // Rank-up notification
@@ -730,10 +754,13 @@ const Starfighter = (function () {
             this.selectedWeapon = 0;     // 0=laser, 1=gun, 2=pulse, 3=torpedo
         }
 
-        static WEAPONS = ['LASER', 'GUN', 'PULSE', 'TORP'];
+        // Weapons unlock progressively by wave/level:
+        // L1=LASER, L2+=SPREAD, L3+=TORP, L4+=EMP
+        static WEAPONS = ['LASER', 'SPREAD', 'TORP', 'EMP'];
 
         cycleWeapon() {
-            this.selectedWeapon = (this.selectedWeapon + 1) % Player.WEAPONS.length;
+            const maxSlots = _getUnlockedWeaponCount(state.wave);
+            this.selectedWeapon = (this.selectedWeapon + 1) % maxSlots;
             const name = Player.WEAPONS[this.selectedWeapon];
             if (window.SFAudio) SFAudio.playSound('click');
             if (window.SFAnnouncer) SFAnnouncer.onWeaponSwitch(name);
@@ -990,7 +1017,13 @@ const Starfighter = (function () {
         // GDD §3.1: Bay ambient audio
         if (window.SFAudio) {
             SFAudio.init();
-            if (SFAudio.setVoiceModule) SFAudio.setVoiceModule('au_female');
+            // Restore saved voice preference (default au_female for new players)
+            const savedVoiceMod = localStorage.getItem('sf_voice_module') || 'au_female';
+            if (SFAudio.setVoiceModule) SFAudio.setVoiceModule(savedVoiceMod);
+            if (SFAudio.setCrewVoiceModule) {
+                SFAudio.setCrewVoiceModule('Cdr. Vasquez', savedVoiceMod);
+                SFAudio.setCrewVoiceModule('Resolute Actual', savedVoiceMod);
+            }
             SFAudio.startBayAmbience();
         }
 
@@ -1028,17 +1061,54 @@ const Starfighter = (function () {
         }
     }
 
-    // ── Tutorial Prompt: first-game "Want a tutorial?" overlay ──
+    // ── Tutorial Prompt: first-game "Want a tutorial?" overlay (+ wave-1 pilot config) ──
     function _showTutorialPrompt() {
+        // ── Build voice picker options from SFAudio if available ──
+        const menu = (window.SFAudio && SFAudio.getPlayerVoiceMenu) ? SFAudio.getPlayerVoiceMenu() : null;
+        const savedVoice = localStorage.getItem('sf_voice_module') || '';
+        const savedGender = localStorage.getItem('sf_voice_gender') || 'female';
+
+        function _voiceOptHTML(list, currentId) {
+            return list.map(v =>
+                `<option value="${v.id}"${v.id === currentId ? ' selected' : ''}>${v.label}</option>`
+            ).join('');
+        }
+
+        const fOpts = menu ? _voiceOptHTML(menu.female, savedGender === 'female' ? savedVoice : menu.female[0].id) : '';
+        const mOpts = menu ? _voiceOptHTML(menu.male, savedGender === 'male' ? savedVoice : menu.male[0].id) : '';
+
+        const voicePickerHTML = menu ? `
+            <div id="voice-config-panel" style="margin-bottom:22px;padding:14px 18px;background:rgba(0,20,40,0.7);border:1px solid rgba(0,255,255,0.18);border-radius:6px;min-width:320px">
+              <div style="font-size:10px;letter-spacing:3px;color:#556;margin-bottom:10px">MISSION COMMANDER VOICE</div>
+              <div style="display:flex;gap:10px;margin-bottom:10px;justify-content:center">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;color:#aaccdd;font-size:12px">
+                  <input type="radio" name="vc-gender" id="vc-female" value="female" ${savedGender !== 'male' ? 'checked' : ''}
+                    style="accent-color:#00ffcc"> Female
+                </label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;color:#aaccdd;font-size:12px">
+                  <input type="radio" name="vc-gender" id="vc-male" value="male" ${savedGender === 'male' ? 'checked' : ''}
+                    style="accent-color:#00ffcc"> Male
+                </label>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;justify-content:center">
+                <select id="vc-accent" style="background:#0a1a2a;color:#0ff;border:1px solid rgba(0,255,255,0.3);border-radius:4px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;flex:1">
+                  ${savedGender === 'male' ? mOpts : fOpts}
+                </select>
+                <button id="vc-test" style="padding:5px 12px;background:rgba(0,255,120,0.1);color:#0f8;border:1px solid rgba(0,255,120,0.3);border-radius:4px;font-family:monospace;font-size:11px;cursor:pointer;white-space:nowrap">&#9658; Test</button>
+              </div>
+            </div>` : '';
+
         const overlay = document.createElement('div');
         overlay.id = 'tutorial-prompt-overlay';
         overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);pointer-events:auto';
         overlay.innerHTML = `
-            <div style="text-align:center;max-width:480px">
+            <div style="text-align:center;max-width:540px">
                 <div style="font-size:12px;letter-spacing:4px;color:#446688;margin-bottom:12px">EARTH DEFENSE FORCE</div>
                 <div style="font-size:11px;color:#88aacc;margin-bottom:8px">CALLSIGN: <span style="color:#0ff;font-size:14px;letter-spacing:2px">${_cs()}</span></div>
-                <div style="font-size:20px;color:#ffd24a;margin-bottom:24px;text-shadow:0 0 12px rgba(255,210,74,0.4)">FLIGHT ORIENTATION BRIEFING</div>
-                <div style="font-size:13px;color:#aaccdd;margin-bottom:28px;line-height:1.5">Would you like a guided tutorial covering flight controls, weapons, and a practice run?</div>
+                <div style="font-size:20px;color:#ffd24a;margin-bottom:20px;text-shadow:0 0 12px rgba(255,210,74,0.4)">PILOT CONFIGURATION</div>
+                ${voicePickerHTML}
+                <div style="font-size:12px;color:#556;letter-spacing:3px;margin-bottom:10px;margin-top:4px">FLIGHT BRIEFING</div>
+                <div style="font-size:13px;color:#aaccdd;margin-bottom:24px;line-height:1.5">Would you like a guided tutorial covering flight controls, weapons, and a practice run?</div>
                 <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
                     <button id="tut-yes" class="avtn-btn avtn-btn-green" tabindex="1">YES — BRIEF ME</button>
                     <button id="tut-no" class="avtn-btn avtn-btn-red" tabindex="2">NO — LAUNCH NOW</button>
@@ -1046,6 +1116,56 @@ const Starfighter = (function () {
                 </div>
             </div>`;
         document.body.appendChild(overlay);
+
+        // ── Wire voice picker ──
+        if (menu) {
+            const fMenuList = menu.female;
+            const mMenuList = menu.male;
+
+            function _applyVoiceChoice() {
+                const gender = document.querySelector('input[name="vc-gender"]:checked')?.value || 'female';
+                const moduleId = document.getElementById('vc-accent')?.value;
+                if (!moduleId) return;
+                localStorage.setItem('sf_voice_module', moduleId);
+                localStorage.setItem('sf_voice_gender', gender);
+                if (window.SFAudio) {
+                    // Apply to the main command crew voices so backstory uses chosen voice
+                    SFAudio.setCrewVoiceModule('Cdr. Vasquez', moduleId);
+                    SFAudio.setCrewVoiceModule('Resolute Actual', moduleId);
+                    SFAudio.setVoiceModule(moduleId);
+                }
+            }
+
+            function _rebuildAccentList(gender) {
+                const sel = document.getElementById('vc-accent');
+                if (!sel) return;
+                const list = gender === 'male' ? mMenuList : fMenuList;
+                // Try to keep same index if switching
+                const curIdx = sel.selectedIndex;
+                sel.innerHTML = list.map(v => `<option value="${v.id}">${v.label}</option>`).join('');
+                sel.selectedIndex = Math.min(curIdx, list.length - 1);
+                _applyVoiceChoice();
+            }
+
+            document.querySelectorAll('input[name="vc-gender"]').forEach(r => {
+                r.onchange = () => _rebuildAccentList(r.value);
+            });
+            const accentSel = document.getElementById('vc-accent');
+            if (accentSel) accentSel.onchange = _applyVoiceChoice;
+            _applyVoiceChoice(); // apply saved preference immediately
+
+            const testBtn = document.getElementById('vc-test');
+            if (testBtn) {
+                testBtn.onclick = () => {
+                    _applyVoiceChoice();
+                    if (window.SFAudio && SFAudio.speakAs) {
+                        const moduleId = document.getElementById('vc-accent')?.value || 'au_female';
+                        const testLine = `Callsign ${_cs()}, this is your mission commander. All systems nominal. Prepare for launch.`;
+                        SFAudio.speak(testLine, { voiceModule: moduleId });
+                    }
+                };
+            }
+        }
 
         // Focus first button for keyboard nav
         setTimeout(() => document.getElementById('tut-yes').focus(), 100);
@@ -1096,7 +1216,168 @@ const Starfighter = (function () {
         overlay.id = 'tutorial-overlay';
         overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);pointer-events:auto;overflow-y:auto;padding:20px';
 
+        // ── Diagram interaction state (keyboard/gamepad listeners + RAF) ──
+        let _diagRAF = null, _diagKbDown = null, _diagKbUp = null;
+        let _diagMouseDown = null, _diagMouseMove = null, _diagScroll = null;
+        let _lastSpokenAction = '', _lastSpokenTime = 0;
+
+        function _cleanupDiagram() {
+            if (_diagRAF) { cancelAnimationFrame(_diagRAF); _diagRAF = null; }
+            if (_diagKbDown) { document.removeEventListener('keydown', _diagKbDown, true); _diagKbDown = null; }
+            if (_diagKbUp) { document.removeEventListener('keyup', _diagKbUp, true); _diagKbUp = null; }
+            if (_diagMouseDown) { document.removeEventListener('mousedown', _diagMouseDown, true); _diagMouseDown = null; }
+            if (_diagMouseMove) { document.removeEventListener('mousemove', _diagMouseMove, true); _diagMouseMove = null; }
+            if (_diagScroll) { document.removeEventListener('wheel', _diagScroll, true); _diagScroll = null; }
+        }
+
+        function _buildKbDiagramHTML() {
+            const k = (id, lbl, action, w = 34, h = 34, fs = 10) =>
+                `<div id="tut-k-${id}" class="tut-hw-btn" data-action="${action}" style="width:${w}px;height:${h}px;font-size:${fs}px;flex-shrink:0">${lbl}</div>`;
+            const sp = (w = 34) => `<div style="width:${w}px;flex-shrink:0"></div>`;
+            return `<div style="display:flex;gap:12px;justify-content:center;align-items:flex-start;flex-wrap:wrap;padding:4px 0">
+                    <div style="display:inline-flex;flex-direction:column;gap:3px">
+                        <div style="display:flex;gap:3px">${k('Digit1', '1', 'Weapon 1 — Laser Cannon')}${k('Digit2', '2', 'Weapon 2 — Plasma Bolt')}${k('Digit3', '3', 'Weapon 3 — Rail Gun')}${k('Digit4', '4', 'Weapon 4 — Scatter')}</div>
+                        <div style="display:flex;gap:3px">${k('KeyQ', 'Q', 'Roll Left')}${k('KeyW', 'W', 'Throttle Up')}${k('KeyE', 'E', 'Roll Right')}${k('KeyR', 'R', 'Emergency RTB')}${k('KeyT', 'T', 'Lock Target')}</div>
+                        <div style="display:flex;gap:3px">${k('KeyA', 'A', 'Strafe Left')}${k('KeyS', 'S', 'Throttle Down')}${sp()}${k('KeyF', 'F', 'Boost')}${k('KeyG', 'G', 'Request Dock')}${k('KeyH', 'H', 'Hyperdrive')}</div>
+                        <div style="display:flex;gap:3px">${k('ShiftLeft', 'SHIFT', 'Afterburner', 55, 34, 8)}${sp(20)}${k('KeyV', 'V', 'Flight Assist Toggle')}${k('Space', 'SPACE', 'Fire Weapon', 98, 34, 8)}</div>
+                    </div>
+                    <div style="display:inline-flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0">
+                        <div style="font-family:'Courier New';font-size:8px;letter-spacing:2px;color:rgba(0,180,220,0.5);margin-bottom:2px">MOUSE</div>
+                        <div style="display:flex;gap:3px">${k('MouseLeft', 'LMB', 'Fire Weapon', 32, 42, 7)}${k('MouseRight', 'RMB', 'Torpedo', 32, 42, 7)}</div>
+                        ${k('MouseScroll', 'SCROLL', 'Throttle Up / Down', 68, 24, 7)}
+                        ${k('MouseMove', 'MOVE', 'Pitch + Yaw — Steering', 68, 24, 7)}
+                    </div>
+                </div>`;
+        }
+
+        function _buildGpDiagramHTML(controller) {
+            const isPS = controller === 'playstation';
+            const fa = isPS ? ['✕', '○', '□', '△'] : ['A', 'B', 'X', 'Y'];
+            const fc = isPS
+                ? ['#5577ee', '#ee4455', '#bb55ee', '#44cc77']
+                : ['#44bb66', '#cc3333', '#3366cc', '#ccaa33'];
+            let s = `<svg viewBox="0 0 320 185" width="100%" style="max-width:320px;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">`;
+            s += `<defs><filter id="tglow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter></defs>`;
+            // Controller body silhouette
+            s += `<ellipse cx="75" cy="115" rx="50" ry="58" fill="rgba(0,8,22,0.85)" stroke="rgba(0,130,180,0.3)" stroke-width="1.5"/>`;
+            s += `<ellipse cx="245" cy="115" rx="50" ry="58" fill="rgba(0,8,22,0.85)" stroke="rgba(0,130,180,0.3)" stroke-width="1.5"/>`;
+            s += `<rect x="75" y="40" width="170" height="88" rx="18" fill="rgba(0,8,22,0.85)" stroke="rgba(0,130,180,0.3)" stroke-width="1.5"/>`;
+            // Triggers (LT=btn6, RT=btn7)
+            s += `<g id="tut-k-6" class="tut-hw-btn" data-action="Fire Torpedo" style="cursor:default"><rect x="22" y="8" width="56" height="25" rx="5" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1"/><text x="50" y="23" font-family="Courier New" font-size="9" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">LT</text></g>`;
+            s += `<g id="tut-k-7" class="tut-hw-btn" data-action="Fire Lasers" style="cursor:default"><rect x="242" y="8" width="56" height="25" rx="5" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1"/><text x="270" y="23" font-family="Courier New" font-size="9" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">RT</text></g>`;
+            // Bumpers (LB=btn4, RB=btn5)
+            s += `<g id="tut-k-4" class="tut-hw-btn" data-action="Roll Left" style="cursor:default"><rect x="27" y="36" width="50" height="16" rx="4" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1"/><text x="52" y="47" font-family="Courier New" font-size="8" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">LB</text></g>`;
+            s += `<g id="tut-k-5" class="tut-hw-btn" data-action="Roll Right" style="cursor:default"><rect x="243" y="36" width="50" height="16" rx="4" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1"/><text x="268" y="47" font-family="Courier New" font-size="8" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">RB</text></g>`;
+            // Left stick (btn10) + Right stick (btn11)
+            s += `<g id="tut-k-ls" class="tut-hw-btn" data-action="Throttle + Strafe (L-Stick)" style="cursor:default"><circle cx="98" cy="108" r="22" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1.5"/><text x="98" y="112" font-family="Courier New" font-size="7" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">LS</text></g>`;
+            s += `<g id="tut-k-rs" class="tut-hw-btn" data-action="Pitch + Yaw (R-Stick)" style="cursor:default"><circle cx="210" cy="122" r="22" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1.5"/><text x="210" y="126" font-family="Courier New" font-size="7" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">RS</text></g>`;
+            // D-pad (btns 12-15)
+            for (const [x, y, btn, action, sym] of [[160, 52, 12, 'Throttle Up', '▲'], [160, 90, 13, 'Throttle Down', '▼'], [141, 71, 14, 'Strafe Left', '◀'], [179, 71, 15, 'Strafe Right', '▶']]) {
+                s += `<g id="tut-k-${btn}" class="tut-hw-btn" data-action="${action}" style="cursor:default"><rect x="${x}" y="${y}" width="18" height="18" rx="2" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.3)" stroke-width="1"/><text x="${x + 9}" y="${y + 12}" font-family="Courier New" font-size="9" fill="#5a7a9a" text-anchor="middle" class="tut-hw-text">${sym}</text></g>`;
+            }
+            // Face buttons (A/Cross=0, B/Circle=1, X/Square=2, Y/Triangle=3)
+            const fb = [[248, 98, 0, 'Afterburner'], [272, 74, 1, 'Boost'], [224, 74, 2, 'Flight Assist'], [248, 50, 3, 'Lock Target']];
+            if (isPS) fb[0][3] = 'Fire Weapon (Cross)';
+            for (let i = 0; i < fb.length; i++) {
+                const [cx, cy, btn, action] = fb[i];
+                s += `<g id="tut-k-${btn}" class="tut-hw-btn" data-action="${action}" style="cursor:default"><circle cx="${cx}" cy="${cy}" r="13" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="${fc[i]}55" stroke-width="1.5"/><text x="${cx}" y="${cy + 4}" font-family="Courier New" font-size="9" fill="${fc[i]}bb" text-anchor="middle" class="tut-hw-text">${fa[i]}</text></g>`;
+            }
+            // Select / Start (btn8, btn9)
+            s += `<g id="tut-k-8" class="tut-hw-btn" data-action="Comms Menu" style="cursor:default"><rect x="131" y="73" width="22" height="13" rx="3" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.2)" stroke-width="1"/><text x="142" y="82" font-family="Courier New" font-size="6" fill="#3a5a7a" text-anchor="middle" class="tut-hw-text">SEL</text></g>`;
+            s += `<g id="tut-k-9" class="tut-hw-btn" data-action="Pause / Menu" style="cursor:default"><rect x="167" y="73" width="22" height="13" rx="3" class="tut-hw-rect" fill="rgba(0,12,30,0.9)" stroke="rgba(0,130,180,0.2)" stroke-width="1"/><text x="178" y="82" font-family="Courier New" font-size="6" fill="#3a5a7a" text-anchor="middle" class="tut-hw-text">SRT</text></g>`;
+            s += `</svg>`;
+            return s;
+        }
+
+        function _attachDiagramListeners(controller) {
+            _cleanupDiagram();
+            const callout = document.getElementById('tut-action-callout');
+            const isGP = controller !== 'keyboard';
+
+            function _announce(action) {
+                if (callout) { callout.textContent = action; callout.style.color = '#0cf'; }
+                if (localStorage.getItem('sf_tut_voice_off') === '1') return;
+                if (!window.SFAudio || !SFAudio.speak) return;
+                const voices = (window.speechSynthesis && speechSynthesis.getVoices) ? speechSynthesis.getVoices() : [];
+                if (voices.length === 0) return; // no voices loaded yet — show text only, never bot fallback
+                const now = Date.now();
+                if (action === _lastSpokenAction && now - _lastSpokenTime < 2800) return;
+                _lastSpokenAction = action;
+                _lastSpokenTime = now;
+                const mod = localStorage.getItem('sf_voice_module') || 'au_female';
+                SFAudio.speak(action, { voiceModule: mod });
+            }
+
+            function _lit(code, on) {
+                const el = document.getElementById(`tut-k-${code}`);
+                if (el) el.classList.toggle('active', on);
+            }
+
+            if (!isGP) {
+                _diagKbDown = (e) => {
+                    const el = document.getElementById(`tut-k-${e.code}`);
+                    if (el) { e.preventDefault(); _lit(e.code, true); _announce(el.dataset.action || e.code); }
+                };
+                _diagKbUp = (e) => _lit(e.code, false);
+                document.addEventListener('keydown', _diagKbDown, true);
+                document.addEventListener('keyup', _diagKbUp, true);
+
+                let _moveTimer = null;
+                _diagMouseMove = () => {
+                    _lit('MouseMove', true);
+                    if (_moveTimer) clearTimeout(_moveTimer);
+                    _moveTimer = setTimeout(() => _lit('MouseMove', false), 350);
+                    _announce('Pitch + Yaw — Steering');
+                };
+                document.addEventListener('mousemove', _diagMouseMove, { passive: true, capture: true });
+
+                _diagMouseDown = (e) => {
+                    if (e.button === 0) { _lit('MouseLeft', true); _announce('Fire Weapon'); setTimeout(() => _lit('MouseLeft', false), 220); }
+                    else if (e.button === 2) { _lit('MouseRight', true); _announce('Torpedo'); setTimeout(() => _lit('MouseRight', false), 220); }
+                };
+                document.addEventListener('mousedown', _diagMouseDown, true);
+
+                _diagScroll = (e) => {
+                    _lit('MouseScroll', true);
+                    _announce(e.deltaY < 0 ? 'Throttle Up' : 'Throttle Down');
+                    setTimeout(() => _lit('MouseScroll', false), 320);
+                };
+                document.addEventListener('wheel', _diagScroll, { passive: true, capture: true });
+            } else {
+                // Gamepad polling via RAF
+                const GP_KEY = { 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: 'ls', 11: 'rs', 12: '12', 13: '13', 14: '14', 15: '15' };
+                const _prev = {};
+                function _poll() {
+                    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+                    const pad = Array.from(pads).find(p => p && p.connected);
+                    if (pad) {
+                        pad.buttons.forEach((btn, i) => {
+                            const key = GP_KEY[i]; if (!key) return;
+                            const el = document.getElementById(`tut-k-${key}`); if (!el) return;
+                            const pressed = btn.pressed || btn.value > 0.5;
+                            if (pressed && !_prev[i]) { _lit(key, true); _announce(el.dataset.action || `Button ${i}`); }
+                            else if (!pressed && _prev[i]) _lit(key, false);
+                            _prev[i] = pressed;
+                        });
+                        // Analog sticks
+                        const lActive = Math.hypot(pad.axes[0] || 0, pad.axes[1] || 0) > 0.25;
+                        const rActive = Math.hypot(pad.axes[2] || 0, pad.axes[3] || 0) > 0.25;
+                        if (lActive && !_prev.ls) { _lit('ls', true); _announce('Throttle + Strafe (L-Stick)'); }
+                        else if (!lActive && _prev.ls) _lit('ls', false);
+                        if (rActive && !_prev.rs) { _lit('rs', true); _announce('Pitch + Yaw (R-Stick)'); }
+                        else if (!rActive && _prev.rs) _lit('rs', false);
+                        _prev.ls = lActive; _prev.rs = rActive;
+                    }
+                    if (document.getElementById('tutorial-overlay')) _diagRAF = requestAnimationFrame(_poll);
+                    else _diagRAF = null;
+                }
+                _diagRAF = requestAnimationFrame(_poll);
+            }
+        }
+
         function _buildTutorialHTML(controller) {
+            const tutVoiceOff = localStorage.getItem('sf_tut_voice_off') === '1';
+            const displayName = { keyboard: 'Keyboard + Mouse', xbox: 'Xbox Controller', playstation: 'PlayStation Controller', gamepad: 'Generic Gamepad', hotas: 'HOTAS / Flight Stick' }[controller] || controllerName;
             const kbControls = `
                 <div class="tut-section">
                     <div class="tut-section-title">FLIGHT CONTROLS — KEYBOARD + MOUSE</div>
@@ -1157,7 +1438,7 @@ const Starfighter = (function () {
                     <div style="text-align:center;margin-bottom:20px">
                         <div style="font-size:11px;letter-spacing:4px;color:#446688;margin-bottom:8px">UEDF FLIGHT ORIENTATION</div>
                         <div style="font-size:20px;color:#0ff;text-shadow:0 0 14px rgba(0,255,255,0.4)">PILOT BRIEFING</div>
-                        <div style="font-size:11px;color:#88aacc;margin-top:6px">Callsign: ${_cs()} | Controller: ${controllerName}</div>
+                        <div style="font-size:11px;color:#88aacc;margin-top:6px">Callsign: ${_cs()} | Controller: ${displayName}</div>
                     </div>
 
                     <div class="tut-section">
@@ -1188,6 +1469,17 @@ const Starfighter = (function () {
                         ${controller === 'keyboard' ? kbControls : gpControls}
                     </div>
 
+                    <div class="tut-section">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <div class="tut-section-title" style="margin-bottom:0">INTERACTIVE HARDWARE TESTER</div>
+                            <button id="tut-voice-toggle" class="tut-voice-chip${tutVoiceOff ? '' : ' active'}">${tutVoiceOff ? '🔇 VOICE: OFF' : '🔊 VOICE: ON'}</button>
+                        </div>
+                        <div id="tut-action-callout" class="tut-action-callout" style="color:#334455">— press any mapped control —</div>
+                        <div id="tut-hw-diagram" style="overflow-x:auto;padding:4px 0">
+                            ${controller === 'keyboard' ? _buildKbDiagramHTML() : _buildGpDiagramHTML(controller)}
+                        </div>
+                    </div>
+
                     <div class="tut-section" style="text-align:center;margin-top:16px">
                         <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
                             <button id="tut-practice" class="avtn-btn avtn-btn-green" tabindex="2">PRACTICE FLIGHT</button>
@@ -1201,49 +1493,50 @@ const Starfighter = (function () {
         overlay.innerHTML = _buildTutorialHTML(detectedController);
         document.body.appendChild(overlay);
 
-        // Controller dropdown changes displayed controls
-        const select = document.getElementById('tut-controller-select');
-        select.onchange = () => {
-            const section = document.getElementById('tut-controls-section');
-            const val = select.value;
-            if (val === 'keyboard') section.innerHTML = _buildTutorialHTML(val).match(/<div id="tut-controls-section">([\s\S]*?)<\/div>\s*<div class="tut-section" style="text-align/)[0] || '';
-            // Simpler: just rebuild the whole overlay
-            overlay.innerHTML = _buildTutorialHTML(val);
-            // Re-attach handlers
-            _attachTutorialHandlers();
-        };
-
         function _attachTutorialHandlers() {
             const sel = document.getElementById('tut-controller-select');
             if (sel) sel.onchange = () => {
+                _cleanupDiagram();
                 overlay.innerHTML = _buildTutorialHTML(sel.value);
                 _attachTutorialHandlers();
             };
             const practiceBtn = document.getElementById('tut-practice');
             const doneBtn = document.getElementById('tut-done');
             if (practiceBtn) practiceBtn.onclick = () => {
+                _cleanupDiagram();
                 overlay.remove();
                 _startPracticeMode();
             };
             if (doneBtn) doneBtn.onclick = () => {
+                _cleanupDiagram();
                 overlay.remove();
                 if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
                 _beginLaunchSequence();
             };
+            const voiceBtn = document.getElementById('tut-voice-toggle');
+            if (voiceBtn) voiceBtn.onclick = () => {
+                const off = localStorage.getItem('sf_tut_voice_off') === '1';
+                const nowOff = !off;
+                localStorage.setItem('sf_tut_voice_off', nowOff ? '1' : '0');
+                voiceBtn.textContent = nowOff ? '🔇 VOICE: OFF' : '🔊 VOICE: ON';
+                voiceBtn.classList.toggle('active', !nowOff);
+            };
+            // Wire diagram interaction for current controller
+            const sel2 = document.getElementById('tut-controller-select');
+            const curController = sel2 ? sel2.value : detectedController;
+            _attachDiagramListeners(curController);
         }
         _attachTutorialHandlers();
-
-        // Announcer narrates the briefing — game-state aware (text only, no bot TTS)
-        // The tutorial overlay itself provides all the controls info visually
 
         // Keyboard: Escape to skip
         overlay.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                _cleanupDiagram();
                 overlay.remove();
                 if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
                 _beginLaunchSequence();
             }
-        });
+        }, true);
 
         setTimeout(() => {
             const f = document.getElementById('tut-controller-select');
@@ -1686,19 +1979,54 @@ const Starfighter = (function () {
         else { const s = _snap(); addComm(_crew('deck'), `${_cs()}, clear of bay. ${s.totalHostile} contacts on scope.`, 'base'); }
     }
 
+    // ── Mission titles per wave (BFXG-008 Progression Bible) ──
+    const WAVE_TITLES = {
+        1: { name: 'FIRST FLIGHT', obj: 'Complete flight training. Destroy all target drones and return safely.' },
+        2: { name: 'BAPTISM OF FIRE', obj: 'Eliminate Vek Corsair scouts before they report fleet position.' },
+        3: { name: 'THE GAUNTLET', obj: 'Destroy the Vek outpost in the Kessler Belt. Boss: IRONJAW.' },
+        4: { name: 'SHIELD WALL', obj: 'Defend the fleet carrier Vanguard from three Vek attack waves. Boss: RAZORWING.' },
+        5: { name: 'INTO THE NEBULA', obj: 'Destroy the Vek staging depot hidden inside the Caldera Nebula. Boss: THE SHROUD.' },
+        6: { name: 'CONVOY AMBUSH', obj: 'Protect the civilian supply convoy from Vek raiders. Boss: DREADCLAW.' },
+        7: { name: 'MINEFIELD', obj: 'Navigate the Shattered Reach and disable the Vek mine control station. Boss: MINELORD KETH.' },
+        8: { name: 'CAPITAL STRIKE', obj: 'Destroy the Vek command ship Subjugator before the battle group mobilizes. Boss: THE SUBJUGATOR.' },
+        9: { name: 'DARK HORIZON', obj: 'Intercept Vek supply convoy in the Obsidian Corridor. Boss: GRAVITON.' },
+        10: { name: 'THE SWARM', obj: 'Survive Skorne first contact. Protect the Meridian Colony comms array. Boss: QUEEN THORAX.' },
+        11: { name: 'WRECKAGE AND RUIN', obj: 'Salvage Skorne bio-tech from wrecked hive ships. Watch for both factions. Boss: SCRAPJAW.' },
+        12: { name: 'BLACK OMEGA', obj: 'Infiltrate and destroy the Vek weapons research facility. Boss: WARDEN VOSS.' },
+        13: { name: 'SIEGE OF MERIDIAN', obj: 'Defend Meridian Colony. Protect 8 evacuation transports. Boss: WORLDBREAKER.' },
+        14: { name: 'THE DEEP BLACK', obj: 'Intercept the Skorne carrier group in deep space. Boss: THE PATRIARCH.' },
+        15: { name: 'GHOST PROTOCOL', obj: 'Infiltrate Vek command station in the gas giant rings. Classified. Boss: ARCHON ZAEL.' },
+        16: { name: 'MANIFOLD RIFT', obj: 'Stabilize the manifold rift before it destabilizes the sector. Boss: THE CONVERGENCE.' },
+        17: { name: 'ALLIANCE OF DESPERATION', obj: 'Joint operation with rogue Vek. Destroy Skorne hive nodes in Cygnus Threshold. Boss: THE OVERMIND.' },
+        18: { name: 'HEART OF THE HIVE', obj: 'Penetrate the Skorne megastructure and plant the manifold destabilizer at its core. Boss: CORE GUARDIAN.' },
+        19: { name: 'TOTAL WAR', obj: 'Lead the allied fleet. Destroy Vek capital ships and Skorne carriers. Protect Vanguard. Dual Boss: KRENN & SKARA.' },
+        20: { name: 'SINGULARITY', obj: 'Final confrontation. Defeat the Manifold Architect. Close the rift. Save the universe. Boss: MANIFOLD ARCHITECT (6 phases).' },
+    };
+
     function completeLanding() {
+        // ── Teardown dock cutscene ──
+        const dco = document.getElementById('dock-cutscene-overlay');
+        if (dco) {
+            dco.classList.remove('active');
+            dco.style.display = 'none';
+            const fadeEl = document.getElementById('dock-fade');
+            if (fadeEl) fadeEl.style.opacity = '0';
+        }
+        state.cutsceneCamPos = null;
+        state.cutsceneCamQuat = null;
+        state.cutsceneVelocity = null;
+        const _hud = document.getElementById('gameplay-hud');
+        const _rad = document.getElementById('radar-overlay');
+        if (_hud) { _hud.style.opacity = ''; _hud.style.display = 'none'; }
+        if (_rad) _rad.style.opacity = '';
+        document.getElementById('crosshair').style.display = 'none';
+        document.getElementById('ship-panel').style.display = 'none';
+
         state.phase = 'docking';
         const prevWave = state.wave;
         state.wave++;
-        state.player.torpedoes = dim('player.torpedoes');
 
-        // GDD §9.3: Shield restores, hull carries, fuel replenished
-        state.player.shields = dim('player.shields');
-        state.player.fuel = dim('player.fuel');
-        state.player.boostCooldown = 0;
-        state.player.boostActive = false;
-
-        // ── Purge any attached organisms on landing (baseship decontamination) ──
+        // ── Purge any attached organisms ──
         let purgedOrganisms = false;
         const ents = state.entities;
         for (let i = 0, len = ents.length; i < len; i++) {
@@ -1713,69 +2041,166 @@ const Starfighter = (function () {
             SFAnnouncer.onDecontamination();
             if (window.SFAudio) SFAudio.playSound('comm_beep');
         }
-        state._emergencyRTB = false; // reset emergency state
+        state._emergencyRTB = false;
         const rtbBtn = document.getElementById('btn-rtb');
         if (rtbBtn) rtbBtn.style.display = 'none';
 
-        // Wave debrief display
-        const countdownDisplay = document.getElementById('countdown-display');
-        countdownDisplay.style.display = 'block';
-        countdownDisplay.style.fontSize = '1.8em';
-        countdownDisplay.style.color = '#00ff88';
-        // ── Progression: award wave-complete XP ──
+        // ── Music to closing theme ──
+        if (window.SFMusic) { SFMusic.setSection('closing-theme'); SFMusic.setIntensity(0.1); }
+
+        // ── Snapshot hull before repair, then do full refit ──
+        const hullBefore = Math.round(state.player.hull);
+        const hullMax = Math.round(dim('player.hull') + 25); // partial repair
+        const shldMax = Math.round(dim('player.shields'));
+        const fuelMax = Math.round(dim('player.fuel'));
+        const torpMax = dim('player.torpedoes');
+        state.player.hull = Math.min(dim('player.hull'), state.player.hull + 25);
+        state.player.torpedoes = torpMax;
+        state.player.shields = shldMax;
+        state.player.fuel = fuelMax;
+        state.player.boostCooldown = 0;
+        state.player.boostActive = false;
+        // Resupply baseship
+        state.baseship.hull = Math.min(dim('baseship.hull'), state.baseship.hull + dim('baseship.repairHull'));
+        state.baseship.shields = Math.min(dim('baseship.shields'), state.baseship.shields + dim('baseship.repairShields'));
+
+        // ── Progression: capture pre-award state, then award ──
+        let xpEarned = 0, crEarned = 0, rankedUp = false, newRankName = '';
+        let progressBefore = 0, progressAfter = 0, rankCurName = '', rankNextName = '';
         if (window.SFProgression) {
-            SFProgression.awardEvent('wave_complete');
-            // Check for no-damage bonus
+            const cBefore = SFProgression.career();
+            const xpBefore = cBefore.xp;
+            const crBefore = cBefore.credits;
+            progressBefore = SFProgression.getRankProgress();
+
+            // Award events
+            const r1 = SFProgression.awardEvent('wave_complete');
             if (state.missionStats.damageTaken === 0) SFProgression.awardEvent('wave_no_damage');
+
+            const cAfter = SFProgression.career();
+            xpEarned = cAfter.xp - xpBefore;
+            crEarned = cAfter.credits - crBefore;
+            progressAfter = SFProgression.getRankProgress();
+
+            const curRank = SFProgression.getRank();
+            const nxtRank = SFProgression.getNextRank ? SFProgression.getNextRank() : null;
+            rankCurName = curRank ? curRank.name : 'ENSIGN';
+            rankNextName = nxtRank ? nxtRank.name : 'MAX RANK';
+
+            rankedUp = r1 && r1.ranked;
+            newRankName = r1 && r1.newRank ? r1.newRank.name : rankCurName;
         }
 
-        // Build upgrade shop HTML for between-wave screen
-        let shopHTML = '';
-        if (window.SFProgression) {
-            const upgrades = SFProgression.getPurchasableUpgrades();
-            const cr = SFProgression.career().credits;
-            if (upgrades.length > 0) {
-                shopHTML = '<div style="margin-top:8px;font-size:0.4em;color:#88ccee;letter-spacing:1px;">UPGRADE BAY</div>';
-                shopHTML += '<div style="font-size:0.35em;color:#556;margin-bottom:6px;">Credits: ₡' + cr + '</div>';
-                shopHTML += '<div id="upgrade-shop" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:600px;margin:0 auto;">';
-                for (const u of upgrades.slice(0, 6)) { // max 6 shown
-                    const canAfford = cr >= u.cost;
-                    shopHTML += '<div onclick="window._sfBuyUpgrade && window._sfBuyUpgrade(\'' + u.id + '\')" '
-                        + 'style="cursor:' + (canAfford ? 'pointer' : 'not-allowed') + ';padding:6px 10px;background:rgba(0,20,40,' + (canAfford ? '0.85' : '0.5') + ');border:1px solid ' + (canAfford ? 'rgba(0,255,255,0.3)' : 'rgba(100,100,100,0.3)') + ';border-radius:4px;font-size:0.4em;text-align:left;min-width:120px;">'
-                        + '<div style="color:' + (canAfford ? '#0ff' : '#556') + ';font-weight:bold;">' + u.name + '</div>'
-                        + '<div style="color:#88aacc;font-size:0.9em;">' + u.desc + '</div>'
-                        + '<div style="color:' + (canAfford ? '#ffaa00' : '#664433') + ';margin-top:3px;">₡' + u.cost + '</div>'
-                        + '</div>';
-                }
-                shopHTML += '</div>';
+        // ── Weapon unlocks (compare prev wave vs new wave) ──
+        const _prevUnlocked = _getUnlockedWeaponCount(prevWave);
+        const _newUnlocked = _getUnlockedWeaponCount(state.wave);
+        const _wepNames = ['Laser Cannon', 'Spread Shot', 'Proton Torpedo', 'EMP Pulse'];
+        const newWeapon = _newUnlocked > _prevUnlocked ? _wepNames[_newUnlocked - 1] : null;
+
+        // ── Accuracy calc ──
+        const ms = state.missionStats;
+        const acc = ms.shotsFired > 0 ? Math.round((ms.shotsHit / ms.shotsFired) * 100) : 0;
+        const flightSec = ms.startTime ? Math.round((performance.now() - ms.startTime) / 1000) : 0;
+        const flightMin = Math.floor(flightSec / 60);
+        const flightSs = flightSec % 60;
+
+        // ── Populate debrief overlay ──
+        const overlay = document.getElementById('bay-debrief');
+        if (overlay) {
+            // Header
+            const titleInfo = WAVE_TITLES[prevWave] || { name: 'MISSION', obj: 'Sortie complete.' };
+            const el = (id) => document.getElementById(id);
+            el('bdr-wave-title').textContent = `WAVE ${prevWave} COMPLETE`;
+            el('bdr-mission-name').textContent = titleInfo.name;
+
+            // Stats rows
+            el('bdr-stats-rows').innerHTML =
+                _bdrStatRow('KILLS', state.kills, state.kills > 10 ? 'green' : '') +
+                _bdrStatRow('KILL SCORE', state.score, '') +
+                _bdrStatRow('ACCURACY', acc + '%', acc >= 60 ? 'green' : acc >= 30 ? 'yellow' : 'red') +
+                _bdrStatRow('HULL ENTERING', hullBefore + '%', hullBefore > 60 ? 'green' : hullBefore > 30 ? 'yellow' : 'red') +
+                _bdrStatRow('FLIGHT TIME', `${flightMin}m ${flightSs < 10 ? '0' : ''}${flightSs}s`, '') +
+                _bdrStatRow('DAMAGE TAKEN', Math.round(ms.damageTaken), ms.damageTaken === 0 ? 'green' : '');
+
+            // Rank progress bar
+            el('bdr-rank-cur').textContent = rankCurName.toUpperCase();
+            el('bdr-rank-next').textContent = rankNextName.toUpperCase();
+            el('bdr-xp-delta').textContent = `+${xpEarned} XP  this wave`;
+            el('bdr-xp-earned').textContent = `+${xpEarned}`;
+            el('bdr-cr-earned').textContent = `+₡${crEarned}`;
+
+            if (state.missionStats.damageTaken === 0) {
+                el('bdr-bonus-row').style.display = 'flex';
             }
-        }
 
-        countdownDisplay.innerHTML = `WAVE ${prevWave} COMPLETE<br>` +
-            `<span style="font-size:0.5em;color:#88ccff">` +
-            `Kills: ${state.kills} | Score: ${state.score}<br>` +
-            `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / dim('baseship.hull')) * 100)}%` +
-            `</span><br>` +
-            shopHTML +
-            `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
+            const career = window.SFProgression ? SFProgression.career() : { credits: 0 };
+            el('bdr-cr-balance').textContent = `₡${career.credits}`;
+            el('bdr-shop-credits').textContent = `₡${career.credits} AVAILABLE`;
 
-        // PA debrief
-        SFAnnouncer.onWaveComplete(prevWave);
+            // Rank-up banner
+            if (rankedUp) {
+                el('bdr-rankup').classList.add('visible');
+                el('bdr-rankup-name').textContent = newRankName.toUpperCase();
+            }
 
-        // GDD §9.3: Music intensity drops to ambient, rebuilds next wave
-        if (window.SFMusic) {
-            SFMusic.setSection('closing-theme');
-            SFMusic.setIntensity(0.1);
-        }
-
-        if (state.wave >= 2) {
+            // Animate XP bar after short delay
             setTimeout(() => {
-                SFAnnouncer.onNextWaveIntel();
-            }, 3000);
+                el('bdr-xp-fill').style.width = Math.round(progressAfter * 100) + '%';
+            }, 400);
+
+            // Ship status animated bars
+            const hullPct = Math.round((state.player.hull / dim('player.hull')) * 100);
+            el('bdr-hull-pct').textContent = hullPct + '%';
+            el('bdr-shld-pct').textContent = '100%';
+            el('bdr-fuel-pct').textContent = '100%';
+            el('bdr-torp-val').textContent = torpMax + ' / ' + torpMax;
+            setTimeout(() => {
+                el('bdr-hull-fill').style.width = hullPct + '%';
+                el('bdr-shld-fill').style.width = '100%';
+                el('bdr-fuel-fill').style.width = '100%';
+                el('bdr-torp-fill').style.width = '100%';
+            }, 600);
+
+            // New weapon/ability unlock
+            if (newWeapon) {
+                const sec = el('bdr-unlocks-section');
+                sec.style.display = 'block';
+                el('bdr-unlocks-list').innerHTML =
+                    `<div class="bdr-unlock-item">
+                        <div class="bdr-unlock-icon">⚡</div>
+                        <div class="bdr-unlock-text">
+                            <div class="bdr-unlock-name">${newWeapon}</div>
+                            <div class="bdr-unlock-desc">New weapon unlocked. Cycle weapons with [T].</div>
+                        </div>
+                        <div class="bdr-unlock-new">NEW</div>
+                    </div>`;
+            }
+
+            // Next mission card
+            const nextTitleInfo = WAVE_TITLES[state.wave] || { name: 'COMBAT PATROL', obj: 'Engage and destroy all hostile forces.' };
+            el('bdr-next-wave-num').textContent = `WAVE ${state.wave}`;
+            el('bdr-next-title').textContent = nextTitleInfo.name;
+            el('bdr-next-objective').textContent = nextTitleInfo.obj;
+            el('bdr-next-wave-num2').textContent = state.wave;
+
+            // Upgrade shop
+            _bdrRebuildShop();
+
+            // Show the overlay
+            overlay.classList.add('active');
         }
 
-        // GDD §9.3: 8s docked, then show launch button for next wave
-        setTimeout(() => {
+        // PA debrief (announcer runs in background)
+        SFAnnouncer.onWaveComplete(prevWave);
+        if (state.wave >= 2) {
+            setTimeout(() => { SFAnnouncer.onNextWaveIntel(); }, 4000);
+        }
+
+        // ── Launch handler — triggered by "LAUNCH" button in debrief panel ──
+        function _doBayTransition() {
+            const overlay = document.getElementById('bay-debrief');
+            if (overlay) { overlay.classList.remove('active'); overlay.style.display = 'none'; }
+
             state.player.position.set(0, -32, 50);
             state.player.velocity.set(0, 0, 0);
             state.player.quaternion.set(0, 0, 0, 1);
@@ -1783,7 +2208,7 @@ const Starfighter = (function () {
             state.player.pitch = 0;
             state.player.yaw = 0;
             state.player.roll = 0;
-            state.phase = 'bay-ready';  // Wait for player to push launch button again
+            state.phase = 'bay-ready';
             if (window.SFMusic) SFMusic.setSection('launch-bay');
             state.launchTimer = 0;
             state._launchAudioPlayed = false;
@@ -1792,39 +2217,92 @@ const Starfighter = (function () {
             state.cutsceneCamPos = null;
             state.cutsceneCamQuat = null;
             state.cutsceneVelocity = null;
-            state.player.hull = Math.min(dim('player.hull'), state.player.hull + 25); // partial hull repair
 
-            // Resupply baseship if damaged
-            state.baseship.hull = Math.min(dim('baseship.hull'), state.baseship.hull + dim('baseship.repairHull'));
-            state.baseship.shields = Math.min(dim('baseship.shields'), state.baseship.shields + dim('baseship.repairShields'));
-
-            // Audio transition back to bay
             if (window.SFAudio) {
                 SFAudio.stopCockpitHum();
                 SFAudio.stopThrustRumble();
                 SFAudio.stopStrafeHiss();
                 SFAudio.startBayAmbience();
             }
+            if (window.SF3D) { SF3D.setLaunchPhase(true); SF3D.showLaunchBay(); }
 
-            // Setup for next launch
-            if (window.SF3D) {
-                SF3D.setLaunchPhase(true);
-                SF3D.showLaunchBay();
-            }
-
-            // Show red launch button for next wave
             const launchBtn = document.getElementById('launch-btn');
             if (launchBtn) launchBtn.style.display = 'block';
-            document.getElementById('countdown-display').style.display = 'block';
-            document.getElementById('countdown-display').innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>';
+            const cd = document.getElementById('countdown-display');
+            if (cd) { cd.style.display = 'block'; cd.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>'; }
 
             SFAnnouncer.onBayReady();
 
-            document.getElementById('ship-panel').style.display = 'none';
-            document.getElementById('gameplay-hud').style.display = 'none';
-            document.getElementById('crosshair').style.display = 'none';
-        }, 8000);
+            // Reset per-wave mission stats
+            state.missionStats.kills = 0;
+            state.missionStats.shotsFired = 0;
+            state.missionStats.shotsHit = 0;
+            state.missionStats.damageDealt = 0;
+            state.missionStats.damageTaken = 0;
+            state.missionStats.wingmenSaved = 0;
+            state.missionStats.wingmenLost = 0;
+            state.missionStats.startTime = 0;
+        }
+
+        window._bdrLaunch = function () {
+            window._bdrLaunch = null; // one-shot
+            _doBayTransition();
+        };
     }
+
+    // ── Bay-debrief helper: single stat row HTML ──
+    function _bdrStatRow(label, val, cls) {
+        return `<div class="bdr-stat-row">
+            <span class="bdr-stat-label">${label}</span>
+            <span class="bdr-stat-val ${cls}">${val}</span>
+        </div>`;
+    }
+
+    // ── Bay-debrief: rebuild upgrade shop list (also called after purchase) ──
+    function _bdrRebuildShop() {
+        if (!window.SFProgression) return;
+        const upgrades = SFProgression.getPurchasableUpgrades();
+        const shopList = document.getElementById('bdr-shop-list');
+        const shopEmpty = document.getElementById('bdr-shop-empty');
+        const shopCr = document.getElementById('bdr-shop-credits');
+        const career = SFProgression.career();
+        if (shopCr) shopCr.textContent = `₡${career.credits} AVAILABLE`;
+        const crBal = document.getElementById('bdr-cr-balance');
+        if (crBal) crBal.textContent = `₡${career.credits}`;
+        if (!shopList) return;
+        if (upgrades.length === 0) {
+            shopList.innerHTML = '';
+            if (shopEmpty) shopEmpty.style.display = 'block';
+            return;
+        }
+        if (shopEmpty) shopEmpty.style.display = 'none';
+        shopList.innerHTML = upgrades.slice(0, 8).map(u => {
+            const canAfford = career.credits >= u.cost;
+            return `<div class="bdr-shop-item${canAfford ? '' : ' cant-afford'}"
+                onclick="window._sfBayBuy && window._sfBayBuy('${u.id}')">
+                <div class="bdr-shop-item-left">
+                    <div class="bdr-shop-item-name">${u.name}</div>
+                    <div class="bdr-shop-item-desc">${u.desc}</div>
+                </div>
+                <div class="bdr-shop-item-cost">₡${u.cost}</div>
+            </div>`;
+        }).join('');
+    }
+
+    window._sfBayBuy = function (upgradeId) {
+        if (!window.SFProgression) return;
+        const result = SFProgression.purchaseUpgrade(upgradeId);
+        if (result.success) {
+            if (window.SFAudio) SFAudio.playSound('comm_beep');
+            SFProgression.applyUpgradesToPlayer(state.player, () => { });
+            _bdrRebuildShop();
+            const career = SFProgression.career();
+            const shopCr = document.getElementById('bdr-shop-credits');
+            if (shopCr) shopCr.textContent = `₡${career.credits} AVAILABLE`;
+            const crBal = document.getElementById('bdr-cr-balance');
+            if (crBal) crBal.textContent = `₡${career.credits}`;
+        }
+    };
 
     const MANIFOLD_ARCHETYPES = {
         enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 30, hullWave: 5, hullField: 4, speedBase: 160, speedWave: 10, speedField: 10, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
@@ -1833,6 +2311,7 @@ const Starfighter = (function () {
         predator: { x: 2.2, y: 1.9, waveX: 0.1, waveY: 0.12, hullBase: 500, hullWave: 60, hullField: 20, speedBase: 280, speedWave: 10, speedField: 12, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
         dreadnought: { x: 3.6, y: 2.8, waveX: 0.08, waveY: 0.1, hullBase: 2000, hullWave: 200, hullField: 60, speedBase: 30, speedWave: 2, speedField: 3, shieldsBase: 1000, shieldsWave: 100, shieldsField: 40 },
         'alien-baseship': { x: 3.1, y: 2.4, waveX: 0.09, waveY: 0.11, hullBase: 1000, hullWave: 500, hullField: 80, speedBase: 40, speedWave: 3, speedField: 5, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        'hive-queen': { x: 4.8, y: 3.6, waveX: 0.09, waveY: 0.07, hullBase: 5000, hullWave: 300, hullField: 120, speedBase: 18, speedWave: 0.5, speedField: 2, shieldsBase: 2500, shieldsWave: 150, shieldsField: 80 },
         wingman: { x: 1.05, y: 1.1, waveX: 0.06, waveY: 0.09, hullBase: 60, hullWave: 5, hullField: 3, speedBase: 180, speedWave: 6, speedField: 8, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
     };
 
@@ -1869,230 +2348,355 @@ const Starfighter = (function () {
         };
     }
 
-    function spawnWave() {
-        // ── Wave 1: Training wave — gentle introduction for new players ──
-        if (state.wave === 1) {
-            for (let i = 0; i < 3; i++) {
-                const r = 3000 + Math.random() * 1500; // spawn close — immediate action
-                const theta = (Math.PI * 2 / 3) * i + Math.random() * 0.4; // spread evenly, slight jitter
-                const phi = Math.PI / 2 + (Math.random() - 0.5) * 0.6; // cluster near horizon, easier to spot
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
+    // ══════════════════════════════════════════════════════════════
+    // LEVEL / WEAPON PROGRESSION HELPERS
+    // ══════════════════════════════════════════════════════════════
 
-                const e = new Entity('enemy', x, y, z);
-                const profile = deriveCombatProfile('enemy', state.wave, { training: true, speedScale: 0.9 });
-                e.hull = profile.hull;
-                e.maxSpeed = profile.maxSpeed;
-                e._manifoldDerivation = profile.trace;
-                state.entities.push(e);
-            }
-            SFAnnouncer.onWaveStart();
-            return; // skip all advanced enemy types for wave 1
-        }
+    // Returns number of weapon slots unlocked at a given wave/level:
+    //   Level 1 (wave 1): LASER only
+    //   Level 2 (wave 2): + SPREAD SHOT
+    //   Level 3 (wave 3): + PROTON TORPEDO (can now attack enemy base ships)
+    //   Level 4 (wave 4+): + EMP PULSE
+    function _getUnlockedWeaponCount(wave) {
+        if (wave >= 4) return 4;  // All: LASER, SPREAD, TORP, EMP
+        if (wave >= 3) return 3;  // LASER, SPREAD, TORP
+        if (wave >= 2) return 2;  // LASER, SPREAD
+        return 1;                 // LASER only
+    }
 
-        const count = 5 + state.wave * 2;
-        // Drones (basic enemies)
-        const droneCount = Math.max(2, count - Math.floor(state.wave * 0.5));
-        for (let i = 0; i < droneCount; i++) {
-            const r = 3000 + Math.random() * 2000;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos((Math.random() * 2) - 1);
-            const x = r * Math.sin(phi) * Math.cos(theta);
-            const y = r * Math.sin(phi) * Math.sin(theta);
-            const z = r * Math.cos(phi);
+    // Enemy base fire cooldown (seconds) — decreases each wave for escalating difficulty
+    // Wave 1: very slow (3.5s) → Wave 6+: fast (0.75s)
+    function _levelFireCooldown(wave) {
+        return Math.max(0.75, 3.5 - (wave - 1) * 0.55);
+    }
 
-            const e = new Entity('enemy', x, y, z);
-            const profile = deriveCombatProfile('enemy', state.wave);
+    // Spawn a tight cluster of enemies around a world-space center point.
+    // Enemies share a clusterId so radar / wingman comms can reference them.
+    function _spawnCluster(clusterId, clusterLabel, cx, cy, cz, enemyType, count, wave, opts) {
+        state.clusters.push({ id: clusterId, label: clusterLabel, center: { x: cx, y: cy, z: cz }, total: count, alive: count });
+        const spread = 350; // formation spread radius
+        for (let i = 0; i < count; i++) {
+            const ax = cx + (Math.random() - 0.5) * spread * 2;
+            const ay = cy + (Math.random() - 0.5) * spread * 0.6;
+            const az = cz + (Math.random() - 0.5) * spread * 2;
+            const e = new Entity(enemyType, ax, ay, az);
+            const profile = deriveCombatProfile(enemyType, wave, opts || {});
             e.hull = profile.hull;
             e.maxSpeed = profile.maxSpeed;
+            e.shields = profile.shields || 0;
             e._manifoldDerivation = profile.trace;
+            e._clusterId = clusterId;
+            // Per-level fire rate (harder each wave)
+            e._fireCooldownBase = _levelFireCooldown(wave);
+            // Wave 2+: interceptors always spread-fire, drones 50% chance
+            e._useSpread = wave >= 2 && (enemyType === 'interceptor' || Math.random() > 0.5);
+            // Type-specific setup
+            if (enemyType === 'interceptor') {
+                e.radius = dim('entity.interceptor.radius');
+            } else if (enemyType === 'bomber') {
+                e.radius = dim('entity.bomber.radius');
+                e._bombCooldown = 0;
+                e._bombInterval = dim('enemy.bomber.bombInterval');
+            }
             state.entities.push(e);
         }
+    }
 
-        // Interceptors spawn wave 2+ — fast flankers, target the player
-        if (state.wave >= 2) {
-            const intCount = Math.min(4, Math.floor(state.wave / 2));
-            for (let i = 0; i < intCount; i++) {
-                const r = 4000 + Math.random() * 2000;
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
-
-                const int = new Entity('interceptor', x, y, z);
-                const profile = deriveCombatProfile('interceptor', state.wave);
-                int.hull = profile.hull;
-                int.shields = profile.shields;
-                int.maxSpeed = profile.maxSpeed;
-                int._manifoldDerivation = profile.trace;
-                int.radius = dim('entity.interceptor.radius');
-                state.entities.push(int);
-            }
+    // Enemy spread shot — 3-round fan fired by wave 2+ enemies alongside their laser
+    function _fireEnemySpread(entity) {
+        if (_countType('laser') + 3 >= dim('cap.lasers')) return;
+        for (let s = 0; s < 3; s++) {
+            const rx = (Math.random() - 0.5) * 0.18;
+            const ry = (Math.random() - 0.5) * 0.18;
+            _q1.setFromEuler(new THREE.Euler(rx, ry, 0));
+            _v1.set(0, 0, -8).applyQuaternion(entity.quaternion);
+            const l = new Entity('laser',
+                entity.position.x + _v1.x,
+                entity.position.y + _v1.y,
+                entity.position.z + _v1.z);
+            l.quaternion.copy(entity.quaternion).multiply(_q1);
+            _v1.set(0, 0, -dim('weapon.laser.speed') * 0.85).applyQuaternion(l.quaternion);
+            l.velocity.copy(_v1);
+            l.owner = 'enemy';
+            l.radius = dim('weapon.laser.radius');
+            l.maxAge = dim('weapon.laser.maxAge') || 2;
+            l._spawnTime = state.elapsed;
+            l.damage = Math.round(dim('weapon.laser.damage') * 0.55); // reduced per-pellet, compensated by volume
+            state.entities.push(l);
+            if (window.SF3D) SF3D.spawnLaser(l);
         }
+        if (window.SFAudio) SFAudio.playSound('laser');
+    }
 
-        // Bombers spawn wave 3+ — slow, beeline for baseship
-        if (state.wave >= 3) {
-            const bombCount = Math.min(4, Math.floor((state.wave - 2) / 1));
-            for (let i = 0; i < bombCount; i++) {
-                const r = 5000 + Math.random() * 2000;
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
-
-                const bm = new Entity('bomber', x, y, z);
-                const profile = deriveCombatProfile('bomber', state.wave, { speedScale: 0.98 });
-                bm.hull = profile.hull;
-                bm.shields = profile.shields;
-                bm.maxSpeed = profile.maxSpeed;
-                bm._manifoldDerivation = profile.trace;
-                bm.radius = dim('entity.bomber.radius');
-                bm._bombCooldown = 0;
-                bm._bombInterval = dim('enemy.bomber.bombInterval');
-                state.entities.push(bm);
-            }
+    // ── Wingman cluster bearing callout ──
+    // Announces closest active cluster bearing, range, and bogey count.
+    function _wingmanClusterComm() {
+        if (!state.player || state.phase !== 'combat') return;
+        const activeClusters = state.clusters.filter(cl => cl.alive > 0);
+        if (activeClusters.length === 0) return;
+        const p = state.player.position;
+        let best = activeClusters[0];
+        let bestDist = Infinity;
+        for (const cl of activeClusters) {
+            const d = Math.hypot(cl.center.x - p.x, cl.center.y - p.y, cl.center.z - p.z);
+            if (d < bestDist) { bestDist = d; best = cl; }
         }
+        const bearing = Math.round(((Math.atan2(best.center.x - p.x, -(best.center.z - p.z)) * 180 / Math.PI) + 360) % 360);
+        const rangePretty = Math.round(bestDist / 100) * 100;
+        const others = activeClusters.length - 1;
+        const tail = others > 0 ? ` ${others} other cluster${others > 1 ? 's' : ''} active.` : ' Last cluster — finish them.';
+        const wingmen = state.entities.filter(e => e.type === 'wingman' && !e.markedForDeletion);
+        const caller = wingmen.length > 0 ? (wingmen[0].callsign || 'Alpha-2') : 'Alpha-2';
+        addComm(caller, `Cluster ${best.label} — bearing ${bearing}°, range ${rangePretty}. ${best.alive} bogey${best.alive !== 1 ? 's' : ''}.${tail}`, 'info');
+        _updateClusterHUD();
+    }
 
-        // Alien Baseship spawns on wave 2+, attacks friendly baseship
-        if (state.wave >= 2) {
-            const r = 7000 + Math.random() * 3000;
+    // Initial cluster announcement at wave start (fires after launch delay)
+    function _clusterStartComm() {
+        setTimeout(() => {
+            if (state.clusters.length === 0) return;
+            const names = state.clusters.map(cl => cl.label).join(', ');
+            const total = state.clusters.reduce((s, cl) => s + cl.total, 0);
+            addComm(_crew('tactical'), `${state.clusters.length} enemy cluster${state.clusters.length > 1 ? 's' : ''} on scope: ${names}. ${total} hostiles total. Engage at will.`, 'warning');
+            _updateClusterHUD();
+            // Immediately give first bearing call
+            state._clusterCallTimer = 3;
+        }, 4500);
+    }
+
+    // Render active cluster status below radar — shows label + remaining bogeys as dots
+    function _updateClusterHUD() {
+        let el = document.getElementById('cluster-status');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'cluster-status';
+            el.style.cssText = 'position:fixed;bottom:155px;right:14px;z-index:200;pointer-events:none;font-family:monospace;font-size:10px;text-align:right;line-height:1.5;';
+            document.body.appendChild(el);
+        }
+        const active = state.clusters.filter(cl => cl.alive > 0);
+        if (active.length === 0) { el.innerHTML = ''; return; }
+        el.innerHTML = '<div style="color:#556;letter-spacing:1px;margin-bottom:2px;">CLUSTERS</div>' +
+            active.map(cl => {
+                const alive = '●'.repeat(cl.alive);
+                const dead = '<span style="color:#333">' + '○'.repeat(Math.max(0, cl.total - cl.alive)) + '</span>';
+                return `<div style="color:#0ff;">${cl.label} <span style="letter-spacing:2px;">${alive}${dead}</span></div>`;
+            }).join('');
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // CLUSTER-BASED WAVE SPAWNER
+    // GDD §9.2 — waves 1-6 explicit, 7+ procedural
+    // Each enemy group spawns as a tight cluster 5500-9000 units out.
+    // Player is NEVER surrounded at launch — clusters spread around the arena.
+    // ══════════════════════════════════════════════════════════════
+
+    function spawnWave() {
+        state.clusters = []; // clear previous cluster tracking
+        let _nextId = 0;
+        const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
+        let _nameIdx = 0;
+        const nextLabel = () => ({ id: _nextId++, label: NAMES[_nameIdx++ % NAMES.length] });
+
+        // Helper: compute a cluster center at radial distance r, evenly spread around arena
+        const clusterPos = (r, thetaBase, phiOff) => {
+            const theta = thetaBase + (Math.random() - 0.5) * 0.5;
+            const phi = Math.PI / 2 + (phiOff || 0) + (Math.random() - 0.5) * 0.7;
+            return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi) };
+        };
+
+        // Shared: spawn support ships and AI wingmen (called for all waves)
+        const spawnSupportAndWingmen = () => {
+            _despawnSupportShips();
+            if (state.wave >= 3) _spawnTanker();
+            if (state.wave >= 2) _spawnMedic();
+            if (state.aiWingmen) {
+                const ANPC = window.SFAnpc;
+                const rosterKeys = state.wave >= 5
+                    ? ['hotshot', 'ice', 'motherhen', 'nightshade']
+                    : state.wave >= 3 ? ['hotshot', 'ice', 'motherhen'] : ['hotshot', 'ice'];
+                for (let i = 0; i < rosterKeys.length; i++) {
+                    const offset = new THREE.Vector3(
+                        (i === 0 ? -150 : i === 1 ? 150 : i === 2 ? 0 : -200),
+                        (i === 2 ? 80 : i === 3 ? -40 : 0),
+                        200 + Math.random() * 100
+                    );
+                    const spawnPos = state.player.position.clone().add(offset);
+                    const w = new Entity('wingman', spawnPos.x, spawnPos.y, spawnPos.z);
+                    const profile = deriveCombatProfile('wingman', state.wave);
+                    w.hull = profile.hull;
+                    w.maxSpeed = profile.maxSpeed;
+                    w._manifoldDerivation = profile.trace;
+                    const key = rosterKeys[i];
+                    if (ANPC) {
+                        const npc = ANPC.spawn(key);
+                        w.callsign = npc.callsign;
+                        w._anpc = npc;
+                        w._anpcKey = key;
+                        const pers = npc.personality;
+                        w.maxSpeed = Math.round(w.maxSpeed * (0.85 + pers.E * 0.3));
+                        w.hull = Math.round(w.hull * (0.9 + pers.C * 0.2));
+                    } else {
+                        w.callsign = ['Alpha-2', 'Alpha-3', 'Alpha-4', 'Alpha-5'][i];
+                    }
+                    w.quaternion.copy(state.player.quaternion);
+                    state.entities.push(w);
+                }
+            }
+        };
+
+        // Helper: spawn alien-baseship as a roaming objective (wave 3+: torpedoes unlock)
+        const spawnAlienBaseship = () => {
+            const r = 8000 + Math.random() * 3000;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
-            const x = r * Math.sin(phi) * Math.cos(theta);
-            const y = r * Math.sin(phi) * Math.sin(theta);
-            const z = r * Math.cos(phi);
-
-            const ab = new Entity('alien-baseship', x, y, z);
+            const ab = new Entity('alien-baseship',
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.sin(phi) * Math.sin(theta),
+                r * Math.cos(phi));
             const profile = deriveCombatProfile('alien-baseship', state.wave, { speedScale: 1.0 });
             ab.hull = profile.hull;
             ab.maxSpeed = profile.maxSpeed;
             ab._manifoldDerivation = profile.trace;
             ab.radius = dim('entity.alien-baseship.radius');
             state.entities.push(ab);
-        }
+        };
 
-        // Predator Drones spawn on wave 4+ — fast, armored, plasma-spewing hunters
-        if (state.wave >= 4) {
-            const predCount = Math.min(3, Math.floor((state.wave - 3) / 2) + 1); // 1 at wave 4, 2 at wave 6, 3 at wave 8+
-            for (let i = 0; i < predCount; i++) {
-                const r = 5000 + Math.random() * 3000;
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
+        // ══════════════════════════════════════════════════════════════
+        // MANIFOLD-DRIVEN WAVE COMPOSITION
+        // Every wave produces a unique enemy layout using z=xy² manifold math.
+        // Wave tier constraints (weapon unlocks) are preserved but composition
+        // within each tier is fully randomised — no two waves are alike.
+        //
+        // x = wave intensity  (0.14 per wave, caps near 1.0)
+        // y = chaos seed      (random 0.55–1.0, rolled fresh every wave)
+        // z_linear  = x*y     → proportional scaling (cluster count / base size)
+        // z_asymm   = x*y²    → escalation factor (harder unit ratios, predator count)
+        // ══════════════════════════════════════════════════════════════
+        {
+            const w = state.wave;
+            const _mx = Math.min(1.2, w * 0.14);               // wave intensity
+            const _my = 0.55 + Math.random() * 0.45;           // chaos seed — different every wave
+            const _mzL = _mx * _my;                             // linear manifold
+            const _mzA = _mx * _my * _my;                       // asymmetric manifold (escalation)
 
-                const pred = new Entity('predator', x, y, z);
-                const profile = deriveCombatProfile('predator', state.wave);
-                pred.hull = profile.hull;
-                pred.shields = profile.shields;
-                pred.maxSpeed = profile.maxSpeed;
-                pred._manifoldDerivation = profile.trace;
-                pred.radius = dim('entity.predator.radius');
-                pred._turnRate = 0.4;                 // slow turn rate (not nimble)
-                pred._plasmaTimer = 0;                // cooldown between plasma bursts
-                pred._plasmaCooldown = dim('enemy.predator.plasmaCooldown');
-                pred._consumeTarget = null;           // entity it's trying to eat
-                pred._consuming = false;              // currently consuming a kill
-                pred._consumeTimer = 0;
-                pred._eggTimer = 8 + Math.random() * 5; // time until first egg lay
-                state.entities.push(pred);
-            }
-        }
+            // ── Enemy budget: total enemies this wave ──
+            // Wave 1: ~4–6 enemies. Wave 4: ~18–26. Wave 8+: 36+
+            const budget = Math.round(2 + w * 3.5 + _mzA * w * 5);
 
-        // Dreadnought spawns on wave 6+ (boss wave) — GDD: every 5th wave after W6
-        if (state.wave >= 6 && (state.wave === 6 || (state.wave - 6) % 5 === 0)) {
-            const r = 8000 + Math.random() * 3000;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos((Math.random() * 2) - 1);
-            const x = r * Math.sin(phi) * Math.cos(theta);
-            const y = r * Math.sin(phi) * Math.sin(theta);
-            const z = r * Math.cos(phi);
+            // ── Cluster count: grows with wave + chaos ──
+            // Wave 1: 2. Wave 2–3: 2–3. Wave 4–5: 3–4. Wave 6+: up to 6.
+            const rawClusters = 2 + Math.round(_mzL * (w * 0.7));
+            const clusterCount = Math.max(2, Math.min(6, rawClusters));
 
-            const dn = new Entity('dreadnought', x, y, z);
-            const profile = deriveCombatProfile('dreadnought', state.wave - 5);
-            dn.hull = profile.hull;
-            dn.shields = profile.shields;
-            dn.maxSpeed = profile.maxSpeed;
-            dn._manifoldDerivation = profile.trace;
-            dn.radius = dim('entity.dreadnought.radius');
-            dn._turretCooldown = 0;
-            dn._turretInterval = dim('enemy.dreadnought.turretInterval');
-            dn._beamCooldown = dim('enemy.dreadnought.beamCooldown');
-            dn._beamCharging = false;
-            state.entities.push(dn);
-        }
+            // ── Enemy type availability per weapon-unlock tier ──
+            const canInterceptor = w >= 2;
+            const canBomber = w >= 3;
 
-        // Alien Hive Base — stationary enemy structure, cooperative objective
-        // Spawns once at wave 5, persists until destroyed (VICTORY condition)
-        if (state.wave === 5 && !state.alienBaseSpawned) {
-            // Place far from the Resolute, opposite side of the arena
-            const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
-            const hivePos = baseDir.multiplyScalar(15000);
-            const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
-            hive.hull = dim('hive.hull');
-            hive.maxSpeed = 0; // stationary
-            hive.radius = dim('entity.alien-base.radius');
-            hive.velocity.set(0, 0, 0);
-            state.entities.push(hive);
-            state.alienBaseSpawned = true;
+            // Type weights — manifold asymmetric factor biases toward harder types at higher waves
+            const typeWeights = {
+                enemy: 1.0,
+                interceptor: canInterceptor ? (0.25 + _mzL * 0.45) : 0,
+                bomber: canBomber ? (0.15 + _mzA * 0.35) : 0,
+            };
+            const tierTypes = Object.keys(typeWeights).filter(t => typeWeights[t] > 0);
+            const totalTW = tierTypes.reduce((s, t) => s + typeWeights[t], 0);
 
-            SFAnnouncer.onHiveDiscovered(hive);
-        }
+            // Distance band: scales with wave but always well away from the player
+            const rBase = 5500 + w * 180;
+            const rSpread = 1200 + w * 240;
 
-        // Support ships — deploy into safe orbit (available for player calls)
-        // Despawn old ones first, then spawn fresh for the wave
-        _despawnSupportShips();
-        if (state.wave >= 3) _spawnTanker();    // tanker from wave 3+
-        if (state.wave >= 2) _spawnMedic();     // medic from wave 2+
+            // Angular base — random each wave so clusters never come from the same direction
+            const baseAngle = Math.random() * Math.PI * 2;
 
-        // AI Wingmen: named ANPC wingmen with full personality
-        if (state.aiWingmen) {
-            const ANPC = window.SFAnpc;
-            // Determine roster: waves 1-2 get 2 wingmen, wave 3+ get 3
-            const rosterKeys = state.wave >= 5
-                ? ['hotshot', 'ice', 'motherhen', 'nightshade']
-                : state.wave >= 3
-                    ? ['hotshot', 'ice', 'motherhen']
-                    : ['hotshot', 'ice'];
+            // ── Build cluster list ──
+            let remaining = budget;
+            for (let c = 0; c < clusterCount; c++) {
+                const isLast = c === clusterCount - 1;
+                // Per-cluster enemy count: fair share with ±40% random variation
+                const fairShare = Math.round(budget / clusterCount * (0.6 + Math.random() * 0.8));
+                const count = Math.max(2, Math.min(5, isLast ? remaining : Math.min(remaining - (clusterCount - c - 1), fairShare)));
+                remaining = Math.max(0, remaining - count);
 
-            for (let i = 0; i < rosterKeys.length; i++) {
-                const offset = new THREE.Vector3(
-                    (i === 0 ? -150 : i === 1 ? 150 : i === 2 ? 0 : -200),
-                    (i === 2 ? 80 : i === 3 ? -40 : 0),
-                    200 + Math.random() * 100
-                );
-                const spawnPos = state.player.position.clone().add(offset);
-                const w = new Entity('wingman', spawnPos.x, spawnPos.y, spawnPos.z);
-                const profile = deriveCombatProfile('wingman', state.wave);
-                w.hull = profile.hull;
-                w.maxSpeed = profile.maxSpeed;
-                w._manifoldDerivation = profile.trace;
-
-                // Attach ANPC personality
-                const key = rosterKeys[i];
-                if (ANPC) {
-                    const npc = ANPC.spawn(key);
-                    w.callsign = npc.callsign;
-                    w._anpc = npc;
-                    w._anpcKey = key;
-                    // Personality-tuned combat: aggressive ANPCs fly faster, defensive ones have more hull
-                    const p = npc.personality;
-                    w.maxSpeed = Math.round(w.maxSpeed * (0.85 + p.E * 0.3)); // extraversion → speed
-                    w.hull = Math.round(w.hull * (0.9 + p.C * 0.2));          // conscientiousness → durability
-                } else {
-                    w.callsign = ['Alpha-2', 'Alpha-3', 'Alpha-4', 'Alpha-5'][i];
+                // Pick type by weighted random
+                let roll = Math.random() * totalTW;
+                let chosenType = 'enemy';
+                for (const t of tierTypes) {
+                    roll -= typeWeights[t];
+                    if (roll <= 0) { chosenType = t; break; }
                 }
 
-                w.quaternion.copy(state.player.quaternion);
-                state.entities.push(w);
-            }
-        }
+                // Harder types spawn further out (flanking pressure)
+                const rMod = chosenType === 'bomber' ? 1.35 : chosenType === 'interceptor' ? 1.12 : 1.0;
+                const r = (rBase + Math.random() * rSpread) * rMod;
+                const theta = baseAngle + (Math.PI * 2 / clusterCount) * c + (Math.random() - 0.5) * 0.45;
+                const phi = Math.PI / 2 + (Math.random() - 0.5) * 0.75;
+                const pos = {
+                    x: r * Math.sin(phi) * Math.cos(theta),
+                    y: r * Math.sin(phi) * Math.sin(theta),
+                    z: r * Math.cos(phi),
+                };
 
-        SFAnnouncer.onWaveStart();
+                const { id, label } = nextLabel();
+                const opts = w === 1 ? { training: true, speedScale: 0.82 } : {};
+                _spawnCluster(id, label, pos.x, pos.y, pos.z, chosenType, count, w, opts);
+            }
+
+            // ── Solo hunters (roaming, not in clusters) ──
+            // Predators: wave 4+, count driven by asymmetric manifold
+            if (w >= 4) {
+                const predCount = Math.min(3, 1 + Math.floor(_mzA * (w - 3) * 1.8));
+                for (let i = 0; i < predCount; i++) {
+                    const r = 7500 + Math.random() * 3000;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 2 - 1);
+                    const pred = new Entity('predator', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+                    const pp = deriveCombatProfile('predator', w);
+                    pred.hull = pp.hull; pred.shields = pp.shields; pred.maxSpeed = pp.maxSpeed;
+                    pred._manifoldDerivation = pp.trace; pred.radius = dim('entity.predator.radius');
+                    pred._turnRate = 0.4; pred._plasmaTimer = 0; pred._plasmaCooldown = dim('enemy.predator.plasmaCooldown');
+                    pred._consumeTarget = null; pred._consuming = false; pred._consumeTimer = 0; pred._eggTimer = 8 + Math.random() * 5;
+                    state.entities.push(pred);
+                }
+            }
+
+            // ── Alien capital ships ──
+            // Alien baseship (torpedo objective): wave 3+, probability scales with manifold
+            if (w >= 3) {
+                const baseChance = 0.55 + _mzL * 0.4;    // 55–95% depending on manifold
+                if (Math.random() < baseChance) spawnAlienBaseship();
+            }
+
+            // Dreadnought boss: wave 6+, escalating frequency
+            if (w >= 6 && (w === 6 || (w - 6) % Math.max(2, Math.round(5 - _mzA * 2)) === 0)) {
+                const r = 9000 + Math.random() * 3000;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                const dn = new Entity('dreadnought', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+                const dp = deriveCombatProfile('dreadnought', w - 5);
+                dn.hull = dp.hull; dn.shields = dp.shields; dn.maxSpeed = dp.maxSpeed;
+                dn._manifoldDerivation = dp.trace; dn.radius = dim('entity.dreadnought.radius');
+                dn._turretCooldown = 0; dn._turretInterval = dim('enemy.dreadnought.turretInterval');
+                dn._beamCooldown = dim('enemy.dreadnought.beamCooldown'); dn._beamCharging = false;
+                state.entities.push(dn);
+            }
+
+            // Alien Hive — spawns once at wave 5 (victory objective)
+            if (w === 5 && !state.alienBaseSpawned) {
+                const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
+                const hivePos = baseDir.multiplyScalar(15000);
+                const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
+                hive.hull = dim('hive.hull'); hive.maxSpeed = 0;
+                hive.radius = dim('entity.alien-base.radius');
+                hive.velocity.set(0, 0, 0);
+                state.entities.push(hive);
+                state.alienBaseSpawned = true;
+                SFAnnouncer.onHiveDiscovered(hive);
+            }
+
+            spawnSupportAndWingmen();
+            SFAnnouncer.onWaveStart();
+            _clusterStartComm();
+        }
     }
 
     function checkWave() {
@@ -2100,16 +2704,21 @@ const Starfighter = (function () {
         if (enemies.length === 0 && state.phase === 'combat') {
             // Cancel any active support call
             _clearSupport();
-            // All enemies cleared - time to return to baseship
+            // BFXG-009 §1.6 — Phase 5: auto-engage autopilot immediately, no player prompt
             state.phase = 'land-approach';
-            state.autopilotActive = false; // Reset autopilot for fresh approach
+            state.autopilotActive = true;   // always auto, no waiting
             state.autopilotTimer = 0;
+            state._returnFlightInit = false; // reset cinematic init flag
             SFAnnouncer.onWaveClear();
-
-            // GDD §9.3: Music intensity drops on wave clear
+            // Hide HUD overlays; AUTOPILOT indicator shown in the phase block
+            const rtbBtn = document.getElementById('rtb-btn');
+            if (rtbBtn) rtbBtn.style.display = 'none';
+            // GDD §1.6: Victory fanfare (3-4s musical sting)
+            if (window.SFAudio) SFAudio.playSound('victory_fanfare');
+            // GDD §9.3: Music intensity drops on wave clear, transition to cinematic feel
             if (window.SFMusic) {
                 SFMusic.setSection('exploration');
-                SFMusic.setIntensity(0.2);
+                SFMusic.setIntensity(0.15);
             }
         }
     }
@@ -2396,132 +3005,156 @@ const Starfighter = (function () {
                 return;
             }
 
-            // ── Landing Approach Phase — GDD §9.3: Auto-pilot return ──
+            // ── BFXG-009 §1.6 Phase 5: Mission Complete — Autopilot Return Flight ──
+            // 17-second cinematic return. Controls disabled. Player can look around (camera rotation).
+            // Autopilot always active — no manual option. AUTOPILOT indicator amber centre-screen.
             if (state.phase === 'land-approach') {
-                // Initialize autopilot on first frame
-                if (!state.autopilotActive) {
-                    state.autopilotActive = false;
+                // ── First-frame init ──
+                if (!state._returnFlightInit) {
+                    state._returnFlightInit = true;
                     state.autopilotTimer = 0;
-                    // Show autopilot prompt
-                    const cdEl = document.getElementById('countdown-display');
-                    cdEl.style.display = 'block';
-                    cdEl.innerHTML = 'WAVE CLEAR!<br><span style="font-size:0.4em;color:#00ff88">Press <b>SPACE</b> to engage autopilot<br>or fly manually to base</span>';
-                    cdEl.style.fontSize = '2.5em';
-                    cdEl.style.color = '#00ffff';
-                    SFAnnouncer.onWaveClear();
-                }
 
-                // Check for autopilot activation
-                if (!state.autopilotActive && window.SFInput && SFInput.isKeyDown('Space')) {
-                    state.autopilotActive = true;
-                    state.autopilotTimer = 0;
-                    SFAnnouncer.onAutopilotEngage();
-                    if (window.SFAudio) SFAudio.playSound('hud_power_up');
-                }
+                    // Hide live combat overlays
+                    const hud = document.getElementById('gameplay-hud');
+                    const rad = document.getElementById('radar-overlay');
+                    const xhair = document.getElementById('crosshair');
+                    if (hud) hud.style.opacity = '0.15';  // dim but visible
+                    if (rad) rad.style.opacity = '0';
+                    if (xhair) xhair.style.display = 'none';
 
-                if (state.autopilotActive) {
-                    // GDD §9.3: 15s autopilot — smoothly fly back to baseship
-                    state.autopilotTimer += safeDt;
-                    const apProgress = Math.min(state.autopilotTimer / 12.0, 1.0); // 12s travel, 3s dock
-
-                    // Calculate direction and distance to baseship bay entrance
-                    _v1.copy(state.baseship.position).add(_v2.set(0, 0, 400));
-                    _v2.copy(_v1).sub(state.player.position);
-                    const distToBase = _v2.length();
-
-                    // Smoothly turn and fly toward base
-                    _v2.normalize();
-                    _q1.setFromUnitVectors(_v1.set(0, 0, -1), _v2);
-                    state.player.quaternion.slerp(_q1, safeDt * 2.0);
-
-                    // Speed profile: accelerate, cruise, decelerate
-                    let apSpeed;
-                    if (apProgress < 0.2) {
-                        apSpeed = apProgress / 0.2 * 300; // accelerate
-                    } else if (apProgress < 0.7) {
-                        apSpeed = 300; // cruise
-                    } else {
-                        apSpeed = 300 * (1.0 - (apProgress - 0.7) / 0.3); // decelerate
-                        apSpeed = Math.max(40, apSpeed);
+                    // BFXG-009: Show letterbox + "MISSION COMPLETE" title card
+                    const dco = document.getElementById('dock-cutscene-overlay');
+                    if (dco) {
+                        const titleEl = document.getElementById('dock-wave-title');
+                        if (titleEl) titleEl.textContent = 'WAVE ' + state.wave + ' CLEARED — RETURNING TO BASE';
+                        dco.style.display = 'block';
+                        requestAnimationFrame(() => dco.classList.add('active'));
                     }
 
-                    _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
-                    state.player.velocity.copy(_v1.multiplyScalar(apSpeed));
+                    // Announcement: BFXG-009 §1.6 line 38
+                    addComm(_crew('command'),
+                        'Mission complete! Outstanding work, pilot. Autopilot engaged — returning to base.',
+                        'success');
 
-                    // Show distance countdown
-                    const cdEl = document.getElementById('countdown-display');
+                    // Fade music to cinematic ambient
+                    if (window.SFMusic) { SFMusic.setSection('exploration'); SFMusic.setIntensity(0.1); }
+                }
+
+                const RETURN_DURATION = 17.0;   // BFXG-009 §1.6: 15-20s return flight
+                state.autopilotTimer += safeDt;
+                const apProgress = Math.min(state.autopilotTimer / RETURN_DURATION, 1.0);
+
+                // ── AUTOPILOT amber indicator (center screen) ──
+                const cdEl = document.getElementById('countdown-display');
+                if (cdEl) {
                     cdEl.style.display = 'block';
-                    cdEl.innerHTML = `AUTOPILOT<br><span style="font-size:0.35em;color:#88ccff">Distance: ${Math.floor(distToBase)}m</span>`;
-                    cdEl.style.fontSize = '2em';
-                    cdEl.style.color = '#00ff88';
+                    cdEl.style.fontSize = '1.8em';
+                    cdEl.style.color = '#FFAA00';
+                    cdEl.innerHTML = 'AUTOPILOT<br><span style="font-size:0.38em;color:#88ccff">'
+                        + 'RETURNING TO BASE — ' + Math.ceil(RETURN_DURATION * (1 - apProgress)) + 's</span>';
+                }
 
-                    // Auto-dock when close enough or timer expires
-                    if (distToBase < 400 || state.autopilotTimer >= 15.0) {
-                        state.phase = 'landing';
-                        state.landingTimer = 0;
-                        state.autopilotActive = false;
-                        cdEl.style.display = 'none';
-                        SFAnnouncer.onDock();
-                        state.score += 500 * state.wave;
-                    }
+                // ── Ship flight: bank toward baseship ──
+                const bayApproach = _v1.copy(state.baseship.position).add(_v2.set(0, 0, 450));
+                const toBase = _v2.copy(bayApproach).sub(state.player.position);
+                const distToBase = toBase.length();
+
+                // Speed profile per BFXG-009: accelerate → cruise → decelerate
+                let apSpeed;
+                if (apProgress < 0.18) {
+                    apSpeed = (apProgress / 0.18) * 320;
+                } else if (apProgress < 0.72) {
+                    apSpeed = 320;
                 } else {
-                    // Manual approach — allow player input
-                    if (window.SFInput) SFInput.update(safeDt);
-
-                    // Hide hangar obstruction for safe landing approach
-                    if (window.SF3D) SF3D.hideHangarBay();
-
-                    const distToBaseship = state.player.position.distanceTo(state.baseship.position);
-                    const playerSpeed = state.player.velocity.length();
-
-                    // Manual dock when close and slow
-                    if (distToBaseship < 400 && playerSpeed < 80) {
-                        const landPrompt = document.getElementById('countdown-display');
-                        landPrompt.style.display = 'block';
-                        landPrompt.innerHTML = 'PRESS <b>SPACE</b> TO LAND';
-                        landPrompt.style.fontSize = '2em';
-                        landPrompt.style.color = '#00ff00';
-
-                        if (window.SFInput && SFInput.isKeyDown('Space')) {
-                            state.phase = 'landing';
-                            state.landingTimer = 0;
-                            landPrompt.style.display = 'none';
-                            SFAnnouncer.onDock();
-                            state.score += 500 * state.wave;
-                        }
-                    } else {
-                        const landPrompt = document.getElementById('countdown-display');
-                        landPrompt.style.display = 'block';
-                        landPrompt.innerHTML = `APPROACH BASE<br><span style="font-size:0.8em">Distance: ${Math.floor(distToBaseship)}m  Speed: ${Math.floor(playerSpeed)}m/s</span><br><span style="font-size:0.6em;color:#00ff88">Press SPACE for autopilot</span>`;
-                        landPrompt.style.fontSize = '1.2em';
-                    }
+                    apSpeed = Math.max(35, 320 * (1.0 - (apProgress - 0.72) / 0.28));
                 }
 
-                // Process combat updates in case more enemies appear
-                for (let i = 0, len = state.entities.length; i < len; i++) {
-                    const e = state.entities[i];
-                    if (e.type === 'predator') updatePredatorAI(e, safeDt);
-                    else if (e.type === 'tanker') updateTankerAI(e, safeDt);
-                    else if (e.type === 'medic') updateMedicAI(e, safeDt);
-                    else if (AI_PROFILES[e.type]) {
-                        updateCombatAI(e, safeDt);
-                        if (e.type === 'wingman') _updateANPCState(e, safeDt);
-                    }
-                    // Torpedo acceleration: 200→350 m/s over 1.5s (GDD §10.1)
-                    else if (e.type === 'torpedo') {
-                        const age = (performance.now() / 1000) - (e.launchTime || 0);
-                        const spd = Math.min(350, 200 + (150 * Math.min(age / 1.5, 1)));
-                        if (e.target && !e.target.markedForDeletion) {
-                            _v1.copy(e.target.position).sub(e.position).normalize();
-                            _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
-                            e.quaternion.slerp(_q1, safeDt * 1.5);
-                        }
-                        _v1.set(0, 0, -1).applyQuaternion(e.quaternion);
-                        e.velocity.copy(_v1.multiplyScalar(spd));
-                    }
+                if (distToBase > 5) {
+                    _q1.setFromUnitVectors(
+                        _v1.set(0, 0, -1),
+                        _v2.copy(toBase).normalize()
+                    );
+                    state.player.quaternion.slerp(_q1, safeDt * 1.8);
+                }
+                _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+                state.player.velocity.copy(_v1.multiplyScalar(apSpeed));
+
+                // ── Cinematic camera — BFXG-009 §1.6 line 44: player can look around ──
+                // We give a slow drifting "cinematic sweep" so the space environment
+                // fills the view — debris from battle, allied ships, Earth below.
+                const WORLD_UP = new THREE.Vector3(0, 1, 0);
+                const shipFwd = _v1.set(0, 0, -1).applyQuaternion(state.player.quaternion);
+                const _mat4 = new THREE.Matrix4();
+
+                if (!state.cutsceneCamPos) {
+                    state.cutsceneCamPos = state.player.position.clone();
+                    state.cutsceneCamQuat = state.player.quaternion.clone();
+                    state.cutsceneVelocity = new THREE.Vector3();
                 }
 
-                // Apply velocity → position (3D physics) during approach
+                if (apProgress < 0.35) {
+                    // A — Behind and above: classic "hero flying home" chase shot
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, -180)
+                        .addScaledVector(WORLD_UP, 55);
+                    state.cutsceneCamPos.lerp(camPos, 0.06);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.player.position.clone().addScaledVector(shipFwd, 80),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                } else if (apProgress < 0.65) {
+                    // B — Slow orbit sweep around the ship: shows Earth, debris, stars
+                    const sweepAngle = ((apProgress - 0.35) / 0.30) * Math.PI * 0.6;
+                    const orbitR = 200;
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(new THREE.Vector3(Math.sin(sweepAngle), 0, -Math.cos(sweepAngle)), orbitR)
+                        .addScaledVector(WORLD_UP, 30);
+                    state.cutsceneCamPos.lerp(camPos, 0.04);
+                    _mat4.lookAt(state.cutsceneCamPos, state.player.position, WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                } else {
+                    // C — Low-front wide: carrier visible ahead, ship silhouetted against it
+                    const T = (apProgress - 0.65) / 0.35;
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, -260 + T * 80)
+                        .addScaledVector(WORLD_UP, 18 - T * 12);
+                    state.cutsceneCamPos.lerp(camPos, 0.05);
+                    _mat4.lookAt(state.cutsceneCamPos, state.baseship.position, WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+                }
+
+                // ── Transition to docking cutscene ──
+                if (distToBase < 450 || apProgress >= 1.0) {
+                    // BFXG-009 §1.7: Begin Phase 6 — Docking Cut Scene
+                    state.phase = 'landing';
+                    state.landingTimer = 0;
+                    state._returnFlightInit = false;
+                    state.cutsceneCamPos = null;
+                    state.cutsceneCamQuat = null;
+                    state.cutsceneVelocity = null;
+                    state._dockAudioFlags = {}; // reset per-shot audio triggers
+                    if (window.SFAudio) SFAudio.playSound('klaxon'); // landing lights on
+                    SFAnnouncer.onDock();
+                    state.score += 500 * state.wave;
+
+                    const cdHide = document.getElementById('countdown-display');
+                    if (cdHide) cdHide.style.display = 'none';
+                }
+
+                // Pass cinematic cam to renderer
+                if (state.cutsceneCamPos) {
+                    // Override with cutscene cam rather than player camera
+                    state._cutsceneCamOverride = {
+                        pos: state.cutsceneCamPos,
+                        quat: state.cutsceneCamQuat,
+                    };
+                } else {
+                    state._cutsceneCamOverride = null;
+                }
+
+                // Keep projectile AI ticking (shouldn't be any, but safety)
                 for (let i = 0, len = state.entities.length; i < len; i++) {
                     const e = state.entities[i];
                     if (e.markedForDeletion) continue;
@@ -2529,19 +3162,6 @@ const Starfighter = (function () {
                     e.position.y += e.velocity.y * safeDt;
                     e.position.z += e.velocity.z * safeDt;
                 }
-
-                // Expiry for in-flight projectiles during approach phase
-                for (let i = state.entities.length - 1; i >= 0; i--) {
-                    const e = state.entities[i];
-                    if (e.maxAge > 0) {
-                        e.age += safeDt;
-                        if (e.age >= e.maxAge) {
-                            e.markedForDeletion = true;
-                            if (M) M.remove(e.id);
-                        }
-                    }
-                }
-                // Cleanup marked entities
                 for (let i = state.entities.length - 1; i >= 0; i--) {
                     if (state.entities[i].markedForDeletion) {
                         state.entities[i] = state.entities[state.entities.length - 1];
@@ -2549,24 +3169,214 @@ const Starfighter = (function () {
                     }
                 }
 
-                checkWave();
                 updateHUD();
                 if (window.SF3D) SF3D.render(state);
                 return;
             }
 
-            // ── Landing Phase (cinematic return to bay) ──
+            // ── BFXG-009 §1.7 Phase 6: Docking Cut Scene — 28 seconds, 9 shots ──
             if (state.phase === 'landing') {
                 state.landingTimer += safeDt;
-                const t = state.landingTimer / state.landingDuration;
-                const progress = Math.min(t, 1.0);
+                const DOCK_DUR = 28.0;   // BFXG-009: ~28s total cutscene
+                const progress = Math.min(state.landingTimer / DOCK_DUR, 1.0);
+                const elapsed = state.landingTimer;
 
-                // Move player toward baseship hangar
-                _v1.copy(state.baseship.position).add(_v2.set(0, -32, 50));
-                state.player.position.lerp(_v1, progress * 0.3);
+                // Ensure audio flags map exists
+                if (!state._dockAudioFlags) state._dockAudioFlags = {};
 
+                const WORLD_UP = new THREE.Vector3(0, 1, 0);
+                const hangarPos = state.baseship.position.clone().add(new THREE.Vector3(0, -30, 60));
 
-                // Dock the player to baseship on completion
+                // ── First frame: show letterbox overlay, hide HUD ──
+                if (!state.cutsceneCamPos) {
+                    state.cutsceneCamPos = state.player.position.clone();
+                    state.cutsceneCamQuat = state.player.quaternion.clone();
+                    state.cutsceneVelocity = state.player.velocity.clone();
+
+                    const dco = document.getElementById('dock-cutscene-overlay');
+                    if (dco) {
+                        const titleEl = document.getElementById('dock-wave-title');
+                        if (titleEl) titleEl.textContent = 'WAVE ' + state.wave + ' CLEARED';
+                        dco.style.display = 'block';
+                        requestAnimationFrame(() => dco.classList.add('active'));
+                    }
+                    const hud = document.getElementById('gameplay-hud');
+                    const rad = document.getElementById('radar-overlay');
+                    const xhair = document.getElementById('crosshair');
+                    const rtbBtn = document.getElementById('rtb-btn');
+                    const cdEl = document.getElementById('countdown-display');
+                    if (hud) hud.style.opacity = '0';
+                    if (rad) rad.style.opacity = '0';
+                    if (xhair) xhair.style.display = 'none';
+                    if (rtbBtn) rtbBtn.style.display = 'none';
+                    if (cdEl) cdEl.style.display = 'none';
+
+                    // BFXG-009 §1.7 line 65: Music transitions to closing theme
+                    if (window.SFMusic) { SFMusic.setSection('closing-theme'); SFMusic.setIntensity(0.08); }
+
+                    // BFXG-009 Shot 1 audio: klaxon as landing lights come on
+                    if (window.SFAudio) SFAudio.playSound('klaxon');
+                    state._dockAudioFlags.klaxon = true;
+                }
+
+                // ── BFXG-009 §1.7: Skippable after Round 1 (SPACE key) ──
+                if (state.wave > 1 && window.SFInput && SFInput.isKeyDown('Space')) {
+                    // Skip: jump straight to completeLanding
+                    completeLanding();
+                    return;
+                }
+
+                // ── Ship smoothly glides into hangar throughout cutscene ──
+                const lerpRate = progress < 0.5 ? 0.025 : 0.055;
+                state.player.position.lerp(hangarPos, lerpRate);
+                const toHangar = hangarPos.clone().sub(state.player.position);
+                if (toHangar.lengthSq() > 400) {
+                    _q1.setFromUnitVectors(new THREE.Vector3(0, 0, -1), toHangar.normalize());
+                    state.player.quaternion.slerp(_q1, 0.035);
+                }
+
+                const shipFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(state.player.quaternion);
+                const _mat4 = new THREE.Matrix4();
+
+                // ── 9 Camera Shots ──
+                // Shot 1 (0-4s = 0–14.3%): External chase, carrier grows ahead
+                if (elapsed < 4.0) {
+                    const T = elapsed / 4.0;
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, -260 + T * 40)
+                        .addScaledVector(WORLD_UP, 70 - T * 20);
+                    state.cutsceneCamPos.lerp(camPos, 0.08);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.player.position.clone().addScaledVector(shipFwd, 200),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 2 (4-7s = 14.3–25%): Chase cam slight angle — landing lights blink
+                } else if (elapsed < 7.0) {
+                    const T = (elapsed - 4.0) / 3.0;
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, -200)
+                        .addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(state.player.quaternion), 60 * T)
+                        .addScaledVector(WORLD_UP, 35);
+                    state.cutsceneCamPos.lerp(camPos, 0.06);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.baseship.position.clone().add(new THREE.Vector3(0, 0, 80)),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 3 (7-10s = 25–35.7%): Cockpit POV — alignment HUD appears
+                } else if (elapsed < 10.0) {
+                    if (!state._dockAudioFlags.shot3) {
+                        state._dockAudioFlags.shot3 = true;
+                        if (window.SFAudio) SFAudio.playSound('hud_power_up'); // alignment HUD on
+                    }
+                    // Cockpit interior: camera is slightly behind and inside the ship
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, 2)
+                        .addScaledVector(WORLD_UP, 5);
+                    state.cutsceneCamPos.lerp(camPos, 0.12);
+                    // Looking forward through canopy toward carrier
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.baseship.position.clone().add(new THREE.Vector3(0, -15, 0)),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 4 (10-13s = 35.7–46.4%): Cockpit POV — bay doors open, green guide lights
+                } else if (elapsed < 13.0) {
+                    if (!state._dockAudioFlags.bayDoor) {
+                        state._dockAudioFlags.bayDoor = true;
+                        if (window.SFAudio) SFAudio.playSound('klaxon'); // bay door warning klaxon
+                    }
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, 3)
+                        .addScaledVector(WORLD_UP, 4);
+                    state.cutsceneCamPos.lerp(camPos, 0.1);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.baseship.position.clone().add(new THREE.Vector3(0, -10, 30)),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 5 (13-17s = 46.4–60.7%): External side cam inside bay — crew, equipment
+                } else if (elapsed < 17.0) {
+                    if (!state._dockAudioFlags.bayAmbience) {
+                        state._dockAudioFlags.bayAmbience = true;
+                        if (window.SFAudio && SFAudio.startBayAmbience) SFAudio.startBayAmbience();
+                    }
+                    const T = (elapsed - 13.0) / 4.0;
+                    const camPos = state.baseship.position.clone()
+                        .add(new THREE.Vector3(150 - T * 30, -20 + T * 10, 40));
+                    state.cutsceneCamPos.lerp(camPos, 0.05);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.player.position.clone().add(new THREE.Vector3(0, -15, 0)),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 6 (17-20s = 60.7–71.4%): Low angle bay floor — landing gear deploys
+                } else if (elapsed < 20.0) {
+                    if (!state._dockAudioFlags.landingGear) {
+                        state._dockAudioFlags.landingGear = true;
+                        if (window.SFAudio) SFAudio.playSound('turbine_whine'); // hydraulic/gear sound
+                    }
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(WORLD_UP, -60)       // below the ship — looking up
+                        .addScaledVector(shipFwd, 20);
+                    state.cutsceneCamPos.lerp(camPos, 0.07);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.player.position.clone().addScaledVector(WORLD_UP, 8),
+                        shipFwd.clone().negate());  // up is forward (looking up at belly)
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 7 (20-22s = 71.4–78.6%): Close-up docking clamps — mechanical lock + engines down
+                } else if (elapsed < 22.0) {
+                    if (!state._dockAudioFlags.clamp) {
+                        state._dockAudioFlags.clamp = true;
+                        if (window.SFAudio) {
+                            SFAudio.playSound('clamp_release'); // reuse: clamp mechanism sound
+                            setTimeout(() => SFAudio.playSound('comm_beep'), 600); // lock confirmation beep
+                        }
+                    }
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(WORLD_UP, -28)
+                        .addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(state.player.quaternion), 25);
+                    state.cutsceneCamPos.lerp(camPos, 0.1);
+                    _mat4.lookAt(state.cutsceneCamPos, state.player.position, WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 8 (22-24s = 78.6–85.7%): Cockpit interior — ambient bay, engines wind down
+                } else if (elapsed < 24.0) {
+                    if (!state._dockAudioFlags.engineDown) {
+                        state._dockAudioFlags.engineDown = true;
+                        if (window.SFAudio) SFAudio.playSound('boost'); // reuse: engine power change
+                    }
+                    const camPos = state.player.position.clone()
+                        .addScaledVector(shipFwd, 4)
+                        .addScaledVector(WORLD_UP, 6)
+                        .addScaledVector(new THREE.Vector3(-1, 0, 0).applyQuaternion(state.player.quaternion), 2);
+                    state.cutsceneCamPos.lerp(camPos, 0.15);
+                    _mat4.lookAt(state.cutsceneCamPos,
+                        state.player.position.clone().addScaledVector(WORLD_UP, 2),
+                        WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+
+                    // Shot 9 (24-28s = 85.7–100%): Side tracking cam — rail moves ship to launch tube
+                } else {
+                    const T = (elapsed - 24.0) / 4.0;
+                    const railStart = state.player.position.clone().add(new THREE.Vector3(-180, 0, 0));
+                    const railEnd = state.player.position.clone().add(new THREE.Vector3(180, 0, 0));
+                    const camPos = railStart.clone().lerp(railEnd, T)
+                        .addScaledVector(WORLD_UP, 55);
+                    state.cutsceneCamPos.lerp(camPos, 0.06);
+                    _mat4.lookAt(state.cutsceneCamPos, state.player.position, WORLD_UP);
+                    state.cutsceneCamQuat.setFromRotationMatrix(_mat4);
+                }
+
+                // ── Fade to black: last 14.3% of cutscene (last 4 seconds) ──
+                if (progress > 0.857) {
+                    const fadeEl = document.getElementById('dock-fade');
+                    if (fadeEl) fadeEl.style.opacity = String((progress - 0.857) / 0.143);
+                }
+
+                // ── Complete docking sequence ──
                 if (progress >= 1.0) {
                     completeLanding();
                     return;
@@ -2602,6 +3412,12 @@ const Starfighter = (function () {
 
             // Autonomous announcer — observe game state and generate chatter
             SFAnnouncer.observe(safeDt);
+            // Wingman cluster guidance — bearing callout every 15-23s during combat
+            state._clusterCallTimer -= safeDt;
+            if (state._clusterCallTimer <= 0 && state.phase === 'combat') {
+                _wingmanClusterComm();
+                state._clusterCallTimer = 15 + Math.random() * 8;
+            }
             state.commTimer += safeDt;
             if (state.commTimer >= state.commInterval) {
                 state.commTimer = 0;
@@ -2751,6 +3567,7 @@ const Starfighter = (function () {
             const _DP = M ? M.DiningPhilosophers : null;
             const collisionPairs = M ? M.detectCollisions() : [];
             for (const [a, b] of collisionPairs) {
+                if (!a || !b) continue; // guard null refs from manifold reconstruct
                 if (a.markedForDeletion || b.markedForDeletion) continue;
                 // Acquire forks for both entities — skip pair if either is revoked
                 if (_DP && (!_DP.acquire(a.id, 'collision') || !_DP.acquire(b.id, 'collision'))) continue;
@@ -2800,7 +3617,11 @@ const Starfighter = (function () {
                 if (isAProj && a.owner === 'enemy' && _isHostile(b.type)) continue;
                 if (isBProj && b.owner === 'enemy' && _isHostile(a.type)) continue;
 
-                const distSq = a.position.distanceToSquared(b.position);
+                // Use inline math so this works whether position is THREE.Vector3 or a plain {x,y,z}
+                const _cx = a.position.x - b.position.x;
+                const _cy = a.position.y - b.position.y;
+                const _cz = (a.position.z || 0) - (b.position.z || 0);
+                const distSq = _cx * _cx + _cy * _cy + _cz * _cz;
                 const rSum = a.radius + b.radius;
                 if (distSq < rSum * rSum) {
                     handleCollision(a, b);
@@ -3017,34 +3838,39 @@ const Starfighter = (function () {
 
     // ── Evasion dimension: break turn when player has target lock ──
     function _combatEvade(entity, dt) {
-        if (!entity._evading) {
+        // Guard: initialise evade state if missing or direction lost
+        if (!entity._evading || !entity._evadeDir) {
             entity._evading = true;
             entity._evadeTimer = 0;
-            entity._evadeDir = new THREE.Vector3(
-                (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5)
-            ).normalize();
+            const ex = (Math.random() - 0.5) * 2, ey = (Math.random() - 0.5) * 2, ez = (Math.random() - 0.5);
+            const elen = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
+            entity._evadeDir = new THREE.Vector3(ex / elen, ey / elen, ez / elen);
         }
         entity._evadeTimer += dt;
         if (entity._evadeTimer > 1.5) {
             entity._evadeTimer = 0;
-            entity._evadeDir.set(
-                (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5)
-            ).normalize();
+            const ex = (Math.random() - 0.5) * 2, ey = (Math.random() - 0.5) * 2, ez = (Math.random() - 0.5);
+            const elen = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
+            entity._evadeDir.set(ex / elen, ey / elen, ez / elen);
         }
-        _q1.setFromUnitVectors(_v2.set(0, 0, -1), entity._evadeDir);
-        entity.quaternion.slerp(_q1, dt * 4.0);
+        // Only call setFromUnitVectors when direction is valid (non-zero)
+        const edLen = entity._evadeDir.lengthSq();
+        if (edLen > 0.001) {
+            _q1.setFromUnitVectors(_v2.set(0, 0, -1), entity._evadeDir);
+            entity.quaternion.slerp(_q1, dt * 4.0);
+        }
         const fwd = _v1.set(0, 0, -1).applyQuaternion(entity.quaternion);
         entity.velocity.copy(fwd).multiplyScalar(entity.maxSpeed * 1.5);
-        // Return fire while evading
+        // Return fire while evading — guard against null player
         if (!entity._fireCooldown) entity._fireCooldown = 0;
         entity._fireCooldown -= dt;
-        if (entity._fireCooldown <= 0) {
+        if (entity._fireCooldown <= 0 && state.player && !state.player.markedForDeletion) {
             const dx = entity.position.x - state.player.position.x;
             const dy = entity.position.y - state.player.position.y;
             const dz = entity.position.z - state.player.position.z;
             if (dx * dx + dy * dy + dz * dz < 640000) {
                 fireLaser(entity, 'enemy');
-                entity._fireCooldown = dim('enemy.fireCooldown');
+                entity._fireCooldown = entity._fireCooldownBase || dim('enemy.fireCooldown');
             }
         }
     }
@@ -3188,7 +4014,9 @@ const Starfighter = (function () {
         if (entity._fireCooldown <= 0 && dist2 < prof.fireRange * prof.fireRange) {
             if (prof.weapon === 'laser') {
                 fireLaser(entity, entity.type === 'wingman' ? 'wingman' : 'enemy');
-                entity._fireCooldown = dim('enemy.fireCooldown') * prof.cooldownMul + Math.random() * 0.3;
+                // Spread shot — wave 2+ enemies fire a burst alongside their laser
+                if (entity._useSpread) setTimeout(() => { if (!entity.markedForDeletion) _fireEnemySpread(entity); }, 90);
+                entity._fireCooldown = (entity._fireCooldownBase || dim('enemy.fireCooldown')) * prof.cooldownMul + Math.random() * 0.3;
             } else if (prof.weapon === 'torpedo') {
                 _combatFireTorpedo(entity, target);
                 entity._fireCooldown = entity._bombInterval || dim('enemy.baseship.fireCooldown');
@@ -3986,6 +4814,17 @@ const Starfighter = (function () {
         cdEl.style.color = '#ff0000';
     }
 
+    // ── Wave-clear autopilot RTB — player presses SPACE or clicks RTB button ──
+    function _engageAutopilotRTB() {
+        if (state.autopilotActive) return;
+        state.autopilotActive = true;
+        state.autopilotTimer = 0;
+        SFAnnouncer.onAutopilotEngage();
+        if (window.SFAudio) SFAudio.playSound('hud_power_up');
+        const rtbBtn = document.getElementById('rtb-btn');
+        if (rtbBtn) rtbBtn.style.display = 'none';
+    }
+
     // ── Request Dock — manual redock, player flies themselves ──
     function _requestDock() {
         if (state.phase !== 'combat') return;
@@ -4384,11 +5223,12 @@ const Starfighter = (function () {
     function firePrimary() {
         const p = state.player;
         if (!p) return;
+        // Weapon dispatch — slots unlock by level: 1=laser, 2+=spread, 3+=torp, 4+=EMP
         switch (p.selectedWeapon) {
             case 0: fireLaser(p, 'player'); break;
             case 1: fireMachineGun(p, 'player'); break;
-            case 2: firePulseEMP(p, 'player'); break;
-            case 3: fireTorpedo(p, 'player'); break;
+            case 2: fireTorpedo(p, 'player'); break;
+            case 3: firePulseEMP(p, 'player'); break;
         }
     }
 
@@ -5332,6 +6172,8 @@ const Starfighter = (function () {
         cycleWeapon: () => state.player && state.player.cycleWeapon(),
         tryLockOnTarget: () => tryLockOnTarget(state.player),
         emergencyRTB: _triggerEmergencyRTB,
+        engageAutopilotRTB: _engageAutopilotRTB,
+        skipDockCutscene: () => { if (state.phase === 'landing') state.landingTimer = state.landingDuration; },
         requestDock: _requestDock,
         callTanker: () => _callSupport('tanker'),
         callMedic: () => _callSupport('medic'),
@@ -5345,6 +6187,11 @@ const Starfighter = (function () {
 })();
 
 window.Starfighter = Starfighter;
+
+// Skip docking cutscene from HTML button onclick
+window._skipDockCutscene = function () {
+    if (window.Starfighter) Starfighter.skipDockCutscene();
+};
 
 // Global upgrade purchase handler (called by between-wave shop onclick)
 window._sfBuyUpgrade = function (id) {

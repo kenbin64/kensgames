@@ -123,7 +123,7 @@ const SpaceManifold = (function () {
     // ── Weapons ──
     'weapon.laser.speed': 1600,    // m/s projectile velocity
     'weapon.laser.damage': 15,     // per hit
-    'weapon.laser.maxAge': 2.5,    // seconds (range = speed × age)
+    'weapon.laser.maxAge': 1.0,    // seconds (range = speed × age)
     'weapon.laser.fireRate': 6,      // rounds per second
     'weapon.laser.radius': 2,      // collision radius
     'weapon.laser.fuelCost': 0.3,    // fuel per shot

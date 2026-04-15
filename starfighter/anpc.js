@@ -799,6 +799,16 @@ const SFANPC = (function () {
       // Alive/active
       this.active = true;
       this.faction = schema.faction || 'allied'; // allied | enemy
+
+      // Wingman / manifold-extension fields
+      this.wingmanEligible = schema.wingmanEligible || false;
+      this.genderLabel = schema.genderLabel || null;
+      this.nationalityLabel = schema.nationalityLabel || null;
+      this.rankLabel = schema.rankLabel || null;
+      this.primarySkill = schema.primarySkill || null;
+      this.motivationLabel = schema.motivationLabel || null;
+      this.backstoryMotif = schema.backstoryMotif || null;
+      this.pronouns = schema.pronouns || null;
     }
 
     // ── State transitions ──
@@ -1218,6 +1228,15 @@ const SFANPC = (function () {
       moraleFloor: 0.20,
       disposition: 0.65,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: true,
+      genderLabel: 'male',
+      nationalityLabel: 'American',
+      rankLabel: 'Lieutenant',
+      primarySkill: 'dogfighter',
+      motivationLabel: 'glory',
+      backstoryMotif: 'proving worth',
+      pronouns: { subj: 'he', obj: 'him', pos: 'his' },
     },
     frostbite: {
       id: 'ANPC-SF-0043',
@@ -1241,6 +1260,15 @@ const SFANPC = (function () {
       moraleFloor: 0.10,
       disposition: 0.45,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: true,
+      genderLabel: 'male',
+      nationalityLabel: 'Russian',
+      rankLabel: 'Lieutenant',
+      primarySkill: 'marksman',
+      motivationLabel: 'duty',
+      backstoryMotif: 'duty above all',
+      pronouns: { subj: 'he', obj: 'him', pos: 'his' },
     },
     lighthouse: {
       id: 'ANPC-SF-0003',
@@ -1264,6 +1292,15 @@ const SFANPC = (function () {
       moraleFloor: 0.25,
       disposition: 0.70,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: false,
+      genderLabel: 'female',
+      nationalityLabel: 'Nigerian',
+      rankLabel: 'Commander',
+      primarySkill: 'analyst',
+      motivationLabel: 'protection',
+      backstoryMotif: 'following a calling',
+      pronouns: { subj: 'she', obj: 'her', pos: 'her' },
     },
     vasquez: {
       id: 'ANPC-SF-0001',
@@ -1287,6 +1324,15 @@ const SFANPC = (function () {
       moraleFloor: 0.15,
       disposition: 0.60,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: false,
+      genderLabel: 'female',
+      nationalityLabel: 'Mexican',
+      rankLabel: 'Commander',
+      primarySkill: 'commander',
+      motivationLabel: 'duty',
+      backstoryMotif: 'duty above all',
+      pronouns: { subj: 'she', obj: 'her', pos: 'her' },
     },
     nightshade: {
       id: 'ANPC-SF-E-0001',
@@ -1310,6 +1356,15 @@ const SFANPC = (function () {
       moraleFloor: 0.10,
       disposition: -0.60,
       faction: 'enemy',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: false,
+      genderLabel: 'male',
+      nationalityLabel: 'Unknown',
+      rankLabel: 'Ace Pilot',
+      primarySkill: 'ghost',
+      motivationLabel: 'obsession',
+      backstoryMotif: 'running from past',
+      pronouns: { subj: 'he', obj: 'him', pos: 'his' },
     },
     tanaka: {
       id: 'ANPC-SF-0004',
@@ -1333,6 +1388,15 @@ const SFANPC = (function () {
       moraleFloor: 0.20,
       disposition: 0.55,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: false,
+      genderLabel: 'female',
+      nationalityLabel: 'Japanese',
+      rankLabel: 'Lt. Commander',
+      primarySkill: 'tactician',
+      motivationLabel: 'duty',
+      backstoryMotif: 'chosen by fate',
+      pronouns: { subj: 'she', obj: 'her', pos: 'her' },
     },
     park: {
       id: 'ANPC-SF-0005',
@@ -1356,6 +1420,15 @@ const SFANPC = (function () {
       moraleFloor: 0.25,
       disposition: 0.60,
       faction: 'allied',
+      // Wingman / manifold-extension metadata
+      wingmanEligible: false,
+      genderLabel: 'female',
+      nationalityLabel: 'Korean',
+      rankLabel: 'Ensign',
+      primarySkill: 'scout',
+      motivationLabel: 'curiosity',
+      backstoryMotif: 'proving worth',
+      pronouns: { subj: 'she', obj: 'her', pos: 'her' },
     },
   };
 

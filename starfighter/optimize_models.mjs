@@ -45,6 +45,11 @@ const TARGETS = {
     { suffix: 'lod1', ratio: 0.25, keepTextures: false },
     { suffix: 'lod2', ratio: 0.08, keepTextures: false },
   ],
+  'HiveQueen_BossW10.glb': [
+    { suffix: 'lod0', ratio: 0.70, keepTextures: true },
+    { suffix: 'lod1', ratio: 0.25, keepTextures: false },
+    { suffix: 'lod2', ratio: 0.06, keepTextures: false },
+  ],
 };
 
 function simplifyPrimitive(posAccessor, idxAccessor, ratio) {

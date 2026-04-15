@@ -150,29 +150,206 @@ const SFAudio = (function () {
         /Microsoft.*Luke/i,
       ]
     },
+
+    // ── ANPC Character-Specific Voice Modules ──
+    // Each ANPC gets a distinct voice identity. Generic bot voice forbidden.
+
+    anpc_hotshot: {
+      label: 'Hotshot — Marcus Chen (Brash, Energetic)',
+      lang: 'en-US',
+      preferFemale: false,
+      rate: 1.18,       // fast — impulsive, eager, proves himself
+      pitch: 1.28,      // higher than average male — young energy
+      volume: 1.0,
+      radioType: 'cockpit',
+      selectors: [
+        /Microsoft.*Eric.*Online/i,
+        /Microsoft.*Guy.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    anpc_frostbite: {
+      label: 'Frostbite — Viktor Kozlov (Cold, Precise)',
+      lang: 'en-GB',
+      preferFemale: false,
+      rate: 0.78,       // deliberate — methodical, every word measured
+      pitch: 0.70,      // low — ice-cold authority
+      volume: 1.0,
+      radioType: 'cockpit',
+      selectors: [
+        /Google UK English Male/i,
+        /Microsoft.*Ryan.*Online/i,
+        /Microsoft.*George.*Online/i,
+      ]
+    },
+    anpc_lighthouse: {
+      label: 'Lighthouse — Dr. Amara Okafor (Calm, Authoritative)',
+      lang: 'en-GB',
+      preferFemale: true,
+      rate: 0.87,       // measured, deliberate — never rushed
+      pitch: 1.02,      // clear authoritative female — the anchor
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [
+        /Google UK English Female/i,
+        /Microsoft.*Libby.*Online/i,
+        /Microsoft.*Sonia.*Online/i,
+      ]
+    },
+    anpc_vasquez: {
+      label: 'Cdr. Vasquez (Commanding)',
+      lang: 'en-US',
+      preferFemale: true,
+      rate: 0.91,       // firm, unhurried command cadence
+      pitch: 0.90,      // lower than standard female — commanding weight
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [
+        /Microsoft.*Aria.*Online/i,
+        /Microsoft.*Olivia.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    anpc_nightshade: {
+      label: 'Nightshade — Enemy Ace (Calm, Menacing)',
+      lang: 'en-US',
+      preferFemale: false,
+      rate: 0.72,       // very slow — intimidating, surgical precision
+      pitch: 0.58,      // lowest pitch — cold menace
+      volume: 1.0,
+      radioType: 'enemy',
+      selectors: [
+        /Microsoft.*Davis.*Online/i,
+        /Microsoft.*Guy.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    anpc_tanaka: {
+      label: 'XO Tanaka (Precise, Efficient)',
+      lang: 'en-GB',
+      preferFemale: true,
+      rate: 0.96,       // crisp efficiency
+      pitch: 1.12,      // clear, focused
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [
+        /Google UK English Female/i,
+        /Microsoft.*Libby.*Online/i,
+      ]
+    },
+    anpc_scope: {
+      label: 'Scope — Ens. Ji-Yeon Park (Alert, Young)',
+      lang: 'en-US',
+      preferFemale: true,
+      rate: 1.08,       // slightly faster — eager, excited about findings
+      pitch: 1.20,      // higher — youngest crew member
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [
+        /Microsoft.*Jenny.*Online/i,
+        /Microsoft.*Aria.*Online/i,
+        /Google US English/i,
+      ]
+    },
+    anpc_chen: {
+      label: 'Lt. Chen (US Female Tactical)',
+      lang: 'en-US',
+      preferFemale: true,
+      rate: 0.94,
+      pitch: 1.00,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Microsoft.*Aria.*Online/i, /Google US English/i]
+    },
+    anpc_kozlov: {
+      label: 'Sgt. Kozlov (US Male Gruff)',
+      lang: 'en-US',
+      preferFemale: false,
+      rate: 0.86,
+      pitch: 0.75,      // deep gruff sergeant
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Microsoft.*Eric.*Online/i, /Microsoft.*Christopher.*Online/i, /Google US English/i]
+    },
+    anpc_osei: {
+      label: 'Ens. Osei (South African Male)',
+      lang: 'en-ZA',
+      preferFemale: false,
+      rate: 0.90,
+      pitch: 0.88,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Google.*South Africa/i, /Microsoft.*Luke/i]
+    },
+    anpc_okafor: {
+      label: 'CPO Okafor (AU Deck Chief)',
+      lang: 'en-AU',
+      preferFemale: false,
+      rate: 0.88,
+      pitch: 0.92,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Google.*Australian/i, /Microsoft.*Australia/i]
+    },
+    anpc_ruiz: {
+      label: 'PO2 Ruiz (AU Female Deck)',
+      lang: 'en-AU',
+      preferFemale: true,
+      rate: 0.93,
+      pitch: 1.05,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Google.*Australian.*Female/i, /Microsoft.*Natasha.*Online/i, /Microsoft.*Annette.*Online/i]
+    },
+    anpc_cruz: {
+      label: 'Lt. Cruz (Indian Female Ops)',
+      lang: 'en-IN',
+      preferFemale: true,
+      rate: 0.92,
+      pitch: 1.08,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Google.*India/i, /Microsoft.*Neerja.*Online/i]
+    },
+    anpc_hollis: {
+      label: 'Dr. Hollis (UK Female Science)',
+      lang: 'en-GB',
+      preferFemale: true,
+      rate: 0.90,
+      pitch: 1.06,
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [/Google UK English Female/i, /Microsoft.*Sonia.*Online/i]
+    },
   };
 
-  // ── Per-crew voice mapping: each CIC officer gets a distinct voice/accent ──
+  // ── Per-crew voice mapping: each character gets a unique voice module. Generic bot voice forbidden. ──
   const CREW_VOICE_MAP = {
-    'Cdr. Vasquez': 'us_male_deep',     // deep commanding male
-    'XO Tanaka': 'uk_male',           // British-accented male XO
-    'Lt. Chen': 'us_female',         // US female tactical
-    'Sgt. Kozlov': 'us_male',           // US male sergeant
-    'Ens. Park': 'us_female_bright',  // bright young ensign
-    'Ens. Osei': 'za_male',           // South African male
-    'CPO Okafor': 'au_command',        // Australian deck chief
-    'PO2 Ruiz': 'au_female',         // Australian female deck
-    'Lt. Cruz': 'in_female',         // Indian female ops
-    'Dr. Hollis': 'uk_female',         // British female science
-    // ANPC Characters
-    'Hotshot': 'us_male',             // Marcus Chen — young energetic male
-    'Frostbite': 'us_male_deep',      // Viktor Kozlov — calm precise male
-    'Lighthouse': 'uk_female',         // Dr. Amara Okafor — calm authoritative female
-    'Resolute Actual': 'us_female',   // Cdr. Vasquez — commanding female
-    'Resolute XO': 'uk_male',         // XO Tanaka — precise
-    'Scope': 'us_female_bright',      // Ens. Park — alert young female
-    'Nightshade': 'us_male_deep',     // Enemy ace — calm menacing male
-    '[INTERCEPTED] Nightshade': 'us_male_deep',
+    // CIC Crew — each officer has a distinct accent, pitch, and cadence
+    'Cdr. Vasquez': 'anpc_vasquez',   // Commanding US female — mission authority
+    'XO Tanaka': 'anpc_tanaka',    // UK female — precise, efficient
+    'Lt. Chen': 'anpc_chen',      // US female — tactical
+    'Sgt. Kozlov': 'anpc_kozlov',    // US male — gruff sergeant
+    'Ens. Park': 'anpc_scope',     // US female bright — eager young ensign
+    'Ens. Osei': 'anpc_osei',      // South African male
+    'CPO Okafor': 'anpc_okafor',    // AU male — deck chief
+    'PO2 Ruiz': 'anpc_ruiz',      // AU female — deck
+    'Lt. Cruz': 'anpc_cruz',      // Indian female — ops
+    'Dr. Hollis': 'anpc_hollis',    // UK female — science/sensor
+    // ANPC Wingmen — fighter pilots in the cockpit
+    'Hotshot': 'anpc_hotshot',    // Marcus Chen — brash, young, energetic
+    'Frostbite': 'anpc_frostbite',  // Viktor Kozlov — cold, clipped, minimal
+    // Command Operators
+    'Lighthouse': 'anpc_lighthouse', // Dr. Amara Okafor — calm, authoritative anchor
+    'Resolute Actual': 'anpc_vasquez',    // Cdr. Vasquez — commanding
+    'Resolute XO': 'anpc_tanaka',     // XO Tanaka — precise
+    'Scope': 'anpc_scope',      // Ens. Park — alert
+    // Enemy — heavy radio processing, intercepted transmission
+    'Nightshade': 'anpc_nightshade', // Enemy ace — ice-cold, surgical
+    '[INTERCEPTED] Nightshade': 'anpc_nightshade', // Same with intercept effect
+    // Support missions
+    'Lifeline': 'anpc_ruiz',       // Tanker crew
+    'Mercy': 'anpc_hollis',     // Medical frigate
   };
 
   // ── Engine thrust rumble system ──
@@ -252,29 +429,46 @@ const SFAudio = (function () {
     Object.keys(VOICE_MODULES).forEach(id => _resolveVoice(id));
   }
 
+  // Known-female and known-male voice name fragments used across TTS vendors
+  const _FEMALE_RE = /\bfemale\b|natasha|annette|libby|sonia|aria|olivia|samantha|karen|jenny|zira|heera|susan|alice|emma|amy|eleanor|grace|hazel|emily|sophia|charlotte|victoria|jasmine|neerja|moira|tessa|fiona/i;
+  const _MALE_RE = /\bmale\b|ryan|george|guy|eric|davis|james|christopher|paul|mark|thomas|leon|daniel|david|richard|oliver|rishi|junior|arthur|alfie|harvey|jack|liam|noah|ethan|prabhat|navin/i;
+
   function _pickVoice(moduleId, voices) {
     const cfg = VOICE_MODULES[moduleId] || VOICE_MODULES.au_female;
     let best = null;
     let bestScore = -1e9;
 
+    // Determine required locale root (e.g. 'en-AU' → 'en')
+    const langRoot = cfg.lang ? cfg.lang.split('-')[0] : 'en';
+    const langFull = cfg.lang || 'en-US';
+
     voices.forEach(v => {
       let score = 0;
 
-      // Strong explicit selector matches first
-      if (cfg.selectors.some(re => re.test(v.name))) score += 120;
+      // ── Tier 1: explicit selector match (highest trust) ──
+      if (cfg.selectors && cfg.selectors.some(re => re.test(v.name))) score += 120;
 
-      if (cfg.lang && v.lang === cfg.lang) score += 60;
-      if (cfg.lang && v.lang && v.lang.startsWith(cfg.lang.split('-')[0])) score += 20;
+      // ── Tier 2: language / locale match ──
+      if (v.lang === langFull) score += 60;
+      else if (v.lang && v.lang.startsWith(langRoot)) score += 20;
 
+      // ── Tier 3: gender match — symmetric bonus/penalty ──
+      const isFemName = _FEMALE_RE.test(v.name);
+      const isMalName = _MALE_RE.test(v.name);
       if (cfg.preferFemale) {
-        if (/female|natasha|annette|libby|sonia|aria|olivia|samantha|karen/i.test(v.name)) score += 30;
+        if (isFemName) score += 40;   // wanted female, found female — reward
+        if (isMalName) score -= 35;   // wanted female, found male — penalise
+      } else {
+        // preferMale
+        if (isMalName) score += 40;   // wanted male, found male — reward
+        if (isFemName) score -= 35;   // wanted male, found female — penalise
       }
 
-      // Prefer cloud/online neural voices when available
+      // ── Tier 4: quality preference (cloud/neural > local) ──
       if (!v.localService) score += 12;
       if (/online|neural|natural|enhanced/i.test(v.name)) score += 10;
 
-      // Penalize generic sounding labels
+      // ── Tier 5: hard penalties ──
       if (/generic|default|robot|espeak|festival/i.test(v.name)) score -= 100;
 
       if (score > bestScore) {
@@ -284,6 +478,32 @@ const SFAudio = (function () {
     });
 
     return best;
+  }
+
+  // Diagnostic: log all voices with their scores for a given module (call from console)
+  function debugVoiceScores(moduleId) {
+    if (!('speechSynthesis' in window)) return [];
+    const voices = speechSynthesis.getVoices();
+    const cfg = VOICE_MODULES[moduleId] || VOICE_MODULES.au_female;
+    const langRoot = cfg.lang ? cfg.lang.split('-')[0] : 'en';
+    const langFull = cfg.lang || 'en-US';
+    return voices.map(v => {
+      let score = 0;
+      if (cfg.selectors && cfg.selectors.some(re => re.test(v.name))) score += 120;
+      if (v.lang === langFull) score += 60;
+      else if (v.lang && v.lang.startsWith(langRoot)) score += 20;
+      const isFemName = _FEMALE_RE.test(v.name);
+      const isMalName = _MALE_RE.test(v.name);
+      if (cfg.preferFemale) {
+        if (isFemName) score += 40; if (isMalName) score -= 35;
+      } else {
+        if (isMalName) score += 40; if (isFemName) score -= 35;
+      }
+      if (!v.localService) score += 12;
+      if (/online|neural|natural|enhanced/i.test(v.name)) score += 10;
+      if (/generic|default|robot|espeak|festival/i.test(v.name)) score -= 100;
+      return { name: v.name, lang: v.lang, score, local: v.localService };
+    }).sort((a, b) => b.score - a.score);
   }
 
   function _resolveVoice(moduleId = _activeVoiceModule) {
@@ -359,6 +579,7 @@ const SFAudio = (function () {
       case 'plasma_spit': return _playPlasmaSpit(t);
       case 'hull_alarm': return _playHullAlarm(t);
       case 'egg_hatch': return _playEggHatch(t);
+      case 'victory_fanfare': return _playVictoryFanfare(t);
     }
   }
 
@@ -953,6 +1174,57 @@ const SFAudio = (function () {
     osc.stop(t + 0.08);
   }
 
+  // BFXG-009 §1.6: Victory fanfare — 3-4 second triumphant sting played on wave clear
+  // Three-note ascending figure (C-E-G major triad) with harmonics + tail shimmer
+  function _playVictoryFanfare(t) {
+    const notes = [
+      { freq: 523.25, start: 0.0, dur: 1.6 },   // C5
+      { freq: 659.25, start: 0.55, dur: 1.5 },   // E5
+      { freq: 783.99, start: 1.10, dur: 2.0 },   // G5 — sustained
+    ];
+    for (const n of notes) {
+      // Primary sine carrier
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(n.freq, t + n.start);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0, t + n.start);
+      g.gain.linearRampToValueAtTime(0.14, t + n.start + 0.06);
+      g.gain.setValueAtTime(0.12, t + n.start + n.dur * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.001, t + n.start + n.dur);
+      osc.connect(g);
+      g.connect(masterGain);
+      osc.start(t + n.start);
+      osc.stop(t + n.start + n.dur);
+
+      // Triangle harmonic one octave up — adds brightness
+      const harmOsc = ctx.createOscillator();
+      harmOsc.type = 'triangle';
+      harmOsc.frequency.setValueAtTime(n.freq * 2, t + n.start);
+      const harmG = ctx.createGain();
+      harmG.gain.setValueAtTime(0.0, t + n.start);
+      harmG.gain.linearRampToValueAtTime(0.05, t + n.start + 0.08);
+      harmG.gain.exponentialRampToValueAtTime(0.001, t + n.start + n.dur * 0.75);
+      harmOsc.connect(harmG);
+      harmG.connect(masterGain);
+      harmOsc.start(t + n.start);
+      harmOsc.stop(t + n.start + n.dur);
+    }
+    // Tail: shimmering overtone at 1318 Hz (E6) fades in during G note
+    const shimOsc = ctx.createOscillator();
+    shimOsc.type = 'sine';
+    shimOsc.frequency.setValueAtTime(1318.5, t + 1.4);
+    shimOsc.frequency.linearRampToValueAtTime(1400, t + 3.8);
+    const shimG = ctx.createGain();
+    shimG.gain.setValueAtTime(0.0, t + 1.4);
+    shimG.gain.linearRampToValueAtTime(0.04, t + 2.2);
+    shimG.gain.exponentialRampToValueAtTime(0.001, t + 3.8);
+    shimOsc.connect(shimG);
+    shimG.connect(masterGain);
+    shimOsc.start(t + 1.4);
+    shimOsc.stop(t + 3.8);
+  }
+
   // GDD §3.1: Distant klaxons in launch bay
   function _playKlaxon(t) {
     for (let i = 0; i < 3; i++) {
@@ -1404,12 +1676,15 @@ const SFAudio = (function () {
 
         // Use a hidden audio element to capture the speech output
         // Fallback: just play through normal synthesis (still sounds better with voice selection)
+        utter.onend = opts.onEnd || null;
         speechSynthesis.speak(utter);
       } catch (e) {
         // Fallback to direct speech
+        utter.onend = opts.onEnd || null;
         speechSynthesis.speak(utter);
       }
     } else {
+      utter.onend = opts.onEnd || null;
       speechSynthesis.speak(utter);
     }
 
@@ -1464,6 +1739,164 @@ const SFAudio = (function () {
   function speakAs(crewName, text, opts = {}) {
     const voiceModule = CREW_VOICE_MAP[crewName] || _activeVoiceModule;
     speak(text, { ...opts, voiceModule });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ANPC VOICE DISPATCH — Character-specific tactical radio voices
+  // Per ButterflyFX ANPC Guideline §7.2: Generic bot voice forbidden.
+  // Each character gets distinct pitch, rate, voice selection, and radio profile.
+  // Speech queue per §11.2: max 3 queued, oldest dropped on overflow (except Mayday).
+  // ══════════════════════════════════════════════════════════════════
+
+  const _anpcQueue = [];          // speech queue items: { callsign, text, priority }
+  let _anpcSpeaking = false;      // true while an utterance is in progress
+  const ANPC_QUEUE_MAX = 3;       // §11.2 max queued transmissions
+  let _anpcLastSender = '';       // avoid same-sender back-to-back spam
+
+  // ── Radio effect: pre-transmission click + optional alien intercept tone ──
+  function _playRadioClick(radioType, phase) {
+    if (!ctx || !masterGain) return;
+
+    const isEnemy = radioType === 'enemy';
+    const isCockpit = radioType === 'cockpit';
+    const now = ctx.currentTime;
+
+    if (isEnemy && phase === 'pre') {
+      // Alien intercept tone — rising sawtooth sweep, filtered static burst
+      const sweep = ctx.createOscillator();
+      sweep.type = 'sawtooth';
+      sweep.frequency.setValueAtTime(140, now);
+      sweep.frequency.linearRampToValueAtTime(680, now + 0.10);
+      const sweepGain = ctx.createGain();
+      sweepGain.gain.setValueAtTime(0.18, now);
+      sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      const sweepBPF = ctx.createBiquadFilter();
+      sweepBPF.type = 'bandpass';
+      sweepBPF.frequency.value = 380;
+      sweepBPF.Q.value = 4.0;
+      sweep.connect(sweepBPF);
+      sweepBPF.connect(sweepGain);
+      sweepGain.connect(masterGain);
+      sweep.start(now);
+      sweep.stop(now + 0.14);
+
+      // Simultaneous noise burst
+      const noiseLen = Math.floor(ctx.sampleRate * 0.09);
+      const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+      const nd = noiseBuf.getChannelData(0);
+      for (let i = 0; i < noiseLen; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (noiseLen * 0.4));
+      const noiseSrc = ctx.createBufferSource();
+      noiseSrc.buffer = noiseBuf;
+      const noiseHP = ctx.createBiquadFilter();
+      noiseHP.type = 'highpass';
+      noiseHP.frequency.value = 2000;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.35;
+      noiseSrc.connect(noiseHP);
+      noiseHP.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      noiseSrc.start(now);
+      return;
+    }
+
+    // Standard tactical radio click (cockpit = louder + wider static)
+    const clickDuration = isCockpit ? 0.065 : 0.045;
+    const clickVol = isCockpit ? 0.30 : 0.18;
+    const bpFreq = isCockpit ? 1400 : 2800;
+    const clickLen = Math.floor(ctx.sampleRate * clickDuration);
+    const clickBuf = ctx.createBuffer(1, clickLen, ctx.sampleRate);
+    const cd = clickBuf.getChannelData(0);
+    for (let i = 0; i < clickLen; i++) {
+      const env = phase === 'pre'
+        ? Math.exp(-i / (clickLen * 0.45))
+        : (i < clickLen * 0.25 ? (i / (clickLen * 0.25)) : Math.exp(-(i - clickLen * 0.25) / (clickLen * 0.45)));
+      cd[i] = (Math.random() * 2 - 1) * clickVol * env;
+    }
+    const clickSrc = ctx.createBufferSource();
+    clickSrc.buffer = clickBuf;
+    const clickBPF = ctx.createBiquadFilter();
+    clickBPF.type = 'bandpass';
+    clickBPF.frequency.value = bpFreq;
+    clickBPF.Q.value = isCockpit ? 0.9 : 0.7;
+    const clickGain = ctx.createGain();
+    clickGain.gain.value = 0.8;
+    clickSrc.connect(clickBPF);
+    clickBPF.connect(clickGain);
+    clickGain.connect(masterGain);
+    clickSrc.start(now);
+  }
+
+  // ── Process next item from ANPC speech queue ──
+  function _drainAnpcQueue() {
+    if (_anpcSpeaking || _anpcQueue.length === 0) return;
+    const item = _anpcQueue.shift();
+    _anpcSpeaking = true;
+    _anpcLastSender = item.callsign;
+
+    const moduleId = CREW_VOICE_MAP[item.callsign] || 'anpc_lighthouse';
+    const voiceCfg = VOICE_MODULES[moduleId];
+    const radioType = (voiceCfg && voiceCfg.radioType) ? voiceCfg.radioType : 'command';
+
+    // Pre-click (enemy gets alien intercept tone)
+    _playRadioClick(radioType, 'pre');
+
+    // Brief silence before speech (enemy slightly longer — "intercepted" feel)
+    const preDelay = radioType === 'enemy' ? 160 : 90;
+    setTimeout(() => {
+      // Estimate speech duration for post-click timing
+      const rateAdj = (voiceCfg && voiceCfg.rate) ? voiceCfg.rate : 1.0;
+      const estDuration = Math.max(800, (item.text.length * 62) / rateAdj);
+
+      speak(item.text, {
+        voiceModule: moduleId,
+        onEnd: () => {
+          // Post-transmission click after a brief pause
+          setTimeout(() => {
+            _playRadioClick(radioType, 'post');
+            _anpcSpeaking = false;
+            setTimeout(_drainAnpcQueue, 80); // chain to next queued item
+          }, 60);
+        },
+      });
+
+      // Fallback: if speak() onEnd never fires (unfocused tab, etc.), force drain after estimate
+      setTimeout(() => {
+        if (_anpcSpeaking && _anpcLastSender === item.callsign) {
+          _playRadioClick(radioType, 'post');
+          _anpcSpeaking = false;
+          setTimeout(_drainAnpcQueue, 80);
+        }
+      }, estDuration + 1500);
+
+    }, preDelay);
+  }
+
+  // ── speakAnpc: main entry point — voice every comm with the right character voice ──
+  // Call from addComm() with the sender name string and message text.
+  function speakAnpc(callsign, text) {
+    if (!('speechSynthesis' in window)) return;
+    if (!ctx) init();
+    if (!text || !callsign) return;
+
+    // Strip HUD markup, brackets, channel prefixes that shouldn't be spoken
+    const cleanText = text
+      .replace(/\[.*?\]/g, '')      // remove [CHANNEL] prefixes
+      .replace(/\{.*?\}/g, '')      // remove unfilled template slots
+      .replace(/[*_~`]/g, '')       // remove markdown
+      .trim();
+    if (!cleanText) return;
+
+    // Classify priority: Mayday/eject calls bypass queue overflow
+    const isMayday = /mayday|eject|punching out|going down/i.test(cleanText);
+
+    // Queue management: max ANPC_QUEUE_MAX. Drop oldest non-emergency on overflow.
+    if (_anpcQueue.length >= ANPC_QUEUE_MAX) {
+      if (!isMayday) return;  // discard overflow non-emergency per §11.2
+      _anpcQueue.shift();     // emergency: drops oldest to make room
+    }
+
+    _anpcQueue.push({ callsign, text: cleanText, priority: isMayday ? 1 : 0 });
+    _drainAnpcQueue();
   }
 
   // Volume control
@@ -1628,6 +2061,39 @@ const SFAudio = (function () {
     _strafeHissNodes.hissGain.gain.setTargetAtTime(vol, t, 0.02); // fast attack
   }
 
+  // ── Override a named crew member's voice module (e.g. let player pick commander accent) ──
+  function setCrewVoiceModule(crewName, moduleId) {
+    if (!VOICE_MODULES[moduleId]) return false;
+    CREW_VOICE_MAP[crewName] = moduleId;
+    _resolveVoice(moduleId);
+    return true;
+  }
+
+  // ── Return voice modules grouped by gender, filtered to player-facing options ──
+  const PLAYER_VOICE_MENU = {
+    female: [
+      { id: 'us_female', label: '🇺🇸 American (Standard)' },
+      { id: 'anpc_vasquez', label: '🇺🇸 American (Commanding)' },
+      { id: 'uk_female', label: '🇬🇧 British' },
+      { id: 'anpc_hollis', label: '🇬🇧 British (Scientific)' },
+      { id: 'au_female', label: '🇦🇺 Australian' },
+      { id: 'in_female', label: '🇮🇳 Indian' },
+      { id: 'anpc_scope', label: '🇺🇸 American (Young/Alert)' },
+      { id: 'anpc_tanaka', label: '🇬🇧 British (XO Precise)' },
+    ],
+    male: [
+      { id: 'us_male', label: '🇺🇸 American' },
+      { id: 'us_male_deep', label: '🇺🇸 American (Deep)' },
+      { id: 'uk_male', label: '🇬🇧 British' },
+      { id: 'au_command', label: '🇦🇺 Australian' },
+      { id: 'za_male', label: '🇿🇦 South African' },
+      { id: 'anpc_kozlov', label: '🇺🇸 American (Sergeant)' },
+      { id: 'anpc_frostbite', label: '🇬🇧 British (Cold/Clipped)' },
+      { id: 'anpc_osei', label: '🇿🇦 South African (Officer)' },
+    ],
+  };
+  function getPlayerVoiceMenu() { return PLAYER_VOICE_MENU; }
+
   return {
     init,
     resume,
@@ -1636,6 +2102,7 @@ const SFAudio = (function () {
     playSound,
     speak,
     speakAs,
+    speakAnpc,
     startBayAmbience,
     stopBayAmbience,
     startCockpitHum,
@@ -1651,6 +2118,9 @@ const SFAudio = (function () {
     setVoiceModule,
     getVoiceModule,
     listVoiceModules,
+    setCrewVoiceModule,
+    getPlayerVoiceMenu,
+    debugVoiceScores,
     getCtx: () => ctx,
     getMasterGain: () => masterGain
   };

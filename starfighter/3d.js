@@ -40,50 +40,78 @@ const SF3D = (function () {
     const glbModels = {};    // { modelName: THREE.Group }
     // LOD levels: [{ path, distance }] — distance is the camera distance at which
     // Three.js switches FROM this level to the next (coarser) one.
-    // Model paths — single LOD using full original GLBs
+    // lod0 = highest quality (close range); materials/textures embedded.
+    // lod1/lod2 = geometry-only; materials copied from lod0 at load time.
+    // Distances use game world units; glow sphere takes over at DOT_DIST.
     const GLB_LOD = {
         enemy: [
-            { path: 'assets/models/AlienEnemyFighter.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 250 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 550 },
         ],
         ally: [
-            { path: 'assets/models/HumanFriendlStarFighter.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 220 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 480 },
         ],
         'alien-baseship': [
-            { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 1300 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 2700 },
         ],
         predator: [
-            { path: 'assets/models/AlienEnemyPreditorDrone.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb', distance: 380 },
+            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb', distance: 820 },
         ],
         baseship: [
-            { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 2500 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 5500 },
         ],
         station: [
-            { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 4800 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 10000 },
         ],
-        // New enemy types
         interceptor: [
-            { path: 'assets/models/Interceptor_Needle.glb', distance: 0 },
+            { path: 'assets/models/optimized/Interceptor_Needle_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Interceptor_Needle_lod1.glb', distance: 250 },
+            { path: 'assets/models/optimized/Interceptor_Needle_lod2.glb', distance: 550 },
         ],
         bomber: [
-            { path: 'assets/models/Bomber_Leviathan%20Tick.glb', distance: 0 },
+            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod1.glb', distance: 320 },
+            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod2.glb', distance: 680 },
         ],
         dreadnought: [
-            { path: 'assets/models/Dreadnought_Hive%20Throne.glb', distance: 0 },
+            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod1.glb', distance: 950 },
+            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod2.glb', distance: 2100 },
         ],
-        // Friendly support
         tanker: [
-            { path: 'assets/models/friendlyfueltanker.glb', distance: 0 },
+            { path: 'assets/models/optimized/friendlyfueltanker_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/friendlyfueltanker_lod1.glb', distance: 250 },
+            { path: 'assets/models/optimized/friendlyfueltanker_lod2.glb', distance: 550 },
         ],
         medic: [
-            { path: 'assets/models/freindly_medical_frigate.glb', distance: 0 },
+            { path: 'assets/models/optimized/freindly_medical_frigate_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/freindly_medical_frigate_lod1.glb', distance: 320 },
+            { path: 'assets/models/optimized/freindly_medical_frigate_lod2.glb', distance: 680 },
         ],
-        // Earth uses full hi-poly model (single level) — it's always distant, always impressive
         earth: [
-            { path: 'assets/models/Earth.glb', distance: 0 },
+            { path: 'assets/models/optimized/Earth_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Earth_lod1.glb', distance: 80000 },
+            { path: 'assets/models/optimized/Earth_lod2.glb', distance: 150000 },
         ],
-        // Moon uses full model — visible from combat area
         moon: [
-            { path: 'assets/models/moon.glb', distance: 0 },
+            { path: 'assets/models/optimized/moon_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/moon_lod1.glb', distance: 60000 },
+        ],
+        'hive-queen': [
+            { path: 'assets/models/optimized/HiveQueen_BossW10_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/HiveQueen_BossW10_lod1.glb', distance: 1200 },
+            { path: 'assets/models/optimized/HiveQueen_BossW10_lod2.glb', distance: 2800 },
         ],
     };
     // Scale factors — proportional to real ship sizes, forced perspective for celestials
@@ -103,6 +131,7 @@ const SF3D = (function () {
         station: 3000,         // space station ~massive, thousands of people
         earth: 18000,  // forced perspective — fills ~27° of sky at distance 60000
         moon: 4000,    // forced perspective — fills ~4.5° of sky at distance 80000 (1/4.5 Earth ratio)
+        'hive-queen': 2400,  // bio-organic queen ~3000m — slightly smaller than alien-baseship
     };
 
     // ── Dimensional LOD Manifold: z = xy ──
@@ -115,6 +144,7 @@ const SF3D = (function () {
         enemy: 1800, predator: 2500, interceptor: 1800, bomber: 2200,
         dreadnought: 6000, 'alien-baseship': 8000, tanker: 1800, medic: 2000,
         ally: 1500, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
+        'hive-queen': 9000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
 
@@ -127,6 +157,7 @@ const SF3D = (function () {
         enemy: 800, predator: 1200, interceptor: 800, bomber: 1000,
         dreadnought: 3000, 'alien-baseship': 4000, tanker: 800, medic: 1000,
         ally: 700, baseship: 8000, station: 15000, earth: 200000, moon: 150000,
+        'hive-queen': 5000,
         laser: 600, machinegun: 400, torpedo: 800, plasma: 600,
         egg: 500, youngling: 400,
     };
@@ -136,6 +167,7 @@ const SF3D = (function () {
         enemy: 0x22ff44, predator: 0x44ff00, interceptor: 0x00ffcc, bomber: 0xff6600,
         dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0xffaa44, medic: 0xff4444,
         ally: 0x4488ff, baseship: 0x88ccff, station: 0xaaaaff, earth: 0x4488ff, moon: 0xcccccc,
+        'hive-queen': 0xff00cc,
         laser: 0x00ffaa, machinegun: 0xffcc00, torpedo: 0xff8800, plasma: 0x44ff00,
         egg: 0x99cc33, youngling: 0x332211,
     };
@@ -329,6 +361,61 @@ const SF3D = (function () {
     // ── Shared materials (created once, reused across all entities) ──
     let sharedMats = null;
 
+    // ── Cached weapon billboard materials (created once) ──
+    let _laserBillMat = null;
+    let _torpBillMat = null;
+
+    function _createBeamTexture(hexColor) {
+        const W = 32, H = 256;
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const c = cv.getContext('2d');
+        const r = (hexColor >> 16) & 0xff;
+        const g = (hexColor >> 8) & 0xff;
+        const b = hexColor & 0xff;
+        // Cross-beam gradient: transparent at edges, blazing white-hot center
+        const xg = c.createLinearGradient(0, 0, W, 0);
+        xg.addColorStop(0, `rgba(${r},${g},${b},0)`);
+        xg.addColorStop(0.2, `rgba(${r},${g},${b},0.35)`);
+        xg.addColorStop(0.5, `rgba(255,255,255,1)`);
+        xg.addColorStop(0.8, `rgba(${r},${g},${b},0.35)`);
+        xg.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        c.fillStyle = xg;
+        c.fillRect(0, 0, W, H);
+        // Along-beam mask: fade ends to transparent
+        c.globalCompositeOperation = 'destination-in';
+        const yg = c.createLinearGradient(0, 0, 0, H);
+        yg.addColorStop(0, 'rgba(0,0,0,0)');
+        yg.addColorStop(0.05, 'rgba(0,0,0,1)');
+        yg.addColorStop(0.95, 'rgba(0,0,0,1)');
+        yg.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = yg;
+        c.fillRect(0, 0, W, H);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.needsUpdate = true;
+        return tex;
+    }
+
+    function _getLaserBillMat() {
+        if (_laserBillMat) return _laserBillMat;
+        _laserBillMat = new THREE.MeshBasicMaterial({
+            map: _createBeamTexture(0x00ffcc),
+            transparent: true, blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide, depthWrite: false,
+        });
+        return _laserBillMat;
+    }
+
+    function _getTorpBillMat() {
+        if (_torpBillMat) return _torpBillMat;
+        _torpBillMat = new THREE.MeshBasicMaterial({
+            map: _createBeamTexture(0xff6600),
+            transparent: true, blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide, depthWrite: false,
+        });
+        return _torpBillMat;
+    }
+
     let launchPhaseActive = false;
 
     function setLaunchPhase(active) {
@@ -515,8 +602,10 @@ const SF3D = (function () {
         const pct = Math.floor((_modelsLoaded / _totalModelsToLoad) * 100);
         const bar = document.getElementById('loading-bar');
         const text = document.getElementById('loading-text');
+        const pctEl = document.getElementById('loading-pct');
         if (bar) bar.style.width = pct + '%';
-        if (text) text.textContent = label ? ('LOADING ' + label.toUpperCase() + '...') : ('LOADING ' + pct + '%');
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (text) text.textContent = label ? ('LOADING ' + label.toUpperCase() + '...') : 'LOADING ASSETS...';
         if (_modelsLoaded >= _totalModelsToLoad) {
             _allModelsReady = true;
             console.log('All GLB models loaded — game ready');
@@ -628,13 +717,39 @@ const SF3D = (function () {
     // ── Bioluminescent glow for alien species from Brown Giant ──
     // They glow like deep-sea creatures in the vacuum of space
     const ALIEN_GLOW_COLORS = {
-        enemy: { emissive: 0x22ff44, intensity: 0.6, pointColor: 0x44ff66, pointIntensity: 2.5, pointDist: 300 },
-        predator: { emissive: 0x44ff00, intensity: 0.8, pointColor: 0x66ff22, pointIntensity: 4.0, pointDist: 600 },
-        interceptor: { emissive: 0x00ffcc, intensity: 0.7, pointColor: 0x22ffdd, pointIntensity: 3.0, pointDist: 300 },
-        bomber: { emissive: 0xff6600, intensity: 0.6, pointColor: 0xff8800, pointIntensity: 3.5, pointDist: 500 },
-        dreadnought: { emissive: 0xff0044, intensity: 0.7, pointColor: 0xff2266, pointIntensity: 8.0, pointDist: 3000 },
-        'alien-baseship': { emissive: 0xff00ff, intensity: 0.5, pointColor: 0xff44ff, pointIntensity: 6.0, pointDist: 2000 },
+        enemy: { emissive: 0x22ff44, intensity: 1.4, pointColor: 0x44ff66, pointIntensity: 5.0, pointDist: 600 },
+        predator: { emissive: 0x44ff00, intensity: 1.8, pointColor: 0x66ff22, pointIntensity: 8.0, pointDist: 1200 },
+        interceptor: { emissive: 0x00ffcc, intensity: 1.5, pointColor: 0x22ffdd, pointIntensity: 6.0, pointDist: 600 },
+        bomber: { emissive: 0xff6600, intensity: 1.4, pointColor: 0xff8800, pointIntensity: 7.0, pointDist: 900 },
+        dreadnought: { emissive: 0xff0044, intensity: 1.6, pointColor: 0xff2266, pointIntensity: 14.0, pointDist: 5000 },
+        'alien-baseship': { emissive: 0xff00ff, intensity: 1.2, pointColor: 0xff44ff, pointIntensity: 12.0, pointDist: 4000 },
     };
+
+    // Running lights config for friendly / human ships — warm engine glow + nav beacons
+    const FRIENDLY_LIGHT_CONFIGS = {
+        ally: { engineColor: 0x88bbff, engineIntensity: 4.0, engineDist: 300, navColor: 0x4488ff, navIntensity: 2.0, navDist: 200 },
+        baseship: { engineColor: 0x88aaff, engineIntensity: 10.0, engineDist: 3000, navColor: 0x4466ff, navIntensity: 5.0, navDist: 1500 },
+        station: { engineColor: 0xaabbff, engineIntensity: 8.0, engineDist: 4000, navColor: 0x6688ff, navIntensity: 4.0, navDist: 2000 },
+        tanker: { engineColor: 0x88ffbb, engineIntensity: 3.0, engineDist: 300, navColor: 0x00ff88, navIntensity: 1.5, navDist: 180 },
+        medic: { engineColor: 0xff8888, engineIntensity: 3.5, engineDist: 400, navColor: 0xff4444, navIntensity: 2.0, navDist: 250 },
+        wingman: { engineColor: 0x88bbff, engineIntensity: 4.0, engineDist: 300, navColor: 0x4488ff, navIntensity: 2.0, navDist: 200 },
+    };
+
+    function _applyFriendlyLights(mesh, key) {
+        const cfg = FRIENDLY_LIGHT_CONFIGS[key];
+        if (!cfg) return;
+        // Engine exhaust glow — rear of ship
+        const engine = new THREE.PointLight(cfg.engineColor, cfg.engineIntensity, cfg.engineDist);
+        engine.name = 'engineGlow';
+        engine.position.set(0, 0, 1);  // +Z = rear of ship in Three.js
+        mesh.add(engine);
+        // Nav beacon — top/front, pulsing handled by animation loop
+        const nav = new THREE.PointLight(cfg.navColor, cfg.navIntensity, cfg.navDist);
+        nav.name = 'navBeacon';
+        nav.position.set(0, 0.5, -0.5);
+        mesh.add(nav);
+        mesh.userData.hasRunningLights = true;
+    }
 
     // ── Glow Sphere: far-distance LOD tier — minimal geometry, maximum visibility ──
     function _createGlowSphere(key) {
@@ -1123,7 +1238,7 @@ const SF3D = (function () {
 
         // Load GLB cockpit model
         const gltfLoader = new THREE.GLTFLoader();
-        gltfLoader.load('assets/models/firstPersonStarFighterCockpit.glb',
+        gltfLoader.load('assets/models/optimized/firstPersonStarFighterCockpit_lod0.glb',
             function (gltf) {
                 cockpitModel = gltf.scene;
 
@@ -1564,7 +1679,7 @@ const SF3D = (function () {
         return sharedMats;
     }
 
-    function createEntityMesh(type) {
+    function createEntityMesh(type, owner) {
         let mesh;
 
         // ── Map entity types to GLB model keys ──
@@ -1578,10 +1693,12 @@ const SF3D = (function () {
             if (type === 'baseship') mesh.userData.isBaseship = true;
             if (type === 'tanker') mesh.userData.isTanker = true;
             if (type === 'medic') mesh.userData.isMedic = true;
-            // Add bioluminescent point light to alien types
+            // Lighting: alien bioluminescence or friendly running lights
             if (ALIEN_GLOW_COLORS[glbKey]) {
                 _addGlowLight(mesh, glbKey);
                 mesh.userData.alienGlow = true;
+            } else if (FRIENDLY_LIGHT_CONFIGS[glbKey]) {
+                _applyFriendlyLights(mesh, glbKey);
             }
             scene.add(mesh);
             return mesh;
@@ -1720,42 +1837,13 @@ const SF3D = (function () {
             mesh.add(eye2);
         } else if (type === 'laser') {
             // ═══════════════════════════════════════════════════════════════
-            // LASER BOLT — bright twin beams, hot white core + cyan glow halo
-            // Looks like a real laser cannon — visible, bright, satisfying
+            // ENERGY BOLT — ButterflyFX Weapon VFX Rendering Guide §2
+            // Billboard quad with GLSL shader: white core + colored glow halo
+            // + scrolling noise energy pulse.  Per spec: NOT a sphere, NOT a
+            // cylinder — a camera-facing quad that always faces the camera.
+            // Particle trail still emitted per-frame in render loop (§8).
             // ═══════════════════════════════════════════════════════════════
-            const boltLen = 48, sep = 3.0;
-            // Hot white-green core beam — thick enough to see
-            const coreGeo = new THREE.CylinderGeometry(0.4, 0.4, boltLen, 6, 1);
-            coreGeo.rotateX(Math.PI / 2);
-            // Primary glow: tapered energy envelope
-            const glowGeo = new THREE.CylinderGeometry(1.8, 0.5, boltLen + 6, 6, 1);
-            glowGeo.rotateX(Math.PI / 2);
-            // Outer halo: wide soft bloom
-            const haloGeo = new THREE.CylinderGeometry(4.0, 1.0, boltLen + 10, 6, 1);
-            haloGeo.rotateX(Math.PI / 2);
-            // Leading tip: bright sphere flash
-            const tipGeo = new THREE.SphereGeometry(1.5, 6, 6);
-            tipGeo.translate(0, 0, -boltLen / 2);
-            // Rear spark
-            const rearGeo = new THREE.SphereGeometry(0.8, 4, 4);
-            rearGeo.translate(0, 0, boltLen / 2);
-            for (const xOff of [-sep, sep]) {
-                const core = new THREE.Mesh(coreGeo, m.laserCore);
-                core.position.x = xOff;
-                mesh.add(core);
-                const glow = new THREE.Mesh(glowGeo, m.laserGlow);
-                glow.position.x = xOff;
-                mesh.add(glow);
-                const halo = new THREE.Mesh(haloGeo, m.laserHalo);
-                halo.position.x = xOff;
-                mesh.add(halo);
-                const tip = new THREE.Mesh(tipGeo, m.laserCore);
-                tip.position.x = xOff;
-                mesh.add(tip);
-                const rear = new THREE.Mesh(rearGeo, m.laserGlow);
-                rear.position.x = xOff;
-                mesh.add(rear);
-            }
+            return _createLaserBoltMesh(owner === 'player'); // early return — already scene.add'd
         } else if (type === 'machinegun') {
             // ═══════════════════════════════════════════════════════════════
             // TRACER ROUNDS — bright hot yellow-white dashes with streak
@@ -1779,45 +1867,84 @@ const SF3D = (function () {
             mesh.add(new THREE.Mesh(tipGeo, tracerMat));
         } else if (type === 'torpedo') {
             // ═══════════════════════════════════════════════════════════════
-            // PROTON TORPEDO — white-hot warhead, deep orange firework exhaust
-            // Multi-layer: core → inner glow → flame cone → wide halo → sparkler ring
+            // PROTON TORPEDO — streamlined missile, world-class 2026 rendering
+            // Travels nose-first in the -Z direction; engine exhaust at +Z rear
+            // • Metallic body with nose cone + guidance ring + engine housing
+            // • Glowing engine nozzle ring (TorusGeometry, smooth)
+            // • Additive glow spheres at engine — animated in render loop
+            // • Dynamic particle trail via spawnTorpedoTrail (world-space particles)
             // ═══════════════════════════════════════════════════════════════
-            // Warhead: brilliant white-hot core
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2.0, 8, 8), m.torpCore));
-            // Inner yellow-white glow
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4.0, 8, 8), m.torpInner));
-            // Orange glow envelope
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(7.0, 6, 6), m.torpGlow));
-            // Wide outer halo — visible at distance
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(14, 6, 6), m.torpHalo));
-            // Exhaust flame cone — long tapered trail
-            const plumeGeo = new THREE.ConeGeometry(5.0, 30, 8);
-            plumeGeo.rotateX(-Math.PI / 2);
-            plumeGeo.translate(0, 0, 18);
-            mesh.add(new THREE.Mesh(plumeGeo, m.torpTrail));
-            // Secondary wider exhaust
-            const plume2Geo = new THREE.ConeGeometry(8.0, 20, 6);
-            plume2Geo.rotateX(-Math.PI / 2);
-            plume2Geo.translate(0, 0, 14);
-            mesh.add(new THREE.Mesh(plume2Geo, m.torpHalo));
-            // Sparkler ring — bright points around exhaust (firework look)
-            const sparkGeo = new THREE.BufferGeometry();
-            const sparkCount = 24;
-            const sparkPos = new Float32Array(sparkCount * 3);
-            for (let s = 0; s < sparkCount; s++) {
-                const a = (s / sparkCount) * Math.PI * 2;
-                const r = 4 + Math.random() * 4;
-                sparkPos[s * 3] = Math.cos(a) * r;
-                sparkPos[s * 3 + 1] = Math.sin(a) * r;
-                sparkPos[s * 3 + 2] = 10 + Math.random() * 12;
-            }
-            sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sparkPos, 3));
-            const sparkMat = new THREE.PointsMaterial({
-                color: 0xffdd66, size: 6, transparent: true, opacity: 0.9,
-                blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
-                map: _createSoftCircleTexture(),
-            });
-            mesh.add(new THREE.Points(sparkGeo, sparkMat));
+
+            // Per-torpedo materials (instance-specific for independent animation)
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xb8ccd8, metalness: 0.85, roughness: 0.2 });
+            const noseMat = new THREE.MeshStandardMaterial({ color: 0xddeeff, metalness: 0.95, roughness: 0.12, emissive: 0x223344, emissiveIntensity: 0.4 });
+            const engineMat = new THREE.MeshStandardMaterial({ color: 0x445566, metalness: 0.98, roughness: 0.08 });
+
+            // Nose cone — sleek pointed tip, travels in -Z direction
+            const noseConeGeo = new THREE.ConeGeometry(1.8, 9, 16, 1);
+            noseConeGeo.rotateX(Math.PI / 2);   // tip now at -Z
+            noseConeGeo.translate(0, 0, -11.5); // tip at Z≈-16, base at Z≈-7
+            mesh.add(new THREE.Mesh(noseConeGeo, noseMat));
+
+            // Main body cylinder — smooth, silver-blue
+            const bodyGeo = new THREE.CylinderGeometry(2.3, 2.3, 20, 16, 1);
+            bodyGeo.rotateX(Math.PI / 2);
+            bodyGeo.translate(0, 0, -1.5);
+            mesh.add(new THREE.Mesh(bodyGeo, bodyMat));
+
+            // Guidance ring — cyan-glowing ring at midpoint
+            const guideRingMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+            const guideRingGeo = new THREE.TorusGeometry(2.8, 0.35, 8, 24);
+            guideRingGeo.translate(0, 0, -3);
+            mesh.add(new THREE.Mesh(guideRingGeo, guideRingMat));
+
+            // Engine housing — slightly flared at rear
+            const engineGeo = new THREE.CylinderGeometry(3.2, 2.4, 7, 16, 1);
+            engineGeo.rotateX(Math.PI / 2);
+            engineGeo.translate(0, 0, 9);
+            mesh.add(new THREE.Mesh(engineGeo, engineMat));
+
+            // Engine nozzle ring — glowing hot orange torus (smooth 24-seg)
+            const nozzleRingMat = new THREE.MeshBasicMaterial({ color: 0xff7700, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending });
+            const nozzleRingGeo = new THREE.TorusGeometry(2.8, 0.6, 8, 24);
+            nozzleRingGeo.translate(0, 0, 13);
+            mesh.add(new THREE.Mesh(nozzleRingGeo, nozzleRingMat));
+
+            // Engine inner core — bright white-yellow point light center
+            const engineCoreMat = new THREE.MeshBasicMaterial({ color: 0xffeecc, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
+            const engineCoreGeo = new THREE.SphereGeometry(2.2, 12, 12);
+            engineCoreGeo.translate(0, 0, 13);
+            const engCoreMesh = new THREE.Mesh(engineCoreGeo, engineCoreMat);
+            engCoreMesh.userData.torpGlowCore = true; // animated in render loop
+            mesh.add(engCoreMesh);
+
+            // Engine glow sphere — orange bloom around nozzle
+            const engGlowMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
+            const engGlowGeo = new THREE.SphereGeometry(5.5, 12, 12);
+            engGlowGeo.translate(0, 0, 14);
+            const engGlowMesh = new THREE.Mesh(engGlowGeo, engGlowMat);
+            engGlowMesh.userData.torpGlowSphere = true; // animated in render loop
+            mesh.add(engGlowMesh);
+
+            // Outer exhaust halo — large soft bloom (back-face so it glows outward)
+            const haloMat = new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, side: THREE.BackSide });
+            const haloGeo = new THREE.SphereGeometry(11, 12, 12);
+            haloGeo.translate(0, 0, 15);
+            mesh.add(new THREE.Mesh(haloGeo, haloMat));
+
+            // Exhaust billboard — cross-hatch plane for volumetric trail glow
+            const torpBillMat = _getTorpBillMat();
+            const torpBillW = 18, torpBillH = 28;
+            const tbg1 = new THREE.PlaneGeometry(torpBillW, torpBillH);
+            tbg1.rotateX(-Math.PI / 2); // in XZ plane, pointing +Z
+            tbg1.translate(0, 0, 22);
+            mesh.add(new THREE.Mesh(tbg1, torpBillMat));
+            const tbg2 = new THREE.PlaneGeometry(torpBillW, torpBillH);
+            tbg2.rotateX(-Math.PI / 2);
+            tbg2.rotateZ(Math.PI / 2);
+            tbg2.translate(0, 0, 22);
+            mesh.add(new THREE.Mesh(tbg2, torpBillMat));
+
             mesh.userData.isTorpedo = true;
         } else {
             // Fallback: glowing point
@@ -1952,11 +2079,49 @@ const SF3D = (function () {
     }
 
     function spawnImpactEffect(pos, color = 0xff00ff) {
-        // ── Weapon impact — bright burst with radial sparks ──
+        // ── Weapon impact (spec §7): flash sprite + point light glow + radial sparks ──
         const [r, g, b] = _hexRGB(color);
-        // Central flash
-        _emitParticle(pos.x, pos.y, pos.z, 0, 0, 0, 1, 1, 1, 0.1, 40);
+
+        // Flash sprite — expands and fades over 0.1s (spec §7 ImpactEffect)
+        const flashMat = new THREE.SpriteMaterial({
+            color: new THREE.Color(r + 0.4, g + 0.4, b + 0.4),
+            blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
+        });
+        const flashSprite = new THREE.Sprite(flashMat);
+        flashSprite.position.copy(pos);
+        flashSprite.scale.set(4, 4, 1);
+        flashSprite.renderOrder = 102;
+        scene.add(flashSprite);
+
+        // Point light glow — fades over 0.3s (spec §7)
+        const impactLight = new THREE.PointLight(new THREE.Color(r, g, b), 5.0, 200);
+        impactLight.position.copy(pos);
+        scene.add(impactLight);
+
+        let impactAge = 0;
+        const impactInterval = setInterval(() => {
+            impactAge += 0.016;
+            const t = impactAge / 0.3;
+            // Flash: scale up then hide
+            if (t < 0.35) {
+                const s = 4 + t * 30;
+                flashSprite.scale.set(s, s, 1);
+                flashMat.opacity = 1.0 - t / 0.35;
+            } else {
+                flashSprite.visible = false;
+            }
+            // Glow light fade
+            impactLight.intensity = 5.0 * Math.max(0, 1.0 - t);
+            if (t >= 1.0) {
+                scene.remove(flashSprite);
+                scene.remove(impactLight);
+                flashMat.dispose();
+                clearInterval(impactInterval);
+            }
+        }, 16);
+
         // Radial sparks
+        _emitParticle(pos.x, pos.y, pos.z, 0, 0, 0, 1, 1, 1, 0.1, 40);
         for (let i = 0; i < 16; i++) {
             const a = Math.random() * Math.PI * 2;
             const el = (Math.random() - 0.5) * Math.PI;
@@ -1965,7 +2130,6 @@ const SF3D = (function () {
                 Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp * 0.6, Math.sin(a) * Math.cos(el) * sp,
                 r, g, b, 0.3 + Math.random() * 0.4, 12 + Math.random() * 18);
         }
-        // Bright core particles
         for (let i = 0; i < 6; i++) {
             const sp = 30 + Math.random() * 60;
             const a = Math.random() * Math.PI * 2;
@@ -1993,86 +2157,275 @@ const SF3D = (function () {
 
     function spawnLaser(laserEntity) {
         const p = laserEntity.position;
-        // Bright muzzle flash
+        if (!p) return;
+
+        // Beam color by owner (spec §2.5 — player=red, enemy=green)
+        const isPlayer = laserEntity.owner === 'player';
+        const flashHex = isPlayer ? 0xff4444 : 0x44ff44;
+        const [fr, fg, fb] = isPlayer ? [1.0, 0.25, 0.25] : [0.25, 1.0, 0.25];
+
+        // Muzzle flash sprite — expanding billboard quad (spec §2.4)
+        const mfMat = new THREE.SpriteMaterial({
+            color: new THREE.Color(fr + 0.3, fg + 0.3, fb + 0.3),
+            blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
+        });
+        const mfSprite = new THREE.Sprite(mfMat);
+        mfSprite.position.copy(p);
+        mfSprite.scale.set(6, 6, 1);
+        mfSprite.renderOrder = 101;
+        scene.add(mfSprite);
+
+        // Fade out muzzle sprite over 0.05s (spec §2.4)
+        let mfAge = 0;
+        const mfInterval = setInterval(() => {
+            mfAge += 0.016;
+            const t = mfAge / 0.07;
+            mfMat.opacity = Math.max(0, 1.0 - t);
+            if (t >= 1.0) { scene.remove(mfSprite); mfMat.dispose(); clearInterval(mfInterval); }
+        }, 16);
+
+        // Point light glow at muzzle
         const flash = _getMuzzleFlash();
         flash.light.position.copy(p);
-        flash.light.color.setHex(0x00ffaa);
-        flash.light.intensity = 8.0;
-        flash.baseIntensity = 8.0;
-        flash.baseDuration = 0.12;
-        flash.timer = 0.12;
-        // Bright muzzle spark burst
-        for (let i = 0; i < 10; i++) {
+        flash.light.color.setHex(flashHex);
+        flash.light.intensity = 12.0;
+        flash.baseIntensity = 12.0;
+        flash.baseDuration = 0.09;
+        flash.timer = 0.09;
+
+        // Muzzle spark burst — tight forward cone
+        for (let i = 0; i < 14; i++) {
             const a = Math.random() * Math.PI * 2;
-            const sp = 80 + Math.random() * 120;
-            _emitParticle(p.x, p.y, p.z,
-                Math.cos(a) * sp * 0.4, (Math.random() - 0.5) * sp * 0.3, Math.sin(a) * sp * 0.4 - sp,
-                0.3, 1, 0.75, 0.12 + Math.random() * 0.08, 15 + Math.random() * 10);
+            const sp = 100 + Math.random() * 160;
+            _emitParticle(
+                p.x, p.y, p.z,
+                Math.cos(a) * sp * 0.25, (Math.random() - 0.5) * sp * 0.2, -sp,
+                fr, fg, fb, 0.08 + Math.random() * 0.06, 12 + Math.random() * 10
+            );
         }
-        // Central bright flash particle
-        _emitParticle(p.x, p.y, p.z, 0, 0, -40, 0.7, 1, 0.9, 0.08, 35);
+        // Central bright streak forward
+        _emitParticle(p.x, p.y, p.z, 0, 0, -80, 1, 1, 1, 0.07, 40);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LASER BOLT — ButterflyFX Weapon VFX Rendering Guide §2
+    // Billboard quad with custom GLSL shaders.
+    // Per spec: NOT a cylinder, NOT a sphere — a camera-facing quad.
+    // White-hot core + colored glow halo + scrolling noise + energy pulse.
+    // Player = red(1,0.2,0.2)  Enemy = green(0.2,1,0.2)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const _LASER_VERT = [
+        'uniform vec3 beamStart;',
+        'uniform vec3 beamEnd;',
+        'uniform float beamWidth;',
+        'uniform float boltTime;',
+        'attribute vec2 uv;',
+        'varying vec2 vUv;',
+        'varying float vAlpha;',
+        'void main() {',
+        '  vec3 beamDir = beamEnd - beamStart;',
+        '  float beamLen = length(beamDir);',
+        '  if (beamLen < 0.001) { gl_Position = vec4(0.0); return; }',
+        '  vec3 beamDirN = beamDir / beamLen;',
+        '  float t = position.y;',
+        '  vec3 pt = beamStart + beamDir * t;',
+        '  vec3 camToBeam = normalize(pt - cameraPosition);',
+        '  vec3 rgt = normalize(cross(beamDirN, camToBeam));',
+        '  float w = beamWidth * mix(1.0, 0.5, t);',
+        '  float wobble = sin(t * 12.0 + boltTime * 8.0) * 0.02 * (1.0 - t);',
+        '  vec3 worldPos = pt + rgt * (position.x * w * 0.5 + wobble);',
+        '  vAlpha = 1.0 - t * 0.1;',
+        '  vUv = uv;',
+        '  gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);',
+        '}'
+    ].join('\n');
+
+    const _LASER_FRAG = [
+        'uniform float boltTime;',
+        'uniform vec3 beamColor;',
+        'uniform sampler2D noiseTex;',
+        'varying vec2 vUv;',
+        'varying float vAlpha;',
+        'void main() {',
+        '  float d = abs(vUv.x - 0.5) * 2.0;',
+        '  float core = 1.0 - smoothstep(0.0, 0.15, d);',
+        '  float glow = pow(1.0 - smoothstep(0.0, 0.8, d), 2.0);',
+        '  vec2 nuv = vec2(vUv.y * 3.0 - boltTime * 2.0, vUv.x);',
+        '  float noise = texture2D(noiseTex, nuv).r;',
+        '  float ep = 0.8 + 0.2 * noise;',
+        '  float pulse = 0.9 + 0.1 * sin(boltTime * 15.0);',
+        '  vec3 col = (vec3(1.0) * core + beamColor * glow) * ep * pulse;',
+        '  float edge = 1.0 - smoothstep(0.6, 1.0, d);',
+        '  float alpha = (core + glow * 0.6) * edge * vAlpha;',
+        '  gl_FragColor = vec4(col * alpha, alpha);',
+        '}'
+    ].join('\n');
+
+    // Pre-allocated reuse vectors — no allocations in hot bolt uniform update path
+    const _boltFwd = new THREE.Vector3();
+    const _boltStart = new THREE.Vector3();
+    const _boltEnd = new THREE.Vector3();
+
+    // Build a billboard quad mesh for a single energy bolt (spec §2.4)
+    function _createLaserBoltMesh(isPlayer) {
+        const positions = new Float32Array([-1, 0, 0, 1, 0, 0, -1, 1, 0, 1, 1, 0]);
+        const uvs = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
+        const indices = new Uint16Array([0, 1, 2, 2, 1, 3]);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        geo.setIndex(new THREE.BufferAttribute(indices, 1));
+
+        const beamColor = isPlayer
+            ? new THREE.Vector3(1.0, 0.2, 0.2)   // red  — player
+            : new THREE.Vector3(0.2, 1.0, 0.2);  // green — enemy
+
+        const mat = new THREE.ShaderMaterial({
+            vertexShader: _LASER_VERT,
+            fragmentShader: _LASER_FRAG,
+            uniforms: {
+                beamStart: { value: new THREE.Vector3() },
+                beamEnd: { value: new THREE.Vector3() },
+                beamWidth: { value: 6.0 },
+                beamColor: { value: beamColor },
+                boltTime: { value: 0 },
+                noiseTex: { value: getNoiseTexture() },
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: true,
+            side: THREE.DoubleSide,
+        });
+
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.frustumCulled = false;
+        mesh.renderOrder = 100;
+        mesh.userData.isLaserBolt = true;
+        mesh.userData.boltOwner = isPlayer ? 'player' : 'enemy';
+        scene.add(mesh);
+        return mesh;
+    }
+
+    // Update billboard bolt uniforms each frame — no allocations (uses pre-alloc vectors)
+    function _updateLaserBoltUniforms(mesh, e, dt) {
+        const u = mesh.material.uniforms;
+        u.boltTime.value += dt;
+
+        // Bolt forward direction: -Z local axis rotated by entity quaternion
+        const q = e.quaternion;
+        // -Z column of rotation matrix from quaternion
+        _boltFwd.set(
+            -2 * (q.x * q.z + q.y * q.w),
+            -2 * (q.y * q.z - q.x * q.w),
+            -(1 - 2 * (q.x * q.x + q.y * q.y))
+        );
+        // Center bolt at entity position; stretch 15 units each way
+        const halfLen = 15;
+        _boltStart.copy(e.position).addScaledVector(_boltFwd, -halfLen); // tail
+        _boltEnd.copy(e.position).addScaledVector(_boltFwd, halfLen);   // nose
+        u.beamStart.value.copy(_boltStart);
+        u.beamEnd.value.copy(_boltEnd);
+    }
+
+    // ── Energy bolt trail — allocation-free per-frame particle stream ──
+    // Uses inline quaternion math to avoid new THREE.Vector3() each frame.
+    // Backward direction (+Z local) = trail spawn axis.
+    function _emitBoltTrail(e) {
+        const p = e.position, q = e.quaternion;
+        if (!p || !q) return;
+        // +Z local axis in world space (bolt flies in -Z, trail is behind at +Z)
+        const wx = 2 * (q.x * q.z + q.y * q.w);
+        const wy = 2 * (q.y * q.z - q.x * q.w);
+        const wz = 1 - 2 * (q.x * q.x + q.y * q.y);
+        const isPlayer = (e.owner === 'player');
+        const cr = isPlayer ? 1.0 : 0.15;
+        const cg = isPlayer ? 0.12 : 0.9;
+        const cb = isPlayer ? 0.0 : 0.1;
+        for (let i = 0; i < 3; i++) {
+            const d = 5 + i * 3.5;
+            _emitParticle(
+                p.x + wx * d + (Math.random() - 0.5) * 1.5,
+                p.y + wy * d + (Math.random() - 0.5) * 1.5,
+                p.z + wz * d + (Math.random() - 0.5) * 1.5,
+                wx * 55 + (Math.random() - 0.5) * 20,
+                wy * 55 + (Math.random() - 0.5) * 20,
+                wz * 55 + (Math.random() - 0.5) * 20,
+                cr, cg, cb,
+                0.04 + Math.random() * 0.05,  // very short lifetime
+                4 + Math.random() * 5          // small sprite
+            );
+        }
     }
 
     function spawnTorpedoTrail(torpEntity) {
         // ═══════════════════════════════════════════════════════════════
-        // TORPEDO TRAIL — dense streaming firework exhaust
-        // Multiple layers: core flame + sparks + smoke wisps
+        // TORPEDO EXHAUST TRAIL — dense hot engine plume
+        // Particles spawn at the engine (+Z rear) and drift behind as the
+        // torpedo zooms forward in -Z.  They naturally form a persistent
+        // streaming wake.  Three layers:
+        //   • Core flame  — white → orange, tight spread
+        //   • Spark spray  — fast, tiny, radial burst
+        //   • Long ember   — slower, dim, fade over 0.8-1.2s
         // ═══════════════════════════════════════════════════════════════
         const p = torpEntity.position;
-        const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(torpEntity.quaternion);
-        // Core flame particles — bright orange-white
-        for (let i = 0; i < 8; i++) {
-            const spread = 30;
+        if (!p) return;
+        const q = torpEntity.quaternion;
+        if (!q) return;
+
+        // Exhaust direction = +Z local (rear of torpedo) in world space
+        const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+        // Engine nozzle offset: +13 units along +Z local
+        const nozzleX = p.x + fwd.x * 13;
+        const nozzleY = p.y + fwd.y * 13;
+        const nozzleZ = p.z + fwd.z * 13;
+
+        // ── Core flame plume — hot white-orange, tight cone ──
+        for (let i = 0; i < 10; i++) {
             const heat = Math.random();
+            const sp = 40 + Math.random() * 60;
+            const spread = 12;
             _emitParticle(
-                p.x + (Math.random() - 0.5) * 3,
-                p.y + (Math.random() - 0.5) * 3,
-                p.z + (Math.random() - 0.5) * 3,
-                fwd.x * 80 + (Math.random() - 0.5) * spread,
-                fwd.y * 80 + (Math.random() - 0.5) * spread,
-                fwd.z * 80 + (Math.random() - 0.5) * spread,
-                1, 0.6 + heat * 0.4, heat * 0.3,
-                0.3 + Math.random() * 0.4, 18 + Math.random() * 22
+                nozzleX + (Math.random() - 0.5) * 2,
+                nozzleY + (Math.random() - 0.5) * 2,
+                nozzleZ + (Math.random() - 0.5) * 2,
+                fwd.x * sp + (Math.random() - 0.5) * spread,
+                fwd.y * sp + (Math.random() - 0.5) * spread,
+                fwd.z * sp + (Math.random() - 0.5) * spread,
+                1.0, 0.55 + heat * 0.45, heat * 0.25,
+                0.25 + Math.random() * 0.35, 20 + Math.random() * 20
             );
         }
-        // Sparkler particles — fast bright tiny specks (firework look)
-        for (let i = 0; i < 6; i++) {
+
+        // ── Radial spark spray — fast tiny specks fanning outward ──
+        for (let i = 0; i < 7; i++) {
             const a = Math.random() * Math.PI * 2;
-            const r = 5 + Math.random() * 8;
+            const r = 2 + Math.random() * 3;
+            const vr = 40 + Math.random() * 80; // radial spread velocity
             _emitParticle(
-                p.x + Math.cos(a) * r * 0.3,
-                p.y + Math.sin(a) * r * 0.3,
-                p.z + fwd.z * 4,
-                fwd.x * 40 + Math.cos(a) * 60 + (Math.random() - 0.5) * 80,
-                fwd.y * 40 + Math.sin(a) * 60 + (Math.random() - 0.5) * 80,
-                fwd.z * 40 + (Math.random() - 0.5) * 80,
-                1, 0.9, 0.4 + Math.random() * 0.3,
-                0.15 + Math.random() * 0.2, 6 + Math.random() * 8
+                nozzleX + Math.cos(a) * r * 0.5,
+                nozzleY + Math.sin(a) * r * 0.5,
+                nozzleZ,
+                fwd.x * 30 + Math.cos(a) * vr,
+                fwd.y * 30 + Math.sin(a) * vr,
+                fwd.z * 30 + (Math.random() - 0.5) * 30,
+                1.0, 0.85, 0.35 + Math.random() * 0.3,
+                0.12 + Math.random() * 0.18, 7 + Math.random() * 9
             );
         }
-        // Dim smoke wisps — darker, slower, fade slowly
-        if (Math.random() < 0.4) {
+
+        // ── Long embers — slow dim particles that drift and fade ──
+        if (Math.random() < 0.5) {
             _emitParticle(
-                p.x + (Math.random() - 0.5) * 4,
-                p.y + (Math.random() - 0.5) * 4,
-                p.z + fwd.z * 6,
-                fwd.x * 15 + (Math.random() - 0.5) * 20,
-                fwd.y * 15 + (Math.random() - 0.5) * 20,
-                fwd.z * 15 + (Math.random() - 0.5) * 20,
-                0.5, 0.25, 0.1, 0.8 + Math.random() * 0.6, 30 + Math.random() * 20
-            );
-        }
-        // Bright white sparks (sparkler effect)
-        for (let i = 0; i < 3; i++) {
-            const a = Math.random() * Math.PI * 2;
-            const sp = 30 + Math.random() * 50;
-            _emitParticle(
-                p.x, p.y, p.z,
-                Math.cos(a) * sp + fwd.x * 20,
-                (Math.random() - 0.5) * sp + fwd.y * 20,
-                Math.sin(a) * sp + fwd.z * 20,
-                1, 1, 0.8,
-                0.2 + Math.random() * 0.2
+                nozzleX + (Math.random() - 0.5) * 4,
+                nozzleY + (Math.random() - 0.5) * 4,
+                nozzleZ + (Math.random() - 0.5) * 4,
+                fwd.x * 15 + (Math.random() - 0.5) * 18,
+                fwd.y * 15 + (Math.random() - 0.5) * 18,
+                fwd.z * 15 + (Math.random() - 0.5) * 18,
+                0.6, 0.28, 0.08,
+                0.8 + Math.random() * 0.7, 25 + Math.random() * 20
             );
         }
     }
@@ -2082,8 +2435,9 @@ const SF3D = (function () {
 
         // Cockpit must stay visible during all player-flight phases.
         const phase = state && state.phase;
+        // 'landing' excluded — that phase uses an external cutscene camera (no cockpit HUD)
         const cockpitRequired = phase === 'bay-ready' || phase === 'launching' || phase === 'combat' ||
-            phase === 'land-approach' || phase === 'landing' || phase === 'docking';
+            phase === 'land-approach' || phase === 'docking';
         if (cockpitRequired && !cockpitVisible) {
             cockpitVisible = true;
             lastCockpitToggleAt = Date.now();
@@ -2105,21 +2459,28 @@ const SF3D = (function () {
 
         // Update Camera to Player Position/Rotation
         if (state.player) {
-            camera.position.copy(state.player.position);
+            // ── Docking cutscene: use cinematographer camera override ──
+            if (state.cutsceneCamPos && phase === 'landing') {
+                camera.position.copy(state.cutsceneCamPos);
+                camera.quaternion.copy(state.cutsceneCamQuat);
+                // No cockpit arms animation needed for external cam
+            } else {
+                camera.position.copy(state.player.position);
 
-            // Apply camera shake if active
-            if (cameraShakeIntensity > 0) {
-                camera.position.x += (Math.random() - 0.5) * cameraShakeIntensity;
-                camera.position.y += (Math.random() - 0.5) * cameraShakeIntensity;
-                camera.position.z += (Math.random() - 0.5) * cameraShakeIntensity * 0.5;
-                cameraShakeIntensity *= 0.92; // Decay shake faster
+                // Apply camera shake if active
+                if (cameraShakeIntensity > 0) {
+                    camera.position.x += (Math.random() - 0.5) * cameraShakeIntensity;
+                    camera.position.y += (Math.random() - 0.5) * cameraShakeIntensity;
+                    camera.position.z += (Math.random() - 0.5) * cameraShakeIntensity * 0.5;
+                    cameraShakeIntensity *= 0.92; // Decay shake faster
+                }
+
+                camera.quaternion.copy(state.player.quaternion);
+
+                // Animate cockpit steering (arms follow stick input)
+                _animateCockpitArms(state.player);
+                _animateManifoldCockpit(state.player);
             }
-
-            camera.quaternion.copy(state.player.quaternion);
-
-            // Animate cockpit steering (arms follow stick input)
-            _animateCockpitArms(state.player);
-            _animateManifoldCockpit(state.player);
         }
 
         // Sync Entities — acquire dining philosopher forks before touching
@@ -2179,7 +2540,7 @@ const SF3D = (function () {
 
             let mesh = entityMeshes.get(e.id);
             if (!mesh) {
-                mesh = createEntityMesh(e.type);
+                mesh = createEntityMesh(e.type, e.owner);
                 entityMeshes.set(e.id, mesh);
             }
 
@@ -2214,9 +2575,31 @@ const SF3D = (function () {
                 }
             }
 
-            // Torpedo sparkler trail — continuous particle emission
+            // Running light pulse — friendly ships nav beacons slow-pulse (~0.7 Hz)
+            if (mesh.userData && mesh.userData.hasRunningLights) {
+                const nav = mesh.getObjectByName('navBeacon');
+                if (nav) {
+                    const beaconPulse = 0.5 + 0.5 * Math.abs(Math.sin(_frameTime * 0.00215 + e.id * 2.3));
+                    const baseCfg = FRIENDLY_LIGHT_CONFIGS[e.type] || FRIENDLY_LIGHT_CONFIGS['ally'];
+                    nav.intensity = baseCfg.navIntensity * beaconPulse;
+                }
+            }
+
+            // Torpedo: emit particle trail + animate engine glow
             if (e.type === 'torpedo' && mesh.userData && mesh.userData.isTorpedo) {
                 spawnTorpedoTrail(e);
+                // Pulse engine glow children — flicker like a real rocket exhaust
+                const pulse = 0.8 + 0.2 * Math.sin(_frameTime * 0.018 + (e.id.charCodeAt(0) || 0) * 0.7);
+                mesh.traverse(child => {
+                    if (child.userData.torpGlowCore) child.scale.setScalar(0.9 + 0.2 * pulse);
+                    if (child.userData.torpGlowSphere) child.scale.setScalar(0.85 + 0.3 * pulse);
+                });
+            }
+
+            // Energy bolt: update billboard shader uniforms + emit particle trail (spec §2, §8)
+            if (e.type === 'laser' && mesh.userData && mesh.userData.isLaserBolt) {
+                _updateLaserBoltUniforms(mesh, e, 0.016);
+                _emitBoltTrail(e);
             }
         }
 

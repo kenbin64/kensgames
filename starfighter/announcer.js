@@ -81,14 +81,15 @@ const SFAnnouncer = (function () {
     dreadnought: ['Dreadnought', 'Hive Throne', 'capital ship'],
     baseship: ['mothership', 'capital ship', 'alien carrier', 'enemy capital'],
     hive: ['the hive', 'alien base', 'hive structure', 'enemy base'],
+    hive_queen: ['Hive Queen', 'the Queen', 'alien matriarch', 'primary organism'],
     // Tactical advice
     useTorps: ['use torpedoes', 'switch to torpedoes', 'torps are your best bet', 'heavy ordnance recommended'],
     targetWeak: ['target the underbelly', 'hit the weak point', 'aim for the vents', 'go for their underside'],
     clearEscorts: ['clear the escorts first', 'thin out their fighters', 'deal with the escorts', 'sweep the perimeter'],
-    // Status
-    hullStatus: (pct) => pct < 20 ? 'hull critical' : pct < 40 ? 'hull damaged' : pct < 60 ? 'hull holding' : pct < 80 ? 'hull stable' : 'hull strong',
-    shieldStatus: (pct) => pct <= 0 ? 'shields down' : pct < 30 ? 'shields failing' : pct < 60 ? 'shields weakened' : 'shields holding',
-    fuelStatus: (pct) => pct < 10 ? 'fuel critical' : pct < 25 ? 'fuel low' : pct < 50 ? 'fuel half' : 'fuel nominal',
+    // Status — delegate to SFPhrase if loaded, else local fallback
+    hullStatus: (pct) => window.SFPhrase ? SFPhrase.hullStatus(pct) : (pct < 20 ? 'hull critical' : pct < 40 ? 'hull damaged' : pct < 60 ? 'hull holding' : pct < 80 ? 'hull stable' : 'hull strong'),
+    shieldStatus: (pct) => window.SFPhrase ? SFPhrase.shieldStatus(pct) : (pct <= 0 ? 'shields down' : pct < 30 ? 'shields failing' : pct < 60 ? 'shields weakened' : 'shields holding'),
+    fuelStatus: (pct) => window.SFPhrase ? SFPhrase.fuelStatus(pct) : (pct < 10 ? 'fuel critical' : pct < 25 ? 'fuel low' : pct < 50 ? 'fuel half' : 'fuel nominal'),
     // Launch sequence
     launchReady: ['all systems green', 'boards are green', 'pre-flight nominal', 'launch checks complete', 'all stations report ready'],
     launchGo: ['Launch! Launch! Launch!', 'All ahead — punch it!', 'Light the fires — go go go!', 'Clear the rail — full military!', 'Catapult engaged — godspeed!'],
@@ -104,10 +105,19 @@ const SFAnnouncer = (function () {
     return filtered.length ? _pick(filtered) : _pick(arr);
   }
 
+  // ── Convenience: derive SFPhrase state from snap ──
+  function _phraseState(snap, overrides) {
+    if (!window.SFPhrase) return null;
+    const urgency = SFPhrase.deriveUrgency(snap);
+    const severity = SFPhrase.deriveSeverity(snap);
+    return { urgency, severity, morale: (snap ? (snap.hullPct || 100) / 100 : 0.5), ...overrides };
+  }
+
   // ── Compose functions — build natural sentences from state + vocab ──
 
   function _composeNewContacts(snap, newCount, types) {
     const parts = [];
+    if (types.includes('hive-queen')) parts.push(`${_pick(V.hive_queen)}`);
     if (types.includes('dreadnought')) parts.push(`${snap.dreadnoughts} ${_pick(V.dreadnought)}`);
     if (types.includes('predator')) parts.push(`${snap.predators} ${_pick(V.predator)}${snap.predators > 1 ? 's' : ''}`);
     if (types.includes('bomber')) parts.push(`${snap.bombers} ${_pick(V.bomber)}${snap.bombers > 1 ? 's' : ''}`);
@@ -119,6 +129,25 @@ const SFAnnouncer = (function () {
   }
 
   function _composeKill(type, snap) {
+    if (window.SFPhrase) {
+      return SFPhrase.killConfirm({
+        urgency: SFPhrase.deriveUrgency(snap),
+        severity: SFPhrase.deriveSeverity(snap),
+        morale: (snap.hullPct || 100) / 100,
+        tokens: {
+          target: type === 'predator' ? _pick(V.predator)
+            : type === 'interceptor' ? _pick(V.interceptor)
+              : type === 'bomber' ? _pick(V.bomber)
+                : type === 'dreadnought' ? _pick(V.dreadnought)
+                  : type === 'alien-baseship' ? _pick(V.baseship)
+                    : type === 'hive-queen' ? _pick(V.hive_queen)
+                      : _pick(V.drone),
+          remaining: snap.totalHostile,
+          bearing: snap.priorityTarget ? _bearingOf(snap.priorityTarget) : null,
+        }
+      });
+    }
+    // Legacy fallback
     const left = snap.totalHostile;
     const verb = _pick(V.destroyed);
     const typeName = type === 'predator' ? _pick(V.predator)
@@ -126,13 +155,30 @@ const SFAnnouncer = (function () {
         : type === 'bomber' ? _pick(V.bomber)
           : type === 'dreadnought' ? _pick(V.dreadnought)
             : type === 'alien-baseship' ? _pick(V.baseship)
-              : _pick(V.drone);
+              : type === 'hive-queen' ? _pick(V.hive_queen)
+                : _pick(V.drone);
     if (left === 0) return `${typeName} ${verb}. Sector clear. ${_state.kills} kills this wave.`;
     const next = snap.priorityTarget ? ` Next at ${_bearingOf(snap.priorityTarget)}.` : '';
     return `${typeName} ${verb}. ${left} ${left === 1 ? 'hostile' : _pick(V.contacts)} remaining.${next}`;
   }
 
   function _composeWaveStart(snap) {
+    if (window.SFPhrase) {
+      const manifest = [];
+      if (snap.hiveQueens > 0) manifest.push({ count: snap.hiveQueens, label: _pick(V.hive_queen) });
+      if (snap.enemies > 0) manifest.push({ count: snap.enemies, label: _pick(V.drone) });
+      if (snap.interceptors > 0) manifest.push({ count: snap.interceptors, label: _pick(V.interceptor) });
+      if (snap.bombers > 0) manifest.push({ count: snap.bombers, label: _pick(V.bomber) });
+      if (snap.predators > 0) manifest.push({ count: snap.predators, label: _pick(V.predator) });
+      if (snap.dreadnoughts > 0) manifest.push({ count: snap.dreadnoughts, label: _pick(V.dreadnought) });
+      if (snap.alienMothership) manifest.push({ count: 1, label: _pick(V.baseship) });
+      return SFPhrase.waveManifest({
+        urgency: SFPhrase.deriveUrgency(snap),
+        severity: SFPhrase.deriveSeverity(snap),
+        tokens: { manifest, totalHostile: snap.totalHostile, basePct: snap.basePct, wave: _state.wave }
+      });
+    }
+    // Legacy fallback
     const parts = [];
     if (snap.enemies > 0) parts.push(`${snap.enemies} ${_pick(V.drone)}${snap.enemies > 1 ? 's' : ''}`);
     if (snap.interceptors > 0) parts.push(`${snap.interceptors} ${_pick(V.interceptor)}${snap.interceptors > 1 ? 's' : ''}`);
@@ -151,6 +197,18 @@ const SFAnnouncer = (function () {
   }
 
   function _composeDamageReport(snap, what) {
+    if (window.SFPhrase) {
+      return SFPhrase.damageReport({
+        urgency: SFPhrase.deriveUrgency(snap),
+        severity: SFPhrase.deriveSeverity(snap),
+        tokens: {
+          system: what,
+          pct: what === 'hull' ? snap.hullPct : what === 'shields' ? snap.shieldPct : what === 'base' ? snap.basePct : snap.fuelPct,
+          callsign: _cs(),
+        }
+      });
+    }
+    // Legacy fallback
     if (what === 'hull') return `${_cs()}, ${V.hullStatus(snap.hullPct)} at ${snap.hullPct}%. ${_pick(V.watch)}.`;
     if (what === 'shields') return `${V.shieldStatus(snap.shieldPct)}. Hull ${snap.hullPct}%. ${_pick(V.move)}.`;
     if (what === 'base') return `Base ${V.hullStatus(snap.basePct)} at ${snap.basePct}%. ${_pick(V.protect)}.`;
@@ -166,6 +224,7 @@ const SFAnnouncer = (function () {
   }
 
   function _composeTacticalAdvice(snap) {
+    if (snap.hiveQueens > 0) return `${_pick(V.hive_queen)} on scope. Target weak points — ${_pick(V.targetWeak)}.`;
     if (snap.dreadnoughts > 0 && snap.torpCount > 0) return `${_pick(V.dreadnought)} active. ${_pick(V.useTorps)}.`;
     if (snap.predators > 0) return `${_pick(V.predator)} on scope. ${_pick(V.targetWeak)}.`;
     if (snap.bombers > 0 && snap.basePct < 60) return `${_pick(V.bomber)}s heading for base. ${_pick(V.protect)}.`;
@@ -578,6 +637,50 @@ const SFAnnouncer = (function () {
     const snap = _snap();
     const line = _anpcSpeak('deck', 'status_update', { status: `wave ${_state.wave} standing by, ${_composePlayerStatus(snap)}`, wave: _state.wave });
     _addComm(_crew('deck'), line || `${_cs()}, wave ${_state.wave} standing by. ${_composePlayerStatus(snap)}. Launch when ready.`, 'base');
+
+    // Wave 1 only: dramatic backstory narration before launch
+    if (_state.wave === 1) {
+      _deliverFirstMissionBriefing();
+    }
+  }
+
+  // ── First mission backstory — narrated by Cdr. Vasquez in the launch bay ──
+  function _deliverFirstMissionBriefing() {
+    setTimeout(() => {
+      _addComm(_crew('command'),
+        'Attention all crew. Classified intelligence report — eyes only.',
+        'warning');
+    }, 1200);
+
+    setTimeout(() => {
+      _addComm(_crew('command'),
+        'Seventeen months ago, deep-space array Delta-7 went dark. No distress signal. No wreckage. Gone.',
+        'base');
+    }, 5500);
+
+    setTimeout(() => {
+      _addComm(_crew('sensor'),
+        'What emerged from that silence we\'ve designated HIVE SIGMA. Organic-metallic hybrid ships — grown, not built. They don\'t communicate. They don\'t negotiate. They consume.',
+        'warning');
+    }, 11000);
+
+    setTimeout(() => {
+      _addComm(_crew('tactical'),
+        'HIVE SIGMA has reached Earth orbit. Standard missile defenses are ineffective against their bio-hull. Lasers and proton torpedoes are your only confirmed kill methods.',
+        'warning');
+    }, 17500);
+
+    setTimeout(() => {
+      _addComm(_crew('command'),
+        `You launch from UEDF Battleship Resolute — Earth's last active heavy carrier. If she falls, the orbital defense line collapses. There is no fallback position.`,
+        'base');
+    }, 24000);
+
+    setTimeout(() => {
+      _addComm(_crew('command'),
+        `Callsign ${_cs()} — you are weapons free. Good hunting. For Earth.`,
+        'warning');
+    }, 30000);
   }
 
   function onLaunchStart() {

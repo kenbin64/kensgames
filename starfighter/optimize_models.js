@@ -1,58 +1,111 @@
 #!/usr/bin/env node
 /**
- * GLB Model Optimizer
- * - Decimates meshes to target vertex count using meshoptimizer
- * - Quantizes vertex attributes (positions to 16-bit, normals to 8-bit, UVs to 16-bit)
- * - Passes through textures as-is (already JPEG compressed)
- * - Outputs optimized GLBs to assets/models/optimized/
+ * GLB Model Optimizer — ButterflyFX Manifold Quality Pipeline
+ * ═══════════════════════════════════════════════════════════════
+ * Uses a triple manifold  m = x · y · z  to compute quality budgets.
+ *
+ *   x = visual importance   (0–1)   how central to gameplay visuals
+ *   y = proximity factor    (0–1)   how often seen at close range
+ *   z = complexity need     (0–1)   silhouette complexity required
+ *   m = x · y · z          (0–1)   quality multiplier
+ *
+ * m drives:
+ *   - lod0 vertex target   = m_lod0 · BASE_VERTS
+ *   - lod1 vertex target   = m_lod1 · BASE_VERTS  (m_lod1 = m · LOD1_FALLOFF)
+ *   - lod2 vertex target   = m_lod2 · BASE_VERTS  (m_lod2 = m · LOD2_FALLOFF²  ← z=xy²)
+ *   - texture quality      = TEX_Q_MIN + m · (TEX_Q_MAX – TEX_Q_MIN)
+ *
+ * This means:
+ *   - Cockpit (m≈1): 80k verts, textures at 92% JPEG quality
+ *   - Combat fighters (m≈0.63): ~32k verts, textures at 87%
+ *   - Background capitals (m≈0.27): ~14k verts, textures at 83%
+ *   Nothing is hardcoded — every model's LOD budget is manifold-derived.
+ *
+ * Mesh reduction: spatial-grid vertex clustering (no native deps).
+ * Texture reduction: jimp JPEG re-encode at manifold-derived quality.
+ * lod1 / lod2 strip textures (applied from lod0 at runtime by Three.js).
+ *
+ * Usage:  node optimize_models.js
+ * Output: assets/models/optimized/<name>_lod{0,1,2}.glb
  */
 
+'use strict';
 const fs = require('fs');
 const path = require('path');
+const { Jimp } = require('jimp');
 
 const INPUT_DIR = path.join(__dirname, 'assets/models');
 const OUTPUT_DIR = path.join(__dirname, 'assets/models/optimized');
 
-// Target vertex counts per model (aggressive for web)
-// LOD levels per model.
-// lod0 = close up (highest detail)
-// lod1 = medium distance
-// lod2 = far away (lowest detail)
-const TARGETS = {
-  'AlienEnemyFighter.glb': [
-    { suffix: 'lod0', maxVerts: 30000 },
-    { suffix: 'lod1', maxVerts: 8000 },
-    { suffix: 'lod2', maxVerts: 2000 },
-  ],
-  'HumanFriendlStarFighter.glb': [
-    { suffix: 'lod0', maxVerts: 30000 },
-    { suffix: 'lod1', maxVerts: 8000 },
-    { suffix: 'lod2', maxVerts: 2000 },
-  ],
-  'AlienMotherShip.glb': [
-    { suffix: 'lod0', maxVerts: 60000 },
-    { suffix: 'lod1', maxVerts: 20000 },
-    { suffix: 'lod2', maxVerts: 5000 },
-  ],
-  'HumanSpaceBattleShip.glb': [
-    { suffix: 'lod0', maxVerts: 60000 },
-    { suffix: 'lod1', maxVerts: 20000 },
-    { suffix: 'lod2', maxVerts: 5000 },
-  ],
-  'HumanSpaceStationWithAritificalGravity.glb': [
-    { suffix: 'lod0', maxVerts: 60000 },
-    { suffix: 'lod1', maxVerts: 20000 },
-    { suffix: 'lod2', maxVerts: 5000 },
-  ],
-  'Earth.glb': [
-    { suffix: 'lod0', maxVerts: 50000 },
-    { suffix: 'lod1', maxVerts: 20000 },
-    { suffix: 'lod2', maxVerts: 8000 },
-  ],
-  // Cockpit — always at distance 0 (first person), one level only
-  'firstPersonStarFighterCockpit.glb': [
-    { suffix: 'lod0', maxVerts: 120000 },
-  ],
+// ── Manifold constants ──────────────────────────────────────────────
+const BASE_VERTS = 80000;   // vertex budget at m=1.0
+const LOD1_FALLOFF = 0.28;    // lod1 = m · LOD1_FALLOFF  (linear manifold z=xy)
+const LOD2_FALLOFF = 0.07;    // lod2 = m · LOD2_FALLOFF² (asymmetric z=xy²)
+const TEX_Q_MIN = 82;      // JPEG quality floor  (m=0)
+const TEX_Q_MAX = 93;      // JPEG quality ceiling (m=1)
+
+/**
+ * Triple manifold: m = x · y · z
+ *   x = visual importance  (cockpit=1, fighter=0.85, capital=0.7, bg=0.5)
+ *   y = proximity factor   (cockpit=1, fighter=0.85, support=0.7, capital=0.6)
+ *   z = complexity need    (cockpit=1, capital=0.9, fighter=0.75, bg=0.6)
+ */
+function manifold(x, y, z) {
+  return Math.max(0, Math.min(1, x * y * z));
+}
+
+/**
+ * Derive LOD vertex targets + texture quality from manifold value m.
+ * lod0: m · BASE_VERTS
+ * lod1: m · LOD1_FALLOFF · BASE_VERTS          (linear falloff)
+ * lod2: m · LOD2_FALLOFF² · BASE_VERTS         (asymmetric escalation — drops fast)
+ * texQ: TEX_Q_MIN + m · (TEX_Q_MAX - TEX_Q_MIN)
+ */
+function deriveLODs(m, lodCount = 3) {
+  const texQ = Math.round(TEX_Q_MIN + m * (TEX_Q_MAX - TEX_Q_MIN));
+  const lod0v = Math.round(m * BASE_VERTS);
+  const lod1v = Math.round(m * LOD1_FALLOFF * BASE_VERTS);
+  const lod2v = Math.round(m * LOD2_FALLOFF * LOD2_FALLOFF * BASE_VERTS);
+  const levels = [
+    { suffix: 'lod0', maxVerts: Math.max(lod0v, 8000) },
+    { suffix: 'lod1', maxVerts: Math.max(lod1v, 1500) },
+    { suffix: 'lod2', maxVerts: Math.max(lod2v, 400) },
+  ].slice(0, lodCount);
+  return { levels, texQ };
+}
+
+// ── Per-model manifold parameters ──────────────────────────────────
+// Each entry: [x_importance, y_proximity, z_complexity, lodCount]
+const MANIFOLD_PARAMS = {
+  // Cockpit: always fills screen, maximum detail
+  'firstPersonStarFighterCockpit.glb': [1.00, 1.00, 1.00, 1],  // m=1.00 → 80k verts, 1 LOD
+
+  // Player/ally fighters: close combat, high silhouette importance
+  'HumanFriendlStarFighter.glb': [0.90, 0.85, 0.80, 3],  // m=0.61
+  'HumanSpaceBattleShip.glb': [0.80, 0.65, 0.85, 3],  // m=0.44
+
+  // Enemy fighters: seen constantly in combat
+  'AlienEnemyFighter.glb': [0.88, 0.85, 0.80, 3],  // m=0.60
+  'AlienEnemyPreditorDrone.glb': [0.88, 0.85, 0.80, 3],  // m=0.60
+  'Interceptor_Needle.glb': [0.85, 0.82, 0.78, 3],  // m=0.54
+
+  // Bombers / sentinels: mid-range threats
+  'Bomber_Leviathan Tick.glb': [0.80, 0.75, 0.80, 3],  // m=0.48
+  'enemy_cruiser_hive_sentinel.glb': [0.75, 0.70, 0.80, 3],  // m=0.42
+
+  // Support ships: seen close during docking
+  'freindly_medical_frigate.glb': [0.70, 0.75, 0.72, 3],  // m=0.38
+  'friendlyfueltanker.glb': [0.70, 0.75, 0.68, 3],  // m=0.36
+  'Rescue Shuttle .glb': [0.60, 0.65, 0.68, 3],  // m=0.27
+
+  // Capital ships: large, seen from mid-far range
+  'AlienMotherShip.glb': [0.75, 0.60, 0.88, 3],  // m=0.40
+  'HumanSpaceStationWithAritificalGravity.glb': [0.65, 0.55, 0.88, 3],  // m=0.31
+  'Dreadnought_Hive Throne.glb': [0.78, 0.62, 0.88, 3],  // m=0.43
+
+  // Background / environment
+  'Earth.glb': [0.50, 0.40, 0.60, 3],  // m=0.12 (sphere, low geo needed)
+  'moon.glb': [0.40, 0.35, 0.55, 2],  // m=0.08
 };
 
 function parseGLB(buffer) {
@@ -120,10 +173,27 @@ function simplifyMesh(positions, normals, uvs, indices, targetCount) {
     if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
   }
 
-  // Grid cell size to achieve target vertex count
+  // Estimate surface area from sampled triangles (surface meshes need sqrt formula, not cbrt).
+  // Sample every Nth triangle to keep this O(N/rate) instead of O(N).
+  const sampleRate = Math.max(1, Math.floor(indices.length / 3 / 2000));
+  let sampledArea = 0, sampledCount = 0;
+  for (let i = 0; i < indices.length - 2; i += 3 * sampleRate) {
+    const ai = indices[i] * 3, bi = indices[i + 1] * 3, ci = indices[i + 2] * 3;
+    const ax = positions[ai] - positions[ci], ay = positions[ai + 1] - positions[ci + 1], az = positions[ai + 2] - positions[ci + 2];
+    const bx = positions[bi] - positions[ci], by = positions[bi + 1] - positions[ci + 1], bz = positions[bi + 2] - positions[ci + 2];
+    const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+    sampledArea += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+    sampledCount++;
+  }
+  const estSurfaceArea = (sampledCount > 0) ? sampledArea * (indices.length / 3) / (sampledCount * sampleRate) : 1;
+
+  // Surface mesh cell size: area per cell = estSurfaceArea / targetCount → cellSize = sqrt(area/target)
+  // Factor 1.3 gives slight over-target to leave margin after degenerate triangle removal.
+  const cellSizeSurface = Math.sqrt(estSurfaceArea / targetCount) * 1.3;
+  // Volume fallback (for when surface area estimate is 0 or very small)
   const volume = (maxX - minX) * (maxY - minY) * (maxZ - minZ);
-  const cellVolume = volume / targetCount;
-  const cellSize = Math.cbrt(cellVolume);
+  const cellSizeVolume = Math.cbrt(volume / targetCount);
+  const cellSize = Math.max(cellSizeSurface, cellSizeVolume * 0.12);
 
   // Map each vertex to a grid cell and pick representative
   const cellMap = new Map(); // cellKey -> { sumPos, sumNorm, sumUV, count, newIndex }
@@ -210,7 +280,8 @@ function simplifyMesh(positions, normals, uvs, indices, targetCount) {
 }
 
 // stripTextures=true → geometry-only GLB (for lod1, lod2). Materials applied at runtime from lod0.
-function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, origIndices, stripTextures = false) {
+// compressedImages: Map(bufferViewIndex → Buffer) — pre-recompressed texture buffers.
+function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, origIndices, stripTextures = false, compressedImages = null) {
   // Build new binary buffer with decimated mesh + original images
   const chunks = [];
   const newBufferViews = [];
@@ -218,21 +289,23 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
   let byteOffset = 0;
 
   // Position
+  // Compute bounding box via loop (spread operator overflows stack for large meshes)
+  let bbMinX = Infinity, bbMinY = Infinity, bbMinZ = Infinity;
+  let bbMaxX = -Infinity, bbMaxY = -Infinity, bbMaxZ = -Infinity;
+  for (let i = 0; i < meshData.positions.length; i += 3) {
+    const px = meshData.positions[i], py = meshData.positions[i + 1], pz = meshData.positions[i + 2];
+    if (px < bbMinX) bbMinX = px; if (px > bbMaxX) bbMaxX = px;
+    if (py < bbMinY) bbMinY = py; if (py > bbMaxY) bbMaxY = py;
+    if (pz < bbMinZ) bbMinZ = pz; if (pz > bbMaxZ) bbMaxZ = pz;
+  }
+
   const posBytes = Buffer.from(meshData.positions.buffer, meshData.positions.byteOffset, meshData.positions.byteLength);
   newBufferViews.push({ buffer: 0, byteOffset, byteLength: posBytes.length });
   newAccessors.push({
     bufferView: 0, componentType: 5126, count: meshData.positions.length / 3,
     type: 'VEC3',
-    max: [
-      Math.max(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3])),
-      Math.max(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3 + 1])),
-      Math.max(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3 + 2]))
-    ],
-    min: [
-      Math.min(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3])),
-      Math.min(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3 + 1])),
-      Math.min(...Array.from({ length: meshData.positions.length / 3 }, (_, i) => meshData.positions[i * 3 + 2]))
-    ]
+    max: [bbMaxX, bbMaxY, bbMaxZ],
+    min: [bbMinX, bbMinY, bbMinZ]
   });
   chunks.push(posBytes);
   byteOffset += posBytes.length;
@@ -280,7 +353,10 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
   if (!stripTextures && json.images) {
     json.images.forEach((img, i) => {
       const origBv = json.bufferViews[img.bufferView];
-      const imgData = bin.slice(origBv.byteOffset || 0, (origBv.byteOffset || 0) + origBv.byteLength);
+      // Use pre-compressed buffer if available, otherwise fall through to original
+      const imgData = (compressedImages && compressedImages.has(img.bufferView))
+        ? compressedImages.get(img.bufferView)
+        : bin.slice(origBv.byteOffset || 0, (origBv.byteOffset || 0) + origBv.byteLength);
       newBufferViews.push({ buffer: 0, byteOffset, byteLength: imgData.length });
       chunks.push(imgData);
       byteOffset += imgData.length;
@@ -350,17 +426,40 @@ function buildGLB(json, bin, meshData, origPositions, origNormals, origUVs, orig
   return Buffer.concat([header, jsonChunkHeader, jsonBuf, binChunkHeader, binBuf]);
 }
 
+/**
+ * Re-encode an embedded texture using jimp at the given JPEG quality.
+ * Falls back to original bytes on any error (non-JPEG/PNG, corrupt data, etc.).
+ * quality 0–100 (100 = lossless perceptually).
+ */
+async function recompressTexture(imgData, quality) {
+  try {
+    const img = await Jimp.fromBuffer(Buffer.from(imgData));
+    return await img.getBuffer('image/jpeg', { quality });
+  } catch (e) {
+    return imgData;  // non-JPEG/unsupported format — keep original
+  }
+}
+
 async function main() {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
   const files = fs.readdirSync(INPUT_DIR).filter(f => f.endsWith('.glb'));
 
-  for (const file of files) {
-    const lodLevels = TARGETS[file];
-    if (!lodLevels) { console.log(`Skipping ${file} (no target config)`); continue; }
+  let grandOrigTotal = 0, grandOptTotal = 0;
 
-    console.log(`\n=== ${file} — ${lodLevels.length} LOD level(s) ===`);
+  for (const file of files) {
+    const mParams = MANIFOLD_PARAMS[file];
+    if (!mParams) { console.log(`Skipping ${file} (no manifold config)`); continue; }
+
+    const [xi, yi, zi, lodCount] = mParams;
+    const m = manifold(xi, yi, zi);
+    const { levels, texQ } = deriveLODs(m, lodCount);
+
+    console.log(`\n=== ${file} ===`);
+    console.log(`  Manifold: x=${xi} y=${yi} z=${zi}  →  m=${m.toFixed(3)}  texQ=${texQ}`);
+
     const buf = fs.readFileSync(path.join(INPUT_DIR, file));
+    grandOrigTotal += buf.length;
     const { json, bin } = parseGLB(buf);
 
     const prim = json.meshes[0].primitives[0];
@@ -371,29 +470,52 @@ async function main() {
 
     const origVerts = positions.length / 3;
     const origTris = indices.length / 3;
-    console.log(`  Original: ${origVerts.toLocaleString()} verts, ${origTris.toLocaleString()} tris, ${(buf.length / 1024 / 1024).toFixed(1)} MB`);
+    console.log(`  Input: ${origVerts.toLocaleString()} verts, ${origTris.toLocaleString()} tris, ${(buf.length / 1048576).toFixed(1)} MB`);
+    console.log(`  LOD targets: ${levels.map(l => `${l.suffix}(${l.maxVerts.toLocaleString()})`).join(', ')}`);
 
-    for (const { suffix, maxVerts } of lodLevels) {
-      const stripTextures = suffix !== 'lod0'; // only lod0 keeps textures
+    // ── Recompress textures once (embedded in lod0 only) ─────────
+    const compressedImages = new Map();
+    if (json.images) {
+      let texOrigBytes = 0, texCompBytes = 0;
+      for (const img of json.images) {
+        if (img.bufferView === undefined) continue;
+        const bv = json.bufferViews[img.bufferView];
+        const offset = bv.byteOffset || 0;
+        const imgData = bin.slice(offset, offset + bv.byteLength);
+        texOrigBytes += imgData.length;
+        const compressed = await recompressTexture(imgData, texQ);
+        compressedImages.set(img.bufferView, compressed);
+        texCompBytes += compressed.length;
+      }
+      if (texOrigBytes > 0) {
+        const texPct = Math.round((1 - texCompBytes / texOrigBytes) * 100);
+        console.log(`  Textures: ${(texOrigBytes / 1048576).toFixed(1)} MB → ${(texCompBytes / 1048576).toFixed(1)} MB (-${texPct}%) @q${texQ}`);
+      }
+    }
+
+    // ── Produce each LOD level ────────────────────────────────────
+    for (const { suffix, maxVerts } of levels) {
+      const stripTextures = suffix !== 'lod0';
       const meshData = simplifyMesh(positions, normals, uvs, indices, maxVerts);
-      const glb = buildGLB(json, bin, meshData, positions, normals, uvs, indices, stripTextures);
+      const glb = buildGLB(json, bin, meshData, positions, normals, uvs, indices, stripTextures, compressedImages);
       const baseName = file.replace('.glb', '');
       const outPath = path.join(OUTPUT_DIR, `${baseName}_${suffix}.glb`);
       fs.writeFileSync(outPath, glb);
       const pct = Math.round((1 - glb.length / buf.length) * 100);
-      console.log(`  ${suffix}: ${(meshData.positions.length / 3).toLocaleString()} verts | ${(glb.length / 1024 / 1024).toFixed(1)} MB (-${pct}%)`);
+      grandOptTotal += glb.length;
+      console.log(`  ${suffix}: ${(meshData.positions.length / 3).toLocaleString()} verts | ${(glb.length / 1048576).toFixed(1)} MB (-${pct}%)`);
     }
   }
 
-  console.log('\n=== Done! ===');
-
-  // Summary
-  const origFiles = fs.readdirSync(INPUT_DIR).filter(f => f.endsWith('.glb'));
-  const optFiles = fs.readdirSync(OUTPUT_DIR).filter(f => f.endsWith('.glb'));
-  let origTotal = 0, optTotal = 0;
-  origFiles.forEach(f => origTotal += fs.statSync(path.join(INPUT_DIR, f)).size);
-  optFiles.forEach(f => optTotal += fs.statSync(path.join(OUTPUT_DIR, f)).size);
-  console.log(`\nTotal: ${(origTotal / 1024 / 1024).toFixed(1)} MB -> ${(optTotal / 1024 / 1024).toFixed(1)} MB`);
+  console.log('\n╔══════════════════════════════════╗');
+  console.log('║       Optimization Complete       ║');
+  console.log('╚══════════════════════════════════╝');
+  const totalPct = Math.round((1 - grandOptTotal / grandOrigTotal) * 100);
+  console.log(`Total input:  ${(grandOrigTotal / 1048576).toFixed(1)} MB`);
+  console.log(`Total output: ${(grandOptTotal / 1048576).toFixed(1)} MB (-${totalPct}%)`);
+  console.log(`\nOutput directory: ${OUTPUT_DIR}`);
+  console.log('Next: update 3d.js model paths to assets/models/optimized/<name>_lod0.glb');
+  console.log('      and register _lod1/_lod2 with THREE.LOD for distance switching.');
 }
 
 main().catch(console.error);
