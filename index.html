@@ -280,6 +280,25 @@
             box-shadow: var(--glow-yellow);
         }
 
+        .game-download-link {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .game-download-link a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+            transition: all 0.2s;
+            margin: 0 4px;
+        }
+
+        .game-download-link a:hover {
+            color: var(--neon-yellow);
+            text-shadow: 0 0 8px rgba(255, 232, 0, 0.4);
+        }
+
         /* ══════════════════════════════════════
            HERO
            ══════════════════════════════════════ */
@@ -1285,7 +1304,15 @@
                             Waves of alien formations advance with tactical intelligence. Dodge, strafe, and blast your
                             way to the top of the galactic kill board.</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/starfighter/')">PLAY ALIEN ATTACK &#9654;</button>
+                    <div>
+                        <button class="btn-green" onclick="goToGame('/starfighter/')">PLAY ALIEN ATTACK &#9654;</button>
+                        <div class="game-download-link">
+                            or download for 
+                            <a href="/starfighter/downloads/Starfighter-Setup.exe">Windows</a> |
+                            <a href="/starfighter/downloads/Starfighter.dmg">Mac</a> |
+                            <a href="/starfighter/downloads/Starfighter.AppImage">Linux</a>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1331,7 +1358,9 @@
                             <span class="game-tag">Physics</span>
                             <span class="game-tag">Builder</span>
                         </div>
-                        <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical and electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally sound, it runs. If not, watch it fail spectacularly.</div>
+                        <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical and
+                            electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally
+                            sound, it runs. If not, watch it fail spectacularly.</div>
                     </div>
                     <button class="btn-green" onclick="goToGame('/assemble/')">BUILD CONTRAPTION &#9654;</button>
                 </div>
