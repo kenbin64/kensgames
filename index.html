@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KensGames — World Class Arcade Portal</title>
     <meta name="description"
-        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D and Alien Space Attack. Powered by a geometry-driven game engine unlike anything else.">
+        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D, Alien Space Attack, 4D TicTacToe and Assemble. Powered by a geometry-driven game engine unlike anything else.">
 
     <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="/fasttrack/assets/images/icon-192.png">
@@ -465,6 +465,14 @@
 
         .game-card:nth-child(3) {
             animation-delay: 0.25s;
+        }
+
+        .game-card:nth-child(4) {
+            animation-delay: 0.35s;
+        }
+
+        .game-card:nth-child(5) {
+            animation-delay: 0.45s;
         }
 
         .game-card:hover {
@@ -1281,6 +1289,54 @@
                 </div>
             </div>
 
+            <div class="game-card">
+                <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
+                    <div class="img-placeholder">
+                        <div class="ph-icon" style="color:var(--neon-purple)">
+                            &#10005;&#9711;&#10005;&#9711;&#10005;&#9711;</div>
+                        <div class="ph-text">Gameplay Screenshot</div>
+                    </div>
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">4D TicTacToe</div>
+                        <div class="game-meta">
+                            <span class="game-tag">1&ndash;4 Players</span>
+                            <span class="game-tag">Strategy</span>
+                            <span class="game-tag">Hypercube</span>
+                        </div>
+                        <div class="game-description">TicTacToe in three and four dimensions. A
+                            3&times;3&times;3&times;3 hypercube with 76 winning lines your brain can't visualize. Play
+                            solo against the AI, pass-and-play locally, or challenge a friend online.</div>
+                    </div>
+                    <button class="btn-green" onclick="goToGame('/4DTicTacToe/')">PLAY 4D TICTACTOE &#9654;</button>
+                </div>
+            </div>
+
+            <div class="game-card">
+                <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
+                    <div class="img-placeholder">
+                        <div class="ph-icon" style="color:var(--neon-orange)">
+                            &#9881;&#9881;&#9881;&#9881;&#9881;&#9881;</div>
+                        <div class="ph-text">Gameplay Screenshot</div>
+                    </div>
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">Assemble</div>
+                        <div class="game-meta">
+                            <span class="game-tag">1 Player</span>
+                            <span class="game-tag">Physics</span>
+                            <span class="game-tag">Builder</span>
+                        </div>
+                        <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical and electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally sound, it runs. If not, watch it fail spectacularly.</div>
+                    </div>
+                    <button class="btn-green" onclick="goToGame('/assemble/')">BUILD CONTRAPTION &#9654;</button>
+                </div>
+            </div>
+
         </div>
     </section>
 
@@ -1649,6 +1705,8 @@
                     <li><a href="/fasttrack/">FastTrack</a></li>
                     <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
                     <li><a href="/starfighter/">Alien Space Attack</a></li>
+                    <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
+                    <li><a href="/assemble/">Assemble</a></li>
                 </ul>
             </div>
             <div class="footer-col">

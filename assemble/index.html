@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assemble — Build Anything | KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --dim: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warn: #d29922;
+      --fail: #f85149;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      z-index: 200;
+    }
+
+    .nav-logo {
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--dim);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────────── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    #c {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── SIDEBAR PANELS ─────────────────────────────────────── */
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .part-category {
+      margin-bottom: 14px;
+    }
+
+    .cat-label {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .part-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .part-btn {
+      aspect-ratio: 1;
+      background: rgba(88, 166, 255, 0.05);
+      border: 1px solid rgba(88, 166, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 4px;
+      font-size: 9px;
+      color: var(--text);
+    }
+
+    .part-btn:hover {
+      background: rgba(88, 166, 255, 0.12);
+      border-color: var(--accent);
+    }
+
+    .part-btn .icon {
+      font-size: 20px;
+    }
+
+    .part-btn .lbl {
+      font-size: 7px;
+      text-align: center;
+      line-height: 1.2;
+      opacity: 0.8;
+    }
+
+    /* ── PROPERTIES PANEL ───────────────────────────────────── */
+    #props {
+      display: none;
+    }
+
+    #props.show {
+      display: block;
+    }
+
+    .prop-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .prop-label {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .prop-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      width: 120px;
+    }
+
+    .prop-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* ── CONTROLS BAR ───────────────────────────────────────── */
+    .controls-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      background: var(--panel);
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .ctrl-btn {
+      padding: 8px 16px;
+      background: rgba(88, 166, 255, 0.08);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 6px;
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(88, 166, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    .ctrl-btn.active {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .ctrl-btn.danger {
+      color: var(--fail);
+      border-color: rgba(248, 81, 73, 0.3);
+    }
+
+    .ctrl-btn.danger:hover {
+      background: rgba(248, 81, 73, 0.12);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── STATUS BAR ─────────────────────────────────────────── */
+    .status-bar {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 100;
+      background: var(--panel);
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      line-height: 1.6;
+      min-width: 220px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      color: var(--dim);
+    }
+
+    .stat-val {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .stat-val.good {
+      color: var(--success);
+    }
+
+    .stat-val.bad {
+      color: var(--fail);
+    }
+
+    /* ── HELP HINT ──────────────────────────────────────────── */
+    .help-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      z-index: 100;
+      font-size: 10px;
+      color: rgba(139, 148, 158, 0.6);
+      line-height: 1.8;
+      pointer-events: none;
+      max-width: 240px;
+    }
+
+    /* ── MODAL ──────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.75);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .modal-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+
+    .modal-body {
+      font-size: 12px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────────────────── */
+    .sidebar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover {
+      background: #484f58;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
+    <ul class="nav-links">
+      <li><a href="/">← Portal</a></li>
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/4DTicTacToe/">Connect 4D</a></li>
+    </ul>
+  </nav>
+
+  <div class="workspace">
+    <!-- LEFT SIDEBAR: Parts palette + properties -->
+    <aside class="sidebar">
+      <div class="panel-section">
+        <div class="panel-title">PART LIBRARY</div>
+        <div id="parts-palette">
+          <!-- Built by JS -->
+        </div>
+      </div>
+
+      <div class="panel-section" id="props">
+        <div class="panel-title">PROPERTIES</div>
+        <div id="props-content">
+          <div class="prop-row">
+            <span class="prop-label">Position X</span>
+            <input type="number" class="prop-input" id="prop-x" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Y</span>
+            <input type="number" class="prop-input" id="prop-y" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Z</span>
+            <input type="number" class="prop-input" id="prop-z" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Rotation Y</span>
+            <input type="number" class="prop-input" id="prop-ry" step="15" min="-180" max="180">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Label</span>
+            <input type="text" class="prop-input" id="prop-label" placeholder="(optional)">
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: 3D canvas -->
+    <div class="canvas-wrap">
+      <canvas id="c"></canvas>
+
+      <div class="status-bar">
+        <div class="stat-row">
+          <span class="stat-label">Parts:</span>
+          <span class="stat-val" id="stat-parts">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Connections:</span>
+          <span class="stat-val" id="stat-conns">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Powered:</span>
+          <span class="stat-val" id="stat-powered">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Mass:</span>
+          <span class="stat-val" id="stat-mass">0 kg</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Status:</span>
+          <span class="stat-val good" id="stat-status">Ready</span>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <button class="ctrl-btn" id="btn-run" onclick="toggleSim()">▶ RUN</button>
+        <button class="ctrl-btn" onclick="deleteSelected()" disabled id="btn-delete">DELETE</button>
+        <button class="ctrl-btn" onclick="saveContraption()">💾 SAVE</button>
+        <button class="ctrl-btn" onclick="loadContraption()">📂 LOAD</button>
+        <button class="ctrl-btn danger" onclick="clearAll()">CLEAR ALL</button>
+      </div>
+
+      <div class="help-hint">
+        <b>Click</b> part from library → <b>Click</b> in scene to place<br>
+        <b>Drag</b> to orbit camera | <b>Scroll</b> to zoom<br>
+        <b>Select</b> part to edit properties
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div class="modal-overlay" id="result-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="result-title">SUCCESS!</div>
+      <div class="modal-body" id="result-body">Your contraption is structurally sound and running.</div>
+      <div class="modal-btns">
+        <button class="ctrl-btn" onclick="closeModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="/lib/three/OrbitControls.js"></script>
+  <script type="module">
+    'use strict';
+
+    import { PARTS, PART_MAP, CATEGORIES } from './parts.js';
+    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js';
+
+    // ═══════════════════════════════════════════════════════════════
+    // GLOBAL STATE
+    // ═══════════════════════════════════════════════════════════════
+    const engine = new AssembleEngine();
+    const renderer = new AssembleRenderer(document.getElementById('c'), engine);
+
+    let selectedTool = null;  // partId when placing
+    let selectedNode = null;  // nodeId when editing
+    let placementMode = false;
+    let ghostVisible = false;
+
+    // ═══════════════════════════════════════════════════════════════
+    // BUILD PARTS PALETTE
+    // ═══════════════════════════════════════════════════════════════
+    const palette = document.getElementById('parts-palette');
+    const grouped = {};
+    PARTS.forEach(p => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+
+    for (const cat of CATEGORIES) {
+      const parts = grouped[cat] || [];
+      if (!parts.length) continue;
+
+      const catDiv = document.createElement('div');
+      catDiv.className = 'part-category';
+      catDiv.innerHTML = `<span class="cat-label">${cat.toUpperCase()}</span><div class="part-grid" data-cat="${cat}"></div>`;
+      palette.appendChild(catDiv);
+
+      const grid = catDiv.querySelector('.part-grid');
+      parts.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'part-btn';
+        btn.dataset.partId = p.id;
+        btn.innerHTML = `<div class="icon">${p.icon}</div><div class="lbl">${p.label}</div>`;
+        btn.onclick = () => selectTool(p.id);
+        grid.appendChild(btn);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TOOL SELECTION
+    // ═══════════════════════════════════════════════════════════════
+    function selectTool(partId) {
+      selectedTool = partId;
+      placementMode = true;
+      document.querySelectorAll('.part-btn').forEach(b => b.style.background = 'rgba(88,166,255,0.05)');
+      const btn = document.querySelector(`[data-part-id="${partId}"]`);
+      if (btn) btn.style.background = 'rgba(88,166,255,0.25)';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CANVAS INTERACTION
+    // ═══════════════════════════════════════════════════════════════
+    const canvas = document.getElementById('c');
+
+    canvas.addEventListener('click', e => {
+      if (engine.running) return; // can't edit while running
+
+      if (placementMode && selectedTool) {
+        // Place part
+        const rect = canvas.getBoundingClientRect();
+        const mouse = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1,
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(mouse, renderer.camera);
+        // Intersect with ground plane y=0
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const pt = new THREE.Vector3();
+        ray.ray.intersectPlane(plane, pt);
+        if (pt) {
+          const snapped = engine.snapToGrid({ x: pt.x, y: 0.5, z: pt.z });
+          const node = engine.addNode(selectedTool, snapped, { x: 0, y: 0, z: 0 });
+          renderer._addMesh(node);
+          placementMode = false;
+          selectedTool = null;
+          renderer.hideGhost();
+          updateStats();
+        }
+      } else {
+        // Select existing part
+        const nodeId = renderer.pick(e.clientX, e.clientY);
+        if (nodeId) {
+          selectNode(nodeId);
+        } else {
+          deselectNode();
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (!placementMode || !selectedTool) {
+        if (ghostVisible) { renderer.hideGhost(); ghostVisible = false; }
+        return;
+      }
+      // Show ghost preview
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(mouse, renderer.camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const pt = new THREE.Vector3();
+      ray.ray.intersectPlane(plane, pt);
+      if (pt) {
+        const snapped = engine.snapToGrid({ x: pt.x, y: 0.5, z: pt.z });
+        renderer.showGhost(selectedTool, snapped, null);
+        ghostVisible = true;
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // NODE SELECTION & PROPERTIES
+    // ═══════════════════════════════════════════════════════════════
+    function selectNode(nodeId) {
+      selectedNode = nodeId;
+      renderer.select(nodeId);
+      document.getElementById('btn-delete').disabled = false;
+      const node = engine.nodes.get(nodeId);
+      if (!node) return;
+
+      // Show properties panel
+      document.getElementById('props').classList.add('show');
+      document.getElementById('prop-x').value = node.position.x;
+      document.getElementById('prop-y').value = node.position.y;
+      document.getElementById('prop-z').value = node.position.z;
+      document.getElementById('prop-ry').value = node.rotation.y;
+      document.getElementById('prop-label').value = node.label || '';
+    }
+
+    function deselectNode() {
+      selectedNode = null;
+      renderer.select(null);
+      document.getElementById('btn-delete').disabled = true;
+      document.getElementById('props').classList.remove('show');
+    }
+
+    // Property inputs update node
+    ['prop-x', 'prop-y', 'prop-z', 'prop-ry', 'prop-label'].forEach(id => {
+      const inp = document.getElementById(id);
+      inp.addEventListener('input', () => {
+        if (!selectedNode) return;
+        const node = engine.nodes.get(selectedNode);
+        if (!node) return;
+        if (id === 'prop-x') node.position.x = parseFloat(inp.value) || 0;
+        if (id === 'prop-y') node.position.y = parseFloat(inp.value) || 0;
+        if (id === 'prop-z') node.position.z = parseFloat(inp.value) || 0;
+        if (id === 'prop-ry') node.rotation.y = parseFloat(inp.value) || 0;
+        if (id === 'prop-label') node.label = inp.value;
+        renderer.updateMeshTransform(node);
+      });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // SIMULATION CONTROL
+    // ═══════════════════════════════════════════════════════════════
+    window.toggleSim = function () {
+      if (engine.running) {
+        engine.stop();
+        document.getElementById('btn-run').innerHTML = '▶ RUN';
+        document.getElementById('btn-run').classList.remove('active');
+      } else {
+        engine.start();
+        document.getElementById('btn-run').innerHTML = '⏹ STOP';
+        document.getElementById('btn-run').classList.add('active');
+        // Check if it works or fails
+        setTimeout(() => {
+          const stats = engine.stats();
+          if (stats.structurallySound && stats.powered > 0) {
+            showModal('SUCCESS!', `Your contraption is running! ${stats.powered} parts powered, total mass ${stats.totalMass} kg.`, 'good');
+          } else if (!stats.structurallySound) {
+            showModal('FAILURE!', `Structural failure detected. Check for overload, fractures, or electrical shorts.`, 'bad');
+          } else if (stats.powered === 0 && stats.total > 0) {
+            showModal('NO POWER', `No power sources detected. Add a motor, battery, or engine to run your contraption.`, 'warn');
+          }
+        }, 500);
+      }
+    };
+
+    window.deleteSelected = function () {
+      if (!selectedNode) return;
+      engine.removeNode(selectedNode);
+      renderer._removeMesh(engine.nodes.get(selectedNode) || { id: selectedNode });
+      deselectNode();
+      updateStats();
+    };
+
+    window.clearAll = function () {
+      if (!confirm('Clear entire workspace?')) return;
+      for (const id of [...engine.nodes.keys()]) {
+        engine.removeNode(id);
+      }
+      updateStats();
+    };
+
+    window.saveContraption = function () {
+      const data = engine.serialise();
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contraption_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.loadContraption = function () {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            engine.load(data);
+            // Rebuild meshes
+            for (const node of engine.nodes.values()) {
+              renderer._addMesh(node);
+            }
+            for (const conn of engine.connections.values()) {
+              renderer._addConnLine(conn);
+            }
+            updateStats();
+          } catch (err) {
+            alert('Failed to load: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // STATS UPDATE
+    // ═══════════════════════════════════════════════════════════════
+    function updateStats() {
+      const s = engine.stats();
+      document.getElementById('stat-parts').textContent = s.total;
+      document.getElementById('stat-conns').textContent = s.connections;
+      document.getElementById('stat-powered').textContent = s.powered;
+      document.getElementById('stat-mass').textContent = s.totalMass + ' kg';
+      const statEl = document.getElementById('stat-status');
+      if (engine.running) {
+        if (s.structurallySound) {
+          statEl.textContent = 'Running';
+          statEl.className = 'stat-val good';
+        } else {
+          statEl.textContent = 'FAILED';
+          statEl.className = 'stat-val bad';
+        }
+      } else {
+        statEl.textContent = 'Ready';
+        statEl.className = 'stat-val';
+      }
+    }
+
+    engine.on('simStep', () => updateStats());
+    engine.on('failure', ({ node, mode }) => {
+      console.warn(`FAILURE: ${node.partDef.label} — ${mode}`);
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODAL
+    // ═══════════════════════════════════════════════════════════════
+    function showModal(title, body, type) {
+      document.getElementById('result-title').textContent = title;
+      document.getElementById('result-body').textContent = body;
+      const titleEl = document.getElementById('result-title');
+      titleEl.style.color = type === 'good' ? 'var(--success)' : type === 'bad' ? 'var(--fail)' : 'var(--warn)';
+      document.getElementById('result-modal').classList.add('show');
+    }
+
+    window.closeModal = function () {
+      document.getElementById('result-modal').classList.remove('show');
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER LOOP
+    // ═══════════════════════════════════════════════════════════════
+    let lastTime = 0;
+    function animate(t) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((t - lastTime) / 1000, 0.05);
+      lastTime = t;
+      engine.step(dt);
+      renderer.render();
+    }
+
+    animate(0);
+    updateStats();
+  </script>
+</body>
+
+</html>
