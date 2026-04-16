@@ -750,8 +750,14 @@
     });
 
     canvas.addEventListener('mouseup', e => {
-      if (!mouseMoved && mouseDownPos && e.button === 0) {
-        handleCanvasClick(e);
+      if (e.button === 0) { // Left click only
+        if (isDragging) {
+          // Always drop if we're currently dragging
+          stopDragging();
+        } else if (!mouseMoved && mouseDownPos) {
+          // Only process click if mouse didn't move (for picking up parts)
+          handleCanvasClick(e);
+        }
       }
       mouseDownPos = null;
       mouseMoved = false;
@@ -781,9 +787,6 @@
           startDragging(node.id, e);
           updateStats();
         }
-      } else if (isDragging) {
-        // Drop current part
-        stopDragging();
       } else {
         // Pick up existing part
         const nodeId = renderer.pick(e.clientX, e.clientY);
