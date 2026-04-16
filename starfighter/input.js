@@ -115,29 +115,12 @@ const SFInput = (function () {
 
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement === document.body) {
-                // Locked — hide cursor, hide resume btn + overlay
+                // Locked — hide cursor
                 document.body.classList.add('immersed');
-                const btn = document.getElementById('fs-resume');
-                const overlay = document.getElementById('fs-resume-overlay');
-                if (btn) btn.style.display = 'none';
-                if (overlay) overlay.style.display = 'none';
             } else {
+                // Pointer lock lost — pause game and allow in-game buttons
                 document.body.classList.remove('immersed');
-                if (_isElectron) {
-                    // Electron: pointer lock lost = window lost focus (alt-tab etc.)
-                    // Re-acquire on next click; don't show browser-style resume overlay
-                    // Just pause the game if it's running
-                    if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(true);
-                } else {
-                    // Browser: ESC breaks pointer lock — show resume prompt
-                    const phase = window.Starfighter && Starfighter.getPhase ? Starfighter.getPhase() : '';
-                    if (phase && phase !== 'loading') {
-                        const btn = document.getElementById('fs-resume');
-                        const overlay = document.getElementById('fs-resume-overlay');
-                        if (btn) btn.style.display = 'block';
-                        if (overlay) overlay.style.display = 'block';
-                    }
-                }
+                if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(true);
             }
         });
 
@@ -591,10 +574,6 @@ const SFInput = (function () {
         }
         document.body.classList.add('immersed');
         if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(false);
-        const btn = document.getElementById('fs-resume');
-        const overlay = document.getElementById('fs-resume-overlay');
-        if (btn) btn.style.display = 'none';
-        if (overlay) overlay.style.display = 'none';
     }
 
     return { init, update, getLaunchTriggered, checkLaunch, isKeyDown, updateLivePanel, togglePanel, enterImmersive, isMobile: () => isMobile };

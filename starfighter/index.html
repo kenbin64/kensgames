@@ -30,61 +30,6 @@
       cursor: none !important
     }
 
-    /* Fullscreen resume button — appears when ESC exits immersion */
-    #fs-resume {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 9990;
-      padding: 20px 48px;
-      font-family: 'Courier New', monospace;
-      font-size: 20px;
-      font-weight: bold;
-      letter-spacing: 3px;
-      color: #0ff;
-      background: rgba(0, 20, 30, 0.92);
-      border: 2px solid rgba(0, 255, 255, 0.6);
-      border-radius: 8px;
-      cursor: pointer;
-      pointer-events: auto;
-      text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
-      animation: fsResumePulse 2s ease-in-out infinite;
-      will-change: opacity
-    }
-
-    #fs-resume:hover {
-      background: rgba(0, 40, 60, 0.95);
-      border-color: #0ff;
-      text-shadow: 0 0 20px rgba(0, 255, 255, 0.8)
-    }
-
-    /* Dim the game when paused / un-immersed */
-    #fs-resume-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      z-index: 9989;
-      pointer-events: none
-    }
-
-    @keyframes fsResumePulse {
-
-      0%,
-      100% {
-        opacity: 0.9
-      }
-
-      50% {
-        opacity: 1
-      }
-    }
-
     /* ── Canvas fills entire viewport ── */
     #game-canvas {
       display: block;
@@ -1112,8 +1057,11 @@
     #respawn-overlay {
       display: none;
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(40,0,0,0.92);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(40, 0, 0, 0.92);
       z-index: 95;
       pointer-events: auto;
       flex-direction: column;
@@ -1121,40 +1069,90 @@
       align-items: center;
       animation: respawnFlash 0.5s ease-out
     }
-    #respawn-overlay.active { display: flex }
+
+    #respawn-overlay.active {
+      display: flex
+    }
+
     @keyframes respawnFlash {
-      0% { background: rgba(220,0,0,0.7) }
-      100% { background: rgba(40,0,0,0.92) }
+      0% {
+        background: rgba(220, 0, 0, 0.7)
+      }
+
+      100% {
+        background: rgba(40, 0, 0, 0.92)
+      }
     }
+
     .respawn-reason-text {
-      font-family: monospace; font-size: 1em; color: #ff8888;
-      letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px
+      font-family: monospace;
+      font-size: 1em;
+      color: #ff8888;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 6px
     }
+
     .respawn-headline {
-      font-family: monospace; font-size: 3.2em; color: #ff2222;
-      text-shadow: 0 0 30px #f00, 0 0 60px rgba(255,0,0,0.4);
-      letter-spacing: 6px; text-transform: uppercase; margin-bottom: 20px
+      font-family: monospace;
+      font-size: 3.2em;
+      color: #ff2222;
+      text-shadow: 0 0 30px #f00, 0 0 60px rgba(255, 0, 0, 0.4);
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      margin-bottom: 20px
     }
-    .lives-meter-row { display: flex; gap: 14px; margin-bottom: 10px }
-    .lives-pip { font-size: 2.2em; transition: all 0.3s }
-    .lives-pip.active { color: #ff4444; text-shadow: 0 0 14px #f00 }
-    .lives-pip.lost { color: rgba(80,20,20,0.4) }
+
+    .lives-meter-row {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 10px
+    }
+
+    .lives-pip {
+      font-size: 2.2em;
+      transition: all 0.3s
+    }
+
+    .lives-pip.active {
+      color: #ff4444;
+      text-shadow: 0 0 14px #f00
+    }
+
+    .lives-pip.lost {
+      color: rgba(80, 20, 20, 0.4)
+    }
+
     .respawn-turns-text {
-      font-family: monospace; font-size: 1.1em; color: #ffaaaa; margin-bottom: 30px
+      font-family: monospace;
+      font-size: 1.1em;
+      color: #ffaaaa;
+      margin-bottom: 30px
     }
-    .respawn-turns-text strong { color: #ff4444 }
+
+    .respawn-turns-text strong {
+      color: #ff4444
+    }
+
     .respawn-btn {
-      padding: 14px 48px; font-family: monospace; font-size: 1.05em;
-      letter-spacing: 3px; text-transform: uppercase;
-      background: linear-gradient(180deg,rgba(200,30,30,0.9),rgba(140,10,10,0.95));
-      color: #fff; border: 1px solid rgba(255,80,80,0.5);
-      cursor: pointer; border-radius: 4px;
-      box-shadow: 0 0 20px rgba(255,0,0,0.25);
-      pointer-events: auto; transition: all 0.15s
+      padding: 14px 48px;
+      font-family: monospace;
+      font-size: 1.05em;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, rgba(200, 30, 30, 0.9), rgba(140, 10, 10, 0.95));
+      color: #fff;
+      border: 1px solid rgba(255, 80, 80, 0.5);
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
+      pointer-events: auto;
+      transition: all 0.15s
     }
+
     .respawn-btn:hover {
-      background: linear-gradient(180deg,rgba(255,60,60,0.95),rgba(200,20,20,0.98));
-      box-shadow: 0 0 35px rgba(255,0,0,0.5)
+      background: linear-gradient(180deg, rgba(255, 60, 60, 0.95), rgba(200, 20, 20, 0.98));
+      box-shadow: 0 0 35px rgba(255, 0, 0, 0.5)
     }
 
     /* ═══════════════════════════════════════
@@ -1163,8 +1161,11 @@
     #waveclear-overlay {
       display: none;
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,8,24,0.93);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 8, 24, 0.93);
       z-index: 95;
       pointer-events: auto;
       flex-direction: column;
@@ -1172,36 +1173,66 @@
       align-items: center;
       animation: waveclearFlash 0.5s ease-out
     }
-    #waveclear-overlay.active { display: flex }
+
+    #waveclear-overlay.active {
+      display: flex
+    }
+
     @keyframes waveclearFlash {
-      0% { background: rgba(0,60,200,0.75) }
-      100% { background: rgba(0,8,24,0.93) }
+      0% {
+        background: rgba(0, 60, 200, 0.75)
+      }
+
+      100% {
+        background: rgba(0, 8, 24, 0.93)
+      }
     }
+
     .waveclear-headline {
-      font-family: monospace; font-size: 2.8em; color: #44ddff;
-      text-shadow: 0 0 30px #0af, 0 0 60px rgba(0,160,255,0.3);
-      letter-spacing: 8px; text-transform: uppercase; margin-bottom: 8px
+      font-family: monospace;
+      font-size: 2.8em;
+      color: #44ddff;
+      text-shadow: 0 0 30px #0af, 0 0 60px rgba(0, 160, 255, 0.3);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-bottom: 8px
     }
+
     .waveclear-congrats {
-      font-family: monospace; font-size: 1.15em; color: #ffdd44;
-      letter-spacing: 4px; margin-bottom: 16px
+      font-family: monospace;
+      font-size: 1.15em;
+      color: #ffdd44;
+      letter-spacing: 4px;
+      margin-bottom: 16px
     }
+
     .waveclear-kills {
-      font-family: monospace; font-size: 0.95em; color: #88ccff;
-      letter-spacing: 2px; margin-bottom: 36px
+      font-family: monospace;
+      font-size: 0.95em;
+      color: #88ccff;
+      letter-spacing: 2px;
+      margin-bottom: 36px
     }
+
     .waveclear-btn {
-      padding: 14px 48px; font-family: monospace; font-size: 1.05em;
-      letter-spacing: 3px; text-transform: uppercase;
-      background: linear-gradient(180deg,rgba(0,100,200,0.9),rgba(0,60,140,0.95));
-      color: #fff; border: 1px solid rgba(0,180,255,0.4);
-      cursor: pointer; border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0,160,255,0.25);
-      pointer-events: auto; transition: all 0.15s
+      padding: 14px 48px;
+      font-family: monospace;
+      font-size: 1.05em;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, rgba(0, 100, 200, 0.9), rgba(0, 60, 140, 0.95));
+      color: #fff;
+      border: 1px solid rgba(0, 180, 255, 0.4);
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 0 20px rgba(0, 160, 255, 0.25);
+      pointer-events: auto;
+      transition: all 0.15s
     }
+
     .waveclear-btn:hover {
-      background: linear-gradient(180deg,rgba(0,140,255,0.95),rgba(0,80,180,0.98));
-      box-shadow: 0 0 35px rgba(0,160,255,0.5)
+      background: linear-gradient(180deg, rgba(0, 140, 255, 0.95), rgba(0, 80, 180, 0.98));
+      box-shadow: 0 0 35px rgba(0, 160, 255, 0.5)
     }
 
     /* ═══════════════════════════════════════
@@ -1210,161 +1241,468 @@
     #bay-debrief {
       display: none;
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,4,12,0.96);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 4, 12, 0.96);
       z-index: 110;
       pointer-events: auto;
       overflow-y: auto;
       font-family: monospace
     }
-    #bay-debrief.active { display: block }
-    .bdr-container { max-width: 740px; margin: 0 auto; padding: 24px 16px }
+
+    #bay-debrief.active {
+      display: block
+    }
+
+    .bdr-container {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 24px 16px
+    }
+
     .bdr-header {
-      text-align: center; margin-bottom: 18px;
-      padding-bottom: 14px; border-bottom: 1px solid rgba(0,255,255,0.12)
+      text-align: center;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.12)
     }
+
     #bdr-wave-title {
-      font-size: 1.9em; color: #0ff; letter-spacing: 6px;
-      text-shadow: 0 0 18px #0af; text-transform: uppercase; margin-bottom: 4px
+      font-size: 1.9em;
+      color: #0ff;
+      letter-spacing: 6px;
+      text-shadow: 0 0 18px #0af;
+      text-transform: uppercase;
+      margin-bottom: 4px
     }
-    #bdr-mission-name { font-size: 0.9em; color: #ffcc44; letter-spacing: 3px; text-transform: uppercase }
-    #bdr-callsign-ack { font-size: 0.82em; color: #88ccee; margin-top: 8px; letter-spacing: 1px }
+
+    #bdr-mission-name {
+      font-size: 0.9em;
+      color: #ffcc44;
+      letter-spacing: 3px;
+      text-transform: uppercase
+    }
+
+    #bdr-callsign-ack {
+      font-size: 0.82em;
+      color: #88ccee;
+      margin-top: 8px;
+      letter-spacing: 1px
+    }
+
     #bdr-rankup {
-      display: none; text-align: center;
-      background: linear-gradient(135deg,rgba(255,200,0,0.12),rgba(255,100,0,0.08));
-      border: 1px solid rgba(255,200,0,0.4); border-radius: 6px;
-      padding: 14px 24px; margin-bottom: 16px;
-      box-shadow: 0 0 24px rgba(255,200,0,0.12), inset 0 0 30px rgba(255,180,0,0.04)
+      display: none;
+      text-align: center;
+      background: linear-gradient(135deg, rgba(255, 200, 0, 0.12), rgba(255, 100, 0, 0.08));
+      border: 1px solid rgba(255, 200, 0, 0.4);
+      border-radius: 6px;
+      padding: 14px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 24px rgba(255, 200, 0, 0.12), inset 0 0 30px rgba(255, 180, 0, 0.04)
     }
-    #bdr-rankup.visible { display: block }
-    .bdr-rankup-label { font-size: 0.65em; color: #ffcc44; letter-spacing: 5px; margin-bottom: 6px }
-    .bdr-rankup-icon { font-size: 2.4em; margin-bottom: 6px }
-    #bdr-rankup-name { font-size: 1.5em; color: #fff; letter-spacing: 5px; text-transform: uppercase }
+
+    #bdr-rankup.visible {
+      display: block
+    }
+
+    .bdr-rankup-label {
+      font-size: 0.65em;
+      color: #ffcc44;
+      letter-spacing: 5px;
+      margin-bottom: 6px
+    }
+
+    .bdr-rankup-icon {
+      font-size: 2.4em;
+      margin-bottom: 6px
+    }
+
+    #bdr-rankup-name {
+      font-size: 1.5em;
+      color: #fff;
+      letter-spacing: 5px;
+      text-transform: uppercase
+    }
+
     .bdr-main-cols {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px
     }
-    @media(max-width:560px) { .bdr-main-cols { grid-template-columns: 1fr } }
+
+    @media(max-width:560px) {
+      .bdr-main-cols {
+        grid-template-columns: 1fr
+      }
+    }
+
     .bdr-card {
-      background: rgba(0,14,28,0.8); border: 1px solid rgba(0,255,255,0.1);
-      border-radius: 6px; padding: 14px
+      background: rgba(0, 14, 28, 0.8);
+      border: 1px solid rgba(0, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 14px
     }
+
     .bdr-card-title {
-      font-size: 0.62em; color: rgba(0,255,255,0.45); letter-spacing: 3px;
-      text-transform: uppercase; margin-bottom: 10px;
-      border-bottom: 1px solid rgba(0,255,255,0.08); padding-bottom: 6px
+      font-size: 0.62em;
+      color: rgba(0, 255, 255, 0.45);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+      padding-bottom: 6px
     }
+
     .bdr-stat-row {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 3px 0; font-size: 0.78em
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 0.78em
     }
-    .bdr-stat-label { color: rgba(0,255,255,0.55) }
-    .bdr-stat-val { color: #0ff; font-weight: bold }
-    .bdr-stat-val.green { color: #00ff88 }
-    .bdr-stat-val.yellow { color: #ffdd00 }
-    .bdr-stat-val.red { color: #ff4444 }
+
+    .bdr-stat-label {
+      color: rgba(0, 255, 255, 0.55)
+    }
+
+    .bdr-stat-val {
+      color: #0ff;
+      font-weight: bold
+    }
+
+    .bdr-stat-val.green {
+      color: #00ff88
+    }
+
+    .bdr-stat-val.yellow {
+      color: #ffdd00
+    }
+
+    .bdr-stat-val.red {
+      color: #ff4444
+    }
+
     .bdr-ship-row {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.74em
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.74em
     }
-    .bdr-ship-label { width: 38px; color: rgba(0,255,255,0.55); text-align: right; flex-shrink: 0 }
+
+    .bdr-ship-label {
+      width: 38px;
+      color: rgba(0, 255, 255, 0.55);
+      text-align: right;
+      flex-shrink: 0
+    }
+
     .bdr-ship-bar-track {
-      flex: 1; height: 5px; background: rgba(0,255,255,0.08);
-      border: 1px solid rgba(0,255,255,0.12); border-radius: 3px; overflow: hidden
+      flex: 1;
+      height: 5px;
+      background: rgba(0, 255, 255, 0.08);
+      border: 1px solid rgba(0, 255, 255, 0.12);
+      border-radius: 3px;
+      overflow: hidden
     }
-    .bdr-ship-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; width: 0% }
-    .bdr-ship-bar-fill.hull { background: linear-gradient(90deg,#00aa44,#00ff66) }
-    .bdr-ship-bar-fill.shld { background: linear-gradient(90deg,#0066ff,#00ffff) }
-    .bdr-ship-bar-fill.fuel { background: linear-gradient(90deg,#aa8800,#ffcc00) }
-    .bdr-ship-bar-fill.torp { background: linear-gradient(90deg,#8800aa,#ff44ff) }
-    .bdr-ship-val { width: 36px; color: #0ff; text-align: right; flex-shrink: 0 }
+
+    .bdr-ship-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+      width: 0%
+    }
+
+    .bdr-ship-bar-fill.hull {
+      background: linear-gradient(90deg, #00aa44, #00ff66)
+    }
+
+    .bdr-ship-bar-fill.shld {
+      background: linear-gradient(90deg, #0066ff, #00ffff)
+    }
+
+    .bdr-ship-bar-fill.fuel {
+      background: linear-gradient(90deg, #aa8800, #ffcc00)
+    }
+
+    .bdr-ship-bar-fill.torp {
+      background: linear-gradient(90deg, #8800aa, #ff44ff)
+    }
+
+    .bdr-ship-val {
+      width: 36px;
+      color: #0ff;
+      text-align: right;
+      flex-shrink: 0
+    }
+
     .bdr-cr-row {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.72em; margin-top: 8px; padding-top: 8px;
-      border-top: 1px solid rgba(0,255,255,0.08)
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72em;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(0, 255, 255, 0.08)
     }
-    .bdr-cr-row .label { color: rgba(0,255,255,0.45) }
-    #bdr-cr-balance { color: #ffcc44; font-weight: bold }
-    .bdr-xp-section { margin-bottom: 14px }
+
+    .bdr-cr-row .label {
+      color: rgba(0, 255, 255, 0.45)
+    }
+
+    #bdr-cr-balance {
+      color: #ffcc44;
+      font-weight: bold
+    }
+
+    .bdr-xp-section {
+      margin-bottom: 14px
+    }
+
     .bdr-xp-labels {
-      display: flex; justify-content: space-between;
-      font-size: 0.68em; color: rgba(0,255,255,0.45); margin-bottom: 4px
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.68em;
+      color: rgba(0, 255, 255, 0.45);
+      margin-bottom: 4px
     }
+
     .bdr-xp-bar-track {
-      width: 100%; height: 7px; background: rgba(0,255,255,0.08);
-      border: 1px solid rgba(0,255,255,0.15); border-radius: 4px; overflow: hidden
+      width: 100%;
+      height: 7px;
+      background: rgba(0, 255, 255, 0.08);
+      border: 1px solid rgba(0, 255, 255, 0.15);
+      border-radius: 4px;
+      overflow: hidden
     }
+
     #bdr-xp-fill {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg,#0088ff,#00ffff);
-      border-radius: 4px; transition: width 0.8s ease
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0088ff, #00ffff);
+      border-radius: 4px;
+      transition: width 0.8s ease
     }
+
     .bdr-xp-earned-row {
-      display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.68em
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.68em
     }
-    #bdr-xp-delta { color: #88ccee }
-    .bdr-earned-chips { display: flex; gap: 12px }
-    #bdr-xp-earned { color: #00ffcc }
-    #bdr-cr-earned { color: #ffcc44 }
+
+    #bdr-xp-delta {
+      color: #88ccee
+    }
+
+    .bdr-earned-chips {
+      display: flex;
+      gap: 12px
+    }
+
+    #bdr-xp-earned {
+      color: #00ffcc
+    }
+
+    #bdr-cr-earned {
+      color: #ffcc44
+    }
+
     #bdr-bonus-row {
-      display: none; font-size: 0.68em; color: #00ff88;
-      padding: 3px 10px; background: rgba(0,80,40,0.18);
-      border: 1px solid rgba(0,180,80,0.25); border-radius: 3px;
-      margin-top: 5px; text-align: center
+      display: none;
+      font-size: 0.68em;
+      color: #00ff88;
+      padding: 3px 10px;
+      background: rgba(0, 80, 40, 0.18);
+      border: 1px solid rgba(0, 180, 80, 0.25);
+      border-radius: 3px;
+      margin-top: 5px;
+      text-align: center
     }
-    #bdr-unlocks-section { display: none; margin-bottom: 14px }
+
+    #bdr-unlocks-section {
+      display: none;
+      margin-bottom: 14px
+    }
+
     .bdr-unlock-item {
-      display: flex; align-items: center; gap: 12px;
-      background: rgba(0,220,80,0.06); border: 1px solid rgba(0,220,80,0.22);
-      border-radius: 6px; padding: 12px
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0, 220, 80, 0.06);
+      border: 1px solid rgba(0, 220, 80, 0.22);
+      border-radius: 6px;
+      padding: 12px
     }
-    .bdr-unlock-icon { font-size: 1.7em; flex-shrink: 0 }
-    .bdr-unlock-text { flex: 1 }
-    .bdr-unlock-name { font-size: 0.88em; color: #00ff88; font-weight: bold; margin-bottom: 2px }
-    .bdr-unlock-desc { font-size: 0.68em; color: #88aa88 }
+
+    .bdr-unlock-icon {
+      font-size: 1.7em;
+      flex-shrink: 0
+    }
+
+    .bdr-unlock-text {
+      flex: 1
+    }
+
+    .bdr-unlock-name {
+      font-size: 0.88em;
+      color: #00ff88;
+      font-weight: bold;
+      margin-bottom: 2px
+    }
+
+    .bdr-unlock-desc {
+      font-size: 0.68em;
+      color: #88aa88
+    }
+
     .bdr-unlock-new {
-      font-size: 0.58em; letter-spacing: 2px; color: #fff;
-      background: #007733; padding: 2px 8px; border-radius: 3px; flex-shrink: 0
+      font-size: 0.58em;
+      letter-spacing: 2px;
+      color: #fff;
+      background: #007733;
+      padding: 2px 8px;
+      border-radius: 3px;
+      flex-shrink: 0
     }
+
     .bdr-next-card {
-      background: rgba(0,18,36,0.8); border: 1px solid rgba(0,255,255,0.15);
-      border-radius: 6px; padding: 14px; margin-bottom: 14px;
-      display: flex; align-items: center; gap: 14px
+      background: rgba(0, 18, 36, 0.8);
+      border: 1px solid rgba(0, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px
     }
-    .bdr-next-wave-badge { text-align: center; flex-shrink: 0; min-width: 72px }
-    .bdr-wave-num { font-size: 2.2em; color: #0ff; line-height: 1; text-shadow: 0 0 10px #0af }
-    .bdr-wave-label { font-size: 0.58em; color: rgba(0,255,255,0.45); letter-spacing: 2px }
-    .bdr-next-info { flex: 1 }
-    .bdr-next-title { font-size: 0.85em; color: #ffcc44; margin-bottom: 4px; letter-spacing: 1px }
-    .bdr-next-obj { font-size: 0.7em; color: #88aacc; line-height: 1.4 }
-    .bdr-shop-section { margin-bottom: 14px }
-    .bdr-shop-balance { font-size: 0.7em; color: #ffcc44; margin-bottom: 8px }
+
+    .bdr-next-wave-badge {
+      text-align: center;
+      flex-shrink: 0;
+      min-width: 72px
+    }
+
+    .bdr-wave-num {
+      font-size: 2.2em;
+      color: #0ff;
+      line-height: 1;
+      text-shadow: 0 0 10px #0af
+    }
+
+    .bdr-wave-label {
+      font-size: 0.58em;
+      color: rgba(0, 255, 255, 0.45);
+      letter-spacing: 2px
+    }
+
+    .bdr-next-info {
+      flex: 1
+    }
+
+    .bdr-next-title {
+      font-size: 0.85em;
+      color: #ffcc44;
+      margin-bottom: 4px;
+      letter-spacing: 1px
+    }
+
+    .bdr-next-obj {
+      font-size: 0.7em;
+      color: #88aacc;
+      line-height: 1.4
+    }
+
+    .bdr-shop-section {
+      margin-bottom: 14px
+    }
+
+    .bdr-shop-balance {
+      font-size: 0.7em;
+      color: #ffcc44;
+      margin-bottom: 8px
+    }
+
     .bdr-shop-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 8px 10px; cursor: pointer;
-      background: rgba(0,10,20,0.7); border: 1px solid rgba(0,255,255,0.08);
-      border-radius: 4px; margin-bottom: 4px; transition: all 0.1s
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      cursor: pointer;
+      background: rgba(0, 10, 20, 0.7);
+      border: 1px solid rgba(0, 255, 255, 0.08);
+      border-radius: 4px;
+      margin-bottom: 4px;
+      transition: all 0.1s
     }
-    .bdr-shop-item:hover { background: rgba(0,26,50,0.8); border-color: rgba(0,255,255,0.25) }
-    .bdr-shop-item.cant-afford { opacity: 0.38; cursor: default }
-    .bdr-shop-item-left { flex: 1 }
-    .bdr-shop-item-name { font-size: 0.78em; color: #0ff; margin-bottom: 2px }
-    .bdr-shop-item-desc { font-size: 0.63em; color: #445566 }
-    .bdr-shop-item-cost { font-size: 0.78em; color: #ffcc44; font-weight: bold; flex-shrink: 0; margin-left: 10px }
-    #bdr-shop-empty { font-size: 0.68em; color: #334455; text-align: center; padding: 12px }
+
+    .bdr-shop-item:hover {
+      background: rgba(0, 26, 50, 0.8);
+      border-color: rgba(0, 255, 255, 0.25)
+    }
+
+    .bdr-shop-item.cant-afford {
+      opacity: 0.38;
+      cursor: default
+    }
+
+    .bdr-shop-item-left {
+      flex: 1
+    }
+
+    .bdr-shop-item-name {
+      font-size: 0.78em;
+      color: #0ff;
+      margin-bottom: 2px
+    }
+
+    .bdr-shop-item-desc {
+      font-size: 0.63em;
+      color: #445566
+    }
+
+    .bdr-shop-item-cost {
+      font-size: 0.78em;
+      color: #ffcc44;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-left: 10px
+    }
+
+    #bdr-shop-empty {
+      font-size: 0.68em;
+      color: #334455;
+      text-align: center;
+      padding: 12px
+    }
+
     .bdr-footer {
-      text-align: center; padding-top: 16px; border-top: 1px solid rgba(0,255,255,0.08)
+      text-align: center;
+      padding-top: 16px;
+      border-top: 1px solid rgba(0, 255, 255, 0.08)
     }
+
     .bdr-launch-btn {
-      padding: 14px 60px; font-family: monospace; font-size: 1.05em;
-      letter-spacing: 4px; text-transform: uppercase;
-      background: linear-gradient(180deg,rgba(0,150,40,0.9),rgba(0,90,20,0.95));
-      color: #fff; border: 1px solid rgba(0,240,80,0.35);
-      cursor: pointer; border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0,200,60,0.18);
+      padding: 14px 60px;
+      font-family: monospace;
+      font-size: 1.05em;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, rgba(0, 150, 40, 0.9), rgba(0, 90, 20, 0.95));
+      color: #fff;
+      border: 1px solid rgba(0, 240, 80, 0.35);
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 0 20px rgba(0, 200, 60, 0.18);
       transition: all 0.15s
     }
+
     .bdr-launch-btn:hover {
-      background: linear-gradient(180deg,rgba(0,200,60,0.95),rgba(0,130,30,0.98));
-      box-shadow: 0 0 32px rgba(0,200,60,0.35)
+      background: linear-gradient(180deg, rgba(0, 200, 60, 0.95), rgba(0, 130, 30, 0.98));
+      box-shadow: 0 0 32px rgba(0, 200, 60, 0.35)
     }
 
     /* ═══════════════════════════════════════
@@ -1488,7 +1826,7 @@
       display: none !important
     }
   </style>
-  </head>
+</head>
 
 <body>
 
@@ -1611,6 +1949,12 @@
       style="background:linear-gradient(180deg,rgba(60,15,15,0.95),rgba(40,8,8,0.98));border-color:rgba(200,60,60,0.5);color:#ff6666;display:none"
       onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚ CALL MEDIC</button>
   </div>
+
+  <!-- Emergency Rescue Button -->
+  <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
+    ⚠ EMERGENCY RESCUE
+    <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
+  </button>
 
   <!-- ═══ MOBILE TOUCH HUD — shown only on phones/tablets ═══ -->
   <div id="mobile-hud" style="display:none">
@@ -1944,11 +2288,13 @@
     </div>
   </div>
 
-  <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
-  <!-- Fullscreen resume overlay + button (hidden until ESC exits immersion) -->
-  <div id="fs-resume-overlay"></div>
-  <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO RESUME</div>
+  <!-- Emergency Rescue Button -->
+  <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
+    ⚠ EMERGENCY RESCUE
+    <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
+  </button>
 
+  <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
   <div id="loading-screen"
     style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
     <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
@@ -2013,22 +2359,30 @@
           <div class="bdr-card-title">Ship Status — After Refit</div>
           <div class="bdr-ship-row">
             <div class="bdr-ship-label">HULL</div>
-            <div class="bdr-ship-bar-track"><div id="bdr-hull-fill" class="bdr-ship-bar-fill hull"></div></div>
+            <div class="bdr-ship-bar-track">
+              <div id="bdr-hull-fill" class="bdr-ship-bar-fill hull"></div>
+            </div>
             <div class="bdr-ship-val" id="bdr-hull-pct">100%</div>
           </div>
           <div class="bdr-ship-row">
             <div class="bdr-ship-label">SHLD</div>
-            <div class="bdr-ship-bar-track"><div id="bdr-shld-fill" class="bdr-ship-bar-fill shld"></div></div>
+            <div class="bdr-ship-bar-track">
+              <div id="bdr-shld-fill" class="bdr-ship-bar-fill shld"></div>
+            </div>
             <div class="bdr-ship-val" id="bdr-shld-pct">100%</div>
           </div>
           <div class="bdr-ship-row">
             <div class="bdr-ship-label">FUEL</div>
-            <div class="bdr-ship-bar-track"><div id="bdr-fuel-fill" class="bdr-ship-bar-fill fuel"></div></div>
+            <div class="bdr-ship-bar-track">
+              <div id="bdr-fuel-fill" class="bdr-ship-bar-fill fuel"></div>
+            </div>
             <div class="bdr-ship-val" id="bdr-fuel-pct">100%</div>
           </div>
           <div class="bdr-ship-row">
             <div class="bdr-ship-label">TORPS</div>
-            <div class="bdr-ship-bar-track"><div id="bdr-torp-fill" class="bdr-ship-bar-fill torp"></div></div>
+            <div class="bdr-ship-bar-track">
+              <div id="bdr-torp-fill" class="bdr-ship-bar-fill torp"></div>
+            </div>
             <div class="bdr-ship-val" id="bdr-torp-val">2/2</div>
           </div>
           <div class="bdr-cr-row">
@@ -2045,7 +2399,9 @@
           <span id="bdr-rank-cur">ENSIGN</span>
           <span id="bdr-rank-next">LT. JUNIOR</span>
         </div>
-        <div class="bdr-xp-bar-track"><div id="bdr-xp-fill"></div></div>
+        <div class="bdr-xp-bar-track">
+          <div id="bdr-xp-fill"></div>
+        </div>
         <div class="bdr-xp-earned-row">
           <span id="bdr-xp-delta">+0 XP this wave</span>
           <div class="bdr-earned-chips">
@@ -2080,7 +2436,8 @@
         </div>
         <div class="bdr-next-info">
           <div class="bdr-next-title" id="bdr-next-title">BAPTISM OF FIRE</div>
-          <div class="bdr-next-obj" id="bdr-next-objective">Eliminate Vek Corsair scouts before they report fleet position.</div>
+          <div class="bdr-next-obj" id="bdr-next-objective">Eliminate Vek Corsair scouts before they report fleet
+            position.</div>
         </div>
       </div>
 
@@ -2116,7 +2473,7 @@
       if (window.Starfighter) Starfighter.init();
     });
   </script>
-<script src="starfighter.bundle.js?v=4988fa189fea43d9"></script>
+  <script src="starfighter.bundle.js?v=4988fa189fea43d9"></script>
 </body>
 
 </html>

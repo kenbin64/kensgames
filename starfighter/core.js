@@ -990,6 +990,9 @@ const Starfighter = (function () {
             bearing: _bearing, bearingOf: _bearingOf, dim, countHostiles: _countActiveHostiles
         });
 
+        // Init rescue system
+        if (window.SFRescue) SFRescue.init(state);
+
         // Cockpit always visible — even during loading/bay
         if (window.SF3D) SF3D.showCockpit(true);
 
@@ -2239,6 +2242,9 @@ const Starfighter = (function () {
             state.cutsceneCamPos = null;
             state.cutsceneCamQuat = null;
             state.cutsceneVelocity = null;
+
+            // Reset rescue uses for new wave
+            if (window.SFRescue) SFRescue.reset();
 
             if (window.SFAudio) {
                 SFAudio.stopCockpitHum();
@@ -3515,6 +3521,10 @@ const Starfighter = (function () {
 
             // Autonomous announcer — observe game state and generate chatter
             SFAnnouncer.observe(safeDt);
+
+            // Emergency rescue system — button visibility and autopilot
+            if (window.SFRescue) SFRescue.update(safeDt, state);
+
             // Wingman cluster guidance — bearing callout every 15-23s during combat
             state._clusterCallTimer -= safeDt;
             if (state._clusterCallTimer <= 0 && state.phase === 'combat') {
