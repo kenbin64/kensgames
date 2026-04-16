@@ -1,13 +1,19 @@
 /**
  * Starfighter 3D Renderer
  * Three.js, First-Person Cockpit, Entity Meshes
+ *
+ * DIMENSIONAL PROGRAMMING ARCHITECTURE:
+ * - Geometry is NOT loaded from binary GLB files
+ * - Instead, meshes are OBSERVED from manifold equations (z=xy, z=xy², m=xyz)
+ * - Manifolds ARE the data; this renderer is a substrate that extracts geometry
+ * - Audio is synthesized from manifold waveforms, not binary audio files
  */
 
 const SF3D = (function () {
     let scene, camera, renderer;
     const entityMeshes = new Map();
     let cockpitGroup;
-    let cockpitModel; // GLB cockpit model
+    let cockpitModel; // Manifold-generated cockpit geometry
     let manifoldCockpitGroup;
     let manifoldCockpitShell;
     let manifoldCockpitDash;
@@ -36,13 +42,16 @@ const SF3D = (function () {
     const _activeIds = new Set();  // reused every frame — no allocation
     let _frameTime = 0;  // cached performance.now() per frame
 
-    // ── GLB model cache: loaded once, cloned per entity ──
+    // ══════════════════════════════════════════════════════════════════
+    // § MANIFOLD GEOMETRY CACHE
+    // ══════════════════════════════════════════════════════════════════
+    // Geometry observed from manifold substrates, cached for performance
+    // No binary GLB files loaded — pure mathematical reconstruction
+    const manifoldGeometryCache = {}; // { type_lod: { geometry, material, scale } }
+
+    // LEGACY GLB SYSTEM (DEPRECATED — kept for backward compatibility)
+    // This system is being phased out in favor of manifold substrates
     const glbModels = {};    // { modelName: THREE.Group }
-    // LOD levels: [{ path, distance }] — distance is the camera distance at which
-    // Three.js switches FROM this level to the next (coarser) one.
-    // lod0 = highest quality (close range); materials/textures embedded.
-    // lod1/lod2 = geometry-only; materials copied from lod0 at load time.
-    // Distances use game world units; glow sphere takes over at DOT_DIST.
     const GLB_LOD = {
         enemy: [
             { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
@@ -548,8 +557,11 @@ const SF3D = (function () {
         // Launch Bay
         createLaunchBay();
 
-        // Preload all GLB models
-        _preloadGLBModels();
+        // ══════════════════════════════════════════════════════════════════
+        // § MANIFOLD GEOMETRY PRELOADING
+        // ══════════════════════════════════════════════════════════════════
+        // Observe manifolds and cache geometries (no binary files loaded)
+        _preloadManifoldGeometries();
 
         // Target Lock Reticle — modern bracket-style ring
         targetLockMesh = _createTargetReticle();
@@ -618,10 +630,49 @@ const SF3D = (function () {
     function onAllModelsReady(cb) { _onReadyCallback = cb; if (_allModelsReady) cb(); }
     function isReady() { return _allModelsReady; }
 
-    // ── Preload essential GLBs; lazy-load combat models on demand ──
-    // Dimensional LOD: preloaded types get GLB + glow sphere immediately;
-    // lazy types start as procedural fallback, GLB streams in during gameplay
-    function _preloadGLBModels() {
+    // ══════════════════════════════════════════════════════════════════
+    // § MANIFOLD GEOMETRY PRELOADING
+    // ══════════════════════════════════════════════════════════════════
+    // Observe manifolds and cache geometries for instant use
+    // No binary files loaded — pure mathematical reconstruction
+    function _preloadManifoldGeometries() {
+        console.log('[ManifoldGeometry] Observing manifolds and caching geometries...');
+
+        // Check if manifold substrate is available
+        if (!window.SFManifoldGeometry) {
+            console.warn('[ManifoldGeometry] Substrate not loaded, falling back to legacy GLB system');
+            _preloadGLBModels_LEGACY();
+            return;
+        }
+
+        const availableTypes = SFManifoldGeometry.getAvailableTypes();
+        _totalModelsToLoad = availableTypes.length * 3; // 3 LOD levels per type
+        _modelsLoaded = 0;
+
+        // Pre-observe all manifolds at all LOD levels
+        for (const type of availableTypes) {
+            for (let lodLevel = 0; lodLevel < 3; lodLevel++) {
+                const cacheKey = `${type}_lod${lodLevel}`;
+
+                try {
+                    const observed = SFManifoldGeometry.observeGeometry(type, lodLevel);
+                    if (observed) {
+                        manifoldGeometryCache[cacheKey] = observed;
+                        console.log(`[ManifoldGeometry] Cached ${cacheKey}: ${observed.geometry.attributes.position.count} vertices`);
+                    }
+                } catch (err) {
+                    console.error(`[ManifoldGeometry] Failed to observe ${cacheKey}:`, err);
+                }
+
+                _updateLoadingProgress(cacheKey);
+            }
+        }
+
+        console.log(`[ManifoldGeometry] Preloaded ${Object.keys(manifoldGeometryCache).length} manifold geometries`);
+    }
+
+    // LEGACY GLB PRELOAD (kept for backward compatibility)
+    function _preloadGLBModels_LEGACY() {
         const loader = new THREE.GLTFLoader();
 
         // Only count preloaded models for loading screen (+ cockpit)
@@ -1682,10 +1733,61 @@ const SF3D = (function () {
     function createEntityMesh(type, owner) {
         let mesh;
 
-        // ── Map entity types to GLB model keys ──
-        const glbKey = type === 'wingman' ? 'ally' : type;
+        // ── Map entity types to manifold model keys ──
+        const manifoldKey = type === 'wingman' ? 'ally' : type;
 
-        // ── Try GLB LOD clone first (only if model has finished loading levels) ──
+        // ══════════════════════════════════════════════════════════════════
+        // § MANIFOLD GEOMETRY OBSERVATION (Primary Path)
+        // ══════════════════════════════════════════════════════════════════
+        if (window.SFManifoldGeometry && SFManifoldGeometry.hasManifold(manifoldKey)) {
+            // Observe geometry from manifold substrate
+            const cacheKey = `${manifoldKey}_lod0`; // Start with highest LOD
+            let observed = manifoldGeometryCache[cacheKey];
+
+            if (!observed) {
+                // Not cached — observe now
+                observed = SFManifoldGeometry.observeGeometry(manifoldKey, 0);
+                if (observed) manifoldGeometryCache[cacheKey] = observed;
+            }
+
+            if (observed) {
+                // Create mesh from observed manifold geometry
+                const { geometry, material, scale } = observed;
+                const mat = new THREE.MeshStandardMaterial({
+                    color: material.color,
+                    metalness: material.metalness,
+                    roughness: material.roughness,
+                    emissive: material.emissive,
+                    emissiveIntensity: 0.5
+                });
+
+                mesh = new THREE.Mesh(geometry, mat);
+                mesh.scale.setScalar(scale);
+
+                // Add metadata
+                if (type === 'wingman') mesh.userData.isWingman = true;
+                if (type === 'baseship') mesh.userData.isBaseship = true;
+                if (type === 'tanker') mesh.userData.isTanker = true;
+                if (type === 'medic') mesh.userData.isMedic = true;
+
+                // Add lighting based on faction
+                if (ALIEN_GLOW_COLORS[manifoldKey]) {
+                    _addGlowLight(mesh, manifoldKey);
+                    mesh.userData.alienGlow = true;
+                } else if (FRIENDLY_LIGHT_CONFIGS[manifoldKey]) {
+                    _applyFriendlyLights(mesh, manifoldKey);
+                }
+
+                scene.add(mesh);
+                console.log(`[ManifoldGeometry] Created ${type} mesh from manifold (${geometry.attributes.position.count} vertices)`);
+                return mesh;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // § LEGACY GLB PATH (Fallback for backward compatibility)
+        // ══════════════════════════════════════════════════════════════════
+        const glbKey = manifoldKey;
         if (glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0) {
             mesh = _cloneLOD(glbKey);
             mesh.scale.setScalar(GLB_SCALES[glbKey] || 10);
@@ -1693,7 +1795,6 @@ const SF3D = (function () {
             if (type === 'baseship') mesh.userData.isBaseship = true;
             if (type === 'tanker') mesh.userData.isTanker = true;
             if (type === 'medic') mesh.userData.isMedic = true;
-            // Lighting: alien bioluminescence or friendly running lights
             if (ALIEN_GLOW_COLORS[glbKey]) {
                 _addGlowLight(mesh, glbKey);
                 mesh.userData.alienGlow = true;
@@ -1704,10 +1805,12 @@ const SF3D = (function () {
             return mesh;
         }
 
-        // ── Trigger lazy GLB load for combat types (streams in during gameplay) ──
+        // Trigger lazy GLB load for types without manifolds
         if (GLB_LOD[glbKey] && !_lazyState[glbKey]) _triggerLazyLoad(glbKey);
 
-        // ── Fallback: simple procedural geometry while GLBs load ──
+        // ══════════════════════════════════════════════════════════════════
+        // § PROCEDURAL FALLBACK (for types not in manifolds or GLB)
+        // ══════════════════════════════════════════════════════════════════
         mesh = new THREE.Group();
         const m = _getSharedMats();
 
@@ -1946,6 +2049,29 @@ const SF3D = (function () {
             mesh.add(new THREE.Mesh(tbg2, torpBillMat));
 
             mesh.userData.isTorpedo = true;
+        } else if (type === 'flare') {
+            // ═══════════════════════════════════════════════════════════════
+            // COUNTERMEASURE FLARE — bright cyan-white thermal decoy
+            // Small but intense, attracts heat-seeking missiles
+            // ═══════════════════════════════════════════════════════════════
+
+            // Bright core
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(2, 8, 8), coreMat));
+
+            // Cyan glow layer
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), glowMat));
+
+            // Outer bloom
+            const bloomMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.BackSide });
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8), bloomMat));
+
+            // Point light
+            const flareLight = new THREE.PointLight(0x00ffff, 4, 100);
+            mesh.add(flareLight);
+
+            mesh.userData.isFlare = true;
         } else {
             // Fallback: glowing point
             mesh.add(new THREE.Mesh(new THREE.SphereGeometry(3, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })));
