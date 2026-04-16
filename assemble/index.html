@@ -148,6 +148,7 @@
       padding: 4px;
       font-size: 9px;
       color: var(--text);
+      position: relative;
     }
 
     .part-btn:hover {
@@ -164,6 +165,39 @@
       text-align: center;
       line-height: 1.2;
       opacity: 0.8;
+    }
+
+    /* ── TOOLTIP ────────────────────────────────────────────── */
+    .tooltip {
+      position: fixed;
+      background: rgba(22, 27, 34, 0.98);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      pointer-events: none;
+      z-index: 500;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      max-width: 280px;
+    }
+
+    .tooltip.show {
+      display: block;
+    }
+
+    .tooltip-title {
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .tooltip-desc {
+      font-size: 13px;
+      color: var(--dim);
     }
 
     /* ── PROPERTIES PANEL ───────────────────────────────────── */
@@ -216,6 +250,7 @@
       border: 1px solid var(--border);
       z-index: 100;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      align-items: center;
     }
 
     .ctrl-btn {
@@ -255,6 +290,45 @@
     .ctrl-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
+    }
+
+    .ctrl-separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    .grid-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .grid-control input[type="range"] {
+      width: 80px;
+    }
+
+    /* ── ROTATION SPHERE ────────────────────────────────────── */
+    .rotation-sphere {
+      position: fixed;
+      width: 180px;
+      height: 180px;
+      display: none;
+      pointer-events: none;
+      z-index: 400;
+    }
+
+    .rotation-sphere.show {
+      display: block;
+      pointer-events: all;
+    }
+
+    .rotation-sphere canvas {
+      width: 100%;
+      height: 100%;
     }
 
     /* ── STATUS BAR ─────────────────────────────────────────── */
@@ -449,6 +523,14 @@
       </div>
 
       <div class="controls-bar">
+        <button class="ctrl-btn active" id="btn-snap" onclick="toggleSnap()">📍 SNAP: ON</button>
+        <div class="grid-control">
+          <label>Grid:</label>
+          <input type="range" id="grid-slider" min="0.1" max="2" step="0.1" value="0.5"
+            oninput="updateGridSize(this.value)">
+          <span id="grid-val">0.5</span>
+        </div>
+        <div class="ctrl-separator"></div>
         <button class="ctrl-btn" id="btn-run" onclick="toggleSim()">▶ RUN</button>
         <button class="ctrl-btn" onclick="deleteSelected()" disabled id="btn-delete">DELETE</button>
         <button class="ctrl-btn" onclick="saveContraption()">💾 SAVE</button>
@@ -457,11 +539,22 @@
       </div>
 
       <div class="help-hint">
-        <b>Click</b> part from library → <b>Click</b> in scene to place<br>
-        <b>Drag</b> to orbit camera | <b>Scroll</b> to zoom<br>
-        <b>Select</b> part to edit properties
+        <b>Left-click</b> part → <b>Click</b> scene to pick up → <b>Drag</b> to move → <b>Click</b> to drop<br>
+        <b>Right-click</b> while holding part for 3D rotation sphere<br>
+        <b>Drag canvas</b> to orbit | <b>Scroll</b> to zoom
       </div>
     </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title" id="tooltip-title">Part Name</div>
+    <div class="tooltip-desc" id="tooltip-desc">Description</div>
+  </div>
+
+  <!-- Rotation Sphere (for 3D rotation control) -->
+  <div class="rotation-sphere" id="rotation-sphere">
+    <canvas id="rotation-canvas" width="180" height="180"></canvas>
   </div>
 
   <!-- Result Modal -->
@@ -493,6 +586,13 @@
     let selectedNode = null;  // nodeId when editing
     let placementMode = false;
     let ghostVisible = false;
+    let snapEnabled = true;
+    let gridSize = 0.5;
+    let draggedNode = null;   // node being dragged
+    let dragOffset = new THREE.Vector3();
+    let isDragging = false;
+    let rotationMode = false;
+    let rotSphere = null;
 
     // ═══════════════════════════════════════════════════════════════
     // BUILD PARTS PALETTE
@@ -520,9 +620,43 @@
         btn.dataset.partId = p.id;
         btn.innerHTML = `<div class="icon">${p.icon}</div><div class="lbl">${p.label}</div>`;
         btn.onclick = () => selectTool(p.id);
+        // Tooltip
+        btn.addEventListener('mouseenter', e => showTooltip(e, p.label, `Category: ${p.category} | Mass: ${p.mass}kg`));
+        btn.addEventListener('mouseleave', hideTooltip);
         grid.appendChild(btn);
       });
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TOOLTIP
+    // ═══════════════════════════════════════════════════════════════
+    const tooltip = document.getElementById('tooltip');
+    const tooltipTitle = document.getElementById('tooltip-title');
+    const tooltipDesc = document.getElementById('tooltip-desc');
+
+    function showTooltip(e, title, desc) {
+      tooltipTitle.textContent = title;
+      tooltipDesc.textContent = desc;
+      tooltip.classList.add('show');
+      updateTooltipPos(e);
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('show');
+    }
+
+    function updateTooltipPos(e) {
+      const x = e.clientX + 15;
+      const y = e.clientY + 15;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    document.addEventListener('mousemove', e => {
+      if (tooltip.classList.contains('show')) {
+        updateTooltipPos(e);
+      }
+    });
 
     // ═══════════════════════════════════════════════════════════════
     // TOOL SELECTION
@@ -536,52 +670,152 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // CANVAS INTERACTION
+    // SNAP & GRID CONTROLS
+    // ═══════════════════════════════════════════════════════════════
+    window.toggleSnap = function () {
+      snapEnabled = !snapEnabled;
+      const btn = document.getElementById('btn-snap');
+      if (snapEnabled) {
+        btn.textContent = '📍 SNAP: ON';
+        btn.classList.add('active');
+      } else {
+        btn.textContent = '📍 SNAP: OFF';
+        btn.classList.remove('active');
+      }
+    };
+
+    window.updateGridSize = function (val) {
+      gridSize = parseFloat(val);
+      document.getElementById('grid-val').textContent = val;
+      // Update renderer grid
+      renderer.updateGrid(gridSize);
+    };
+
+    function snapPosition(pos) {
+      if (!snapEnabled) return pos;
+      return {
+        x: Math.round(pos.x / gridSize) * gridSize,
+        y: Math.round(pos.y / gridSize) * gridSize,
+        z: Math.round(pos.z / gridSize) * gridSize,
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CANVAS INTERACTION - New drag & drop model
     // ═══════════════════════════════════════════════════════════════
     const canvas = document.getElementById('c');
+    let mouseDownPos = null;
+    let mouseMoved = false;
 
-    canvas.addEventListener('click', e => {
-      if (engine.running) return; // can't edit while running
+    canvas.addEventListener('mousedown', e => {
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+      mouseMoved = false;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (mouseDownPos) {
+        const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+        if (dist > 3) mouseMoved = true;
+      }
+
+      // Ghost preview when in placement mode
+      if (placementMode && selectedTool && !isDragging) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          renderer.showGhost(selectedTool, snapped, null);
+          ghostVisible = true;
+        }
+      }
+
+      // Drag existing part
+      if (isDragging && draggedNode) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const node = engine.nodes.get(draggedNode);
+          if (node) {
+            const newPos = {
+              x: pt.x + dragOffset.x,
+              y: 0.5,
+              z: pt.z + dragOffset.z
+            };
+            const snapped = snapPosition(newPos);
+            node.position.x = snapped.x;
+            node.position.y = snapped.y;
+            node.position.z = snapped.z;
+            renderer.updateMeshTransform(node);
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', e => {
+      if (!mouseMoved && mouseDownPos && e.button === 0) {
+        handleCanvasClick(e);
+      }
+      mouseDownPos = null;
+      mouseMoved = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (isDragging && draggedNode) {
+        showRotationSphere(e);
+      }
+    });
+
+    function handleCanvasClick(e) {
+      if (engine.running) return;
 
       if (placementMode && selectedTool) {
-        // Place part
-        const rect = canvas.getBoundingClientRect();
-        const mouse = new THREE.Vector2(
-          ((e.clientX - rect.left) / rect.width) * 2 - 1,
-          -((e.clientY - rect.top) / rect.height) * 2 + 1,
-        );
-        const ray = new THREE.Raycaster();
-        ray.setFromCamera(mouse, renderer.camera);
-        // Intersect with ground plane y=0
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-        const pt = new THREE.Vector3();
-        ray.ray.intersectPlane(plane, pt);
+        // Place new part
+        const pt = raycastToGround(e);
         if (pt) {
-          const snapped = engine.snapToGrid({ x: pt.x, y: 0.5, z: pt.z });
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
           const node = engine.addNode(selectedTool, snapped, { x: 0, y: 0, z: 0 });
           renderer._addMesh(node);
           placementMode = false;
           selectedTool = null;
           renderer.hideGhost();
+          // Immediately pick up the newly placed part
+          startDragging(node.id, e);
           updateStats();
         }
+      } else if (isDragging) {
+        // Drop current part
+        stopDragging();
       } else {
-        // Select existing part
+        // Pick up existing part
         const nodeId = renderer.pick(e.clientX, e.clientY);
         if (nodeId) {
-          selectNode(nodeId);
+          startDragging(nodeId, e);
         } else {
           deselectNode();
         }
       }
-    });
+    }
 
-    canvas.addEventListener('mousemove', e => {
-      if (!placementMode || !selectedTool) {
-        if (ghostVisible) { renderer.hideGhost(); ghostVisible = false; }
-        return;
+    function startDragging(nodeId, e) {
+      draggedNode = nodeId;
+      isDragging = true;
+      selectNode(nodeId);
+      renderer.controls.enabled = false; // Disable orbit while dragging
+
+      const node = engine.nodes.get(nodeId);
+      const pt = raycastToGround(e);
+      if (node && pt) {
+        dragOffset.set(node.position.x - pt.x, 0, node.position.z - pt.z);
       }
-      // Show ghost preview
+    }
+
+    function stopDragging() {
+      isDragging = false;
+      draggedNode = null;
+      renderer.controls.enabled = true;
+      dragOffset.set(0, 0, 0);
+    }
+
+    function raycastToGround(e) {
       const rect = canvas.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -592,11 +826,102 @@
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
       const pt = new THREE.Vector3();
       ray.ray.intersectPlane(plane, pt);
-      if (pt) {
-        const snapped = engine.snapToGrid({ x: pt.x, y: 0.5, z: pt.z });
-        renderer.showGhost(selectedTool, snapped, null);
-        ghostVisible = true;
+      return pt;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ROTATION SPHERE (3D rotation control)
+    // ═══════════════════════════════════════════════════════════════
+    const rotSphereDiv = document.getElementById('rotation-sphere');
+    const rotCanvas = document.getElementById('rotation-canvas');
+    const rotCtx = rotCanvas.getContext('2d');
+    let rotDragStart = null;
+
+    function showRotationSphere(e) {
+      rotSphereDiv.style.left = (e.clientX - 90) + 'px';
+      rotSphereDiv.style.top = (e.clientY - 90) + 'px';
+      rotSphereDiv.classList.add('show');
+      drawRotationSphere();
+    }
+
+    function hideRotationSphere() {
+      rotSphereDiv.classList.remove('show');
+    }
+
+    function drawRotationSphere() {
+      const w = 180, h = 180, cx = w / 2, cy = h / 2, r = 80;
+      rotCtx.clearRect(0, 0, w, h);
+
+      // Outer circle
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.lineWidth = 2;
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // X axis (red)
+      rotCtx.strokeStyle = '#f85149';
+      rotCtx.lineWidth = 1.5;
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx - r, cy);
+      rotCtx.lineTo(cx + r, cy);
+      rotCtx.stroke();
+
+      // Y axis (green)
+      rotCtx.strokeStyle = '#3fb950';
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx, cy - r);
+      rotCtx.lineTo(cx, cy + r);
+      rotCtx.stroke();
+
+      // Z axis (blue circle)
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // Labels
+      rotCtx.fillStyle = '#c9d1d9';
+      rotCtx.font = '11px Orbitron';
+      rotCtx.fillText('X', cx + r + 8, cy + 4);
+      rotCtx.fillText('Y', cx - 4, cy - r - 8);
+      rotCtx.fillText('Z', cx + r * 0.6 + 8, cy - r * 0.6 - 8);
+    }
+
+    rotCanvas.addEventListener('mousedown', e => {
+      const rect = rotCanvas.getBoundingClientRect();
+      rotDragStart = {
+        x: e.clientX - rect.left - 90,
+        y: e.clientY - rect.top - 90
+      };
+    });
+
+    rotCanvas.addEventListener('mousemove', e => {
+      if (!rotDragStart || !draggedNode) return;
+      const rect = rotCanvas.getBoundingClientRect();
+      const dx = (e.clientX - rect.left - 90) - rotDragStart.x;
+      const dy = (e.clientY - rect.top - 90) - rotDragStart.y;
+
+      const node = engine.nodes.get(draggedNode);
+      if (node) {
+        // Rotate based on mouse drag
+        node.rotation.y += dx * 0.02;
+        node.rotation.x -= dy * 0.02;
+        renderer.updateMeshTransform(node);
+        updatePropertiesPanel();
       }
+
+      rotDragStart.x += dx;
+      rotDragStart.y += dy;
+    });
+
+    rotCanvas.addEventListener('mouseup', () => {
+      rotDragStart = null;
+    });
+
+    rotSphereDiv.addEventListener('mouseleave', () => {
+      hideRotationSphere();
+      rotDragStart = null;
     });
 
     // ═══════════════════════════════════════════════════════════════
@@ -611,10 +936,16 @@
 
       // Show properties panel
       document.getElementById('props').classList.add('show');
-      document.getElementById('prop-x').value = node.position.x;
-      document.getElementById('prop-y').value = node.position.y;
-      document.getElementById('prop-z').value = node.position.z;
-      document.getElementById('prop-ry').value = node.rotation.y;
+      updatePropertiesPanel();
+    }
+
+    function updatePropertiesPanel() {
+      const node = engine.nodes.get(selectedNode);
+      if (!node) return;
+      document.getElementById('prop-x').value = node.position.x.toFixed(2);
+      document.getElementById('prop-y').value = node.position.y.toFixed(2);
+      document.getElementById('prop-z').value = node.position.z.toFixed(2);
+      document.getElementById('prop-ry').value = (node.rotation.y * 180 / Math.PI).toFixed(0);
       document.getElementById('prop-label').value = node.label || '';
     }
 
@@ -635,7 +966,7 @@
         if (id === 'prop-x') node.position.x = parseFloat(inp.value) || 0;
         if (id === 'prop-y') node.position.y = parseFloat(inp.value) || 0;
         if (id === 'prop-z') node.position.z = parseFloat(inp.value) || 0;
-        if (id === 'prop-ry') node.rotation.y = parseFloat(inp.value) || 0;
+        if (id === 'prop-ry') node.rotation.y = (parseFloat(inp.value) || 0) * Math.PI / 180;
         if (id === 'prop-label') node.label = inp.value;
         renderer.updateMeshTransform(node);
       });

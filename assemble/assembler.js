@@ -419,15 +419,24 @@ export class AssembleRenderer {
     this.hoveredPort = null;
     this.ghostMesh = null;
     this.particles = [];
+    this.gridHelper = null;     // Store reference to grid
+    this.gridHelperTop = null;  // Top grid (lavender)
 
     window.addEventListener('resize', () => this._onResize());
   }
 
   _buildScene() {
-    // Grid floor
-    const grid = new THREE.GridHelper(40, 80, 0x1a2a3a, 0x111820);
-    grid.position.y = -0.01;
-    this.scene.add(grid);
+    // Bottom grid (light green)
+    this.gridHelper = new THREE.GridHelper(40, 80, 0x3fb950, 0x1a2a1a);
+    this.gridHelper.position.y = -0.01;
+    this.scene.add(this.gridHelper);
+
+    // Top grid (lavender, above ground)
+    this.gridHelperTop = new THREE.GridHelper(40, 80, 0x9966cc, 0x2a1a3a);
+    this.gridHelperTop.position.y = 4;
+    this.gridHelperTop.material.transparent = true;
+    this.gridHelperTop.material.opacity = 0.3;
+    this.scene.add(this.gridHelperTop);
 
     // Ground plane (for shadows)
     const ground = new THREE.Mesh(
@@ -507,10 +516,11 @@ export class AssembleRenderer {
   _addMesh(node) {
     const mesh = this._buildMesh(node);
     mesh.position.set(node.position.x, node.position.y, node.position.z);
+    // Rotation is already in radians
     mesh.rotation.set(
-      node.rotation.x * Math.PI / 180,
-      node.rotation.y * Math.PI / 180,
-      node.rotation.z * Math.PI / 180,
+      node.rotation.x || 0,
+      node.rotation.y || 0,
+      node.rotation.z || 0,
     );
     this.scene.add(mesh);
     this.meshMap.set(node.id, mesh);
@@ -647,11 +657,33 @@ export class AssembleRenderer {
     const mesh = this.meshMap.get(node.id);
     if (!mesh) return;
     mesh.position.set(node.position.x, node.position.y, node.position.z);
+    // Rotation is already in radians (set by rotation sphere or converted from properties)
     mesh.rotation.set(
-      node.rotation.x * Math.PI / 180,
-      node.rotation.y * Math.PI / 180,
-      node.rotation.z * Math.PI / 180,
+      node.rotation.x || 0,
+      node.rotation.y || 0,
+      node.rotation.z || 0,
     );
+  }
+
+  updateGrid(gridSize) {
+    // Update grid divisions based on grid size
+    const size = 40;
+    const divisions = Math.round(size / gridSize);
+
+    // Remove old grids
+    if (this.gridHelper) this.scene.remove(this.gridHelper);
+    if (this.gridHelperTop) this.scene.remove(this.gridHelperTop);
+
+    // Create new grids with updated divisions
+    this.gridHelper = new THREE.GridHelper(size, divisions, 0x3fb950, 0x1a2a1a);
+    this.gridHelper.position.y = -0.01;
+    this.scene.add(this.gridHelper);
+
+    this.gridHelperTop = new THREE.GridHelper(size, divisions, 0x9966cc, 0x2a1a3a);
+    this.gridHelperTop.position.y = 4;
+    this.gridHelperTop.material.transparent = true;
+    this.gridHelperTop.material.opacity = 0.3;
+    this.scene.add(this.gridHelperTop);
   }
 
   updateConnLine(conn) {
