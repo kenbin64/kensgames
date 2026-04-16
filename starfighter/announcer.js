@@ -59,6 +59,92 @@ const SFAnnouncer = (function () {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // § MANIFOLD DIALOG SYSTEM INTEGRATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Uses SFPatterns + SFIntents + SFHistory for procedural dialog generation
+
+  /**
+   * Generate dialog using manifold system (pattern + intent + history)
+   * @param {object} anpc - ANPC personality { role, callsign, temperament, morale }
+   * @param {object} trigger - Optional trigger { event, data }
+   * @returns {string|null} - Generated dialog or null
+   */
+  function _generateManifoldDialog(anpc, trigger = {}) {
+    // Check if manifold systems are loaded
+    if (!window.SFPatterns || !window.SFIntents || !window.SFHistory) {
+      return null; // Fall back to legacy system
+    }
+
+    // Resolve intent from game state
+    const intent = SFIntents.resolveIntent(_state, anpc, trigger);
+    if (!intent) return null;
+
+    // Skip if intent was very recently used (within same update cycle)
+    if (SFHistory.isIntentRecent(intent)) {
+      // Allow only critical intents to repeat
+      const criticalIntents = ['ALERT_MISSILE', 'ALERT_LOCK', 'PANIC_DAMAGE'];
+      if (!criticalIntents.includes(intent)) return null;
+    }
+
+    // Map intent to pattern key
+    const patternKey = SFIntents.intentToPattern(intent);
+
+    // Check pattern cooldown/overuse
+    if (SFHistory.isPatternOnCooldown(patternKey)) return null;
+    if (SFHistory.isPatternOverused(patternKey)) return null;
+
+    // Build context for pattern filling
+    const context = SFIntents.buildContext(_state, anpc);
+
+    // Generate multiple candidates and pick best (lowest penalty)
+    const candidates = [];
+    const maxAttempts = 3;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      const text = SFPatterns.generate(patternKey, context);
+      if (!text) continue;
+
+      const penalty = SFHistory.calculatePenalty(text, patternKey, intent);
+      candidates.push({ text, penalty });
+    }
+
+    // No valid candidates
+    if (candidates.length === 0) return null;
+
+    // Pick candidate with lowest penalty
+    candidates.sort((a, b) => a.penalty - b.penalty);
+    const best = candidates[0];
+
+    // Record successful generation
+    SFHistory.recordDialog(best.text, patternKey, intent);
+
+    return best.text;
+  }
+
+  /**
+   * Quick manifold dialog for specific intent (bypasses intent resolution)
+   * @param {string} intent - Intent key from SFIntents.INTENTS
+   * @param {object} anpc - ANPC data
+   * @returns {string|null} - Generated dialog
+   */
+  function _quickManifoldDialog(intent, anpc) {
+    if (!window.SFPatterns || !window.SFHistory) return null;
+
+    const patternKey = intent; // Direct mapping
+    if (SFHistory.isPatternOnCooldown(patternKey)) return null;
+
+    const context = window.SFIntents ?
+      SFIntents.buildContext(_state, anpc) :
+      { callsignSrc: anpc.callsign || 'Wingman', callsignDst: _cs() };
+
+    const text = SFPatterns.generate(patternKey, context);
+    if (!text) return null;
+
+    SFHistory.recordDialog(text, patternKey, intent);
+    return text;
+  }
+
   // ── Vocabulary pools — word options, never fixed lines ──
   const V = {
     // Picking functions
@@ -300,22 +386,39 @@ const SFAnnouncer = (function () {
     if (snap.totalHostile === 0) {
       // Sector clear — command announces
       _transitionWingmen('hostiles_cleared');
-      const cmdLine = _anpcSpeak('command', 'tactical_coord', { remaining: 0 });
+
+      // Try manifold system first
+      const manifoldLine = _quickManifoldDialog('REPORT_KILL', {
+        role: 'command',
+        callsign: _crew('command')
+      });
+      const cmdLine = manifoldLine || _anpcSpeak('command', 'tactical_coord', { remaining: 0 });
       _addComm(_crew('command'), cmdLine || _composeKill(type, snap), 'base');
+
       // Wingman celebration
       const wingCel = _wingmanSpeak('morale_banter');
       if (wingCel) _addComm(wingCel.sender, wingCel.msg, wingCel.type);
     } else if (type === 'dreadnought') {
-      _addComm(_crew('command'), _composeKill(type, snap), 'base');
+      // Try manifold kill report
+      const manifoldKill = _quickManifoldDialog('REPORT_KILL', {
+        role: 'command',
+        callsign: _crew('command')
+      });
+      _addComm(_crew('command'), manifoldKill || _composeKill(type, snap), 'base');
+
       const sensLine = _anpcSpeak('sensor', 'kill_confirm', { remaining: snap.totalHostile, target: _pick(V.dreadnought) });
       _addComm(_crew('sensor'), sensLine || `${_pick(V.dreadnought)} signal lost. ${snap.totalHostile} ${_pick(V.contacts)} remain.`, 'base');
     } else {
-      // Wingman gets kill confirm if ANPC available
+      // Wingman gets kill confirm if ANPC available, otherwise try manifold
       const wingKill = _wingmanSpeak('kill_confirm', { remaining: snap.totalHostile });
       if (wingKill && Math.random() < 0.4) {
         _addComm(wingKill.sender, wingKill.msg, wingKill.type);
       } else {
-        _addComm(_crew('tactical'), _composeKill(type, snap), 'base');
+        const manifoldKill = _quickManifoldDialog('REPORT_KILL', {
+          role: 'wingman',
+          callsign: _crew('tactical')
+        });
+        _addComm(_crew('tactical'), manifoldKill || _composeKill(type, snap), 'base');
       }
     }
   }
@@ -1014,6 +1117,11 @@ const SFAnnouncer = (function () {
       SFANPC.initCharacters();
       _anpcReady = true;
     }
+
+    // Initialize manifold history system
+    if (window.SFHistory) {
+      SFHistory.reset();
+    }
   }
 
   function resetWave() {
@@ -1022,6 +1130,11 @@ const SFAnnouncer = (function () {
     if (_anpcReady) {
       // Reset scenario toward patrol between waves
       SFANPC.resetScenario('patrol');
+    }
+
+    // Reset dialog history for new wave (new session seed)
+    if (window.SFHistory) {
+      SFHistory.reset();
     }
   }
 
