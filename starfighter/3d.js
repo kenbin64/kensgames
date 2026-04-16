@@ -118,20 +118,20 @@ const SF3D = (function () {
     // Player ~F-16 (16m), Baseship ~aircraft carrier (400m), Alien ships 3× human
     // Earth/Moon use forced perspective: sized for apparent angular size from player, not real scale
     const GLB_SCALES = {
-        enemy: 50,             // alien fighter ~48m (3× human)
-        predator: 200,         // predator drone ~240m — massive alien hunter
-        interceptor: 50,       // interceptor ~48m — 3× human, fast
-        bomber: 120,           // bomber ~120m — 3× heavy craft
-        dreadnought: 1800,     // dreadnought ~1800m — alien capital
-        'alien-baseship': 2100,// alien mothership ~2100m — 3× human carrier
+        enemy: 100,            // alien fighter ~96m (2× size, 6× human) — giants
+        predator: 400,         // predator drone ~480m — 2× massive alien hunter
+        interceptor: 100,      // interceptor ~96m — 2× size, 6× human, fast
+        bomber: 240,           // bomber ~240m — 2× size, 6× heavy craft
+        dreadnought: 3600,     // dreadnought ~3600m — 2× alien capital
+        'alien-baseship': 4200,// alien mothership ~4200m — 2× size, 6× human carrier
         baseship: 400,         // human carrier ~400m — aircraft carrier class
         ally: 16,              // human fighter ~16m wingspan
-        tanker: 60,            // fuel tanker ~80m — support craft
-        medic: 80,             // medical frigate ~90m — larger support vessel
-        station: 3000,         // space station ~massive, thousands of people
+        tanker: 600,           // fuel tanker ~800m — 10× civilian support craft
+        medic: 800,            // medical frigate ~900m — 10× larger civilian support vessel
+        station: 30000,        // space station ~30km — 10× massive home base, city-sized
         earth: 18000,  // forced perspective — fills ~27° of sky at distance 60000
         moon: 4000,    // forced perspective — fills ~4.5° of sky at distance 80000 (1/4.5 Earth ratio)
-        'hive-queen': 2400,  // bio-organic queen ~3000m — slightly smaller than alien-baseship
+        'hive-queen': 4800,  // bio-organic queen ~6000m — 2× size, slightly larger than alien-baseship
     };
 
     // ── Dimensional LOD Manifold: z = xy ──
@@ -141,10 +141,10 @@ const SF3D = (function () {
         ? new Set(Object.keys(GLB_LOD))
         : new Set(['earth', 'moon', 'baseship', 'station', 'ally']);
     const LOD_GLOW_DIST = {
-        enemy: 1800, predator: 2500, interceptor: 1800, bomber: 2200,
-        dreadnought: 6000, 'alien-baseship': 8000, tanker: 1800, medic: 2000,
-        ally: 1500, baseship: 12000, station: 25000, earth: 300000, moon: 200000,
-        'hive-queen': 9000,
+        enemy: 3600, predator: 5000, interceptor: 3600, bomber: 4400,
+        dreadnought: 12000, 'alien-baseship': 16000, tanker: 18000, medic: 20000,
+        ally: 1500, baseship: 12000, station: 250000, earth: 300000, moon: 200000,
+        'hive-queen': 18000,
     };
     const _lazyState = {};   // key → 'loading' | 'loaded' | 'error'
 
@@ -154,10 +154,10 @@ const SF3D = (function () {
     // RULE: 3D models should appear well before enemies are close enough to attack.
     // Combat range is ~500-1500 units, so 3D models must be visible by ~1500-2000.
     const DOT_DIST = {
-        enemy: 800, predator: 1200, interceptor: 800, bomber: 1000,
-        dreadnought: 3000, 'alien-baseship': 4000, tanker: 800, medic: 1000,
-        ally: 700, baseship: 8000, station: 15000, earth: 200000, moon: 150000,
-        'hive-queen': 5000,
+        enemy: 1600, predator: 2400, interceptor: 1600, bomber: 2000,
+        dreadnought: 6000, 'alien-baseship': 8000, tanker: 8000, medic: 10000,
+        ally: 700, baseship: 8000, station: 150000, earth: 200000, moon: 150000,
+        'hive-queen': 10000,
         laser: 600, machinegun: 400, torpedo: 800, plasma: 600,
         egg: 500, youngling: 400,
     };
