@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB Manifold Encoder Demo | KensGames</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --dim: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+    }
+
+    h1 {
+      font-family: 'Orbitron', monospace;
+      color: var(--accent);
+      margin-bottom: 10px;
+      font-size: 24px;
+      letter-spacing: 2px;
+    }
+
+    .subtitle {
+      color: var(--dim);
+      font-size: 13px;
+      margin-bottom: 30px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 15px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: rgba(88, 166, 255, 0.2);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    select {
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .viewer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .viewer {
+      position: relative;
+      aspect-ratio: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .viewer-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(13, 17, 23, 0.8);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      z-index: 10;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .stat-box {
+      background: rgba(88, 166, 255, 0.05);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+    }
+
+    .log-entry.success {
+      color: var(--success);
+    }
+
+    .log-entry.info {
+      color: var(--accent);
+    }
+
+    .log-entry.dim {
+      color: var(--dim);
+    }
+
+    .variants {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .variant-btn {
+      padding: 8px 16px;
+      background: rgba(63, 185, 80, 0.1);
+      border: 1px solid var(--success);
+      color: var(--success);
+      font-size: 11px;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <h1>🔷 GLB → MANIFOLD ENCODER</h1>
+  <div class="subtitle">Convert 3D models to geometric manifolds using z=xy, z=xy², m=xyz equations</div>
+
+  <div class="panel">
+    <div class="panel-title">LOAD STARFIGHTER MODEL</div>
+    <div class="controls">
+      <select id="model-select">
+        <option value="">Select a ship...</option>
+        <option value="assets/models/AlienEnemyFighter.glb">Alien Enemy Fighter</option>
+        <option value="assets/models/HumanFriendlStarFighter.glb">Human Starfighter</option>
+        <option value="assets/models/AlienMotherShip.glb">Alien Mothership</option>
+        <option value="assets/models/AlienEnemyPreditorDrone.glb">Predator Drone</option>
+        <option value="assets/models/firstPersonStarFighterCockpit.glb">Cockpit</option>
+      </select>
+      <button id="load-btn">Load Model</button>
+      <button id="encode-btn" disabled>Encode to Manifold</button>
+      <button id="reconstruct-btn" disabled>Reconstruct</button>
+    </div>
+  </div>
+
+  <div class="viewer-grid">
+    <div class="viewer">
+      <div class="viewer-label">ORIGINAL GLB</div>
+      <canvas id="canvas-original"></canvas>
+    </div>
+    <div class="viewer">
+      <div class="viewer-label">MANIFOLD RECONSTRUCTED</div>
+      <canvas id="canvas-reconstructed"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">STATISTICS</div>
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-label">Vertices</div>
+        <div class="stat-value" id="stat-verts">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Manifold Patches</div>
+        <div class="stat-value" id="stat-patches">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Compression</div>
+        <div class="stat-value" id="stat-compression">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Fidelity</div>
+        <div class="stat-value" id="stat-fidelity">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">GENERATE VARIANTS</div>
+    <div class="variants">
+      <button class="variant-btn" onclick="generateVariant({a: 0.2})">Bulge +20%</button>
+      <button class="variant-btn" onclick="generateVariant({a: -0.2})">Flatten -20%</button>
+      <button class="variant-btn" onclick="generateVariant({b: 0.3, c: 0.3})">Stretch +30%</button>
+      <button class="variant-btn" onclick="generateVariant({a: 0.1, b: 0.1, c: -0.1})">Morph Mix</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">LOG</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="/lib/three/OrbitControls.js"></script>
+  <script src="/lib/three/GLTFLoader.js"></script>
+  <script src="/lib/manifold-glb-encoder.js"></script>
+  <script>
+    'use strict';
+
+    // ═══════════════════════════════════════════════════════════
+    // GLOBAL STATE
+    // ═══════════════════════════════════════════════════════════
+    let originalModel = null;
+    let encodedManifold = null;
+    const encoder = new GLBManifoldEncoder();
+    const decoder = new GLBManifoldDecoder();
+    const loader = new THREE.GLTFLoader();
+
+    // ═══════════════════════════════════════════════════════════
+    // SCENE SETUP
+    // ═══════════════════════════════════════════════════════════
+    const sceneOrig = new THREE.Scene();
+    const sceneRecon = new THREE.Scene();
+    sceneOrig.background = new THREE.Color(0x0d1117);
+    sceneRecon.background = new THREE.Color(0x0d1117);
+
+    const canvasOrig = document.getElementById('canvas-original');
+    const canvasRecon = document.getElementById('canvas-reconstructed');
+    const rendererOrig = new THREE.WebGLRenderer({ canvas: canvasOrig, antialias: true });
+    const rendererRecon = new THREE.WebGLRenderer({ canvas: canvasRecon, antialias: true });
+
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    camera.position.set(3, 2, 5);
+    const controlsOrig = new THREE.OrbitControls(camera, canvasOrig);
+    const controlsRecon = new THREE.OrbitControls(camera.clone(), canvasRecon);
+
+    // Lights
+    [sceneOrig, sceneRecon].forEach(scene => {
+      scene.add(new THREE.AmbientLight(0x404040, 1.5));
+      const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+      dir.position.set(5, 5, 5);
+      scene.add(dir);
+      const fill = new THREE.PointLight(0x58a6ff, 0.8, 50);
+      fill.position.set(-3, 2, -3);
+      scene.add(fill);
+    });
+
+    // Render loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controlsOrig.update();
+      controlsRecon.update();
+      rendererOrig.render(sceneOrig, camera);
+      rendererRecon.render(sceneRecon, controlsRecon.object);
+    }
+    animate();
+
+    // ═══════════════════════════════════════════════════════════
+    // UI HANDLERS
+    // ═══════════════════════════════════════════════════════════
+    function log(msg, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    document.getElementById('load-btn').addEventListener('click', async () => {
+      const path = document.getElementById('model-select').value;
+      if (!path) { alert('Select a model first!'); return; }
+
+      log(`Loading ${path}...`, 'info');
+      loader.load(`/starfighter/${path}`, gltf => {
+        originalModel = gltf.scene;
+
+        // Clear and add to scene
+        while (sceneOrig.children.length > 3) sceneOrig.children.pop();
+        sceneOrig.add(originalModel);
+
+        // Center camera
+        const box = new THREE.Box3().setFromObject(originalModel);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3()).length();
+        camera.position.set(center.x + size, center.y + size * 0.5, center.z + size);
+        camera.lookAt(center);
+        controlsOrig.target.copy(center);
+        controlsRecon.target.copy(center);
+
+        log(`✓ Loaded: ${path}`, 'success');
+        document.getElementById('encode-btn').disabled = false;
+
+        // Parse mesh
+        encoder.parseMesh(originalModel);
+        document.getElementById('stat-verts').textContent = encoder.meshData.vertices.length;
+      }, null, err => {
+        log(`✗ Load failed: ${err}`, 'dim');
+      });
+    });
+
+    document.getElementById('encode-btn').addEventListener('click', () => {
+      log('Encoding to manifold patches...', 'info');
+      const patches = encoder.encodeMesh(32);
+      encodedManifold = encoder.serialize();
+
+      const avgFidelity = patches.reduce((sum, p) => sum + p.manifold.fidelity, 0) / patches.length;
+      const origSize = encoder.meshData.vertices.length * 12; // 3 floats * 4 bytes
+      const manifoldSize = patches.length * 64; // Rough estimate
+      const compression = ((1 - manifoldSize / origSize) * 100).toFixed(1);
+
+      document.getElementById('stat-patches').textContent = patches.length;
+      document.getElementById('stat-compression').textContent = `${compression}%`;
+      document.getElementById('stat-fidelity').textContent = (avgFidelity * 100).toFixed(1) + '%';
+
+      log(`✓ Encoded ${patches.length} patches`, 'success');
+      log(`  Compression: ${compression}%`, 'dim');
+      log(`  Fidelity: ${(avgFidelity * 100).toFixed(1)}%`, 'dim');
+
+      document.getElementById('reconstruct-btn').disabled = false;
+    });
+
+    document.getElementById('reconstruct-btn').addEventListener('click', () => {
+      log('Reconstructing mesh from manifolds...', 'info');
+      const geometry = decoder.reconstructMesh(encodedManifold, 12);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x58a6ff,
+        metalness: 0.6,
+        roughness: 0.4,
+        wireframe: false
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      while (sceneRecon.children.length > 3) sceneRecon.children.pop();
+      sceneRecon.add(mesh);
+
+      log(`✓ Reconstructed ${geometry.attributes.position.count} vertices`, 'success');
+    });
+
+    window.generateVariant = function (mutations) {
+      if (!encodedManifold) { alert('Encode first!'); return; }
+
+      log(`Generating variant: ${JSON.stringify(mutations)}`, 'info');
+      const variant = decoder.generateVariant(encodedManifold, mutations);
+      const geometry = decoder.reconstructMesh(variant, 12);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x3fb950,
+        metalness: 0.7,
+        roughness: 0.3
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      while (sceneRecon.children.length > 3) sceneRecon.children.pop();
+      sceneRecon.add(mesh);
+
+      log(`✓ Variant applied`, 'success');
+    };
+
+    // Initial resize
+    window.addEventListener('resize', () => {
+      const rect = canvasOrig.getBoundingClientRect();
+      rendererOrig.setSize(rect.width, rect.height);
+      rendererRecon.setSize(rect.width, rect.height);
+      camera.aspect = rect.width / rect.height;
+      camera.updateProjectionMatrix();
+    });
+    window.dispatchEvent(new Event('resize'));
+
+    log('Ready. Select and load a Starfighter model.', 'dim');
+  </script>
+</body>
+
+</html>
