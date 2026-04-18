@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Showcase - Manifold Gaming Portal</title>
-    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <title>Game Showcase - KensGames</title>
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
     <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
 
     <style>
@@ -72,6 +72,24 @@
 
         .nav-links a:hover {
             color: var(--primary);
+        }
+
+        #access-status a.kg-access-link {
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 180, 255, 0.35);
+            background: rgba(0, 180, 255, 0.08);
+            color: var(--text);
+            font-size: 12px;
+            text-decoration: none;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        #access-status a.kg-access-link:hover {
+            background: rgba(0, 180, 255, 0.16);
         }
 
         main {
@@ -295,17 +313,23 @@
             margin: 100px 0;
         }
     </style>
-  <script src="/js/analytics.js"></script>
+    <script src="/js/access_status.js" defer></script>
+    <script src="/js/substrates/avatar_picker.js" defer></script>
+    <script src="/js/substrates/player_profile.js" defer></script>
+    <script src="/js/analytics.js"></script>
 </head>
 
 <body>
     <!-- Navigation -->
     <nav>
-        <a href="/" class="logo">⟳ MANIFOLD</a>
+        <a href="/" class="logo"><img src="/assets/images/logo/icon.png" alt="KensGames"
+                style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KENSGAMES</a>
         <div class="nav-links">
             <a href="/">Home</a>
             <a href="/kensgames.com/lounge.html">Lounge</a>
             <a href="/kensgames.com/discover.html">Discover</a>
+            <div id="kg-player"></div>
+            <div id="access-status" data-access-mode="compact"></div>
         </div>
     </nav>
 

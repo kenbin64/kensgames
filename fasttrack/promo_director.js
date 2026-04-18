@@ -14,7 +14,7 @@
 // Convert: ffmpeg -i promo.webm -c:v libx264 -preset slow -crf 18 promo.mp4
 // ============================================================
 
-(function() {
+(function () {
     'use strict';
 
     // ============================================================
@@ -444,7 +444,7 @@
                 MusicSubstrate.masterGain.connect(dest);
                 stream.addTrack(dest.stream.getAudioTracks()[0]);
             }
-        } catch(e) {}
+        } catch (e) { }
 
         mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'video/webm;codecs=vp9',
@@ -456,7 +456,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url; a.download = 'fasttrack_promo_60s.webm'; a.click();
-            console.log('[Promo] Saved!', (blob.size/1048576).toFixed(1), 'MB');
+            console.log('[Promo] Saved!', (blob.size / 1048576).toFixed(1), 'MB');
             showComplete(url);
         };
 
@@ -563,7 +563,7 @@
         // Start music
         try {
             if (window.MusicSubstrate) { MusicSubstrate.activate(); MusicSubstrate.play('cosmic'); }
-        } catch(e) {}
+        } catch (e) { }
 
         // Start recording after first render
         if (withRecording) { await wait(100); setupRecording(); }
@@ -576,7 +576,7 @@
         const timerInterval = setInterval(() => {
             if (timerEl) {
                 const s = Math.floor((Date.now() - startMs) / 1000);
-                timerEl.textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+                timerEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
             }
         }, 250);
 
@@ -640,11 +640,11 @@
         await wait(500);
 
         const themes = [
-            { name: 'colosseum', label: 'COLOSSEUM',  color: '#CD853F', angle: 0 },
-            { name: 'spaceace',  label: 'SPACE ACE',   color: '#00CCFF', angle: Math.PI * 0.5 },
-            { name: 'undersea',  label: 'DEEP SEA',    color: '#00CED1', angle: Math.PI },
-            { name: 'fibonacci', label: 'FIBONACCI',   color: '#FFD700', angle: Math.PI * 1.5 },
-            { name: 'cosmic',    label: 'COSMIC',      color: '#9B59B6', angle: Math.PI * 0.25 },
+            { name: 'colosseum', label: 'COLOSSEUM', color: '#CD853F', angle: 0 },
+            { name: 'spaceace', label: 'SPACE ACE', color: '#00CCFF', angle: Math.PI * 0.5 },
+            { name: 'undersea', label: 'DEEP SEA', color: '#00CED1', angle: Math.PI },
+            { name: 'fibonacci', label: 'FIBONACCI', color: '#FFD700', angle: Math.PI * 1.5 },
+            { name: 'cosmic', label: 'COSMIC', color: '#9B59B6', angle: Math.PI * 0.25 },
         ];
 
         for (let i = 0; i < themes.length; i++) {
@@ -900,7 +900,7 @@
         });
 
         if (typeof window.testWinner === 'function') window.testWinner();
-        try { if (window.FastTrackThemes) FastTrackThemes.triggerCrowdReaction('roaring'); } catch(e) {}
+        try { if (window.FastTrackThemes) FastTrackThemes.triggerCrowdReaction('roaring'); } catch (e) { }
 
         speakAsync("VICTORY!", 0.7, 0.45);
 
@@ -940,14 +940,14 @@
         const splashFade = await fadeBlack(600);
         await wait(400);
 
-        showTitle('PLAY FREE NOW', {
+        showTitle('PLAY NOW', {
             size: 96, color: '#FFD700', y: 'center',
             enterDuration: 800, holdDuration: 4500, exitDuration: 1000,
             enterAnim: 'scaleUp', letterSpacing: '0.3em', fontWeight: 900,
             subText: 'kensgames.com/fasttrack', subSize: 40, subColor: '#ffffff',
         });
 
-        speakAsync("Play free. Right now.", 0.72, 0.45);
+        speakAsync("Play now. Right now.", 0.72, 0.45);
         await wait(5500);
 
         // Logo end card

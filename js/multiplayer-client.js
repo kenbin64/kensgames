@@ -52,10 +52,52 @@ class KGMultiplayer {
     return 'wss://' + h + '/ws';
   }
 
-  connect(auth) {
+  async connect(auth) {
     if (this.ws && this.ws.readyState <= 1) return;
     this.username = (auth && auth.username) || localStorage.getItem('username') || 'Guest';
-    const token = (auth && auth.token) || localStorage.getItem('user_token') || null;
+    let token = (auth && auth.token) || localStorage.getItem('user_token') || null;
+
+    const isGuestToken = (t) => !t || String(t).startsWith('guest-');
+
+    // If the visitor is already authenticated via Cloudflare Access, mint a real
+    // KensGames JWT token so games don't require a second login.
+    if (isGuestToken(token)) {
+      try {
+        const res = await fetch('/api/auth/access-session', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' },
+        });
+        if (res && res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.token) {
+            token = data.token;
+            // Prefer Access-issued identity fields
+            if (data.username) this.username = data.username;
+            try {
+              localStorage.setItem('user_token', data.token);
+              if (data.username) localStorage.setItem('username', data.username);
+              if (data.displayName) localStorage.setItem('display_name', data.displayName);
+              if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
+            } catch { /* ignore */ }
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Ensure guests get a stable token so the server can derive a stable guest id.
+    // (JWT tokens for signed-in users are preserved as-is.)
+    if (!token) {
+      token = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      try { localStorage.setItem('user_token', token); } catch { /* ignore */ }
+    }
+
+    // Best-effort avatar_id (shared AvatarPicker stores under kg_avatar)
+    let avatarId = null;
+    try {
+      const av = JSON.parse(localStorage.getItem('kg_avatar'));
+      avatarId = av && av.id ? av.id : null;
+    } catch { /* ignore */ }
 
     this.ws = new WebSocket(this.wsUrl());
 
@@ -67,6 +109,7 @@ class KGMultiplayer {
         token: token,
         username: this.username,
         guest_name: this.username,
+        avatar_id: avatarId,
       });
       this._emit('connected');
     };
@@ -141,14 +184,14 @@ class KGMultiplayer {
       type: 'create_session',
       game_id: this.gameId,
       private: (opts && opts.private) || false,
-      max_players: (opts && opts.maxPlayers) || undefined,
+      max_players: (opts && (opts.max_players || opts.maxPlayers)) || undefined,
       settings: (opts && opts.settings) || {},
     });
   }
 
   /** Join by 6-char invite code */
   joinByCode(code) {
-    this._send({ type: 'join_session', code: code.toUpperCase().trim() });
+    this._send({ type: 'join_by_code', code: code.toUpperCase().trim() });
   }
 
   /** Join by session ID */
@@ -189,14 +232,23 @@ class KGMultiplayer {
   /** Toggle ready state */
   toggleReady() { this._send({ type: 'toggle_ready' }); }
 
+  /** Host accepts the group once everyone is ready */
+  acceptLobby() { this._send({ type: 'accept_lobby' }); }
+
   /** Start the game (host only) */
   startGame() { this._send({ type: 'start_game' }); }
 
   /** Add an AI bot to the session (host only) */
-  addBot(difficulty) { this._send({ type: 'add_ai', difficulty: difficulty || 'medium' }); }
+  addBot(difficulty) {
+    // Server supports both add_ai and add_ai_player
+    this._send({ type: 'add_ai_player', level: difficulty || 'medium' });
+  }
 
   /** Remove an AI bot (host only) */
-  removeBot(slot) { this._send({ type: 'remove_ai', slot }); }
+  removeBot(playerId) {
+    // Server supports both remove_ai and remove_ai_player
+    this._send({ type: 'remove_ai_player', player_id: playerId });
+  }
 
   /** Send a chat message */
   chat(message) { this._send({ type: 'chat', message }); }
@@ -265,17 +317,19 @@ class KGMultiplayer {
   _handleMessage(data) {
     switch (data.type) {
       case 'auth_success':
-        this.userId = data.user_id;
-        this.username = data.username;
+        this.userId = (data.user && data.user.user_id) ? data.user.user_id : data.user_id;
+        this.username = (data.user && data.user.username) ? data.user.username : data.username;
         this._emit('authenticated', { userId: this.userId, username: this.username });
         break;
 
       case 'session_created':
       case 'session_update':
+      case 'session_joined':
       case 'player_joined':
       case 'player_left':
       case 'ready_update':
       case 'matchmake_result':
+      case 'session_settings_updated':
         this.session = data.session;
         this.sessionCode = data.session.session_code;
         this.isHost = data.session.host_id === this.userId;

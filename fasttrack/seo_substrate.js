@@ -36,8 +36,8 @@ const SEOSubstrate = (() => {
     const IDENTITY = Object.freeze({
         name: 'Fast Track',
         tagline: 'The Board Game Reimagined in 3D',
-        description: 'A free online strategic card & peg racing board game for 2-4 players with 7 stunning 3D themes, smart AI opponents, and multiplayer support.',
-        shortDescription: 'Free 3D card & peg racing board game. 2-4 players, 7 themes, smart AI.',
+        description: 'An online strategic card & peg racing board game for 2-4 players with 7 stunning 3D themes, smart AI opponents, and multiplayer support.',
+        shortDescription: '3D card & peg racing board game. 2-4 players, 7 themes, smart AI.',
         url: 'https://kensgames.com/fasttrack/',
         image: 'https://kensgames.com/fasttrack/assets/images/og-preview.png',
         screenshot: 'https://kensgames.com/fasttrack/assets/images/screenshot-game.png',
@@ -51,9 +51,9 @@ const SEOSubstrate = (() => {
             url: 'https://kensgames.com'
         },
         keywords: [
-            'fast track', 'board game online', 'free board game', 'card game',
+            'fast track', 'board game online', 'board game', 'card game',
             'peg game', 'racing game', 'multiplayer board game', 'family game',
-            'strategy game', '3D board game', 'play online free', 'butterflyfx'
+            'strategy game', '3D board game', 'play online', 'butterflyfx'
         ],
         features: [
             '7 stunning 3D themes (Cosmic, Colosseum, Space Ace, Undersea, Fibonacci)',
@@ -81,11 +81,6 @@ const SEOSubstrate = (() => {
                 'applicationCategory': IDENTITY.category,
                 'operatingSystem': 'Any',
                 'browserRequirements': 'Requires WebGL',
-                'offers': {
-                    '@type': 'Offer',
-                    'price': '0',
-                    'priceCurrency': 'USD'
-                },
                 'author': {
                     '@type': 'Organization',
                     'name': IDENTITY.author.name,
@@ -121,7 +116,7 @@ const SEOSubstrate = (() => {
                 '@context': 'https://schema.org',
                 '@type': 'VideoGame',
                 'name': IDENTITY.name,
-                'description': 'Play Fast Track free in your browser — a 3D card & peg racing board game with 7 themes and smart AI.',
+                'description': 'Play Fast Track in your browser — a 3D card & peg racing board game with 7 themes and smart AI.',
                 'url': IDENTITY.url + '3d.html',
                 'genre': ['Board Game', 'Card Game', 'Strategy'],
                 'numberOfPlayers': {
@@ -132,11 +127,6 @@ const SEOSubstrate = (() => {
                 'gamePlatform': ['Web Browser'],
                 'applicationCategory': IDENTITY.category,
                 'operatingSystem': 'Any',
-                'offers': {
-                    '@type': 'Offer',
-                    'price': '0',
-                    'priceCurrency': 'USD'
-                },
                 'author': {
                     '@type': 'Organization',
                     'name': IDENTITY.author.name,
@@ -153,8 +143,8 @@ const SEOSubstrate = (() => {
             schema: () => ({
                 '@context': 'https://schema.org',
                 '@type': 'WebPage',
-                'name': 'Play Fast Track Free Online',
-                'description': 'Watch live AI demo or play Fast Track board game free. 7 stunning 3D themes, 2-4 players.',
+                'name': 'Play Fast Track Online',
+                'description': 'Watch live AI demo or play Fast Track. 7 stunning 3D themes, 2-4 players.',
                 'url': IDENTITY.url + 'play.html',
                 'isPartOf': {
                     '@type': 'WebSite',
@@ -308,7 +298,7 @@ const SEOSubstrate = (() => {
         IDENTITY: IDENTITY,
 
         /** Initialize — auto-called on load */
-        init: function() {
+        init: function () {
             _injectJsonLD();
             _injectBreadcrumbs();
             _validateMeta();
@@ -316,12 +306,12 @@ const SEOSubstrate = (() => {
         },
 
         /** Get the canonical identity object */
-        getIdentity: function() {
+        getIdentity: function () {
             return Object.assign({}, IDENTITY);
         },
 
         /** Generate OG meta HTML for a page (utility for SSR or templating) */
-        generateMetaHTML: function(pageUrl) {
+        generateMetaHTML: function (pageUrl) {
             const path = new URL(pageUrl).pathname;
             const config = PAGE_SCHEMAS[path];
             if (!config) return '';

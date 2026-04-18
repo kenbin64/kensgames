@@ -32,7 +32,104 @@ const state = {
     currentSession: null,
     selectedAvatar: 'person_smile',
     tutorialStep: 0,
+    _authSent: false,
 };
+
+function mergePlayersIntoCurrentSession(players) {
+    if (!state.currentSession) return;
+    if (!Array.isArray(players)) return;
+    if (!Array.isArray(state.currentSession.players)) state.currentSession.players = [];
+
+    const existingById = new Map(state.currentSession.players.map(p => [p.user_id, p]));
+    state.currentSession.players = players.map(p => {
+        const prev = existingById.get(p.user_id);
+        const ready = (typeof p.ready === 'boolean') ? p.ready : (prev ? !!prev.ready : false);
+        return { ...prev, ...p, ready };
+    });
+}
+
+function getSiteAuthToken() {
+    try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
+}
+
+function isGuestToken(token) {
+    return !token || String(token).startsWith('guest-');
+}
+
+async function ensureUserTokenFromAccess() {
+    // If we already have a non-guest token, keep it.
+    const existing = getSiteAuthToken();
+    if (!isGuestToken(existing)) return existing;
+
+    try {
+        const res = await fetch('/api/auth/access-session', {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' },
+        });
+        if (!res.ok) return existing;
+        const data = await res.json();
+        if (!data || !data.success || !data.token) return existing;
+        try {
+            localStorage.setItem('user_token', data.token);
+            if (data.username) localStorage.setItem('username', data.username);
+            if (data.displayName) localStorage.setItem('display_name', data.displayName);
+            if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
+        } catch (e) { /* ignore */ }
+        return data.token;
+    } catch (e) {
+        return existing;
+    }
+}
+
+function getSiteUsernameFallback() {
+    try {
+        return localStorage.getItem('username') || localStorage.getItem('display_name') || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function getAvatarIdFromStorage() {
+    try {
+        const av = JSON.parse(localStorage.getItem('kg_avatar') || 'null');
+        return av && av.id ? av.id : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function autoAuthenticateToLobby() {
+    if (state._authSent) return;
+    if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+    state._authSent = true;
+
+    const token = getSiteAuthToken();
+    const username = getSiteUsernameFallback() || `Player_${Math.random().toString(36).slice(2, 6)}`;
+    const avatarId = getAvatarIdFromStorage();
+
+    if (token) {
+        send({
+            type: 'auth',
+            token,
+            username,
+            guest_name: username,
+            avatar_id: avatarId,
+        });
+        return;
+    }
+
+    // No site login token:
+    // - For invite/join flows, allow guest login
+    // - For private game creation, require sign-in (handled by UI)
+    if (state.pendingAction === 'join' || state.pendingAction === 'code') {
+        send({
+            type: 'guest_login',
+            name: username,
+            avatar_id: avatarId || 'person_smile'
+        });
+    }
+}
 
 // =============================================================================
 // WebSocket Connection
@@ -40,6 +137,7 @@ const state = {
 
 function connectToLobby() {
     try {
+        state._authSent = false;
         state.socket = new WebSocket(LOBBY_CONFIG.wsUrl);
 
         state.socket.onopen = () => {
@@ -47,11 +145,15 @@ function connectToLobby() {
             state.connected = true;
             state.reconnectAttempts = 0;
             showToast('Connected to lobby', 'success');
+
+            // Reuse existing site login across all games (SSO: Access → JWT)
+            ensureUserTokenFromAccess().finally(() => autoAuthenticateToLobby());
         };
 
         state.socket.onclose = () => {
             console.log('[Lobby] Disconnected from server');
             state.connected = false;
+            state._authSent = false;
 
             if (state.reconnectAttempts < LOBBY_CONFIG.maxReconnectAttempts) {
                 state.reconnectAttempts++;
@@ -103,6 +205,10 @@ function handleServerMessage(data) {
         'profile': onProfile,
         'session_created': onSessionCreated,
         'session_joined': onSessionJoined,
+        'session_update': onSessionUpdate,
+        'ready_update': onSessionUpdate,
+        'session_settings_updated': onSessionUpdate,
+        'lobby_accepted': onSessionUpdate,
         'session_list': onSessionList,
         'player_joined': onPlayerJoined,
         'player_left': onPlayerLeft,
@@ -136,37 +242,22 @@ function handleServerMessage(data) {
     }
 }
 
+function onSessionUpdate(data) {
+    if (!data.session) return;
+    state.currentSession = data.session;
+    updateWaitingRoom();
+}
+
 function onConnected(data) {
     console.log('[Lobby] Welcome message:', data.message);
 
-    // Check for stored credentials
-    const stored = localStorage.getItem('ft_user');
-    if (stored) {
-        try {
-            const { username, password } = JSON.parse(stored);
-            send({ type: 'login', username, password });
-        } catch (e) {
-            localStorage.removeItem('ft_user');
-        }
-    } else if (state.pendingAction && state.pendingAction !== 'private') {
-        // Auto-guest-login for join actions (no login required)
-        // Private game creation requires sign-in
-        send({
-            type: 'guest_login',
-            name: `Player_${Math.random().toString(36).slice(2, 6)}`,
-            avatar_id: 'person_smile'
-        });
-    }
+    // Some server variants emit a 'connected' welcome before auth;
+    // ensure we have attempted auth once the socket is open.
+    autoAuthenticateToLobby();
 }
 
 function onAuthSuccess(data) {
     state.user = data.user;
-
-    // Persist credentials to localStorage only after confirmed auth success (login or register)
-    if (!data.user.is_guest && data.action !== 'guest_login' && state.pendingCredentials) {
-        localStorage.setItem('ft_user', JSON.stringify(state.pendingCredentials));
-        state.pendingCredentials = null;
-    }
 
     updateUserUI();
     showMainApp();
@@ -199,7 +290,15 @@ function onError(data) {
 
 function onLoggedOut() {
     state.user = null;
-    localStorage.removeItem('ft_user');
+
+    // Global logout: clear site auth so other games don't auto-auth again
+    try {
+        localStorage.removeItem('user_token');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('username');
+        localStorage.removeItem('display_name');
+    } catch (e) { }
+
     showAuthScreen();
     showToast('Logged out', 'success');
 }
@@ -231,7 +330,10 @@ function onSessionCreated(data) {
     const wizardModal = document.getElementById('private-wizard-modal');
     if (wizardModal && wizardModal.classList.contains('active')) {
         const code = data.share_code || data.session.session_code;
-        let url = data.share_url || `${window.location.origin}${window.location.pathname.replace('lobby.html', 'join.html')}?code=${code}`;
+        const isPrivate = !!data.session?.is_private;
+        let url = isPrivate
+            ? `${window.location.origin}/invited/fasttrack/join.html?code=${encodeURIComponent(code)}`
+            : (data.share_url || `${window.location.origin}${window.location.pathname.replace('lobby.html', 'join.html')}?code=${code}`);
         if (url.startsWith('/')) url = window.location.origin + url;
         document.getElementById('wizard-room-code').textContent = code;
         document.getElementById('wizard-share-url').value = url;
@@ -254,15 +356,17 @@ function onSessionList(data) {
 }
 
 function onPlayerJoined(data) {
-    state.currentSession.players = data.players;
+    if (data.session) state.currentSession = data.session;
+    if (data.players) mergePlayersIntoCurrentSession(data.players);
     updateWaitingRoom();
-    showToast(`${data.player.username} joined!`, 'success');
+    if (data.player?.username) showToast(`${data.player.username} joined!`, 'success');
 }
 
 function onPlayerLeft(data) {
-    state.currentSession.players = data.players;
+    if (data.session) state.currentSession = data.session;
+    if (data.players) mergePlayersIntoCurrentSession(data.players);
     updateWaitingRoom();
-    showToast(`${data.username} left`, 'info');
+    if (data.username) showToast(`${data.username} left`, 'info');
 }
 
 function onLeftSession() {
@@ -296,10 +400,22 @@ function onGameStarted(data) {
         username: p.username,
         avatar: AVATAR_EMOJIS[p.avatar_id] || '👤',
         is_ai: !!(p.is_ai || p.is_bot),
+        is_host: !!p.is_host,
     }));
     try {
         sessionStorage.setItem('ft_session_players', JSON.stringify(roster));
         sessionStorage.setItem('ft_my_user_id', myUserId);
+
+        // Turn timer settings (host can opt out for private games)
+        const enabled = session.settings?.turn_timer !== false && !!session.settings?.turn_timer;
+        const waitSeconds = Number(session.settings?.turn_timer_seconds || 120);
+        const warningSeconds = Number(session.settings?.warning_seconds || 60);
+        sessionStorage.setItem('ft_turn_timer_enabled', enabled ? '1' : '0');
+        sessionStorage.setItem('ft_turn_timer_wait_seconds', String(waitSeconds));
+        sessionStorage.setItem('ft_turn_timer_warning_seconds', String(warningSeconds));
+
+        // Host identity
+        if (session.host_id) sessionStorage.setItem('ft_host_user_id', String(session.host_id));
     } catch (e) { /* sessionStorage unavailable – board will fall back to URL name */ }
 
     // Redirect to game board with full player info in URL
@@ -535,6 +651,7 @@ function handleRegister(event) {
 function logout() {
     send({ type: 'logout' });
     closeModal('profile-modal');
+    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?redirectUrl=https://kensgames.com/';
 }
 
 function showPrivateGameJoin() {
@@ -581,10 +698,12 @@ function updateUserUI() {
 
 function switchTab(tabId) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+    const tabEl = document.querySelector(`.tab[data-tab="${tabId}"]`);
+    if (tabEl) tabEl.classList.add('active');
 
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(`panel-${tabId}`).classList.add('active');
+    const panelEl = document.getElementById(`panel-${tabId}`);
+    if (panelEl) panelEl.classList.add('active');
 }
 
 // =============================================================================
@@ -651,7 +770,7 @@ function showCreatePrivateGame() {
     // Reset settings
     document.getElementById('wiz-music').checked = true;
     document.getElementById('wiz-allow-ai').checked = true;
-    document.getElementById('wiz-turn-timer').checked = false;
+    document.getElementById('wiz-turn-timer').checked = true;
     document.getElementById('wiz-late-arrivals').checked = true;
     document.getElementById('wiz-max-players').value = '4';
 
@@ -669,8 +788,8 @@ function showCreatePrivateGame() {
             initial_bots: 0,
             allow_bots: true,
             replace_with_bot: true,
-            turn_timer: false,
-            turn_timer_seconds: 0,
+            turn_timer: true,
+            turn_timer_seconds: 120,
             warning_seconds: 60
         }
     });
@@ -943,13 +1062,17 @@ function showWaitingRoom(session, code, shareUrl) {
     if (wizardModal && wizardModal.classList.contains('active')) {
         state.wizardStep = 4;
         updateWizardSteps();
+        updateWaitingRoom();
         return;
     }
 
     // Legacy waiting room for non-wizard flows (public games, join-by-code)
     document.getElementById('waiting-room-code').textContent = code;
 
-    let url = shareUrl || `${window.location.origin}${window.location.pathname.replace('lobby.html', 'join.html')}?code=${code}`;
+    const isPrivate = !!session?.is_private;
+    let url = isPrivate
+        ? `${window.location.origin}/invited/fasttrack/join.html?code=${encodeURIComponent(code)}`
+        : (shareUrl || `${window.location.origin}${window.location.pathname.replace('lobby.html', 'join.html')}?code=${code}`);
     if (url.startsWith('/')) url = window.location.origin + url;
     document.getElementById('share-url').value = url;
 
@@ -962,21 +1085,27 @@ function updateWaitingRoom() {
 
     const session = state.currentSession;
     const isHost = session.host_id === state.user?.user_id;
+    const myUserId = state.user?.user_id;
+    const me = session.players.find(p => p.user_id === myUserId);
+    const myReady = !!me?.ready;
     const aiCount = session.players.filter(p => p.is_ai).length;
     const humanCount = session.players.filter(p => !p.is_ai).length;
     const totalPlayers = session.players.length;
+    const accepted = !!session.settings?.lobby_accepted;
+    const allHumansReady = session.players.filter(p => !p.is_ai).every(p => !!p.ready);
 
     // Build player slot HTML
     const slots = [];
     for (let i = 0; i < session.max_players; i++) {
         const player = session.players.find(p => p.slot === i);
         if (player) {
+            const readyText = player.is_ai ? '🤖 AI' : (player.ready ? '✅ Ready' : '⬜ Not Ready');
             slots.push(`
                 <div class="waiting-player ${player.is_host ? 'host' : ''}">
                     <div class="waiting-player-avatar">${getAvatarEmoji(player.avatar_id)}</div>
                     <div class="waiting-player-name">${player.username}</div>
                     ${player.is_host ? '<div style="font-size: 0.7rem;">👑 Host</div>' : ''}
-                    ${player.is_ai ? '<div style="font-size: 0.7rem;">🤖 AI</div>' : ''}
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">${readyText}</div>
                 </div>
             `);
         } else {
@@ -1019,20 +1148,37 @@ function updateWaitingRoom() {
         wizBotInfo.textContent = aiCount > 0 ? `🤖 ${aiCount} bot${aiCount > 1 ? 's' : ''} in game` : '';
     }
 
-    // Start button — require 2+ total players (human + bots)
+    // Accept + Launch gating
+    const canAccept = isHost && totalPlayers >= 2 && allHumansReady && !accepted;
+    const canLaunch = isHost && totalPlayers >= 2 && allHumansReady && accepted;
+
+    // Wizard buttons
+    const wizReadyBtn = document.getElementById('wizard-ready-btn');
+    const wizAcceptBtn = document.getElementById('wizard-accept-btn');
     const wizStartBtn = document.getElementById('wizard-start-btn');
     const wizStartNote = document.getElementById('wizard-start-note');
+
+    if (wizReadyBtn) {
+        wizReadyBtn.textContent = myReady ? '✅ Ready' : '⬜ I\'m Ready';
+    }
+    if (wizAcceptBtn) {
+        wizAcceptBtn.style.display = isHost ? 'inline-flex' : 'none';
+        wizAcceptBtn.disabled = !canAccept;
+        wizAcceptBtn.textContent = accepted ? '✅ Accepted' : '✅ Accept Group';
+    }
     if (wizStartBtn) {
-        const canStart = isHost && totalPlayers >= 2;
-        wizStartBtn.disabled = !canStart;
-        if (wizStartNote) {
-            if (!isHost) {
-                wizStartNote.textContent = 'Waiting for host to start the game...';
-            } else if (totalPlayers < 2) {
-                wizStartNote.textContent = 'Add at least 1 bot or invite a friend to start';
-            } else {
-                wizStartNote.textContent = `${totalPlayers} player${totalPlayers > 1 ? 's' : ''} ready — let\'s go!`;
-            }
+        wizStartBtn.disabled = !canLaunch;
+    }
+    if (wizStartNote) {
+        if (totalPlayers < 2) {
+            wizStartNote.textContent = 'Need at least 2 players (humans or bots).';
+        } else if (!allHumansReady) {
+            const notReady = session.players.filter(p => !p.is_ai && !p.ready).map(p => p.username);
+            wizStartNote.textContent = notReady.length ? `Waiting for ready: ${notReady.join(', ')}` : 'Waiting for players…';
+        } else if (!accepted) {
+            wizStartNote.textContent = isHost ? 'All ready — click Accept Group.' : 'All ready — waiting for host to accept.';
+        } else {
+            wizStartNote.textContent = isHost ? 'Accepted — Launch is enabled.' : 'Accepted — waiting for host to launch.';
         }
     }
 
@@ -1064,9 +1210,33 @@ function updateWaitingRoom() {
         botLimitWarning.style.display = 'none';
     }
 
+    const readyBtn = document.getElementById('ready-btn');
+    const acceptBtn = document.getElementById('accept-btn');
     const startBtn = document.getElementById('start-game-btn');
+    const note = document.getElementById('waiting-room-note');
+
+    if (readyBtn) {
+        readyBtn.textContent = myReady ? '✅ Ready' : '⬜ I\'m Ready';
+    }
+    if (acceptBtn) {
+        acceptBtn.style.display = isHost ? 'inline-flex' : 'none';
+        acceptBtn.disabled = !canAccept;
+        acceptBtn.textContent = accepted ? '✅ Accepted' : '✅ Accept Group';
+    }
     if (startBtn) {
-        startBtn.disabled = !isHost || session.players.length < 2;
+        startBtn.disabled = !canLaunch;
+    }
+    if (note) {
+        if (totalPlayers < 2) {
+            note.textContent = 'Need at least 2 players (humans or bots).';
+        } else if (!allHumansReady) {
+            const notReady = session.players.filter(p => !p.is_ai && !p.ready).map(p => p.username);
+            note.textContent = notReady.length ? `Waiting for ready: ${notReady.join(', ')}` : 'Waiting for players…';
+        } else if (!accepted) {
+            note.textContent = isHost ? 'All ready — click Accept Group.' : 'All ready — waiting for host to accept.';
+        } else {
+            note.textContent = isHost ? 'Accepted — Launch is enabled.' : 'Accepted — waiting for host to launch.';
+        }
     }
 }
 
@@ -1122,6 +1292,14 @@ function removeAIPlayer() {
 
 function startGame() {
     send({ type: 'start_game' });
+}
+
+function toggleReady() {
+    send({ type: 'toggle_ready' });
+}
+
+function acceptLobby() {
+    send({ type: 'accept_lobby' });
 }
 
 function leaveWaitingRoom() {

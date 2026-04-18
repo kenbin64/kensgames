@@ -240,16 +240,33 @@ const SFAudio = (function () {
     },
     anpc_scope: {
       label: 'Scope — Ens. Ji-Yeon Park (Alert, Young)',
-      lang: 'en-US',
+      lang: 'en-AU',
       preferFemale: true,
-      rate: 1.08,       // slightly faster — eager, excited about findings
-      pitch: 1.20,      // higher — youngest crew member
+      rate: 0.92,       // measured, clear — professional sensor officer
+      pitch: 1.04,      // natural female — not artificially high
       volume: 1.0,
       radioType: 'command',
       selectors: [
-        /Microsoft.*Jenny.*Online/i,
-        /Microsoft.*Aria.*Online/i,
+        /Google.*Australian.*Female/i,
+        /Microsoft.*Natasha.*Online/i,
+        /Microsoft.*Annette.*Online/i,
         /Google US English/i,
+      ]
+    },
+    anpc_instructor: {
+      label: 'Instructor — Lt. Renard (French Male, Calm Authority)',
+      lang: 'fr-FR',
+      preferFemale: false,
+      rate: 0.88,       // unhurried, deliberate — patient teacher
+      pitch: 0.92,      // warm baritone
+      volume: 1.0,
+      radioType: 'command',
+      selectors: [
+        /Google.*fran[cç]ais/i,
+        /Microsoft.*Henri.*Online/i,
+        /Microsoft.*Claude.*Online/i,
+        /Microsoft.*Paul.*Online/i,
+        /Google UK English Male/i,
       ]
     },
     anpc_chen: {
@@ -331,7 +348,7 @@ const SFAudio = (function () {
     'XO Tanaka': 'anpc_tanaka',    // UK female — precise, efficient
     'Lt. Chen': 'anpc_chen',      // US female — tactical
     'Sgt. Kozlov': 'anpc_kozlov',    // US male — gruff sergeant
-    'Ens. Park': 'anpc_scope',     // US female bright — eager young ensign
+    'Ens. Park': 'anpc_scope',     // AU female — eager young ensign
     'Ens. Osei': 'anpc_osei',      // South African male
     'CPO Okafor': 'anpc_okafor',    // AU male — deck chief
     'PO2 Ruiz': 'anpc_ruiz',      // AU female — deck
@@ -345,6 +362,7 @@ const SFAudio = (function () {
     'Resolute Actual': 'anpc_vasquez',    // Cdr. Vasquez — commanding
     'Resolute XO': 'anpc_tanaka',     // XO Tanaka — precise
     'Scope': 'anpc_scope',      // Ens. Park — alert
+    'Instructor': 'us_male', // Flight instructor — US male accent
     // Enemy — heavy radio processing, intercepted transmission
     'Nightshade': 'anpc_nightshade', // Enemy ace — ice-cold, surgical
     '[INTERCEPTED] Nightshade': 'anpc_nightshade', // Same with intercept effect
@@ -572,6 +590,9 @@ const SFAudio = (function () {
       case 'torpedo': return _playTorpedo(t);
       case 'explosion': return _playExplosion(t);
       case 'warning': return _playWarning(t);
+      case 'lock_warning': return _playLockWarning(t);
+      case 'flare_deploy': return _playFlareDeply(t);
+      case 'error': return _playError(t);
       case 'shield_hit': return _playShieldHit(t);
       case 'hull_hit': return _playHullHit(t);
       case 'lock_tone': return _playLockTone(t);
@@ -1049,6 +1070,77 @@ const SFAudio = (function () {
     g.connect(masterGain);
     osc.start(t);
     osc.stop(t + 0.6);
+  }
+
+  // Lock-on warning — rapid beeping tone (higher pitch, faster)
+  function _playLockWarning(t) {
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.setValueAtTime(1100, t + 0.08);
+    osc.frequency.setValueAtTime(880, t + 0.16);
+    osc.frequency.setValueAtTime(1100, t + 0.24);
+    osc.frequency.setValueAtTime(880, t + 0.32);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, t);
+    g.gain.setValueAtTime(0.15, t + 0.38);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.42);
+  }
+
+  // Flare deployment — whoosh with high-pitched crackle
+  function _playFlareDeply(t) {
+    // Whoosh sweep
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(3200, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.25);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    filter.Q.value = 2;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.08, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+    osc.connect(filter);
+    filter.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.3);
+
+    // High-frequency crackle
+    const noise = ctx.createBufferSource();
+    noise.buffer = _getNoiseBuffer();
+    const hpFilter = ctx.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    hpFilter.frequency.value = 4000;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.06, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    noise.connect(hpFilter);
+    hpFilter.connect(ng);
+    ng.connect(masterGain);
+    noise.start(t);
+  }
+
+  // Error beep — low harsh tone
+  function _playError(t) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, t);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.2);
   }
 
   // GDD §8.3: Blue shield ripple impact

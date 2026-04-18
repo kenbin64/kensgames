@@ -1,62 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Join Free &mdash; KensGames</title>
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <title>KensGames — Game Portal</title>
+  <meta http-equiv="refresh" content="0; url=/lobby/">
+  <script>
+    // Login is handled by Cloudflare Access.
+    window.location.replace('/lobby/');
+  </script>
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    body { display:flex; flex-direction:column; min-height:100vh; }
-    .reg-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:40px 20px; }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .reg-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
     .reg-box {
-      width:100%; max-width:480px;
-      background:rgba(4,4,20,.96);
-      border:2px solid var(--np); box-shadow:var(--gp),inset 0 0 40px rgba(255,0,255,.03);
-      border-radius:6px; padding:44px 36px;
-      animation:fadeUp .4s ease;
+      width: 100%;
+      max-width: 480px;
+      background: rgba(4, 4, 20, .96);
+      border: 2px solid var(--np);
+      box-shadow: var(--gp), inset 0 0 40px rgba(255, 0, 255, .03);
+      border-radius: 6px;
+      padding: 44px 36px;
+      animation: fadeUp .4s ease;
     }
-    @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-    .cab-art { text-align:center; margin-bottom:20px; font-size:60px; filter:drop-shadow(0 0 12px #FF00FF); }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .cab-art {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 60px;
+      filter: drop-shadow(0 0 12px #FF00FF);
+    }
+
     .reg-title {
-      font-family:var(--fa); font-size:22px; font-weight:900;
-      color:var(--np); text-shadow:var(--gp); text-transform:uppercase;
-      letter-spacing:3px; text-align:center; margin-bottom:4px;
+      font-family: var(--fa);
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--np);
+      text-shadow: var(--gp);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 4px;
     }
-    .reg-sub { font-size:12px; color:var(--txm); text-align:center; margin-bottom:28px; letter-spacing:1px; }
+
+    .reg-sub {
+      font-size: 12px;
+      color: var(--txm);
+      text-align: center;
+      margin-bottom: 28px;
+      letter-spacing: 1px;
+    }
+
     .perks {
-      display:grid; grid-template-columns:1fr 1fr; gap:8px;
-      margin-bottom:24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 24px;
     }
+
     .perk {
-      font-family:var(--fa); font-size:9px; letter-spacing:1px;
-      padding:8px 10px; border:1px solid rgba(255,0,255,.2);
-      border-radius:3px; color:var(--txm); text-transform:uppercase;
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 0, 255, .2);
+      border-radius: 3px;
+      color: var(--txm);
+      text-transform: uppercase;
     }
-    .perk span { color:var(--np); margin-right:5px; }
-    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    .reg-footer { text-align:center; margin-top:20px; font-size:12px; color:var(--txm); }
-    .reg-footer a { color:var(--np); text-decoration:none; }
-    .reg-footer a:hover { text-shadow:var(--gp); }
+
+    .perk span {
+      color: var(--np);
+      margin-right: 5px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .reg-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--txm);
+    }
+
+    .reg-footer a {
+      color: var(--np);
+      text-decoration: none;
+    }
+
+    .reg-footer a:hover {
+      text-shadow: var(--gp);
+    }
+
     .submit-reg {
-      width:100%; padding:14px; margin-top:4px;
-      font-family:var(--fa); font-size:13px; letter-spacing:2px;
-      background:var(--np); color:var(--bg); border:none; border-radius:3px;
-      cursor:pointer; text-transform:uppercase; font-weight:900;
-      box-shadow:var(--gp); transition:all .25s;
+      width: 100%;
+      padding: 14px;
+      margin-top: 4px;
+      font-family: var(--fa);
+      font-size: 13px;
+      letter-spacing: 2px;
+      background: var(--np);
+      color: var(--bg);
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: 900;
+      box-shadow: var(--gp);
+      transition: all .25s;
     }
-    .submit-reg:hover { transform:scale(1.03); box-shadow:var(--gp),0 0 30px var(--np); }
+
+    .submit-reg:hover {
+      transform: scale(1.03);
+      box-shadow: var(--gp), 0 0 30px var(--np);
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
+
 <body>
   <div id="tron-grid"></div>
   <div id="scanlines"></div>
 
   <nav class="arc-nav">
     <div class="arc-nav-inner">
-      <a href="/" class="arc-logo">KEN<span>S</span>GAMES</a>
+      <a href="/" class="arc-logo"><img src="/assets/images/logo/icon.png" alt="KensGames"
+          style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <div class="arc-nav-right">
         <a href="/login" class="btn btn-c">SIGN IN</a>
       </div>
@@ -80,7 +180,8 @@
         <div class="form-row">
           <div class="arc-field">
             <label>Username</label>
-            <input class="arc-input" type="text" id="r-user" placeholder="ArcadeHero99" required minlength="3" maxlength="20">
+            <input class="arc-input" type="text" id="r-user" placeholder="ArcadeHero99" required minlength="3"
+              maxlength="20">
           </div>
           <div class="arc-field">
             <label>Display Name</label>
@@ -122,12 +223,12 @@
       msg.textContent = 'Creating account...'; msg.className = 'arc-msg';
       try {
         const res = await fetch('/api/auth/register', {
-          method:'POST', headers:{'Content-Type':'application/json'},
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username:    document.getElementById('r-user').value,
+            username: document.getElementById('r-user').value,
             displayName: document.getElementById('r-display').value || document.getElementById('r-user').value,
-            email:       document.getElementById('r-email').value,
-            password:    pass
+            email: document.getElementById('r-email').value,
+            password: pass
           })
         });
         const data = await res.json();
@@ -142,4 +243,5 @@
     }
   </script>
 </body>
+
 </html>

@@ -147,6 +147,7 @@ function signOut() {
     updateAuthButtons();
     updateUI();
     sendWS({ type: 'logout' });
+    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?redirectUrl=https://kensgames.com/';
 }
 
 function updateAuthButtons() {

@@ -11,370 +11,180 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BrickBreaker 3D — Arcade Brick Smashing in 3D Space | KensGames</title>
+    <title>BrickBreaker 3D â€” KensGames</title>
     <meta name="description"
-        content="BrickBreaker 3D reimagines the classic paddle-and-ball arcade formula across three full dimensions. Shatter bricks, collect power-ups, play solo or co-op with friends.">
-    <meta property="og:title" content="BrickBreaker 3D — Ken's Games">
-    <meta property="og:description" content="Classic brick breaking evolved into 3D space.">
-    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
-    <link rel="stylesheet" href="/arcade.css">
-  <link rel="stylesheet" href="/css/manifold_3d.css">
+        content="BrickBreaker 3D â€” classic arcade brick-breaking action in a glowing 3D arena. Play solo or challenge friends on KensGames.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kensgames.com/brickbreaker3d/">
+
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+    <link rel="stylesheet" href="/lib/fonts/fonts.css">
+    <link rel="stylesheet" href="/lib/arcade-theme.css">
+
+    <script src="/js/access_status.js" defer></script>
+    <script src="/js/analytics.js"></script>
+
     <style>
-        .hero {
-            text-align: center;
-            padding: 6rem 1rem 4rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-title {
-            font-family: 'Press Start 2P', monospace;
-            font-size: clamp(1.4rem, 5vw, 2.8rem);
-            color: var(--c2);
-            text-shadow: 0 0 20px var(--c2), 0 0 60px rgba(191, 0, 255, 0.4);
-            line-height: 1.3;
-            margin-bottom: 1rem;
-        }
-
-        .hero-tagline {
-            font-size: 1.1rem;
-            color: var(--dim);
-            max-width: 540px;
-            margin: 0 auto 2.5rem;
-            line-height: 1.6;
-        }
-
-        .hero-ctas {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .cta-primary {
-            background: var(--c2);
-            color: #000;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.55rem;
-            letter-spacing: 2px;
-            padding: 0.85rem 1.6rem;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: box-shadow 0.2s;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .cta-primary:hover {
-            box-shadow: 0 0 20px var(--c2);
-        }
-
-        .cta-secondary {
-            background: transparent;
-            color: var(--text);
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.5rem;
-            letter-spacing: 2px;
-            padding: 0.85rem 1.4rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .cta-secondary:hover {
-            border-color: var(--c2);
-            color: var(--c2);
-        }
-
-        section {
-            position: relative;
-            z-index: 2;
-            max-width: 960px;
+        .wrap {
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 3rem 1.5rem;
-        }
-
-        .section-title {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.55rem;
-            letter-spacing: 4px;
-            color: var(--c2);
-            margin-bottom: 2rem;
-        }
-
-        .features-grid {
+            padding: 56px 20px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+            align-items: start;
         }
 
-        .feat-card {
-            background: var(--surface);
-            border: 1px solid rgba(191, 0, 255, 0.2);
-            border-radius: 10px;
-            padding: 1.5rem 1.25rem;
+        .hero {
+            padding: 28px;
         }
 
-        .feat-icon {
-            font-size: 1.8rem;
-            margin-bottom: 0.75rem;
+        .hero .kicker {
+            font-family: var(--fa);
+            font-size: 10px;
+            letter-spacing: 5px;
+            color: var(--np);
+            text-shadow: var(--gp);
+            text-transform: uppercase;
+            margin-bottom: 12px;
         }
 
-        .feat-name {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.42rem;
-            color: var(--text);
-            margin-bottom: 0.5rem;
+        .hero h1 {
+            font-family: var(--fa);
+            font-size: clamp(34px, 4.8vw, 70px);
+            font-weight: 900;
+            color: var(--nc);
+            text-shadow: var(--gc);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            line-height: 1.02;
         }
 
-        .feat-desc {
-            font-size: 0.78rem;
-            color: var(--dim);
-            line-height: 1.5;
+        .hero p {
+            margin-top: 14px;
+            color: var(--txm);
+            font-size: 14px;
+            line-height: 1.8;
+            max-width: 62ch;
         }
 
-        .rules-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .rules-list li {
+        .cta-row {
+            margin-top: 22px;
             display: flex;
-            gap: 0.75rem;
-            align-items: flex-start;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 0.85rem;
-            color: var(--dim);
-            line-height: 1.5;
-        }
-
-        .rules-list li::before {
-            content: '▶';
-            color: var(--c2);
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        .invite-box {
-            background: var(--surface);
-            border: 1px solid rgba(191, 0, 255, 0.25);
-            border-radius: 12px;
-            padding: 2rem;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
-        .invite-input {
-            flex: 1;
-            min-width: 180px;
-            padding: 0.7rem 1rem;
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 6px;
-            color: var(--text);
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.65rem;
-            letter-spacing: 4px;
-            outline: none;
+        .pill {
+            display: inline-flex;
+            gap: 10px;
+            align-items: center;
+            font-family: var(--fa);
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--txm);
         }
 
-        .invite-input:focus {
-            border-color: var(--c2);
-        }
-
-        .about-card {
-            background: var(--surface);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 12px;
-            padding: 2rem;
+        .stack {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
+            gap: 16px;
         }
 
-        @media(max-width: 600px) {
-            .about-card {
+        .site-card {
+            padding: 22px;
+        }
+
+        .site-card h2 {
+            font-family: var(--fa);
+            font-size: 16px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--nc);
+            text-shadow: var(--gc);
+        }
+
+        .site-card p {
+            margin-top: 10px;
+            color: var(--txm);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .site-links {
+            margin-top: 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        @media (max-width: 980px) {
+            .wrap {
                 grid-template-columns: 1fr;
             }
-        }
-
-        .about-label {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.4rem;
-            color: var(--dim);
-            letter-spacing: 3px;
-            margin-bottom: 0.4rem;
-        }
-
-        .about-val {
-            font-size: 0.85rem;
-            color: var(--text);
-            line-height: 1.6;
-        }
-
-        .about-badge {
-            display: inline-block;
-            background: rgba(191, 0, 255, 0.1);
-            border: 1px solid rgba(191, 0, 255, 0.3);
-            border-radius: 4px;
-            padding: 0.15rem 0.5rem;
-            font-size: 0.72rem;
-            color: var(--c2);
-            margin: 0.2rem;
-        }
-
-        .tos-note {
-            font-size: 0.75rem;
-            color: var(--dim);
-            line-height: 1.6;
-            margin-top: 1rem;
-        }
-
-        .tos-note a {
-            color: var(--c2);
-        }
-
-        footer {
-            text-align: center;
-            padding: 2rem;
-            font-size: 0.72rem;
-            color: var(--dim);
-            position: relative;
-            z-index: 2;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
     </style>
 </head>
 
-<body data-mtheme="purple">
-    <div class="scanlines"></div>
-    <canvas id="gyroid-bg"></canvas>
-  <div class="m-dim-ticker" aria-hidden="true"></div>
-    <header class="arcade-header">
-        <a href="/" style="text-decoration:none">
-            <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
-        </a>
-        <nav class="header-nav">
-            <a href="/login/index.html" class="arcade-btn" id="signin-btn">SIGN IN</a>
-        </nav>
-    </header>
-    <div class="hero">
-        <div style="font-size:4rem;margin-bottom:1rem">🧱</div>
-        <h1 class="hero-title">BREAK THE<br>THIRD DIMENSION</h1>
-        <p class="hero-tagline">Classic brick breaking — evolved into full 3D space. Smash bricks, grab power-ups,
-            survive every wave.</p>
-        <div class="hero-ctas">
-            <button class="cta-primary" id="solo-btn" onclick="KG_LANDING.playSolo(this)">PLAY SOLO (1 BOT) —
-                FREE</button>
-            <a href="/login/index.html" class="cta-secondary">SIGN IN FOR MULTIPLAYER</a>
+<body>
+    <div id="tron-grid"></div>
+    <div id="scanlines"></div>
+
+    <nav class="arc-nav">
+        <div class="arc-nav-inner">
+            <a class="arc-logo" href="/"><img src="/assets/images/logo/icon.png" alt="KensGames"
+                    style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KENS<span>GAMES</span></a>
+            <ul class="arc-nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/lobby/">Portal</a></li>
+                <li><a href="/fasttrack/">Fast Track</a></li>
+            </ul>
+            <div class="arc-nav-right">
+                <div id="access-status" data-access-mode="compact"></div>
+                <a class="btn btn-c" href="/brickbreaker3d/lobby.html">Play</a>
+            </div>
         </div>
-    </div>
-    <section>
-        <div class="section-title">FEATURES</div>
-        <div class="features-grid">
-            <div class="feat-card">
-                <div class="feat-icon">🌐</div>
-                <div class="feat-name">TRUE 3D GAMEPLAY</div>
-                <div class="feat-desc">Ball and bricks exist in a full 3D environment. Navigate depth, angle your shots.
+    </nav>
+
+    <main class="wrap">
+        <section class="arc-card hero">
+            <div class="kicker">Arcade / 3D</div>
+            <h1>BrickBreaker 3D</h1>
+            <p>
+                Neon bricks. Snappy paddle control. A clean 3D arena with instant restart.
+                Play solo instantly. Sign in for matchmaker + member multiplayer.
+            </p>
+            <div class="cta-row">
+                <a class="btn btn-c btn-lg" href="/brickbreaker3d/lobby.html">Play Now</a>
+                <a class="btn btn-ghost btn-lg" href="/lobby/">Back to Portal</a>
+            </div>
+            <div style="margin-top:16px" class="pill">Tip: invite friends with a 6â€‘digit code in the lobby.</div>
+        </section>
+
+        <aside class="stack">
+            <section class="arc-card arc-card-p site-card">
+                <h2>KensGames</h2>
+                <p>
+                    World-class arcade portal: one sign-in, all games. Public landing pages,
+                    private play when youâ€™re ready.
+                </p>
+                <div class="site-links">
+                    <a class="btn btn-p btn-full" href="/lobby/">Open Game Portal</a>
+                    <a class="btn btn-ghost btn-full" href="/fasttrack/">Explore Fast Track</a>
                 </div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">🎵</div>
-                <div class="feat-name">ADAPTIVE AUDIO</div>
-                <div class="feat-desc">Music and sound effects respond to gameplay intensity — every combo lands with a
-                    punch.</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">⚡</div>
-                <div class="feat-name">POWER-UPS</div>
-                <div class="feat-desc">Collect laser balls, multi-ball bursts, paddle expansions, and more.</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">🏆</div>
-                <div class="feat-name">PROGRESSIVE LEVELS</div>
-                <div class="feat-desc">Each level introduces new patterns, faster speeds, and tougher obstacles.</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">👥</div>
-                <div class="feat-name">1–4 PLAYERS</div>
-                <div class="feat-desc">Compete or co-op with up to 3 friends. Private lobbies, invite links, or open
-                    public rooms.</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">🤖</div>
-                <div class="feat-name">BOT FILL</div>
-                <div class="feat-desc">No one free to play? Fill open slots with AI bots to keep the action going.</div>
-            </div>
-        </div>
-    </section>
-    <section>
-        <div class="section-title">HOW TO PLAY</div>
-        <ul class="rules-list">
-            <li>Control your paddle to deflect the ball and keep it from falling off the bottom.</li>
-            <li>Break all bricks in each row to advance to the next level. Harder bricks require multiple hits.</li>
-            <li>Collect power-up orbs that fall from broken bricks — they last for a limited time.</li>
-            <li>A life is lost when the ball passes your paddle. Most games start with 3 lives.</li>
-            <li>In multiplayer, each player has their own paddle lane. Co-op: share lives. Versus: last player standing
-                wins.</li>
-            <li>Clear all bricks to win the level. Chain levels for a high score and leaderboard placement.</li>
-        </ul>
-    </section>
-    <section>
-        <div class="section-title">JOIN A PRIVATE GAME</div>
-        <div class="invite-box">
-            <input class="invite-input" type="text" id="invite-code-input" placeholder="XXXXXX" maxlength="6"
-                style="text-transform:uppercase">
-            <button class="cta-primary"
-                onclick="KG_LANDING.openInviteJoin(document.getElementById('invite-code-input').value)">JOIN</button>
-            <span style="font-size:0.78rem;color:var(--dim);flex-basis:100%;margin-top:0.5rem">Got an invite code from a
-                friend? Paste it above — no account needed to join.</span>
-        </div>
-    </section>
-    <section>
-        <div class="section-title">ABOUT THE GAME</div>
-        <div class="about-card">
-            <div>
-                <div class="about-label">PLAYERS</div>
-                <span class="about-badge">1</span><span class="about-badge">2</span><span
-                    class="about-badge">3</span><span class="about-badge">4</span>
-                <br><br>
-                <div class="about-label">PLAY TIME</div>
-                <div class="about-val">5–30 min per session</div>
-                <br>
-                <div class="about-label">PLATFORM</div>
-                <div class="about-val">Browser (WebGL) — no download</div>
-            </div>
-            <div>
-                <div class="about-label">TOS</div>
-                <div class="tos-note">By playing BrickBreaker 3D on KensGames, you agree to our <a
-                        href="/tos/index.html">Terms of Service</a>. Solo/guest play is always free. Multiplayer and
-                    leaderboards require a free account.</div>
-            </div>
-        </div>
-    </section>
-    <footer>
-        <div style="margin-bottom:0.5rem">© 2025 KensGames · <a href="/tos/index.html"
-                style="color:var(--dim)">Terms</a> · <a href="/" style="color:var(--dim)">All Games</a></div>
-        <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate · z =
-            xy</div>
-    </footer>
-    <script src="/js/substrates/game_session_substrate.js"></script>
-    <script src="/js/game_landing.js"></script>
-    <script src="/js/manifold_reality.js" defer></script>
-    <script src="/js/manifold_panels.js" defer></script>
-    <script>
-        KG_LANDING.init('brickbreaker3d', '/brickbreaker3d/lobby.html');
-        document.getElementById('invite-code-input').addEventListener('input', function () {
-            this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, '');
-        });
-        if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
-    </script>
+            </section>
+            <section class="arc-card arc-card-g site-card">
+                <h2>How It Works</h2>
+                <p>
+                    Landing pages are public. Gameplay requires sign-in (Cloudflare Access),
+                    except solo vs AI and invite-code joins.
+                </p>
+            </section>
+        </aside>
+    </main>
+    <script src="../../lib/three/three.min.js"></script>
+    <script src="../../lib/three/OrbitControls.js"></script>
+    <script src="/js/manifold_bridge.js"></script>
+    <script src="game.js"></script>
 </body>
 
 </html>

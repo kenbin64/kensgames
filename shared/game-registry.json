@@ -1,0 +1,74 @@
+{
+  "games": [
+    {
+      "id": "fasttrack",
+      "name": "Fast Track",
+      "portalTitle": "FastTrack",
+      "playPath": "/fasttrack/3d.html",
+      "lobbyPath": "/fasttrack/lobby.html",
+      "maxPlayers": 6,
+      "type": "turn",
+      "supportsUnifiedLobby": true,
+      "supportsMatchmaking": true,
+      "supportsPrivateRooms": true,
+      "supportsSolo": true,
+      "supportsBots": true
+    },
+    {
+      "id": "tictactoe",
+      "name": "4D TicTacToe",
+      "portalTitle": "4D TicTacToe",
+      "playPath": "/4DTicTacToe/index.html",
+      "lobbyPath": "/lobby/game.html?game=tictactoe",
+      "maxPlayers": 4,
+      "type": "turn",
+      "supportsUnifiedLobby": true,
+      "supportsMatchmaking": true,
+      "supportsPrivateRooms": true,
+      "supportsSolo": true,
+      "supportsBots": true
+    },
+    {
+      "id": "brickbreaker",
+      "name": "BrickBreaker 3D",
+      "portalTitle": "BrickBreaker 3D",
+      "playPath": "/brickbreaker3d/index.html",
+      "lobbyPath": "/lobby/game.html?game=brickbreaker",
+      "maxPlayers": 4,
+      "type": "realtime",
+      "supportsUnifiedLobby": true,
+      "supportsMatchmaking": true,
+      "supportsPrivateRooms": true,
+      "supportsSolo": true,
+      "supportsBots": false
+    },
+    {
+      "id": "assemble",
+      "name": "Assemble",
+      "portalTitle": "Assemble",
+      "playPath": "/assemble/",
+      "lobbyPath": "/lobby/game.html?game=assemble",
+      "maxPlayers": 4,
+      "type": "realtime",
+      "supportsUnifiedLobby": true,
+      "supportsMatchmaking": true,
+      "supportsPrivateRooms": true,
+      "supportsSolo": true,
+      "supportsBots": false
+    },
+    {
+      "id": "starfighter",
+      "name": "Starfighter",
+      "portalTitle": "Alien Space Attack",
+      "playPath": "/starfighter/index.html",
+      "lobbyPath": "/starfighter/lobby.html",
+      "maxPlayers": 6,
+      "type": "realtime",
+      "supportsUnifiedLobby": true,
+      "supportsMatchmaking": true,
+      "supportsPrivateRooms": true,
+      "supportsSolo": true,
+      "supportsBots": false
+    }
+  ]
+}

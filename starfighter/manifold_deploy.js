@@ -15,6 +15,8 @@ const stamp = buf => {
 };
 const ROOT = path.resolve(__dirname, '..'), SF = __dirname;
 const AUDIT = process.argv.includes('--audit');
+const ELECTRON = process.argv.includes('--electron');
+const ELECTRON_GAME = path.join(__dirname, 'electron', 'game');
 const fmt = b => b > 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b > 1024 ? (b / 1024).toFixed(1) + ' KB' : b + ' B';
 const fsz = fp => fs.existsSync(fp) ? fs.statSync(fp).size : 0;
 
@@ -24,6 +26,7 @@ const X = [
   ['js/substrates/manifold_ingestor.js', ROOT],
   ['manifold.js', SF], ['native/bridge.js', SF],
   ['manifold_native_substrate.js', SF],
+  ['dimensional_substrate.js', SF], ['manifold_geometry_substrate.js', SF],
   ['lib/three/three.min.js', ROOT], ['lib/three/GLTFLoader.js', ROOT],
   ['audio.js', SF], ['music.js', SF], ['anpc.js', SF], ['progression.js', SF],
   ['js/multiplayer-client.js', ROOT], ['multiplayer.js', SF],
@@ -66,6 +69,54 @@ if (!AUDIT) {
   fs.writeFileSync(path.join(SF, 'index.html'), html);
   fs.writeFileSync(path.join(SF, 'index.html.gz'), hGz);
   console.log('\n  ✓ starfighter.bundle.js\n  ✓ index.html (source→index.src.html)');
+
+  // ── Electron copy: z=xy — bundle × platform = local game point ────────────
+  if (ELECTRON) {
+    fs.mkdirSync(ELECTRON_GAME, { recursive: true });
+
+    // Copy bundle and HTML
+    fs.writeFileSync(path.join(ELECTRON_GAME, 'starfighter.bundle.js'), bundle);
+    fs.writeFileSync(path.join(ELECTRON_GAME, 'index.html'), html);
+
+    // Copy lobby.html (entry point loaded by main.js)
+    const lobbyHtml = path.join(SF, 'lobby.html');
+    if (fs.existsSync(lobbyHtml)) {
+      fs.copyFileSync(lobbyHtml, path.join(ELECTRON_GAME, 'lobby.html'));
+    }
+
+    // Copy assets directory (textures, models, audio — no GLB binaries needed at runtime)
+    const srcAssets = path.join(SF, 'assets');
+    const dstAssets = path.join(ELECTRON_GAME, 'assets');
+    function copyDir(src, dst) {
+      fs.mkdirSync(dst, { recursive: true });
+      for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const s = path.join(src, entry.name), d = path.join(dst, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else {
+          // Skip GLB binaries — geometry is derived from manifold equations at runtime
+          if (entry.name.endsWith('.glb')) {
+            console.log(`    ⊘ skip GLB (manifold derives geometry): ${entry.name}`);
+            continue;
+          }
+          fs.copyFileSync(s, d);
+        }
+      }
+    }
+    if (fs.existsSync(srcAssets)) copyDir(srcAssets, dstAssets);
+
+    // Stamp manifest: manifold hash + build time + diamond field
+    const manifest = {
+      hash: bS.hash,
+      field: parseFloat(bS.field.toFixed(6)),
+      w: parseFloat(bS.w.toFixed(4)),
+      built: new Date().toISOString(),
+      surface: 'z=xy²',
+      note: 'geometry derived from manifold equations — no GLB binaries in runtime',
+    };
+    fs.writeFileSync(path.join(ELECTRON_GAME, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+    console.log(`  ✓ electron/game/ (${bS.hash}) — lobby.html + bundle + assets (GLB excluded)`);
+  }
 }
 
 console.log('\n' + '─'.repeat(60));

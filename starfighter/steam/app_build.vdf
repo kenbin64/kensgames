@@ -1,0 +1,15 @@
+"appbuild"
+{
+  "appid"       "480"
+  "desc"        "Starfighter build 57ec7d95f01062f1 — z=xy² manifold point"
+  "buildoutput" "/var/www/kensgames.com/starfighter/steam/output"
+  "contentroot" "/var/www/kensgames.com/downloads"
+  "setlive"     "beta"
+  "preview"     "0"
+  "depots"
+  {
+    "481"   "depot_win.vdf"
+    "482" "depot_linux.vdf"
+    "483"   "depot_mac.vdf"
+  }
+}

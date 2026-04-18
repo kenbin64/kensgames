@@ -51,20 +51,20 @@ const GrowthSubstrate = (() => {
     // Short, emotional, shareable. The wing-beat.
     const SHARE_TEMPLATES = {
         win: [
-            '🏆 I just won Fast Track in {turns} turns! Can you beat that?\n\n🎮 Play free: {url}',
+            '🏆 I just won Fast Track in {turns} turns! Can you beat that?\n\n🎮 Play: {url}',
             '⚡ Victory! Beat {opponents} opponents in Fast Track on the {theme} board.\n\n🎮 {url}',
             '🎉 {name} is the Fast Track champion! {turns} turns, {theme} theme.\n\nThink you can beat me? 🎮 {url}',
-            '🔥 Just crushed it at Fast Track! {turns} turns on {theme}.\n\nFree 3D board game — try to beat my score: {url}'
+            '🔥 Just crushed it at Fast Track! {turns} turns on {theme}.\n\n3D board game — try to beat my score: {url}'
         ],
         challenge: [
             '⚔️ I challenge you to Fast Track! I won in {turns} turns.\n\nBeat that → {url}',
             '🎯 {name} challenges you! Can you win in under {turns} turns?\n\n→ {url}'
         ],
         capture: [
-            '😈 Just sent {victim} back to start in Fast Track! Savage.\n\n🎮 Play free: {url}'
+            '😈 Just sent {victim} back to start in Fast Track! Savage.\n\n🎮 Play: {url}'
         ],
         fasttrack: [
-            '⚡ FAST TRACK! Skipped half the board in one move!\n\n🎮 Play this wild board game free: {url}'
+            '⚡ FAST TRACK! Skipped half the board in one move!\n\n🎮 Play this wild board game: {url}'
         ]
     };
 
@@ -107,7 +107,7 @@ const GrowthSubstrate = (() => {
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: title || 'Fast Track — Free Board Game',
+                    title: title || 'Fast Track — Board Game',
                     text: text,
                     url: url
                 });
@@ -141,7 +141,7 @@ const GrowthSubstrate = (() => {
         const urls = {
             facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`,
             twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
-            reddit: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodeURIComponent('I just won Fast Track — free 3D board game!')}`,
+            reddit: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodeURIComponent('I just won Fast Track — 3D board game!')}`,
             whatsapp: `https://wa.me/?text=${encodedText}`,
             telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
             messenger: `https://www.facebook.com/dialog/send?link=${encodedUrl}&app_id=0&redirect_uri=${encodedUrl}`
@@ -208,7 +208,7 @@ const GrowthSubstrate = (() => {
          * @param {Object} winner - { name, index, avatar, colorHex }
          * @param {Object} stats - { turns, theme, players, isAI }
          */
-        injectVictoryShare: function(container, winner, stats) {
+        injectVictoryShare: function (container, winner, stats) {
             if (!container) return;
 
             const challengeUrl = _generateChallengeURL({
@@ -347,7 +347,7 @@ const GrowthSubstrate = (() => {
          * @param {URLSearchParams} params - URL search params
          * @returns {Object|null} Challenge data or null
          */
-        parseChallenge: function(params) {
+        parseChallenge: function (params) {
             if (!params || params.get('c') !== '1') return null;
 
             return {
@@ -364,7 +364,7 @@ const GrowthSubstrate = (() => {
          * Show challenge banner at top of screen.
          * "X beat this game in Y turns. Can you do better?"
          */
-        showChallengeBanner: function(challenge) {
+        showChallengeBanner: function (challenge) {
             if (!challenge || !challenge.isChallenge) return;
 
             const banner = document.createElement('div');
@@ -407,7 +407,7 @@ const GrowthSubstrate = (() => {
          * Generate a share for mid-game moments (captures, fast tracks).
          * Called from game event handlers for real-time virality.
          */
-        generateMomentShare: function(type, data) {
+        generateMomentShare: function (type, data) {
             return _generateShareText(type, data);
         },
 

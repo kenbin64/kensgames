@@ -6,11 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Fast Track - Lobby</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="assets/images/ftLogo.png">
-  <link rel="apple-touch-icon" href="assets/images/ftLogo.png">
+  <link rel="icon" type="image/png" href="/assets/images/logo/icon.png">
+  <link rel="apple-touch-icon" href="/assets/images/logo/logo_thumbnail.png">
   <meta name="theme-color" content="#07040f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="assets/css/lobby.css">
   <link rel="stylesheet" href="assets/css/lobby-inline.css">
   <script src="/js/analytics.js"></script>
@@ -132,7 +133,10 @@
 
       <!-- Tabs -->
       <div class="tabs">
-        <button class="tab active" data-tab="games" onclick="switchTab('games')">
+        <button class="tab active" data-tab="lounge" onclick="switchTab('lounge')">
+          <span class="tab-icon">🍸</span> Lounge
+        </button>
+        <button class="tab" data-tab="games" onclick="switchTab('games')">
           <span class="tab-icon">🎮</span> Games
         </button>
         <button class="tab" data-tab="guilds" onclick="switchTab('guilds')">
@@ -144,13 +148,120 @@
         <button class="tab" data-tab="tutorial" onclick="switchTab('tutorial')">
           <span class="tab-icon">📖</span> How to Play
         </button>
+        <button class="tab" data-tab="strategy" onclick="switchTab('strategy')">
+          <span class="tab-icon">♟️</span> Strategy
+        </button>
+        <button class="tab" data-tab="history" onclick="switchTab('history')">
+          <span class="tab-icon">📜</span> History
+        </button>
+        <button class="tab" data-tab="terms" onclick="switchTab('terms')">
+          <span class="tab-icon">🛡️</span> Terms
+        </button>
         <button class="tab" data-tab="chat" onclick="switchTab('chat')">
           <span class="tab-icon">💬</span> Chat
         </button>
       </div>
 
+      <!-- Lounge Panel -->
+      <div class="panel active" id="panel-lounge">
+        <div class="card lounge-welcome">
+          <div class="card-header">
+            <h3 class="card-title">🍸 The Fast Track Lounge</h3>
+          </div>
+          <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
+            Pull up a stool. Fast Track is a race + tactics board game for 2–6 players. Use the outer track for
+            consistency, the inner Fast Track for tempo, and the Bullseye for safety.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🎲 Ways to Play</h3>
+          </div>
+
+          <div class="play-modes" style="margin-bottom: 0;">
+            <div class="play-mode" onclick="createPublicGame()" role="button" tabindex="0">
+              <div class="mode-icon">🎯</div>
+              <div class="mode-title">Quick Match</div>
+              <div class="mode-desc">Create a public game. Fill seats with bots if you want.</div>
+            </div>
+
+            <div class="play-mode" onclick="showCreatePrivateGame()" role="button" tabindex="0">
+              <div class="mode-icon">🔒</div>
+              <div class="mode-title">Private Game</div>
+              <div class="mode-desc">Host a room, share the code, accept the group, then launch.</div>
+            </div>
+
+            <div class="play-mode" onclick="showJoinByCode()" role="button" tabindex="0">
+              <div class="mode-icon">🎟️</div>
+              <div class="mode-title">Join by Code</div>
+              <div class="mode-desc">Got a code? Ask the host to accept you, then click Ready.</div>
+            </div>
+
+            <div class="play-mode" onclick="playOfflineWithAI()" role="button" tabindex="0">
+              <div class="mode-icon">🤖</div>
+              <div class="mode-title">Offline vs Bots</div>
+              <div class="mode-desc">Solo practice. Learn lines and openings without waiting.</div>
+            </div>
+          </div>
+
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 1rem 0 0;">
+            Note: Signed-in players get full multiplayer features. Invite codes can be used by guests.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">📖 Rules at a Glance</h3>
+            <button class="btn btn-small btn-secondary" onclick="switchTab('tutorial')">Open Rules</button>
+          </div>
+          <ul class="lounge-bullets">
+            <li>Goal: move all 5 pegs into your Safe Zone.</li>
+            <li>Track: outer loop is steady; inner Fast Track is the shortcut.</li>
+            <li>Bullseye: safe position and a flexible exit with face cards.</li>
+            <li>Captures: landing on an opponent sends them home (Safe Zones are protected).</li>
+          </ul>
+        </div>
+
+        <div class="lounge-two">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">♟️ Strategy Corner</h3>
+              <button class="btn btn-small btn-secondary" onclick="switchTab('strategy')">Deep Dive</button>
+            </div>
+            <ul class="lounge-bullets">
+              <li>Tempo beats greed: take safe progress over risky leaps when ahead.</li>
+              <li>Threats matter: keep a peg “in range” to discourage passes.</li>
+              <li>Use the Fast Track to convert a good roll into a real swing.</li>
+              <li>Protect your entry: timing Safe Zone entry is everything.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">📜 History & Lore</h3>
+              <button class="btn btn-small btn-secondary" onclick="switchTab('history')">Read</button>
+            </div>
+            <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
+              Fast Track is a classic race game with a ruthless middle: shortcuts, safe zones, and
+              tactical collisions. This portal version keeps the spirit but adds modern match flow.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🛡️ Conduct & Terms</h3>
+            <button class="btn btn-small btn-secondary" onclick="switchTab('terms')">View</button>
+          </div>
+          <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
+            Keep it friendly: no harassment, no cheating, no impersonation. The Portal Terms apply to all games.
+          </p>
+        </div>
+      </div>
+
       <!-- Games Panel -->
-      <div class="panel active" id="panel-games">
+      <div class="panel" id="panel-games">
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">🎮 Active Games</h3>
@@ -511,6 +622,84 @@
               <button class="btn btn-primary" onclick="sendChat()">Send</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Strategy Panel -->
+      <div class="panel" id="panel-strategy">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">♟️ Strategy</h3>
+          </div>
+          <div class="lounge-columns">
+            <div class="lounge-col">
+              <h4 class="lounge-h">Openings</h4>
+              <ul class="lounge-bullets">
+                <li>Advance two pegs early: it creates more legal moves later.</li>
+                <li>Don’t sprint a single peg unless it’s protected or decisive.</li>
+                <li>Use the Bullseye when you need stability more than speed.</li>
+              </ul>
+            </div>
+            <div class="lounge-col">
+              <h4 class="lounge-h">Midgame</h4>
+              <ul class="lounge-bullets">
+                <li>Watch “capture lanes”: leave opponents awkward choices.</li>
+                <li>Shortcut with intent: Fast Track should change who’s leading.</li>
+                <li>Protect your Safe Zone entry timing; avoid getting bounced.</li>
+              </ul>
+            </div>
+            <div class="lounge-col">
+              <h4 class="lounge-h">Endgame</h4>
+              <ul class="lounge-bullets">
+                <li>Prioritize guaranteed scoring over flashy collisions.</li>
+                <li>When ahead, reduce variance: safer paths, fewer gambles.</li>
+                <li>When behind, increase variance: aggressive Fast Track plays.</li>
+              </ul>
+            </div>
+          </div>
+          <p style="color: var(--text-secondary); margin: 1rem 0 0;">
+            Want to learn hands-on? Start an Offline vs Bots match and practice entering Safe Zones under pressure.
+          </p>
+        </div>
+      </div>
+
+      <!-- History Panel -->
+      <div class="panel" id="panel-history">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">📜 Fast Track History</h3>
+          </div>
+          <p style="color: var(--text-secondary); line-height: 1.7; margin: 0;">
+            Fast Track belongs to the family of classic race board games where the “track” is only half the story.
+            The interesting part is the interaction: shortcuts, safety, and sending opponents home.
+          </p>
+          <div style="height: 1px; background: var(--border); opacity: 0.6; margin: 1rem 0;"></div>
+          <h4 class="lounge-h">Why it stays fun</h4>
+          <ul class="lounge-bullets">
+            <li>The Fast Track creates comebacks without feeling random.</li>
+            <li>Safe Zones reward timing and planning.</li>
+            <li>Collisions create tension and social moments.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Terms Panel -->
+      <div class="panel" id="panel-terms">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🛡️ Terms & Safety</h3>
+            <a class="btn btn-small btn-secondary" href="/#tos">Open Full Terms</a>
+          </div>
+          <p style="color: var(--text-secondary); line-height: 1.7; margin: 0;">
+            By playing, you agree to the Portal Terms of Service. Keep it clean and respectful.
+          </p>
+          <div style="height: 1px; background: var(--border); opacity: 0.6; margin: 1rem 0;"></div>
+          <ul class="lounge-bullets">
+            <li>No harassment, hate, or targeted abuse.</li>
+            <li>No cheating, automation, or exploiting bugs to ruin games.</li>
+            <li>No impersonation or doxxing.</li>
+            <li>Hosts control their rooms; follow the lobby flow (Ready → Accept → Launch).</li>
+          </ul>
         </div>
       </div>
     </main>
@@ -933,13 +1122,15 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
-          <button class="btn btn-primary" onclick="startGame()" id="start-game-btn" disabled>🎮 Start
-            Game</button>
+        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="toggleReady()" id="ready-btn">⬜ I’m Ready</button>
+          <button class="btn btn-secondary" onclick="acceptLobby()" id="accept-btn" style="display:none;">✅ Accept
+            Group</button>
+          <button class="btn btn-primary" onclick="startGame()" id="start-game-btn" disabled>🚀 Launch Game</button>
         </div>
 
         <p id="waiting-room-note" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 1rem;">
-          Minimum 2 players required to start
+          Players must click Ready. Host accepts, then launches.
         </p>
       </div>
     </div>
@@ -1044,8 +1235,13 @@
       <!-- Step 4: Waiting Lobby -->
       <div class="wizard-panel" id="wizard-step-4">
         <div class="wizard-content">
-          <button class="btn btn-primary btn-enter-game" onclick="startGame()" id="wizard-start-btn" disabled>🎮 Enter
-            Game</button>
+          <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="toggleReady()" id="wizard-ready-btn">⬜ I’m Ready</button>
+            <button class="btn btn-secondary" onclick="acceptLobby()" id="wizard-accept-btn">✅ Accept Group</button>
+            <button class="btn btn-primary btn-enter-game" onclick="startGame()" id="wizard-start-btn" disabled>🚀
+              Launch
+              Game</button>
+          </div>
           <p id="wizard-start-note"
             style="color: var(--text-secondary); font-size: 0.8rem; text-align: center; margin: 0.5rem 0;">
             Add at least 1 bot or invite a friend to start

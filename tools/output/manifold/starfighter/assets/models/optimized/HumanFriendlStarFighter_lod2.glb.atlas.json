@@ -1,0 +1,34 @@
+{
+  "source": "/var/www/kensgames.com/starfighter/assets/models/optimized/HumanFriendlStarFighter_lod2.glb",
+  "glbBytes": 516868,
+  "bounds": {
+    "min": {
+      "x": -0.9453774690628052,
+      "y": -0.21033020317554474,
+      "z": -0.7614489197731018
+    },
+    "max": {
+      "x": 0.9463229775428772,
+      "y": 0.20884288847446442,
+      "z": 0.7604959607124329
+    }
+  },
+  "bestTpmsFit": null,
+  "patchAtlas": {
+    "gridDivs": 12,
+    "totalCells": 331,
+    "analyzed": 0,
+    "maxCells": 120,
+    "quadMeanAbsErrNorm": {
+      "min": null,
+      "max": null,
+      "mean": 0
+    },
+    "saddleMeanAbsErrNorm": {
+      "min": null,
+      "max": null,
+      "mean": 0
+    },
+    "patches": []
+  }
+}

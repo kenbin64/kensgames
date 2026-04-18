@@ -330,7 +330,7 @@ const SFProgression = (function () {
     // ═══════════════════════════════════════════════════════════════════════
     const ACHIEVEMENTS = [
         { id: 'first_blood', name: 'First Blood', desc: 'Score your first kill.', check: c => c.totalKills >= 1 },
-        { id: 'ace', name: 'Ace', desc: 'Kill 5 enemies in one sortie.', check: null }, // checked by core.js per-mission
+        { id: 'ace', name: 'Ace', desc: 'Kill 5 bogies in one sortie.', check: null }, // checked by core.js per-mission
         { id: 'centurion', name: 'Centurion', desc: '100 career kills.', check: c => c.totalKills >= 100 },
         { id: 'predator_hunter', name: 'Predator Hunter', desc: 'Kill 10 Predator Drones.', check: c => (c.killTally.predator || 0) >= 10 },
         { id: 'dread_slayer', name: 'Dreadnought Slayer', desc: 'Destroy a Dreadnought.', check: c => (c.killTally.dreadnought || 0) >= 1 },

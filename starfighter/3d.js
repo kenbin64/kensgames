@@ -31,6 +31,7 @@ const SF3D = (function () {
     const MANIFOLD_COCKPIT_DEBUG = /(?:\?|&)manifoldCockpit=1(?:&|$)/.test(window.location.search);
     let targetLockMesh;
     let launchBayGroup;
+    let rescueBayGroup; // Compact medical frigate bay for rescue mission
     let cameraShakeIntensity = 0;
     const STRICT_MODEL_BASELINE = false;
     const _viewProj = new THREE.Matrix4();
@@ -108,6 +109,11 @@ const SF3D = (function () {
             { path: 'assets/models/optimized/freindly_medical_frigate_lod1.glb', distance: 320 },
             { path: 'assets/models/optimized/freindly_medical_frigate_lod2.glb', distance: 680 },
         ],
+        rescue: [
+            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod1.glb', distance: 300 },
+            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod2.glb', distance: 600 },
+        ],
         earth: [
             { path: 'assets/models/optimized/Earth_lod0.glb', distance: 0 },
             { path: 'assets/models/optimized/Earth_lod1.glb', distance: 80000 },
@@ -137,6 +143,8 @@ const SF3D = (function () {
         ally: 16,              // human fighter ~16m wingspan
         tanker: 600,           // fuel tanker ~800m — 10× civilian support craft
         medic: 800,            // medical frigate ~900m — 10× larger civilian support vessel
+        rescue: 200,           // rescue shuttle ~200m — SAR craft
+        'science-ship': 1200,  // civilian science vessel ~1200m — research cruiser
         station: 30000,        // space station ~30km — 10× massive home base, city-sized
         earth: 18000,  // forced perspective — fills ~27° of sky at distance 60000
         moon: 4000,    // forced perspective — fills ~4.5° of sky at distance 80000 (1/4.5 Earth ratio)
@@ -152,6 +160,7 @@ const SF3D = (function () {
     const LOD_GLOW_DIST = {
         enemy: 3600, predator: 5000, interceptor: 3600, bomber: 4400,
         dreadnought: 12000, 'alien-baseship': 16000, tanker: 18000, medic: 20000,
+        rescue: 8000, 'science-ship': 25000,
         ally: 1500, baseship: 12000, station: 250000, earth: 300000, moon: 200000,
         'hive-queen': 18000,
     };
@@ -163,18 +172,21 @@ const SF3D = (function () {
     // RULE: 3D models should appear well before enemies are close enough to attack.
     // Combat range is ~500-1500 units, so 3D models must be visible by ~1500-2000.
     const DOT_DIST = {
-        enemy: 1600, predator: 2400, interceptor: 1600, bomber: 2000,
+        // Increased so ships are visible as actual models well before engagement.
+        enemy: 7000, predator: 10000, interceptor: 7000, bomber: 8000,
         dreadnought: 6000, 'alien-baseship': 8000, tanker: 8000, medic: 10000,
+        rescue: 4000, 'science-ship': 12000,
         ally: 700, baseship: 8000, station: 150000, earth: 200000, moon: 150000,
         'hive-queen': 10000,
         laser: 600, machinegun: 400, torpedo: 800, plasma: 600,
         egg: 500, youngling: 400,
     };
     const CULL_DIST = 50000; // beyond this, skip entirely (except celestials)
-    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship']);
+    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship', 'rescue', 'science-ship']);
     const DOT_COLORS = {
-        enemy: 0x22ff44, predator: 0x44ff00, interceptor: 0x00ffcc, bomber: 0xff6600,
-        dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0xffaa44, medic: 0xff4444,
+        enemy: 0xff2222, predator: 0xcc0000, interceptor: 0xff4444, bomber: 0xff3333,
+        dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0x00ff88, medic: 0x44ffcc,
+        rescue: 0x44ffcc, 'science-ship': 0xaaddff,
         ally: 0x4488ff, baseship: 0x88ccff, station: 0xaaaaff, earth: 0x4488ff, moon: 0xcccccc,
         'hive-queen': 0xff00cc,
         laser: 0x00ffaa, machinegun: 0xffcc00, torpedo: 0xff8800, plasma: 0x44ff00,
@@ -182,11 +194,31 @@ const SF3D = (function () {
     };
     const _dotSprites = new Map(); // entity id → sprite
     let _dotMaterialCache = {};
+    let _dotTexture = null;
+
+    function _getDotTexture() {
+        if (_dotTexture) return _dotTexture;
+        const size = 64;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+        g.addColorStop(0.25, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.55, 'rgba(255,255,255,0.25)');
+        g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        _dotTexture = new THREE.CanvasTexture(c);
+        return _dotTexture;
+    }
 
     function _getDotSprite(type) {
         const color = DOT_COLORS[type] || 0xffffff;
         if (!_dotMaterialCache[color]) {
             _dotMaterialCache[color] = new THREE.SpriteMaterial({
+                map: _getDotTexture(),
                 color: color,
                 transparent: true,
                 opacity: 0.9,
@@ -195,7 +227,12 @@ const SF3D = (function () {
             });
         }
         const sprite = new THREE.Sprite(_dotMaterialCache[color]);
-        sprite.scale.setScalar(8);
+        const DOT_SIZE = {
+            enemy: 14, interceptor: 14, bomber: 16, predator: 18,
+            dreadnought: 26, 'alien-baseship': 30, 'hive-queen': 30,
+            ally: 10, baseship: 22,
+        };
+        sprite.scale.setScalar(DOT_SIZE[type] || 10);
         scene.add(sprite);
         return sprite;
     }
@@ -669,6 +706,14 @@ const SF3D = (function () {
         }
 
         console.log(`[ManifoldGeometry] Preloaded ${Object.keys(manifoldGeometryCache).length} manifold geometries`);
+
+        // Celestial bodies (earth, moon) have no manifold seeds — load GLBs in background
+        // Do NOT count toward loading progress so the loading screen doesn't hang
+        const loader = new THREE.GLTFLoader();
+        const celestialTypes = ['earth', 'moon'];
+        for (const key of celestialTypes) {
+            if (GLB_LOD[key]) _loadGLBType(loader, key, GLB_LOD[key], false);
+        }
     }
 
     // LEGACY GLB PRELOAD (kept for backward compatibility)
@@ -783,6 +828,8 @@ const SF3D = (function () {
         station: { engineColor: 0xaabbff, engineIntensity: 8.0, engineDist: 4000, navColor: 0x6688ff, navIntensity: 4.0, navDist: 2000 },
         tanker: { engineColor: 0x88ffbb, engineIntensity: 3.0, engineDist: 300, navColor: 0x00ff88, navIntensity: 1.5, navDist: 180 },
         medic: { engineColor: 0xff8888, engineIntensity: 3.5, engineDist: 400, navColor: 0xff4444, navIntensity: 2.0, navDist: 250 },
+        rescue: { engineColor: 0x44ffcc, engineIntensity: 3.0, engineDist: 350, navColor: 0x22ddaa, navIntensity: 2.0, navDist: 200 },
+        'science-ship': { engineColor: 0xaaddff, engineIntensity: 5.0, engineDist: 800, navColor: 0x88bbff, navIntensity: 3.0, navDist: 500 },
         wingman: { engineColor: 0x88bbff, engineIntensity: 4.0, engineDist: 300, navColor: 0x4488ff, navIntensity: 2.0, navDist: 200 },
     };
 
@@ -1274,7 +1321,18 @@ const SF3D = (function () {
         }
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(starfieldVerts, 3));
-        const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false });
+
+        // Slightly brighter constellation/starfield points.
+        const mat = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 2.4,
+            sizeAttenuation: false,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+
         scene.add(new THREE.Points(geo, mat)); // world space, NOT camera.add
     }
 
@@ -1736,6 +1794,32 @@ const SF3D = (function () {
         // ── Map entity types to manifold model keys ──
         const manifoldKey = type === 'wingman' ? 'ally' : type;
 
+        // Manifold-first by default. Set `?glb=1` to force GLB hero assets.
+        const _USE_GLB_HERO_ASSETS = (() => {
+            try { return new URLSearchParams(location.search).has('glb'); }
+            catch { return false; }
+        })();
+
+        // Optional: prefer detailed GLB models for large/hero objects when explicitly enabled.
+        const _PREFER_GLB = new Set(['baseship', 'station', 'earth', 'moon', 'tanker', 'medic', 'rescue', 'science-ship', 'alien-baseship', 'dreadnought', 'hive-queen']);
+        const glbKey = manifoldKey;
+        if (_USE_GLB_HERO_ASSETS && _PREFER_GLB.has(glbKey) && glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0) {
+            mesh = _cloneLOD(glbKey);
+            mesh.scale.setScalar(GLB_SCALES[glbKey] || 10);
+            if (type === 'wingman') mesh.userData.isWingman = true;
+            if (type === 'baseship') mesh.userData.isBaseship = true;
+            if (type === 'tanker') mesh.userData.isTanker = true;
+            if (type === 'medic') mesh.userData.isMedic = true;
+            if (ALIEN_GLOW_COLORS[glbKey]) {
+                _addGlowLight(mesh, glbKey);
+                mesh.userData.alienGlow = true;
+            } else if (FRIENDLY_LIGHT_CONFIGS[glbKey]) {
+                _applyFriendlyLights(mesh, glbKey);
+            }
+            scene.add(mesh);
+            return mesh;
+        }
+
         // ══════════════════════════════════════════════════════════════════
         // § MANIFOLD GEOMETRY OBSERVATION (Primary Path)
         // ══════════════════════════════════════════════════════════════════
@@ -1787,7 +1871,7 @@ const SF3D = (function () {
         // ══════════════════════════════════════════════════════════════════
         // § LEGACY GLB PATH (Fallback for backward compatibility)
         // ══════════════════════════════════════════════════════════════════
-        const glbKey = manifoldKey;
+        // Note: glbKey defined above
         if (glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0) {
             mesh = _cloneLOD(glbKey);
             mesh.scale.setScalar(GLB_SCALES[glbKey] || 10);
@@ -1911,6 +1995,39 @@ const SF3D = (function () {
             const beacon = new THREE.PointLight(0xff4444, 2, 250);
             beacon.position.set(0, 16, 0);
             mesh.add(beacon);
+        } else if (type === 'rescue') {
+            // Rescue shuttle fallback: compact teal-white SAR craft
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xcceeee, metalness: 0.5, roughness: 0.4 });
+            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(30, 16, 50), bodyMat));
+            const finMat = new THREE.MeshStandardMaterial({ color: 0x22ddaa });
+            const fin = new THREE.Mesh(new THREE.BoxGeometry(2, 20, 18), finMat);
+            fin.position.set(0, 12, -10);
+            mesh.add(fin);
+            const beacon = new THREE.PointLight(0x44ffcc, 2, 300);
+            beacon.position.set(0, 12, 20);
+            mesh.add(beacon);
+        } else if (type === 'science-ship') {
+            // Civilian science vessel fallback: long white hull with sensor arrays
+            const hullMat = new THREE.MeshStandardMaterial({ color: 0xddddee, metalness: 0.3, roughness: 0.5 });
+            mesh.add(new THREE.Mesh(new THREE.BoxGeometry(50, 28, 120), hullMat));
+            // Sensor dish on dorsal spine
+            const dishMat = new THREE.MeshStandardMaterial({ color: 0xaabbdd, metalness: 0.6, roughness: 0.3 });
+            const dish = new THREE.Mesh(new THREE.CylinderGeometry(0, 18, 8, 12), dishMat);
+            dish.position.set(0, 20, 20);
+            dish.rotation.x = Math.PI;
+            mesh.add(dish);
+            // Lab modules (side pods)
+            const podMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, metalness: 0.4, roughness: 0.4 });
+            const podL = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 40), podMat);
+            podL.position.set(-32, -2, 10);
+            mesh.add(podL);
+            const podR = podL.clone();
+            podR.position.set(32, -2, 10);
+            mesh.add(podR);
+            // Navigation lights
+            const navBeacon = new THREE.PointLight(0x88bbff, 3, 500);
+            navBeacon.position.set(0, 18, -50);
+            mesh.add(navBeacon);
         } else if (type === 'plasma') {
             // Toxic green plasma bolt
             const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x44ff00, transparent: true, opacity: 0.8 });
@@ -2949,7 +3066,169 @@ const SF3D = (function () {
         cameraShakeIntensity = Math.max(cameraShakeIntensity, 1.5);
     }
 
-    return { init, render, spawnExplosion, spawnLaser, spawnPlasma, spawnEgg, spawnEggHatch, spawnTorpedoTrail, spawnEMPBurst, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, getCockpitDebugState, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady };
+    function showRescueFrigateBay() {
+        // Show rescue frigate bay (compact, medical-themed, hatchback-style)
+        // Creates a smaller, tighter bay than main baseship — player launches from emergency medical frigate
+        if (launchBayGroup) {
+            launchBayGroup.visible = false; // Hide main bay
+        }
+
+        // Create rescue bay if it doesn't exist
+        if (!rescueBayGroup) {
+            rescueBayGroup = new THREE.Group();
+            rescueBayGroup.name = 'rescue-frigate-bay';
+            scene.add(rescueBayGroup);
+
+            // Compact hatchback-style bay — smaller, tighter, medical aesthetic
+            const bayWidth = 22; // Narrower than main bay (was ~35)
+            const bayHeight = 16; // Lower ceiling (was ~24)
+            const bayDepth = 35; // Shorter (was ~60)
+
+            // Medical white/blue color scheme
+            const wallColor = 0xccddff;
+            const floorColor = 0x88aacc;
+            const accentColor = 0x44ffff; // cyan medical lights
+
+            // Walls — clean medical panels
+            const wallGeo = new THREE.PlaneGeometry(bayWidth, bayHeight);
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: wallColor,
+                metalness: 0.2,
+                roughness: 0.5,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const wallLeft = new THREE.Mesh(wallGeo, wallMat);
+            wallLeft.position.set(-bayWidth / 2, 0, bayDepth / 2);
+            wallLeft.rotation.y = Math.PI / 2;
+            rescueBayGroup.add(wallLeft);
+
+            const wallRight = new THREE.Mesh(wallGeo, wallMat);
+            wallRight.position.set(bayWidth / 2, 0, bayDepth / 2);
+            wallRight.rotation.y = -Math.PI / 2;
+            rescueBayGroup.add(wallRight);
+
+            const ceilingGeo = new THREE.PlaneGeometry(bayWidth, bayDepth);
+            const ceiling = new THREE.Mesh(ceilingGeo, wallMat);
+            ceiling.position.set(0, bayHeight / 2, bayDepth / 2);
+            ceiling.rotation.x = Math.PI / 2;
+            rescueBayGroup.add(ceiling);
+
+            // Floor — medical grid pattern
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: floorColor,
+                metalness: 0.3,
+                roughness: 0.6,
+                side: THREE.DoubleSide
+            });
+            const floor = new THREE.Mesh(ceilingGeo, floorMat);
+            floor.position.set(0, -bayHeight / 2, bayDepth / 2);
+            floor.rotation.x = -Math.PI / 2;
+            rescueBayGroup.add(floor);
+
+            // Medical stripe lights — cyan accent strips
+            for (let i = 0; i < 4; i++) {
+                const stripGeo = new THREE.BoxGeometry(bayWidth * 0.8, 0.3, 0.5);
+                const stripMat = new THREE.MeshStandardMaterial({
+                    color: accentColor,
+                    emissive: accentColor,
+                    emissiveIntensity: 1.2,
+                    metalness: 0.9,
+                    roughness: 0.1
+                });
+                const strip = new THREE.Mesh(stripGeo, stripMat);
+                strip.position.set(0, bayHeight / 2 - 1, (bayDepth / 4) * (i - 1.5));
+                rescueBayGroup.add(strip);
+            }
+
+            // Hatch door — compact sliding door (closed initially)
+            const hatchGeo = new THREE.PlaneGeometry(bayWidth * 0.9, bayHeight * 0.85);
+            const hatchMat = new THREE.MeshStandardMaterial({
+                color: 0xff6644, // Emergency red/orange
+                metalness: 0.7,
+                roughness: 0.4,
+                emissive: 0xff3322,
+                emissiveIntensity: 0.3
+            });
+            const hatch = new THREE.Mesh(hatchGeo, hatchMat);
+            hatch.position.set(0, 0, 0); // Front of bay
+            hatch.name = 'rescue-hatch';
+            rescueBayGroup.add(hatch);
+
+            // Position rescue bay in camera view
+            rescueBayGroup.position.set(0, -32, 50);
+        }
+
+        rescueBayGroup.visible = true;
+        if (launchBayGroup) launchBayGroup.visible = false;
+    }
+
+    // ── Debris Pickup — spinning octahedron with coloured glow ──
+    // Colors keyed by pickup type so they're visually distinct at a glance.
+    const _PICKUP_COLORS = {
+        hull: 0x22ff88,  // green  — hull fragments
+        shield: 0x2288ff,  // blue   — shield cell
+        ammo: 0xff8822,  // orange — ammo cache
+        intel: 0xffff44,  // yellow — intel data
+        crew: 0xff44cc,  // pink   — crew pod
+        alien_tech: 0xaa44ff,  // purple — alien tech
+    };
+    const _pickupMeshes = new Map(); // entityId → { group, light, t }
+
+    function spawnPickup(entity) {
+        const color = _PICKUP_COLORS[entity._pickupType] || 0x00ffff;
+        const geo = new THREE.OctahedronGeometry(entity.radius * 0.9, 0);
+        const mat = new THREE.MeshBasicMaterial({
+            color,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+
+        // Inner solid core — slightly smaller, full colour
+        const coreMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3, depthWrite: false });
+        const core = new THREE.Mesh(new THREE.OctahedronGeometry(entity.radius * 0.5, 0), coreMat);
+
+        const group = new THREE.Group();
+        group.add(mesh);
+        group.add(core);
+        group.position.copy(entity.position);
+
+        // Point light — visible from a fair distance
+        const light = new THREE.PointLight(color, 1.5, entity.radius * 12);
+        light.position.set(0, 0, 0);
+        group.add(light);
+
+        scene.add(group);
+        _pickupMeshes.set(entity.id, { group, light, t: Math.random() * Math.PI * 2 });
+    }
+
+    function removePickup(entityId) {
+        const entry = _pickupMeshes.get(entityId);
+        if (!entry) return;
+        scene.remove(entry.group);
+        entry.group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        _pickupMeshes.delete(entityId);
+    }
+
+    function updatePickups(dt) {
+        for (const [id, entry] of _pickupMeshes) {
+            entry.t += dt * 1.4;
+            entry.group.rotation.y = entry.t;
+            entry.group.rotation.x = entry.t * 0.6;
+            // Pulse opacity and light intensity
+            const pulse = 0.6 + 0.4 * Math.sin(entry.t * 2.5);
+            entry.group.children.forEach(c => { if (c.material) c.material.opacity = c.material.opacity > 0.2 ? pulse * 0.85 : pulse * 0.3; });
+            entry.light.intensity = 1.0 + 0.8 * pulse;
+        }
+    }
+
+    return { init, render, spawnExplosion, spawnLaser, spawnPlasma, spawnEgg, spawnEggHatch, spawnTorpedoTrail, spawnEMPBurst, removeLaunchBay, updateLaunchCinematic, hideHangarBay, showHangarBay, spawnImpactEffect, hideBaseship, showBaseship, showLaunchBay, showRescueFrigateBay, setLaunchPhase, getStarfieldVerts: () => starfieldVerts, STAR_COUNT, STAR_RADIUS, showCockpit, getCockpitDebugState, updateTelemetryScreen, updateRadarTexture, onAllModelsReady, isReady, spawnPickup, removePickup, updatePickups };
 })();
 
 window.SF3D = SF3D;

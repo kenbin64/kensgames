@@ -7,14 +7,190 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assemble � Build Anything Together | KensGames</title>
-  <meta name="description"
-    content="Assemble is a collaborative building puzzle game. Place modular parts, solve challenges, and build together with up to 3 friends.">
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
-  <link rel="stylesheet" href="/arcade.css">
-  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <title>Assemble â€” Build Anything | KensGames</title>
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <style>
-    .hero {
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --dim: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warn: #d29922;
+      --fail: #f85149;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* â”€â”€ NAV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      z-index: 200;
+    }
+
+    .nav-logo {
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--dim);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #access-status a.kg-access-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(88, 166, 255, 0.08);
+      color: var(--accent);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #access-status a.kg-access-link:hover {
+      background: rgba(88, 166, 255, 0.14);
+    }
+
+    /* â”€â”€ LAYOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    #c {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* â”€â”€ SIDEBAR PANELS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .part-category {
+      margin-bottom: 14px;
+    }
+
+    .cat-label {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .part-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .part-btn {
+      aspect-ratio: 1;
+      background: rgba(88, 166, 255, 0.05);
+      border: 1px solid rgba(88, 166, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 4px;
+      font-size: 9px;
+      color: var(--text);
+      position: relative;
+    }
+
+    .part-btn:hover {
+      background: rgba(88, 166, 255, 0.12);
+      border-color: var(--accent);
+    }
+
+    .part-btn .icon {
+      font-size: 20px;
+    }
+
+    .part-btn .lbl {
+      font-size: 7px;
       text-align: center;
       padding: 6rem 1rem 4rem;
       position: relative;
@@ -246,117 +422,1032 @@
   </style>
 </head>
 
-<body data-mtheme="cyan">
-  <div class="scanlines"></div>
-  <canvas id="gyroid-bg"></canvas>
-  <div class="m-dim-ticker" aria-hidden="true"></div>
-  <header class="arcade-header">
-    <a href="/" style="text-decoration:none">
-      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
-    </a>
-    <nav class="header-nav"><a href="/login/index.html" class="arcade-btn" id="signin-btn">SIGN IN</a></nav>
-  </header>
-  <div class="hero">
-    <div style="font-size:4rem;margin-bottom:1rem">?</div>
-    <h1 class="hero-title">ASSEMBLE</h1>
-    <p class="hero-tagline">Build anything � together. Place modular parts, solve challenges, and create with up to 3
-      friends.</p>
-    <div class="hero-ctas">
-      <button class="cta-primary" id="solo-btn" onclick="KG_LANDING.playSolo(this)">PLAY SOLO (1 BOT) � FREE</button>
-      <a href="/login/index.html" class="cta-secondary">SIGN IN TO BUILD WITH FRIENDS</a>
-    </div>
-  </div>
-  <section>
-    <div class="section-title">FEATURES</div>
-    <div class="features-grid">
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">MODULAR PARTS SYSTEM</div>
-        <div class="feat-desc">Hundreds of snap-together parts with unique properties. Connectors, motors, sensors, and
-          more.</div>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">COLLABORATIVE BUILDING</div>
-        <div class="feat-desc">Build together in real time. Each player controls their own part cursor. See each other's
-          placements instantly.</div>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">CHALLENGE MODE</div>
-        <div class="feat-desc">Build to spec within time and part limits. Score is based on efficiency and creativity.
-        </div>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">FREE BUILD</div>
-        <div class="feat-desc">No time limit, no rules � just build whatever you can imagine with the parts library.
-        </div>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">1�4 PLAYERS</div>
-        <div class="feat-desc">Solo with an AI builder bot, or invite up to 3 friends via invite code.</div>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">??</div>
-        <div class="feat-name">CHALLENGE MEDALS</div>
-        <div class="feat-desc">Complete timed challenges to earn Assembler medallions and leaderboard rank.</div>
-      </div>
-    </div>
-  </section>
-  <section>
-    <div class="section-title">HOW TO PLAY</div>
-    <ul class="rules-list">
-      <li>Choose a challenge or start a free build session.</li>
-      <li>Select parts from the palette and place them on the build grid. Parts snap to connectors automatically.</li>
-      <li>In challenge mode, match the target structure shown before time runs out.</li>
-      <li>Each part has a weight, strength, and connector count � more complex builds require careful planning.</li>
-      <li>In co-op, coordinate with your team � each player places parts simultaneously.</li>
-      <li>Complete the challenge to receive a score based on speed, accuracy, and part efficiency.</li>
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav-logo"><img src="/assets/images/logo/icon.png" alt="KensGames"
+        style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span
+        style="color:#fff">S</span>GAMES</a>
+    <ul class="nav-links">
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/4DTicTacToe/">Connect 4D</a></li>
     </ul>
-  </section>
-  <section>
-    <div class="section-title">JOIN A PRIVATE GAME</div>
-    <div class="invite-box">
-      <input class="invite-input" type="text" id="invite-code-input" placeholder="XXXXXX" maxlength="6"
-        style="text-transform:uppercase">
-      <button class="cta-primary"
-        onclick="KG_LANDING.openInviteJoin(document.getElementById('invite-code-input').value)">JOIN</button>
-      <span style="font-size:0.78rem;color:var(--dim);flex-basis:100%;margin-top:0.5rem">Got an invite code from a
-        builder? Paste it above � no account needed to join.</span>
+    <div class="nav-right">
+      <div id="kg-player" data-profile-required="true"></div>
+      <div id="access-status" data-access-mode="compact"></div>
     </div>
-  </section>
-  <section>
-    <div class="section-title">ABOUT THE GAME</div>
-    <div class="about-card">
-      <div>
-        <div class="about-label">PLAYERS</div><span class="about-badge">1</span><span class="about-badge">2</span><span
-          class="about-badge">3</span><span class="about-badge">4</span>
-        <br><br>
-        <div class="about-label">PLAY TIME</div>
-        <div class="about-val">5 min (challenge) or unlimited (free build)</div>
-        <br>
-        <div class="about-label">PLATFORM</div>
-        <div class="about-val">Browser � no download</div>
+  </nav>
+
+  <div class="workspace">
+    <!-- LEFT SIDEBAR: Parts palette + properties -->
+    <aside class="sidebar">
+      <div class="panel-section">
+        <div class="panel-title">FEATURED CONTRAPTIONS</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('battery_bulb')">ðŸ’¡ Battery + Bulb</button>
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('motor_fan')">ðŸŒ€ Motor + Fan</button>
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('boiler_gauge')">â™¨ Boiler + Gauge</button>
+          <div style="color:var(--dim);font-size:11px;line-height:1.4;">
+            Load a starter build, then modify it. Save/load as JSON.
+          </div>
+        </div>
       </div>
-      <div>
-        <div class="about-label">TOS</div>
-        <div class="tos-note">By playing Assemble on KensGames, you agree to our <a href="/tos/index.html">Terms of
-            Service</a>. Solo and guest play is always free. Leaderboards require a free account.</div>
+
+      <div class="panel-section">
+        <div class="panel-title">PART LIBRARY</div>
+        <div id="parts-palette">
+          <!-- Built by JS -->
+        </div>
+      </div>
+
+      <div class="panel-section" id="props">
+        <div class="panel-title">PROPERTIES</div>
+        <div id="props-content">
+          <div class="prop-row">
+            <span class="prop-label">Position X</span>
+            <input type="number" class="prop-input" id="prop-x" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Y</span>
+            <input type="number" class="prop-input" id="prop-y" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Z</span>
+            <input type="number" class="prop-input" id="prop-z" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Rotation Y</span>
+            <input type="number" class="prop-input" id="prop-ry" step="15" min="-180" max="180">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Label</span>
+            <input type="text" class="prop-input" id="prop-label" placeholder="(optional)">
+          </div>
+
+          <!-- Dynamic part settings (gauges, holes, etc.) -->
+          <div id="prop-extra"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: 3D canvas -->
+    <div class="canvas-wrap">
+      <canvas id="c"></canvas>
+
+      <div class="status-bar">
+        <div class="stat-row">
+          <span class="stat-label">Parts:</span>
+          <span class="stat-val" id="stat-parts">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Connections:</span>
+          <span class="stat-val" id="stat-conns">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Powered:</span>
+          <span class="stat-val" id="stat-powered">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Mass:</span>
+          <span class="stat-val" id="stat-mass">0 kg</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Status:</span>
+          <span class="stat-val good" id="stat-status">Ready</span>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <button class="ctrl-btn active" id="btn-snap" onclick="toggleSnap()">ðŸ“ SNAP: ON</button>
+        <button class="ctrl-btn active" id="btn-autoconnect" onclick="toggleAutoConnect()">ðŸ§² AUTO-CONNECT: ON</button>
+        <div class="grid-control">
+          <label>Grid:</label>
+          <input type="range" id="grid-slider" min="0.1" max="2" step="0.1" value="0.5"
+            oninput="updateGridSize(this.value)">
+          <span id="grid-val">0.5</span>
+        </div>
+        <div class="ctrl-separator"></div>
+        <button class="ctrl-btn" id="btn-run" onclick="toggleSim()">â–¶ RUN</button>
+        <button class="ctrl-btn" onclick="deleteSelected()" disabled id="btn-delete">DELETE</button>
+        <button class="ctrl-btn" onclick="saveContraption()">ðŸ’¾ SAVE</button>
+        <button class="ctrl-btn" onclick="loadContraption()">ðŸ“‚ LOAD</button>
+        <button class="ctrl-btn" onclick="importModel()">â¬†ï¸ IMPORT MODEL</button>
+        <button class="ctrl-btn" onclick="exportCustomParts()">â¬‡ï¸ EXPORT PARTS</button>
+        <button class="ctrl-btn danger" onclick="clearAll()">CLEAR ALL</button>
+      </div>
+
+      <div class="help-hint">
+        <b>Left-click</b> part â†’ <b>Click</b> scene to pick up â†’ <b>Drag</b> to move â†’ <b>Click</b> to drop<br>
+        <b>Right-click</b> while holding part to release it<br>
+        <b>Drag canvas</b> to orbit | <b>Scroll</b> to zoom
       </div>
     </div>
   </section>
   <footer>
-    <div style="margin-bottom:0.5rem">� 2025 KensGames � <a href="/tos/index.html" style="color:var(--dim)">Terms</a> �
+    <div style="margin-bottom:0.5rem">ï¿½ 2025 KensGames ï¿½ <a href="/tos/index.html" style="color:var(--dim)">Terms</a> ï¿½
       <a href="/" style="color:var(--dim)">All Games</a></div>
-    <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate � z = xy
+    <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate ï¿½ z = xy
     </div>
-  </footer>
-  <script src="/js/substrates/game_session_substrate.js"></script>
-  <script src="/js/game_landing.js"></script>
-  <script src="/js/manifold_reality.js" defer></script>
-  <script src="/js/manifold_panels.js" defer></script>
+  </div>
+
+  <!-- Hidden file picker for model import -->
+  <input type="file" id="import-model-input" accept=".glb,.gltf,.json" style="display:none;">
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="/lib/three/OrbitControls.js"></script>
+  <script src="/lib/three/GLTFLoader.js"></script>
+  <script src="/js/access_status.js" defer></script>
+  <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
+  <script type="module">
+    'use strict';
+
+    import { PARTS, PART_MAP, CATEGORIES } from './parts.js?v=8';
+    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js?v=8';
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // GLOBAL STATE
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const engine = new AssembleEngine();
+    const renderer = new AssembleRenderer(document.getElementById('c'), engine);
+
+    let selectedTool = null;  // partId when placing
+    let selectedNode = null;  // nodeId when editing
+    let placementMode = false;
+    let ghostVisible = false;
+    let snapEnabled = true;
+    let autoConnectEnabled = true;
+    let gridSize = 0.5;
+    let draggedNode = null;   // node being dragged
+    let dragOffset = new THREE.Vector3();
+    let isDragging = false;
+    let rotationMode = false;
+    let rotSphere = null;
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // FEATURED CONTRAPTIONS (starter builds)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const FEATURED = {
+      battery_bulb: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_battery', partId: 'battery_12v',
+            position: { x: -1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'PLASTIC', color: null, label: '12V', simProps: { outputType: 'wire', voltage: 12, capacity: 60 },
+          },
+          {
+            id: 'n_bulb', partId: 'light_bulb',
+            position: { x: 1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'GLASS', color: null, label: 'Lamp', simProps: { watts: 5, maxVoltage: 24 },
+          },
+        ],
+        connections: [
+          { id: 'c_wire', nodeAId: 'n_battery', portIdxA: 0, nodeBId: 'n_bulb', portIdxB: 0 },
+        ],
+      },
+      motor_fan: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_battery', partId: 'battery_12v',
+            position: { x: -2.4, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'PLASTIC', color: null, label: '12V', simProps: { outputType: 'wire', voltage: 12, capacity: 60 },
+          },
+          {
+            id: 'n_wire', partId: 'wire_copper',
+            position: { x: -1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 90 },
+            matKey: 'COPPER', color: null, label: '', simProps: { resistance: 0.02 },
+          },
+          {
+            id: 'n_motor', partId: 'motor_electric',
+            position: { x: 0.0, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Motor', simProps: { inputType: 'wire', outputType: 'shaft', rpmPerVolt: 100, maxRpm: 3000, requiresRotor: true },
+          },
+          {
+            id: 'n_rotor', partId: 'motor_rotor',
+            position: { x: 1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Rotor', simProps: { rpm: 0 },
+          },
+          {
+            id: 'n_fan', partId: 'fan',
+            position: { x: 2.4, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'ALUMINUM', color: null, label: 'Blades', simProps: { rpm: 0 },
+          },
+        ],
+        connections: [
+          { id: 'c_batt_wire', nodeAId: 'n_battery', portIdxA: 0, nodeBId: 'n_wire', portIdxB: 0 },
+          { id: 'c_wire_motor', nodeAId: 'n_wire', portIdxA: 1, nodeBId: 'n_motor', portIdxB: 1 },
+          { id: 'c_motor_rotor', nodeAId: 'n_motor', portIdxA: 0, nodeBId: 'n_rotor', portIdxB: 0 },
+          { id: 'c_rotor_fan', nodeAId: 'n_rotor', portIdxA: 1, nodeBId: 'n_fan', portIdxB: 0 },
+        ],
+      },
+      boiler_gauge: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_boiler', partId: 'boiler',
+            position: { x: -1.1, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Steam', simProps: { outputType: 'pipe', pressure: 2, temp: 120, fuelType: 'oil' },
+          },
+          {
+            id: 'n_gauge', partId: 'gauge_pressure',
+            position: { x: 1.1, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'PSI', simProps: { range: [0, 300], unit: 'psi' },
+          },
+        ],
+        connections: [
+          { id: 'c_pipe', nodeAId: 'n_boiler', portIdxA: 0, nodeBId: 'n_gauge', portIdxB: 0 },
+        ],
+      },
+    };
+
+    window.loadFeatured = function (key) {
+      const preset = FEATURED[key];
+      if (!preset) return;
+      if (engine.running) engine.stop();
+      deselectNode();
+      renderer.hideGhost();
+      placementMode = false;
+      selectedTool = null;
+      stopDragging();
+      engine.load(preset);
+      updateStats();
+    };
+
+    // Custom parts (runtime-imported models)
+    globalThis.ASSEMBLE_CUSTOM_PART_MAP = globalThis.ASSEMBLE_CUSTOM_PART_MAP || {};
+    const CUSTOM_PARTS = [];
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // BUILD PARTS PALETTE
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const palette = document.getElementById('parts-palette');
+
+    const grouped = {};
+    PARTS.forEach(p => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+
+    for (const cat of CATEGORIES) {
+      const parts = grouped[cat] || [];
+      if (!parts.length) continue;
+
+      const catDiv = document.createElement('div');
+      catDiv.className = 'part-category';
+      catDiv.innerHTML = `<span class="cat-label">${cat.toUpperCase()}</span><div class="part-grid" data-cat="${cat}"></div>`;
+      palette.appendChild(catDiv);
+
+      const grid = catDiv.querySelector('.part-grid');
+      parts.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'part-btn';
+        btn.dataset.partId = p.id;
+        btn.innerHTML = `<div class="icon">${p.icon}</div><div class="lbl">${p.label}</div>`;
+        btn.onclick = () => selectTool(p.id);
+        // Tooltip
+        btn.addEventListener('mouseenter', e => showTooltip(e, p.label, `Category: ${p.category} | Mass: ${p.mass}kg`));
+        btn.addEventListener('mouseleave', hideTooltip);
+        grid.appendChild(btn);
+      });
+    }
+
+    function ensureCategory(cat) {
+      let grid = palette.querySelector(`.part-grid[data-cat="${cat}"]`);
+      if (grid) return grid;
+      const catDiv = document.createElement('div');
+      catDiv.className = 'part-category';
+      catDiv.innerHTML = `<span class="cat-label">${cat.toUpperCase()}</span><div class="part-grid" data-cat="${cat}"></div>`;
+      palette.appendChild(catDiv);
+      return catDiv.querySelector('.part-grid');
+    }
+
+    function addPartToPalette(p) {
+      const grid = ensureCategory(p.category || 'Imported');
+      const btn = document.createElement('button');
+      btn.className = 'part-btn';
+      btn.dataset.partId = p.id;
+      btn.innerHTML = `<div class="icon">${p.icon || 'â¬†ï¸'}</div><div class="lbl">${p.label || p.id}</div>`;
+      btn.onclick = () => selectTool(p.id);
+      btn.addEventListener('mouseenter', e => showTooltip(e, p.label || p.id, `Category: ${p.category || 'Imported'} | Mass: ${p.mass || 1}kg`));
+      btn.addEventListener('mouseleave', hideTooltip);
+      grid.appendChild(btn);
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // TOOLTIP
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const tooltip = document.getElementById('tooltip');
+    const tooltipTitle = document.getElementById('tooltip-title');
+    const tooltipDesc = document.getElementById('tooltip-desc');
+
+    function showTooltip(e, title, desc) {
+      tooltipTitle.textContent = title;
+      tooltipDesc.textContent = desc;
+      tooltip.classList.add('show');
+      updateTooltipPos(e);
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('show');
+    }
+
+    function updateTooltipPos(e) {
+      const x = e.clientX + 15;
+      const y = e.clientY + 15;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    document.addEventListener('mousemove', e => {
+      if (tooltip.classList.contains('show')) {
+        updateTooltipPos(e);
+      }
+    });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // TOOL SELECTION
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    function selectTool(partId) {
+      selectedTool = partId;
+      placementMode = true;
+      document.querySelectorAll('.part-btn').forEach(b => b.style.background = 'rgba(88,166,255,0.05)');
+      const btn = document.querySelector(`[data-part-id="${partId}"]`);
+      if (btn) btn.style.background = 'rgba(88,166,255,0.25)';
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // SNAP & GRID CONTROLS
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    window.toggleSnap = function () {
+      snapEnabled = !snapEnabled;
+      const btn = document.getElementById('btn-snap');
+      if (snapEnabled) {
+        btn.textContent = 'ðŸ“ SNAP: ON';
+        btn.classList.add('active');
+      } else {
+        btn.textContent = 'ðŸ“ SNAP: OFF';
+        btn.classList.remove('active');
+      }
+    };
+
+    window.toggleAutoConnect = function () {
+      autoConnectEnabled = !autoConnectEnabled;
+      const btn = document.getElementById('btn-autoconnect');
+      if (btn) {
+        btn.textContent = autoConnectEnabled ? 'ðŸ§² AUTO-CONNECT: ON' : 'ðŸ§² AUTO-CONNECT: OFF';
+        btn.classList.toggle('active', autoConnectEnabled);
+      }
+    };
+
+    window.updateGridSize = function (val) {
+      gridSize = parseFloat(val);
+      document.getElementById('grid-val').textContent = val;
+      // Update renderer grid
+      renderer.updateGrid(gridSize);
+    };
+
+    function snapPosition(pos) {
+      if (!snapEnabled) return pos;
+      return {
+        x: Math.round(pos.x / gridSize) * gridSize,
+        y: Math.round(pos.y / gridSize) * gridSize,
+        z: Math.round(pos.z / gridSize) * gridSize,
+      };
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // CANVAS INTERACTION - New drag & drop model
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const canvas = document.getElementById('c');
+    let mouseDownPos = null;
+    let mouseMoved = false;
+
+    canvas.addEventListener('mousedown', e => {
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+      mouseMoved = false;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (mouseDownPos) {
+        const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+        if (dist > 3) mouseMoved = true;
+      }
+
+      // Ghost preview when in placement mode
+      if (placementMode && selectedTool && !isDragging) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          renderer.showGhost(selectedTool, snapped, null);
+          ghostVisible = true;
+        }
+      }
+
+      // Drag existing part
+      if (isDragging && draggedNode) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const node = engine.nodes.get(draggedNode);
+          if (node) {
+            const newPos = {
+              x: pt.x + dragOffset.x,
+              y: 0.5,
+              z: pt.z + dragOffset.z
+            };
+            const snapped = snapPosition(newPos);
+            node.position.x = snapped.x;
+            node.position.y = snapped.y;
+            node.position.z = snapped.z;
+            renderer.updateMeshTransform(node);
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', e => {
+      if (e.button === 0) { // Left click only
+        if (isDragging) {
+          // Always drop if we're currently dragging
+          stopDragging();
+        } else if (!mouseMoved && mouseDownPos) {
+          // Only process click if mouse didn't move (for picking up parts)
+          handleCanvasClick(e);
+        }
+      }
+      mouseDownPos = null;
+      mouseMoved = false;
+    });
+
+    // Safety: if mouseup happens outside the canvas, don't get stuck "holding" a part
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0 && isDragging) stopDragging();
+      mouseDownPos = null;
+      mouseMoved = false;
+    });
+
+    window.addEventListener('blur', () => {
+      if (isDragging) stopDragging();
+    });
+
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (isDragging && draggedNode) {
+        // Right-click releases the held part
+        stopDragging();
+      }
+    });
+
+    function handleCanvasClick(e) {
+      if (engine.running) return;
+
+      if (placementMode && selectedTool) {
+        // Place new part
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          const node = engine.addNode(selectedTool, snapped, { x: 0, y: 0, z: 0 });
+          placementMode = false;
+          selectedTool = null;
+          renderer.hideGhost();
+          // Immediately pick up the newly placed part
+          startDragging(node.id, e);
+          updateStats();
+        }
+      } else {
+        // Pick up existing part
+        const nodeId = renderer.pick(e.clientX, e.clientY);
+        if (nodeId) {
+          startDragging(nodeId, e);
+        } else {
+          deselectNode();
+        }
+      }
+    }
+
+    function startDragging(nodeId, e) {
+      draggedNode = nodeId;
+      isDragging = true;
+      selectNode(nodeId);
+      renderer.controls.enabled = false; // Disable orbit while dragging
+
+      const node = engine.nodes.get(nodeId);
+      const pt = raycastToGround(e);
+      if (node && pt) {
+        dragOffset.set(node.position.x - pt.x, 0, node.position.z - pt.z);
+      }
+    }
+
+    function stopDragging() {
+      const droppedNodeId = draggedNode;
+      isDragging = false;
+      draggedNode = null;
+      renderer.controls.enabled = true;
+      dragOffset.set(0, 0, 0);
+      hideRotationSphere();
+      rotDragStart = null;
+
+      if (autoConnectEnabled && droppedNodeId) {
+        tryAutoConnect(droppedNodeId);
+        updateStats();
+      }
+    }
+
+    function tryAutoConnect(nodeId) {
+      const node = engine.nodes.get(nodeId);
+      if (!node) return;
+
+      // Find best snap across all ports
+      let best = null;
+      let bestPortIdx = -1;
+      for (let i = 0; i < node.ports.length; i++) {
+        const p = node.ports[i];
+        const wide = ['wire', 'pipe', 'hose', 'shaft', 'gear', 'belt', 'socket'].includes(p.type);
+        const thresh = wide ? 0.75 : 0.35;
+        const t = engine.findSnapTarget(node, i, thresh);
+        if (!t) continue;
+        if (!best || t.dist < best.dist) {
+          best = t;
+          bestPortIdx = i;
+        }
+      }
+      if (!best || bestPortIdx < 0) return;
+
+      // Align the dragged port to the target port by translation.
+      const a = engine.getWorldPortPos(nodeId, bestPortIdx);
+      const b = engine.getWorldPortPos(best.node.id, best.portIdx);
+      if (!a || !b) return;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dz = b.z - a.z;
+
+      node.position.x += dx;
+      node.position.y += dy;
+      node.position.z += dz;
+      renderer.updateMeshTransform(node);
+
+      engine.connect(nodeId, bestPortIdx, best.node.id, best.portIdx);
+    }
+
+    function raycastToGround(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(mouse, renderer.camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const pt = new THREE.Vector3();
+      ray.ray.intersectPlane(plane, pt);
+      return pt;
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ROTATION SPHERE (3D rotation control)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const rotSphereDiv = document.getElementById('rotation-sphere');
+    const rotCanvas = document.getElementById('rotation-canvas');
+    const rotCtx = rotCanvas.getContext('2d');
+    let rotDragStart = null;
+
+    function showRotationSphere(e) {
+      rotSphereDiv.style.left = (e.clientX - 90) + 'px';
+      rotSphereDiv.style.top = (e.clientY - 90) + 'px';
+      rotSphereDiv.classList.add('show');
+      drawRotationSphere();
+    }
+
+    function hideRotationSphere() {
+      rotSphereDiv.classList.remove('show');
+    }
+
+    function drawRotationSphere() {
+      const w = 180, h = 180, cx = w / 2, cy = h / 2, r = 80;
+      rotCtx.clearRect(0, 0, w, h);
+
+      // Outer circle
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.lineWidth = 2;
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // X axis (red)
+      rotCtx.strokeStyle = '#f85149';
+      rotCtx.lineWidth = 1.5;
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx - r, cy);
+      rotCtx.lineTo(cx + r, cy);
+      rotCtx.stroke();
+
+      // Y axis (green)
+      rotCtx.strokeStyle = '#3fb950';
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx, cy - r);
+      rotCtx.lineTo(cx, cy + r);
+      rotCtx.stroke();
+
+      // Z axis (blue circle)
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // Labels
+      rotCtx.fillStyle = '#c9d1d9';
+      rotCtx.font = '11px Orbitron';
+      rotCtx.fillText('X', cx + r + 8, cy + 4);
+      rotCtx.fillText('Y', cx - 4, cy - r - 8);
+      rotCtx.fillText('Z', cx + r * 0.6 + 8, cy - r * 0.6 - 8);
+    }
+
+    rotCanvas.addEventListener('mousedown', e => {
+      const rect = rotCanvas.getBoundingClientRect();
+      rotDragStart = {
+        x: e.clientX - rect.left - 90,
+        y: e.clientY - rect.top - 90
+      };
+    });
+
+    rotCanvas.addEventListener('mousemove', e => {
+      if (!rotDragStart || !draggedNode) return;
+      const rect = rotCanvas.getBoundingClientRect();
+      const dx = (e.clientX - rect.left - 90) - rotDragStart.x;
+      const dy = (e.clientY - rect.top - 90) - rotDragStart.y;
+
+      const node = engine.nodes.get(draggedNode);
+      if (node) {
+        // Rotate based on mouse drag
+        node.rotation.y += dx * 0.02;
+        node.rotation.x -= dy * 0.02;
+        renderer.updateMeshTransform(node);
+        updatePropertiesPanel();
+      }
+
+      rotDragStart.x += dx;
+      rotDragStart.y += dy;
+    });
+
+    rotCanvas.addEventListener('mouseup', () => {
+      rotDragStart = null;
+    });
+
+    rotSphereDiv.addEventListener('mouseleave', () => {
+      hideRotationSphere();
+      rotDragStart = null;
+    });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // NODE SELECTION & PROPERTIES
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    function selectNode(nodeId) {
+      selectedNode = nodeId;
+      renderer.select(nodeId);
+      document.getElementById('btn-delete').disabled = false;
+      const node = engine.nodes.get(nodeId);
+      if (!node) return;
+
+      // Show properties panel
+      document.getElementById('props').classList.add('show');
+      updatePropertiesPanel();
+    }
+
+    function updatePropertiesPanel() {
+      const node = engine.nodes.get(selectedNode);
+      if (!node) return;
+      document.getElementById('prop-x').value = node.position.x.toFixed(2);
+      document.getElementById('prop-y').value = node.position.y.toFixed(2);
+      document.getElementById('prop-z').value = node.position.z.toFixed(2);
+      document.getElementById('prop-ry').value = (node.rotation.y * 180 / Math.PI).toFixed(0);
+      document.getElementById('prop-label').value = node.label || '';
+
+      const extra = document.getElementById('prop-extra');
+      if (extra) {
+        extra.innerHTML = '';
+
+        // Show holes metadata (from nails/screws)
+        const holes = node.simProps && Array.isArray(node.simProps.holes) ? node.simProps.holes.length : 0;
+        const holesRow = document.createElement('div');
+        holesRow.className = 'prop-row';
+        holesRow.innerHTML = `<span class="prop-label">Holes</span><input class="prop-input" value="${holes}" disabled>`;
+        extra.appendChild(holesRow);
+
+        // Gauges/sensors: unit + system setter
+        if (node.simProps && node.simProps.unit) {
+          const sysRow = document.createElement('div');
+          sysRow.className = 'prop-row';
+          sysRow.innerHTML = `
+            <span class="prop-label">Unit System</span>
+            <select class="prop-input" id="prop-unit-system">
+              <option value="imperial">Imperial (US)</option>
+              <option value="metric">Metric</option>
+            </select>`;
+          extra.appendChild(sysRow);
+
+          const unitRow = document.createElement('div');
+          unitRow.className = 'prop-row';
+          unitRow.innerHTML = `
+            <span class="prop-label">Gauge Unit</span>
+            <select class="prop-input" id="prop-unit">
+              <option value="psi">psi</option>
+              <option value="kPa">kPa</option>
+              <option value="bar">bar</option>
+            </select>`;
+          extra.appendChild(unitRow);
+
+          const unitSel = unitRow.querySelector('#prop-unit');
+          const sysSel = sysRow.querySelector('#prop-unit-system');
+          if (unitSel) unitSel.value = node.simProps.unit;
+          if (sysSel) sysSel.value = node.simProps.unitSystem || (node.simProps.unit === 'psi' ? 'imperial' : 'metric');
+
+          const setUnit = (newUnit) => {
+            node.simProps.unit = newUnit;
+            node.simProps.unitSystem = (newUnit === 'psi') ? 'imperial' : 'metric';
+            if (Array.isArray(node.simProps.range) && node.simProps.range.length === 2) {
+              const r0 = node.simProps.range[0];
+              const r1 = node.simProps.range[1];
+              // Convert only if the old unit is psi.
+              if (newUnit !== 'psi' && (unitSel && unitSel.value === 'psi')) {
+                const psiToKPa = (v) => v * 6.89476;
+                const psiToBar = (v) => v / 14.5038;
+                if (newUnit === 'kPa') node.simProps.range = [psiToKPa(r0), psiToKPa(r1)];
+                if (newUnit === 'bar') node.simProps.range = [psiToBar(r0), psiToBar(r1)];
+              }
+            }
+          };
+
+          if (unitSel) {
+            unitSel.addEventListener('change', () => {
+              if (!selectedNode) return;
+              const n = engine.nodes.get(selectedNode);
+              if (!n || !n.simProps) return;
+              n.simProps.unit = unitSel.value;
+              n.simProps.unitSystem = (unitSel.value === 'psi') ? 'imperial' : 'metric';
+              updateStats();
+            });
+          }
+          if (sysSel) {
+            sysSel.addEventListener('change', () => {
+              if (!selectedNode) return;
+              const n = engine.nodes.get(selectedNode);
+              if (!n || !n.simProps) return;
+              if (sysSel.value === 'imperial') {
+                n.simProps.unit = 'psi';
+              } else {
+                // Metric default
+                n.simProps.unit = (n.simProps.unit === 'bar' || n.simProps.unit === 'kPa') ? n.simProps.unit : 'kPa';
+              }
+              updatePropertiesPanel();
+              updateStats();
+            });
+          }
+        }
+      }
+    }
+
+    function deselectNode() {
+      selectedNode = null;
+      renderer.select(null);
+      document.getElementById('btn-delete').disabled = true;
+      document.getElementById('props').classList.remove('show');
+    }
+
+    // Property inputs update node
+    ['prop-x', 'prop-y', 'prop-z', 'prop-ry', 'prop-label'].forEach(id => {
+      const inp = document.getElementById(id);
+      inp.addEventListener('input', () => {
+        if (!selectedNode) return;
+        const node = engine.nodes.get(selectedNode);
+        if (!node) return;
+        if (id === 'prop-x') node.position.x = parseFloat(inp.value) || 0;
+        if (id === 'prop-y') node.position.y = parseFloat(inp.value) || 0;
+        if (id === 'prop-z') node.position.z = parseFloat(inp.value) || 0;
+        if (id === 'prop-ry') node.rotation.y = (parseFloat(inp.value) || 0) * Math.PI / 180;
+        if (id === 'prop-label') node.label = inp.value;
+        renderer.updateMeshTransform(node);
+      });
+    });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // IMPORT / EXPORT (custom parts & models)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const importInput = document.getElementById('import-model-input');
+    window.importModel = function () {
+      if (!importInput) return;
+      importInput.value = '';
+      importInput.click();
+    };
+
+    if (importInput) {
+      importInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        // Parts library JSON import
+        if ((file.name || '').toLowerCase().endsWith('.json')) {
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            const parts = Array.isArray(data) ? data : (data && Array.isArray(data.parts) ? data.parts : []);
+            if (!parts.length) throw new Error('No parts found in JSON. Expected { parts: [...] }');
+
+            let added = 0;
+            for (const p of parts) {
+              if (!p || !p.id) continue;
+              if (PART_MAP[p.id]) continue; // don't overwrite built-ins
+              globalThis.ASSEMBLE_CUSTOM_PART_MAP[p.id] = p;
+              CUSTOM_PARTS.push(p);
+              addPartToPalette(p);
+              added++;
+            }
+            showModal('IMPORTED', `Imported ${added} custom parts.`, 'good');
+          } catch (err) {
+            showModal('IMPORT FAILED', String(err && err.message ? err.message : err), 'bad');
+          }
+          return;
+        }
+
+        // Model import (.glb/.gltf)
+        const url = URL.createObjectURL(file);
+        const safeName = (file.name || 'Model').replace(/\.[^/.]+$/, '');
+        const id = `model_${Date.now()}`;
+        const partDef = {
+          id,
+          label: safeName,
+          category: 'Imported',
+          layer: 7,
+          icon: 'â¬†ï¸',
+          geo: { type: 'model', url },
+          defaultMat: 'STEEL',
+          mass: 1.0,
+          behavior: 'rigid',
+          ports: [
+            // One simple snap point at origin to start
+            { type: 'snap', pos: [0, -0.3, 0], dir: [0, -1, 0], axis: [0, 1, 0] },
+          ],
+        };
+        globalThis.ASSEMBLE_CUSTOM_PART_MAP[id] = partDef;
+        CUSTOM_PARTS.push(partDef);
+        addPartToPalette(partDef);
+        showModal('IMPORTED', `Added part â€œ${safeName}â€. It will render when placed.`, 'good');
+      });
+    }
+
+    window.exportCustomParts = function () {
+      const data = JSON.stringify({ version: 1, parts: CUSTOM_PARTS }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'assemble_custom_parts.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // SIMULATION CONTROL
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    window.toggleSim = function () {
+      if (engine.running) {
+        engine.stop();
+        document.getElementById('btn-run').innerHTML = 'â–¶ RUN';
+        document.getElementById('btn-run').classList.remove('active');
+      } else {
+        engine.start();
+        document.getElementById('btn-run').innerHTML = 'â¹ STOP';
+        document.getElementById('btn-run').classList.add('active');
+        // Check if it works or fails
+        setTimeout(() => {
+          const stats = engine.stats();
+          if (stats.structurallySound && (stats.activePowered > 0 || stats.spinning > 0)) {
+            const motion = stats.spinning > 0 ? ` Motion: ${stats.spinning} rotating part(s).` : '';
+            showModal('RUNNING', `Active: ${stats.activePowered} part(s) powered (total ${stats.powered}).${motion} Mass ${stats.totalMass} kg.`, 'good');
+          } else if (!stats.structurallySound) {
+            showModal('FAILURE!', `Structural failure detected. Check for overload, fractures, or electrical shorts.`, 'bad');
+          } else if (stats.sourcesPowered === 0 && stats.total > 0) {
+            showModal('NO POWER', `No power sources detected. Add a battery, engine, or boiler and connect it to something.`, 'warn');
+          } else if (stats.activePowered === 0 && stats.total > 0) {
+            showModal('IDLE', `Power is present but nothing is running. Add required parts (e.g., motor rotor / fan blades) and connect them.`, 'warn');
+          }
+        }, 500);
+      }
+    };
+
+    window.deleteSelected = function () {
+      if (!selectedNode) return;
+      engine.removeNode(selectedNode);
+      renderer._removeMesh(engine.nodes.get(selectedNode) || { id: selectedNode });
+      deselectNode();
+      updateStats();
+    };
+
+    window.clearAll = function () {
+      if (!confirm('Clear entire workspace?')) return;
+      for (const id of [...engine.nodes.keys()]) {
+        engine.removeNode(id);
+      }
+      updateStats();
+    };
+
+    window.saveContraption = function () {
+      const data = engine.serialise();
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contraption_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.loadContraption = function () {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            engine.load(data);
+            updateStats();
+          } catch (err) {
+            alert('Failed to load: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STATS UPDATE
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    function updateStats() {
+      const s = engine.stats();
+      document.getElementById('stat-parts').textContent = s.total;
+      document.getElementById('stat-conns').textContent = s.connections;
+      document.getElementById('stat-powered').textContent = s.powered;
+      document.getElementById('stat-mass').textContent = s.totalMass + ' kg';
+      const statEl = document.getElementById('stat-status');
+      if (engine.running) {
+        if (s.structurallySound) {
+          statEl.textContent = (s.activePowered > 0 || s.spinning > 0) ? 'Running' : 'Idle';
+          statEl.className = 'stat-val good';
+        } else {
+          statEl.textContent = 'FAILED';
+          statEl.className = 'stat-val bad';
+        }
+      } else {
+        statEl.textContent = 'Ready';
+        statEl.className = 'stat-val';
+      }
+    }
+
+    engine.on('simStep', () => updateStats());
+    engine.on('failure', ({ node, mode }) => {
+      console.warn(`FAILURE: ${node.partDef.label} â€” ${mode}`);
+    });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // MODAL
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    function showModal(title, body, type) {
+      document.getElementById('result-title').textContent = title;
+      document.getElementById('result-body').textContent = body;
+      const titleEl = document.getElementById('result-title');
+      titleEl.style.color = type === 'good' ? 'var(--success)' : type === 'bad' ? 'var(--fail)' : 'var(--warn)';
+      document.getElementById('result-modal').classList.add('show');
+    }
+
+    window.closeModal = function () {
+      document.getElementById('result-modal').classList.remove('show');
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // RENDER LOOP
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    let lastTime = 0;
+    function animate(t) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((t - lastTime) / 1000, 0.05);
+      lastTime = t;
+      engine.step(dt);
+      renderer.render();
+    }
+
+    animate(0);
+    updateStats();
+
+    // Expose engine for ManifoldBridge (non-module scripts can't import ES modules)
+    window.__assembleEngine = engine;
+  </script>
+  <script src="/js/manifold_bridge.js"></script>
   <script>
     KG_LANDING.init('assemble', '/assemble/lobby.html');
     document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });

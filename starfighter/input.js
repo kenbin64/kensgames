@@ -70,7 +70,7 @@ const SFInput = (function () {
             if (window.SFAudio) SFAudio.resume();
 
             // Ignore UI buttons — don't let them trigger pointer lock or fire weapons
-            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay') ||
+            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-skip-btn, #training-control-overlay') ||
                 (e.target.classList && (e.target.classList.contains('action-btn') || e.target.classList.contains('mob-btn') || e.target.classList.contains('console-btn') || e.target.classList.contains('avtn-btn') || e.target.classList.contains('avtn-select')))) return;
 
             if (document.pointerLockElement !== document.body) {
@@ -94,7 +94,7 @@ const SFInput = (function () {
             }
         });
 
-        // Scroll wheel — throttle control for mouse-primary play
+        // Scroll wheel — throttle control in-game; activate focused button on overlays
         document.addEventListener('wheel', e => {
             if (!player) return;
             if (document.pointerLockElement === document.body) {
@@ -102,6 +102,13 @@ const SFInput = (function () {
                 const step = e.deltaY > 0 ? -0.08 : 0.08;
                 player.throttle = Math.min(1, Math.max(0, player.throttle + step));
                 lastInputDevice = 'mouse';
+            } else {
+                // Not in pointer lock — an overlay is showing; scroll wheel activates focused button
+                const focused = document.activeElement;
+                if (focused && (focused.tagName === 'BUTTON' || focused.tagName === 'SELECT')) {
+                    e.preventDefault();
+                    focused.click();
+                }
             }
         }, { passive: false });
 
@@ -294,9 +301,9 @@ const SFInput = (function () {
         if (keys['KeyQ']) player.roll += dt * 2.0;
         if (keys['KeyE']) player.roll -= dt * 2.0;
 
-        // Strafe — GDD §4.1: Space (up) / Ctrl (down), A/D overloaded as bank + strafe
-        if (keys['KeyA']) player.strafeH = -1;
-        if (keys['KeyD']) player.strafeH = 1;
+        // Bank — A/D for yaw (left/right banking)
+        if (keys['KeyA']) { player.yaw += dt * 2.0; lastInputDevice = 'keyboard'; }
+        if (keys['KeyD']) { player.yaw -= dt * 2.0; lastInputDevice = 'keyboard'; }
         if (keys['Space'] && !keys['ControlLeft']) {
             // Space fires lasers when not strafing
         }
@@ -401,18 +408,38 @@ const SFInput = (function () {
         const pads = navigator.getGamepads ? navigator.getGamepads() : [];
         const pad = pads[0];
         if (pad) {
+            // ── Gamepad tuning ──
+            // Goal: responsive at full deflection, precise for micro-aim near center.
+            const _deadzoneLook = 0.055;
+            const _deadzoneMove = 0.08;
+            const _expoLook = 1.85;
+            const _expoMove = 1.6;
+            const _lookRate = 3.2; // comparable to mouse clamp range (±3)
+            const _curveAxis = (v, dz, expo) => {
+                const a = Math.abs(v || 0);
+                if (a <= dz) return 0;
+                const n = (a - dz) / (1 - dz);
+                return Math.sign(v) * Math.pow(n, expo);
+            };
+
             // Auto-detect: if any axis/button is active, switch to gamepad
             const anyAxis = pad.axes.some(a => Math.abs(a) > 0.15);
             let anyBtn = false;
             for (let bi = 0; bi < pad.buttons.length; bi++) { if (pad.buttons[bi].pressed) { anyBtn = true; break; } }
             if (anyAxis || anyBtn) lastInputDevice = 'gamepad';
+
             // Right stick: Pitch / Yaw (GDD §12.4)
-            if (Math.abs(pad.axes[2]) > 0.1) player.yaw += -pad.axes[2] * dt * 2.0;
-            if (Math.abs(pad.axes[3]) > 0.1) player.pitch += -pad.axes[3] * dt * 2.0;
+            // Apply deadzone + curve so tiny stick movements still register, but gently.
+            const rsx = _curveAxis(pad.axes[2], _deadzoneLook, _expoLook);
+            const rsy = _curveAxis(pad.axes[3], _deadzoneLook, _expoLook);
+            if (rsx !== 0) player.yaw = Math.max(-3.0, Math.min(3.0, (player.yaw || 0) + (-rsx) * dt * _lookRate));
+            if (rsy !== 0) player.pitch = Math.max(-3.0, Math.min(3.0, (player.pitch || 0) + (-rsy) * dt * _lookRate));
 
             // Left stick: Throttle Y + Strafe X (GDD §12.4)
-            if (Math.abs(pad.axes[1]) > 0.1) player.throttle = Math.min(1, Math.max(0, player.throttle - pad.axes[1] * dt * 0.5));
-            if (Math.abs(pad.axes[0]) > 0.1) player.strafeH = pad.axes[0];
+            const lsx = _curveAxis(pad.axes[0], _deadzoneMove, _expoMove);
+            const lsy = _curveAxis(pad.axes[1], _deadzoneMove, _expoMove);
+            if (lsy !== 0) player.throttle = Math.min(1, Math.max(0, player.throttle - lsy * dt * 0.55));
+            player.strafeH = lsx; // ensure it returns to 0 when stick centers
 
             // Bumpers: Roll (GDD §12.4: L1/R1)
             if (pad.buttons[4] && pad.buttons[4].pressed) player.roll += dt * 2.0; // LB

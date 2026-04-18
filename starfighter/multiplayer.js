@@ -30,6 +30,18 @@ const SFMultiplayer = (function () {
         _mp.on('game_action', (d) => {
             if (d.action === 'fire') _emit('remote_fire', d.payload);
             else if (d.action === 'comm') _emit('comm', d.payload);
+            else if (d.action === 'wave_complete') {
+                // A remote player cleared their enemies — add them to the ready set
+                _waveReadySet.add(d.playerId || d.payload?.playerId);
+                _checkAllReady(d.payload?.wave);
+                _emit('wave_complete', d.payload);
+            }
+            else if (d.action === 'player_eliminated') {
+                // Eliminated players no longer count toward wave gate
+                _eliminatedSet.add(d.playerId || d.payload?.playerId);
+                _checkAllReady(_gatedWave);
+                _emit('player_eliminated', d.payload);
+            }
             else _emit(d.action, d.payload);
         });
         _mp.on('game_over', (d) => _emit('game_over', d));
@@ -52,14 +64,23 @@ const SFMultiplayer = (function () {
     }
 
     // ── Room management (delegates to KGMultiplayer) ──
-    function createRoom(opts) { if (_mp) _mp.createGame({ private: true, settings: opts }); }
+    function createRoom(opts) {
+        if (!_mp) return;
+        const maxPlayers = opts && (opts.max_players || opts.maxPlayers) ? (opts.max_players || opts.maxPlayers) : undefined;
+        const settings = opts && opts.settings ? opts.settings : (opts || {});
+        _mp.createGame({ private: true, max_players: maxPlayers, settings });
+    }
     function joinRoom(code) { if (_mp) _mp.joinByCode(code); }
     function leaveRoom() { if (_mp) _mp.leave(); }
     function toggleReady() { if (_mp) _mp.toggleReady(); }
+    function acceptLobby() { if (_mp) _mp.acceptLobby(); }
     function startGame() { if (_mp) _mp.startGame(); }
     function matchmake() { if (_mp) _mp.matchmake(); }
     function listRooms() { if (_mp) _mp.listGames(); }
     function sendChat(msg) { if (_mp) _mp.chat(msg); }
+
+    function addBot(level) { if (_mp) _mp.addBot(level); }
+    function removeBot(playerId) { if (_mp) _mp.removeBot(playerId); }
 
     // ── Game state sync ──
     let _lastStateSend = 0;
@@ -86,6 +107,54 @@ const SFMultiplayer = (function () {
         if (_mp) _mp.sendAction('comm', { sender, message, commType });
     }
 
+    // ── Cooperative wave gate ──
+    // Each player calls sendWaveComplete() when their enemies are cleared.
+    // Eliminated players are excluded — they don't hold up the squad.
+    let _waveReadySet = new Set();  // player IDs that have reported ready
+    let _eliminatedSet = new Set(); // player IDs eliminated this session
+    let _onAllReady = null;
+    let _gatedWave = -1;
+
+    function sendWaveComplete(wave) {
+        if (!_mp) return;
+        // Mark self ready
+        _waveReadySet.add(_mp.userId);
+        _mp.sendAction('wave_complete', { wave });
+        _checkAllReady(wave);
+    }
+
+    function onAllPlayersReady(wave, cb) {
+        _gatedWave = wave;
+        _onAllReady = cb;
+        // In case we're already the only player, check immediately
+        _checkAllReady(wave);
+    }
+
+    function _checkAllReady(wave) {
+        if (wave !== _gatedWave || !_onAllReady) return;
+        const totalPlayers = _mp && _mp.session ? (_mp.session.players || []).length : 1;
+        // Active players = total minus those already eliminated
+        const activePlayers = Math.max(1, totalPlayers - _eliminatedSet.size);
+        if (_waveReadySet.size >= activePlayers) {
+            const cb = _onAllReady;
+            _onAllReady = null;
+            _gatedWave = -1;
+            _waveReadySet.clear();
+            cb();
+        }
+    }
+
+    function resetWaveGate() {
+        _waveReadySet.clear();
+        _onAllReady = null;
+        _gatedWave = -1;
+        // Note: _eliminatedSet persists for the session — eliminated players stay excluded
+    }
+
+    function sendAction(action, payload) {
+        if (_mp) _mp.sendAction(action, payload);
+    }
+
     function sendGameOver(result, message) {
         if (_mp) _mp.sendGameOver(result, null, null, message);
     }
@@ -96,16 +165,19 @@ const SFMultiplayer = (function () {
         get connected() { return _mp ? _mp.connected : false; },
         get playerId() { return _mp ? _mp.userId : null; },
         get callsign() { return _mp ? _mp.username : null; },
-        createRoom, joinRoom, leaveRoom, toggleReady, startGame, matchmake, listRooms, sendChat,
+        createRoom, joinRoom, leaveRoom, toggleReady, acceptLobby, startGame, matchmake, listRooms, sendChat,
         get roomId() { return _mp && _mp.session ? _mp.session.session_id : null; },
         get roomCode() { return _mp ? _mp.sessionCode : null; },
         get isHost() { return _mp ? _mp.isHost : false; },
         get gameStarted() { return _mp ? _mp.gameStarted : false; },
         get currentRoom() { return _mp ? _mp.session : null; },
         get roomList() { return _mp ? _mp.sessionList : []; },
-        sendPlayerState, sendFire, sendComm, sendGameOver,
+        addBot, removeBot,
+        sendPlayerState, sendFire, sendComm, sendGameOver, sendAction,
+        sendWaveComplete, onAllPlayersReady, resetWaveGate,
         get remotePlayers() { return _mp ? _mp.remotePlayers : new Map(); },
         get isMultiplayer() { return _mp ? _mp.isInGame : false; },
+        get playerCount() { return _mp && _mp.session ? (_mp.session.players || []).length : 1; },
     };
 })();
 

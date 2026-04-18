@@ -7,8 +7,9 @@
   <title>Game Portal &mdash; KensGames</title>
   <meta name="description"
     content="KensGames Game Portal &mdash; browse games, join lobbies, create matches, invite friends, and compete on leaderboards.">
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <script src="/js/imgatlas.js?v=20260418" defer></script>
   <style>
     :root {
       --cyan: #00FFFF;
@@ -84,12 +85,22 @@
     }
 
     .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       font-size: 28px;
       font-weight: bold;
       color: var(--cyan);
       text-shadow: var(--gcyan);
       letter-spacing: 2px;
       text-decoration: none
+    }
+
+    .logo-img {
+      height: 30px;
+      width: auto;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.35));
     }
 
     .logo span {
@@ -164,6 +175,33 @@
 
     .btn-out:hover {
       background: rgba(255, 68, 68, 0.25)
+    }
+
+    #access-status {
+      display: flex;
+      align-items: center;
+    }
+
+    #access-status a.kg-access-link {
+      padding: 6px 14px;
+      font-size: 11px;
+      border: 1px solid rgba(0, 255, 255, 0.35);
+      border-radius: 4px;
+      background: rgba(0, 255, 255, 0.08);
+      color: var(--cyan);
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-decoration: none;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    #access-status a.kg-access-link:hover {
+      background: rgba(0, 255, 255, 0.18);
+      border-color: rgba(0, 255, 255, 0.6);
+      box-shadow: var(--gcyan);
     }
 
     /* ── Welcome Banner ── */
@@ -319,6 +357,31 @@
       font-size: 72px;
       position: relative;
       border-bottom: 2px solid rgba(255, 0, 255, 0.15)
+    }
+
+    .game-thumb-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.92;
+      z-index: 0;
+      pointer-events: none;
+      object-fit: cover;
+    }
+
+    .game-thumb canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.92;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .game-thumb .game-badge {
+      z-index: 2;
     }
 
     .game-badge {
@@ -681,6 +744,7 @@
       animation-delay: .3s
     }
   </style>
+  <script src="/js/access_status.js" defer></script>
   <script src="/js/analytics.js"></script>
 </head>
 
@@ -689,7 +753,8 @@
 
   <header>
     <nav>
-      <a href="/" class="logo">KEN<span>S</span>GAMES</a>
+      <a href="/" class="logo"><img class="logo-img" data-imgatlas="auto" data-pngsrc="/assets/images/logo/icon.png"
+          src="/assets/images/logo/icon.png" alt="KensGames" />KEN<span>S</span>GAMES</a>
       <ul class="nav-links">
         <li><a href="#games">Games</a></li>
         <li><a href="#join">Join Code</a></li>
@@ -698,11 +763,11 @@
         <li><a href="/#tos">Terms</a></li>
       </ul>
       <div class="nav-right">
-        <div class="user-pill" onclick="changeAvatar()" title="Change avatar">
+        <div class="user-pill" onclick="editProfile()" title="Player profile">
           <span class="av" id="user-avatar">&#127918;</span>
-          <span class="name" id="user-badge"><small>Loading...</small></span>
+          <span class="name" id="user-badge">Player</span>
         </div>
-        <button class="btn-out" onclick="logout()">LOGOUT</button>
+        <div id="access-status" data-access-mode="compact"></div>
       </div>
     </nav>
   </header>
@@ -767,6 +832,7 @@
   </footer>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
   <script src="/js/multiplayer-client.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════
@@ -784,6 +850,20 @@
         multiplayer: true,
         url: '/fasttrack/',
         lobbyUrl: '/fasttrack/lobby.html',
+        thumb: '/assets/images/fasttrack_lobby.png',
+      },
+      {
+        id: 'assemble',
+        title: 'Assemble',
+        emoji: '&#9632;&#9633;&#9632;&#9633;&#9632;&#9633;&#9632;&#9633;',
+        bg: 'linear-gradient(135deg,#0f1220,#070a12)',
+        icon: '&#x1F9F0;',
+        tags: ['Creative', 'Builder', 'Sandbox'],
+        desc: 'Build anything from parts. A creative sandbox for assembling components into machines, circuits, and art.',
+        multiplayer: false,
+        url: '/assemble/',
+        lobbyUrl: '',
+        thumb: '/assets/images/assembler_lobby.png',
       },
       {
         id: 'brickbreaker3d',
@@ -796,6 +876,7 @@
         multiplayer: true,
         url: '/brickbreaker3d/',
         lobbyUrl: '/brickbreaker3d/',
+        thumb: '/assets/images/brickbreaker3D_lobby.png',
       },
       {
         id: 'starfighter',
@@ -808,6 +889,7 @@
         multiplayer: true,
         url: '/starfighter/',
         lobbyUrl: '/starfighter/lobby.html',
+        thumb: '/assets/images/starfighter_landing.png',
       },
       {
         id: 'tictactoe',
@@ -820,6 +902,7 @@
         multiplayer: true,
         url: '/4DTicTacToe/',
         lobbyUrl: '/4DTicTacToe/',
+        thumb: '/assets/images/logo/logo_thumbnail.png',
       }
     ];
 
@@ -835,25 +918,26 @@
     window.addEventListener('load', init);
 
     function init() {
-      // Auth check
-      const token = localStorage.getItem('user_token');
-      if (!token) { window.location.href = '/?modal=login'; return; }
+      KGPlayerProfile.ensure(true, () => {
+        updateUserPill();
+        renderGames();
+        renderLeaderboard();
+        updateStats();
 
-      // User info
-      const username = localStorage.getItem('username') || 'Player';
-      const displayName = localStorage.getItem('display_name') || username;
+        if (window.KGImgAtlas && typeof window.KGImgAtlas.apply === 'function') {
+          window.KGImgAtlas.apply(document);
+        }
+      });
+
+    }
+
+    function updateUserPill() {
       const badge = document.getElementById('user-badge');
-      badge.innerHTML = displayName;
+      const name = KGPlayerProfile.getName() || 'Player';
+      badge.textContent = name;
 
-      // Avatar
-      const av = AvatarPicker.get();
+      const av = KGPlayerProfile.getAvatar();
       document.getElementById('user-avatar').textContent = av ? av.emoji : '\u{1F3AE}';
-      if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
-
-      renderGames();
-      renderLeaderboard();
-      updateStats();
-
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -863,10 +947,14 @@
       const grid = document.getElementById('games-grid');
       grid.innerHTML = GAMES.map(g => {
         const s = liveStats[g.id];
+        const thumb = g.thumb || '';
+        const thumbImg = thumb
+          ? `<img class="game-thumb-img" data-imgatlas="auto" data-pngsrc="${thumb}" src="${thumb}" alt="${g.title}">`
+          : '';
         return `
         <div class="game-card" onclick="goToGame('${g.url}')">
           <div class="game-thumb" style="background:${g.bg}">
-            <span style="filter:drop-shadow(0 0 10px rgba(0,255,255,0.4))">${g.icon}</span>
+            ${thumbImg}
             <span class="game-badge badge-live">&#9679; LIVE</span>
             ${g.multiplayer ? '<span class="game-badge badge-mp" style="top:12px;right:auto;left:12px">MP</span>' : ''}
           </div>
@@ -882,6 +970,11 @@
           </div>
         </div>`;
       }).join('');
+
+      // Apply atlas rendering to the newly created thumbnails.
+      if (window.KGImgAtlas && typeof window.KGImgAtlas.apply === 'function') {
+        window.KGImgAtlas.apply(grid);
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -910,11 +1003,16 @@
     // ACTIONS
     // ═══════════════════════════════════════════════════════════
     function goToGame(url) {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => goToGame(url), true); return; }
-      window.location.href = url;
+      KGPlayerProfile.ensure(true, () => {
+        window.location.href = url;
+      });
     }
 
     function createRoom(gameId) {
+      KGPlayerProfile.ensure(true, () => createRoomWithProfile(gameId));
+    }
+
+    function createRoomWithProfile(gameId) {
       const game = GAMES.find(g => g.id === gameId);
       if (!game) return;
       // Generate invite code and go to game lobby
@@ -929,6 +1027,10 @@
     }
 
     function joinWithCode() {
+      KGPlayerProfile.ensure(true, () => joinWithCodeWithProfile());
+    }
+
+    function joinWithCodeWithProfile() {
       const input = document.getElementById('invite-code');
       const code = (input.value || '').trim().toUpperCase();
       const msg = document.getElementById('join-msg');
@@ -963,22 +1065,25 @@
         resolver.disconnect();
       });
       resolver.connect({
-        username: localStorage.getItem('username') || 'Guest',
+        username: KGPlayerProfile.getName() || localStorage.getItem('username') || 'Guest',
         token: localStorage.getItem('user_token'),
       });
     }
 
     function quickPlay() {
-      // Random game
-      const g = GAMES[Math.floor(Math.random() * GAMES.length)];
-      goToGame(g.lobbyUrl || g.url);
+      KGPlayerProfile.ensure(true, () => {
+        // Random game
+        const g = GAMES[Math.floor(Math.random() * GAMES.length)];
+        goToGame(g.lobbyUrl || g.url);
+      });
+    }
+
+    function editProfile() {
+      KGPlayerProfile.editName(() => updateUserPill());
     }
 
     function changeAvatar() {
-      AvatarPicker.show(() => {
-        const av = AvatarPicker.get();
-        document.getElementById('user-avatar').textContent = av ? av.emoji : '\u{1F3AE}';
-      });
+      KGPlayerProfile.editAvatar(() => updateUserPill());
     }
 
     function scrollTo(sel) {
@@ -999,6 +1104,7 @@
       localStorage.removeItem('user_token'); // legacy key
       window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
     }
+
   </script>
 </body>
 

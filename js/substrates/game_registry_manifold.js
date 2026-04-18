@@ -98,8 +98,8 @@ const GameRegistryManifold = (() => {
       genre: ['arcade', 'action'],
       author: 'Ken\'s Games Team (Zenxy Edition)',
       version: '1.0.0',
-      entryPoint: '/brickbreaker3d/index.html?mode=solo',
-      icon: '/brickbreaker3d/assets/images/logo.png',
+      entryPoint: '/brickbreaker3d/play.html?mode=solo',
+      icon: '/assets/images/logo/logo_thumbnail.png',
       thumbnail: '/brickbreaker3d/assets/images/arcade.png',
 
       manifold: {
@@ -133,8 +133,8 @@ const GameRegistryManifold = (() => {
       genre: ['arcade', 'action', 'multiplayer'],
       author: 'Ken\'s Games Team (Zenxy Edition)',
       version: '1.0.0',
-      entryPoint: '/brickbreaker3d/index.html?mode=multi',
-      icon: '/brickbreaker3d/assets/images/logo.png',
+      entryPoint: '/brickbreaker3d/play.html?mode=multi',
+      icon: '/assets/images/logo/logo_thumbnail.png',
       thumbnail: '/brickbreaker3d/assets/images/multiplayer.png',
 
       manifold: {

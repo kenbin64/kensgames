@@ -76,6 +76,10 @@ function torus(R, r, segs = 24, tsegs = 12) {
   return { type: 'torus', args: [R, r, tsegs, segs], pivot: [0, 0, 0] };
 }
 
+function group(children) {
+  return { type: 'group', children: children || [], pivot: [0, 0, 0] };
+}
+
 // ─── Connector helper ─────────────────────────────────────────
 // pos: [x,y,z] local to part center
 // dir: [x,y,z] outward normal
@@ -100,6 +104,43 @@ function port(type, pos, dir, axis) {
 // icon         emoji for palette
 // ═══════════════════════════════════════════════════════════════
 export const PARTS = [
+
+  // ════════════════════════════════════════════════
+  // TOOLS (fabrication stations)
+  // Note: currently visual/organizational only; geometry-mod ops come later.
+  // ════════════════════════════════════════════════
+  {
+    id: 'tool_drill_press', label: 'Drill Press', category: 'Tools', layer: 7, icon: '🛠',
+    geo: box(1.2, 2.2, 1.0), defaultMat: 'STEEL', mass: 120.0,
+    behavior: 'rigid',
+    simProps: { toolType: 'drill' },
+    ports: [
+      port(PORT.SNAP, [0, -1.1, 0], [0, -1, 0]),
+      port(PORT.SHAFT, [0, 0.85, 0], [0, 1, 0], [0, 1, 0]),
+    ],
+  },
+  {
+    id: 'tool_lathe', label: 'Lathe', category: 'Tools', layer: 7, icon: '⚙️',
+    geo: box(3.0, 0.9, 1.1), defaultMat: 'STEEL', mass: 220.0,
+    behavior: 'rigid',
+    simProps: { toolType: 'lathe' },
+    ports: [
+      port(PORT.SNAP, [0, -0.45, 0], [0, -1, 0]),
+      port(PORT.SHAFT, [-1.4, 0.2, 0], [-1, 0, 0], [1, 0, 0]),
+      port(PORT.SHAFT, [1.4, 0.2, 0], [1, 0, 0], [1, 0, 0]),
+    ],
+  },
+  {
+    id: 'tool_fabric_former', label: 'Fabric Former', category: 'Tools', layer: 7, icon: '🧵',
+    geo: box(1.8, 1.2, 1.2), defaultMat: 'STEEL', mass: 140.0,
+    behavior: 'rigid',
+    simProps: { toolType: 'former' },
+    ports: [
+      port(PORT.SNAP, [0, -0.6, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0.9, 0, 0], [1, 0, 0]),
+      port(PORT.SNAP, [-0.9, 0, 0], [-1, 0, 0]),
+    ],
+  },
 
   // ════════════════════════════════════════════════
   // LAYER 4 — FORM (structural)
@@ -173,6 +214,7 @@ export const PARTS = [
     id: 'pipe_straight', label: 'Pipe (straight)', category: 'Fluid', layer: 2, icon: '━',
     geo: cyl(0.15, 3.0, 12), defaultMat: 'STEEL', mass: 0.8,
     behavior: 'rigid',
+    simProps: { hollow: true, wall: 0.03 },
     ports: [
       port(PORT.PIPE, [0, 1.5, 0], [0, 1, 0]),
       port(PORT.PIPE, [0, -1.5, 0], [0, -1, 0]),
@@ -182,6 +224,7 @@ export const PARTS = [
     id: 'pipe_elbow', label: 'Pipe Elbow', category: 'Fluid', layer: 2, icon: '┘',
     geo: torus(0.4, 0.15, 12, 8), defaultMat: 'STEEL', mass: 0.3,
     behavior: 'rigid',
+    simProps: { hollow: true, wall: 0.03 },
     ports: [
       port(PORT.PIPE, [0.4, 0, 0], [1, 0, 0]),
       port(PORT.PIPE, [0, 0, -0.4], [0, 0, -1]),
@@ -210,11 +253,76 @@ export const PARTS = [
     ],
   },
   {
+    id: 'screw_wood', label: 'Wood Screw', category: 'Fasteners', layer: 3, icon: '🪛',
+    geo: cyl(0.08, 0.8, 10), defaultMat: 'STEEL', mass: 0.03,
+    behavior: 'rigid',
+    simProps: { penetrates: true, holeDiameter: 0.16 },
+    ports: [
+      port(PORT.SNAP, [0, -0.4, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0, 0.4, 0], [0, 1, 0]),
+    ],
+  },
+  {
+    id: 'nail_steel', label: 'Steel Nail', category: 'Fasteners', layer: 3, icon: '📌',
+    geo: cyl(0.05, 0.9, 8), defaultMat: 'STEEL', mass: 0.02,
+    behavior: 'rigid',
+    simProps: { penetrates: true, holeDiameter: 0.10 },
+    ports: [
+      port(PORT.SNAP, [0, -0.45, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0, 0.45, 0], [0, 1, 0]),
+    ],
+  },
+  {
     id: 'nut_hex', label: 'Hex Nut', category: 'Fasteners', layer: 3, icon: '⬡',
     geo: cyl(0.18, 0.12, 6), defaultMat: 'STEEL', mass: 0.02,
     behavior: 'rigid',
     ports: [
       port(PORT.THREAD, [0, 0, 0], [0, 1, 0]),
+    ],
+  },
+
+  // ════════════════════════════════════════════════
+  // LAYER 3 — RELATION (joints)
+  // ════════════════════════════════════════════════
+  {
+    id: 'u_joint', label: 'U-Joint', category: 'Joints', layer: 3, icon: '⛓',
+    geo: box(0.35, 0.35, 0.35), defaultMat: 'STEEL', mass: 0.15,
+    behavior: 'rigid',
+    ports: [
+      // Input shaft (Y axis)
+      port(PORT.SHAFT, [0, 0.25, 0], [0, 1, 0], [0, 1, 0]),
+      // Output shaft (X axis)
+      port(PORT.SHAFT, [0.25, 0, 0], [1, 0, 0], [1, 0, 0]),
+      port(PORT.SNAP, [0, -0.175, 0], [0, -1, 0]),
+    ],
+  },
+  {
+    id: 'hinge_joint', label: 'Hinge Joint', category: 'Joints', layer: 3, icon: '🚪',
+    geo: box(0.35, 0.55, 0.20), defaultMat: 'STEEL', mass: 0.12,
+    behavior: 'rigid',
+    ports: [
+      port(PORT.HINGE, [0, 0.275, 0], [0, 1, 0]),
+      port(PORT.HINGE, [0, -0.275, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0, 0, 0.10], [0, 0, 1]),
+    ],
+  },
+  {
+    id: 'ball_joint', label: 'Ball Joint', category: 'Joints', layer: 3, icon: '⚪',
+    geo: sphere(0.22), defaultMat: 'STEEL', mass: 0.10,
+    behavior: 'rigid',
+    ports: [
+      port(PORT.BALL, [0, 0.22, 0], [0, 1, 0]),
+      port(PORT.BALL, [0, -0.22, 0], [0, -1, 0]),
+    ],
+  },
+  {
+    id: 'slide_rail', label: 'Slide Rail', category: 'Joints', layer: 3, icon: '➜',
+    geo: box(0.25, 1.8, 0.25), defaultMat: 'STEEL', mass: 0.35,
+    behavior: 'rigid',
+    ports: [
+      port(PORT.SLIDE, [0, 0.9, 0], [0, 1, 0]),
+      port(PORT.SLIDE, [0, -0.9, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0, -0.9, 0], [0, -1, 0]),
     ],
   },
   {
@@ -407,11 +515,12 @@ export const PARTS = [
   {
     id: 'motor_electric', label: 'Electric Motor', category: 'Power', layer: 1, icon: '⚡',
     geo: cyl(0.6, 1.2, 16), defaultMat: 'STEEL', mass: 3.0,
-    behavior: 'source',
-    simProps: { outputType: 'shaft', voltage: 12, rpm: 1200, torque: 5 },
+    behavior: 'motor',
+    simProps: { inputType: 'wire', outputType: 'shaft', rpmPerVolt: 100, maxRpm: 3000, requiresRotor: true },
     ports: [
       port(PORT.SHAFT, [0, 0.6, 0], [0, 1, 0], [0, 1, 0]),
-      port(PORT.WIRE, [0.6, 0, 0], [1, 0, 0]),
+      port(PORT.SOCKET, [0.6, 0, 0], [1, 0, 0]),
+      port(PORT.SNAP, [0, -0.6, 0], [0, -1, 0]),
     ],
   },
   {
@@ -554,6 +663,76 @@ export const PARTS = [
     ports: [
       port(PORT.WIRE, [-0.25, 0, 0], [-1, 0, 0]),
       port(PORT.SNAP, [0, -0.175, 0], [0, -1, 0]),
+    ],
+  },
+
+  // ════════════════════════════════════════════════
+  // LAYER 6 — MIND (loads / indicators)
+  // ════════════════════════════════════════════════
+  {
+    id: 'light_bulb', label: 'Light Bulb', category: 'Instruments', layer: 6, icon: '💡',
+    geo: sphere(0.25), defaultMat: 'GLASS', mass: 0.08,
+    behavior: 'load',
+    simProps: { watts: 5, maxVoltage: 24 },
+    ports: [
+      port(PORT.WIRE, [0, -0.25, 0], [0, -1, 0]),
+      port(PORT.SNAP, [0, -0.35, 0], [0, -1, 0]),
+    ],
+  },
+
+  // ════════════════════════════════════════════════
+  // LAYER 5 — LIFE (mechanical loads)
+  // ════════════════════════════════════════════════
+  {
+    id: 'fan', label: 'Fan (Blades)', category: 'Motion', layer: 5, icon: '🌀',
+    geo: group([
+      { geo: cyl(0.10, 0.10, 16), pos: [0, 0, 0] }, // hub
+      // 3 blades (asymmetric so spin is visible)
+      { geo: box(0.10, 0.02, 0.70), pos: [0, 0, 0.25], rot: [0, 0, 0] },
+      { geo: box(0.10, 0.02, 0.70), pos: [0.2165, 0, -0.125], rot: [0, (2 * Math.PI) / 3, 0] },
+      { geo: box(0.10, 0.02, 0.70), pos: [-0.2165, 0, -0.125], rot: [0, (4 * Math.PI) / 3, 0] },
+    ]),
+    defaultMat: 'ALUMINUM', mass: 0.4,
+    behavior: 'rotate',
+    simProps: { rpm: 0 },
+    ports: [
+      port(PORT.SHAFT, [0, 0, 0], [0, 1, 0], [0, 1, 0]),
+      port(PORT.SNAP, [0, -0.06, 0], [0, -1, 0]),
+    ],
+  },
+
+  // ════════════════════════════════════════════════
+  // Motor internals (required for electric motor output)
+  // ════════════════════════════════════════════════
+  {
+    id: 'motor_rotor', label: 'Motor Rotor', category: 'Motion', layer: 5, icon: '🧲',
+    geo: group([
+      { geo: cyl(0.20, 0.70, 16), pos: [0, 0, 0] },
+      // Offset magnet block so rotation is visible
+      { geo: box(0.10, 0.12, 0.22), pos: [0.18, 0.0, 0], rot: [0, 0, 0] },
+    ]),
+    defaultMat: 'STEEL', mass: 0.6,
+    behavior: 'rotate',
+    simProps: { rpm: 0 },
+    ports: [
+      port(PORT.SHAFT, [0, 0.4, 0], [0, 1, 0], [0, 1, 0]),
+      port(PORT.SHAFT, [0, -0.4, 0], [0, -1, 0], [0, 1, 0]),
+    ],
+  },
+
+  // ════════════════════════════════════════════════
+  // LAYER 5 — LIFE (fluid loads)
+  // ════════════════════════════════════════════════
+  {
+    id: 'pump', label: 'Water Pump', category: 'Fluid', layer: 5, icon: '🫧',
+    geo: cyl(0.35, 0.6, 16), defaultMat: 'STEEL', mass: 1.8,
+    behavior: 'load',
+    simProps: { maxPressure: 6 },
+    ports: [
+      port(PORT.SHAFT, [0, 0.3, 0], [0, 1, 0], [0, 1, 0]),
+      port(PORT.PIPE, [0, 0.3, 0.35], [0, 0, 1]),
+      port(PORT.PIPE, [0, -0.3, -0.35], [0, 0, -1]),
+      port(PORT.SNAP, [0, -0.3, 0], [0, -1, 0]),
     ],
   },
 

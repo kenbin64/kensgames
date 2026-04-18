@@ -32,11 +32,20 @@ You pilot a human starfighter from a cockpit view, defending your baseship again
 - Must approach slowly (speed < threshold) and close enough
 - Press Space to dock when prompted
 
-### 4. Docking / Rearm
-- 5-second landing sequence
-- Ship is rearmed, repaired
-- Baseship receives partial repairs
-- Next wave launches after briefing
+### 4. Between-Wave Return (Debrief + Resupply)
+- Triggered automatically when the wave is cleared
+- Short debrief window (HUD shows wave stats and a countdown)
+- Autopilot guides you back toward the baseship (can be overridden)
+- **Shields fully restore**
+- **Fuel is replenished**
+- **Torpedoes are replenished**
+- **Hull is not instantly repaired in space** (damage persists until docking/refit)
+
+### 5. Docking / Refit & Reward
+- Docking cut scene, then a refit/debrief home screen between rounds
+- Refit operations restore the ship (hull repairs, ammo restock, systems check)
+- Performance summary is shown (kills, accuracy, objectives, XP, credits, rank)
+- Next round begins after the next mission briefing and launch
 
 ---
 

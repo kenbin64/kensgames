@@ -31,3 +31,9 @@ starfighter/index.html.gz
 starfighter/index.src.html
 starfighter/nginx_starfighter.conf
 4DTicTacToe/assets/models/*.glb
+
+# Electron/desktop build outputs and wrappers — not needed in GitHub
+starfighter/downloads/
+downloads/
+starfighter/electron/
+starfighter/native/
