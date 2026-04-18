@@ -1,0 +1,47 @@
+{
+  "manifold": "assemble",
+  "name": "Assemble",
+  "version": "1.0.0",
+  "status": "production",
+  "dimension": {
+    "x": 2,
+    "y": 20,
+    "z": 40,
+    "_note": "z = x*y = 2 players avg * 20 min avg = 40"
+  },
+  "entry": "index.html",
+  "substrates": {
+    "assembler": "assembler.js",
+    "parts": "parts.js"
+  },
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "assemblyState",
+      "selectedParts",
+      "completedItems",
+      "score"
+    ]
+  },
+  "build": {
+    "assets": [
+      "*.html",
+      "*.js"
+    ]
+  },
+  "deploy": {
+    "target": "/var/www/kensgames.com/assemble/",
+    "type": "static"
+  },
+  "manifold_compatibility": {
+    "bridge_included": false,
+    "state_exposed": false,
+    "postmessage_protocol": false,
+    "todo": [
+      "Include js/manifold_bridge.js in index.html",
+      "Emit window.__MANIFOLD__ with assemblyState from assembler.js",
+      "Wire postMessage events to ManifoldBridge.emit()"
+    ]
+  }
+}

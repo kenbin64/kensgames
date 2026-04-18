@@ -1,0 +1,62 @@
+{
+  "manifold": "brickbreaker3d",
+  "name": "BrickBreaker 3D",
+  "version": "1.0.0",
+  "status": "production",
+  "dimension": {
+    "x": 2,
+    "y": 22,
+    "z": 44,
+    "_note": "z = x*y = 2 players avg * 22 min avg = 44"
+  },
+  "entry": "index.html",
+  "lobby": "lobby.html",
+  "substrates": {
+    "physics": "shared:PhysicsSubstrate",
+    "graphics": "shared:GraphicsSubstrate",
+    "audio": "shared:AudioSubstrate",
+    "game_logic": "shared:GameLogicSubstrate",
+    "multiplayer": "shared:MultiplayerSubstrate",
+    "persistence": "shared:PersistenceSubstrate",
+    "ai": "shared:AISubstrate",
+    "ui": "shared:UISubstrate",
+    "admin": "shared:AdminSubstrate"
+  },
+  "_note_substrates": "Uses 9 shared substrates from BrickBreaker manifold refactor — zero code duplication",
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "level",
+      "score",
+      "lives",
+      "ballPosition",
+      "brickGrid"
+    ]
+  },
+  "physics": {
+    "model": "golden_ratio_speed",
+    "_note": "Speed boost per brick layer uses golden ratio φ ≈ 1.618"
+  },
+  "build": {
+    "assets": [
+      "*.html",
+      "*.js",
+      "assets/**"
+    ]
+  },
+  "deploy": {
+    "target": "/var/www/kensgames.com/brickbreaker3d/",
+    "type": "static"
+  },
+  "manifold_compatibility": {
+    "bridge_included": false,
+    "state_exposed": false,
+    "postmessage_protocol": false,
+    "todo": [
+      "Include js/manifold_bridge.js in index.html",
+      "Emit window.__MANIFOLD__ with level/score/lives from game.js",
+      "Wire postMessage events to ManifoldBridge.emit()"
+    ]
+  }
+}

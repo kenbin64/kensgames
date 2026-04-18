@@ -937,6 +937,23 @@ function endGame(msg) {
 window.addEventListener('load', () => {
     initScene();
     animate();
+
+    // ── MANIFOLD BRIDGE ───────────────────────────────────────────
+    if (typeof ManifoldBridge !== 'undefined') {
+        ManifoldBridge.init({
+            id: 'brickbreaker3d',
+            version: '1.0.0',
+            x: 2,
+            y: 22,
+            exposes: () => ({
+                gameActive,
+                gamePaused,
+                mode: gameMode,
+                playerCount: players.length,
+                scores: players.map(p => ({ id: p.id, score: p.score, alive: p.alive })),
+            }),
+        });
+    }
 });
 
 // Keyboard

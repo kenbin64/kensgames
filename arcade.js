@@ -7,10 +7,39 @@ const LOBBY_WS = location.protocol === 'https:'
     ? `wss://${location.host}/ws`
     : `ws://${location.hostname}:8765`;
 
+// Fallback game table — overwritten at runtime by loadRegistry()
 const GAMES = {
-    fasttrack: { title: 'FAST TRACK', url: '/fasttrack/lobby.html', multiplayer: true },
-    brickbreaker3d: { title: 'BRICKBREAKER 3D', url: '/brickbreaker3d/index.html', multiplayer: false }
+    fasttrack: { title: 'FastTrack', url: '/fasttrack/lobby.html', multiplayer: true },
+    brickbreaker3d: { title: 'BrickBreaker 3D', url: '/brickbreaker3d/index.html', multiplayer: true },
+    starfighter: { title: 'StarFighter', url: '/starfighter/index.html', multiplayer: false },
+    '4dtictactoe': { title: '4D TicTacToe', url: '/4DTicTacToe/index.html', multiplayer: true },
+    assemble: { title: 'Assemble', url: '/assemble/index.html', multiplayer: false },
 };
+
+// ── MANIFOLD REGISTRY ─────────────────────────────────────────
+// Fetches /js/manifold.registry.json (emitted by the Manifold Compiler)
+// and merges live game data (dimension, version, status) into GAMES.
+async function loadRegistry() {
+    try {
+        const res = await fetch('/js/manifold.registry.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const reg = await res.json();
+        (reg.games || []).forEach(g => {
+            const url = '/' + g.path + (g.lobby || g.entry);
+            GAMES[g.id] = {
+                title: g.name,
+                url,
+                multiplayer: g.dimension && g.dimension.x > 1,
+                version: g.version,
+                dimension: g.dimension,
+                status: g.status,
+            };
+        });
+        window.__PORTAL_REGISTRY__ = reg;
+    } catch (e) {
+        console.warn('[Arcade] Registry load failed, using fallback GAMES table.', e);
+    }
+}
 
 const AVATARS = [
     '🦊', '🐺', '🦁', '🐯', '🐻', '🐼', '🦄', '🐲',
@@ -27,15 +56,17 @@ let ws = null;
 
 // ── INIT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    // Restore session
-    const saved = localStorage.getItem('arcade_user');
-    if (saved) {
-        try { currentUser = JSON.parse(saved); updateUI(); }
-        catch (e) { localStorage.removeItem('arcade_user'); }
-    }
-    updateAuthButtons();
-    populateAvatars();
-    connectLobby();
+    // Load manifold registry first, then restore session
+    loadRegistry().then(() => {
+        const saved = localStorage.getItem('arcade_user');
+        if (saved) {
+            try { currentUser = JSON.parse(saved); updateUI(); }
+            catch (e) { localStorage.removeItem('arcade_user'); }
+        }
+        updateAuthButtons();
+        populateAvatars();
+        connectLobby();
+    });
 });
 
 // ── AUTH ──────────────────────────────────────────────────────

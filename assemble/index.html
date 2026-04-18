@@ -1116,6 +1116,31 @@
 
     animate(0);
     updateStats();
+
+    // Expose engine for ManifoldBridge (non-module scripts can't import ES modules)
+    window.__assembleEngine = engine;
+  </script>
+  <script src="/js/manifold_bridge.js"></script>
+  <script>
+    // ManifoldBridge init — runs after module script has set window.__assembleEngine
+    window.addEventListener('load', () => {
+      if (typeof ManifoldBridge === 'undefined') return;
+      ManifoldBridge.init({
+        id: 'assemble',
+        version: '1.0.0',
+        x: 2,
+        y: 20,
+        exposes: () => {
+          const eng = window.__assembleEngine;
+          if (!eng) return { running: false, partCount: 0 };
+          return {
+            running: eng.running,
+            partCount: eng.nodes ? eng.nodes.size : 0,
+            connCount: eng.connections ? eng.connections.size : 0,
+          };
+        },
+      });
+    });
   </script>
 </body>
 

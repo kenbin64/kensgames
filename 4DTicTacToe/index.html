@@ -372,6 +372,7 @@
 
   <div id="cam-hint">Drag to orbit &nbsp;|&nbsp; Scroll to zoom<br>Auto-cam follows ball</div>
 
+  <script src="/js/manifold_bridge.js"></script>
   <script src="/lib/three/three.min.js"></script>
   <script>
     'use strict';
@@ -828,6 +829,22 @@
     // ── INIT ─────────────────────────────────────────────────────
     buildColUI(); updateHUD(); refreshColBtns(); orbitCam();
     requestAnimationFrame(animate);
+
+    // ── MANIFOLD BRIDGE ───────────────────────────────────────────
+    if (typeof ManifoldBridge !== 'undefined') {
+      ManifoldBridge.init({
+        id: '4dtictactoe',
+        version: '1.0.0',
+        x: 2,
+        y: 12,
+        exposes: () => ({
+          currentPlayer,
+          scores: [...scores],
+          gameOver,
+          boardFilled: board.filter(v => v !== 0).length,
+        }),
+      });
+    }
   </script>
 </body>
 
