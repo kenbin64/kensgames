@@ -12,13 +12,13 @@ const SUPERUSER_USERNAME = 'kbingh';
 
 // ── LOGOUT ───────────────────────────────────────────────────
 function adminLogout() {
-  localStorage.removeItem('kg_token');
-  localStorage.removeItem('kg_user_id');
-  localStorage.removeItem('kg_username');
-  localStorage.removeItem('kg_display_name');
-  localStorage.removeItem('kg_avatar');
-  // Clear Cloudflare Access session cookie, redirect to login
-  window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
+    localStorage.removeItem('kg_token');
+    localStorage.removeItem('kg_user_id');
+    localStorage.removeItem('kg_username');
+    localStorage.removeItem('kg_display_name');
+    localStorage.removeItem('kg_avatar');
+    // Clear Cloudflare Access session cookie, redirect to login
+    window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
 }
 
 let ws = null;
