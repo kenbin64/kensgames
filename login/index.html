@@ -5,10 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KensGames — Game Portal</title>
-  <meta http-equiv="refresh" content="0; url=/lobby/">
   <script>
     // Login is handled by Cloudflare Access.
-    window.location.replace('/lobby/');
+    // Respect any ?redirect= param so post-login destination works correctly.
+    (function () {
+      var redir = new URLSearchParams(location.search).get('redirect');
+      var dest = (redir && redir.startsWith('/')) ? redir : '/lobby/';
+      window.location.replace(dest);
+    })();
   </script>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
@@ -202,6 +206,7 @@
       <div class="divider">or</div>
       <button class="oauth-btn" onclick="oauthLogin('google')">&#9654; Continue with Google</button>
       <button class="oauth-btn" onclick="oauthLogin('discord')">&#9654; Continue with Discord</button>
+      <button class="oauth-btn" onclick="oauthLogin('facebook')">&#9654; Continue with Facebook</button>
 
       <div class="login-footer">
         <a href="/forgot-password">Forgot password?</a>
@@ -240,7 +245,13 @@
       } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
     }
 
-    function oauthLogin(p) { window.location.href = `${API}/${p}`; }
+    function oauthLogin(p) {
+      // SSO via Cloudflare Access — redirect to a protected page which triggers
+      // the Access login prompt (Google, Discord, etc.) for the chosen provider.
+      // After Access authenticates, access_session_bridge.js mints a KensGames JWT.
+      var redir = new URLSearchParams(location.search).get('redirect') || '/lobby/';
+      window.location.href = '/cdn-cgi/access/login?redirect_url=' + encodeURIComponent(redir);
+    }
   </script>
 </body>
 
