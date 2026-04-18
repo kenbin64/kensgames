@@ -2,17 +2,18 @@
  * ═══════════════════════════════════════════════════════════════════════════
  * MANIFOLD GEOMETRY SUBSTRATE — Starfighter
  * ═══════════════════════════════════════════════════════════════════════════
- * Dimensional Programming Architecture:
- * - GLB files are NOT loaded as binary assets
- * - Instead, geometry is encoded as manifold equations (z=xy, z=xy², m=xyz)
- * - This substrate OBSERVES manifold data and EXTRACTS geometry on demand
- * - The manifold IS the data; substrates observe and interpret
+ * Seed Inversion Doctrine:
+ *   z is the corner. xy are the perpendicular walls.
+ *   You only need z to reconstruct all of xy or xy².
  *
- * Philosophy:
- * - Every mesh IS a dimension
- * - Every vertex IS a point in that dimension
- * - Surfaces are manifold functions, not discrete triangles
- * - No binary asset loading — pure mathematical reconstruction
+ * Schwartz Diamond as universal spiral lattice (TPMS):
+ *   D(x,y,z) = cos(2πx)cos(2πy)cos(2πz) − sin(2πx)sin(2πy)sin(2πz)
+ *
+ *   Place seed z₀ on lattice → gradient ∇D gives the walls (xy recovered).
+ *   vertex_z = z₀ × D(lattice)   ← the fold: z = xy, y = D(lattice)
+ *
+ * Ship DB: list of [z_seed, role] pairs per entity.
+ * Bounds, resolution, and all shape derive from seeds + lattice. Zero GLBs.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -20,411 +21,545 @@ const SFManifoldGeometry = (function () {
   'use strict';
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // § 1. MANIFOLD TYPE CONSTANTS
+  // § 1. SCHWARTZ DIAMOND LATTICE CORE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const MANIFOLD_TYPE = {
-    BILINEAR: 'z=xy',      // z = a·xy + b·x + c·y + d
-    QUADRATIC: 'z=xy²',    // z = a·xy² + b·x² + c·y² + d·xy + e·x + f·y + g
-    VOLUMETRIC: 'm=xyz',   // m = a·xyz + b·xy + c·xz + d·yz + e·x + f·y + g·z + h
+  const _TWO_PI = Math.PI * 2;
+
+  /** Schwartz Diamond field at normalized lattice point (px, py, pz in [0,1]) */
+  function _diamond(px, py, pz) {
+    const x = px * _TWO_PI, y = py * _TWO_PI, z = pz * _TWO_PI;
+    return Math.cos(x) * Math.cos(y) * Math.cos(z)
+         - Math.sin(x) * Math.sin(y) * Math.sin(z);
+  }
+
+  /**
+   * Gradient of the diamond field at (px, py, pz).
+   * ∇D gives perpendicular walls — recovering xy from z alone.
+   */
+  function _diamondGrad(px, py, pz) {
+    const x = px * _TWO_PI, y = py * _TWO_PI, z = pz * _TWO_PI;
+    const cx = Math.cos(x), sx = Math.sin(x);
+    const cy = Math.cos(y), sy = Math.sin(y);
+    const cz = Math.cos(z), sz = Math.sin(z);
+    return {
+      x: _TWO_PI * (-sx * cy * cz - cx * sy * sz),
+      y: _TWO_PI * (-cx * sy * cz - sx * cy * sz),
+      z: _TWO_PI * (-cx * cy * sz - sx * sy * cz),
+    };
+  }
+
+  /**
+   * Derive patch bandwidth from seed's lattice gradient.
+   * Inverse of gradient magnitude: tight curvature → narrow (compact),
+   * loose curvature → wide (spread-out, like a wing).
+   */
+  function _bandwidth(z0) {
+    const g = _diamondGrad(z0, z0, z0);
+    const mag = Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z);
+    if (mag < 0.01) return 0.4;
+    return Math.min(0.45, Math.max(0.04, 0.25 / mag));
+  }
+
+  /**
+   * LOD-adaptive vertex resolution from seed + LOD level.
+   * Higher gradient magnitude = faster-changing surface = more vertices.
+   */
+  function _resolution(z0, lodLevel) {
+    const g = _diamondGrad(z0, z0, z0);
+    const mag = Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z);
+    const base = [12, 7, 4][lodLevel] !== undefined ? [12, 7, 4][lodLevel] : 8;
+    return Math.max(3, Math.round(base + mag * 0.5));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // § 2. ROLE CONSTRUCTORS
+  // Each role generates verts + indices for one semantic part of the ship.
+  // All shape character comes from z₀ + diamond lattice. Zero explicit bounds.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const _roles = {};
+
+  /**
+   * FUSELAGE — primary body, elongated along z-axis.
+   * Cross-section profile modulated by diamond field.
+   * vertex_radius = |z₀ × D(lattice)|   ← the fold: z = xy, y = D(lattice)
+   */
+  _roles.fuselage = function (z0, resolution) {
+    const bw = _bandwidth(z0);
+    const p = z0;
+    const length = 2.0 + Math.abs(z0) * 2.0;
+    const N = resolution;
+    const verts = [], idx = [];
+
+    for (let iu = 0; iu <= N; iu++) {
+      for (let iv = 0; iv <= N; iv++) {
+        const u = iu / N;
+        const v = iv / N;
+        const angle = v * _TWO_PI;
+        const t = (u * 2 - 1) * bw;
+
+        const lx = p + Math.cos(angle) * bw * 0.4;
+        const ly = p + Math.sin(angle) * bw * 0.4;
+        const lz = p + t;
+        const D = _diamond(lx, ly, lz);
+
+        const radius = Math.abs(D) * Math.abs(z0) * 0.8 + 0.08;
+        verts.push(
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius,
+          (u * 2 - 1) * length
+        );
+      }
+    }
+
+    for (let iu = 0; iu < N; iu++) {
+      for (let iv = 0; iv < N; iv++) {
+        const i0 = iu * (N + 1) + iv;
+        const i1 = i0 + 1;
+        const i2 = (iu + 1) * (N + 1) + iv;
+        const i3 = i2 + 1;
+        idx.push(i0, i2, i1, i1, i2, i3);
+      }
+    }
+    return { verts, idx };
+  };
+
+  /**
+   * WING — flat swept surface, generates mirrored +x/-x pair automatically.
+   * Span along x, chord along z. Diamond field provides wing camber.
+   * vertex_y = z₀ × D(lattice)   ← camber from the fold
+   */
+  _roles.wing = function (z0, resolution) {
+    const bw = _bandwidth(z0);
+    const span  = 1.2 + Math.abs(z0) * 3.0;
+    const chord = 0.4 + Math.abs(z0) * 0.6;
+    const p = z0;
+    const N = resolution;
+    const verts = [], idx = [];
+    let offset = 0;
+
+    for (const sx of [1, -1]) {
+      for (let iu = 0; iu <= N; iu++) {
+        for (let iv = 0; iv <= N; iv++) {
+          const u = iu / N;
+          const v = iv / N;
+          const lx = p + u * bw * 2;
+          const lz = p + (v * 2 - 1) * bw;
+          const D = _diamond(lx, p, lz);
+
+          const camber = z0 * D * 0.15;
+          verts.push(
+            sx * u * span,
+            camber,
+            (v * 2 - 1) * chord
+          );
+        }
+      }
+
+      const base = offset;
+      for (let iu = 0; iu < N; iu++) {
+        for (let iv = 0; iv < N; iv++) {
+          const i0 = base + iu * (N + 1) + iv;
+          const i1 = i0 + 1;
+          const i2 = base + (iu + 1) * (N + 1) + iv;
+          const i3 = i2 + 1;
+          if (sx === 1) idx.push(i0, i2, i1, i1, i2, i3);
+          else          idx.push(i0, i1, i2, i1, i3, i2);
+        }
+      }
+      offset += (N + 1) * (N + 1);
+    }
+    return { verts, idx };
+  };
+
+  /**
+   * DOME — hemispherical cap (cockpit, sensor dome).
+   * Radius modulated by diamond field. Placed near nose.
+   */
+  _roles.dome = function (z0, resolution) {
+    const bw = _bandwidth(z0);
+    const p = z0;
+    const N = resolution;
+    const baseR = Math.abs(z0) * 0.5 + 0.1;
+    const verts = [], idx = [];
+
+    for (let iu = 0; iu <= N; iu++) {
+      for (let iv = 0; iv <= N; iv++) {
+        const u = iu / N;
+        const v = iv / N;
+        const polar   = u * Math.PI * 0.5;
+        const azimuth = v * _TWO_PI;
+
+        const lx = p + Math.sin(polar) * Math.cos(azimuth) * bw;
+        const ly = p + Math.sin(polar) * Math.sin(azimuth) * bw;
+        const lz = p + Math.cos(polar) * bw;
+        const D = _diamond(lx, ly, lz);
+
+        const r = baseR + Math.abs(D * z0) * 0.15;
+        verts.push(
+          Math.sin(polar) * Math.cos(azimuth) * r,
+          Math.sin(polar) * Math.sin(azimuth) * r,
+          Math.cos(polar) * r + Math.abs(z0) * 1.5
+        );
+      }
+    }
+
+    for (let iu = 0; iu < N; iu++) {
+      for (let iv = 0; iv < N; iv++) {
+        const i0 = iu * (N + 1) + iv;
+        const i1 = i0 + 1;
+        const i2 = (iu + 1) * (N + 1) + iv;
+        const i3 = i2 + 1;
+        idx.push(i0, i2, i1, i1, i2, i3);
+      }
+    }
+    return { verts, idx };
+  };
+
+  /**
+   * NACELLE — engine pod, generates mirrored ±x pair automatically.
+   */
+  _roles.nacelle = function (z0, resolution) {
+    const bw = _bandwidth(z0) * 0.5;
+    const p  = Math.abs(z0);
+    const length  = 0.8 + Math.abs(z0) * 0.6;
+    const xOffset = 0.5 + Math.abs(z0) * 0.3;
+    const N = Math.max(3, Math.round(resolution * 0.7));
+    const verts = [], idx = [];
+    let vertOffset = 0;
+
+    for (const sx of [1, -1]) {
+      for (let iu = 0; iu <= N; iu++) {
+        for (let iv = 0; iv <= N; iv++) {
+          const u = iu / N;
+          const v = iv / N;
+          const angle = v * _TWO_PI;
+          const t = (u * 2 - 1) * bw;
+
+          const lx = p + Math.cos(angle) * bw * 0.3;
+          const ly = p + Math.sin(angle) * bw * 0.3;
+          const lz = p + t;
+          const D = _diamond(lx, ly, lz);
+
+          const radius = Math.abs(D) * Math.abs(z0) * 0.4 + 0.05;
+          verts.push(
+            sx * (xOffset + Math.cos(angle) * radius),
+            Math.sin(angle) * radius,
+            (u * 2 - 1) * length - Math.abs(z0) * 1.2
+          );
+        }
+      }
+
+      const base = vertOffset;
+      for (let iu = 0; iu < N; iu++) {
+        for (let iv = 0; iv < N; iv++) {
+          const i0 = base + iu * (N + 1) + iv;
+          const i1 = i0 + 1;
+          const i2 = base + (iu + 1) * (N + 1) + iv;
+          const i3 = i2 + 1;
+          if (sx === 1) idx.push(i0, i2, i1, i1, i2, i3);
+          else          idx.push(i0, i1, i2, i1, i3, i2);
+        }
+      }
+      vertOffset += (N + 1) * (N + 1);
+    }
+    return { verts, idx };
+  };
+
+  /**
+   * HULL — broad flat plate for capital ships.
+   * vertex_y = z₀ × D(lattice)   ← hull undulation from the fold
+   */
+  _roles.hull = function (z0, resolution) {
+    const bw    = _bandwidth(z0);
+    const p     = z0;
+    const width = 2.0 + Math.abs(z0) * 2.0;
+    const depth = 3.0 + Math.abs(z0) * 3.0;
+    const N = resolution;
+    const verts = [], idx = [];
+
+    for (let iu = 0; iu <= N; iu++) {
+      for (let iv = 0; iv <= N; iv++) {
+        const u = iu / N;
+        const v = iv / N;
+        const lx = p + (u * 2 - 1) * bw;
+        const lz = p + (v * 2 - 1) * bw;
+        const D = _diamond(lx, p, lz);
+
+        verts.push(
+          (u * 2 - 1) * width,
+          z0 * D * 0.2,
+          (v * 2 - 1) * depth
+        );
+      }
+    }
+
+    for (let iu = 0; iu < N; iu++) {
+      for (let iv = 0; iv < N; iv++) {
+        const i0 = iu * (N + 1) + iv;
+        const i1 = i0 + 1;
+        const i2 = (iu + 1) * (N + 1) + iv;
+        const i3 = i2 + 1;
+        idx.push(i0, i2, i1, i1, i2, i3);
+      }
+    }
+    return { verts, idx };
+  };
+
+  /**
+   * TENDRIL — helical appendage following diamond lattice channel.
+   * For alien ships. Diamond field modulates cross-section radius.
+   */
+  _roles.tendril = function (z0, resolution) {
+    const p = Math.abs(z0);
+    const length = 2.0 + Math.abs(z0) * 2.0;
+    const radius = 0.06 + Math.abs(z0) * 0.1;
+    const N = resolution;
+    const verts = [], idx = [];
+
+    for (let iu = 0; iu <= N; iu++) {
+      for (let iv = 0; iv <= N; iv++) {
+        const u = iu / N;
+        const v = iv / N;
+        const t = u * _TWO_PI;
+
+        const px = p + u * 0.5;
+        const py = p + Math.sin(t) * 0.15;
+        const pz = p + Math.cos(t) * 0.15;
+        const D = _diamond(px, py, pz);
+
+        const angle = v * _TWO_PI;
+        const cr = radius * (1 + Math.abs(D) * 0.3);
+
+        verts.push(
+          u * length * 0.8 - length * 0.4 + Math.cos(t * 0.5) * length * 0.3,
+          Math.sin(t * 0.5) * length * 0.3 + Math.cos(angle) * cr,
+          Math.sin(angle) * cr
+        );
+      }
+    }
+
+    for (let iu = 0; iu < N; iu++) {
+      for (let iv = 0; iv < N; iv++) {
+        const i0 = iu * (N + 1) + iv;
+        const i1 = i0 + 1;
+        const i2 = (iu + 1) * (N + 1) + iv;
+        const i3 = i2 + 1;
+        idx.push(i0, i2, i1, i1, i2, i3);
+      }
+    }
+    return { verts, idx };
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // § 2. MANIFOLD GEOMETRY DATABASE
+  // § 3. SEED DATABASE
+  // Each entity: list of [z_seed, role] pairs + material + scale.
+  // NO explicit bounds, coefficients, or vertex parameters.
+  // ALL shape derived from z-seed + Schwartz Diamond lattice.
+  //
+  // Seed magnitude → part size  (larger |z| = larger volume on lattice)
+  // Seed sign      → channel    (positive = Diamond A, negative = B)
+  // Role           → orientation + sampling strategy
   // ═══════════════════════════════════════════════════════════════════════════
-  // Encoded geometry for all ship types
-  // Each entry: { patches: [...], bounds: {...}, material: {...} }
 
-  const _geometryManifolds = {
-    // Fighter ships (simple, 8-12 patches)
+  const _seeds = {
+    // ── Fighters ─────────────────────────────────────────────────────────────
     'enemy': {
       type: 'fighter',
-      patches: [
-        // Fuselage (bilinear saddle)
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.35, -0.1, 0.2, 0.0], bounds: { x: [-1, 1], y: [-0.5, 0.5], z: [-2, 2] } },
-        // Wings (quadratic curves)
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.18, -0.05, 0.12, 0.08, 0.0, 0.0, 0.0], bounds: { x: [-2, 2], y: [0, 1], z: [-1, 1] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.18, -0.05, 0.12, -0.08, 0.0, 0.0, 0.0], bounds: { x: [-2, 2], y: [0, -1], z: [-1, 1] } },
-        // Cockpit dome (volumetric)
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.25, 0.15, 0.15, 0.15, 0.0, 0.0, 0.0, 0.4], bounds: { x: [-0.3, 0.3], y: [-0.3, 0.3], z: [1.5, 2.2] } },
-        // Engine nacelles
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [-0.2, 0.0, 0.0, 0.0], bounds: { x: [-0.4, -0.2], y: [-0.3, 0.3], z: [-2.5, -1.5] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [-0.2, 0.0, 0.0, 0.0], bounds: { x: [0.2, 0.4], y: [-0.3, 0.3], z: [-2.5, -1.5] } },
-      ],
-      material: { color: 0x44ff88, metalness: 0.6, roughness: 0.3, emissive: 0x002200 },
+      seeds: [[0.35,'fuselage'],[0.08,'wing'],[0.15,'dome'],[-0.12,'nacelle']],
+      mat: { color:0x44ff88, metalness:0.6, roughness:0.3, emissive:0x002200 },
       scale: 100
     },
-
     'ally': {
       type: 'fighter',
-      patches: [
-        // Human fighter — angular, less organic
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.25, 0.0, 0.0, 0.0], bounds: { x: [-0.8, 0.8], y: [-0.4, 0.4], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.15, 0.0, 0.0, 0.0], bounds: { x: [-1.8, -0.8], y: [-0.2, 0.2], z: [-0.5, 0.5] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.15, 0.0, 0.0, 0.0], bounds: { x: [0.8, 1.8], y: [-0.2, 0.2], z: [-0.5, 0.5] } },
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.2, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.3], bounds: { x: [-0.25, 0.25], y: [-0.25, 0.25], z: [1.8, 2.3] } },
-      ],
-      material: { color: 0x4488ff, metalness: 0.7, roughness: 0.2, emissive: 0x001144 },
+      seeds: [[0.25,'fuselage'],[0.10,'wing'],[0.12,'dome']],
+      mat: { color:0x4488ff, metalness:0.7, roughness:0.2, emissive:0x001144 },
       scale: 100
     },
-
     'interceptor': {
       type: 'fighter',
-      patches: [
-        // Needle-like, very sleek
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.12, 0.0, 0.0, 0.0], bounds: { x: [-0.3, 0.3], y: [-0.2, 0.2], z: [-3, 3] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.08, -0.02, 0.05, 0.04, 0.0, 0.0, 0.0], bounds: { x: [-1, 1], y: [0, 0.5], z: [-0.8, 0.8] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.08, -0.02, 0.05, -0.04, 0.0, 0.0, 0.0], bounds: { x: [-1, 1], y: [0, -0.5], z: [-0.8, 0.8] } },
-      ],
-      material: { color: 0x66ff44, metalness: 0.8, roughness: 0.1, emissive: 0x003300 },
+      seeds: [[0.12,'fuselage'],[0.05,'wing']],
+      mat: { color:0x66ff44, metalness:0.8, roughness:0.1, emissive:0x003300 },
       scale: 100
     },
 
+    // ── Heavy ships ───────────────────────────────────────────────────────────
     'bomber': {
       type: 'heavy',
-      patches: [
-        // Bulky, armored
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.4, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.5], bounds: { x: [-1, 1], y: [-0.8, 0.8], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.3, 0.0, 0.0, 0.0], bounds: { x: [-2, -1], y: [-0.5, 0.5], z: [-1, 1] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.3, 0.0, 0.0, 0.0], bounds: { x: [1, 2], y: [-0.5, 0.5], z: [-1, 1] } },
-      ],
-      material: { color: 0x88ff44, metalness: 0.5, roughness: 0.5, emissive: 0x223300 },
+      seeds: [[0.40,'fuselage'],[0.20,'wing'],[-0.18,'nacelle']],
+      mat: { color:0x88ff44, metalness:0.5, roughness:0.5, emissive:0x223300 },
       scale: 240
     },
-
     'predator': {
       type: 'heavy',
-      patches: [
-        // Organic, curved heavily
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.45, 0.18, 0.22, 0.15, 0.0, 0.0, 0.0], bounds: { x: [-1.5, 1.5], y: [-1, 1], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.35, 0.2, 0.2, 0.2, 0.0, 0.0, 0.0, 0.6], bounds: { x: [-0.8, 0.8], y: [-0.6, 0.6], z: [1.5, 2.8] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [-0.25, 0.0, 0.0, 0.0], bounds: { x: [-0.5, -0.3], y: [-0.4, 0.4], z: [-3, -2] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [-0.25, 0.0, 0.0, 0.0], bounds: { x: [0.3, 0.5], y: [-0.4, 0.4], z: [-3, -2] } },
-      ],
-      material: { color: 0xffaa44, metalness: 0.4, roughness: 0.6, emissive: 0x442200 },
+      seeds: [[0.45,'fuselage'],[0.22,'wing'],[0.30,'dome'],[-0.20,'nacelle']],
+      mat: { color:0xffaa44, metalness:0.4, roughness:0.6, emissive:0x442200 },
       scale: 400
     },
 
+    // ── Capital ships ─────────────────────────────────────────────────────────
     'dreadnought': {
       type: 'capital',
-      patches: [
-        // Massive, blocky
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.5, 0.3, 0.3, 0.3, 0.0, 0.0, 0.0, 0.8], bounds: { x: [-2, 2], y: [-1.5, 1.5], z: [-4, 4] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.4, 0.0, 0.0, 0.0], bounds: { x: [-3, -2], y: [-1, 1], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.4, 0.0, 0.0, 0.0], bounds: { x: [2, 3], y: [-1, 1], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.35, 0.15, 0.18, 0.12, 0.0, 0.0, 0.0], bounds: { x: [-1.5, 1.5], y: [1.5, 2.5], z: [-3, 3] } },
-      ],
-      material: { color: 0xff8844, metalness: 0.3, roughness: 0.7, emissive: 0x442211 },
+      seeds: [[0.50,'hull'],[0.35,'fuselage'],[-0.28,'nacelle']],
+      mat: { color:0xff8844, metalness:0.3, roughness:0.7, emissive:0x442211 },
       scale: 1200
     },
-
-    // Capital ships
     'baseship': {
       type: 'capital',
-      patches: [
-        // Human battleship — industrial, modular
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.6, 0.35, 0.35, 0.35, 0.0, 0.0, 0.0, 1.0], bounds: { x: [-3, 3], y: [-2, 2], z: [-5, 5] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.5, 0.0, 0.0, 0.0], bounds: { x: [-4, -3], y: [-1.5, 1.5], z: [-3, 3] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.5, 0.0, 0.0, 0.0], bounds: { x: [3, 4], y: [-1.5, 1.5], z: [-3, 3] } },
-      ],
-      material: { color: 0x6688ff, metalness: 0.6, roughness: 0.4, emissive: 0x112244 },
+      seeds: [[0.60,'hull'],[0.40,'hull'],[-0.35,'nacelle']],
+      mat: { color:0x6688ff, metalness:0.6, roughness:0.4, emissive:0x112244 },
       scale: 3000
     },
-
     'alien-baseship': {
       type: 'capital',
-      patches: [
-        // Alien mothership — organic sphere with tendrils
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.7, 0.4, 0.4, 0.4, 0.0, 0.0, 0.0, 1.2], bounds: { x: [-3, 3], y: [-3, 3], z: [-3, 3] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.55, 0.25, 0.28, 0.2, 0.0, 0.0, 0.0], bounds: { x: [-4, -2], y: [-1, 1], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.QUADRATIC, coef: [0.55, 0.25, 0.28, -0.2, 0.0, 0.0, 0.0], bounds: { x: [2, 4], y: [-1, 1], z: [-2, 2] } },
-      ],
-      material: { color: 0xaa44ff, metalness: 0.3, roughness: 0.6, emissive: 0x330066 },
+      seeds: [[0.70,'hull'],[0.42,'tendril'],[0.38,'tendril']],
+      mat: { color:0xaa44ff, metalness:0.3, roughness:0.6, emissive:0x330066 },
       scale: 4200
     },
 
+    // ── Structures ────────────────────────────────────────────────────────────
     'station': {
       type: 'structure',
-      patches: [
-        // Cylindrical station with rotating sections
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.8, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1.5], bounds: { x: [-5, 5], y: [-5, 5], z: [-8, 8] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.6, 0.0, 0.0, 0.0], bounds: { x: [-2, 2], y: [-2, 2], z: [8, 10] } },
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.6, 0.0, 0.0, 0.0], bounds: { x: [-2, 2], y: [-2, 2], z: [-10, -8] } },
-      ],
-      material: { color: 0x8888aa, metalness: 0.5, roughness: 0.5, emissive: 0x222244 },
+      seeds: [[0.80,'hull'],[0.55,'hull'],[0.60,'nacelle']],
+      mat: { color:0x8888aa, metalness:0.5, roughness:0.5, emissive:0x222244 },
       scale: 30000
     },
 
-    // Support ships
+    // ── Support ships ─────────────────────────────────────────────────────────
     'tanker': {
       type: 'support',
-      patches: [
-        // Bulbous fuel tanks
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.5, 0.3, 0.3, 0.3, 0.0, 0.0, 0.0, 0.9], bounds: { x: [-1, 1], y: [-1, 1], z: [-2, 2] } },
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.4, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.7], bounds: { x: [-0.8, 0.8], y: [-0.8, 0.8], z: [2, 3.5] } },
-      ],
-      material: { color: 0xffcc44, metalness: 0.4, roughness: 0.6, emissive: 0x442200 },
+      seeds: [[0.50,'fuselage'],[0.42,'dome']],
+      mat: { color:0xffcc44, metalness:0.4, roughness:0.6, emissive:0x442200 },
       scale: 600
     },
-
     'medic': {
       type: 'support',
-      patches: [
-        // Medical frigate — clean, modular
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.35, 0.0, 0.0, 0.0], bounds: { x: [-1.2, 1.2], y: [-0.8, 0.8], z: [-2.5, 2.5] } },
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.3, 0.2, 0.2, 0.2, 0.0, 0.0, 0.0, 0.5], bounds: { x: [-0.6, 0.6], y: [-0.6, 0.6], z: [2.5, 3.5] } },
-      ],
-      material: { color: 0xffffff, metalness: 0.3, roughness: 0.3, emissive: 0x001144 },
+      seeds: [[0.35,'fuselage'],[0.28,'dome']],
+      mat: { color:0xffffff, metalness:0.3, roughness:0.3, emissive:0x001144 },
       scale: 800
     },
 
-    // Projectiles
+    // ── Projectiles ───────────────────────────────────────────────────────────
     'laser': {
       type: 'projectile',
-      patches: [
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.05, 0.0, 0.0, 0.0], bounds: { x: [-0.05, 0.05], y: [-0.05, 0.05], z: [-0.8, 0.8] } },
-      ],
-      material: { color: 0xff4444, metalness: 0.9, roughness: 0.1, emissive: 0xff0000 },
+      seeds: [[0.05,'fuselage']],
+      mat: { color:0xff4444, metalness:0.9, roughness:0.1, emissive:0xff0000 },
       scale: 1
     },
-
     'torpedo': {
       type: 'projectile',
-      patches: [
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.15, 0.0, 0.0, 0.0], bounds: { x: [-0.2, 0.2], y: [-0.2, 0.2], z: [-1.5, 1.5] } },
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.12, 0.08, 0.08, 0.08, 0.0, 0.0, 0.0, 0.2], bounds: { x: [-0.15, 0.15], y: [-0.15, 0.15], z: [1.5, 2] } },
-      ],
-      material: { color: 0xffaa00, metalness: 0.7, roughness: 0.3, emissive: 0xff4400 },
+      seeds: [[0.15,'fuselage'],[0.10,'dome']],
+      mat: { color:0xffaa00, metalness:0.7, roughness:0.3, emissive:0xff4400 },
       scale: 1
     },
-
     'missile': {
       type: 'projectile',
-      patches: [
-        { type: MANIFOLD_TYPE.BILINEAR, coef: [0.12, 0.0, 0.0, 0.0], bounds: { x: [-0.15, 0.15], y: [-0.15, 0.15], z: [-1.2, 1.2] } },
-      ],
-      material: { color: 0xff6600, metalness: 0.6, roughness: 0.4, emissive: 0xff2200 },
+      seeds: [[0.12,'fuselage']],
+      mat: { color:0xff6600, metalness:0.6, roughness:0.4, emissive:0xff2200 },
       scale: 1
     },
-
     'flare': {
       type: 'projectile',
-      patches: [
-        { type: MANIFOLD_TYPE.VOLUMETRIC, coef: [0.08, 0.05, 0.05, 0.05, 0.0, 0.0, 0.0, 0.12], bounds: { x: [-0.1, 0.1], y: [-0.1, 0.1], z: [-0.1, 0.1] } },
-      ],
-      material: { color: 0x00ffff, metalness: 0.3, roughness: 0.2, emissive: 0x00ffff },
+      seeds: [[0.08,'dome']],
+      mat: { color:0x00ffff, metalness:0.3, roughness:0.2, emissive:0x00ffff },
       scale: 1
     },
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // § 3. MANIFOLD EVALUATION (Math → Geometry)
+  // § 4. GEOMETRY ASSEMBLER
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Evaluate manifold equation at (x, y) or (x, y, z)
-   * @param {string} type - MANIFOLD_TYPE
-   * @param {Array<number>} coef - Coefficients
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @param {number} z - Z coordinate (for volumetric)
-   * @returns {number} - Result value
-   */
-  function _evaluateManifold(type, coef, x, y, z = 0) {
-    switch (type) {
-      case MANIFOLD_TYPE.BILINEAR:
-        // z = a·xy + b·x + c·y + d
-        return coef[0] * x * y + coef[1] * x + coef[2] * y + coef[3];
+  function _assembleMesh(entry, lodLevel) {
+    const allVerts = [];
+    const allIdx   = [];
+    let vertOffset = 0;
 
-      case MANIFOLD_TYPE.QUADRATIC:
-        // z = a·xy² + b·x² + c·y² + d·xy + e·x + f·y + g
-        return coef[0] * x * y * y +
-          coef[1] * x * x +
-          coef[2] * y * y +
-          coef[3] * x * y +
-          coef[4] * x +
-          coef[5] * y +
-          coef[6];
+    for (const [z0, role] of entry.seeds) {
+      const fn  = _roles[role];
+      if (!fn) continue;
+      const res = _resolution(z0, lodLevel);
 
-      case MANIFOLD_TYPE.VOLUMETRIC:
-        // m = a·xyz + b·xy + c·xz + d·yz + e·x + f·y + g·z + h
-        return coef[0] * x * y * z +
-          coef[1] * x * y +
-          coef[2] * x * z +
-          coef[3] * y * z +
-          coef[4] * x +
-          coef[5] * y +
-          coef[6] * z +
-          coef[7];
-
-      default:
-        return 0;
-    }
-  }
-
-  /**
-   * Reconstruct THREE.BufferGeometry from manifold patches
-   * @param {Array} patches - Manifold patch definitions
-   * @param {number} resolution - Grid resolution (e.g., 12 = 12x12 vertices per patch)
-   * @returns {THREE.BufferGeometry}
-   */
-  function _reconstructGeometry(patches, resolution = 12) {
-    const vertices = [];
-    const indices = [];
-    let vertexOffset = 0;
-
-    for (const patch of patches) {
-      const { type, coef, bounds } = patch;
-      const { x: [xMin, xMax], y: [yMin, yMax], z: [zMin, zMax] } = bounds;
-
-      // Generate grid of vertices for this patch
-      for (let iy = 0; iy <= resolution; iy++) {
-        for (let ix = 0; ix <= resolution; ix++) {
-          const u = ix / resolution;
-          const v = iy / resolution;
-
-          const x = xMin + u * (xMax - xMin);
-          const y = yMin + v * (yMax - yMin);
-
-          let z;
-          if (type === MANIFOLD_TYPE.VOLUMETRIC) {
-            // For volumetric, use z bounds and evaluate at midpoint
-            const zMid = (zMin + zMax) / 2;
-            z = zMid + _evaluateManifold(type, coef, x, y, zMid) * (zMax - zMin) * 0.5;
-          } else {
-            // For 2D manifolds, z is the evaluated result
-            z = zMin + _evaluateManifold(type, coef, x, y) * (zMax - zMin);
-          }
-
-          vertices.push(x, y, z);
-        }
-      }
-
-      // Generate triangle indices for this patch
-      const patchVertCount = (resolution + 1) * (resolution + 1);
-      for (let iy = 0; iy < resolution; iy++) {
-        for (let ix = 0; ix < resolution; ix++) {
-          const i0 = vertexOffset + iy * (resolution + 1) + ix;
-          const i1 = i0 + 1;
-          const i2 = i0 + (resolution + 1);
-          const i3 = i2 + 1;
-
-          // Two triangles per quad
-          indices.push(i0, i2, i1);
-          indices.push(i1, i2, i3);
-        }
-      }
-
-      vertexOffset += patchVertCount;
+      const { verts, idx } = fn(z0, res);
+      for (const v of verts) allVerts.push(v);
+      for (const i of idx)   allIdx.push(i + vertOffset);
+      vertOffset += verts.length / 3;
     }
 
-    // Create BufferGeometry
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(allVerts, 3));
+    geometry.setIndex(allIdx);
     geometry.computeVertexNormals();
-
     return geometry;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // § 4. SUBSTRATE OBSERVATION INTERFACE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Observe manifold and extract geometry for entity type
-   * @param {string} entityType - Entity type (e.g., 'enemy', 'ally', 'bomber')
-   * @param {number} lodLevel - LOD level (0=high, 1=medium, 2=low)
-   * @returns {object} - { geometry: THREE.BufferGeometry, material: {...}, scale: number }
-   */
-  function observeGeometry(entityType, lodLevel = 0) {
-    const manifold = _geometryManifolds[entityType];
-    if (!manifold) {
-      console.warn(`[ManifoldGeometry] No manifold for type: ${entityType}`);
-      return null;
-    }
-
-    // LOD affects reconstruction resolution
-    const resolutionMap = [16, 10, 6]; // High, Medium, Low
-    const resolution = resolutionMap[lodLevel] || 12;
-
-    const geometry = _reconstructGeometry(manifold.patches, resolution);
-
-    return {
-      geometry,
-      material: manifold.material,
-      scale: manifold.scale
-    };
-  }
-
-  /**
-   * Generate variant by mutating manifold coefficients
-   * @param {string} entityType - Base entity type
-   * @param {object} mutations - Coefficient mutations { a: 0.1, b: -0.05, ... }
-   * @param {number} lodLevel - LOD level
-   * @returns {object} - { geometry, material, scale }
-   */
-  function observeVariant(entityType, mutations, lodLevel = 0) {
-    const manifold = _geometryManifolds[entityType];
-    if (!manifold) return null;
-
-    // Clone patches and apply mutations
-    const variantPatches = manifold.patches.map(patch => {
-      const newCoef = [...patch.coef];
-      for (const key in mutations) {
-        const idx = key.charCodeAt(0) - 'a'.charCodeAt(0);
-        if (idx >= 0 && idx < newCoef.length) {
-          newCoef[idx] += mutations[key];
-        }
-      }
-      return { ...patch, coef: newCoef };
-    });
-
-    const resolutionMap = [16, 10, 6];
-    const resolution = resolutionMap[lodLevel] || 12;
-    const geometry = _reconstructGeometry(variantPatches, resolution);
-
-    return {
-      geometry,
-      material: manifold.material,
-      scale: manifold.scale
-    };
-  }
-
-  /**
-   * List all available manifold types
-   * @returns {Array<string>}
-   */
-  function getAvailableTypes() {
-    return Object.keys(_geometryManifolds);
-  }
-
-  /**
-   * Check if manifold exists for type
-   * @param {string} entityType
-   * @returns {boolean}
-   */
-  function hasManifold(entityType) {
-    return !!_geometryManifolds[entityType];
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // § 5. PUBLIC API
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Kept for backward compatibility with external references
+  const MANIFOLD_TYPE = {
+    BILINEAR:   'z=xy',
+    QUADRATIC:  'z=xy²',
+    VOLUMETRIC: 'm=xyz',
+  };
+
+  /**
+   * Observe manifold and extract geometry for entity type.
+   * @param {string} entityType - e.g. 'enemy', 'ally', 'bomber'
+   * @param {number} lodLevel   - 0=high, 1=medium, 2=low
+   * @returns {{ geometry: THREE.BufferGeometry, material: object, scale: number } | null}
+   */
+  function observeGeometry(entityType, lodLevel = 0) {
+    const entry = _seeds[entityType];
+    if (!entry) {
+      console.warn(`[ManifoldGeometry] No seeds for type: ${entityType}`);
+      return null;
+    }
+    return {
+      geometry: _assembleMesh(entry, lodLevel),
+      material: entry.mat,
+      scale:    entry.scale,
+    };
+  }
+
+  /**
+   * Generate variant by shifting seeds on the lattice.
+   * A small zDelta traverses the diamond helix to an adjacent shape.
+   * @param {string}           entityType
+   * @param {number|number[]}  deltas - z-shift per seed (array) or scalar for all
+   * @param {number}           lodLevel
+   */
+  function observeVariant(entityType, deltas, lodLevel = 0) {
+    const base = _seeds[entityType];
+    if (!base) return null;
+
+    const variantEntry = {
+      ...base,
+      seeds: base.seeds.map(([z0, role], i) => {
+        const dz = Array.isArray(deltas) ? (deltas[i] ?? 0) : (deltas ?? 0);
+        return [z0 + dz, role];
+      }),
+    };
+
+    return {
+      geometry: _assembleMesh(variantEntry, lodLevel),
+      material: base.mat,
+      scale:    base.scale,
+    };
+  }
+
+  function getAvailableTypes() { return Object.keys(_seeds); }
+  function hasManifold(entityType) { return !!_seeds[entityType]; }
+
   return {
-    // Observation interface (substrate pattern)
     observeGeometry,
     observeVariant,
-
-    // Introspection
     hasManifold,
     getAvailableTypes,
-
-    // Constants (for external use)
     MANIFOLD_TYPE,
   };
 })();
 
-// Expose globally
 window.SFManifoldGeometry = SFManifoldGeometry;

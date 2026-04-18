@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FastTrack Lobby &mdash; KensGames</title>
-  <link rel="icon" href="assets/images/ftLogo.png" type="image/png">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
@@ -402,10 +402,35 @@
   </div>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/access_session_bridge.js"></script>
   <script>
-    const token = localStorage.getItem('user_token');
-    const username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
+    let token = localStorage.getItem('user_token');
+    let username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
     const av = AvatarPicker.get();
+
+    function _isSignedIn(t) {
+      return !!(t && !String(t).startsWith('guest-'));
+    }
+
+    function _refreshAuthFromStorage() {
+      token = localStorage.getItem('user_token');
+      username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
+      document.getElementById('p-name').textContent = username;
+      document.getElementById('mm-avail').textContent = _isSignedIn(token)
+        ? 'Available \u2022 Finding match...'
+        : 'Login required';
+    }
+
+    async function _maybeUpgradeFromAccess() {
+      if (_isSignedIn(token)) return true;
+      if (!window.KGAccessSession || typeof window.KGAccessSession.ensure !== 'function') return false;
+      const r = await window.KGAccessSession.ensure();
+      if (r && r.token) {
+        _refreshAuthFromStorage();
+        return _isSignedIn(token);
+      }
+      return false;
+    }
 
     // Avatar badge
     document.getElementById('p-name').textContent = username;
@@ -422,15 +447,20 @@
     // Online count removed — will be driven by real analytics
 
     // Matchmaker availability
-    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding match...';
+    if (_isSignedIn(token)) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding match...';
+    // Best-effort: if already authenticated via Access, mint a normal JWT so we don't require a second login.
+    _maybeUpgradeFromAccess();
 
     function startSolo() {
       if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
       window.location.href = '/fasttrack/index.html?mode=solo';
     }
 
-    function startMatchmaker() {
-      if (!token) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
+    async function startMatchmaker() {
+      if (!_isSignedIn(token)) {
+        const ok = await _maybeUpgradeFromAccess();
+        if (!ok) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
+      }
       if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
       window.location.href = '/fasttrack/index.html?mode=multi';
     }
@@ -448,8 +478,11 @@
     }
 
     let _code = '';
-    function generateCode() {
-      if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
+    async function generateCode() {
+      if (!_isSignedIn(token)) {
+        const ok = await _maybeUpgradeFromAccess();
+        if (!ok) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
+      }
       _code = Math.random().toString(36).substring(2, 8).toUpperCase();
       document.getElementById('room-code').textContent = _code;
       document.getElementById('launch-btn').disabled = false;
@@ -460,8 +493,11 @@
       if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; }
     }
 
-    function launchPrivate() {
-      if (!token) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
+    async function launchPrivate() {
+      if (!_isSignedIn(token)) {
+        const ok = await _maybeUpgradeFromAccess();
+        if (!ok) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
+      }
       window.location.href = `/fasttrack/index.html?mode=private&code=${_code}&host=1`;
     }
 

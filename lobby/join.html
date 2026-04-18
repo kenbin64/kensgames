@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join Game — KensGames</title>
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --cyan: #00FFFF;
+      --pink: #FF00FF;
+      --green: #00FF41;
+      --bg: #04040C;
+      --card: rgba(4, 4, 20, .94);
+      --text: #E0E0FF;
+      --dim: #8888AA;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 20%, rgba(0, 255, 255, .08), transparent 50%), radial-gradient(circle at 70% 80%, rgba(255, 0, 255, .08), transparent 50%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+
+    .card {
+      width: min(560px, 92vw);
+      background: var(--card);
+      border: 1px solid rgba(0, 255, 255, .2);
+      border-radius: 10px;
+      padding: 26px;
+      box-shadow: 0 0 40px rgba(0, 255, 255, .08);
+    }
+
+    .title {
+      font-family: 'Orbitron', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      font-size: 16px;
+      margin: 0 0 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .code {
+      font-family: 'Orbitron', monospace;
+      letter-spacing: 6px;
+      color: var(--cyan);
+      font-size: 22px;
+    }
+
+    .msg {
+      color: var(--dim);
+      font-size: 13px;
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    .err {
+      color: var(--pink);
+    }
+
+    a {
+      color: var(--cyan);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1 class="title">Joining Game</h1>
+    <p class="msg" id="status">Looking up your invite code…</p>
+    <div class="row">
+      <div class="code" id="code">------</div>
+    </div>
+    <p class="msg" style="margin-top:14px">If you aren’t redirected automatically, go back to <a href="/lobby/">the
+        lobby</a> and join with your code.</p>
+  </div>
+
+  <script>
+    function wsUrl() {
+      const h = location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1') return 'ws://' + h + ':8765';
+      return 'wss://' + h + '/ws';
+    }
+
+    const params = new URLSearchParams(location.search);
+    const code = (params.get('code') || '').trim().toUpperCase();
+    document.getElementById('code').textContent = code || '------';
+
+    if (!code || code.length < 4) {
+      const s = document.getElementById('status');
+      s.textContent = 'Missing or invalid invite code.';
+      s.classList.add('err');
+    } else {
+      const ws = new WebSocket(wsUrl());
+      const status = document.getElementById('status');
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'resolve_code', code }));
+      };
+
+      ws.onmessage = (e) => {
+        let d; try { d = JSON.parse(e.data); } catch { return; }
+        if (d.type === 'resolve_code_result') {
+          ws.close();
+          if (!d.found) {
+            status.textContent = 'No game found with that code.';
+            status.classList.add('err');
+            return;
+          }
+          status.textContent = 'Found game — redirecting…';
+
+          // FastTrack has a dedicated join wizard (player name + avatar + ready).
+          // Route FastTrack invite codes there so players don't skip setup.
+          const reportedPath = (d.game_lobby_path || d.game_path || '');
+          const isFastTrack = (d.game_id === 'fasttrack') || (typeof reportedPath === 'string' && reportedPath.includes('/fasttrack/'));
+
+          const rawPath = isFastTrack
+            ? '/fasttrack/join.html'
+            : (d.game_lobby_path || d.game_path || '/lobby/');
+
+          const url = new URL(rawPath, location.origin);
+          url.searchParams.set('code', code);
+          location.replace(url.toString());
+        }
+        if (d.type === 'error') {
+          ws.close();
+          status.textContent = d.message || 'Server error. Try again.';
+          status.classList.add('err');
+        }
+      };
+
+      ws.onerror = () => {
+        status.textContent = 'Could not connect to server.';
+        status.classList.add('err');
+      };
+    }
+  </script>
+</body>
+
+</html>

@@ -17,7 +17,7 @@
 
 'use strict';
 
-import { PORT, PARTS, PART_MAP, MAT } from './parts.js';
+import { PORT, PARTS, PART_MAP, MAT } from './parts.js?v=8';
 
 // ─── Simulation constants ─────────────────────────────────────
 const SNAP_DIST = 0.35;   // world units — auto-snap distance
@@ -43,7 +43,8 @@ export const FAIL = {
 export class DimensionNode {
   constructor(partId, position, rotation) {
     this.id = crypto.randomUUID();
-    this.partDef = PART_MAP[partId];
+    const customParts = (globalThis && globalThis.ASSEMBLE_CUSTOM_PART_MAP) ? globalThis.ASSEMBLE_CUSTOM_PART_MAP : null;
+    this.partDef = PART_MAP[partId] || (customParts ? customParts[partId] : undefined);
     if (!this.partDef) throw new Error(`Unknown part: ${partId}`);
     this.position = { ...position };   // {x,y,z}
     this.rotation = { ...rotation };   // {x,y,z} euler degrees
@@ -95,6 +96,7 @@ export class Connection {
     const compat = [
       [PORT.PIPE, PORT.HOSE],
       [PORT.SHAFT, PORT.GEAR],
+      [PORT.WIRE, PORT.SOCKET],
     ];
     return compat.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
   }
@@ -113,7 +115,10 @@ export class AssembleEngine {
   }
 
   // ── Event bus ───────────────────────────────────────────────
-  on(evt, fn) { (this._listeners[evt] ??= []).push(fn); }
+  on(evt, fn) {
+    if (!this._listeners[evt]) this._listeners[evt] = [];
+    this._listeners[evt].push(fn);
+  }
   off(evt, fn) { this._listeners[evt] = (this._listeners[evt] || []).filter(f => f !== fn); }
   emit(evt, data) { (this._listeners[evt] || []).forEach(fn => fn(data)); }
 
@@ -140,6 +145,13 @@ export class AssembleEngine {
 
   // ── Connection management ────────────────────────────────────
   connect(nodeAId, portIdxA, nodeBId, portIdxB) {
+    // Dedupe identical connections (either direction)
+    for (const conn of this.connections.values()) {
+      const sameDir = conn.nodeA.id === nodeAId && conn.portIdxA === portIdxA && conn.nodeB.id === nodeBId && conn.portIdxB === portIdxB;
+      const oppDir = conn.nodeA.id === nodeBId && conn.portIdxA === portIdxB && conn.nodeB.id === nodeAId && conn.portIdxB === portIdxA;
+      if (sameDir || oppDir) return conn;
+    }
+
     const nA = this.nodes.get(nodeAId);
     const nB = this.nodes.get(nodeBId);
     if (!nA || !nB) return null;
@@ -150,7 +162,52 @@ export class AssembleEngine {
     }
     this.connections.set(conn.id, conn);
     this.emit('connectionAdded', conn);
+
+    // Penetrators (nails/screws/etc) create a "hole" record in the target part.
+    // (No mesh boolean op yet — this is metadata for future geometry tooling.)
+    this._maybeRecordHole(conn);
     return conn;
+  }
+
+  getWorldPortPos(nodeId, portIdx) {
+    const node = this.nodes.get(nodeId);
+    if (!node) return null;
+    const portDef = node.ports[portIdx];
+    if (!portDef) return null;
+    return worldPortPos(node, portDef);
+  }
+
+  _maybeRecordHole(conn) {
+    const aPen = !!(conn.nodeA.simProps && conn.nodeA.simProps.penetrates);
+    const bPen = !!(conn.nodeB.simProps && conn.nodeB.simProps.penetrates);
+    if (!aPen && !bPen) return;
+
+    // Determine penetrator and target
+    const penetrator = aPen ? conn.nodeA : conn.nodeB;
+    const target = aPen ? conn.nodeB : conn.nodeA;
+    const penPort = aPen ? conn.portA : conn.portB;
+    const targetPort = aPen ? conn.portB : conn.portA;
+    const targetNodeId = target.id;
+
+    // Only treat SNAP/THREAD/socket as "penetration" targets.
+    if (!['snap', 'thread', 'socket'].includes(targetPort.type)) return;
+
+    if (!target.simProps) target.simProps = {};
+    if (!Array.isArray(target.simProps.holes)) target.simProps.holes = [];
+
+    const diameter = penetrator.simProps && penetrator.simProps.holeDiameter ? penetrator.simProps.holeDiameter : 0.1;
+    const wp = worldPortPos(target, targetPort);
+    const key = `${penetrator.id}:${diameter.toFixed(3)}:${wp.x.toFixed(3)}:${wp.y.toFixed(3)}:${wp.z.toFixed(3)}`;
+    if (target.simProps.holes.some(h => h && h._key === key)) return;
+    target.simProps.holes.push({
+      _key: key,
+      from: penetrator.partDef ? penetrator.partDef.id : null,
+      diameter,
+      at: { x: wp.x, y: wp.y, z: wp.z },
+      via: { type: penPort.type, targetType: targetPort.type },
+      connectionId: conn.id,
+    });
+    this.emit('holeCreated', { targetNodeId, hole: target.simProps.holes[target.simProps.holes.length - 1] });
   }
 
   disconnect(connectionId) {
@@ -255,14 +312,19 @@ export class AssembleEngine {
           const ratio = gearRatio(cur, peer, conn);
           peer.rpm = cur.rpm * ratio;
           peer.torque = cur.torque / (ratio || 1);
-          peer.powered = true;
+          peer.powered = Math.abs(peer.rpm) > 0.001;
         } else if (conn.type === PORT.WIRE || conn.type === PORT.SOCKET) {
           peer.voltage = cur.voltage;
           peer.current = cur.current;
           peer.powered = cur.voltage > 0;
-          // If the peer is a motor, derive rpm from voltage
-          if (peer.behavior === 'source' || peer.behavior === 'rotate') {
-            peer.rpm = peer.voltage * (peer.simProps.rpmPerVolt || 100);
+          // Motors convert voltage into shaft rpm (but require a rotor if configured).
+          if (peer.behavior === 'motor') {
+            const requiresRotor = !!(peer.simProps && peer.simProps.requiresRotor);
+            const hasRotor = requiresRotor ? this._motorHasRotor(peer) : true;
+            const rpmPerVolt = (peer.simProps && peer.simProps.rpmPerVolt) ? peer.simProps.rpmPerVolt : 100;
+            const maxRpm = (peer.simProps && peer.simProps.maxRpm) ? peer.simProps.maxRpm : 3000;
+            peer.rpm = (peer.voltage > 0 && hasRotor) ? Math.min(maxRpm, peer.voltage * rpmPerVolt) : 0;
+            peer.powered = Math.abs(peer.rpm) > 0.001;
           }
         } else if (conn.type === PORT.PIPE || conn.type === PORT.HOSE) {
           peer.pressure = cur.pressure * 0.98; // small loss
@@ -272,13 +334,26 @@ export class AssembleEngine {
           const r1 = cur.simProps.radius || 0.5;
           const r2 = peer.simProps.radius || 0.5;
           peer.rpm = cur.rpm * (r1 / r2);
-          peer.powered = true;
+          peer.powered = Math.abs(peer.rpm) > 0.001;
         }
 
         visited.add(peer.id);
         queue.push(peer);
       }
     }
+  }
+
+  _motorHasRotor(motorNode) {
+    for (const conn of this.connections.values()) {
+      if (!conn.active) continue;
+      const isMotor = conn.nodeA.id === motorNode.id || conn.nodeB.id === motorNode.id;
+      if (!isMotor) continue;
+      const other = conn.nodeA.id === motorNode.id ? conn.nodeB : conn.nodeA;
+      if (!other || !other.partDef) continue;
+      if (conn.type !== PORT.SHAFT && conn.type !== PORT.GEAR) continue;
+      if (other.partDef.id === 'motor_rotor') return true;
+    }
+    return false;
   }
 
   // ── Motion update ───────────────────────────────────────────
@@ -288,7 +363,8 @@ export class AssembleEngine {
       node.age += dt;
 
       if (node.behavior === 'rotate' && node.powered) {
-        const axis = node.partDef.ports.find(p => p.type === PORT.SHAFT)?.axis || [0, 1, 0];
+        const shaftPort = node.partDef.ports.find(p => p.type === PORT.SHAFT);
+        const axis = (shaftPort && shaftPort.axis) ? shaftPort.axis : [0, 1, 0];
         const rad = (node.rpm / 60) * 2 * Math.PI * dt;
         applyAxisRotation(node.mesh, axis, rad);
       }
@@ -345,33 +421,56 @@ export class AssembleEngine {
   }
 
   load(data) {
+    // Tear down current world with proper events so renderers stay in sync
+    for (const id of [...this.nodes.keys()]) {
+      this.removeNode(id);
+    }
     this.nodes.clear();
     this.connections.clear();
-    const nodeMap = {};
-    for (const nd of data.nodes) {
-      const node = this.addNode(nd.partId, nd.position, nd.rotation);
-      // Preserve saved id so connections resolve correctly
-      this.nodes.delete(node.id);
+
+    // Rebuild nodes with stable IDs BEFORE emitting nodeAdded
+    for (const nd of (data.nodes || [])) {
+      const node = new DimensionNode(nd.partId, nd.position, nd.rotation);
       node.id = nd.id;
-      this.nodes.set(node.id, node);
       node.matKey = nd.matKey;
       node.color = nd.color;
       node.label = nd.label || '';
       node.simProps = nd.simProps || node.simProps;
-      nodeMap[nd.id] = node;
+      this.nodes.set(node.id, node);
+      this.emit('nodeAdded', node);
     }
-    for (const cd of data.connections) {
-      this.connect(cd.nodeAId, cd.portIdxA, cd.nodeBId, cd.portIdxB);
+
+    // Rebuild connections with stable IDs BEFORE emitting connectionAdded
+    for (const cd of (data.connections || [])) {
+      const nA = this.nodes.get(cd.nodeAId);
+      const nB = this.nodes.get(cd.nodeBId);
+      if (!nA || !nB) continue;
+      const conn = new Connection(nA, cd.portIdxA, nB, cd.portIdxB);
+      if (!conn.isCompatible()) {
+        this.emit('connectionFailed', { reason: 'incompatible', conn });
+        continue;
+      }
+      conn.id = cd.id;
+      this.connections.set(conn.id, conn);
+      this.emit('connectionAdded', conn);
     }
+
     this.emit('loaded', data);
   }
 
   // ── Stats ────────────────────────────────────────────────────
   stats() {
     const nodes = [...this.nodes.values()];
+    const sources = nodes.filter(n => n.behavior === 'source');
+    const functional = new Set(['motor', 'rotate', 'slide', 'load', 'logic']);
+    const activeNodes = nodes.filter(n => functional.has(n.behavior));
+    const spinning = nodes.filter(n => n.behavior === 'rotate' && n.powered && Math.abs(n.rpm) > 0.1).length;
     return {
       total: nodes.length,
       powered: nodes.filter(n => n.powered).length,
+      sourcesPowered: sources.filter(n => n.powered).length,
+      activePowered: activeNodes.filter(n => n.powered).length,
+      spinning,
       failed: nodes.filter(n => n.failure !== FAIL.NONE).length,
       connections: this.connections.size,
       totalMass: nodes.reduce((s, n) => s + n.mass, 0).toFixed(2),
@@ -485,28 +584,121 @@ export class AssembleRenderer {
     const def = node.partDef;
     const matD = MAT[node.matKey] || MAT.STEEL;
 
-    // Build geometry
-    let geo;
-    const g = def.geo;
-    switch (g.type) {
-      case 'box': geo = new THREE.BoxGeometry(...g.args); break;
-      case 'cylinder': geo = new THREE.CylinderGeometry(...g.args); break;
-      case 'sphere': geo = new THREE.SphereGeometry(...g.args); break;
-      case 'torus': geo = new THREE.TorusGeometry(...g.args); break;
-      default: geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    // Model parts load asynchronously — create a placeholder group now.
+    if (def.geo && def.geo.type === 'model') {
+      const group = new THREE.Group();
+      group.userData.isModelGroup = true;
+      const placeholder = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.6, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.2, roughness: 0.8 })
+      );
+      placeholder.castShadow = true;
+      placeholder.receiveShadow = true;
+      group.add(placeholder);
+      return group;
     }
 
-    // Material
-    const matParams = {
-      color: node.color ?? matD.color,
-      metalness: matD.metalness,
-      roughness: matD.roughness,
+    // Build geometry
+    const g = def.geo;
+
+    const buildPrimitive = (geoDesc) => {
+      if (!geoDesc || !geoDesc.type) return new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      switch (geoDesc.type) {
+        case 'box': return new THREE.BoxGeometry(...geoDesc.args);
+        case 'cylinder': return new THREE.CylinderGeometry(...geoDesc.args);
+        case 'sphere': return new THREE.SphereGeometry(...geoDesc.args);
+        case 'torus': return new THREE.TorusGeometry(...geoDesc.args);
+        default: return new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      }
     };
-    if (matD.transparent) {
-      matParams.transparent = true;
-      matParams.opacity = matD.opacity;
+
+    const buildMaterial = (matKey, colorOverride) => {
+      const d = MAT[matKey] || matD;
+      const matParams = {
+        color: (colorOverride !== null && colorOverride !== undefined) ? colorOverride : ((node.color !== null && node.color !== undefined) ? node.color : d.color),
+        metalness: d.metalness,
+        roughness: d.roughness,
+      };
+      if (d.transparent) {
+        matParams.transparent = true;
+        matParams.opacity = d.opacity;
+      }
+      return new THREE.MeshStandardMaterial(matParams);
+    };
+
+    if (g && g.type === 'group' && Array.isArray(g.children)) {
+      const group = new THREE.Group();
+      for (const child of g.children) {
+        if (!child || !child.geo) continue;
+        const childGeo = buildPrimitive(child.geo);
+        const childMat = buildMaterial(child.matKey || node.matKey, child.color);
+        const childMesh = new THREE.Mesh(childGeo, childMat);
+        childMesh.castShadow = true;
+        childMesh.receiveShadow = true;
+        const p = child.pos || [0, 0, 0];
+        const r = child.rot || [0, 0, 0];
+        childMesh.position.set(p[0] || 0, p[1] || 0, p[2] || 0);
+        childMesh.rotation.set(r[0] || 0, r[1] || 0, r[2] || 0);
+        group.add(childMesh);
+      }
+      return group;
     }
-    const mat = new THREE.MeshStandardMaterial(matParams);
+
+    let geo = buildPrimitive(g);
+
+    // Material
+    const mat = buildMaterial(node.matKey, node.color);
+
+    // Hollow pipe look: render a dark inner shell.
+    const hollow = def.simProps && def.simProps.hollow;
+    if (hollow && (g.type === 'cylinder' || g.type === 'torus')) {
+      const wall = (def.simProps && def.simProps.wall) ? def.simProps.wall : 0.03;
+      const group = new THREE.Group();
+      const outer = new THREE.Mesh(geo, mat);
+      outer.castShadow = true;
+      outer.receiveShadow = true;
+      group.add(outer);
+
+      let innerGeo = null;
+      if (g.type === 'cylinder') {
+        const args = g.args;
+        const rt = args[0], rb = args[1], h = args[2];
+        const segs = args[3] || 12;
+        innerGeo = new THREE.CylinderGeometry(
+          Math.max(0.001, rt - wall),
+          Math.max(0.001, rb - wall),
+          Math.max(0.001, h - wall * 2),
+          segs
+        );
+      } else if (g.type === 'torus') {
+        const args = g.args;
+        const R = args[0], r = args[1];
+        const tsegs = args[2] || 12;
+        const segs = args[3] || 8;
+        innerGeo = new THREE.TorusGeometry(
+          R,
+          Math.max(0.001, r - wall),
+          tsegs,
+          segs
+        );
+      }
+
+      if (innerGeo) {
+        const innerMat = new THREE.MeshStandardMaterial({
+          color: 0x0b0f14,
+          metalness: 0.0,
+          roughness: 0.95,
+          side: THREE.BackSide,
+        });
+        const inner = new THREE.Mesh(innerGeo, innerMat);
+        inner.castShadow = false;
+        inner.receiveShadow = false;
+        group.add(inner);
+      }
+
+      return group;
+    }
+
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -515,6 +707,7 @@ export class AssembleRenderer {
 
   _addMesh(node) {
     const mesh = this._buildMesh(node);
+    mesh.userData.nodeId = node.id;
     mesh.position.set(node.position.x, node.position.y, node.position.z);
     // Rotation is already in radians
     mesh.rotation.set(
@@ -526,6 +719,11 @@ export class AssembleRenderer {
     this.meshMap.set(node.id, mesh);
     node.mesh = mesh;
 
+    // If this is a model part, swap in the loaded GLTF scene.
+    if (node.partDef.geo && node.partDef.geo.type === 'model' && node.partDef.geo.url) {
+      this._loadModelInto(node, mesh, node.partDef.geo.url);
+    }
+
     // Port dot indicators
     node.ports.forEach(p => {
       const dot = new THREE.Mesh(
@@ -534,9 +732,58 @@ export class AssembleRenderer {
       );
       dot.position.set(...p.pos);
       dot.userData.isPortDot = true;
+      dot.userData.nodeId = node.id;
       mesh.add(dot);
     });
     return mesh;
+  }
+
+  _loadModelInto(node, rootObj, url) {
+    if (!THREE.GLTFLoader) {
+      console.warn('GLTFLoader not found; cannot load model part:', url);
+      return;
+    }
+    if (!this._modelCache) this._modelCache = new Map();
+    const cached = this._modelCache.get(url);
+    const attach = (gltf) => {
+      // Remove any placeholder children
+      while (rootObj.children.length) rootObj.remove(rootObj.children[0]);
+      const model = gltf.scene || gltf.scenes && gltf.scenes[0];
+      if (!model) return;
+      model.traverse(obj => {
+        obj.userData.nodeId = node.id;
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      });
+      // Normalize scale: fit into ~1m box
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const scale = 1.0 / maxDim;
+      model.scale.set(scale, scale, scale);
+      // Put model on origin
+      const box2 = new THREE.Box3().setFromObject(model);
+      const center = new THREE.Vector3();
+      box2.getCenter(center);
+      model.position.sub(center);
+      rootObj.add(model);
+    };
+
+    if (cached && cached.gltf) {
+      attach(cached.gltf);
+      return;
+    }
+
+    const loader = new THREE.GLTFLoader();
+    loader.load(url, (gltf) => {
+      this._modelCache.set(url, { gltf });
+      attach(gltf);
+    }, undefined, (err) => {
+      console.warn('Failed to load model:', url, err);
+    });
   }
 
   _removeMesh(node) {
@@ -713,11 +960,12 @@ export class AssembleRenderer {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
     const meshes = [...this.meshMap.values()];
-    const hits = ray.intersectObjects(meshes, false);
+    const hits = ray.intersectObjects(meshes, true);
     if (!hits.length) return null;
-    // Map mesh back to nodeId
-    for (const [id, mesh] of this.meshMap) {
-      if (mesh === hits[0].object) return id;
+    let obj = hits[0].object;
+    while (obj) {
+      if (obj.userData && obj.userData.nodeId) return obj.userData.nodeId;
+      obj = obj.parent;
     }
     return null;
   }
@@ -742,7 +990,7 @@ function worldPortPos(node, portDef) {
 function portsCompatible(a, b) {
   if (a === b) return true;
   const pairs = [
-    ['pipe', 'hose'], ['shaft', 'gear'],
+    ['pipe', 'hose'], ['shaft', 'gear'], ['wire', 'socket'],
   ];
   return pairs.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
 }

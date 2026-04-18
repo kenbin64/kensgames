@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assemble — Build Anything | KensGames</title>
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <style>
     :root {
@@ -71,6 +71,32 @@
 
     .nav-links a:hover {
       color: var(--accent);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #access-status a.kg-access-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(88, 166, 255, 0.08);
+      color: var(--accent);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #access-status a.kg-access-link:hover {
+      background: rgba(88, 166, 255, 0.14);
     }
 
     /* ── LAYOUT ─────────────────────────────────────────────── */
@@ -451,16 +477,31 @@
   <nav class="nav">
     <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
     <ul class="nav-links">
-      <li><a href="/">← Portal</a></li>
       <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
       <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
       <li><a href="/4DTicTacToe/">Connect 4D</a></li>
     </ul>
+    <div class="nav-right">
+      <div id="kg-player" data-profile-required="true"></div>
+      <div id="access-status" data-access-mode="compact"></div>
+    </div>
   </nav>
 
   <div class="workspace">
     <!-- LEFT SIDEBAR: Parts palette + properties -->
     <aside class="sidebar">
+      <div class="panel-section">
+        <div class="panel-title">FEATURED CONTRAPTIONS</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('battery_bulb')">💡 Battery + Bulb</button>
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('motor_fan')">🌀 Motor + Fan</button>
+          <button class="ctrl-btn" style="width:100%;" onclick="loadFeatured('boiler_gauge')">♨ Boiler + Gauge</button>
+          <div style="color:var(--dim);font-size:11px;line-height:1.4;">
+            Load a starter build, then modify it. Save/load as JSON.
+          </div>
+        </div>
+      </div>
+
       <div class="panel-section">
         <div class="panel-title">PART LIBRARY</div>
         <div id="parts-palette">
@@ -491,6 +532,9 @@
             <span class="prop-label">Label</span>
             <input type="text" class="prop-input" id="prop-label" placeholder="(optional)">
           </div>
+
+          <!-- Dynamic part settings (gauges, holes, etc.) -->
+          <div id="prop-extra"></div>
         </div>
       </div>
     </aside>
@@ -524,6 +568,7 @@
 
       <div class="controls-bar">
         <button class="ctrl-btn active" id="btn-snap" onclick="toggleSnap()">📍 SNAP: ON</button>
+        <button class="ctrl-btn active" id="btn-autoconnect" onclick="toggleAutoConnect()">🧲 AUTO-CONNECT: ON</button>
         <div class="grid-control">
           <label>Grid:</label>
           <input type="range" id="grid-slider" min="0.1" max="2" step="0.1" value="0.5"
@@ -535,12 +580,14 @@
         <button class="ctrl-btn" onclick="deleteSelected()" disabled id="btn-delete">DELETE</button>
         <button class="ctrl-btn" onclick="saveContraption()">💾 SAVE</button>
         <button class="ctrl-btn" onclick="loadContraption()">📂 LOAD</button>
+        <button class="ctrl-btn" onclick="importModel()">⬆️ IMPORT MODEL</button>
+        <button class="ctrl-btn" onclick="exportCustomParts()">⬇️ EXPORT PARTS</button>
         <button class="ctrl-btn danger" onclick="clearAll()">CLEAR ALL</button>
       </div>
 
       <div class="help-hint">
         <b>Left-click</b> part → <b>Click</b> scene to pick up → <b>Drag</b> to move → <b>Click</b> to drop<br>
-        <b>Right-click</b> while holding part for 3D rotation sphere<br>
+        <b>Right-click</b> while holding part to release it<br>
         <b>Drag canvas</b> to orbit | <b>Scroll</b> to zoom
       </div>
     </div>
@@ -568,13 +615,20 @@
     </div>
   </div>
 
+  <!-- Hidden file picker for model import -->
+  <input type="file" id="import-model-input" accept=".glb,.gltf,.json" style="display:none;">
+
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/OrbitControls.js"></script>
+  <script src="/lib/three/GLTFLoader.js"></script>
+  <script src="/js/access_status.js" defer></script>
+  <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
   <script type="module">
     'use strict';
 
-    import { PARTS, PART_MAP, CATEGORIES } from './parts.js';
-    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js';
+    import { PARTS, PART_MAP, CATEGORIES } from './parts.js?v=8';
+    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js?v=8';
 
     // ═══════════════════════════════════════════════════════════════
     // GLOBAL STATE
@@ -587,6 +641,7 @@
     let placementMode = false;
     let ghostVisible = false;
     let snapEnabled = true;
+    let autoConnectEnabled = true;
     let gridSize = 0.5;
     let draggedNode = null;   // node being dragged
     let dragOffset = new THREE.Vector3();
@@ -595,9 +650,105 @@
     let rotSphere = null;
 
     // ═══════════════════════════════════════════════════════════════
+    // FEATURED CONTRAPTIONS (starter builds)
+    // ═══════════════════════════════════════════════════════════════
+    const FEATURED = {
+      battery_bulb: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_battery', partId: 'battery_12v',
+            position: { x: -1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'PLASTIC', color: null, label: '12V', simProps: { outputType: 'wire', voltage: 12, capacity: 60 },
+          },
+          {
+            id: 'n_bulb', partId: 'light_bulb',
+            position: { x: 1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'GLASS', color: null, label: 'Lamp', simProps: { watts: 5, maxVoltage: 24 },
+          },
+        ],
+        connections: [
+          { id: 'c_wire', nodeAId: 'n_battery', portIdxA: 0, nodeBId: 'n_bulb', portIdxB: 0 },
+        ],
+      },
+      motor_fan: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_battery', partId: 'battery_12v',
+            position: { x: -2.4, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'PLASTIC', color: null, label: '12V', simProps: { outputType: 'wire', voltage: 12, capacity: 60 },
+          },
+          {
+            id: 'n_wire', partId: 'wire_copper',
+            position: { x: -1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 90 },
+            matKey: 'COPPER', color: null, label: '', simProps: { resistance: 0.02 },
+          },
+          {
+            id: 'n_motor', partId: 'motor_electric',
+            position: { x: 0.0, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Motor', simProps: { inputType: 'wire', outputType: 'shaft', rpmPerVolt: 100, maxRpm: 3000, requiresRotor: true },
+          },
+          {
+            id: 'n_rotor', partId: 'motor_rotor',
+            position: { x: 1.2, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Rotor', simProps: { rpm: 0 },
+          },
+          {
+            id: 'n_fan', partId: 'fan',
+            position: { x: 2.4, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'ALUMINUM', color: null, label: 'Blades', simProps: { rpm: 0 },
+          },
+        ],
+        connections: [
+          { id: 'c_batt_wire', nodeAId: 'n_battery', portIdxA: 0, nodeBId: 'n_wire', portIdxB: 0 },
+          { id: 'c_wire_motor', nodeAId: 'n_wire', portIdxA: 1, nodeBId: 'n_motor', portIdxB: 1 },
+          { id: 'c_motor_rotor', nodeAId: 'n_motor', portIdxA: 0, nodeBId: 'n_rotor', portIdxB: 0 },
+          { id: 'c_rotor_fan', nodeAId: 'n_rotor', portIdxA: 1, nodeBId: 'n_fan', portIdxB: 0 },
+        ],
+      },
+      boiler_gauge: {
+        version: 1,
+        nodes: [
+          {
+            id: 'n_boiler', partId: 'boiler',
+            position: { x: -1.1, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'Steam', simProps: { outputType: 'pipe', pressure: 2, temp: 120, fuelType: 'oil' },
+          },
+          {
+            id: 'n_gauge', partId: 'gauge_pressure',
+            position: { x: 1.1, y: 0.5, z: 0 }, rotation: { x: 0, y: 0, z: 0 },
+            matKey: 'STEEL', color: null, label: 'PSI', simProps: { range: [0, 300], unit: 'psi' },
+          },
+        ],
+        connections: [
+          { id: 'c_pipe', nodeAId: 'n_boiler', portIdxA: 0, nodeBId: 'n_gauge', portIdxB: 0 },
+        ],
+      },
+    };
+
+    window.loadFeatured = function (key) {
+      const preset = FEATURED[key];
+      if (!preset) return;
+      if (engine.running) engine.stop();
+      deselectNode();
+      renderer.hideGhost();
+      placementMode = false;
+      selectedTool = null;
+      stopDragging();
+      engine.load(preset);
+      updateStats();
+    };
+
+    // Custom parts (runtime-imported models)
+    globalThis.ASSEMBLE_CUSTOM_PART_MAP = globalThis.ASSEMBLE_CUSTOM_PART_MAP || {};
+    const CUSTOM_PARTS = [];
+
+    // ═══════════════════════════════════════════════════════════════
     // BUILD PARTS PALETTE
     // ═══════════════════════════════════════════════════════════════
     const palette = document.getElementById('parts-palette');
+
     const grouped = {};
     PARTS.forEach(p => {
       if (!grouped[p.category]) grouped[p.category] = [];
@@ -625,6 +776,28 @@
         btn.addEventListener('mouseleave', hideTooltip);
         grid.appendChild(btn);
       });
+    }
+
+    function ensureCategory(cat) {
+      let grid = palette.querySelector(`.part-grid[data-cat="${cat}"]`);
+      if (grid) return grid;
+      const catDiv = document.createElement('div');
+      catDiv.className = 'part-category';
+      catDiv.innerHTML = `<span class="cat-label">${cat.toUpperCase()}</span><div class="part-grid" data-cat="${cat}"></div>`;
+      palette.appendChild(catDiv);
+      return catDiv.querySelector('.part-grid');
+    }
+
+    function addPartToPalette(p) {
+      const grid = ensureCategory(p.category || 'Imported');
+      const btn = document.createElement('button');
+      btn.className = 'part-btn';
+      btn.dataset.partId = p.id;
+      btn.innerHTML = `<div class="icon">${p.icon || '⬆️'}</div><div class="lbl">${p.label || p.id}</div>`;
+      btn.onclick = () => selectTool(p.id);
+      btn.addEventListener('mouseenter', e => showTooltip(e, p.label || p.id, `Category: ${p.category || 'Imported'} | Mass: ${p.mass || 1}kg`));
+      btn.addEventListener('mouseleave', hideTooltip);
+      grid.appendChild(btn);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -681,6 +854,15 @@
       } else {
         btn.textContent = '📍 SNAP: OFF';
         btn.classList.remove('active');
+      }
+    };
+
+    window.toggleAutoConnect = function () {
+      autoConnectEnabled = !autoConnectEnabled;
+      const btn = document.getElementById('btn-autoconnect');
+      if (btn) {
+        btn.textContent = autoConnectEnabled ? '🧲 AUTO-CONNECT: ON' : '🧲 AUTO-CONNECT: OFF';
+        btn.classList.toggle('active', autoConnectEnabled);
       }
     };
 
@@ -763,10 +945,22 @@
       mouseMoved = false;
     });
 
+    // Safety: if mouseup happens outside the canvas, don't get stuck "holding" a part
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0 && isDragging) stopDragging();
+      mouseDownPos = null;
+      mouseMoved = false;
+    });
+
+    window.addEventListener('blur', () => {
+      if (isDragging) stopDragging();
+    });
+
     canvas.addEventListener('contextmenu', e => {
       e.preventDefault();
       if (isDragging && draggedNode) {
-        showRotationSphere(e);
+        // Right-click releases the held part
+        stopDragging();
       }
     });
 
@@ -779,7 +973,6 @@
         if (pt) {
           const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
           const node = engine.addNode(selectedTool, snapped, { x: 0, y: 0, z: 0 });
-          renderer._addMesh(node);
           placementMode = false;
           selectedTool = null;
           renderer.hideGhost();
@@ -812,10 +1005,54 @@
     }
 
     function stopDragging() {
+      const droppedNodeId = draggedNode;
       isDragging = false;
       draggedNode = null;
       renderer.controls.enabled = true;
       dragOffset.set(0, 0, 0);
+      hideRotationSphere();
+      rotDragStart = null;
+
+      if (autoConnectEnabled && droppedNodeId) {
+        tryAutoConnect(droppedNodeId);
+        updateStats();
+      }
+    }
+
+    function tryAutoConnect(nodeId) {
+      const node = engine.nodes.get(nodeId);
+      if (!node) return;
+
+      // Find best snap across all ports
+      let best = null;
+      let bestPortIdx = -1;
+      for (let i = 0; i < node.ports.length; i++) {
+        const p = node.ports[i];
+        const wide = ['wire', 'pipe', 'hose', 'shaft', 'gear', 'belt', 'socket'].includes(p.type);
+        const thresh = wide ? 0.75 : 0.35;
+        const t = engine.findSnapTarget(node, i, thresh);
+        if (!t) continue;
+        if (!best || t.dist < best.dist) {
+          best = t;
+          bestPortIdx = i;
+        }
+      }
+      if (!best || bestPortIdx < 0) return;
+
+      // Align the dragged port to the target port by translation.
+      const a = engine.getWorldPortPos(nodeId, bestPortIdx);
+      const b = engine.getWorldPortPos(best.node.id, best.portIdx);
+      if (!a || !b) return;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dz = b.z - a.z;
+
+      node.position.x += dx;
+      node.position.y += dy;
+      node.position.z += dz;
+      renderer.updateMeshTransform(node);
+
+      engine.connect(nodeId, bestPortIdx, best.node.id, best.portIdx);
     }
 
     function raycastToGround(e) {
@@ -950,6 +1187,89 @@
       document.getElementById('prop-z').value = node.position.z.toFixed(2);
       document.getElementById('prop-ry').value = (node.rotation.y * 180 / Math.PI).toFixed(0);
       document.getElementById('prop-label').value = node.label || '';
+
+      const extra = document.getElementById('prop-extra');
+      if (extra) {
+        extra.innerHTML = '';
+
+        // Show holes metadata (from nails/screws)
+        const holes = node.simProps && Array.isArray(node.simProps.holes) ? node.simProps.holes.length : 0;
+        const holesRow = document.createElement('div');
+        holesRow.className = 'prop-row';
+        holesRow.innerHTML = `<span class="prop-label">Holes</span><input class="prop-input" value="${holes}" disabled>`;
+        extra.appendChild(holesRow);
+
+        // Gauges/sensors: unit + system setter
+        if (node.simProps && node.simProps.unit) {
+          const sysRow = document.createElement('div');
+          sysRow.className = 'prop-row';
+          sysRow.innerHTML = `
+            <span class="prop-label">Unit System</span>
+            <select class="prop-input" id="prop-unit-system">
+              <option value="imperial">Imperial (US)</option>
+              <option value="metric">Metric</option>
+            </select>`;
+          extra.appendChild(sysRow);
+
+          const unitRow = document.createElement('div');
+          unitRow.className = 'prop-row';
+          unitRow.innerHTML = `
+            <span class="prop-label">Gauge Unit</span>
+            <select class="prop-input" id="prop-unit">
+              <option value="psi">psi</option>
+              <option value="kPa">kPa</option>
+              <option value="bar">bar</option>
+            </select>`;
+          extra.appendChild(unitRow);
+
+          const unitSel = unitRow.querySelector('#prop-unit');
+          const sysSel = sysRow.querySelector('#prop-unit-system');
+          if (unitSel) unitSel.value = node.simProps.unit;
+          if (sysSel) sysSel.value = node.simProps.unitSystem || (node.simProps.unit === 'psi' ? 'imperial' : 'metric');
+
+          const setUnit = (newUnit) => {
+            node.simProps.unit = newUnit;
+            node.simProps.unitSystem = (newUnit === 'psi') ? 'imperial' : 'metric';
+            if (Array.isArray(node.simProps.range) && node.simProps.range.length === 2) {
+              const r0 = node.simProps.range[0];
+              const r1 = node.simProps.range[1];
+              // Convert only if the old unit is psi.
+              if (newUnit !== 'psi' && (unitSel && unitSel.value === 'psi')) {
+                const psiToKPa = (v) => v * 6.89476;
+                const psiToBar = (v) => v / 14.5038;
+                if (newUnit === 'kPa') node.simProps.range = [psiToKPa(r0), psiToKPa(r1)];
+                if (newUnit === 'bar') node.simProps.range = [psiToBar(r0), psiToBar(r1)];
+              }
+            }
+          };
+
+          if (unitSel) {
+            unitSel.addEventListener('change', () => {
+              if (!selectedNode) return;
+              const n = engine.nodes.get(selectedNode);
+              if (!n || !n.simProps) return;
+              n.simProps.unit = unitSel.value;
+              n.simProps.unitSystem = (unitSel.value === 'psi') ? 'imperial' : 'metric';
+              updateStats();
+            });
+          }
+          if (sysSel) {
+            sysSel.addEventListener('change', () => {
+              if (!selectedNode) return;
+              const n = engine.nodes.get(selectedNode);
+              if (!n || !n.simProps) return;
+              if (sysSel.value === 'imperial') {
+                n.simProps.unit = 'psi';
+              } else {
+                // Metric default
+                n.simProps.unit = (n.simProps.unit === 'bar' || n.simProps.unit === 'kPa') ? n.simProps.unit : 'kPa';
+              }
+              updatePropertiesPanel();
+              updateStats();
+            });
+          }
+        }
+      }
     }
 
     function deselectNode() {
@@ -976,6 +1296,81 @@
     });
 
     // ═══════════════════════════════════════════════════════════════
+    // IMPORT / EXPORT (custom parts & models)
+    // ═══════════════════════════════════════════════════════════════
+    const importInput = document.getElementById('import-model-input');
+    window.importModel = function () {
+      if (!importInput) return;
+      importInput.value = '';
+      importInput.click();
+    };
+
+    if (importInput) {
+      importInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        // Parts library JSON import
+        if ((file.name || '').toLowerCase().endsWith('.json')) {
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            const parts = Array.isArray(data) ? data : (data && Array.isArray(data.parts) ? data.parts : []);
+            if (!parts.length) throw new Error('No parts found in JSON. Expected { parts: [...] }');
+
+            let added = 0;
+            for (const p of parts) {
+              if (!p || !p.id) continue;
+              if (PART_MAP[p.id]) continue; // don't overwrite built-ins
+              globalThis.ASSEMBLE_CUSTOM_PART_MAP[p.id] = p;
+              CUSTOM_PARTS.push(p);
+              addPartToPalette(p);
+              added++;
+            }
+            showModal('IMPORTED', `Imported ${added} custom parts.`, 'good');
+          } catch (err) {
+            showModal('IMPORT FAILED', String(err && err.message ? err.message : err), 'bad');
+          }
+          return;
+        }
+
+        // Model import (.glb/.gltf)
+        const url = URL.createObjectURL(file);
+        const safeName = (file.name || 'Model').replace(/\.[^/.]+$/, '');
+        const id = `model_${Date.now()}`;
+        const partDef = {
+          id,
+          label: safeName,
+          category: 'Imported',
+          layer: 7,
+          icon: '⬆️',
+          geo: { type: 'model', url },
+          defaultMat: 'STEEL',
+          mass: 1.0,
+          behavior: 'rigid',
+          ports: [
+            // One simple snap point at origin to start
+            { type: 'snap', pos: [0, -0.3, 0], dir: [0, -1, 0], axis: [0, 1, 0] },
+          ],
+        };
+        globalThis.ASSEMBLE_CUSTOM_PART_MAP[id] = partDef;
+        CUSTOM_PARTS.push(partDef);
+        addPartToPalette(partDef);
+        showModal('IMPORTED', `Added part “${safeName}”. It will render when placed.`, 'good');
+      });
+    }
+
+    window.exportCustomParts = function () {
+      const data = JSON.stringify({ version: 1, parts: CUSTOM_PARTS }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'assemble_custom_parts.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    // ═══════════════════════════════════════════════════════════════
     // SIMULATION CONTROL
     // ═══════════════════════════════════════════════════════════════
     window.toggleSim = function () {
@@ -990,12 +1385,15 @@
         // Check if it works or fails
         setTimeout(() => {
           const stats = engine.stats();
-          if (stats.structurallySound && stats.powered > 0) {
-            showModal('SUCCESS!', `Your contraption is running! ${stats.powered} parts powered, total mass ${stats.totalMass} kg.`, 'good');
+          if (stats.structurallySound && (stats.activePowered > 0 || stats.spinning > 0)) {
+            const motion = stats.spinning > 0 ? ` Motion: ${stats.spinning} rotating part(s).` : '';
+            showModal('RUNNING', `Active: ${stats.activePowered} part(s) powered (total ${stats.powered}).${motion} Mass ${stats.totalMass} kg.`, 'good');
           } else if (!stats.structurallySound) {
             showModal('FAILURE!', `Structural failure detected. Check for overload, fractures, or electrical shorts.`, 'bad');
-          } else if (stats.powered === 0 && stats.total > 0) {
-            showModal('NO POWER', `No power sources detected. Add a motor, battery, or engine to run your contraption.`, 'warn');
+          } else if (stats.sourcesPowered === 0 && stats.total > 0) {
+            showModal('NO POWER', `No power sources detected. Add a battery, engine, or boiler and connect it to something.`, 'warn');
+          } else if (stats.activePowered === 0 && stats.total > 0) {
+            showModal('IDLE', `Power is present but nothing is running. Add required parts (e.g., motor rotor / fan blades) and connect them.`, 'warn');
           }
         }, 500);
       }
@@ -1041,13 +1439,6 @@
           try {
             const data = JSON.parse(ev.target.result);
             engine.load(data);
-            // Rebuild meshes
-            for (const node of engine.nodes.values()) {
-              renderer._addMesh(node);
-            }
-            for (const conn of engine.connections.values()) {
-              renderer._addConnLine(conn);
-            }
             updateStats();
           } catch (err) {
             alert('Failed to load: ' + err.message);
@@ -1070,7 +1461,7 @@
       const statEl = document.getElementById('stat-status');
       if (engine.running) {
         if (s.structurallySound) {
-          statEl.textContent = 'Running';
+          statEl.textContent = (s.activePowered > 0 || s.spinning > 0) ? 'Running' : 'Idle';
           statEl.className = 'stat-val good';
         } else {
           statEl.textContent = 'FAILED';

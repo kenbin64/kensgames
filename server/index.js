@@ -98,6 +98,104 @@ function writeUserToManifold(username, userData) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: GET /api/auth/access-session
+// ═══════════════════════════════════════════════════════════════════════════
+// If the request is already authenticated by Cloudflare Access, mint a
+// KensGames JWT token and return it so game pages don't require a second login.
+//
+// Cloudflare Access typically injects identity headers such as:
+//   - cf-access-authenticated-user-email
+//   - cf-access-authenticated-user-id
+//
+// If those headers are missing (e.g., local dev), this endpoint returns 401.
+
+function sanitizeUsernameFromEmail(email) {
+  const local = String(email || '').split('@')[0] || '';
+  const cleaned = local
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+
+  if (cleaned.length >= 3) return cleaned;
+  return `player_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+app.get('/api/auth/access-session', async (req, res) => {
+  try {
+    const emailHeader = req.headers['cf-access-authenticated-user-email']
+      || req.headers['cf-access-authenticated-user-email'.toLowerCase()]
+      || req.headers['cf-access-user-email']
+      || req.headers['x-authenticated-user-email'];
+
+    const idHeader = req.headers['cf-access-authenticated-user-id']
+      || req.headers['cf-access-authenticated-user-id'.toLowerCase()]
+      || req.headers['x-authenticated-user-id'];
+
+    const email = (emailHeader ? String(emailHeader).trim().toLowerCase() : '');
+    if (!email || !email.includes('@')) {
+      return res.status(401).json({ success: false, error: 'Not authenticated via Access' });
+    }
+
+    // If a KensGames account already exists for this email, reuse it.
+    let userData = readUserFromManifoldByEmail(email);
+
+    let username;
+    if (userData && userData.username) {
+      username = userData.username;
+    } else {
+      username = sanitizeUsernameFromEmail(email);
+
+      // Ensure uniqueness if a different account already uses the derived username.
+      const existingByName = readUserFromManifold(username);
+      if (existingByName && existingByName.email && existingByName.email !== email) {
+        username = `${username.slice(0, 18)}_${Math.random().toString(36).slice(2, 6)}`;
+      }
+
+      // Create a passwordless account bound to Access identity.
+      const userCoord = getOrCreateUserCoordinate(username, 3);
+      userData = writeUserToManifold(username, {
+        ...userCoord,
+        username,
+        email,
+        displayName: userCoord.displayName || username,
+        emailVerified: true,
+        status: 'active',
+        accessUserId: idHeader ? String(idHeader) : undefined,
+      });
+    }
+
+    // Create session token
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const token = authHandler.generateToken(userData.userId, sessionId);
+
+    const session = {
+      id: sessionId,
+      token: token,
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+      method: 'access',
+    };
+
+    const sessions = userData.sessions || [];
+    sessions.push(session);
+    writeUserToManifold(username, { sessions, lastLoginAt: Date.now() });
+
+    return res.status(200).json({
+      success: true,
+      token,
+      userId: userData.userId,
+      username,
+      displayName: userData.displayName || username,
+      email,
+    });
+  } catch (error) {
+    console.error('Access session error:', error);
+    return res.status(500).json({ success: false, error: 'Access session failed' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // ENDPOINT: POST /api/auth/register
 // ═══════════════════════════════════════════════════════════════════════════
 

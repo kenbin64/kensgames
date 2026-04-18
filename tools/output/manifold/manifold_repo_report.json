@@ -1,0 +1,1410 @@
+{
+  "generatedAt": "2026-04-17T23:46:31.722Z",
+  "root": "/var/www/kensgames.com",
+  "settings": {
+    "outDir": "tools/output/manifold",
+    "gridDivs": 12,
+    "maxCells": 120,
+    "maxCellsBig": 200,
+    "bigGlbBytes": 10000000,
+    "pngMaxError": 10,
+    "pngMinBlock": 16,
+    "pngSampleStep": 4,
+    "pngMaxLeaves": 0,
+    "limit": 0
+  },
+  "counts": {
+    "assets": 98,
+    "glb": 64,
+    "png": 34
+  },
+  "totals": {
+    "glbBytes": 836802104,
+    "glbGzipBytes": 607054260,
+    "atlasBytes": 13821644,
+    "atlasGzipBytes": 2496360,
+    "pngBytes": 75735046,
+    "pngAtlasBytes": 21371278,
+    "pngAtlasGzipBytes": 7124565
+  },
+  "png": [
+    {
+      "path": "fasttrack/assets/images/art/chess.png",
+      "bytes": 6841743,
+      "width": 2048,
+      "height": 1512,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/chess.png.imgatlas.json",
+      "atlasBytes": 1411547,
+      "atlasGzipBytes": 470157,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/bear.png",
+      "bytes": 6823603,
+      "width": 2048,
+      "height": 1656,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/bear.png.imgatlas.json",
+      "atlasBytes": 1401623,
+      "atlasGzipBytes": 490491,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/bridge.png",
+      "bytes": 6680358,
+      "width": 2048,
+      "height": 1621,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/bridge.png.imgatlas.json",
+      "atlasBytes": 1404906,
+      "atlasGzipBytes": 448750,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/voyage.png",
+      "bytes": 5710848,
+      "width": 2048,
+      "height": 1481,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/voyage.png.imgatlas.json",
+      "atlasBytes": 1256238,
+      "atlasGzipBytes": 421641,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/pigs.png",
+      "bytes": 5543678,
+      "width": 1652,
+      "height": 2048,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/pigs.png.imgatlas.json",
+      "atlasBytes": 1152825,
+      "atlasGzipBytes": 385303,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/DrivingTheHerd.png",
+      "bytes": 4955138,
+      "width": 1920,
+      "height": 1501,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/DrivingTheHerd.png.imgatlas.json",
+      "atlasBytes": 1216909,
+      "atlasGzipBytes": 405882,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/Brick texture.png",
+      "bytes": 4732740,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/Brick_texture.png.imgatlas.json",
+      "atlasBytes": 1420888,
+      "atlasGzipBytes": 515499,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/fastTrack_neon.png",
+      "bytes": 2429854,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/fastTrack_neon.png.imgatlas.json",
+      "atlasBytes": 388068,
+      "atlasGzipBytes": 145349,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/assembler_landing.png",
+      "bytes": 2895563,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/assembler_landing.png.imgatlas.json",
+      "atlasBytes": 1108092,
+      "atlasGzipBytes": 398607,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/starfighter_landing.png",
+      "bytes": 2450511,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/starfighter_landing.png.imgatlas.json",
+      "atlasBytes": 965069,
+      "atlasGzipBytes": 334684,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/assembler_lobby.png",
+      "bytes": 2305407,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/assembler_lobby.png.imgatlas.json",
+      "atlasBytes": 836755,
+      "atlasGzipBytes": 290185,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "4DTicTacToe/assets/images/manifold.png",
+      "bytes": 2352608,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/4DTicTacToe/assets/images/manifold.png.imgatlas.json",
+      "atlasBytes": 953702,
+      "atlasGzipBytes": 336594,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/textures/starfighterlogo.png",
+      "bytes": 1576455,
+      "width": 1184,
+      "height": 864,
+      "atlasPath": "tools/output/manifold/starfighter/assets/textures/starfighterlogo.png.imgatlas.json",
+      "atlasBytes": 224282,
+      "atlasGzipBytes": 79306,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/game/assets/textures/starfighterlogo.png",
+      "bytes": 1576455,
+      "width": 1184,
+      "height": 864,
+      "atlasPath": "tools/output/manifold/starfighter/electron/game/assets/textures/starfighterlogo.png.imgatlas.json",
+      "atlasBytes": 224296,
+      "atlasGzipBytes": 79315,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/fasttrack_lobby.png",
+      "bytes": 1869234,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/fasttrack_lobby.png.imgatlas.json",
+      "atlasBytes": 576587,
+      "atlasGzipBytes": 206636,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/brickbreaker3D_lobby.png",
+      "bytes": 1462616,
+      "width": 1024,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/brickbreaker3D_lobby.png.imgatlas.json",
+      "atlasBytes": 221291,
+      "atlasGzipBytes": 77557,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "assets/images/brickbreaker3D_landing.png",
+      "bytes": 1408509,
+      "width": 1024,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/assets/images/brickbreaker3D_landing.png.imgatlas.json",
+      "atlasBytes": 219609,
+      "atlasGzipBytes": 78534,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/lighthouse.png",
+      "bytes": 1999226,
+      "width": 1131,
+      "height": 960,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/lighthouse.png.imgatlas.json",
+      "atlasBytes": 912276,
+      "atlasGzipBytes": 328756,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon.png",
+      "bytes": 1109443,
+      "width": 1024,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon.png.imgatlas.json",
+      "atlasBytes": 74074,
+      "atlasGzipBytes": 26548,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon1024.png",
+      "bytes": 1109443,
+      "width": 1024,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon1024.png.imgatlas.json",
+      "atlasBytes": 74078,
+      "atlasGzipBytes": 26551,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/billiard_theme.png",
+      "bytes": 2229659,
+      "width": 2549,
+      "height": 1299,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/billiard_theme.png.imgatlas.json",
+      "atlasBytes": 1349152,
+      "atlasGzipBytes": 372115,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/textures/starship.png",
+      "bytes": 1217814,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/starfighter/assets/textures/starship.png.imgatlas.json",
+      "atlasBytes": 500032,
+      "atlasGzipBytes": 148421,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/game/assets/textures/starship.png",
+      "bytes": 1217814,
+      "width": 1536,
+      "height": 1024,
+      "atlasPath": "tools/output/manifold/starfighter/electron/game/assets/textures/starship.png.imgatlas.json",
+      "atlasBytes": 500046,
+      "atlasGzipBytes": 148434,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/fastTrackpromo2.png",
+      "bytes": 2383487,
+      "width": 2559,
+      "height": 1303,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/fastTrackpromo2.png.imgatlas.json",
+      "atlasBytes": 1691433,
+      "atlasGzipBytes": 482656,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/rainedout.png",
+      "bytes": 998130,
+      "width": 864,
+      "height": 638,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/rainedout.png.imgatlas.json",
+      "atlasBytes": 306447,
+      "atlasGzipBytes": 111408,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/together.png",
+      "bytes": 584019,
+      "width": 720,
+      "height": 540,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/together.png.imgatlas.json",
+      "atlasBytes": 287264,
+      "atlasGzipBytes": 104026,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon512.png",
+      "bytes": 308811,
+      "width": 512,
+      "height": 512,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon512.png.imgatlas.json",
+      "atlasBytes": 23984,
+      "atlasGzipBytes": 8912,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/parrot.png",
+      "bytes": 530257,
+      "width": 517,
+      "height": 540,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/parrot.png.imgatlas.json",
+      "atlasBytes": 276792,
+      "atlasGzipBytes": 101631,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon256.png",
+      "bytes": 82199,
+      "width": 256,
+      "height": 256,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon256.png.imgatlas.json",
+      "atlasBytes": 8721,
+      "atlasGzipBytes": 3424,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon128.png",
+      "bytes": 23198,
+      "width": 128,
+      "height": 128,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon128.png.imgatlas.json",
+      "atlasBytes": 3716,
+      "atlasGzipBytes": 1590,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon64.png",
+      "bytes": 6909,
+      "width": 64,
+      "height": 64,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon64.png.imgatlas.json",
+      "atlasBytes": 1669,
+      "atlasGzipBytes": 811,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon32.png",
+      "bytes": 1985,
+      "width": 32,
+      "height": 32,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon32.png.imgatlas.json",
+      "atlasBytes": 640,
+      "atlasGzipBytes": 414,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/electron/assets/icon16.png",
+      "bytes": 651,
+      "width": 16,
+      "height": 16,
+      "atlasPath": "tools/output/manifold/starfighter/electron/assets/icon16.png.imgatlas.json",
+      "atlasBytes": 389,
+      "atlasGzipBytes": 291,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "fasttrack/assets/images/art/breakout.png",
+      "bytes": 316681,
+      "width": 1297,
+      "height": 1186,
+      "atlasPath": "tools/output/manifold/fasttrack/assets/images/art/breakout.png.imgatlas.json",
+      "atlasBytes": 377878,
+      "atlasGzipBytes": 94087,
+      "params": {
+        "pngMaxError": 10,
+        "pngMinBlock": 16,
+        "pngSampleStep": 4,
+        "pngMaxLeaves": 0
+      },
+      "timingMs": 0
+    }
+  ],
+  "glb": [
+    {
+      "path": "starfighter/assets/models/firstPersonStarFighterCockpit.glb",
+      "bytes": 78979012,
+      "gzipBytes": 55318637,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/firstPersonStarFighterCockpit.glb.atlas.json",
+      "atlasBytes": 397272,
+      "atlasGzipBytes": 71461,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/AlienMotherShip.glb",
+      "bytes": 68730644,
+      "gzipBytes": 48284010,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/AlienMotherShip.glb.atlas.json",
+      "atlasBytes": 397204,
+      "atlasGzipBytes": 71475,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/HiveQueen_BossW10.glb",
+      "bytes": 49214584,
+      "gzipBytes": 35964695,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/HiveQueen_BossW10.glb.atlas.json",
+      "atlasBytes": 397555,
+      "atlasGzipBytes": 71521,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/Bomber_Leviathan Tick.glb",
+      "bytes": 44971472,
+      "gzipBytes": 32690762,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/Bomber_Leviathan_Tick.glb.atlas.json",
+      "atlasBytes": 397724,
+      "atlasGzipBytes": 71797,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/Dreadnought_Hive Throne.glb",
+      "bytes": 41628944,
+      "gzipBytes": 30523189,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/Dreadnought_Hive_Throne.glb.atlas.json",
+      "atlasBytes": 398429,
+      "atlasGzipBytes": 71159,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/HumanSpaceStationWithAritificalGravity.glb",
+      "bytes": 36249272,
+      "gzipBytes": 27304966,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/HumanSpaceStationWithAritificalGravity.glb.atlas.json",
+      "atlasBytes": 398153,
+      "atlasGzipBytes": 71563,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/firstPersonStarFighterCockpit_lod0.glb",
+      "bytes": 33324716,
+      "gzipBytes": 24682786,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/firstPersonStarFighterCockpit_lod0.glb.atlas.json",
+      "atlasBytes": 397660,
+      "atlasGzipBytes": 71604,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/HumanSpaceBattleShip.glb",
+      "bytes": 33015388,
+      "gzipBytes": 24327428,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/HumanSpaceBattleShip.glb.atlas.json",
+      "atlasBytes": 398225,
+      "atlasGzipBytes": 71895,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/freindly_medical_frigate.glb",
+      "bytes": 28700308,
+      "gzipBytes": 21939651,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/freindly_medical_frigate.glb.atlas.json",
+      "atlasBytes": 399107,
+      "atlasGzipBytes": 71586,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/Rescue Shuttle .glb",
+      "bytes": 28471564,
+      "gzipBytes": 20912728,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/Rescue_Shuttle_.glb.atlas.json",
+      "atlasBytes": 398523,
+      "atlasGzipBytes": 71390,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/enemy_cruiser_hive_sentinel.glb",
+      "bytes": 26345920,
+      "gzipBytes": 19879108,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/enemy_cruiser_hive_sentinel.glb.atlas.json",
+      "atlasBytes": 398861,
+      "atlasGzipBytes": 71865,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/AlienEnemyFighter.glb",
+      "bytes": 24573872,
+      "gzipBytes": 19244969,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/AlienEnemyFighter.glb.atlas.json",
+      "atlasBytes": 398615,
+      "atlasGzipBytes": 71522,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/AlienEnemyPreditorDrone.glb",
+      "bytes": 24573872,
+      "gzipBytes": 19244969,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/AlienEnemyPreditorDrone.glb.atlas.json",
+      "atlasBytes": 398621,
+      "atlasGzipBytes": 71535,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/Interceptor_Needle.glb",
+      "bytes": 20099500,
+      "gzipBytes": 16492034,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/Interceptor_Needle.glb.atlas.json",
+      "atlasBytes": 399103,
+      "atlasGzipBytes": 71729,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/HumanFriendlStarFighter.glb",
+      "bytes": 16323632,
+      "gzipBytes": 13824364,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/HumanFriendlStarFighter.glb.atlas.json",
+      "atlasBytes": 375511,
+      "atlasGzipBytes": 67432,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienMotherShip_lod0.glb",
+      "bytes": 18835788,
+      "gzipBytes": 13655822,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienMotherShip_lod0.glb.atlas.json",
+      "atlasBytes": 397375,
+      "atlasGzipBytes": 71268,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Bomber_Leviathan Tick_lod0.glb",
+      "bytes": 15997780,
+      "gzipBytes": 11899770,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Bomber_Leviathan_Tick_lod0.glb.atlas.json",
+      "atlasBytes": 397762,
+      "atlasGzipBytes": 71967,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/friendlyfueltanker.glb",
+      "bytes": 14207020,
+      "gzipBytes": 11412763,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/friendlyfueltanker.glb.atlas.json",
+      "atlasBytes": 328084,
+      "atlasGzipBytes": 59247,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Dreadnought_Hive Throne_lod0.glb",
+      "bytes": 14545240,
+      "gzipBytes": 10864511,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Dreadnought_Hive_Throne_lod0.glb.atlas.json",
+      "atlasBytes": 398302,
+      "atlasGzipBytes": 71467,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/freindly_medical_frigate_lod0.glb",
+      "bytes": 13805288,
+      "gzipBytes": 10434461,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/freindly_medical_frigate_lod0.glb.atlas.json",
+      "atlasBytes": 399496,
+      "atlasGzipBytes": 71608,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceBattleShip_lod0.glb",
+      "bytes": 12446408,
+      "gzipBytes": 9311403,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceBattleShip_lod0.glb.atlas.json",
+      "atlasBytes": 398407,
+      "atlasGzipBytes": 71912,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyFighter_lod0.glb",
+      "bytes": 11305200,
+      "gzipBytes": 8855511,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyFighter_lod0.glb.atlas.json",
+      "atlasBytes": 398618,
+      "atlasGzipBytes": 71848,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod0.glb",
+      "bytes": 11305200,
+      "gzipBytes": 8855511,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod0.glb.atlas.json",
+      "atlasBytes": 398624,
+      "atlasGzipBytes": 71862,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb",
+      "bytes": 11293452,
+      "gzipBytes": 8815254,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb.atlas.json",
+      "atlasBytes": 397979,
+      "atlasGzipBytes": 71657,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod0.glb",
+      "bytes": 11500676,
+      "gzipBytes": 8567635,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod0.glb.atlas.json",
+      "atlasBytes": 398930,
+      "atlasGzipBytes": 71878,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Interceptor_Needle_lod0.glb",
+      "bytes": 9475672,
+      "gzipBytes": 7639737,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Interceptor_Needle_lod0.glb.atlas.json",
+      "atlasBytes": 239771,
+      "atlasGzipBytes": 43466,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "4DTicTacToe/assets/models/connect4.glb",
+      "bytes": 28732436,
+      "gzipBytes": 6947703,
+      "atlasPath": "tools/output/manifold/4DTicTacToe/assets/models/connect4.glb.atlas.json",
+      "atlasBytes": 390753,
+      "atlasGzipBytes": 67932,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 200
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Rescue Shuttle _lod0.glb",
+      "bytes": 8727468,
+      "gzipBytes": 6598794,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Rescue_Shuttle__lod0.glb.atlas.json",
+      "atlasBytes": 239270,
+      "atlasGzipBytes": 43518,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanFriendlStarFighter_lod0.glb",
+      "bytes": 7756040,
+      "gzipBytes": 6378162,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanFriendlStarFighter_lod0.glb.atlas.json",
+      "atlasBytes": 237951,
+      "atlasGzipBytes": 43124,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienMotherShip_lod1.glb",
+      "bytes": 8785524,
+      "gzipBytes": 6058509,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienMotherShip_lod1.glb.atlas.json",
+      "atlasBytes": 238502,
+      "atlasGzipBytes": 43208,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Bomber_Leviathan Tick_lod1.glb",
+      "bytes": 7610920,
+      "gzipBytes": 5252693,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Bomber_Leviathan_Tick_lod1.glb.atlas.json",
+      "atlasBytes": 238986,
+      "atlasGzipBytes": 43541,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/freindly_medical_frigate_lod1.glb",
+      "bytes": 7461508,
+      "gzipBytes": 5009246,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/freindly_medical_frigate_lod1.glb.atlas.json",
+      "atlasBytes": 239998,
+      "atlasGzipBytes": 43139,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/friendlyfueltanker_lod0.glb",
+      "bytes": 6145580,
+      "gzipBytes": 4579511,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/friendlyfueltanker_lod0.glb.atlas.json",
+      "atlasBytes": 150509,
+      "atlasGzipBytes": 27892,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Dreadnought_Hive Throne_lod1.glb",
+      "bytes": 6192616,
+      "gzipBytes": 4226136,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Dreadnought_Hive_Throne_lod1.glb.atlas.json",
+      "atlasBytes": 239501,
+      "atlasGzipBytes": 43443,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceBattleShip_lod1.glb",
+      "bytes": 6017564,
+      "gzipBytes": 4114045,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceBattleShip_lod1.glb.atlas.json",
+      "atlasBytes": 239495,
+      "atlasGzipBytes": 43571,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod1.glb",
+      "bytes": 5742028,
+      "gzipBytes": 3947809,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod1.glb.atlas.json",
+      "atlasBytes": 239754,
+      "atlasGzipBytes": 43409,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "4DTicTacToe/assets/models/jupiter.glb",
+      "bytes": 3558884,
+      "gzipBytes": 3190500,
+      "atlasPath": "tools/output/manifold/4DTicTacToe/assets/models/jupiter.glb.atlas.json",
+      "atlasBytes": 4932,
+      "atlasGzipBytes": 1153,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyFighter_lod1.glb",
+      "bytes": 4715780,
+      "gzipBytes": 3217675,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyFighter_lod1.glb.atlas.json",
+      "atlasBytes": 239624,
+      "atlasGzipBytes": 43351,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb",
+      "bytes": 4715780,
+      "gzipBytes": 3217675,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb.atlas.json",
+      "atlasBytes": 239630,
+      "atlasGzipBytes": 43365,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb",
+      "bytes": 4281004,
+      "gzipBytes": 2925870,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb.atlas.json",
+      "atlasBytes": 239143,
+      "atlasGzipBytes": 43235,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Interceptor_Needle_lod1.glb",
+      "bytes": 3852168,
+      "gzipBytes": 2630564,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Interceptor_Needle_lod1.glb.atlas.json",
+      "atlasBytes": 174233,
+      "atlasGzipBytes": 31839,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Rescue Shuttle _lod1.glb",
+      "bytes": 3818396,
+      "gzipBytes": 2600441,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Rescue_Shuttle__lod1.glb.atlas.json",
+      "atlasBytes": 158005,
+      "atlasGzipBytes": 29152,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/friendlyfueltanker_lod1.glb",
+      "bytes": 2748740,
+      "gzipBytes": 2338934,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/friendlyfueltanker_lod1.glb.atlas.json",
+      "atlasBytes": 46892,
+      "atlasGzipBytes": 9351,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanFriendlStarFighter_lod1.glb",
+      "bytes": 2485512,
+      "gzipBytes": 2142441,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanFriendlStarFighter_lod1.glb.atlas.json",
+      "atlasBytes": 138357,
+      "atlasGzipBytes": 25488,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/freindly_medical_frigate_lod2.glb",
+      "bytes": 1285248,
+      "gzipBytes": 1056401,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/freindly_medical_frigate_lod2.glb.atlas.json",
+      "atlasBytes": 706,
+      "atlasGzipBytes": 370,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienMotherShip_lod2.glb",
+      "bytes": 984484,
+      "gzipBytes": 840159,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienMotherShip_lod2.glb.atlas.json",
+      "atlasBytes": 693,
+      "atlasGzipBytes": 361,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Bomber_Leviathan Tick_lod2.glb",
+      "bytes": 859808,
+      "gzipBytes": 735610,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Bomber_Leviathan_Tick_lod2.glb.atlas.json",
+      "atlasBytes": 701,
+      "atlasGzipBytes": 369,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Earth_lod0.glb",
+      "bytes": 797236,
+      "gzipBytes": 695176,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Earth_lod0.glb.atlas.json",
+      "atlasBytes": 634,
+      "atlasGzipBytes": 317,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod2.glb",
+      "bytes": 801076,
+      "gzipBytes": 688252,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/enemy_cruiser_hive_sentinel_lod2.glb.atlas.json",
+      "atlasBytes": 705,
+      "atlasGzipBytes": 371,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/Earth.glb",
+      "bytes": 1183172,
+      "gzipBytes": 688502,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/Earth.glb.atlas.json",
+      "atlasBytes": 4913,
+      "atlasGzipBytes": 1264,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/friendlyfueltanker_lod2.glb",
+      "bytes": 768724,
+      "gzipBytes": 651807,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/friendlyfueltanker_lod2.glb.atlas.json",
+      "atlasBytes": 701,
+      "atlasGzipBytes": 370,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceBattleShip_lod2.glb",
+      "bytes": 757740,
+      "gzipBytes": 645471,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceBattleShip_lod2.glb.atlas.json",
+      "atlasBytes": 701,
+      "atlasGzipBytes": 370,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/moon.glb",
+      "bytes": 1097128,
+      "gzipBytes": 595841,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/moon.glb.atlas.json",
+      "atlasBytes": 4912,
+      "atlasGzipBytes": 1261,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Dreadnought_Hive Throne_lod2.glb",
+      "bytes": 678560,
+      "gzipBytes": 578531,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Dreadnought_Hive_Throne_lod2.glb.atlas.json",
+      "atlasBytes": 703,
+      "atlasGzipBytes": 371,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/moon_lod0.glb",
+      "bytes": 611220,
+      "gzipBytes": 514632,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/moon_lod0.glb.atlas.json",
+      "atlasBytes": 633,
+      "atlasGzipBytes": 315,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Rescue Shuttle _lod2.glb",
+      "bytes": 603368,
+      "gzipBytes": 514436,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Rescue_Shuttle__lod2.glb.atlas.json",
+      "atlasBytes": 691,
+      "atlasGzipBytes": 360,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb",
+      "bytes": 582332,
+      "gzipBytes": 493793,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb.atlas.json",
+      "atlasBytes": 717,
+      "atlasGzipBytes": 383,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Interceptor_Needle_lod2.glb",
+      "bytes": 554876,
+      "gzipBytes": 474822,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Interceptor_Needle_lod2.glb.atlas.json",
+      "atlasBytes": 699,
+      "atlasGzipBytes": 367,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyFighter_lod2.glb",
+      "bytes": 548756,
+      "gzipBytes": 468410,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyFighter_lod2.glb.atlas.json",
+      "atlasBytes": 698,
+      "atlasGzipBytes": 363,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb",
+      "bytes": 548756,
+      "gzipBytes": 468410,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb.atlas.json",
+      "atlasBytes": 704,
+      "atlasGzipBytes": 370,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/HumanFriendlStarFighter_lod2.glb",
+      "bytes": 516868,
+      "gzipBytes": 440944,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/HumanFriendlStarFighter_lod2.glb.atlas.json",
+      "atlasBytes": 705,
+      "atlasGzipBytes": 370,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Earth_lod1.glb",
+      "bytes": 159156,
+      "gzipBytes": 76490,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Earth_lod1.glb.atlas.json",
+      "atlasBytes": 634,
+      "atlasGzipBytes": 318,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/moon_lod1.glb",
+      "bytes": 145404,
+      "gzipBytes": 71803,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/moon_lod1.glb.atlas.json",
+      "atlasBytes": 665,
+      "atlasGzipBytes": 329,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    },
+    {
+      "path": "starfighter/assets/models/optimized/Earth_lod2.glb",
+      "bytes": 49820,
+      "gzipBytes": 31388,
+      "atlasPath": "tools/output/manifold/starfighter/assets/models/optimized/Earth_lod2.glb.atlas.json",
+      "atlasBytes": 683,
+      "atlasGzipBytes": 336,
+      "params": {
+        "gridDivs": 12,
+        "maxCells": 120
+      },
+      "timingMs": 0
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 // Perfect for Facebook / social media sharing.
 // ============================================================
 
-(function() {
+(function () {
     'use strict';
 
     // ============================================================
@@ -116,7 +116,7 @@
                 transition: transform 0.2s, box-shadow 0.2s;
                 animation: ctaGlow 2s infinite;
             ">
-                ▶ PLAY NOW — FREE
+                ▶ PLAY NOW
             </a>
         `;
         document.body.appendChild(ctaBar);
@@ -273,7 +273,7 @@
                 MusicSubstrate.activate();
                 MusicSubstrate.play(DEMO_THEMES[0]);
             }
-        } catch(e) {}
+        } catch (e) { }
 
         // Initialize a 4-player game
         if (typeof window.initGame === 'function') {

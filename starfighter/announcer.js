@@ -160,13 +160,13 @@ const SFAnnouncer = (function () {
     watch: ['watch your six', 'check six', 'stay sharp', 'eyes open', 'heads up'],
     protect: ['cover the base', 'protect the Resolute', 'defend the carrier', 'keep them off her'],
     // Ship-type specific
-    drone: ['drone', 'light fighter', 'enemy fighter'],
+    drone: ['drone', 'light fighter', 'bogie'],
     interceptor: ['interceptor', 'fast mover', 'flanker'],
     bomber: ['bomber', 'attack ship', 'heavy bomber'],
     predator: ['Predator', 'Predator Drone', 'hunter'],
     dreadnought: ['Dreadnought', 'Hive Throne', 'capital ship'],
-    baseship: ['mothership', 'capital ship', 'alien carrier', 'enemy capital'],
-    hive: ['the hive', 'alien base', 'hive structure', 'enemy base'],
+    baseship: ['mothership', 'capital ship', 'alien carrier', 'bogie capital'],
+    hive: ['the hive', 'alien base', 'hive structure', 'bogie base'],
     hive_queen: ['Hive Queen', 'the Queen', 'alien matriarch', 'primary organism'],
     // Tactical advice
     useTorps: ['use torpedoes', 'switch to torpedoes', 'torps are your best bet', 'heavy ordnance recommended'],

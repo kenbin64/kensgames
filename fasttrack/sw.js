@@ -3,7 +3,7 @@
  * NETWORK-FIRST for everything — cache is ONLY an offline fallback
  */
 
-const CACHE_NAME = 'fasttrack-v3.2.0-local-libs';
+const CACHE_NAME = 'fasttrack-v3.2.1-local-libs';
 const PRECACHE_URLS = [
   '/fasttrack/3d.html',
   '/fasttrack/assets/images/ftLogo.png',
@@ -83,7 +83,7 @@ self.addEventListener('sync', (event) => {
 // Push notifications for multiplayer
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  
+
   const data = event.data.json();
   const options = {
     body: data.body || 'Your turn!',
@@ -95,7 +95,7 @@ self.addEventListener('push', (event) => {
       { action: 'play', title: 'Play Now', icon: '/fasttrack/assets/images/icon-72.png' }
     ]
   };
-  
+
   event.waitUntil(
     self.registration.showNotification(data.title || 'Fast Track', options)
   );
@@ -104,9 +104,9 @@ self.addEventListener('push', (event) => {
 // Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
+
   const url = event.notification.data?.url || '/fasttrack/mobile.html';
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {

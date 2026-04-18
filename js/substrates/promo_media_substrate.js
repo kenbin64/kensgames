@@ -404,18 +404,31 @@ const PromoMediaSubstrate = (() => {
                 <div style="position: relative; width: 100%; padding-bottom: 56.25%;">
                     ${promo.screenshotUrls
                 .map(
-                    (url, i) => `
-                        <img src="${url}" alt="Screenshot ${i + 1}" style="
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            object-fit: cover;
-                            opacity: ${i === 0 ? 1 : 0};
-                            transition: opacity 0.5s;
-                        " class="carousel-image" data-index="${i}">
-                    `
+                    (url, i) => {
+                        const isFirst = i === 0;
+                        const placeholder = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+                        return `
+                        <img
+                            src="${isFirst ? url : placeholder}"
+                            data-src="${isFirst ? '' : url}"
+                            alt="Screenshot ${i + 1}"
+                            loading="${isFirst ? 'eager' : 'lazy'}"
+                            decoding="async"
+                            fetchpriority="${isFirst ? 'high' : 'low'}"
+                            style="
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                width: 100%;
+                                height: 100%;
+                                object-fit: cover;
+                                opacity: ${isFirst ? 1 : 0};
+                                transition: opacity 0.5s;
+                            "
+                            class="carousel-image"
+                            data-index="${i}">
+                    `;
+                    }
                 )
                 .join('')}
                 </div>
@@ -450,6 +463,25 @@ const PromoMediaSubstrate = (() => {
                 <script>
                     (function() {
                         const carousel = document.getElementById('${carouselId}');
+
+                        const ensureLoaded = (index) => {
+                            const img = carousel.querySelector(`.carousel - image[data - index="${index}"]`);
+                            if (!img) return;
+                            const ds = img.getAttribute('data-src');
+                            if (ds && img.getAttribute('src') && img.getAttribute('src').startsWith('data:image')) {
+                                img.setAttribute('src', ds);
+                                img.setAttribute('data-src', '');
+                            }
+                        };
+
+                        const applySlide = () => {
+                            const slide = parseInt(carousel.getAttribute('data-slide') || '0', 10) || 0;
+                            ensureLoaded(slide);
+                            carousel.querySelectorAll('.carousel-image').forEach((img, i) => {
+                                img.style.opacity = i === slide ? 1 : 0;
+                            });
+                        };
+
                         carousel.addEventListener('click', function(e) {
                             if (e.offsetX < carousel.offsetWidth / 2) {
                                 // Previous
@@ -464,12 +496,12 @@ const PromoMediaSubstrate = (() => {
                             }
                         });
 
-                        carousel.addEventListener('attrchange', function() {
-                            const slide = carousel.getAttribute('data-slide') || 0;
-                            document.querySelectorAll('#${carouselId} .carousel-image').forEach((img, i) => {
-                                img.style.opacity = i === parseInt(slide) ? 1 : 0;
-                            });
-                        });
+                        // Observe slide changes reliably (no non-standard events).
+                        const mo = new MutationObserver(applySlide);
+                        mo.observe(carousel, { attributes: true, attributeFilter: ['data-slide'] });
+
+                        // Initialize
+                        applySlide();
                     })();
                 </script>
             </div>

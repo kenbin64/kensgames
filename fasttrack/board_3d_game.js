@@ -414,14 +414,71 @@ function connectToLobby() {
 
         lobbyWebSocket.onopen = () => {
             console.log('[Lobby] Connected');
-            // Auto-login as guest
-            myUsername = 'Player' + Math.floor(Math.random() * 9999);
-            myUserId = 'guest_' + Date.now();
-            lobbyWebSocket.send(JSON.stringify({
-                type: 'guest_login',
-                name: myUsername
-            }));
-            resolve();
+
+            (async () => {
+                // SSO: if authenticated via Cloudflare Access, mint a real KensGames JWT.
+                try {
+                    const existing = (() => {
+                        try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
+                    })();
+                    if (!existing || String(existing).startsWith('guest-')) {
+                        const res = await fetch('/api/auth/access-session', {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        if (res && res.ok) {
+                            const data = await res.json();
+                            if (data && data.success && data.token) {
+                                try {
+                                    localStorage.setItem('user_token', data.token);
+                                    if (data.username) localStorage.setItem('username', data.username);
+                                    if (data.displayName) localStorage.setItem('display_name', data.displayName);
+                                    if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
+                                } catch (e) { /* ignore */ }
+                            }
+                        }
+                    }
+                } catch (e) { /* ignore */ }
+
+                const token = (() => {
+                    try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
+                })();
+
+                const storedName = (() => {
+                    try { return localStorage.getItem('username') || localStorage.getItem('display_name') || null; } catch (e) { return null; }
+                })();
+
+                const avatarId = (() => {
+                    try {
+                        const av = JSON.parse(localStorage.getItem('kg_avatar') || 'null');
+                        return av && av.id ? av.id : null;
+                    } catch (e) {
+                        return null;
+                    }
+                })();
+
+                if (token) {
+                    myUsername = storedName || myUsername || ('Player' + Math.floor(Math.random() * 9999));
+                    myUserId = null;
+                    lobbyWebSocket.send(JSON.stringify({
+                        type: 'auth',
+                        token,
+                        username: myUsername,
+                        guest_name: myUsername,
+                        avatar_id: avatarId
+                    }));
+                } else {
+                    // Guests allowed for invite-code and solo flows
+                    myUsername = myUsername || ('Player' + Math.floor(Math.random() * 9999));
+                    myUserId = 'guest_' + Date.now();
+                    lobbyWebSocket.send(JSON.stringify({
+                        type: 'guest_login',
+                        name: myUsername
+                    }));
+                }
+                resolve();
+            })();
         };
 
         lobbyWebSocket.onmessage = (event) => {
@@ -466,14 +523,19 @@ const LobbyMessageIntents = {
     session_created: (data) => {
         privateSessionData = data.session;
         isLobbyHost = true;
-        showPrivateLobby(data.session, data.share_code, data.share_url);
+        const code = data.share_code || data.session?.session_code;
+        showPrivateLobby(
+            data.session,
+            code,
+            `${window.location.origin}/invited/fasttrack/join.html?code=${encodeURIComponent(code)}`
+        );
     },
 
     session_joined: (data) => {
         privateSessionData = data.session;
         isLobbyHost = data.session.host_id === myUserId;
         showPrivateLobby(data.session, data.session.session_code,
-            `https://kensgames.com/fasttrack/join.html?code=${data.session.session_code}`);
+            `${window.location.origin}/invited/fasttrack/join.html?code=${encodeURIComponent(data.session.session_code)}`);
     },
 
     join_request: (data) => {
@@ -596,6 +658,19 @@ const LobbyMessageIntents = {
             applyRemoteGameState(data.game_state);
     },
 
+    game_action: (data) => {
+        const action = data.action;
+        if (!action || typeof action !== 'object') return;
+        if (action.type === 'turn_timer_warning') {
+            handleRemoteTurnTimerWarning(action);
+            return;
+        }
+        if (action.type === 'turn_timer_expired') {
+            handleRemoteTurnTimerExpired(action);
+            return;
+        }
+    },
+
     error: (data) => {
         showMsg(data.message ?? 'Error occurred', 3000);
         console.error('[Lobby] Error:', data.message);
@@ -709,7 +784,7 @@ window.createPrivateGame = async function () {
         }
 
         // Show the join URL with locally-generated code
-        const joinUrl = `/fasttrack/join.html?code=${localCode}`;
+        const joinUrl = `/invited/fasttrack/join.html?code=${encodeURIComponent(localCode)}`;
         const fullUrl = window.location.origin + joinUrl;
 
         // Create local session data
@@ -773,7 +848,7 @@ function showPrivateLobby(session, code, url) {
     if (codeDisplay) codeDisplay.textContent = code || '------';
 
     // Update URL — ensure absolute
-    let fullUrl = url || `/fasttrack/join.html?code=${code}`;
+    let fullUrl = url || `/invited/fasttrack/join.html?code=${encodeURIComponent(code)}`;
     if (fullUrl.startsWith('/')) fullUrl = window.location.origin + fullUrl;
     const urlInput = document.getElementById('private-share-url');
     if (urlInput) urlInput.value = fullUrl;
@@ -1156,12 +1231,20 @@ function startMultiplayerGame(session) {
     multiplayerSession = session;
 
     // Initialize session settings for organizer controls
+    const ttEnabled = session.settings?.turn_timer !== false;
+    const ttWait = Number(session.settings?.turn_timer_seconds || 120);
+    const ttWarn = Number(session.settings?.warning_seconds || 60);
     initSessionSettings({
         isOrganizer: isLobbyHost,
         organizerId: session.host_id,
         isPrivate: session.is_private,
         replaceWithBot: true,
         noBots: !(session.settings?.allow_bots !== false),
+        turnTimer: ttEnabled,
+        turnTimerWaitSeconds: Number.isFinite(ttWait) ? ttWait : 120,
+        turnTimerClockSeconds: Number.isFinite(ttWarn) ? ttWarn : 60,
+        turnTimerSeconds: (Number.isFinite(ttWait) ? ttWait : 120) + (Number.isFinite(ttWarn) ? ttWarn : 60),
+        warningSeconds: Number.isFinite(ttWarn) ? ttWarn : 60,
         allowLateJoin: session.settings?.allow_late_join !== false
     });
 
@@ -7756,7 +7839,7 @@ function showPlayAgainButton(winner) {
                     background:linear-gradient(135deg,rgba(0,255,255,0.6),rgba(0,200,255,0.5));
                     border:1px solid rgba(0,255,255,0.5);border-radius:20px;color:#fff;cursor:pointer;
                     box-shadow:0 0 15px rgba(0,255,255,0.3);transition:all 0.3s;">
-                    ✨ Sign Up Free
+                    ✨ Sign Up
                 </button>
             `;
         overlay.appendChild(signupDiv);
@@ -8084,7 +8167,9 @@ let turnTimerState = {
     secondsRemaining: 0,
     clockSeconds: 60,
     phase: null,        // 'wait' or 'clock'
-    isWarning: false
+    isWarning: false,
+    _remoteUiIntervalId: null,
+    _remoteTurnToken: null
 };
 
 // Initialize session settings from URL params or server data
@@ -8754,6 +8839,16 @@ window.handleServerJoinRequest = handleServerJoinRequest;
 function startTurnTimer() {
     if (!gameSessionSettings.turnTimer) return;
 
+    const isNetworkedMultiplayer = !!(isMultiplayerGame && lobbyWebSocket && lobbyWebSocket.readyState === WebSocket.OPEN);
+    const isAuthoritative = !isNetworkedMultiplayer || !!(isLobbyHost || gameSessionSettings.isOrganizer);
+
+    // In networked multiplayer, only the host enforces the timer.
+    // Other clients render warning UI from host broadcasts.
+    if (isNetworkedMultiplayer && !isAuthoritative) {
+        stopTurnTimer();
+        return;
+    }
+
     // Only use turn timer in multiplayer games with 2+ human players.
     // Solo play against bots doesn't need a timer.
     if (gameState && gameState.players) {
@@ -8793,6 +8888,18 @@ function startTurnTimer() {
                 turnTimerState.secondsRemaining = turnTimerState.clockSeconds;
                 turnTimerState.isWarning = true;
 
+                // Broadcast warning start so all clients show the 60s countdown.
+                if (isNetworkedMultiplayer && isAuthoritative && typeof GameStateBroadcaster !== 'undefined') {
+                    const turnToken = `${gameState?.turnCount ?? ''}:${gameState?.currentPlayerIndex ?? ''}`;
+                    GameStateBroadcaster.sendAction({
+                        type: 'turn_timer_warning',
+                        turnToken,
+                        playerIndex: gameState?.currentPlayerIndex,
+                        warningSeconds: turnTimerState.clockSeconds,
+                        startedAt: Date.now()
+                    });
+                }
+
                 // Show the countdown clock
                 if (timerDisplay) timerDisplay.style.display = 'block';
                 if (label) label.textContent = 'Time Remaining';
@@ -8830,8 +8937,13 @@ function stopTurnTimer() {
         clearTimeout(turnTimerState.waitTimeoutId);
         turnTimerState.waitTimeoutId = null;
     }
+    if (turnTimerState._remoteUiIntervalId) {
+        clearInterval(turnTimerState._remoteUiIntervalId);
+        turnTimerState._remoteUiIntervalId = null;
+    }
     turnTimerState.active = false;
     turnTimerState.phase = null;
+    turnTimerState._remoteTurnToken = null;
 
     const timerDisplay = document.getElementById('turn-timer-display');
     if (timerDisplay) timerDisplay.style.display = 'none';
@@ -8852,30 +8964,116 @@ function handleTurnTimerExpired() {
     const currentIdx = gameState?.currentPlayerIndex;
     if (currentIdx === undefined) return;
 
-    const player = gameState.players[currentIdx];
+    const isNetworkedMultiplayer = !!(isMultiplayerGame && lobbyWebSocket && lobbyWebSocket.readyState === WebSocket.OPEN);
+    const isAuthoritative = !isNetworkedMultiplayer || !!(isLobbyHost || gameSessionSettings.isOrganizer);
+
+    // In networked multiplayer, only the host is allowed to enforce expiry.
+    if (isNetworkedMultiplayer && !isAuthoritative) return;
+
+    const mode = gameSessionSettings.noBots ? 'remove' : 'bot';
+    if (isNetworkedMultiplayer && typeof GameStateBroadcaster !== 'undefined') {
+        const turnToken = `${gameState?.turnCount ?? ''}:${gameState?.currentPlayerIndex ?? ''}`;
+        GameStateBroadcaster.sendAction({
+            type: 'turn_timer_expired',
+            turnToken,
+            playerIndex: currentIdx,
+            mode,
+            timestamp: Date.now()
+        });
+    }
+
+    applyTurnTimerExpiry({ playerIndex: currentIdx, mode, isAuthoritative: true });
+}
+
+function applyTurnTimerExpiry({ playerIndex, mode, isAuthoritative }) {
+    if (!gameState || !gameState.players || playerIndex === undefined || playerIndex === null) return;
+    const player = gameState.players[playerIndex];
     if (!player || player.isAI) return;
 
-    // Check organizer setting: bots allowed?
-    if (gameSessionSettings.noBots) {
-        // === NO BOTS MODE: Remove player entirely ===
+    if (mode === 'remove') {
         showBotAlert(
             `${player.name} Timed Out`,
             `${player.name} ran out of time and has been removed from the game. Their pegs have been cleared.`
         );
-        removePlayerFromGame(currentIdx);
-        console.log(`[TurnTimer] Player ${currentIdx} removed (no-bots mode)`);
-    } else {
-        // === BOTS ALLOWED: Replace with bot ===
-        showBotAlert(
-            'Time\'s Up!',
-            `${player.name} ran out of time and has been replaced by a bot.`
-        );
-        replacePlayerWithBot(currentIdx);
-
-        // Let the bot take over
-        setTimeout(() => aiTakeTurn(), 1000);
-        console.log(`[TurnTimer] Player ${currentIdx} replaced with bot`);
+        removePlayerFromGame(playerIndex);
+        console.log(`[TurnTimer] Player ${playerIndex} removed (no-bots mode)`);
+        return;
     }
+
+    showBotAlert(
+        'Time\'s Up!',
+        `${player.name} ran out of time and has been replaced by a bot.`
+    );
+    replacePlayerWithBot(playerIndex);
+
+    // Only the authoritative controller should drive AI decisions.
+    if (isAuthoritative && typeof aiTakeTurn === 'function') {
+        setTimeout(() => aiTakeTurn(), 1000);
+    }
+    console.log(`[TurnTimer] Player ${playerIndex} replaced with bot`);
+}
+
+function handleRemoteTurnTimerWarning(action) {
+    const isNetworkedMultiplayer = !!(isMultiplayerGame && lobbyWebSocket && lobbyWebSocket.readyState === WebSocket.OPEN);
+    if (!isNetworkedMultiplayer) return;
+
+    // Host does not receive its own relay; but keep this safe.
+    if (isLobbyHost || gameSessionSettings.isOrganizer) return;
+
+    // Avoid showing stale warnings
+    if (action.turnToken && turnTimerState._remoteTurnToken && action.turnToken !== turnTimerState._remoteTurnToken) {
+        // A different turn warning is already active; replace it.
+    }
+    turnTimerState._remoteTurnToken = action.turnToken || null;
+
+    const timerDisplay = document.getElementById('turn-timer-display');
+    const countdown = document.getElementById('turn-timer-countdown');
+    const warning = document.getElementById('turn-timer-warning');
+    const label = document.getElementById('turn-timer-label');
+
+    const warningSeconds = Number(action.warningSeconds || 60);
+    const startedAt = Number(action.startedAt || Date.now());
+
+    if (timerDisplay) timerDisplay.style.display = 'block';
+    if (label) label.textContent = 'Time Remaining';
+    if (warning) {
+        warning.textContent = '⚠️ Make your move!';
+        warning.style.display = 'block';
+    }
+    if (countdown) countdown.classList.add('warning');
+
+    const tick = () => {
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        const remaining = Math.max(0, warningSeconds - elapsed);
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        if (countdown) countdown.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        if (remaining <= 15 && countdown) countdown.classList.add('critical');
+        if (remaining <= 15 && warning) warning.textContent = '⏰ Hurry up!';
+        if (remaining <= 0) {
+            if (turnTimerState._remoteUiIntervalId) {
+                clearInterval(turnTimerState._remoteUiIntervalId);
+                turnTimerState._remoteUiIntervalId = null;
+            }
+        }
+    };
+
+    if (turnTimerState._remoteUiIntervalId) clearInterval(turnTimerState._remoteUiIntervalId);
+    tick();
+    turnTimerState._remoteUiIntervalId = setInterval(tick, 1000);
+}
+
+function handleRemoteTurnTimerExpired(action) {
+    const isNetworkedMultiplayer = !!(isMultiplayerGame && lobbyWebSocket && lobbyWebSocket.readyState === WebSocket.OPEN);
+    if (!isNetworkedMultiplayer) return;
+    if (isLobbyHost || gameSessionSettings.isOrganizer) return;
+
+    // Clear warning UI
+    stopTurnTimer();
+
+    const idx = action.playerIndex;
+    const mode = action.mode || 'bot';
+    applyTurnTimerExpiry({ playerIndex: idx, mode, isAuthoritative: false });
 }
 
 function showBotAlert(title, message) {
@@ -10626,6 +10824,43 @@ function startGameSession() {
     if (!isMultiplayerGame && sessionParams.get('multiplayer') === 'true') {
         isMultiplayerGame = true;
         console.log('[startGameSession] Set isMultiplayerGame=true from URL param');
+    }
+
+    // Multiplayer (lobby redirect): hydrate identity + session settings from sessionStorage
+    if (isMultiplayerGame) {
+        try {
+            const storedMyId = sessionStorage.getItem('ft_my_user_id');
+            if (storedMyId) myUserId = storedMyId;
+        } catch (e) { }
+
+        let hostUserId = null;
+        try { hostUserId = sessionStorage.getItem('ft_host_user_id'); } catch (e) { }
+
+        // Turn timer settings: 2 min silent + 1 min warning (host can opt out)
+        let turnTimerEnabled = true;
+        let waitSeconds = 120;
+        let warningSeconds = 60;
+        try {
+            const enabledRaw = sessionStorage.getItem('ft_turn_timer_enabled');
+            if (enabledRaw === '0') turnTimerEnabled = false;
+            if (enabledRaw === '1') turnTimerEnabled = true;
+
+            const ws = Number(sessionStorage.getItem('ft_turn_timer_wait_seconds') || 120);
+            const warn = Number(sessionStorage.getItem('ft_turn_timer_warning_seconds') || 60);
+            if (Number.isFinite(ws) && ws >= 0) waitSeconds = ws;
+            if (Number.isFinite(warn) && warn >= 0) warningSeconds = warn;
+        } catch (e) { }
+
+        const isOrganizer = !!(hostUserId && myUserId && String(hostUserId) === String(myUserId));
+        initSessionSettings({
+            isOrganizer,
+            organizerId: hostUserId,
+            turnTimer: !!turnTimerEnabled,
+            turnTimerWaitSeconds: waitSeconds,
+            turnTimerClockSeconds: warningSeconds,
+            turnTimerSeconds: waitSeconds + warningSeconds,
+            warningSeconds: warningSeconds
+        });
     }
 
     // Multiplayer: derive player count from the session roster stored by lobby_client.js

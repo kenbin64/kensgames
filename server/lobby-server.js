@@ -25,7 +25,30 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const http = require('http');
 
+const AuthHandler = require('./auth-handler');
+
 const PORT = 8765;
+
+const authHandler = new AuthHandler();
+
+function stableGuestIdFromToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  if (!token.startsWith('guest-')) return null;
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  return `guest_${hash.slice(0, 16)}`;
+}
+
+function postAuthSendSessionState(ws, userId) {
+  if (!userId) return;
+  const session = findSessionByPlayer(userId);
+  if (!session) return;
+
+  // Unified clients expect a session_update to hydrate UI.
+  send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'resume' });
+  if (session.status === 'playing') {
+    send(ws, { type: 'game_started', session: sanitizeSession(session) });
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // In-memory state
@@ -89,6 +112,28 @@ function authApiRequest(path, body) {
   });
 }
 
+function authApiValidateToken(token) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: 3000,
+      path: '/api/auth/validate',
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (e) { reject(new Error('Invalid JSON from auth validate')); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(5000, () => { req.destroy(); reject(new Error('Auth validate timeout')); });
+    req.end();
+  });
+}
+
 function hashPassword(pw) {
   return crypto.createHash('sha256').update(pw).digest('hex');
 }
@@ -125,14 +170,25 @@ function getWsByUserId(userId) {
 
 // ── Registered game types ──
 const GAME_REGISTRY = {
-  fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', maxPlayers: 6, type: 'turn' },
-  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/index.html', maxPlayers: 4, type: 'realtime' },
-  starfighter: { name: 'Starfighter', path: '/starfighter/index.html', maxPlayers: 6, type: 'realtime' },
-  connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', maxPlayers: 2, type: 'turn' },
-  swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', maxPlayers: 4, type: 'turn' },
-  cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: '4D TicTacToe', path: '/4DTicTacToe/index.html', maxPlayers: 4, type: 'turn' },
+  fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
+  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
+  starfighter: { name: 'Starfighter', path: '/starfighter/index.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
+  connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
+  swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
+  cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },
+  tictactoe: { name: '4D TicTacToe', path: '/4DTicTacToe/index.html', lobby: '/4DTicTacToe/lobby.html', maxPlayers: 4, type: 'turn' },
 };
+
+function resetLobbyAcceptance(session) {
+  if (!session) return;
+  if (!session.settings) session.settings = {};
+  session.settings.lobby_accepted = false;
+}
+
+function broadcastSessionUpdate(session, extra) {
+  if (!session) return;
+  broadcast(session.session_id, { type: 'session_update', session: sanitizeSession(session), ...(extra || {}) });
+}
 
 function getPublicSessions(gameId) {
   const result = [];
@@ -219,10 +275,61 @@ handlers.ping = (ws) => {
   send(ws, { type: 'pong' });
 };
 
+// Some join flows send this when the user hits Cancel on a join spinner.
+// We don't currently keep a pending-approval queue, so this is a no-op.
+handlers.cancel_join_request = () => { };
+
+// --- Unified auth (KGMultiplayer) ---
+// Accepts { token, username, guest_name, avatar_id }
+// - token missing OR token starts with "guest-" → guest_login
+// - otherwise validate JWT via Auth API and treat as signed-in user
+handlers.auth = async (ws, data) => {
+  const token = data && data.token ? String(data.token) : '';
+  const username = (data && (data.username || data.guest_name)) ? String(data.username || data.guest_name) : 'Guest';
+  const avatarId = (data && data.avatar_id) ? String(data.avatar_id) : (data && data.avatarId) ? String(data.avatarId) : null;
+
+  // Guest path
+  if (!token || token.startsWith('guest-')) {
+    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
+  }
+
+  // Signed-in path (validate token)
+  try {
+    const res = await authApiValidateToken(token);
+    if (res.status !== 200 || !res.body || !res.body.valid) {
+      // Fallback to guest if token invalid (keeps invite links usable)
+      return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile' });
+    }
+
+    const userId = `user_${res.body.userId}`;
+    const user = {
+      user_id: userId,
+      id: userId,
+      username: username.slice(0, 20),
+      avatar_id: avatarId || 'person_smile',
+      is_guest: false,
+      prestige_level: 'bronze',
+      prestige_points: 0,
+      games_played: 0,
+      games_won: 0,
+      guild_id: null
+    };
+
+    connections.set(ws, { user_id: userId, user });
+    send(ws, { type: 'auth_success', action: 'token_auth', user, user_id: user.user_id, username: user.username });
+    postAuthSendSessionState(ws, userId);
+  } catch (e) {
+    console.error('[Lobby] Auth validate error:', e.message);
+    // Non-fatal: allow guest so invites still work
+    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
+  }
+};
+
 // --- Auth ---
 
 handlers.guest_login = (ws, data) => {
-  const userId = generateId('guest');
+  const stableId = stableGuestIdFromToken(data && data.token ? String(data.token) : '');
+  const userId = stableId || generateId('guest');
   const username = (data.name || `Guest_${Math.random().toString(36).slice(2, 6)}`).slice(0, 20);
   const avatarId = data.avatar_id || 'person_smile';
 
@@ -244,8 +351,12 @@ handlers.guest_login = (ws, data) => {
   send(ws, {
     type: 'auth_success',
     action: 'guest_login',
-    user
+    user,
+    user_id: user.user_id,
+    username: user.username
   });
+
+  postAuthSendSessionState(ws, userId);
 };
 
 handlers.login = async (ws, data) => {
@@ -278,7 +389,9 @@ handlers.login = async (ws, data) => {
       send(ws, {
         type: 'auth_success',
         action: 'login',
-        user: { ...user, auth_token: undefined }
+        user: { ...user, auth_token: undefined },
+        user_id: user.user_id,
+        username: user.username
       });
     } else {
       send(ws, { type: 'error', message: res.body.error || 'Invalid credentials' });
@@ -330,7 +443,9 @@ handlers.register = async (ws, data) => {
       send(ws, {
         type: 'auth_success',
         action: 'register',
-        user: { ...user, auth_token: undefined }
+        user: { ...user, auth_token: undefined },
+        user_id: user.user_id,
+        username: user.username
       });
     } else {
       send(ws, { type: 'error', message: res.body.error || 'Registration failed' });
@@ -379,9 +494,9 @@ handlers.create_session = (ws, data) => {
     return;
   }
 
-  // Only signed-in users can create private games
-  if (conn.user.is_guest && data.private) {
-    send(ws, { type: 'error', message: 'Sign in to create a private game' });
+  // Guests may create PRIVATE invite-code sessions, but not public listings.
+  if (conn.user.is_guest && !(data && data.private)) {
+    send(ws, { type: 'error', message: 'Sign in to create public games' });
     return;
   }
 
@@ -414,7 +529,7 @@ handlers.create_session = (ws, data) => {
     host_username: conn.user.username,
     is_private: !!data.private,
     max_players: maxPlayers,
-    settings: data.settings || {},
+    settings: { ...(data.settings || {}), lobby_accepted: false },
     status: 'waiting',
     created_at: Date.now(),
     players: [{
@@ -454,6 +569,13 @@ handlers.list_sessions = (ws, data) => {
 handlers.matchmake = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
+
+  // Spec: matchmaking requires sign-in
+  if (conn.user.is_guest) {
+    send(ws, { type: 'error', message: 'Sign in to use matchmaking' });
+    return;
+  }
+
   const gameId = data.game_id || 'fasttrack';
   const existing = findSessionByPlayer(conn.user_id);
   if (existing) removePlayerFromSession(conn.user_id);
@@ -467,7 +589,7 @@ handlers.matchmake = (ws, data) => {
 
     // Join this session
     const slot = session.players.length;
-    session.players.push({
+    const player = {
       user_id: conn.user_id,
       username: conn.user.username,
       avatar_id: conn.user.avatar_id,
@@ -475,12 +597,50 @@ handlers.matchmake = (ws, data) => {
       is_ai: false,
       slot,
       ready: false
-    });
+    };
+    session.players.push(player);
+
+    resetLobbyAcceptance(session);
+
+    const playersPayload = session.players.map(p => ({
+      user_id: p.user_id,
+      username: p.username,
+      avatar_id: p.avatar_id,
+      is_host: p.is_host,
+      is_ai: p.is_ai,
+      slot: p.slot,
+      ready: p.ready
+    }));
+
     broadcast(session.session_id, {
       type: 'player_joined',
       session: sanitizeSession(session),
+      player: {
+        user_id: player.user_id,
+        username: player.username,
+        avatar_id: player.avatar_id,
+        is_host: false,
+        is_ai: false,
+        slot: player.slot,
+        ready: player.ready
+      },
+      players: playersPayload,
       username: conn.user.username
     });
+
+    send(ws, { type: 'session_joined', session: sanitizeSession(session) });
+
+    // Starfighter Versus: auto-start when both players are present.
+    if (gameId === 'starfighter' && session.players.length >= 2) {
+      if (!session.settings) session.settings = {};
+      session.settings.lobby_accepted = true;
+      session.status = 'playing';
+      for (const p of session.players) {
+        const pws = getWsByUserId(p.user_id);
+        if (pws) send(pws, { type: 'game_started', session: sanitizeSession(session) });
+      }
+      broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: session.session_id });
+    }
     return;
   }
 
@@ -495,8 +655,9 @@ handlers.matchmake = (ws, data) => {
     host_id: conn.user_id,
     host_username: conn.user.username,
     is_private: false,
-    max_players: gameInfo.maxPlayers || 4,
-    settings: {},
+    // Starfighter Versus is 2-player quick match
+    max_players: (gameId === 'starfighter') ? 2 : (gameInfo.maxPlayers || 4),
+    settings: { lobby_accepted: false },
     status: 'waiting',
     created_at: Date.now(),
     players: [{
@@ -537,6 +698,7 @@ handlers.resolve_code = (ws, data) => {
     game_id: session.game_id,
     game_name: gameInfo.name || session.game_id,
     game_path: gameInfo.path || '/',
+    game_lobby_path: gameInfo.lobby || gameInfo.path || '/',
     session: sanitizeSession(session),
   });
 };
@@ -548,9 +710,31 @@ handlers.join_session = (ws, data) => {
     return;
   }
 
+  // Back-compat: allow { code } in join_session by delegating
+  if (data && data.code) {
+    return handlers.join_by_code(ws, { code: data.code });
+  }
+
+  // Spec: joining via browsing/match sessions requires sign-in (invite codes are the exception)
+  if (conn.user.is_guest && !(data && data.allow_guest)) {
+    send(ws, { type: 'error', message: 'Sign in to join games (invite codes are the exception)' });
+    return;
+  }
+
   const session = sessions.get(data.session_id);
   if (!session) {
     send(ws, { type: 'error', message: 'Game not found' });
+    return;
+  }
+
+  // Rejoin / resume: if the player is already in this session, allow it even if started.
+  // This enables lobby → game navigation and reconnects for stable guest tokens.
+  if (session.players.some(p => p.user_id === conn.user_id)) {
+    send(ws, { type: 'session_joined', session: sanitizeSession(session), action: 'rejoined' });
+    send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'rejoined' });
+    if (session.status === 'playing') {
+      send(ws, { type: 'game_started', session: sanitizeSession(session) });
+    }
     return;
   }
   if (session.status !== 'waiting') {
@@ -581,6 +765,8 @@ handlers.join_session = (ws, data) => {
   };
   session.players.push(player);
 
+  resetLobbyAcceptance(session);
+
   // Notify joiner
   send(ws, { type: 'session_joined', session: sanitizeSession(session) });
 
@@ -597,9 +783,13 @@ handlers.join_session = (ws, data) => {
     },
     players: session.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   }, ws);
+
+  // Also send a canonical session update for unified clients
+  broadcastSessionUpdate(session, { action: 'player_joined' });
+  send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'joined' });
 };
 
 handlers.join_by_code = (ws, data) => {
@@ -617,7 +807,7 @@ handlers.join_by_code = (ws, data) => {
   }
 
   // Delegate to join_session
-  handlers.join_session(ws, { session_id: sessionId });
+  handlers.join_session(ws, { session_id: sessionId, allow_guest: true });
 };
 
 handlers.leave_session = (ws) => {
@@ -630,6 +820,8 @@ handlers.leave_session = (ws) => {
   const sessionId = session.session_id;
   removePlayerFromSession(conn.user_id);
 
+  resetLobbyAcceptance(session);
+
   send(ws, { type: 'left_session' });
 
   // Notify remaining
@@ -639,9 +831,11 @@ handlers.leave_session = (ws) => {
       username: conn.user.username,
       players: session.players.map(p => ({
         user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-        is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+        is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
       }))
     });
+
+    broadcastSessionUpdate(session, { action: 'player_left' });
   }
 };
 
@@ -683,6 +877,35 @@ handlers.update_session_settings = (ws, data) => {
   if (data.max_players) {
     session.max_players = Math.min(Math.max(data.max_players, 2), 6);
   }
+
+  send(ws, { type: 'session_settings_updated', session: sanitizeSession(session) });
+  broadcastSessionUpdate(session, { action: 'settings_updated' });
+};
+
+// Host acceptance gate (ready-check then accept)
+handlers.accept_lobby = (ws) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session) return;
+  if (session.host_id !== conn.user_id) {
+    send(ws, { type: 'error', message: 'Only the host can accept the group' });
+    return;
+  }
+
+  const allHumansReady = session.players
+    .filter(p => !p.is_ai)
+    .every(p => !!p.ready);
+
+  if (!allHumansReady) {
+    send(ws, { type: 'error', message: 'All players must be ready before accepting' });
+    return;
+  }
+
+  if (!session.settings) session.settings = {};
+  session.settings.lobby_accepted = true;
+  broadcastSessionUpdate(session, { action: 'accepted' });
+  send(ws, { type: 'lobby_accepted', session: sanitizeSession(session) });
 };
 
 handlers.add_ai_player = (ws, data) => {
@@ -722,6 +945,8 @@ handlers.add_ai_player = (ws, data) => {
   };
   session.players.push(bot);
 
+  resetLobbyAcceptance(session);
+
   // Notify all in session
   broadcast(session.session_id, {
     type: 'player_joined',
@@ -735,7 +960,7 @@ handlers.add_ai_player = (ws, data) => {
     },
     players: session.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
 
@@ -752,10 +977,13 @@ handlers.add_ai_player = (ws, data) => {
     },
     players: session.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
 };
+
+// Aliases for unified clients
+handlers.add_ai = (ws, data) => handlers.add_ai_player(ws, { level: data && data.difficulty ? data.difficulty : (data && data.level ? data.level : 'medium') });
 
 handlers.remove_ai_player = (ws, data) => {
   const conn = connections.get(ws);
@@ -783,12 +1011,13 @@ handlers.remove_ai_player = (ws, data) => {
   }
 
   if (removed) {
+    resetLobbyAcceptance(session);
     // Re-slot
     session.players.forEach((p, i) => { p.slot = i; });
 
     const playersPayload = session.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }));
 
     // Notify everyone in session including the sender
@@ -805,6 +1034,8 @@ handlers.remove_ai_player = (ws, data) => {
   }
 };
 
+handlers.remove_ai = (ws, data) => handlers.remove_ai_player(ws, { player_id: (data && data.player_id) || null });
+
 handlers.start_game = (ws) => {
   const conn = connections.get(ws);
   if (!conn) return;
@@ -820,6 +1051,19 @@ handlers.start_game = (ws) => {
   }
   if (session.players.length < 2) {
     send(ws, { type: 'error', message: 'Need at least 2 players' });
+    return;
+  }
+
+  const allHumansReady = session.players
+    .filter(p => !p.is_ai)
+    .every(p => !!p.ready);
+  if (!allHumansReady) {
+    send(ws, { type: 'error', message: 'All players must be ready' });
+    return;
+  }
+
+  if (!session.settings || session.settings.lobby_accepted !== true) {
+    send(ws, { type: 'error', message: 'Host must accept the group before launch' });
     return;
   }
 
@@ -1077,16 +1321,28 @@ handlers.toggle_ready = (ws) => {
   const player = session.players.find(p => p.user_id === conn.user_id);
   if (player) {
     player.ready = !player.ready;
+
+    resetLobbyAcceptance(session);
+
+    const sessionPayload = sanitizeSession(session);
+    broadcast(session.session_id, { type: 'ready_update', session: sessionPayload, user_id: conn.user_id, ready: player.ready });
+    send(ws, { type: 'ready_update', session: sessionPayload, user_id: conn.user_id, ready: player.ready });
+
+    // Back-compat message
     broadcast(session.session_id, {
       type: 'player_ready_changed',
       user_id: conn.user_id,
-      ready: player.ready
+      ready: player.ready,
+      username: conn.user.username
     });
     send(ws, {
       type: 'player_ready_changed',
       user_id: conn.user_id,
-      ready: player.ready
+      ready: player.ready,
+      username: conn.user.username
     });
+
+    broadcastSessionUpdate(session, { action: 'ready_changed' });
   }
 };
 
@@ -1162,7 +1418,7 @@ wss.on('connection', (ws) => {
             username: conn.user.username,
             players: session.players.map(p => ({
               user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-              is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
+              is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
             }))
           });
         }

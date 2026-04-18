@@ -2,7 +2,7 @@
    FAST TRACK LOBBY — 80s Wizard Theme
    Deep void, neon cyan / electric green / arcane purple
    ═══════════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600;700&display=swap');
+/* Fonts are self-hosted via /lib/fonts/fonts.css (Orbitron + Rajdhani) */
 
 :root {
     --bg: #07040f;
@@ -45,7 +45,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: 'Rajdhani', -apple-system, 'Segoe UI', sans-serif;
     background: var(--bg);
     /* 80s Wizard atmosphere: deep void + perspective grid floor + neon corona */
     background-image:
@@ -92,13 +92,13 @@ body {
 
 /* ── TYPOGRAPHY ────────────────────────────────────────────── */
 .font-arcade {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
 }
 
 h1,
 h2,
 h3 {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
 }
 
 /* ── LAYOUT ────────────────────────────────────────────────── */
@@ -179,7 +179,7 @@ h3 {
 
 /* ── BUTTONS ───────────────────────────────────────────────── */
 .btn {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.5rem;
     padding: 0.75rem 1.25rem;
     border: 1px solid var(--border);
@@ -287,7 +287,7 @@ h3 {
 /* ── INPUTS ────────────────────────────────────────────────── */
 .input,
 select {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 0.9rem;
     padding: 0.75rem 1rem;
     background: var(--bg-input);
@@ -320,7 +320,7 @@ select:focus {
     margin-bottom: 0.4rem;
     letter-spacing: 1px;
     text-transform: uppercase;
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
 }
 
 /* ── TOGGLE SWITCH ─────────────────────────────────────────── */
@@ -468,7 +468,7 @@ select:focus {
 /* ── PLAY MODES — Big action cards ─────────────────────────── */
 .play-modes {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
     margin-bottom: 2rem;
 }
@@ -508,7 +508,7 @@ select:focus {
 }
 
 .play-mode .mode-title {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.55rem;
     color: var(--cyan);
     margin-bottom: 0.75rem;
@@ -525,7 +525,7 @@ select:focus {
     position: absolute;
     top: 0.75rem;
     right: 0.75rem;
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.3rem;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
@@ -928,7 +928,7 @@ select:focus {
 }
 
 .waiting-code {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 1.5rem;
     color: var(--cyan);
     text-shadow: var(--glow-cyan);
@@ -990,7 +990,7 @@ select:focus {
 
 /* ── PRESTIGE BADGES ───────────────────────────────────────── */
 .prestige-badge {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.35rem;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
@@ -1084,7 +1084,7 @@ select:focus {
 }
 
 .tab {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.38rem;
     padding: 0.7rem 1rem;
     background: transparent;
@@ -1124,6 +1124,47 @@ select:focus {
     animation: panel3dIn 0.38s cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
+/* ── LOUNGE HELPERS ────────────────────────────────────────── */
+.lounge-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.lounge-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+.lounge-h {
+    margin: 0 0 0.5rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.lounge-bullets {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.lounge-bullets li {
+    margin: 0.35rem 0;
+}
+
+@media (max-width: 900px) {
+    .lounge-two {
+        grid-template-columns: 1fr;
+    }
+
+    .lounge-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
 @keyframes panel3dIn {
     from {
         opacity: 0;
@@ -1148,7 +1189,7 @@ select:focus {
 }
 
 .toast {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 0.85rem;
     padding: 0.75rem 1.25rem;
     border-radius: 8px;
@@ -1228,7 +1269,7 @@ select:focus {
     font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.4rem;
 }
 
@@ -1437,7 +1478,7 @@ select:focus {
 }
 
 .quick-action-title {
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Orbitron', monospace;
     font-size: 0.38rem;
     color: var(--cyan);
     letter-spacing: 0.5px;
@@ -1606,7 +1647,7 @@ body::before {
     border: 1px solid rgba(200, 160, 60, 0.3);
     border-radius: 24px;
     color: #c8a03c;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 0.75rem;
     cursor: pointer;
     backdrop-filter: blur(12px);

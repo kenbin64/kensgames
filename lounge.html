@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎭 Logged-In Lounge - Manifold Gaming Portal</title>
+    <title>🎭 The Lounge - KensGames</title>
     <meta name="description"
-        content="Multiplayer game lobbies, real-time matchmaking, and global leaderboards on the Manifold Gaming Portal">
-    <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+        content="Multiplayer game lobbies, real-time matchmaking, and global leaderboards on KensGames">
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
     <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
 
     <style>
@@ -86,6 +86,24 @@
 
         .nav-links a:hover {
             color: var(--primary);
+        }
+
+        #access-status a.kg-access-link {
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 180, 255, 0.35);
+            background: rgba(0, 180, 255, 0.08);
+            color: var(--text);
+            font-size: 12px;
+            text-decoration: none;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        #access-status a.kg-access-link:hover {
+            background: rgba(0, 180, 255, 0.16);
         }
 
         main {
@@ -368,7 +386,10 @@
             }
         }
     </style>
-  <script src="/js/analytics.js"></script>
+    <script src="/js/access_status.js" defer></script>
+    <script src="/js/substrates/avatar_picker.js" defer></script>
+    <script src="/js/substrates/player_profile.js" defer></script>
+    <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -376,11 +397,12 @@
 
     <!-- Navigation -->
     <nav>
-        <a href="/" class="logo">⟳ MANIFOLD</a>
+        <a href="/" class="logo">⟳ KENSGAMES</a>
         <div class="nav-links">
             <a href="/">🎮 Home</a>
             <a href="/lobby/">🎲 Game Portal</a>
-            <a href="#" onclick="handleLogout()">🚪 Logout</a>
+            <div id="kg-player"></div>
+            <div id="access-status" data-access-mode="compact"></div>
         </div>
     </nav>
 
@@ -388,7 +410,7 @@
     <main>
         <!-- Header -->
         <section class="lounge-header">
-            <h1 class="lounge-title">🎭 The Logged-In Lounge</h1>
+            <h1 class="lounge-title">🎭 The Lounge</h1>
             <p class="lounge-subtitle">Matchmade Multiplayer Gaming</p>
             <div class="online-status">
                 <div class="online-dot"></div>
@@ -560,11 +582,6 @@
         function joinLobby(gameId, gameTitle) {
             alert(`🎮 Joining ${gameTitle}...\n\nIn production, this would:\n- Connect to WebSocket server\n- Put you in a game lobby\n- Match you with players\n- Launch the game`);
             // TODO: Implement actual multiplayer connection
-        }
-
-        function handleLogout() {
-            sessionStorage.removeItem('user_session');
-            window.location.href = '/';
         }
 
         function renderGlobalLeaderboard() {

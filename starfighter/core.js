@@ -32,9 +32,20 @@ const Starfighter = (function () {
         aiWingmen: true, // AI wingmen always present in solo play
         maxLives: 3,
         livesRemaining: 3,
+        eliminated: false,     // true when non-leader runs out of lives
+        spectating: false,     // true in multiplayer after elimination
+        _waveDeaths: 0,        // deaths this wave (resets each new wave in _configureGame)
+        _performanceTier: 2,   // 2=clean / 1=one death / 0=two+ deaths — gates debrief shop
         respawnReason: 'HULL INTEGRITY FAIL',
         _replacementVariant: '',
         _replacementBriefing: '',
+        // ── Training wave state (wave 1 guided flight training) ──
+        _trainingMode: false,     // true during wave 1 training sortie
+        _trainingPhase: 0,        // current training step index
+        _trainingTimer: 0,        // timer for advancing training steps
+        _trainingSkipped: false,  // true if player dismissed training
+        _trainingDronesSpawned: false, // ensures wave 1 doesn't sit empty of hostiles
+        _trainingControlType: 'keyboard', // 'keyboard', 'gamepad', 'touch'
         callsign: localStorage.getItem('sf_callsign') || '',
         alienBaseSpawned: false, // alien hive base spawned flag
         // Multiplayer state (populated by URL params in init)
@@ -275,7 +286,7 @@ const Starfighter = (function () {
         }
 
         // ── GENERAL TACTICAL ──
-        if (s.totalHostile > 10 && pt) return `${s.totalHostile} hostiles. ${_cs()}, priority target at ${ptBearing}. Engage.`;
+        if (s.totalHostile > 10 && pt) return `${s.totalHostile} bogies. ${_cs()}, priority target at ${ptBearing}. Engage.`;
         if (s.totalHostile > 5 && pt) return `${s.totalHostile} contacts. Nearest threat at ${ptBearing}, ${_cs()}.`;
         if (s.totalHostile > 0 && s.closestPos) return `${_cs()}, contact at ${_bearing(s.closestPos)}. ${s.totalHostile} remaining. Weapons free.`;
         if (s.totalHostile > 0) return `${s.totalHostile} contacts remaining this wave. Closest at ${s.closestM}m.`;
@@ -299,7 +310,7 @@ const Starfighter = (function () {
         if (s.closestType === 'interceptor' && s.closestM < 400 && s.closestPos) return { sender: callsign, msg: `Interceptor at ${_bearing(s.closestPos)}! Engaging.` };
         if (s.closestType === 'bomber' && s.closestM < 800 && s.closestPos) return { sender: callsign, msg: `Bomber at ${_bearing(s.closestPos)} heading for base. Moving to intercept.` };
         if (s.closestType === 'predator' && s.closestPos) return { sender: callsign, msg: `Predator at ${_bearing(s.closestPos)}. Keeping distance — that plasma is lethal.` };
-        if (s.totalHostile > 8 && s.priorityTarget) return { sender: callsign, msg: `Heavy contacts — ${s.totalHostile} hostiles. Priority at ${_bearingOf(s.priorityTarget)}. Could use help.` };
+        if (s.totalHostile > 8 && s.priorityTarget) return { sender: callsign, msg: `Heavy contacts — ${s.totalHostile} bogies. Priority at ${_bearingOf(s.priorityTarget)}. Could use help.` };
         if (s.totalHostile > 3 && s.closestPos) return { sender: callsign, msg: `${s.totalHostile} on radar. Nearest at ${_bearing(s.closestPos)}. Engaging.` };
         if (s.totalHostile > 0 && s.closestPos) return { sender: callsign, msg: `${s.totalHostile} left at ${_bearing(s.closestPos)}. Pushing to clear.` };
         return { sender: callsign, msg: `Sector quiet. Holding formation near base.` };
@@ -315,11 +326,11 @@ const Starfighter = (function () {
         if (s.bombers > 0 && s.basePct < 50 && s.bomberNearBase) return `WARNING: Bomber at ${_bearingOf(s.bomberNearBase)} heading for base. Base hull only ${s.basePct}%.`;
         if (s.bombers > 0 && s.basePct < 50) return `WARNING: ${s.bombers} bombers active. Base hull only ${s.basePct}%.`;
         if (s.totalHostile > 12 && s.priorityTarget) return `CAUTION: ${s.totalHostile} signatures. Priority threat at ${_bearingOf(s.priorityTarget)}.`;
-        if (s.totalHostile > 12) return `CAUTION: ${s.totalHostile} hostile signatures. High threat density.`;
+        if (s.totalHostile > 12) return `CAUTION: ${s.totalHostile} bogie signatures. High threat density.`;
         if (s.closestM < 300 && s.closestType && s.closestPos) return `PROXIMITY: ${s.closestType} at ${_bearing(s.closestPos)}. Break if needed.`;
         if (s.predators > 0 && s.priorityTarget && s.priorityType === 'predator') return `WARNING: Predator at ${_bearingOf(s.priorityTarget)}. Avoid close range.`;
         if (s.predators > 0) return `WARNING: Predator Drone active. Avoid close range.`;
-        return `Status: ${s.totalHostile} hostiles, hull ${s.hullPct}%, base ${s.basePct}%.`;
+        return `Status: ${s.totalHostile} bogies, hull ${s.hullPct}%, base ${s.basePct}%.`;
     }
 
     // ── CIC Crew Roster ──
@@ -372,6 +383,17 @@ const Starfighter = (function () {
     function _showCallsignPrompt(onReady) {
         // Assign callsign from pool (no user input — prevents abuse)
         _assignCallsign();
+        // Auto-assign a random crew voice if not already set
+        if (window.SFAudio && SFAudio.getPlayerVoiceMenu && !localStorage.getItem('sf_voice_module')) {
+            const menu = SFAudio.getPlayerVoiceMenu();
+            const all = [...menu.female, ...menu.male];
+            const pick = all[Math.floor(Math.random() * all.length)];
+            localStorage.setItem('sf_voice_module', pick.id);
+            localStorage.setItem('sf_voice_gender', menu.female.find(v => v.id === pick.id) ? 'female' : 'male');
+            SFAudio.setCrewVoiceModule && SFAudio.setCrewVoiceModule('Cdr. Vasquez', pick.id);
+            SFAudio.setCrewVoiceModule && SFAudio.setCrewVoiceModule('Resolute Actual', pick.id);
+            SFAudio.setVoiceModule && SFAudio.setVoiceModule(pick.id);
+        }
         onReady();
     }
 
@@ -381,9 +403,9 @@ const Starfighter = (function () {
         const left = s.totalHostile;
         const nextDir = s.priorityTarget ? ` Next priority at ${_bearingOf(s.priorityTarget)}.` : '';
         if (left === 0) return `${_cs()}, that's the last one. Sector clear. ${state.kills} kills this wave.`;
-        if (type === 'predator') return `${_cs()}, Predator Drone down. ${left} hostile${left !== 1 ? 's' : ''} on scope.${nextDir}`;
+        if (type === 'predator') return `${_cs()}, Predator Drone down. ${left} bogie${left !== 1 ? 's' : ''} on scope.${nextDir}`;
         if (type === 'bomber') return `Bomber neutralized, ${_cs()}. Base hull ${s.basePct}%. ${left} remaining.${nextDir}`;
-        if (type === 'dreadnought') return `DREADNOUGHT DESTROYED! Outstanding, ${_cs()}. ${left} hostiles remain.${nextDir}`;
+        if (type === 'dreadnought') return `DREADNOUGHT DESTROYED! Outstanding, ${_cs()}. ${left} bogies remain.${nextDir}`;
         if (type === 'hive-queen') return `HIVE QUEEN DESTROYED! Remarkable flying, ${_cs()}. The Hive is leaderless. ${left} contacts remaining.${nextDir}`;
         if (type === 'interceptor') return `Interceptor eliminated, ${_cs()}. ${left} contacts active.${nextDir}`;
         return `Kill confirmed, ${_cs()}. ${left} remaining.${nextDir}`;
@@ -414,19 +436,104 @@ const Starfighter = (function () {
         addComm(deckOfficer, brief, 'warning');
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // DEBRIS PICKUP SYSTEM
+    // Pickups scatter during combat — collected immediately, applied next wave.
+    // ══════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // POWERUP SYSTEM
+    // Scattered during combat — collected on contact, applied immediately within the sortie.
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    const POWERUPS = [
+        // id, label, icon, rarity (higher = rarer), flavour, apply(player)
+        { id: 'hull', label: 'Hull Repair', icon: '🔩', rarity: 1.0, flavour: 'Hull plating patched.', apply: p => { p.hull = Math.min(dim('player.hull'), p.hull + 40); } },
+        { id: 'shield', label: 'Shield Restore', icon: '🔋', rarity: 1.2, flavour: 'Shield cells recharged.', apply: p => { p.shields = Math.min(dim('player.shields'), p.shields + 35); } },
+        { id: 'fuel', label: 'Fuel Pack', icon: '⛽', rarity: 1.4, flavour: 'Fuel tanks topped off.', apply: p => { p.fuel = Math.min(dim('player.fuel'), p.fuel + dim('player.fuel') * 0.4); } },
+    ];
+
+    // Weighted random powerup type — rarer items less likely
+    function _randomPickupType() {
+        const totalW = POWERUPS.reduce((s, p) => s + (1 / p.rarity), 0);
+        let roll = Math.random() * totalW;
+        for (const p of POWERUPS) {
+            roll -= 1 / p.rarity;
+            if (roll <= 0) return p;
+        }
+        return POWERUPS[0];
+    }
+
+    // Spawn powerups at random positions around the arena after wave start
+    function _spawnDebrisPickups() {
+        if (state.wave < 1) return;
+        const count = 3 + Math.floor(Math.random() * 4); // 3–6
+        const r = 3000 + Math.random() * 4000;
+        for (let i = 0; i < count; i++) {
+            const theta = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.9;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            const px = r * Math.sin(phi) * Math.cos(theta);
+            const py = r * Math.sin(phi) * Math.sin(theta);
+            const pz = r * Math.cos(phi);
+            const def = _randomPickupType();
+            const pickup = new Entity('pickup', px, py, pz);
+            pickup.radius = 120;
+            pickup._pickupType = def.id;
+            pickup._pickupDef = def;
+            pickup._collected = false;
+            state.entities.push(pickup);
+            if (window.SF3D && SF3D.spawnPickup) SF3D.spawnPickup(pickup);
+        }
+    }
+
+    // ── Leader detection: Captain rank (index 4) or above plays indefinitely ──
+    const _LEADER_RANK_IDX = 4; // captain
+    function _isLeader() {
+        if (!window.SFProgression) return false;
+        const rank = SFProgression.getRank();
+        const RANKS = ['ensign', 'ltjg', 'lieutenant', 'ltcmdr', 'captain', 'major', 'colonel', 'commander'];
+        return RANKS.indexOf(rank.id) >= _LEADER_RANK_IDX;
+    }
+
     function _onPlayerDestroyed(causeText) {
         if (!state.running || state.respawning) return;
 
         const reason = causeText || 'HULL INTEGRITY FAIL';
-        state.livesRemaining = Math.max(0, state.livesRemaining - 1);
 
-        if (state.livesRemaining <= 0) {
-            if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, 0, state.maxLives);
-            if (window.SFAudio) SFAudio.playSound('warning');
-            setTimeout(() => gameOver(`MISSION FAILED — ${reason}`), 1200);
+        // Training mode: show death screen but don't actually cost a life
+        if (state._trainingMode) {
+            state.respawning = true;
+            state.respawnTimer = dim('timing.respawn');
+            state.respawnReason = reason;
+            if (window.SFAudio) {
+                SFAudio.playSound('warning');
+                SFAudio.stopCockpitHum();
+                SFAudio.stopThrustRumble();
+                SFAudio.stopStrafeHiss();
+            }
+            addComm('Hotshot', "Don't sweat it, Ensign — that's what training's for. Get back out there.", 'info');
+            _showRespawnScreen();
             return;
         }
 
+        state.livesRemaining = Math.max(0, state.livesRemaining - 1);
+
+        if (state.livesRemaining <= 0) {
+            if (_isLeader()) {
+                // Leaders never get eliminated — grant a bonus life and keep fighting
+                state.livesRemaining = 1;
+                state.maxLives = Math.max(state.maxLives, 1);
+                if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, 1, state.maxLives);
+                if (window.SFAudio) SFAudio.playSound('warning');
+                addComm('COMMAND', `${state.callsign ? state.callsign.toUpperCase() : 'LEADER'} — command authority extends your sortie. Press on.`, 'info');
+                // Fall through to normal respawn below
+            } else {
+                if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, 0, state.maxLives);
+                if (window.SFAudio) SFAudio.playSound('warning');
+                setTimeout(() => _eliminatePlayer(reason), 1200);
+                return;
+            }
+        }
+
+        state._waveDeaths = (state._waveDeaths || 0) + 1; // track deaths for tier + adaptive scenario
         state._replacementBriefing = _makeDynamicBattleBrief();
         state.respawning = true;
         state.respawnTimer = dim('timing.respawn');
@@ -442,6 +549,76 @@ const Starfighter = (function () {
         }
 
         _showRespawnScreen();
+    }
+
+    // ── Player elimination (non-leader, all lives exhausted) ──
+    function _eliminatePlayer(reason) {
+        state.running = false;
+        state.eliminated = true;
+
+        // Build AAR identical to gameOver but shown on elimination overlay
+        const ms = state.missionStats;
+        ms.waveReached = state.wave;
+        const elapsed = Math.floor((performance.now() - ms.startTime) / 1000);
+        ms.accuracy = ms.shotsFired > 0 ? Math.round((ms.shotsHit / ms.shotsFired) * 100) : 0;
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+
+        if (window.SFProgression) {
+            SFProgression.endMission({ deaths: state.maxLives, waveReached: ms.waveReached, flightTime: elapsed, score: state.score });
+        }
+
+        const rank = window.SFProgression ? SFProgression.getRank() : { icon: '◇', name: 'Ensign' };
+        const nextRank = window.SFProgression && SFProgression.getNextRank ? SFProgression.getNextRank() : null;
+        const nextMsg = nextRank
+            ? `Reach <b>${nextRank.name}</b> for unlimited lives &amp; leaderboard status.`
+            : `<span style="color:#ffd700">★ LEADER STATUS ACTIVE — leaderboard eligible</span>`;
+
+        // Broadcast elimination to squad in multiplayer
+        if (state.isMultiplayer && window.SFMultiplayer) {
+            SFMultiplayer.sendAction('player_eliminated', { wave: state.wave, score: state.score });
+        }
+
+        const overlay = document.getElementById('eliminated-overlay');
+        if (overlay) {
+            overlay.querySelector('#elim-reason').textContent = reason || 'ALL FIGHTERS LOST';
+            overlay.querySelector('#elim-wave').textContent = ms.waveReached;
+            overlay.querySelector('#elim-kills').textContent = state.kills;
+            overlay.querySelector('#elim-score').textContent = state.score.toLocaleString();
+            overlay.querySelector('#elim-accuracy').textContent = ms.accuracy + '%';
+            overlay.querySelector('#elim-rank').innerHTML = rank.icon + ' ' + rank.name;
+            overlay.querySelector('#elim-next').innerHTML = nextMsg;
+            overlay.querySelector('#elim-time').textContent = minutes + 'm ' + seconds + 's';
+            overlay.style.display = 'flex';
+        } else {
+            // Fallback: use death screen
+            const deathScreen = document.getElementById('death-screen');
+            if (deathScreen) {
+                document.getElementById('death-reason').innerText = `ELIMINATED — Wave ${ms.waveReached} | Score ${state.score.toLocaleString()}`;
+                deathScreen.style.display = 'flex';
+            }
+        }
+        document.getElementById('gameplay-hud').style.display = 'none';
+        document.getElementById('radar-overlay').style.display = 'none';
+
+        if (state.isMultiplayer && window.SFMultiplayer) {
+            // In multiplayer: shift to spectator — keep world rendering, block input
+            state.spectating = true;
+            state.running = true; // keep the render loop alive
+            const specMsg = document.getElementById('spectator-msg');
+            if (specMsg) specMsg.style.display = 'block';
+        } else {
+            // Solo: 10s countdown then reload
+            let _eSecs = 10;
+            const _eCdEl = document.getElementById('elim-countdown');
+            if (_eCdEl) _eCdEl.textContent = _eSecs;
+            const _eTick = setInterval(() => {
+                _eSecs--;
+                const el = document.getElementById('elim-countdown');
+                if (el) el.textContent = _eSecs;
+                if (_eSecs <= 0) { clearInterval(_eTick); location.reload(); }
+            }, 1000);
+        }
     }
 
     function addComm(sender, message, type) {
@@ -600,6 +777,14 @@ const Starfighter = (function () {
             if (window.SF3D) SF3D.spawnExplosion(this.position);
             if (window.SFAudio) SFAudio.playSound('explosion');
             if (window.SFAudio) SFAudio.playSound('shockwave');
+
+            // ── Wreckage spawning (wave 3+, 40% chance for enemies/predators/bosses) ──
+            if (state.wave >= 3 && Math.random() < 0.4) {
+                if (this.type === 'enemy' || this.type === 'predator' || this.type === 'dreadnought' ||
+                    this.type === 'alien-baseship' || this._isBoss) {
+                    _spawnWreckage(this.position, this.type, this._isBoss);
+                }
+            }
 
             if (this.type === 'enemy') {
                 state.score += dim('score.enemy');
@@ -902,6 +1087,8 @@ const Starfighter = (function () {
     function init() {
         state.maxLives = dim('lives.max');
         state.livesRemaining = state.maxLives;
+        state.eliminated = false;
+        state.spectating = false;
         state.respawning = false;
         state.respawnTimer = 0;
         state.respawnReason = 'HULL INTEGRITY FAIL';
@@ -993,6 +1180,9 @@ const Starfighter = (function () {
         // Init rescue system
         if (window.SFRescue) SFRescue.init(state);
 
+        // Init threat detection & countermeasures system
+        if (window.SFThreatSys) SFThreatSys.init();
+
         // Cockpit always visible — even during loading/bay
         if (window.SF3D) SF3D.showCockpit(true);
 
@@ -1052,146 +1242,241 @@ const Starfighter = (function () {
         else addComm(_crew('deck'), `${_cs()}, fighter secured in bay. Wave ${state.wave} standing by.`, 'base');
         _setPauseButtonUI(false);
 
-        // First wave: offer tutorial if player hasn't declined permanently
-        if (state.wave === 1 && !localStorage.getItem('sf_no_tutorial')) {
-            _showTutorialPrompt();
-        } else {
-            // Auto-start launch sequence
-            setTimeout(() => {
-                if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
-                _beginLaunchSequence();
-            }, 1500);
+        // Entry point for round 1 — _configureGame handles all subsequent rounds
+        _configureGame(state.player);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // TRAINING WAVE SYSTEM — Wave 1 guided in-flight training
+    // Wingman Hotshot (male US) leads player through controls,
+    // navigation, radar, and basic combat. Deaths don't cost lives.
+    // ══════════════════════════════════════════════════════════════
+
+    // Training comm script — each step fires after a delay from the previous
+    // { delay: seconds from previous step, sender: comm name, msg: text, type: comm type }
+    const TRAINING_SCRIPT_KB = [
+        { delay: 2.0, sender: 'Hotshot', msg: "Hey Ensign, I'm Hotshot — your wingman. Time for your first in-flight training. Let's get you combat ready.", type: 'info' },
+        { delay: 5.0, sender: 'Instructor', msg: "Alright Ensign, I'm your flight instructor. First — click anywhere on the screen to capture your mouse. Hit ESCAPE anytime to get your cursor back.", type: 'info' },
+        { delay: 7.0, sender: 'Instructor', msg: "Good. Now move your mouse around — that is pitch and yaw. Get a feel for looking around the cockpit.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "W and S control your throttle — push W to accelerate, S for reverse thrust. Try pushing forward now.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "A and D bank you left and right. Arrow keys work too. Q and E roll your ship. Try a barrel roll — just for fun.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Check your radar — bottom left of your display. Blue blips are wingmen, green are support ships, red are hostiles. The degree markings show your bearing.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "SHIFT gives you afterburner — burns fuel fast but gets you out of trouble. SPACE fires your weapons.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Press T to lock onto a target, or hold your crosshair on a bogie for 2 seconds — it will auto-lock. Press F to cycle targets.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "One more thing — you will see colored diamonds out there. Those are power-ups. Fly through them to activate — shields, weapons, speed. They last for the round.", type: 'info' },
+        { delay: 5.0, sender: 'Scope', msg: "Deploying target drones for live-fire practice. Contacts appearing on scope.", type: 'warning', action: 'spawn_drones' },
+        { delay: 5.0, sender: 'Hotshot', msg: "Drones on scope. Line up your crosshair, wait for the lock tone, and light 'em up. Show me what you've got, Ensign.", type: 'info' },
+    ];
+
+    const TRAINING_SCRIPT_GAMEPAD = [
+        { delay: 2.0, sender: 'Hotshot', msg: "Hey Ensign, I'm Hotshot — your wingman. Time for your first in-flight training. Let's get you combat ready.", type: 'info' },
+        { delay: 5.0, sender: 'Instructor', msg: "Alright Ensign, I'm your flight instructor. Use your right stick to look around — that's pitch and yaw. Left stick controls throttle and movement.", type: 'info' },
+        { delay: 7.0, sender: 'Instructor', msg: "Push the left stick forward to accelerate. Pull back to slow down. Left and right to bank.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Bumpers roll your ship — LB left, RB right. Try a barrel roll.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Check your radar — bottom left of your display. Blue blips are wingmen, green are support ships, red are hostiles. The degree markings show your bearing.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Right trigger fires your weapons. Left trigger is afterburner — burns fuel but gets you out of trouble fast.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Press Y to lock onto a target, or hold your crosshair on a bogie for 2 seconds — it will auto-lock.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "One more thing — you will see colored diamonds out there. Those are power-ups. Fly through them to activate — shields, weapons, speed. They last for the round.", type: 'info' },
+        { delay: 5.0, sender: 'Scope', msg: "Deploying target drones for live-fire practice. Contacts appearing on scope.", type: 'warning', action: 'spawn_drones' },
+        { delay: 5.0, sender: 'Hotshot', msg: "Drones on scope. Line up your crosshair, wait for the lock tone, and light 'em up. Show me what you've got, Ensign.", type: 'info' },
+    ];
+
+    const TRAINING_SCRIPT_TOUCH = [
+        { delay: 2.0, sender: 'Hotshot', msg: "Hey Ensign, I'm Hotshot — your wingman. Time for your first in-flight training. Let's get you combat ready.", type: 'info' },
+        { delay: 5.0, sender: 'Instructor', msg: "Alright Ensign, I'm your flight instructor. Drag on the right side of your screen to look around. The left side joystick controls your movement.", type: 'info' },
+        { delay: 7.0, sender: 'Instructor', msg: "Push the throttle slider up to accelerate. The joystick handles your banking and movement.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Check your radar — bottom left of your display. Blue blips are wingmen, green are support ships, red are hostiles. The degree markings show your bearing.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "Tap the FIRE button to shoot. Hold on a target for 2 seconds to auto-lock. The BOOST button gives you afterburner.", type: 'info' },
+        { delay: 6.0, sender: 'Instructor', msg: "One more thing — you will see colored diamonds out there. Those are power-ups. Fly through them to activate — shields, weapons, speed. They last for the round.", type: 'info' },
+        { delay: 5.0, sender: 'Scope', msg: "Deploying target drones for live-fire practice. Contacts appearing on scope.", type: 'warning', action: 'spawn_drones' },
+        { delay: 5.0, sender: 'Hotshot', msg: "Drones on scope. Line up your crosshair, wait for the lock tone, and light 'em up. Show me what you've got, Ensign.", type: 'info' },
+    ];
+
+    let _trainingTimeouts = []; // track timeouts so skip can clear them
+
+    function _getTrainingScript() {
+        if (state._trainingControlType === 'gamepad') return TRAINING_SCRIPT_GAMEPAD;
+        if (state._trainingControlType === 'touch') return TRAINING_SCRIPT_TOUCH;
+        return TRAINING_SCRIPT_KB;
+    }
+
+    function _startTrainingSequence() {
+        state._trainingMode = true;
+        state._trainingPhase = 0;
+        state._trainingSkipped = false;
+        state._trainingDronesSpawned = false;
+        _trainingTimeouts = [];
+
+        // Show skip-training button
+        const skipBtn = document.getElementById('training-skip-btn');
+        if (skipBtn) skipBtn.style.display = 'block';
+
+        // Run through the training script with timed comms
+        const script = _getTrainingScript();
+        let cumDelay = 0;
+        for (let i = 0; i < script.length; i++) {
+            cumDelay += script[i].delay * 1000;
+            const step = script[i];
+            const stepIdx = i;
+            const tid = setTimeout(() => {
+                if (!state._trainingMode) return; // training was skipped
+                state._trainingPhase = stepIdx;
+                addComm(step.sender, step.msg, step.type);
+                if (step.action === 'spawn_drones') _spawnTrainingDrones();
+            }, cumDelay);
+            _trainingTimeouts.push(tid);
+        }
+
+        // Failsafe: don't leave wave 1 with zero hostiles for ~1 minute while the tutorial talks.
+        // Spawn the training drones early if they haven't appeared yet.
+        const failTid = setTimeout(() => {
+            if (!state._trainingMode) return;
+            if (state._trainingDronesSpawned) return;
+            addComm('Scope', 'Target drones deployed for live-fire practice. Contacts on scope.', 'warning');
+            _spawnTrainingDrones();
+        }, 15000);
+        _trainingTimeouts.push(failTid);
+    }
+
+    function _spawnTrainingDrones() {
+        // Spawn 4 slow, weak target drones around the player
+        if (state._trainingDronesSpawned) return;
+        const p = state.player;
+        if (!p) return;
+        state._trainingDronesSpawned = true;
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(p.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(p.quaternion);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion);
+        const offsets = [
+            fwd.clone().multiplyScalar(1200).add(right.clone().multiplyScalar(300)),
+            fwd.clone().multiplyScalar(1000).add(right.clone().multiplyScalar(-400)),
+            fwd.clone().multiplyScalar(1400).add(up.clone().multiplyScalar(200)),
+            fwd.clone().multiplyScalar(900).add(up.clone().multiplyScalar(-150)).add(right.clone().multiplyScalar(200)),
+        ];
+        for (let i = 0; i < offsets.length; i++) {
+            const pos = p.position.clone().add(offsets[i]);
+            const drone = new Entity('enemy', pos.x, pos.y, pos.z);
+            const profile = deriveCombatProfile('enemy', 1, { training: true, speedScale: 0.5 });
+            drone.hull = Math.round(profile.hull * 0.5); // fragile training drones
+            drone.maxSpeed = Math.round(profile.maxSpeed * 0.4);
+            drone._manifoldDerivation = profile.trace;
+            drone.callsign = 'DRONE-' + (i + 1);
+            drone._isTrainingDrone = true;
+            state.entities.push(drone);
         }
     }
 
-    // ── Tutorial Prompt: first-game "Want a tutorial?" overlay (+ wave-1 pilot config) ──
-    function _showTutorialPrompt() {
-        // ── Build voice picker options from SFAudio if available ──
-        const menu = (window.SFAudio && SFAudio.getPlayerVoiceMenu) ? SFAudio.getPlayerVoiceMenu() : null;
-        const savedVoice = localStorage.getItem('sf_voice_module') || '';
-        const savedGender = localStorage.getItem('sf_voice_gender') || 'female';
+    function _skipTraining() {
+        if (!state._trainingMode) return;
+        // Clear all pending comm timeouts
+        for (const tid of _trainingTimeouts) clearTimeout(tid);
+        _trainingTimeouts = [];
+        state._trainingMode = false;
+        state._trainingSkipped = true;
 
-        function _voiceOptHTML(list, currentId) {
-            return list.map(v =>
-                `<option value="${v.id}"${v.id === currentId ? ' selected' : ''}>${v.label}</option>`
-            ).join('');
+        // Hide skip button
+        const skipBtn = document.getElementById('training-skip-btn');
+        if (skipBtn) skipBtn.style.display = 'none';
+
+        addComm('Hotshot', "Roger that, Ensign. Skipping the walkthrough — you'll learn on the job. Good luck out there.", 'info');
+
+        // If no enemies remain (drones not spawned yet or already killed), end training wave
+        const enemies = state.entities.filter(e =>
+            (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber') && !e.markedForDeletion
+        );
+        if (enemies.length === 0) {
+            // Spawn a small batch of real enemies so there's something to fight
+            _spawnTrainingDrones();
         }
+    }
 
-        const fOpts = menu ? _voiceOptHTML(menu.female, savedGender === 'female' ? savedVoice : menu.female[0].id) : '';
-        const mOpts = menu ? _voiceOptHTML(menu.male, savedGender === 'male' ? savedVoice : menu.male[0].id) : '';
+    function _onTrainingWaveClear() {
+        // Training complete — wingman congratulates, transition to real wave 2
+        state._trainingMode = false;
+        const skipBtn = document.getElementById('training-skip-btn');
+        if (skipBtn) skipBtn.style.display = 'none';
 
-        const voicePickerHTML = menu ? `
-            <div id="voice-config-panel" style="margin-bottom:22px;padding:14px 18px;background:rgba(0,20,40,0.7);border:1px solid rgba(0,255,255,0.18);border-radius:6px;min-width:320px">
-              <div style="font-size:10px;letter-spacing:3px;color:#556;margin-bottom:10px">MISSION COMMANDER VOICE</div>
-              <div style="display:flex;gap:10px;margin-bottom:10px;justify-content:center">
-                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;color:#aaccdd;font-size:12px">
-                  <input type="radio" name="vc-gender" id="vc-female" value="female" ${savedGender !== 'male' ? 'checked' : ''}
-                    style="accent-color:#00ffcc"> Female
-                </label>
-                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;color:#aaccdd;font-size:12px">
-                  <input type="radio" name="vc-gender" id="vc-male" value="male" ${savedGender === 'male' ? 'checked' : ''}
-                    style="accent-color:#00ffcc"> Male
-                </label>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;justify-content:center">
-                <select id="vc-accent" style="background:#0a1a2a;color:#0ff;border:1px solid rgba(0,255,255,0.3);border-radius:4px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;flex:1">
-                  ${savedGender === 'male' ? mOpts : fOpts}
-                </select>
-                <button id="vc-test" style="padding:5px 12px;background:rgba(0,255,120,0.1);color:#0f8;border:1px solid rgba(0,255,120,0.3);border-radius:4px;font-family:monospace;font-size:11px;cursor:pointer;white-space:nowrap">&#9658; Test</button>
-              </div>
-            </div>` : '';
+        for (const tid of _trainingTimeouts) clearTimeout(tid);
+        _trainingTimeouts = [];
 
+        if (!state._trainingSkipped) {
+            addComm('Hotshot', "Not bad at all, Ensign! Training complete. Time for your first real sortie — stay sharp out there.", 'info');
+        }
+    }
+
+    function _showControlTypeDropdown(onSelect) {
+        // Create overlay for control type selection before training launch
         const overlay = document.createElement('div');
-        overlay.id = 'tutorial-prompt-overlay';
-        overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);pointer-events:auto';
+        overlay.id = 'training-control-overlay';
+        overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);pointer-events:auto;';
+
+        // Auto-detect gamepad
+        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        let detected = 'keyboard';
+        for (const gp of gamepads) {
+            if (gp && gp.connected) { detected = 'gamepad'; break; }
+        }
+        // Detect touch
+        if ('ontouchstart' in window && window.innerWidth < 900) detected = 'touch';
+
         overlay.innerHTML = `
-            <div style="text-align:center;max-width:540px">
-                <div style="font-size:12px;letter-spacing:4px;color:#446688;margin-bottom:12px">EARTH DEFENSE FORCE</div>
-                <div style="font-size:11px;color:#88aacc;margin-bottom:8px">CALLSIGN: <span style="color:#0ff;font-size:14px;letter-spacing:2px">${_cs()}</span></div>
-                <div style="font-size:20px;color:#ffd24a;margin-bottom:20px;text-shadow:0 0 12px rgba(255,210,74,0.4)">PILOT CONFIGURATION</div>
-                ${voicePickerHTML}
-                <div style="font-size:12px;color:#556;letter-spacing:3px;margin-bottom:10px;margin-top:4px">FLIGHT BRIEFING</div>
-                <div style="font-size:13px;color:#aaccdd;margin-bottom:24px;line-height:1.5">Would you like a guided tutorial covering flight controls, weapons, and a practice run?</div>
-                <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-                    <button id="tut-yes" class="avtn-btn avtn-btn-green" tabindex="1">YES — BRIEF ME</button>
-                    <button id="tut-no" class="avtn-btn avtn-btn-red" tabindex="2">NO — LAUNCH NOW</button>
-                    <button id="tut-never" class="avtn-btn avtn-btn-dim" tabindex="3" style="font-size:10px">DON'T ASK AGAIN</button>
+            <div style="max-width:420px;text-align:center;font-family:'Courier New',monospace;">
+                <div style="color:#00ffcc;font-size:1.6em;font-weight:bold;margin-bottom:12px;text-shadow:0 0 10px rgba(0,255,200,0.4)">
+                    ✦ FLIGHT TRAINING ✦
                 </div>
-            </div>`;
+                <div style="color:#88aacc;font-size:0.95em;margin-bottom:24px;">
+                    Select your control method to begin guided training.
+                </div>
+                <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+                    <button class="training-ctrl-btn" data-ctrl="keyboard"
+                        style="padding:14px 24px;font-size:1.1em;font-family:inherit;background:${detected === 'keyboard' ? 'rgba(0,255,200,0.2)' : 'rgba(255,255,255,0.06)'};border:1px solid ${detected === 'keyboard' ? '#00ffcc' : '#446688'};color:#ddeeff;border-radius:6px;cursor:pointer;transition:all 0.2s;">
+                        ⌨ KEYBOARD + MOUSE ${detected === 'keyboard' ? '(detected)' : ''}
+                    </button>
+                    <button class="training-ctrl-btn" data-ctrl="gamepad"
+                        style="padding:14px 24px;font-size:1.1em;font-family:inherit;background:${detected === 'gamepad' ? 'rgba(0,255,200,0.2)' : 'rgba(255,255,255,0.06)'};border:1px solid ${detected === 'gamepad' ? '#00ffcc' : '#446688'};color:#ddeeff;border-radius:6px;cursor:pointer;transition:all 0.2s;">
+                        🎮 GAMEPAD / CONTROLLER ${detected === 'gamepad' ? '(detected)' : ''}
+                    </button>
+                    <button class="training-ctrl-btn" data-ctrl="touch"
+                        style="padding:14px 24px;font-size:1.1em;font-family:inherit;background:${detected === 'touch' ? 'rgba(0,255,200,0.2)' : 'rgba(255,255,255,0.06)'};border:1px solid ${detected === 'touch' ? '#00ffcc' : '#446688'};color:#ddeeff;border-radius:6px;cursor:pointer;transition:all 0.2s;">
+                        📱 TOUCH / MOBILE ${detected === 'touch' ? '(detected)' : ''}
+                    </button>
+                </div>
+                <div style="color:#446688;font-size:0.8em;">Training can be skipped at any time during flight.</div>
+            </div>
+        `;
         document.body.appendChild(overlay);
 
-        // ── Wire voice picker ──
-        if (menu) {
-            const fMenuList = menu.female;
-            const mMenuList = menu.male;
-
-            function _applyVoiceChoice() {
-                const gender = document.querySelector('input[name="vc-gender"]:checked')?.value || 'female';
-                const moduleId = document.getElementById('vc-accent')?.value;
-                if (!moduleId) return;
-                localStorage.setItem('sf_voice_module', moduleId);
-                localStorage.setItem('sf_voice_gender', gender);
-                if (window.SFAudio) {
-                    // Apply to the main command crew voices so backstory uses chosen voice
-                    SFAudio.setCrewVoiceModule('Cdr. Vasquez', moduleId);
-                    SFAudio.setCrewVoiceModule('Resolute Actual', moduleId);
-                    SFAudio.setVoiceModule(moduleId);
-                }
-            }
-
-            function _rebuildAccentList(gender) {
-                const sel = document.getElementById('vc-accent');
-                if (!sel) return;
-                const list = gender === 'male' ? mMenuList : fMenuList;
-                // Try to keep same index if switching
-                const curIdx = sel.selectedIndex;
-                sel.innerHTML = list.map(v => `<option value="${v.id}">${v.label}</option>`).join('');
-                sel.selectedIndex = Math.min(curIdx, list.length - 1);
-                _applyVoiceChoice();
-            }
-
-            document.querySelectorAll('input[name="vc-gender"]').forEach(r => {
-                r.onchange = () => _rebuildAccentList(r.value);
+        // Wire button clicks
+        overlay.querySelectorAll('.training-ctrl-btn').forEach(btn => {
+            btn.addEventListener('mouseover', () => { btn.style.borderColor = '#00ffcc'; btn.style.background = 'rgba(0,255,200,0.15)'; });
+            btn.addEventListener('mouseout', () => {
+                const isDetected = btn.dataset.ctrl === detected;
+                btn.style.borderColor = isDetected ? '#00ffcc' : '#446688';
+                btn.style.background = isDetected ? 'rgba(0,255,200,0.2)' : 'rgba(255,255,255,0.06)';
             });
-            const accentSel = document.getElementById('vc-accent');
-            if (accentSel) accentSel.onchange = _applyVoiceChoice;
-            _applyVoiceChoice(); // apply saved preference immediately
-
-            const testBtn = document.getElementById('vc-test');
-            if (testBtn) {
-                testBtn.onclick = () => {
-                    _applyVoiceChoice();
-                    if (window.SFAudio && SFAudio.speakAs) {
-                        const moduleId = document.getElementById('vc-accent')?.value || 'au_female';
-                        const testLine = `Callsign ${_cs()}, this is your mission commander. All systems nominal. Prepare for launch.`;
-                        SFAudio.speak(testLine, { voiceModule: moduleId });
-                    }
-                };
-            }
-        }
-
-        // Focus first button for keyboard nav
-        setTimeout(() => document.getElementById('tut-yes').focus(), 100);
-
-        function _dismiss(launchTutorial, neverAsk) {
-            overlay.remove();
-            if (neverAsk) localStorage.setItem('sf_no_tutorial', '1');
-            if (launchTutorial) {
-                _startTutorial();
-            } else {
-                if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
-                _beginLaunchSequence();
-            }
-        }
-
-        document.getElementById('tut-yes').onclick = () => _dismiss(true, false);
-        document.getElementById('tut-no').onclick = () => _dismiss(false, false);
-        document.getElementById('tut-never').onclick = () => _dismiss(false, true);
-
-        // Keyboard nav through buttons
-        overlay.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') _dismiss(false, false);
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                const ctrl = btn.dataset.ctrl;
+                state._trainingControlType = ctrl;
+                // Remove overlay synchronously before pointer lock
+                overlay.style.display = 'none';
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                onSelect(ctrl);
+            });
         });
+    }
+
+    function _showEscapeHint(onDone) {
+        const hint = document.createElement('div');
+        hint.id = 'escape-hint-overlay';
+        hint.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);pointer-events:none;';
+        hint.innerHTML = '<div style="color:#00ffcc;font-size:1.6em;font-family:\'Courier New\',monospace;text-shadow:0 0 14px rgba(0,255,200,0.5);">Hit Escape to return cursor</div>';
+        document.body.appendChild(hint);
+        setTimeout(() => {
+            hint.style.display = 'none';
+            hint.remove();
+            onDone();
+        }, 2000);
     }
 
     // ── Tutorial System: guided walkthrough with announcer + practice mode ──
@@ -1488,7 +1773,7 @@ const Starfighter = (function () {
                             <button id="tut-practice" class="avtn-btn avtn-btn-green" tabindex="2">PRACTICE FLIGHT</button>
                             <button id="tut-done" class="avtn-btn avtn-btn-red" tabindex="3">SKIP — LAUNCH MISSION</button>
                         </div>
-                        <div style="font-size:10px;color:#556677;margin-top:10px">You can revisit this tutorial anytime via the ✦ TUTORIAL button</div>
+                        <div style="font-size:10px;color:#334455;letter-spacing:2px;margin-top:10px">TAB TO SELECT &nbsp;·&nbsp; SPACE OR SCROLL WHEEL TO CONFIRM</div>
                     </div>
                 </div>`;
         }
@@ -1976,35 +2261,377 @@ const Starfighter = (function () {
         }
 
         // Spawn enemies BEFORE announcement so announcer sees them on scope
-        spawnWave();
+        if (state.wave === 1 && !state._trainingSkipped) {
+            // Wave 1 training: spawn support/wingmen but no enemies yet
+            // Training script will spawn drones at the appropriate step
+            state._trainingMode = true;
+            _despawnSupportShips();
+            _spawnTanker();
+            _spawnMedic();
+            _spawnRescueShuttle();
+            _spawnScienceVessel();
+            // Spawn wingmen (Hotshot introduces himself via training comms)
+            if (state.aiWingmen) {
+                const ANPC = window.SFAnpc;
+                const rosterKeys = ['hotshot', 'ice'];
+                for (let i = 0; i < rosterKeys.length; i++) {
+                    const offset = new THREE.Vector3(i === 0 ? -150 : 150, 0, 200 + Math.random() * 100);
+                    const spawnPos = state.player.position.clone().add(offset);
+                    const w = new Entity('wingman', spawnPos.x, spawnPos.y, spawnPos.z);
+                    const profile = deriveCombatProfile('wingman', state.wave);
+                    w.hull = profile.hull; w.maxSpeed = profile.maxSpeed;
+                    w._manifoldDerivation = profile.trace;
+                    const key = rosterKeys[i];
+                    if (ANPC) {
+                        const npc = ANPC.spawn(key);
+                        w.callsign = npc.callsign; w._anpc = npc; w._anpcKey = key;
+                    } else {
+                        w.callsign = ['Alpha-2', 'Alpha-3'][i];
+                    }
+                    w.quaternion.copy(state.player.quaternion);
+                    state.entities.push(w);
+                }
+            }
+            _startTrainingSequence();
+        } else {
+            spawnWave();
+        }
+
+        // Scatter debris pickups 10s into combat — gives players time to engage first
+        setTimeout(() => {
+            if (state.phase === 'combat') _spawnDebrisPickups();
+        }, 10000);
 
         if (window.SFAnnouncer) SFAnnouncer.onLaunchClear();
         else { const s = _snap(); addComm(_crew('deck'), `${_cs()}, clear of bay. ${s.totalHostile} contacts on scope.`, 'base'); }
     }
 
     // ── Mission titles per wave (BFXG-008 Progression Bible) ──
-    const WAVE_TITLES = {
-        1: { name: 'FIRST FLIGHT', obj: 'Complete flight training. Destroy all target drones and return safely.' },
-        2: { name: 'BAPTISM OF FIRE', obj: 'Eliminate Vek Corsair scouts before they report fleet position.' },
-        3: { name: 'THE GAUNTLET', obj: 'Destroy the Vek outpost in the Kessler Belt. Boss: IRONJAW.' },
-        4: { name: 'SHIELD WALL', obj: 'Defend the fleet carrier Vanguard from three Vek attack waves. Boss: RAZORWING.' },
-        5: { name: 'INTO THE NEBULA', obj: 'Destroy the Vek staging depot hidden inside the Caldera Nebula. Boss: THE SHROUD.' },
-        6: { name: 'CONVOY AMBUSH', obj: 'Protect the civilian supply convoy from Vek raiders. Boss: DREADCLAW.' },
-        7: { name: 'MINEFIELD', obj: 'Navigate the Shattered Reach and disable the Vek mine control station. Boss: MINELORD KETH.' },
-        8: { name: 'CAPITAL STRIKE', obj: 'Destroy the Vek command ship Subjugator before the battle group mobilizes. Boss: THE SUBJUGATOR.' },
-        9: { name: 'DARK HORIZON', obj: 'Intercept Vek supply convoy in the Obsidian Corridor. Boss: GRAVITON.' },
-        10: { name: 'THE SWARM', obj: 'Survive Skorne first contact. Protect the Meridian Colony comms array. Boss: QUEEN THORAX.' },
-        11: { name: 'WRECKAGE AND RUIN', obj: 'Salvage Skorne bio-tech from wrecked hive ships. Watch for both factions. Boss: SCRAPJAW.' },
-        12: { name: 'BLACK OMEGA', obj: 'Infiltrate and destroy the Vek weapons research facility. Boss: WARDEN VOSS.' },
-        13: { name: 'SIEGE OF MERIDIAN', obj: 'Defend Meridian Colony. Protect 8 evacuation transports. Boss: WORLDBREAKER.' },
-        14: { name: 'THE DEEP BLACK', obj: 'Intercept the Skorne carrier group in deep space. Boss: THE PATRIARCH.' },
-        15: { name: 'GHOST PROTOCOL', obj: 'Infiltrate Vek command station in the gas giant rings. Classified. Boss: ARCHON ZAEL.' },
-        16: { name: 'MANIFOLD RIFT', obj: 'Stabilize the manifold rift before it destabilizes the sector. Boss: THE CONVERGENCE.' },
-        17: { name: 'ALLIANCE OF DESPERATION', obj: 'Joint operation with rogue Vek. Destroy Skorne hive nodes in Cygnus Threshold. Boss: THE OVERMIND.' },
-        18: { name: 'HEART OF THE HIVE', obj: 'Penetrate the Skorne megastructure and plant the manifold destabilizer at its core. Boss: CORE GUARDIAN.' },
-        19: { name: 'TOTAL WAR', obj: 'Lead the allied fleet. Destroy Vek capital ships and Skorne carriers. Protect Vanguard. Dual Boss: KRENN & SKARA.' },
-        20: { name: 'SINGULARITY', obj: 'Final confrontation. Defeat the Manifold Architect. Close the rift. Save the universe. Boss: MANIFOLD ARCHITECT (6 phases).' },
+    // ══════════════════════════════════════════════════════════════
+    // PROCEDURAL MISSION SCENARIO SYSTEM
+    // Waves 1-2: Linear tutorial. Wave 3+: Dynamic mix-and-match missions
+    // ══════════════════════════════════════════════════════════════
+
+    // Fixed scenarios for tutorial waves
+    const FIXED_SCENARIOS = {
+        1: { name: 'FIRST FLIGHT', obj: 'Complete flight training. Destroy all target drones and return safely.', type: 'training' },
+        2: { name: 'BAPTISM OF FIRE', obj: 'Eliminate Vek Corsair scouts. Boss: RAZOR', type: 'combat', boss: 'RAZOR' },
     };
+
+    // Mission type templates (procedurally mixed after wave 2)
+    const MISSION_TYPES = {
+        assault: { weight: 1.0, names: ['STRIKE VECTOR', 'HAMMER DOWN', 'LIGHTNING WAR', 'IRON FIST', 'THUNDER RUN'] },
+        defense: { weight: 0.8, names: ['SHIELD WALL', 'LAST STAND', 'FORTRESS', 'GUARDIAN', 'BULWARK'] },
+        escort: { weight: 0.7, names: ['CONVOY DUTY', 'SAFE PASSAGE', 'SHEPHERD', 'GUARDIAN ANGEL', 'ESCORT PRIME'] },
+        reconnaissance: { weight: 0.6, names: ['GHOST PROTOCOL', 'SHADOW RUN', 'DARK HORIZON', 'SILENT WATCH', 'DEEP SCAN'] },
+        mining: { weight: 0.5, names: ['SALVAGE OPS', 'WRECKAGE HAUL', 'SCAVENGER', 'CLAIM STAKE', 'DEAD HARVEST'] },
+        sabotage: { weight: 0.6, names: ['BLACK OPS', 'SABOTEUR', 'VIPER STRIKE', 'GHOST KNIFE', 'SILENT DEATH'] },
+        rescue: { weight: 0.5, names: ['LIFELINE', 'EXTRACTION', 'SEARCH & RESCUE', 'MERCY FLIGHT', 'LAST HOPE'] },
+        interception: { weight: 0.9, names: ['INTERCEPT ALPHA', 'CUT THEM OFF', 'BLOCKADE RUN', 'BARRIER PATROL', 'NET CAST'] },
+    };
+
+    // Deep space location pool (unlocked progressively)
+    const LOCATIONS = {
+        nearEarth: ['Lunar Orbit', 'Kessler Belt', 'L4 Lagrange', 'Geosync Station Theta'],
+        asteroidBelt: ['Ceres Approach', 'Vesta Mining Zone', 'Pallas Debris Field', 'Hygiea Cluster'],
+        mars: ['Phobos Shadow', 'Deimos Outpost', 'Valles Marineris Rift', 'Olympus Mons Approach'],
+        jupiter: ['Io Flux Tube', 'Europa Ice Fields', 'Ganymede Crater', 'Callisto Dark Side'],
+        saturn: ['Titan Atmosphere', 'Enceladus Geysers', 'Ring Gap Sigma', 'Hyperion Tumble'],
+        deepSpace: ['Kuiper Belt Edge', 'Oort Cloud Threshold', 'Interstellar Medium', 'Manifold Rift'],
+    };
+
+    // Boss roster - randomly selected per wave
+    const BOSS_ROSTER = [
+        { name: 'RAZOR', type: 'interceptor', hull: 1.5, speed: 1.3, desc: 'Vek Ace Pilot' },
+        { name: 'IRONJAW', type: 'bomber', hull: 2.0, speed: 0.9, desc: 'Vek Assault Frigate' },
+        { name: 'THE SHROUD', type: 'predator', hull: 1.8, speed: 1.1, desc: 'Stealth Hunter' },
+        { name: 'DREADCLAW', type: 'dreadnought', hull: 3.0, speed: 0.7, desc: 'Raider Warlord' },
+        { name: 'MINELORD KETH', type: 'bomber', hull: 2.2, speed: 0.8, desc: 'Mine Controller' },
+        { name: 'GRAVITON', type: 'alien-baseship', hull: 4.0, speed: 0.5, desc: 'Gravity Platform' },
+        { name: 'QUEEN THORAX', type: 'predator', hull: 2.5, speed: 1.2, desc: 'Hive Matriarch' },
+        { name: 'SCRAPJAW', type: 'dreadnought', hull: 3.5, speed: 0.6, desc: 'Salvage Lord' },
+        { name: 'WARDEN VOSS', type: 'alien-baseship', hull: 4.5, speed: 0.5, desc: 'Prison Commander' },
+        { name: 'THE PATRIARCH', type: 'predator', hull: 3.0, speed: 1.0, desc: 'Ancient One' },
+        { name: 'WORLDBREAKER', type: 'dreadnought', hull: 5.0, speed: 0.4, desc: 'Siege Titan' },
+        { name: 'ARCHON ZAEL', type: 'alien-baseship', hull: 5.5, speed: 0.6, desc: 'Grand Admiral' },
+    ];
+
+    // Wreckage alien tech pool (wave 3+)
+    const ALIEN_TECH = [
+        { name: 'Vek Shield Capacitor', effect: 'shields', bonus: 25, rarity: 0.3 },
+        { name: 'Bio-Armor Plating', effect: 'hull', bonus: 20, rarity: 0.3 },
+        { name: 'Plasma Injector', effect: 'damage', bonus: 1.15, rarity: 0.2 },
+        { name: 'Ion Thruster Core', effect: 'speed', bonus: 1.1, rarity: 0.25 },
+        { name: 'Targeting Matrix', effect: 'accuracy', bonus: 1.2, rarity: 0.15 },
+        { name: 'Energy Recycler', effect: 'ammo', bonus: 3, rarity: 0.2 },
+        { name: 'Stealth Coating', effect: 'evasion', bonus: 1.15, rarity: 0.1 },
+        { name: 'Quantum Radar', effect: 'sensors', bonus: 1.3, rarity: 0.15 },
+        { name: 'Manifold Fragment', effect: 'special', bonus: 0, rarity: 0.05 },
+    ];
+
+    // Generate procedural mission for wave N
+    // ── Evaluate the current pilot/team capability to drive adaptive difficulty ──
+    // Returns a profile used by _generateMission() to scale the next scenario.
+    // Works equally for solo and multiplayer — more deaths / lower accuracy = easier scenario.
+    function _evaluateTeamCapability() {
+        const stats = state.missionStats;
+        const shots = Math.max(1, stats.shotsFired || 1);
+        const accuracy = Math.round(((stats.shotsHit || 0) / shots) * 100);
+        const hullMax = (window.dim && dim('player.hull')) || 100;
+        const hullPct = state.player ? Math.min(1, state.player.hull / Math.max(1, hullMax)) : 1;
+        const deaths = state._waveDeaths || 0;
+        const kills = stats.kills || 0;
+        const wave = state.wave || 1;
+
+        // Accuracy contribution: 50%+ is baseline; 0% = full penalty, 100% = full bonus
+        const accScore = Math.min(1, (accuracy / 100) * 1.4); // 0-1.0+
+        // Hull at landing: full hull = no penalty, 10% hull = heavy penalty
+        const hullScore = 0.4 + hullPct * 0.6;               // 0.4-1.0
+        // Death penalty: each death reduces score by 20%, capped at 60%
+        const deathScore = Math.max(0.4, 1 - deaths * 0.2);   // 0.4-1.0
+        // Kill volume: up to 20 kills = full score (scales with wave)
+        const killScore = Math.min(1, kills / Math.max(10, wave * 2.5)); // 0-1.0
+
+        // Weighted skill index: 0.3 (struggling) → 1.5 (dominating)
+        // Weights: accuracy 40%, hull survival 25%, no deaths 25%, kill count 10%
+        const skillIndex = Math.max(0.3, Math.min(1.5,
+            accScore * 0.40 +
+            hullScore * 0.25 +
+            deathScore * 0.25 +
+            killScore * 0.10
+        ));
+
+        // Weapon tier: more purchased upgrades → higher capability
+        const upgrades = (window.SFProgression && SFProgression.career().purchasedUpgrades) || [];
+        const weaponTier = upgrades.filter(id => id.startsWith('laser') || id.startsWith('torp') || id.startsWith('after')).length;
+
+        return { accuracy, hullPct, deaths, kills, skillIndex, weaponTier };
+    }
+
+    function _generateMission(wave, teamProfile) {
+        // Waves 1-2: Fixed tutorial
+        if (wave <= 2) return FIXED_SCENARIOS[wave];
+
+        // Wave 3+: Procedural
+        const types = Object.keys(MISSION_TYPES);
+        const weights = types.map(t => MISSION_TYPES[t].weight);
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let roll = Math.random() * totalWeight;
+        let selectedType = types[0];
+        for (let i = 0; i < types.length; i++) {
+            roll -= weights[i];
+            if (roll <= 0) { selectedType = types[i]; break; }
+        }
+
+        const template = MISSION_TYPES[selectedType];
+        const name = template.names[Math.floor(Math.random() * template.names.length)];
+
+        // ── Team-adaptive difficulty scale ──
+        // skillIndex > 1.0 → harder scenario; < 0.7 → easier scenario.
+        // This is stored on the mission object and consumed by spawnWave().
+        const tp = teamProfile || (wave > 2 ? _evaluateTeamCapability() : { skillIndex: 0.75, weaponTier: 0 });
+        const diffScale = tp.skillIndex;
+
+        // Bias mission type selection: struggling teams get more defensive/logistic missions;
+        // skilled teams get more assault/sabotage pressure.
+        if (wave > 2) {
+            if (diffScale < 0.6) {
+                // Ease off — boost escort/mining/defense weight, suppress assault/interception
+                if (MISSION_TYPES.escort) MISSION_TYPES.escort.weight = 2.5;
+                if (MISSION_TYPES.mining) MISSION_TYPES.mining.weight = 2.0;
+                if (MISSION_TYPES.defense) MISSION_TYPES.defense.weight = 2.0;
+                if (MISSION_TYPES.assault) MISSION_TYPES.assault.weight = 0.5;
+                if (MISSION_TYPES.interception) MISSION_TYPES.interception.weight = 0.5;
+                if (MISSION_TYPES.sabotage) MISSION_TYPES.sabotage.weight = 0.5;
+            } else if (diffScale > 1.1) {
+                // Push harder — boost assault/interception/sabotage, suppress easy types
+                if (MISSION_TYPES.assault) MISSION_TYPES.assault.weight = 2.5;
+                if (MISSION_TYPES.interception) MISSION_TYPES.interception.weight = 2.0;
+                if (MISSION_TYPES.sabotage) MISSION_TYPES.sabotage.weight = 1.8;
+                if (MISSION_TYPES.escort) MISSION_TYPES.escort.weight = 0.6;
+                if (MISSION_TYPES.mining) MISSION_TYPES.mining.weight = 0.6;
+                if (MISSION_TYPES.defense) MISSION_TYPES.defense.weight = 0.8;
+            } else {
+                // Near baseline — restore default weights
+                if (MISSION_TYPES.assault) MISSION_TYPES.assault.weight = 1.5;
+                if (MISSION_TYPES.interception) MISSION_TYPES.interception.weight = 1.2;
+                if (MISSION_TYPES.sabotage) MISSION_TYPES.sabotage.weight = 1.0;
+                if (MISSION_TYPES.escort) MISSION_TYPES.escort.weight = 1.2;
+                if (MISSION_TYPES.mining) MISSION_TYPES.mining.weight = 1.0;
+                if (MISSION_TYPES.defense) MISSION_TYPES.defense.weight = 1.0;
+            }
+        }
+
+        // Location based on wave progression
+        let locationPool = 'nearEarth';
+        if (wave >= 15) locationPool = 'deepSpace';
+        else if (wave >= 12) locationPool = 'saturn';
+        else if (wave >= 9) locationPool = 'jupiter';
+        else if (wave >= 6) locationPool = 'mars';
+        else if (wave >= 4) locationPool = 'asteroidBelt';
+
+        const location = LOCATIONS[locationPool][Math.floor(Math.random() * LOCATIONS[locationPool].length)];
+
+        // Boss every 2-3 waves (after wave 2)
+        const hasBoss = wave === 2 || (wave > 2 && Math.random() < 0.4 + (wave * 0.03));
+        const boss = hasBoss ? BOSS_ROSTER[Math.floor(Math.random() * Math.min(BOSS_ROSTER.length, 1 + Math.floor(wave / 2)))] : null;
+
+        // Generate objective based on mission type
+        const objectives = {
+            assault: `Destroy enemy ${boss ? 'command ship' : 'staging area'} in ${location}`,
+            defense: `Defend ${location} from ${boss ? 'massive' : 'coordinated'} assault`,
+            escort: `Escort convoy through ${location}${boss ? ' — enemy ace spotted' : ''}`,
+            reconnaissance: `Scan ${location} for enemy activity${boss ? ' — hostile commander detected' : ''}`,
+            mining: `Salvage wreckage in ${location}${boss ? ' — scavenger lord inbound' : ''}`,
+            sabotage: `Infiltrate and sabotage enemy installation at ${location}`,
+            rescue: `Extract stranded personnel from ${location}${boss ? ' — area heavily defended' : ''}`,
+            interception: `Intercept enemy fleet en route to ${location}`,
+        };
+
+        return {
+            name,
+            obj: objectives[selectedType] + (boss ? ` | BOSS: ${boss.name}` : ''),
+            type: selectedType,
+            location,
+            locationPool,
+            boss,
+            diffScale,   // adaptive difficulty multiplier consumed by spawnWave()
+            skillIndex: tp.skillIndex,
+        };
+    }
+
+    // Get mission for current wave (cached)
+    function _getCurrentMission() {
+        if (!state._currentMission || state._currentMission.wave !== state.wave) {
+            state._currentMission = { wave: state.wave, ...(_generateMission(state.wave) || {}) };
+        }
+        return state._currentMission;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // _configureGame(player) — single entry point for every round.
+    //
+    //   Win  path: state.wave is already incremented → _configureGame() → next scenario
+    //   Lose path: state.wave unchanged              → _configureGame() → retry same scenario
+    //
+    // Flow: generate mission → reset bay → briefing comms → auto-launch
+    // ══════════════════════════════════════════════════════════════════════════
+    function _configureGame(player) {
+        // ── 0. Reset per-wave death counter (new wave = fresh performance record) ──
+        state._waveDeaths = 0;
+        state._performanceTier = 2;
+
+        // ── 1. Generate scenario for this wave using team capability evaluation ──
+        const _teamProfile = _evaluateTeamCapability();
+        state._currentMission = { wave: state.wave, ...(_generateMission(state.wave, _teamProfile) || {}) };
+        const mission = state._currentMission;
+
+        // ── 2. Reset bay state ──
+        state.phase = 'bay-ready';
+        state.launchTimer = 0;
+        state._launchAudioPlayed = false;
+        state._launchBlastPlayed = false;
+        state._paBriefingDone = false;
+        state.cutsceneCamPos = null;
+        state.cutsceneCamQuat = null;
+        state.cutsceneVelocity = null;
+
+        // Reset per-wave stats
+        state.missionStats.kills = 0;
+        state.missionStats.shotsFired = 0;
+        state.missionStats.shotsHit = 0;
+        state.missionStats.damageDealt = 0;
+        state.missionStats.damageTaken = 0;
+        state.missionStats.wingmenSaved = 0;
+        state.missionStats.wingmenLost = 0;
+        state.missionStats.startTime = 0;
+        state._waveClearKills = null;
+        state._waveClearPlayerKills = null;
+
+        // Reset subsystems
+        if (window.SFRescue) SFRescue.reset();
+        if (window.SFThreatSys) SFThreatSys.reset();
+
+        // Clear any uncollected pickups from previous wave (remove from scene + entity list)
+        state.entities = (state.entities || []).filter(e => {
+            if (e.type !== 'pickup') return true;
+            if (window.SF3D && SF3D.removePickup) SF3D.removePickup(e.id);
+            return false;
+        });
+
+        // ── 3. Reset player position to bay ──
+        if (player) {
+            player.position.set(0, -32, 50);
+            player.velocity.set(0, 0, 0);
+            player.quaternion.set(0, 0, 0, 1);
+            player.throttle = 0;
+            player.pitch = 0;
+            player.yaw = 0;
+            player.roll = 0;
+        }
+
+        // ── 4. Scene / audio ──
+        if (window.SFMusic) SFMusic.setSection('launch-bay');
+        if (window.SFAudio) {
+            SFAudio.stopCockpitHum();
+            SFAudio.stopThrustRumble();
+            SFAudio.stopStrafeHiss();
+            SFAudio.startBayAmbience();
+        }
+        if (window.SF3D) { SF3D.setLaunchPhase(true); SF3D.showLaunchBay(); SF3D.showCockpit(true); }
+
+        // ── 5. HUD ──
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) { hud.style.display = 'block'; hud.style.opacity = '1'; }
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '1';
+        const launchBtn = document.getElementById('launch-btn');
+        if (launchBtn) launchBtn.style.display = 'none';
+        const shipPanel = document.getElementById('ship-panel');
+        if (shipPanel) shipPanel.style.display = 'none';
+        document.getElementById('crosshair').style.display = 'none';
+        const cd = document.getElementById('countdown-display');
+        if (cd) { cd.style.display = 'block'; cd.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — PREPARING LAUNCH</span>'; }
+
+        // ── 6. Pre-launch briefing comms ──
+        const cs = state.callsign || 'Pilot';
+        setTimeout(() => {
+            addComm('Tactical', `Wave ${state.wave}: ${mission.name || 'Combat Patrol'}. ${mission.obj || 'Engage and destroy all bogies.'}`, 'warning');
+        }, 300);
+        setTimeout(() => {
+            if (window.SFAnnouncer) SFAnnouncer.onBayReady();
+        }, 1200);
+
+        // ── 7. Auto-launch ──
+        if (state.wave === 1) {
+            // Wave 1: Auto-detect controls, then launch training
+            setTimeout(() => {
+                if (state.phase !== 'bay-ready') return;
+                // Auto-detect control type
+                const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+                let detected = 'keyboard';
+                for (const gp of gamepads) { if (gp && gp.connected) { detected = 'gamepad'; break; } }
+                if ('ontouchstart' in window && window.innerWidth < 900) detected = 'touch';
+                state._trainingControlType = detected;
+                const isElectronApp = !!(window.NativeApp && window.NativeApp.isElectron);
+                setTimeout(() => {
+                    if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+                    if (isElectronApp) {
+                        _beginLaunchSequence();
+                    } else {
+                        _showEscapeHint(() => _beginLaunchSequence());
+                    }
+                }, 50);
+            }, 1500);
+        } else {
+            setTimeout(() => {
+                if (state.phase === 'bay-ready') {
+                    if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+                    _beginLaunchSequence();
+                }
+            }, 3000);
+        }
+    }
 
     function completeLanding() {
         // ── Teardown dock cutscene ──
@@ -2114,10 +2741,10 @@ const Starfighter = (function () {
             const bdrRankup = document.getElementById('bdr-rankup');
             if (bdrRankup) bdrRankup.classList.remove('visible');
             // Header
-            const titleInfo = WAVE_TITLES[prevWave] || { name: 'MISSION', obj: 'Sortie complete.' };
+            const mission = _getCurrentMission();
             const el = (id) => document.getElementById(id);
             el('bdr-wave-title').textContent = `WAVE ${prevWave} COMPLETE`;
-            el('bdr-mission-name').textContent = titleInfo.name;
+            el('bdr-mission-name').textContent = mission.name || 'COMBAT PATROL';
 
             // Callsign acknowledgment
             const cs = state.callsign || 'PILOT';
@@ -2202,14 +2829,20 @@ const Starfighter = (function () {
             }
 
             // Next mission card
-            const nextTitleInfo = WAVE_TITLES[state.wave] || { name: 'COMBAT PATROL', obj: 'Engage and destroy all hostile forces.' };
+            const nextMission = _generateMission(state.wave);
+            state._currentMission = { wave: state.wave, ...nextMission }; // Cache for next wave
             el('bdr-next-wave-num').textContent = `WAVE ${state.wave}`;
-            el('bdr-next-title').textContent = nextTitleInfo.name;
-            el('bdr-next-objective').textContent = nextTitleInfo.obj;
+            el('bdr-next-title').textContent = nextMission.name || 'COMBAT PATROL';
+            el('bdr-next-objective').textContent = nextMission.obj || 'Engage and destroy all bogies.';
             el('bdr-next-wave-num2').textContent = state.wave;
 
-            // Upgrade shop
-            _bdrRebuildShop();
+            // Upgrade shop — gated by wave performance tier
+            _bdrRebuildShop(state._performanceTier);
+
+            // Exit pointer lock so user can interact with UI
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
 
             // Show the overlay
             overlay.classList.add('active');
@@ -2246,6 +2879,9 @@ const Starfighter = (function () {
             // Reset rescue uses for new wave
             if (window.SFRescue) SFRescue.reset();
 
+            // Reset countermeasures for new wave
+            if (window.SFThreatSys) SFThreatSys.reset();
+
             if (window.SFAudio) {
                 SFAudio.stopCockpitHum();
                 SFAudio.stopThrustRumble();
@@ -2255,9 +2891,9 @@ const Starfighter = (function () {
             if (window.SF3D) { SF3D.setLaunchPhase(true); SF3D.showLaunchBay(); }
 
             const launchBtn = document.getElementById('launch-btn');
-            if (launchBtn) launchBtn.style.display = 'block';
+            if (launchBtn) launchBtn.style.display = 'none'; // auto-launch; no manual button
             const cd = document.getElementById('countdown-display');
-            if (cd) { cd.style.display = 'block'; cd.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — STANDING BY</span>'; }
+            if (cd) { cd.style.display = 'block'; cd.innerHTML = '<span style="font-size:0.35em;color:#446688">LAUNCH BAY — PREPARING LAUNCH</span>'; }
 
             SFAnnouncer.onBayReady();
 
@@ -2273,10 +2909,31 @@ const Starfighter = (function () {
             // Reset wave-clear snapshot
             state._waveClearKills = null;
             state._waveClearPlayerKills = null;
+
+            // Auto-launch after 3 seconds in bay (player can still press Space to skip)
+            setTimeout(() => {
+                if (state.phase === 'bay-ready') {
+                    if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+                    _beginLaunchSequence();
+                }
+            }, 3000);
         }
 
+        // Auto-advance debrief: 8-second countdown then transition to bay
+        window._bdrLaunch = null; // clear any stale ref
+        let _bdrSecs = 8;
+        const _bdrCdEl = document.getElementById('bdr-countdown-secs');
+        if (_bdrCdEl) _bdrCdEl.textContent = _bdrSecs;
+        const _bdrTick = setInterval(() => {
+            _bdrSecs--;
+            const el = document.getElementById('bdr-countdown-secs');
+            if (el) el.textContent = _bdrSecs;
+            if (_bdrSecs <= 0) { clearInterval(_bdrTick); _doBayTransition(); }
+        }, 1000);
+        // Still allow spacebar or tap to skip the countdown early
         window._bdrLaunch = function () {
-            window._bdrLaunch = null; // one-shot
+            clearInterval(_bdrTick);
+            window._bdrLaunch = null;
             _doBayTransition();
         };
     }
@@ -2290,9 +2947,20 @@ const Starfighter = (function () {
     }
 
     // ── Bay-debrief: rebuild upgrade shop list (also called after purchase) ──
-    function _bdrRebuildShop() {
+    // tier 2 = full shop (clean wave)  | tier 1 = hull/shield/fuel only (1 death) | tier 0 = field refit only (2+ deaths)
+    // Shop tier config:
+    //   Tier 2 (clean wave)  — full shop: all upgrades, sorted by cost, up to 8 slots
+    //   Tier 1 (1 death)     — limited supply: cheapest 4 upgrades only
+    //   Tier 0 (2+ deaths)   — scarce supply: cheapest 2 upgrades only
+    // All tiers always show something so credits are always spendable.
+    const _SHOP_SLOTS = [2, 4, 8];   // indexed by tier
+    const _SHOP_BANNERS = [
+        'SCARCE SUPPLIES — only the basics are available. Fewer casualties next wave means better stock.',
+        'LIMITED SUPPLIES — some upgrades held back. Survive cleanly next wave for the full selection.',
+        '',  // tier 2: no banner needed
+    ];
+    function _bdrRebuildShop(tier) {
         if (!window.SFProgression) return;
-        const upgrades = SFProgression.getPurchasableUpgrades();
         const shopList = document.getElementById('bdr-shop-list');
         const shopEmpty = document.getElementById('bdr-shop-empty');
         const shopCr = document.getElementById('bdr-shop-credits');
@@ -2301,23 +2969,39 @@ const Starfighter = (function () {
         const crBal = document.getElementById('bdr-cr-balance');
         if (crBal) crBal.textContent = `₡${career.credits}`;
         if (!shopList) return;
+
+        const effectiveTier = (tier === undefined || tier === null) ? (state._performanceTier ?? 2) : Math.max(0, Math.min(2, tier));
+        const slots = _SHOP_SLOTS[effectiveTier];
+        const banner = _SHOP_BANNERS[effectiveTier];
+
+        // Sort all available upgrades cheapest-first so lower tiers always get the most accessible items
+        const upgrades = SFProgression.getPurchasableUpgrades()
+            .slice()
+            .sort((a, b) => a.cost - b.cost)
+            .slice(0, slots);
+
         if (upgrades.length === 0) {
-            shopList.innerHTML = '';
-            if (shopEmpty) shopEmpty.style.display = 'block';
+            shopList.innerHTML = banner
+                ? `<div style="padding:10px 4px;color:#aa8844;font-size:10px;letter-spacing:1.5px;line-height:1.5;">${banner}</div>`
+                : '';
+            if (!banner && shopEmpty) shopEmpty.style.display = 'block';
             return;
         }
         if (shopEmpty) shopEmpty.style.display = 'none';
-        shopList.innerHTML = upgrades.slice(0, 8).map(u => {
-            const canAfford = career.credits >= u.cost;
-            return `<div class="bdr-shop-item${canAfford ? '' : ' cant-afford'}"
-                onclick="window._sfBayBuy && window._sfBayBuy('${u.id}')">
-                <div class="bdr-shop-item-left">
-                    <div class="bdr-shop-item-name">${u.name}</div>
-                    <div class="bdr-shop-item-desc">${u.desc}</div>
-                </div>
-                <div class="bdr-shop-item-cost">₡${u.cost}</div>
-            </div>`;
-        }).join('');
+        shopList.innerHTML = (banner
+            ? `<div style="padding:6px 4px 10px;color:${effectiveTier === 0 ? '#aa6644' : '#aa8844'};font-size:9px;letter-spacing:1px;line-height:1.4;">${banner}</div>`
+            : '')
+            + upgrades.map(u => {
+                const canAfford = career.credits >= u.cost;
+                return `<div class="bdr-shop-item${canAfford ? '' : ' cant-afford'}"
+                    onclick="window._sfBayBuy && window._sfBayBuy('${u.id}')">
+                    <div class="bdr-shop-item-left">
+                        <div class="bdr-shop-item-name">${u.name}</div>
+                        <div class="bdr-shop-item-desc">${u.desc}</div>
+                    </div>
+                    <div class="bdr-shop-item-cost">₡${u.cost}</div>
+                </div>`;
+            }).join('');
     }
 
     window._sfBayBuy = function (upgradeId) {
@@ -2488,7 +3172,7 @@ const Starfighter = (function () {
             if (state.clusters.length === 0) return;
             const names = state.clusters.map(cl => cl.label).join(', ');
             const total = state.clusters.reduce((s, cl) => s + cl.total, 0);
-            addComm(_crew('tactical'), `${state.clusters.length} enemy cluster${state.clusters.length > 1 ? 's' : ''} on scope: ${names}. ${total} hostiles total. Engage at will.`, 'warning');
+            addComm(_crew('tactical'), `${state.clusters.length} bogie cluster${state.clusters.length > 1 ? 's' : ''} on scope: ${names}. ${total} bogies total. Engage at will.`, 'warning');
             _updateClusterHUD();
             // Immediately give first bearing call
             state._clusterCallTimer = 3;
@@ -2538,8 +3222,10 @@ const Starfighter = (function () {
         // Shared: spawn support ships and AI wingmen (called for all waves)
         const spawnSupportAndWingmen = () => {
             _despawnSupportShips();
-            if (state.wave >= 3) _spawnTanker();
-            if (state.wave >= 2) _spawnMedic();
+            _spawnTanker();
+            _spawnMedic();
+            _spawnRescueShuttle();
+            _spawnScienceVessel();
             if (state.aiWingmen) {
                 const ANPC = window.SFAnpc;
                 const rosterKeys = state.wave >= 5
@@ -2612,7 +3298,9 @@ const Starfighter = (function () {
 
             // ── Enemy budget: total enemies this wave ──
             // Wave 1: ~4–6 enemies. Wave 4: ~18–26. Wave 8+: 36+
-            const budget = Math.round(2 + w * 3.5 + _mzA * w * 5);
+            // Scaled by adaptive diffScale: struggling pilot gets fewer enemies, dominant pilot gets more.
+            const _diffScale = (state._currentMission && state._currentMission.diffScale) || 1.0;
+            const budget = Math.round((2 + w * 3.5 + _mzA * w * 5) * _diffScale);
 
             // ── Cluster count: grows with wave + chaos ──
             // Wave 1: 2. Wave 2–3: 2–3. Wave 4–5: 3–4. Wave 6+: up to 6.
@@ -2623,18 +3311,21 @@ const Starfighter = (function () {
             const canInterceptor = w >= 2;
             const canBomber = w >= 3;
 
-            // Type weights — manifold asymmetric factor biases toward harder types at higher waves
+            // Type weights — manifold asymmetric factor biases toward harder types at higher waves.
+            // diffScale > 1: more interceptors/bombers; diffScale < 0.7: mostly basic enemies.
+            const _ds = (state._currentMission && state._currentMission.diffScale) || 1.0;
             const typeWeights = {
                 enemy: 1.0,
-                interceptor: canInterceptor ? (0.25 + _mzL * 0.45) : 0,
-                bomber: canBomber ? (0.15 + _mzA * 0.35) : 0,
+                interceptor: canInterceptor ? Math.max(0, (0.25 + _mzL * 0.45) * _ds) : 0,
+                bomber: canBomber ? Math.max(0, (0.15 + _mzA * 0.35) * _ds) : 0,
             };
             const tierTypes = Object.keys(typeWeights).filter(t => typeWeights[t] > 0);
             const totalTW = tierTypes.reduce((s, t) => s + typeWeights[t], 0);
 
-            // Distance band: scales with wave but always well away from the player
-            const rBase = 5500 + w * 180;
-            const rSpread = 1200 + w * 240;
+            // Distance band: keep early waves closer so fights start quickly.
+            // Later waves remain long-range to support multi-cluster engagements.
+            const rBase = (w <= 2) ? (2600 + w * 260) : (5500 + w * 180);
+            const rSpread = (w <= 2) ? (900 + w * 180) : (1200 + w * 240);
 
             // Angular base — random each wave so clusters never come from the same direction
             const baseAngle = Math.random() * Math.PI * 2;
@@ -2731,8 +3422,14 @@ const Starfighter = (function () {
     }
 
     function checkWave() {
-        const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling') && !e.markedForDeletion);
+        const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling' || e.type === 'hive-queen') && !e.markedForDeletion);
         if (enemies.length === 0 && state.phase === 'combat') {
+
+            // Training wave clear — special handling
+            if (state._trainingMode) {
+                _onTrainingWaveClear();
+            }
+
             // Cancel any active support call
             _clearSupport();
             // Capture wave-kill snapshot
@@ -2771,14 +3468,20 @@ const Starfighter = (function () {
         overlay.innerHTML = `
             <div class="waveclear-headline">WAVE ${wave} CLEARED</div>
             <div class="waveclear-congrats">CONGRATULATIONS, ${cs}</div>
-            <div class="waveclear-kills">${kills} ENEMY FIGHTER${kills !== 1 ? 'S' : ''} DESTROYED THIS MISSION</div>
-            <button class="waveclear-btn" id="waveclear-rtb-btn">RETURN TO BASE</button>
+            <div class="waveclear-kills">${kills} BOGIE${kills !== 1 ? 'S' : ''} DESTROYED THIS SORTIE</div>
+            <div class="waveclear-auto-msg" style="margin-top:18px;font-size:12px;letter-spacing:3px;color:#446688">RETURNING TO BASE IN <span id="waveclear-cd">5</span>s</div>
         `;
+
+        // Exit pointer lock
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+
         overlay.classList.add('active');
 
-        // Pause phase at combat (prevents normal game loop from advancing)
+        // Pause phase at land-approach (prevents normal game loop from advancing)
         state.phase = 'land-approach';
-        state.autopilotActive = false; // Wait for button click
+        state.autopilotActive = false;
         state._returnFlightInit = false;
 
         const hud = document.getElementById('gameplay-hud');
@@ -2788,7 +3491,14 @@ const Starfighter = (function () {
         const radar = document.getElementById('radar-overlay');
         if (radar) radar.style.opacity = '0';
 
-        document.getElementById('waveclear-rtb-btn').addEventListener('click', _doWaveClearRTB);
+        // Auto-RTB after 5-second countdown
+        let _wcSecs = 5;
+        const _wcTick = setInterval(() => {
+            _wcSecs--;
+            const el = document.getElementById('waveclear-cd');
+            if (el) el.textContent = _wcSecs;
+            if (_wcSecs <= 0) { clearInterval(_wcTick); _doWaveClearRTB(); }
+        }, 1000);
     }
 
     // ── Instant bay return on wave-clear button click ──
@@ -2804,6 +3514,10 @@ const Starfighter = (function () {
         if (hud) hud.style.opacity = '1';
         const radar = document.getElementById('radar-overlay');
         if (radar) radar.style.opacity = '1';
+
+        // Compute performance tier for debrief shop gating
+        const _deaths = state._waveDeaths || 0;
+        state._performanceTier = _deaths === 0 ? 2 : _deaths === 1 ? 1 : 0;
 
         // Jump directly to bay debrief (skip 17s autopilot + 28s docking cutscene)
         completeLanding();
@@ -2868,6 +3582,17 @@ const Starfighter = (function () {
                 + '<div style="font-size:14px;margin-top:4px;">' + tallyHtml + '</div>'
                 + '</div>';
         }
+
+        // Auto-reload after 10 seconds so game always resets without needing a button
+        let _goSecs = 10;
+        const _goCdEl = document.getElementById('death-countdown');
+        if (_goCdEl) _goCdEl.textContent = _goSecs;
+        const _goTick = setInterval(() => {
+            _goSecs--;
+            const el = document.getElementById('death-countdown');
+            if (el) el.textContent = _goSecs;
+            if (_goSecs <= 0) { clearInterval(_goTick); location.reload(); }
+        }, 1000);
     }
 
     function _aarRow(label, value) {
@@ -2880,6 +3605,11 @@ const Starfighter = (function () {
         const overlay = document.getElementById('respawn-overlay');
         if (!overlay) return;
 
+        // Exit pointer lock so user can click the button
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+
         const lives = state.livesRemaining;
         const maxLives = state.maxLives;
         const reason = state.respawnReason || 'HULL INTEGRITY FAIL';
@@ -2889,10 +3619,10 @@ const Starfighter = (function () {
 
         overlay.innerHTML = `
             <div class="respawn-reason-text">${reason}</div>
-            <div class="respawn-headline">FIGHTER LOST</div>
+            <div class="respawn-headline">MISSION FAILED</div>
             <div class="lives-meter-row">${pips}</div>
             <div class="respawn-turns-text">You have <strong>${lives}</strong> turn${lives !== 1 ? 's' : ''} remaining</div>
-            <button class="respawn-btn" id="respawn-launch-btn">LAUNCH NEW FIGHTER</button>
+            <div class="respawn-turns-text" style="font-size:0.85em;color:#446688;margin-top:8px;letter-spacing:2px">RETURNING TO BASE IN <span id="respawn-cd">5</span>s</div>
         `;
         overlay.classList.add('active');
 
@@ -2905,7 +3635,14 @@ const Starfighter = (function () {
         const cdEl = document.getElementById('countdown-display');
         if (cdEl) cdEl.style.display = 'none';
 
-        document.getElementById('respawn-launch-btn').addEventListener('click', _doRespawnLaunch);
+        // Auto-launch after 5 seconds countdown
+        let _respawnSecs = 5;
+        const _respawnTick = setInterval(() => {
+            _respawnSecs--;
+            const el = document.getElementById('respawn-cd');
+            if (el) el.textContent = _respawnSecs;
+            if (_respawnSecs <= 0) { clearInterval(_respawnTick); _doRespawnLaunch(); }
+        }, 1000);
     }
 
     function _doRespawnLaunch() {
@@ -2923,7 +3660,15 @@ const Starfighter = (function () {
         if (window.SFInput) SFInput.init(state.player);
         if (window.SFProgression) SFProgression.applyUpgradesToPlayer(state.player, () => { });
 
-        // Reset to launch bay
+        // Check if this is the first respawn — trigger rescue frigate mission
+        const isFirstRespawn = !state._hasRespawned;
+        if (isFirstRespawn) {
+            state._hasRespawned = true;
+            _initiateRescueMission();
+            return; // Rescue mission handles its own launch flow
+        }
+
+        // Normal respawn: Reset to main baseship launch bay
         state.phase = 'bay-ready';
         state.launchTimer = 0;
         state._launchAudioPlayed = false;
@@ -2956,6 +3701,646 @@ const Starfighter = (function () {
 
         if (window.SFAnnouncer) SFAnnouncer.onRespawnReady();
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // RESCUE FRIGATE EMERGENCY MISSION
+    // Triggered on first respawn — player launches from medical frigate.
+    // Mission: Defend service ships (medic, tanker, station) from enemy
+    // mothership's assault fleet. Massive mothership visible in distance.
+    // ══════════════════════════════════════════════════════════════
+    function _initiateRescueMission() {
+        // Position player in rescue frigate bay (compact medical frigate)
+        state.phase = 'rescue-ready';
+        state.launchTimer = 0;
+        state._launchAudioPlayed = false;
+        state._launchBlastPlayed = false;
+        state._paBriefingDone = false;
+        state._rescueMissionActive = true;
+
+        // EMERGENCY WEAPON UNLOCK: Proton Torpedo (Rank 8 Captain unlock)
+        state._emergencyWeaponUnlocked = true;
+        state.player.torpedoes = 12; // Full torpedo loadout
+
+        // Clear any remaining enemies from previous wave
+        for (let i = state.entities.length - 1; i >= 0; i--) {
+            const e = state.entities[i];
+            if (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'laser') {
+                state.entities.splice(i, 1);
+            }
+        }
+
+        // Spawn service ships armada — close together, vulnerable
+        _spawnServiceShipsArmada();
+
+        // Spawn extra allied wingmen (more help = more enemies)
+        _spawnRescueWingmen();
+
+        // Spawn distant enemy mothership (backdrop, not engageable)
+        _spawnDistantMothership();
+
+        // Spawn assault fleet — more enemies than normal due to allied support
+        _spawnRescueAssaultFleet();
+
+        // Show rescue frigate bay (compact, hatchback-style medical bay)
+        if (window.SF3D) {
+            SF3D.setLaunchPhase(true);
+            SF3D.showRescueFrigateBay(); // New function to show compact medical bay
+            SF3D.showCockpit(true);
+        }
+
+        if (window.SFAudio) {
+            SFAudio.stopCockpitHum();
+            SFAudio.stopThrustRumble();
+            SFAudio.stopStrafeHiss();
+            SFAudio.startBayAmbience();
+        }
+
+        const hud = document.getElementById('gameplay-hud');
+        if (hud) { hud.style.display = 'block'; hud.style.opacity = '1'; }
+        const radar = document.getElementById('radar-overlay');
+        if (radar) radar.style.opacity = '1';
+        const cdEl = document.getElementById('countdown-display');
+        if (cdEl) {
+            cdEl.style.display = 'block';
+            cdEl.style.fontSize = '';
+            cdEl.style.color = '';
+            cdEl.innerHTML = '<span style="font-size:0.35em;color:#ff6644">MEDICAL FRIGATE — EMERGENCY LAUNCH</span>';
+        }
+
+        // Show rescue bay interface with weapon unlock + training
+        // Release pointer lock so player can click the buttons
+        if (document.pointerLockElement) document.exitPointerLock();
+        _showRescueBayInterface();
+
+        const shipPanel = document.getElementById('ship-panel');
+        if (shipPanel) shipPanel.style.display = 'none';
+
+        // Emergency briefing
+        if (window.SFAnnouncer) {
+            const cs = state.callsign || 'Pilot';
+            setTimeout(() => {
+                addComm('Medical Frigate', `${cs}, you're aboard the emergency medical frigate. We've been picked up by a bogie mothership.`, 'warning');
+            }, 800);
+            setTimeout(() => {
+                addComm('Tactical', `Massive bogie contact bearing zero-three-zero. Service ships are at risk. Launch when ready — defend the armada.`, 'warning');
+            }, 3500);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // RESCUE BAY INTERFACE
+    // Shows weapon unlock, training option, and launch button
+    // ══════════════════════════════════════════════════════════════
+    function _showRescueBayInterface() {
+        let overlay = document.getElementById('rescue-bay-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'rescue-bay-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 500;
+                background: linear-gradient(135deg, rgba(10,30,50,0.95), rgba(20,40,60,0.95));
+                border: 2px solid #44ffff;
+                border-radius: 8px;
+                padding: 32px;
+                min-width: 480px;
+                max-width: 600px;
+                box-shadow: 0 0 40px rgba(0,255,255,0.3), inset 0 0 20px rgba(0,255,255,0.1);
+                font-family: monospace;
+                color: #fff;
+                pointer-events: auto;
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        const cs = state.callsign || 'Pilot';
+        overlay.innerHTML = `
+            <div style="text-align:center;margin-bottom:24px;">
+                <div style="font-size:1.8em;color:#ff6644;font-weight:bold;letter-spacing:2px;margin-bottom:8px;">EMERGENCY FRIGATE</div>
+                <div style="font-size:0.9em;color:#88aacc;margin-bottom:16px;">Medical Bay • Combat Refit Station</div>
+                <div style="border-top:1px solid rgba(68,255,255,0.3);padding-top:16px;margin-top:16px;">
+                    <div style="color:#0ff;font-size:1.1em;margin-bottom:8px;">WEAPON UNLOCK</div>
+                    <div style="background:rgba(0,255,255,0.1);border:1px solid #0ff;border-radius:4px;padding:16px;margin:12px 0;">
+                        <div style="font-size:1.3em;color:#ffaa00;font-weight:bold;margin-bottom:6px;">⚡ PROTON TORPEDO</div>
+                        <div style="font-size:0.85em;color:#88aacc;line-height:1.5;">
+                            High-yield anti-capital ship weapon. Devastating against large targets.
+                            Guided tracking. Limited ammunition (12 rounds).
+                        </div>
+                        <div style="margin-top:12px;font-size:0.8em;color:#ffaa00;">
+                            <strong>Controls:</strong> Press [3] to select &nbsp;·&nbsp; Space to fire
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align:center;margin-top:24px;">
+                <button id="rescue-training-btn" style="
+                    background: linear-gradient(135deg, rgba(0,150,200,0.3), rgba(0,100,150,0.3));
+                    color: #0ff;
+                    border: 2px solid #0ff;
+                    border-radius: 6px;
+                    padding: 14px 32px;
+                    font-size: 1.1em;
+                    font-family: monospace;
+                    cursor: pointer;
+                    margin-right: 16px;
+                    transition: all 0.2s;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                ">WEAPONS TRAINING</button>
+
+                <button id="rescue-launch-btn" style="
+                    background: linear-gradient(135deg, rgba(255,100,50,0.5), rgba(200,50,30,0.5));
+                    color: #fff;
+                    border: 2px solid #ff6644;
+                    border-radius: 6px;
+                    padding: 14px 32px;
+                    font-size: 1.1em;
+                    font-family: monospace;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                ">LAUNCH MISSION ▶</button>
+            </div>
+
+            <div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(68,255,255,0.2);text-align:center;">
+                <div style="font-size:0.85em;color:#ff6644;margin-bottom:6px;">⚠ MISSION BRIEFING</div>
+                <div style="font-size:0.8em;color:#88aacc;line-height:1.6;text-align:left;">
+                    Enemy mothership detected. Service ships under threat.<br>
+                    <strong style="color:#ffaa00;">Objective:</strong> Defend Medical Frigate, Fuel Tanker, Supply Station<br>
+                    <strong style="color:#ffaa00;">Allied Support:</strong> ${4 + Math.floor(Math.random() * 3)} fighters<br>
+                    <strong style="color:#ff6644;">Threat Level:</strong> HIGH — Multiple assault groups inbound
+                </div>
+            </div>
+        `;
+
+        overlay.style.display = 'block';
+
+        // Training button - spawn practice drones
+        const trainingBtn = document.getElementById('rescue-training-btn');
+        trainingBtn.onmouseenter = () => trainingBtn.style.background = 'linear-gradient(135deg, rgba(0,200,255,0.5), rgba(0,150,200,0.5))';
+        trainingBtn.onmouseleave = () => trainingBtn.style.background = 'linear-gradient(135deg, rgba(0,150,200,0.3), rgba(0,100,150,0.3))';
+        trainingBtn.onclick = () => {
+            _startWeaponsTraining();
+        };
+
+        // Launch button - start mission
+        const launchBtn = document.getElementById('rescue-launch-btn');
+        launchBtn.onmouseenter = () => launchBtn.style.background = 'linear-gradient(135deg, rgba(255,120,70,0.7), rgba(220,70,50,0.7))';
+        launchBtn.onmouseleave = () => launchBtn.style.background = 'linear-gradient(135deg, rgba(255,100,50,0.5), rgba(200,50,30,0.5))';
+        launchBtn.onclick = () => {
+            overlay.style.display = 'none';
+            addComm('Deck Officer', `${cs}, all systems green. Proton torpedoes loaded. Launching.`, 'info');
+            setTimeout(() => {
+                if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+                _beginLaunchSequence();
+            }, 800);
+        };
+    }
+
+    function _startWeaponsTraining() {
+        // Close overlay
+        const overlay = document.getElementById('rescue-bay-overlay');
+        if (overlay) overlay.style.display = 'none';
+
+        // Spawn training drones in front of player
+        const cs = state.callsign || 'Pilot';
+        addComm('Training Officer', `${cs}, initiating weapons training. Three target drones deployed. Test your Proton Torpedoes.`, 'info');
+
+        // Spawn 3 stationary target drones
+        for (let i = 0; i < 3; i++) {
+            const angle = (Math.PI / 4) * (i - 1); // Spread in front
+            const r = 1500 + i * 400;
+            const drone = new Entity('enemy',
+                state.player.position.x + Math.sin(angle) * r,
+                state.player.position.y + (i - 1) * 200,
+                state.player.position.z - Math.cos(angle) * r
+            );
+            drone.hull = 200; // Easier to destroy
+            drone.shields = 100;
+            drone.maxSpeed = 0; // Stationary
+            drone.velocity.set(0, 0, 0);
+            drone._isTrainingDrone = true;
+            drone._noAI = true; // Don't move or shoot
+            state.entities.push(drone);
+        }
+
+        state._trainingActive = true;
+        state._trainingDronesDestroyed = 0;
+
+        // Show instructions
+        const cdEl = document.getElementById('countdown-display');
+        if (cdEl) {
+            cdEl.style.display = 'block';
+            cdEl.innerHTML = '<span style="font-size:0.4em;color:#ffaa00">WEAPONS TRAINING<br>Press [3] for Torpedoes • Space to Fire</span>';
+        }
+
+        // Return to bay interface after training
+        setTimeout(() => {
+            addComm('Training Officer', 'Training complete. Return to bay when ready.', 'info');
+        }, 2000);
+    }
+
+    function _spawnServiceShipsArmada() {
+        // Spawn three service ships in tight formation — medic, tanker, station
+        const baseX = -2500;
+        const baseY = 150;
+        const baseZ = -3000;
+        const spacing = 600;
+
+        // Medical frigate (player launches from this one)
+        const medic = new Entity('medic', baseX - spacing, baseY, baseZ);
+        medic.hull = dim('medic.hull') || 800;
+        medic.shields = dim('medic.shields') || 400;
+        medic.radius = 400;
+        medic._isServiceShip = true;
+        medic._protected = true; // Mission objective
+        state.entities.push(medic);
+
+        // Fuel tanker
+        const tanker = new Entity('tanker', baseX, baseY - 100, baseZ + spacing);
+        tanker.hull = dim('tanker.hull') || 600;
+        tanker.shields = dim('tanker.shields') || 300;
+        tanker.radius = 350;
+        tanker._isServiceShip = true;
+        tanker._protected = true;
+        state.entities.push(tanker);
+
+        // Supply station
+        const station = new Entity('station', baseX + spacing, baseY + 80, baseZ);
+        station.hull = dim('station.hull') || 1200;
+        station.shields = dim('station.shields') || 600;
+        station.radius = 500;
+        station._isServiceShip = true;
+        station._protected = true;
+        state.entities.push(station);
+
+        // Track service ships for mission success/failure
+        state._serviceShipsAlive = 3;
+    }
+
+    function _spawnRescueWingmen() {
+        // Spawn 4-6 allied fighters (more than normal wave)
+        const ANPC = window.SFAnpc;
+        const rosterKeys = ['hotshot', 'ice', 'motherhen', 'nightshade', 'viper', 'ghost'];
+        const count = 4 + Math.floor(Math.random() * 3); // 4-6 allies
+
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 / count) * i;
+            const r = 300 + Math.random() * 150;
+            const offset = new THREE.Vector3(
+                Math.cos(angle) * r,
+                (Math.random() - 0.5) * 100,
+                Math.sin(angle) * r + 400
+            );
+            const spawnPos = state.player.position.clone().add(offset);
+            const w = new Entity('wingman', spawnPos.x, spawnPos.y, spawnPos.z);
+            const profile = deriveCombatProfile('wingman', state.wave);
+            w.hull = profile.hull * 1.2; // Tougher for rescue mission
+            w.maxSpeed = profile.maxSpeed;
+            w._manifoldDerivation = profile.trace;
+            const key = rosterKeys[i % rosterKeys.length];
+            if (ANPC) {
+                const npc = ANPC.spawn(key);
+                w.callsign = npc.callsign;
+                w._anpc = npc;
+                w._anpcKey = key;
+            } else {
+                w.callsign = `Alpha-${i + 2}`;
+            }
+            w.quaternion.copy(state.player.quaternion);
+            w._rescueDefender = true;
+            state.entities.push(w);
+        }
+    }
+
+    function _spawnDistantMothership() {
+        // Massive enemy mothership — visible backdrop, not engageable
+        const r = 45000; // Very far — visible but unreachable
+        const theta = Math.PI / 6; // Bearing ~30°
+        const phi = Math.PI / 2.2;
+        const mothership = new Entity('alien-baseship',
+            r * Math.sin(phi) * Math.cos(theta),
+            r * Math.sin(phi) * Math.sin(theta),
+            r * Math.cos(phi));
+        mothership.hull = 999999; // Invulnerable
+        mothership.shields = 999999;
+        mothership.radius = 5000; // Massive
+        mothership.maxSpeed = 5; // Nearly stationary
+        mothership._isDistantThreat = true;
+        mothership._protected = true; // Don't delete
+        state.entities.push(mothership);
+        state._distantMothership = mothership;
+    }
+
+    function _spawnRescueAssaultFleet() {
+        // Spawn more enemies than normal (compensate for extra allies)
+        // 3-4 clusters, mixed types, closing on service ships
+        state.clusters = [];
+        const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta'];
+        const clusterCount = 3 + Math.floor(Math.random() * 2);
+        const enemiesPerCluster = 5 + Math.floor(Math.random() * 3); // 5-7 per cluster
+
+        for (let c = 0; c < clusterCount; c++) {
+            const clusterId = c;
+            const clusterLabel = NAMES[c % NAMES.length];
+            const baseAngle = (Math.PI * 2 / clusterCount) * c + Math.random() * 0.8;
+            const r = 6000 + Math.random() * 2000;
+            const phi = Math.PI / 2 + (Math.random() - 0.5) * 0.6;
+            const cx = r * Math.sin(phi) * Math.cos(baseAngle);
+            const cy = r * Math.sin(phi) * Math.sin(baseAngle);
+            const cz = r * Math.cos(phi);
+
+            // Mix of enemy types
+            const types = ['enemy', 'enemy', 'interceptor', 'interceptor', 'bomber'];
+            for (let i = 0; i < enemiesPerCluster; i++) {
+                const enemyType = types[Math.floor(Math.random() * types.length)];
+                const spread = 400;
+                const ax = cx + (Math.random() - 0.5) * spread * 2;
+                const ay = cy + (Math.random() - 0.5) * spread * 0.6;
+                const az = cz + (Math.random() - 0.5) * spread * 2;
+                const e = new Entity(enemyType, ax, ay, az);
+                const profile = deriveCombatProfile(enemyType, state.wave, {});
+                e.hull = profile.hull * 1.3; // Tougher for rescue mission
+                e.maxSpeed = profile.maxSpeed;
+                e.shields = profile.shields || 0;
+                e._manifoldDerivation = profile.trace;
+                e._clusterId = clusterId;
+                e._fireCooldownBase = 1.2;
+                e._useSpread = Math.random() > 0.4;
+                if (enemyType === 'interceptor') e.radius = dim('entity.interceptor.radius');
+                else if (enemyType === 'bomber') {
+                    e.radius = dim('entity.bomber.radius');
+                    e._bombCooldown = 0;
+                    e._bombInterval = dim('enemy.bomber.bombInterval');
+                }
+                // Prioritize service ships as targets
+                e._priorityTarget = 'service-ship';
+                state.entities.push(e);
+            }
+            state.clusters.push({ id: clusterId, label: clusterLabel, center: { x: cx, y: cy, z: cz }, total: enemiesPerCluster, alive: enemiesPerCluster });
+        }
+
+        // Initial cluster announcement
+        setTimeout(() => {
+            const total = state.clusters.reduce((s, cl) => s + cl.total, 0);
+            addComm('Tactical', `${state.clusters.length} assault groups inbound. ${total} bogies. Protect the service ships at all costs.`, 'warning');
+            _updateClusterHUD();
+        }, 5000);
+    }
+
+    function _updateRescueMission(dt) {
+        if (!state._rescueMissionActive) return;
+
+        // Check if service ships are destroyed
+        const servicesAlive = state.entities.filter(e => e._isServiceShip && !e.markedForDeletion).length;
+        if (servicesAlive < state._serviceShipsAlive) {
+            state._serviceShipsAlive = servicesAlive;
+            if (servicesAlive === 0) {
+                // Mission failed — all service ships lost
+                addComm('Command', 'All service ships lost. Emergency evacuation failed. RTB immediately.', 'danger');
+                state._rescueMissionActive = false;
+                // Despawn distant mothership
+                if (state._distantMothership) state._distantMothership.markedForDeletion = true;
+            } else {
+                addComm('Tactical', `Service ship destroyed! ${servicesAlive} remaining. Keep them alive!`, 'danger');
+            }
+        }
+
+        // Check if all enemies cleared
+        const hostiles = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber') && !e.markedForDeletion).length;
+        if (hostiles === 0 && state._serviceShipsAlive > 0) {
+            // Mission success
+            addComm('Command', `Assault fleet destroyed. Service ships secured. Well done. Distant mothership retreating.`, 'success');
+            state._rescueMissionActive = false;
+            // Despawn distant mothership (it "retreats")
+            if (state._distantMothership) {
+                setTimeout(() => {
+                    if (state._distantMothership) state._distantMothership.markedForDeletion = true;
+                }, 3000);
+            }
+            // Return to normal wave progression after 8 seconds
+            setTimeout(() => {
+                addComm('Command', 'Rejoin the main battle group. Proceeding to next objective.', 'info');
+                // Trigger next wave
+                state.phase = 'land-approach';
+                state.autopilotActive = true;
+                state.autopilotTimer = 0;
+                state._returnFlightInit = false;
+            }, 8000);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // WRECKAGE SPAWNING & ALIEN TECH LOOTING SYSTEM (Wave 3+)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    function _spawnWreckage(pos, sourceType, isBoss) {
+        const w = new Entity(pos, 'wreckage');
+        w.radius = sourceType === 'dreadnought' || sourceType === 'alien-baseship' ? 50 : 25;
+        w.hull = 1; // Indestructible
+        w.maxHull = 1;
+        w.shields = 0;
+        w.maxShields = 0;
+        w.speed = 0;
+        w.maxSpeed = 0;
+        w._sourceType = sourceType;
+        w._isBoss = isBoss;
+        w._lifetime = 120; // 2 minutes before despawn
+        w._hasLoot = Math.random() < (isBoss ? 0.7 : 0.25); // Bosses: 70%, normal: 25%
+        w._looted = false;
+
+        // Random drift velocity
+        w.velocity.x = (Math.random() - 0.5) * 10;
+        w.velocity.y = (Math.random() - 0.5) * 10;
+        w.velocity.z = (Math.random() - 0.5) * 10;
+
+        state.entities.push(w);
+        if (M) M.add(w);
+        if (window.SF3D && SF3D.spawnWreckage) SF3D.spawnWreckage(w);
+
+        // Add to wreckage pool for tracking
+        if (!state._wreckagePool) state._wreckagePool = [];
+        state._wreckagePool.push(w);
+    }
+
+    function _updateWreckage(dt) {
+        if (!state._wreckagePool || state.phase !== 'combat') return;
+
+        state._wreckagePool = state._wreckagePool.filter(w => {
+            if (w.markedForDeletion) return false;
+
+            // Decay lifetime
+            w._lifetime -= dt;
+            if (w._lifetime <= 0) {
+                w.markedForDeletion = true;
+                if (M) M.remove(w.id);
+                if (window.SF3D && SF3D.removeWreckage) SF3D.removeWreckage(w);
+                return false;
+            }
+
+            // Looting check: player straifs close to wreckage
+            const p = state.player;
+            if (!p || p.markedForDeletion || w._looted) return true;
+
+            const dx = p.position.x - w.position.x;
+            const dy = p.position.y - w.position.y;
+            const dz = p.position.z - w.position.z;
+            const distSq = dx * dx + dy * dy + dz * dz;
+            const lootRangeSq = (w.radius + 80) * (w.radius + 80); // Close pass required
+
+            if (distSq < lootRangeSq && !w._looted) {
+                w._looted = true;
+                _attemptLoot(w);
+            }
+
+            return true;
+        });
+    }
+
+    function _attemptLoot(wreckage) {
+        if (!wreckage._hasLoot) {
+            // No loot
+            if (window.SFAnnouncer) {
+                SFAnnouncer.onCustom('Wreckage scanned. No salvage detected.', '#888888');
+            }
+            if (window.SFAudio) SFAudio.playSound('scan'); // TODO: add scan sound
+            return;
+        }
+
+        // Roll for alien tech from pool
+        const lootPool = ALIEN_TECH.filter(tech => {
+            // Filter by rarity
+            return Math.random() < tech.rarity;
+        });
+
+        if (lootPool.length === 0) {
+            if (window.SFAnnouncer) {
+                SFAnnouncer.onCustom('Salvage corrupted. No usable technology.', '#aa6600');
+            }
+            return;
+        }
+
+        // Pick random tech from filtered pool
+        const tech = lootPool[Math.floor(Math.random() * lootPool.length)];
+        _applyAlienTech(tech);
+
+        // Visual & audio feedback
+        if (window.SF3D && SF3D.spawnLootEffect) SF3D.spawnLootEffect(wreckage.position);
+        if (window.SFAudio) SFAudio.playSound('powerup'); // TODO: add loot sound
+        if (window.SFAnnouncer) {
+            SFAnnouncer.onCustom(`ALIEN TECH ACQUIRED: ${tech.name}`, '#00ffcc');
+        }
+
+        // Add to player inventory
+        if (!state._alienTechInventory) state._alienTechInventory = [];
+        state._alienTechInventory.push(tech);
+
+        // Update HUD notification
+        _showAlienTechNotification(tech);
+    }
+
+    function _applyAlienTech(tech) {
+        const p = state.player;
+        if (!p) return;
+
+        switch (tech.effect) {
+            case 'shields':
+                p.shields = Math.min(p.maxShields, p.shields + tech.bonus);
+                p.maxShields += tech.bonus;
+                break;
+            case 'hull':
+                p.hull = Math.min(p.maxHull, p.hull + tech.bonus);
+                p.maxHull += tech.bonus;
+                break;
+            case 'damage':
+                if (!state._damageMultiplier) state._damageMultiplier = 1.0;
+                state._damageMultiplier *= tech.bonus;
+                break;
+            case 'speed':
+                p.maxSpeed *= tech.bonus;
+                break;
+            case 'accuracy':
+                if (!state._accuracyBonus) state._accuracyBonus = 1.0;
+                state._accuracyBonus *= tech.bonus;
+                break;
+            case 'ammo':
+                p.torpedoes += tech.bonus;
+                break;
+            case 'evasion':
+                if (!state._evasionBonus) state._evasionBonus = 1.0;
+                state._evasionBonus *= tech.bonus;
+                break;
+            case 'sensors':
+                if (!state._sensorRange) state._sensorRange = 1.0;
+                state._sensorRange *= tech.bonus;
+                break;
+            case 'special':
+                // Manifold Fragment: exotic effect (TBD - could unlock special abilities)
+                if (window.SFAnnouncer) {
+                    SFAnnouncer.onCustom('Manifold Fragment resonating... analyzing...', '#ff00ff');
+                }
+                break;
+        }
+    }
+
+    function _showAlienTechNotification(tech) {
+        // Create HUD notification overlay
+        const notif = document.createElement('div');
+        notif.id = 'alien-tech-notif';
+        notif.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(0,255,204,0.2), rgba(0,100,150,0.3));
+            border: 2px solid #00ffcc;
+            border-radius: 8px;
+            padding: 20px 30px;
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            color: #00ffcc;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0,255,204,0.8);
+            box-shadow: 0 0 30px rgba(0,255,204,0.5);
+            z-index: 10000;
+            pointer-events: none;
+            animation: techPopIn 0.3s ease-out;
+        `;
+
+        const effectDesc = {
+            shields: `+${tech.bonus} Max Shields`,
+            hull: `+${tech.bonus} Max Hull`,
+            damage: `+${Math.round((tech.bonus - 1) * 100)}% Weapon Damage`,
+            speed: `+${Math.round((tech.bonus - 1) * 100)}% Max Speed`,
+            accuracy: `+${Math.round((tech.bonus - 1) * 100)}% Accuracy`,
+            ammo: `+${tech.bonus} Torpedoes`,
+            evasion: `+${Math.round((tech.bonus - 1) * 100)}% Evasion`,
+            sensors: `+${Math.round((tech.bonus - 1) * 100)}% Sensor Range`,
+            special: 'Unknown Manifold Effect',
+        };
+
+        notif.innerHTML = `
+            <div style=\"font-size: 14px; opacity: 0.8; margin-bottom: 8px;\">⚡ ALIEN TECHNOLOGY ACQUIRED ⚡</div>
+            <div style=\"font-size: 22px; font-weight: bold; margin-bottom: 5px;\">${tech.name}</div>
+            <div style=\"font-size: 16px; color: #88ffcc;\">${effectDesc[tech.effect]}</div>
+        `;
+
+        document.body.appendChild(notif);
+
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            if (notif.parentNode) notif.parentNode.removeChild(notif);
+        }, 4000);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // END WRECKAGE SYSTEM
+    // ══════════════════════════════════════════════════════════════════════════
 
     function _updateRespawn(dt) {
         if (!state.respawning) return false;
@@ -2991,7 +4376,21 @@ const Starfighter = (function () {
             }
 
             // ── Bay Ready Phase — player is in bay, waiting to push red LAUNCH button ──
-            if (state.phase === 'bay-ready') {
+            if (state.phase === 'bay-ready' || state.phase === 'rescue-ready') {
+                // Handle ESC during training mode - return to rescue bay interface
+                if (state.phase === 'rescue-ready' && state._trainingActive && window.SFInput && SFInput.isKeyDown('Escape')) {
+                    state._trainingActive = false;
+                    // Clear training drones
+                    for (let i = state.entities.length - 1; i >= 0; i--) {
+                        if (state.entities[i]._isTrainingDrone) {
+                            state.entities.splice(i, 1);
+                        }
+                    }
+                    // Show rescue bay interface again
+                    _showRescueBayInterface();
+                    addComm('Deck Officer', 'Training terminated. Returning to bay.', 'info');
+                }
+
                 // Just render the bay scene, no launch timer advancement
                 if (window.SF3D) SF3D.render(state);
                 _frameCount++;
@@ -3510,6 +4909,14 @@ const Starfighter = (function () {
             _updateEggs(safeDt);
             _updateYounglings(safeDt);
 
+            // Rescue mission tracking (first-death scenario)
+            if (state._rescueMissionActive) {
+                _updateRescueMission(safeDt);
+            }
+
+            // Wreckage looting system (wave 3+)
+            _updateWreckage(safeDt);
+
             if (window.SFInput && !state._playerDisabled && !_isPlayerInSupportAutopilot()) {
                 SFInput.update(safeDt);
                 SFInput.updateLivePanel();
@@ -3524,6 +4931,9 @@ const Starfighter = (function () {
 
             // Emergency rescue system — button visibility and autopilot
             if (window.SFRescue) SFRescue.update(safeDt, state);
+
+            // Threat detection & countermeasures — radar tracking and alerts
+            if (window.SFThreatSys) SFThreatSys.update(safeDt, state);
 
             // Wingman cluster guidance — bearing callout every 15-23s during combat
             state._clusterCallTimer -= safeDt;
@@ -3584,11 +4994,11 @@ const Starfighter = (function () {
                     state.player.afterburnerActive,
                     state.player.boostActive
                 );
-                SFAudio.setStrafeLevel(state.player.strafeH, state.player.strafeV);
+                // Strafe hiss disabled
             }
 
             // Auto-targeting: crosshair tracks and locks enemies in range + cone
-            updateCrosshairTargeting();
+            updateCrosshairTargeting(safeDt);
 
             // AI sets intent (velocity) on enemies and torpedoes — for loop, no closure
             // 🍴 Fork-guarded: skip entities whose fork was revoked mid-frame
@@ -3597,9 +5007,13 @@ const Starfighter = (function () {
             for (let i = 0, len = ents.length; i < len; i++) {
                 const e = ents[i];
                 if (_DPe && !_DPe.acquire(e.id, 'ai')) continue;
+                // Skip AI for training drones (stationary targets)
+                if (e._noAI || e._isTrainingDrone) continue;
                 if (e.type === 'predator') updatePredatorAI(e, safeDt);
                 else if (e.type === 'tanker') updateTankerAI(e, safeDt);
                 else if (e.type === 'medic') updateMedicAI(e, safeDt);
+                else if (e.type === 'rescue') _updateRescueOrbit(safeDt);
+                else if (e.type === 'science-ship') _updateScienceOrbit(safeDt);
                 else if (AI_PROFILES[e.type]) {
                     updateCombatAI(e, safeDt);
                     if (e.type === 'wingman') _updateANPCState(e, safeDt);
@@ -3675,6 +5089,8 @@ const Starfighter = (function () {
             }
             if (_DPe) _DPe.releaseAll('expiry');
 
+            if (window.SF3D && SF3D.updatePickups) SF3D.updatePickups(dt);
+
             // Observe proximity events (collisions) from the manifold
             // 🍴 Dijkstra-ordered fork acquisition prevents stale-ref crashes
             const _DP = M ? M.DiningPhilosophers : null;
@@ -3722,7 +5138,7 @@ const Starfighter = (function () {
                 if ((isAProj && a.owner === b.type) || (isBProj && b.owner === a.type)) continue;
 
                 // Friendly fire prevention — player/wingman projectiles skip friendly targets
-                const _isFriendlyType = (t) => t === 'player' || t === 'wingman' || t === 'baseship' || t === 'tanker' || t === 'medic';
+                const _isFriendlyType = (t) => t === 'player' || t === 'wingman' || t === 'baseship' || t === 'tanker' || t === 'medic' || t === 'station' || t === 'rescue' || t === 'science-ship';
                 const _isFriendlyOwner = (o) => o === 'player' || o === 'wingman';
                 if (isAProj && _isFriendlyOwner(a.owner) && _isFriendlyType(b.type)) continue;
                 if (isBProj && _isFriendlyOwner(b.owner) && _isFriendlyType(a.type)) continue;
@@ -3737,6 +5153,23 @@ const Starfighter = (function () {
                 const distSq = _cx * _cx + _cy * _cy + _cz * _cz;
                 const rSum = a.radius + b.radius;
                 if (distSq < rSum * rSum) {
+                    if (a.type === 'pickup' || b.type === 'pickup') {
+                        const pick = a.type === 'pickup' ? a : b;
+                        const other = a.type === 'pickup' ? b : a;
+                        if (!pick._collected && other.type === 'player') {
+                            pick._collected = true;
+                            pick.markedForDeletion = true;
+                            if (window.SF3D && SF3D.removePickup) SF3D.removePickup(pick.id);
+                            // Apply immediately — powerups are good for this sortie only
+                            pick._pickupDef.apply(state.player);
+                            const cs = state.callsign ? state.callsign.toUpperCase() : 'PILOT';
+                            addComm('LOADMASTER', `${pick._pickupDef.icon} ${cs} — ${pick._pickupDef.label}. ${pick._pickupDef.flavour}`, 'info');
+                            if (window.SF3D) SF3D.spawnExplosion(pick.position);
+                            if (window.SFAudio) SFAudio.playSound('comm_beep');
+                        }
+                        continue;
+                    }
+
                     handleCollision(a, b);
                 }
             }
@@ -4312,6 +5745,8 @@ const Starfighter = (function () {
 
     let _tankerEntity = null;   // live tanker entity (null = not spawned)
     let _medicEntity = null;    // live medic entity (null = not spawned)
+    let _rescueEntity = null;   // rescue shuttle entity (null = not spawned)
+    let _scienceEntity = null;  // civilian science vessel (null = not spawned)
 
     // Support call state
     state._supportCall = null;      // 'tanker' | 'medic' | null
@@ -4370,6 +5805,52 @@ const Starfighter = (function () {
         med._callsign = callsigns[(state.wave + state.kills) % callsigns.length];
 
         SFAnnouncer.onMedicDeploy(med._callsign);
+    }
+
+    function _spawnRescueShuttle() {
+        if (_rescueEntity) return;
+        if (!state.baseship) return;
+        // Position rescue shuttle close to baseship, slightly above
+        const angle = Math.PI * 0.75; // between tanker and medic arcs
+        const orbitDist = 3500;
+        const spawnPos = state.baseship.position.clone().add(
+            new THREE.Vector3(Math.cos(angle) * orbitDist, 200, Math.sin(angle) * orbitDist)
+        );
+        const rs = new Entity('rescue', spawnPos.x, spawnPos.y, spawnPos.z);
+        rs.hull = 2000;
+        rs.shields = 1000;
+        rs.maxSpeed = 80;
+        rs.radius = 30;
+        rs._orbitAngle = angle;
+        rs._orbitTimer = 0;
+        rs._evadeTimer = 0;
+        rs._evadeDir = new THREE.Vector3(0, 0, 0);
+        rs._isScenery = true; // not callable, just visible
+        state.entities.push(rs);
+        _rescueEntity = rs;
+    }
+
+    function _spawnScienceVessel() {
+        if (_scienceEntity) return;
+        if (!state.baseship) return;
+        // Civilian science ship on a wide orbit — visible backdrop between Earth and Moon
+        const angle = Math.PI * 1.5;
+        const orbitDist = 7000;
+        const spawnPos = state.baseship.position.clone().add(
+            new THREE.Vector3(Math.cos(angle) * orbitDist, -400, Math.sin(angle) * orbitDist)
+        );
+        const sv = new Entity('science-ship', spawnPos.x, spawnPos.y, spawnPos.z);
+        sv.hull = 3000;
+        sv.shields = 1500;
+        sv.maxSpeed = 60;
+        sv.radius = 80;
+        sv._orbitAngle = angle;
+        sv._orbitTimer = 0;
+        sv._evadeTimer = 0;
+        sv._evadeDir = new THREE.Vector3(0, 0, 0);
+        sv._isScenery = true;
+        state.entities.push(sv);
+        _scienceEntity = sv;
     }
 
     // ── ORBIT AI: evasive safe-zone orbit, stay clear of fighting ──
@@ -4431,6 +5912,16 @@ const Starfighter = (function () {
         }
         // Otherwise: evasive orbit
         _updateSupportOrbit(med, dt, 'entity.medic.orbitDist');
+    }
+
+    function _updateRescueOrbit(dt) {
+        if (!_rescueEntity || _rescueEntity.markedForDeletion) return;
+        _updateSupportOrbit(_rescueEntity, dt, 'entity.tanker.orbitDist'); // reuse tanker orbit dist
+    }
+
+    function _updateScienceOrbit(dt) {
+        if (!_scienceEntity || _scienceEntity.markedForDeletion) return;
+        _updateSupportOrbit(_scienceEntity, dt, 'entity.medic.orbitDist'); // reuse medic orbit dist
     }
 
     // ── ELIGIBILITY: dire conditions required to call support ──
@@ -4701,8 +6192,18 @@ const Starfighter = (function () {
             _medicEntity.markedForDeletion = true;
             if (M) M.remove(_medicEntity.id);
         }
+        if (_rescueEntity && !_rescueEntity.markedForDeletion) {
+            _rescueEntity.markedForDeletion = true;
+            if (M) M.remove(_rescueEntity.id);
+        }
+        if (_scienceEntity && !_scienceEntity.markedForDeletion) {
+            _scienceEntity.markedForDeletion = true;
+            if (M) M.remove(_scienceEntity.id);
+        }
         _tankerEntity = null;
         _medicEntity = null;
+        _rescueEntity = null;
+        _scienceEntity = null;
         _clearSupport();
     }
 
@@ -5090,14 +6591,16 @@ const Starfighter = (function () {
         const ents = state.entities;
         for (let i = 0, len = ents.length; i < len; i++) {
             const e = ents[i];
-            if (e.type !== 'enemy' && e.type !== 'interceptor' && e.type !== 'bomber' && e.type !== 'dreadnought' && e.type !== 'alien-baseship' && e.type !== 'predator') continue;
+            if (e.type !== 'enemy' && e.type !== 'interceptor' && e.type !== 'bomber'
+                && e.type !== 'dreadnought' && e.type !== 'alien-baseship'
+                && e.type !== 'predator' && e.type !== 'hive-queen') continue;
             if (e.markedForDeletion) continue;
 
             _v2.copy(e.position).sub(source.position);
             const dist = _v2.length();
             if (dist > 4000) continue;
 
-            _v2.multiplyScalar(1 / dist); // normalize without creating new vector
+            _v2.multiplyScalar(1 / dist);
             const dot = _v1.dot(_v2);
             if (dot > 0.8) {
                 const score = dot * 10000 - dist;
@@ -5109,11 +6612,14 @@ const Starfighter = (function () {
     }
 
     // ── Auto-targeting: check if any enemy is in crosshair cone and in range ──
-    // Updates crosshair color and auto-locks when target is centered
+    // Updates crosshair color and auto-locks when target is centered for 2 seconds
     let _crosshairLocked = false;
     let _crosshairTarget = null;
+    let _crosshairDwellTime = 0;       // seconds crosshair has been on current target
+    let _crosshairDwellEntity = null;   // entity being tracked for dwell lock
+    const DWELL_LOCK_TIME = 2.0;        // seconds to dwell before auto-lock
 
-    function updateCrosshairTargeting() {
+    function updateCrosshairTargeting(dt) {
         const p = state.player;
         const crosshair = document.getElementById('crosshair');
         if (!crosshair || !p) return;
@@ -5122,47 +6628,65 @@ const Starfighter = (function () {
 
         let bestTarget = null;
         let bestDot = -1;
+        let bestDist = Infinity;
 
         const ents = state.entities;
         for (let i = 0, len = ents.length; i < len; i++) {
             const e = ents[i];
-            if (e.type !== 'enemy' && e.type !== 'interceptor' && e.type !== 'bomber' && e.type !== 'dreadnought' && e.type !== 'alien-baseship' && e.type !== 'predator') continue;
+            if (e.type !== 'enemy' && e.type !== 'interceptor' && e.type !== 'bomber'
+                && e.type !== 'dreadnought' && e.type !== 'alien-baseship'
+                && e.type !== 'predator' && e.type !== 'hive-queen') continue;
             if (e.markedForDeletion) continue;
 
             _v2.copy(e.position).sub(p.position);
             const dist = _v2.length();
-            if (dist > 4000) continue; // weapon range — close enough to fire
+            // Only target enemies within rendering range (full 3D model visible)
+            const dotThresh = ({ enemy: 1600, interceptor: 1600, bomber: 2000, predator: 2400, dreadnought: 6000, 'alien-baseship': 8000, 'hive-queen': 10000 })[e.type] || 3000;
+            if (dist > dotThresh) continue;
 
             _v2.multiplyScalar(1 / dist);
             const dot = _v1.dot(_v2);
 
-            // ~5° cone for precise crosshair alignment (cos(5°) ≈ 0.996)
             // ~15° cone for tracking awareness (cos(15°) ≈ 0.966)
             if (dot > 0.966 && dot > bestDot) {
                 bestDot = dot;
                 bestTarget = e;
+                bestDist = dist;
             }
         }
 
         const wasLocked = _crosshairLocked;
 
-        if (bestTarget && bestDot > 0.993) {
-            // Target is centered in crosshair — full lock
-            _crosshairLocked = true;
-            _crosshairTarget = bestTarget;
-            p.lockedTarget = bestTarget;
-            crosshair.classList.add('locked');
-            crosshair.classList.remove('tracking');
-        } else if (bestTarget) {
-            // Target near crosshair — tracking (amber)
-            _crosshairLocked = false;
-            _crosshairTarget = bestTarget;
-            crosshair.classList.remove('locked');
-            crosshair.classList.add('tracking');
+        if (bestTarget) {
+            // Track dwell time on the same target
+            if (bestTarget === _crosshairDwellEntity) {
+                _crosshairDwellTime += dt;
+            } else {
+                // New target — reset dwell timer
+                _crosshairDwellEntity = bestTarget;
+                _crosshairDwellTime = 0;
+            }
+
+            if (_crosshairDwellTime >= DWELL_LOCK_TIME) {
+                // Dwell threshold reached — full lock
+                _crosshairLocked = true;
+                _crosshairTarget = bestTarget;
+                p.lockedTarget = bestTarget;
+                crosshair.classList.add('locked');
+                crosshair.classList.remove('tracking');
+            } else {
+                // Tracking (amber) — building toward lock
+                _crosshairLocked = false;
+                _crosshairTarget = bestTarget;
+                crosshair.classList.remove('locked');
+                crosshair.classList.add('tracking');
+            }
         } else {
-            // No target — default green
+            // No target in cone — reset everything
             _crosshairLocked = false;
             _crosshairTarget = null;
+            _crosshairDwellEntity = null;
+            _crosshairDwellTime = 0;
             crosshair.classList.remove('locked');
             crosshair.classList.remove('tracking');
         }
@@ -5338,6 +6862,7 @@ const Starfighter = (function () {
     function firePrimary() {
         const p = state.player;
         if (!p) return;
+        if (state.spectating) return; // eliminated players watch only
         // Weapon dispatch — slots unlock by level: 1=laser, 2+=spread, 3+=torp, 4+=EMP
         switch (p.selectedWeapon) {
             case 0: fireLaser(p, 'player'); break;
@@ -5425,6 +6950,19 @@ const Starfighter = (function () {
                 a.takeDamage(effectiveDmg);
                 state.missionStats.damageDealt += effectiveDmg;
                 if (b.owner === 'player') state.missionStats.shotsHit++;
+
+                // Training drone destroyed
+                if (a._isTrainingDrone && a.markedForDeletion && state._trainingActive) {
+                    state._trainingDronesDestroyed++;
+                    const remaining = 3 - state._trainingDronesDestroyed;
+                    if (remaining > 0) {
+                        addComm('Training Officer', `Target destroyed! ${remaining} drone${remaining > 1 ? 's' : ''} remaining.`, 'success');
+                    } else {
+                        addComm('Training Officer', 'All targets destroyed! Training complete. Press ESC to return to bay.', 'success');
+                        state._trainingActive = false;
+                    }
+                }
+
                 // ANPC kill tracking
                 if (a.markedForDeletion && b.owner === 'wingman') {
                     const shooter = state.entities.find(e => e.type === 'wingman' && !e.markedForDeletion && e._anpc);
@@ -5554,15 +7092,24 @@ const Starfighter = (function () {
             gh('ghud-score').innerText = state.score;
             gh('ghud-wave').innerText = state.wave;
 
-            // Lives pips
+            // Lives pips (leaders show ∞ badge instead)
             const livesEl = gh('ghud-lives');
             if (livesEl) {
-                const pips = Array.from({ length: state.maxLives }, (_, i) =>
-                    i < state.livesRemaining ? '★' : '☆'
-                ).join('');
-                livesEl.textContent = pips;
-                livesEl.style.color = state.livesRemaining <= 1 ? '#ff2222'
-                    : state.livesRemaining === 2 ? '#ffaa00' : '#ff4444';
+                if (_isLeader()) {
+                    livesEl.textContent = '∞ LEADER';
+                    livesEl.style.color = '#ffd700';
+                    livesEl.style.fontSize = '10px';
+                    livesEl.style.letterSpacing = '2px';
+                } else {
+                    const pips = Array.from({ length: state.maxLives }, (_, i) =>
+                        i < state.livesRemaining ? '★' : '☆'
+                    ).join('');
+                    livesEl.textContent = pips;
+                    livesEl.style.color = state.livesRemaining <= 1 ? '#ff2222'
+                        : state.livesRemaining === 2 ? '#ffaa00' : '#ff4444';
+                    livesEl.style.fontSize = '';
+                    livesEl.style.letterSpacing = '3px';
+                }
             }
 
             // GDD §11: Boost cooldown indicator
@@ -5683,7 +7230,7 @@ const Starfighter = (function () {
     // Player at dead center. Forward direction indicated. Entities shown as blips.
     // Elevation ticks show above/below. Base always marked. Targeted entity pulses.
     let radarScene, radarCamera, radarRenderer;
-    let radarSphere, radarShipMarker, radarForwardMarker, radarBaseMarker;
+    let radarSphere, radarShipMarker, radarShipWire, radarForwardMarker, radarBaseMarker;
     let radarElevRing;
     let radarLevelRing;      // baseship-orientation horizon
     let radarLevelUp;        // small "up" tick on level ring
@@ -5748,6 +7295,36 @@ const Starfighter = (function () {
         radarShipMarker = new THREE.Mesh(shipGeo, shipMat);
         radarShipMarker.position.set(0, 0, SHIP_OFFSET);
         radarScene.add(radarShipMarker);
+
+        // Player wings wireframe — always aligned to the player's bearing.
+        // Drawn as line segments so it's readable even when the globe is busy.
+        {
+            const pts = [
+                // wing span
+                new THREE.Vector3(-0.16, 0, -0.02), new THREE.Vector3(-0.05, 0, -0.02),
+                new THREE.Vector3(0.05, 0, -0.02), new THREE.Vector3(0.16, 0, -0.02),
+                // nose struts
+                new THREE.Vector3(-0.05, 0, -0.02), new THREE.Vector3(0, 0, -0.14),
+                new THREE.Vector3(0.05, 0, -0.02), new THREE.Vector3(0, 0, -0.14),
+                // fuselage
+                new THREE.Vector3(0, 0, 0.07), new THREE.Vector3(0, 0, -0.14),
+                // tail fins
+                new THREE.Vector3(0, 0, 0.07), new THREE.Vector3(-0.04, 0, 0.02),
+                new THREE.Vector3(0, 0, 0.07), new THREE.Vector3(0.04, 0, 0.02),
+            ];
+            const wingGeo = new THREE.BufferGeometry().setFromPoints(pts);
+            const wingMat = new THREE.LineBasicMaterial({
+                color: 0x00ff88,
+                transparent: true,
+                opacity: 0.55,
+                depthTest: false,
+            });
+            radarShipWire = new THREE.LineSegments(wingGeo, wingMat);
+            radarShipWire.position.set(0, 0, SHIP_OFFSET);
+            radarShipWire.renderOrder = 50;
+            radarShipWire.frustumCulled = false;
+            radarScene.add(radarShipWire);
+        }
 
         // GDD §7: Forward direction indicator — small cone pointing where player faces
         const fwdGeo = new THREE.ConeGeometry(0.035, 0.10, 6);
@@ -5924,6 +7501,46 @@ const Starfighter = (function () {
                 radarCardinalLabels[c.key] = sprite;
             }
         }
+
+        // ── Degree markings around equatorial ring ──
+        {
+            const DEG_R = 1.03; // just outside equatorial ring
+            const degrees = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+            for (const deg of degrees) {
+                const rad = deg * Math.PI / 180;
+                const cvs = document.createElement('canvas');
+                cvs.width = 48;
+                cvs.height = 24;
+                const ctx = cvs.getContext('2d');
+                ctx.fillStyle = (deg % 90 === 0) ? 'rgba(0,255,255,0.8)' : 'rgba(0,255,255,0.45)';
+                ctx.font = (deg % 90 === 0) ? 'bold 16px monospace' : '13px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(deg + '°', 24, 13);
+                const tex = new THREE.CanvasTexture(cvs);
+                const mat = new THREE.SpriteMaterial({
+                    map: tex, transparent: true, opacity: 0.7,
+                    depthTest: false, sizeAttenuation: true
+                });
+                const sprite = new THREE.Sprite(mat);
+                // Place around equator: X = sin(angle), Z = -cos(angle) so 0° = forward (-Z)
+                sprite.position.set(Math.sin(rad) * DEG_R, 0, -Math.cos(rad) * DEG_R);
+                sprite.scale.set(0.12, 0.06, 1);
+                radarOrientGroup.add(sprite);
+            }
+            // Small tick marks between degrees at 10° intervals (no label)
+            for (let deg = 0; deg < 360; deg += 10) {
+                if (deg % 30 === 0) continue; // already have labels
+                const rad = deg * Math.PI / 180;
+                const tickGeo = new THREE.BoxGeometry(0.005, 0.005, 0.025);
+                const tickMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.25 });
+                const tick = new THREE.Mesh(tickGeo, tickMat);
+                tick.position.set(Math.sin(rad) * 0.99, 0, -Math.cos(rad) * 0.99);
+                tick.lookAt(0, 0, 0);
+                radarOrientGroup.add(tick);
+            }
+        }
+
         radarScene.add(radarOrientGroup);
 
         // ── 3-Axis Vector Meter — shows ship orientation relative to world frame ──
@@ -6054,6 +7671,12 @@ const Starfighter = (function () {
 
         // Ship marker stays at fixed center offset
         const shipOff = new THREE.Vector3(0, 0, RADAR_SHIP_OFFSET);
+
+        // Player wings wireframe stays locked to the ship marker.
+        if (radarShipWire) {
+            radarShipWire.position.copy(shipOff);
+            radarShipWire.quaternion.set(0, 0, 0, 1);
+        }
 
         // Forward marker — fixed position (always points "ahead" in ship-local = -Z)
         const localFwd = new THREE.Vector3(0, 0, -1); // always -Z in ship frame
@@ -6231,7 +7854,7 @@ const Starfighter = (function () {
                 blip.material.color.setHex(0xff4444);
                 blip.scale.setScalar(0.8);
             } else if (c.type === 'bomber') {
-                blip.material.color.setHex(0xff8800);
+                blip.material.color.setHex(0xff3333);
                 blip.scale.setScalar(1.4);
             } else if (c.type === 'dreadnought') {
                 blip.material.color.setHex(0xff0044);
@@ -6246,7 +7869,7 @@ const Starfighter = (function () {
                 blip.material.color.setHex(0x00ffff);
                 blip.scale.setScalar(0.7);
             } else if (c.type === 'wingman') {
-                blip.material.color.setHex(0x44ff44);
+                blip.material.color.setHex(0x4488ff);
                 blip.scale.setScalar(1.0);
             } else if (c.type === 'tanker') {
                 blip.material.color.setHex(0x00ff88);
@@ -6254,6 +7877,12 @@ const Starfighter = (function () {
             } else if (c.type === 'medic') {
                 blip.material.color.setHex(0x44ffff);
                 blip.scale.setScalar(1.3);
+            } else if (c.type === 'rescue') {
+                blip.material.color.setHex(0x44ffcc);
+                blip.scale.setScalar(1.0);
+            } else if (c.type === 'science-ship') {
+                blip.material.color.setHex(0xaaddff);
+                blip.scale.setScalar(1.5);
             } else {
                 blip.material.color.setHex(0x4488ff);
                 blip.scale.setScalar(1.0);
@@ -6269,14 +7898,52 @@ const Starfighter = (function () {
                 return;
             }
 
+            // ── Threat highlighting — incoming projectiles and locking enemies ──
+            const threatData = window.SFThreatSys ? window.SFThreatSys.getThreats() : null;
+
+            // Incoming threat — bright orange, pulsing rapidly
+            if (threatData && threatData.incoming.has(entity)) {
+                blip.material.color.setHex(0xff8800);
+                const fastPulse = 1.0 + Math.sin(performance.now() * 0.018) * 0.6;
+                blip.scale.multiplyScalar(fastPulse);
+                blip.material.transparent = true;
+                blip.material.opacity = Math.max(fadeAlpha, 0.85);
+                return;
+            }
+
+            // Enemy locking us — bright red, medium pulse
+            if (threatData && threatData.lockedBy.has(entity)) {
+                blip.material.color.setHex(0xff0000);
+                const medPulse = 1.0 + Math.sin(performance.now() * 0.012) * 0.4;
+                blip.scale.multiplyScalar(medPulse);
+                blip.material.transparent = true;
+                blip.material.opacity = Math.max(fadeAlpha, 0.8);
+                return;
+            }
+
+            // Countermeasure flare — bright cyan glow
+            if (c.type === 'flare') {
+                blip.material.color.setHex(0x00ffff);
+                const flarePulse = 1.0 + Math.sin(performance.now() * 0.025) * 0.8;
+                blip.scale.multiplyScalar(flarePulse * 1.5);
+                blip.material.transparent = true;
+                blip.material.opacity = Math.max(fadeAlpha, 0.9);
+                return;
+            }
+
             blip.material.transparent = true;
             blip.material.opacity = fadeAlpha;
 
-            // FOV highlight — in ship-local space, forward is -Z, so dot = -nz
-            const cosHalfFov = Math.cos(THREE.MathUtils.degToRad(75 / 2));
-            if (-nz > cosHalfFov) {
-                blip.material.opacity = Math.min(fadeAlpha + 0.3, 1.0);
-                blip.scale.multiplyScalar(1.2);
+            // FOV highlight — rectangular frustum check in ship-local space
+            // Forward is -Z; check horizontal and vertical half-angles separately
+            if (nz < 0) { // must be in front of player
+                const fwdDist = -nz;
+                const halfV = Math.tan(THREE.MathUtils.degToRad(75 / 2));
+                const halfH = halfV * (window.innerWidth / window.innerHeight || 16 / 9);
+                if (Math.abs(nx) < halfH * fwdDist && Math.abs(ny) < halfV * fwdDist) {
+                    blip.material.opacity = Math.min(fadeAlpha + 0.3, 1.0);
+                    blip.scale.multiplyScalar(1.2);
+                }
             }
         });
 
@@ -6307,7 +7974,8 @@ const Starfighter = (function () {
         pause: () => _setPaused(true),
         resume: () => _setPaused(false),
         exitGame,
-        openTutorial
+        openTutorial,
+        _skipTraining: _skipTraining
     };
 
 })();

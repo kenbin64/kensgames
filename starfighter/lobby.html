@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alien Space Attack Lobby &mdash; KensGames</title>
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
@@ -547,10 +547,24 @@
       <div id="priv-create">
         <div class="code-display" id="room-code" onclick="copyCode()">------</div>
         <div class="code-hint">Click to copy &bull; Send to your wing-man</div>
-        <button class="btn btn-c btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
+        <div id="squad-roster" style="margin-top:14px;"></div>
+        <div id="squad-controls" style="display:none;margin-top:14px;">
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="toggleReadySelf()" id="ready-btn"
+              style="font-size:10px;padding:4px 14px;">READY</button>
+            <button class="btn btn-ghost" onclick="addBot()" id="add-bot-btn" style="font-size:10px;padding:4px 14px;">+
+              BOT</button>
+            <button class="btn btn-ghost" onclick="removeBot()" id="remove-bot-btn"
+              style="font-size:10px;padding:4px 14px;">- BOT</button>
+            <button class="btn btn-ghost" onclick="acceptSquad()" id="accept-btn"
+              style="font-size:10px;padding:4px 14px;">ACCEPT</button>
+          </div>
+        </div>
+        <button class="btn btn-c btn-full" onclick="launchPrivate()" id="launch-btn" disabled
+          style="margin-top:14px;">&#9654; LAUNCH
           MISSION</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
-          to create a squad room</div>
+        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Create a squad
+          room to get a code.</div>
       </div>
       <div id="priv-join" style="display:none">
         <div class="arc-field"><label>Squad Code</label><input class="arc-input" id="join-code" placeholder="ABC123"
@@ -561,6 +575,13 @@
             placeholder="Ace Pilot"></div>
         <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN SQUAD</button>
         <div class="arc-msg" id="join-msg"></div>
+        <div id="squad-roster-join" style="margin-top:14px;"></div>
+        <div style="display:none;margin-top:14px;" id="join-controls">
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="toggleReadySelf()" id="ready-btn-2"
+              style="font-size:10px;padding:4px 14px;">READY</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -581,9 +602,14 @@
   </div>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/require_auth.js"></script>
+  <script src="/js/access_session_bridge.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
+  <script src="/starfighter/multiplayer.js"></script>
   <script>
-    const token = localStorage.getItem('user_token');
-    const username = localStorage.getItem('username') || 'Pilot';
+    let token = localStorage.getItem('user_token');
+    let username = localStorage.getItem('username') || 'Pilot';
+    let isGuest = !token || String(token).startsWith('guest-');
     const av = AvatarPicker.get();
     document.getElementById('p-name').textContent = username;
     AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
@@ -592,7 +618,31 @@
     if (!av) badge.style.color = 'var(--np)';
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
 
-    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding opponent...';
+    if (!isGuest) document.getElementById('mm-avail').textContent = 'Available \u2022 Find opponent';
+
+    function _refreshAuthFromStorage() {
+      token = localStorage.getItem('user_token');
+      username = localStorage.getItem('username') || 'Pilot';
+      isGuest = !token || String(token).startsWith('guest-');
+      document.getElementById('p-name').textContent = username;
+      document.getElementById('mm-avail').textContent = !isGuest
+        ? 'Available \u2022 Find opponent'
+        : 'Login required';
+    }
+
+    async function _maybeUpgradeFromAccess() {
+      if (!isGuest) return true;
+      if (!window.KGAccessSession || typeof window.KGAccessSession.ensure !== 'function') return false;
+      const r = await window.KGAccessSession.ensure();
+      if (r && r.token) {
+        _refreshAuthFromStorage();
+        return !isGuest;
+      }
+      return false;
+    }
+
+    // Best-effort: if already authenticated via Access, mint a normal JWT so we don't require a second login.
+    _maybeUpgradeFromAccess();
 
     // Show post-game prompt if URL has ?postgame=1 (set by game after session ends for guests)
     if (new URLSearchParams(location.search).get('postgame') === '1' && !token) {
@@ -617,79 +667,327 @@
       });
     }
 
-    function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/starfighter/index.html?mode=solo'; }
-    function startMatchmaker() { if (!token) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; } if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; } window.location.href = '/starfighter/index.html?mode=multi'; }
-    function togglePrivate() { const p = document.getElementById('priv-panel'); p.classList.toggle('open'); if (p.classList.contains('open')) generateCode(); }
-    function privTab(tab) { document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab)); document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none'; document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none'; }
-    let _code = '';
-    function generateCode() { if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a squad room'; return; } _code = Math.random().toString(36).substring(2, 8).toUpperCase(); document.getElementById('room-code').textContent = _code; document.getElementById('launch-btn').disabled = false; document.getElementById('priv-status').textContent = 'Send code to your wing-man. You launch the mission.'; }
-    function copyCode() { if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; } }
-    function launchPrivate() { if (!token) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; } window.location.href = `/starfighter/index.html?mode=private&code=${_code}&host=1`; }
-    function joinPrivate() { const code = document.getElementById('join-code').value.trim().toUpperCase(); const name = document.getElementById('guest-name').value.trim() || 'Pilot'; const msg = document.getElementById('join-msg'); if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; } if (!localStorage.getItem('user_token')) { localStorage.setItem('username', name); localStorage.setItem('user_token', 'guest-' + Date.now()); } if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; } window.location.href = `/starfighter/index.html?mode=private&code=${code}`; }
+    let _mpStarted = false;
+    let _mpReady = false;
+    let _mpQueue = [];
+    let _currentSession = null;
+    let _currentCode = '';
+    let _browseTimer = null;
 
-    // ── Browse Games ──
-    let _browseWs = null;
-    let _browseRefreshTimer = null;
-    function _wsUrl() {
-      return location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-        ? 'ws://' + location.hostname + ':8766'
-        : 'wss://' + location.hostname + '/sf-ws';
+    function _setPrivStatus(text, isErr) {
+      const el = document.getElementById('priv-status');
+      el.textContent = text;
+      el.style.color = isErr ? 'var(--np)' : 'var(--txm)';
     }
+
+    function _setJoinMsg(text, isErr) {
+      const el = document.getElementById('join-msg');
+      el.textContent = text;
+      el.className = 'arc-msg' + (isErr ? ' err' : '');
+    }
+
+    function _ensureMp() {
+      if (_mpStarted) return;
+      if (!window.SFMultiplayer) {
+        _setPrivStatus('Multiplayer unavailable (missing SFMultiplayer).', true);
+        return;
+      }
+      const callsign = localStorage.getItem('username') || 'Pilot';
+      SFMultiplayer.connect(callsign, _onMpEvent);
+      _mpStarted = true;
+    }
+
+    function _mpCall(fn) {
+      _ensureMp();
+      if (_mpReady) fn();
+      else _mpQueue.push(fn);
+    }
+
+    function _flushMpQueue() {
+      const q = _mpQueue;
+      _mpQueue = [];
+      q.forEach(fn => {
+        try { fn(); } catch { /* ignore */ }
+      });
+    }
+
+    function _onMpEvent(event, data) {
+      if (event === 'connected') {
+        _mpReady = true;
+        _flushMpQueue();
+        return;
+      }
+      if (event === 'room_update') {
+        _currentSession = data;
+        _currentCode = (data && data.session_code) ? data.session_code : (_currentCode || '');
+        if (_currentCode) document.getElementById('room-code').textContent = _currentCode;
+        _renderSquad();
+        _updateControls();
+      } else if (event === 'share_code') {
+        _currentCode = data;
+        document.getElementById('room-code').textContent = _currentCode;
+        _setPrivStatus('Code ready. Share it with your wing-man.', false);
+        _updateControls();
+      } else if (event === 'room_list') {
+        _renderRoomList(Array.isArray(data) ? data : []);
+      } else if (event === 'game_start') {
+        const code = (data && data.session && data.session.session_code) ? data.session.session_code : _currentCode;
+        if (!code) return;
+        // Reconnects are supported (stable guest tokens). The game page re-joins by code.
+        window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
+      } else if (event === 'error') {
+        _setPrivStatus(String(data || 'Server error'), true);
+        _setJoinMsg(String(data || 'Server error'), true);
+      }
+    }
+
+    function _renderSquad() {
+      const rosterA = document.getElementById('squad-roster');
+      const rosterB = document.getElementById('squad-roster-join');
+      const s = _currentSession;
+      if (!s || !Array.isArray(s.players) || s.players.length === 0) {
+        const msg = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:12px;">No squad yet.</div>';
+        rosterA.innerHTML = msg;
+        rosterB.innerHTML = msg;
+        return;
+      }
+
+      const accepted = !!(s.settings && s.settings.lobby_accepted);
+      const playersHtml = s.players.map(p => {
+        const badge = p.is_host ? '★' : (p.is_ai ? '🤖' : '•');
+        const ready = p.ready ? '<span style="color:var(--ng);">READY</span>' : '<span style="color:var(--ny);">NOT READY</span>';
+        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid rgba(0,255,255,.10);">'
+          + '<div style="display:flex;gap:8px;align-items:center;min-width:0;">'
+          + '<span style="color:var(--accent);">' + badge + '</span>'
+          + '<span style="color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">' + (p.username || 'Pilot') + '</span>'
+          + '</div>'
+          + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:1px;">' + ready + '</div>'
+          + '</div>';
+      }).join('');
+
+      const hdr = '<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 2px 8px;">'
+        + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;">SQUAD</div>'
+        + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:1px;color:' + (accepted ? 'var(--ng)' : 'var(--ny)') + ';">' + (accepted ? 'ACCEPTED' : 'NOT ACCEPTED') + '</div>'
+        + '</div>';
+
+      const box = '<div style="background:rgba(0,255,255,.03);border:1px solid rgba(0,255,255,.14);border-radius:4px;overflow:hidden;">'
+        + hdr + playersHtml + '</div>';
+
+      rosterA.innerHTML = box;
+      rosterB.innerHTML = box;
+    }
+
+    function _updateControls() {
+      const s = _currentSession;
+      const controls = document.getElementById('squad-controls');
+      const joinControls = document.getElementById('join-controls');
+      const launchBtn = document.getElementById('launch-btn');
+      const acceptBtn = document.getElementById('accept-btn');
+      const addBotBtn = document.getElementById('add-bot-btn');
+      const removeBotBtn = document.getElementById('remove-bot-btn');
+      const readyBtnA = document.getElementById('ready-btn');
+      const readyBtnB = document.getElementById('ready-btn-2');
+
+      if (!s) {
+        controls.style.display = 'none';
+        joinControls.style.display = 'none';
+        launchBtn.disabled = true;
+        return;
+      }
+
+      controls.style.display = 'block';
+      joinControls.style.display = 'block';
+
+      const players = Array.isArray(s.players) ? s.players : [];
+      const accepted = !!(s.settings && s.settings.lobby_accepted);
+      const isHostNow = !!(window.SFMultiplayer && SFMultiplayer.isHost);
+      const allHumansReady = players.filter(p => !p.is_ai).every(p => !!p.ready);
+
+      const selfId = window.SFMultiplayer ? SFMultiplayer.playerId : null;
+      const self = selfId ? players.find(p => p.user_id === selfId) : null;
+      const selfReady = !!(self && self.ready);
+      if (readyBtnA) readyBtnA.textContent = selfReady ? 'UNREADY' : 'READY';
+      if (readyBtnB) readyBtnB.textContent = selfReady ? 'UNREADY' : 'READY';
+
+      // Host-only controls
+      addBotBtn.style.display = isHostNow ? 'inline-flex' : 'none';
+      removeBotBtn.style.display = isHostNow ? 'inline-flex' : 'none';
+      acceptBtn.style.display = isHostNow ? 'inline-flex' : 'none';
+
+      acceptBtn.disabled = !(isHostNow && allHumansReady && !accepted);
+      launchBtn.disabled = !(isHostNow && accepted && players.length >= 2);
+    }
+
+    function startSolo() {
+      if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
+      window.location.href = '/starfighter/index.html?mode=solo';
+    }
+
+    async function startMatchmaker() {
+      if (isGuest) {
+        if (window.KGRequireAuth && typeof window.KGRequireAuth.guard === 'function') {
+          await window.KGRequireAuth.guard({ allowGuest: false });
+          _refreshAuthFromStorage();
+          if (isGuest) return;
+        } else {
+          const ok = await _maybeUpgradeFromAccess();
+          if (!ok) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; }
+        }
+      }
+      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
+      _setPrivStatus('Matchmaking: finding opponent...', false);
+      document.getElementById('priv-panel').classList.add('open');
+      privTab('create');
+      _mpCall(() => SFMultiplayer.matchmake());
+    }
+
+    function togglePrivate() {
+      const p = document.getElementById('priv-panel');
+      const opening = !p.classList.contains('open');
+      p.classList.toggle('open');
+      if (opening) {
+        _ensureMp();
+        privTab('create');
+        createSquad();
+      }
+    }
+
+    function privTab(tab) {
+      document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab));
+      document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none';
+      document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none';
+    }
+
+    function createSquad() {
+      _setPrivStatus('Creating squad room...', false);
+      document.getElementById('room-code').textContent = '------';
+      _currentSession = null;
+      _currentCode = '';
+      document.getElementById('launch-btn').disabled = true;
+      _mpCall(() => SFMultiplayer.createRoom({ max_players: 6, settings: { mode: 'coop' } }));
+    }
+
+    function copyCode() {
+      if (_currentCode) {
+        navigator.clipboard?.writeText(_currentCode);
+        _setPrivStatus('Code copied!', false);
+      }
+    }
+
+    function toggleReadySelf() {
+      _mpCall(() => SFMultiplayer.toggleReady());
+    }
+
+    function acceptSquad() {
+      _mpCall(() => SFMultiplayer.acceptLobby());
+      _setPrivStatus('Squad accepted. Launch when ready.', false);
+    }
+
+    function addBot() {
+      _mpCall(() => SFMultiplayer.addBot('medium'));
+    }
+
+    function removeBot() {
+      _mpCall(() => SFMultiplayer.removeBot(null));
+    }
+
+    function launchPrivate() {
+      _mpCall(() => {
+        if (!SFMultiplayer.isHost) {
+          _setPrivStatus('Only the host can launch the mission.', true);
+          return;
+        }
+        // If not yet accepted, try accepting first (server may reject if not all humans ready).
+        if (_currentSession && !(_currentSession.settings && _currentSession.settings.lobby_accepted)) {
+          SFMultiplayer.acceptLobby();
+        }
+        SFMultiplayer.startGame();
+        _setPrivStatus('Launching mission...', false);
+      });
+    }
+
+    function joinPrivate() {
+      const code = document.getElementById('join-code').value.trim().toUpperCase();
+      const name = document.getElementById('guest-name').value.trim() || 'Pilot';
+      if (code.length !== 6) {
+        _setJoinMsg('Enter a 6-character code', true);
+        return;
+      }
+      // Apply guest name BEFORE connecting/authing.
+      if (!localStorage.getItem('username') || document.getElementById('guest-name').value.trim()) {
+        localStorage.setItem('username', name);
+        document.getElementById('p-name').textContent = name;
+      }
+      _ensureMp();
+      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
+      _setJoinMsg('Joining squad…', false);
+      _mpCall(() => SFMultiplayer.joinRoom(code));
+      document.getElementById('priv-panel').classList.add('open');
+      privTab('join');
+    }
+
+    // Auto-join if redirected from /lobby/join.html?code=...
+    (function autoJoinFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const code = (params.get('code') || '').trim().toUpperCase();
+      if (code && code.length === 6) {
+        document.getElementById('priv-panel').classList.add('open');
+        privTab('join');
+        document.getElementById('join-code').value = code;
+        joinPrivate();
+      }
+    })();
+
+    // ── Browse Games (Unified Lobby) ──
     function toggleBrowse() {
       const p = document.getElementById('browse-panel');
       p.classList.toggle('open');
       if (p.classList.contains('open')) {
-        connectBrowse();
-      } else {
-        disconnectBrowse();
-      }
-    }
-    function connectBrowse() {
-      if (_browseWs && _browseWs.readyState <= 1) { refreshRoomList(); return; }
-      const el = document.getElementById('room-list');
-      el.innerHTML = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:20px;">Connecting...</div>';
-      _browseWs = new WebSocket(_wsUrl());
-      _browseWs.onopen = function () {
-        _browseWs.send(JSON.stringify({ type: 'join', callsign: username }));
+        _ensureMp();
         refreshRoomList();
-        _browseRefreshTimer = setInterval(refreshRoomList, 5000);
-      };
-      _browseWs.onmessage = function (e) {
-        let d; try { d = JSON.parse(e.data); } catch { return; }
-        if (d.type === 'room_list') renderRoomList(d.rooms || []);
-      };
-      _browseWs.onclose = function () { clearInterval(_browseRefreshTimer); };
-    }
-    function disconnectBrowse() {
-      clearInterval(_browseRefreshTimer);
-      if (_browseWs) { _browseWs.close(); _browseWs = null; }
-    }
-    function refreshRoomList() {
-      if (_browseWs && _browseWs.readyState === 1) {
-        _browseWs.send(JSON.stringify({ type: 'list_rooms' }));
+        _browseTimer = setInterval(refreshRoomList, 5000);
+      } else {
+        if (_browseTimer) clearInterval(_browseTimer);
+        _browseTimer = null;
       }
     }
-    function renderRoomList(rooms) {
+
+    function refreshRoomList() {
+      if (!window.SFMultiplayer) return;
+      _mpCall(() => SFMultiplayer.listRooms());
+    }
+
+    function _renderRoomList(rooms) {
       const el = document.getElementById('room-list');
       if (!rooms.length) {
-        el.innerHTML = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:20px;">No games available. Start one with Solo or Wing Squad!</div>';
+        el.innerHTML = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:20px;">No public squads right now. Start one with Wing Squad!</div>';
         return;
       }
       el.innerHTML = rooms.map(r => {
         const status = r.status === 'waiting' ? '🟢' : r.status === 'playing' ? '🟡' : '⚫';
+        const code = r.session_code || '------';
+        const count = (r.player_count != null) ? r.player_count : ((r.players || []).length);
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,255,255,.1);">'
           + '<div><span style="margin-right:8px;">' + status + '</span>'
-          + '<span style="font-family:var(--fa);font-size:12px;color:var(--accent);">' + (r.code || r.id.slice(0, 6)) + '</span>'
-          + '<span style="font-size:11px;color:var(--txm);margin-left:12px;">' + r.playerCount + '/' + r.maxPlayers + ' pilots</span>'
-          + '<span style="font-size:10px;color:var(--txm);margin-left:12px;">Wave ' + (r.wave || 1) + '</span></div>'
-          + (r.status === 'waiting' ? '<button class="btn btn-g" style="font-size:10px;padding:4px 14px;" onclick="joinBrowseRoom(\'' + r.code + '\')">JOIN</button>' : '<span style="font-size:10px;color:var(--ny);">In Progress</span>')
+          + '<span style="font-family:var(--fa);font-size:12px;color:var(--accent);">' + code + '</span>'
+          + '<span style="font-size:11px;color:var(--txm);margin-left:12px;">' + count + '/' + r.max_players + ' pilots</span></div>'
+          + (r.status === 'waiting'
+            ? '<button class="btn btn-g" style="font-size:10px;padding:4px 14px;" onclick="joinBrowseRoom(\'' + code + '\')">JOIN</button>'
+            : '<span style="font-size:10px;color:var(--ny);">In Progress</span>')
           + '</div>';
       }).join('');
     }
-    function joinBrowseRoom(code) {
-      disconnectBrowse();
+
+    async function joinBrowseRoom(code) {
+      if (isGuest) {
+        const ok = await _maybeUpgradeFromAccess();
+        if (!ok) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; }
+      }
       if (!AvatarPicker.has()) { AvatarPicker.show(() => joinBrowseRoom(code), true); return; }
-      window.location.href = '/starfighter/index.html?mode=private&code=' + code;
+      document.getElementById('priv-panel').classList.add('open');
+      privTab('join');
+      document.getElementById('join-code').value = code;
+      joinPrivate();
     }
   </script>
 </body>

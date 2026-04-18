@@ -574,6 +574,9 @@ function getTrackSequence(peg, player, direction) {
   const type = getHoleType(peg.holeId);
   const dir = direction || 'clockwise';
   const bp = player.boardPosition;
+  const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
+  const safeZoneFull = inSafe >= SAFE_ZONE_SIZE;
+  const homeHole = `home-${bp}`;
 
   // Safe zone: can only move forward within safe zone
   if (type === 'safezone') {
@@ -606,13 +609,11 @@ function getTrackSequence(peg, player, direction) {
       if (next === bp) {
         for (let h = 4; h >= 1; h--) seq.push(`side-left-${bp}-${h}`);
         for (let h = 0; h <= 2; h++) seq.push(`outer-${bp}-${h}`);
-        const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-        if (inSafe < SAFE_ZONE_SIZE) {
+        if (!safeZoneFull) {
           for (let h = 1; h <= SAFE_ZONE_SIZE; h++) seq.push(`safe-${bp}-${h}`);
         } else {
           seq.push(`outer-${bp}-3`);
           seq.push(`home-${bp}`);
-          for (let h = 1; h <= 4; h++) seq.push(`side-right-${bp}-${h}`);
         }
         break;
       }
@@ -631,12 +632,12 @@ function getTrackSequence(peg, player, direction) {
   // IF the peg is already sitting exactly ON the safe entry gate,
   // and is eligible to enter, and is moving forward, build the safe sequence directly.
   if (peg.holeId === safeEntry && fwd && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
-    const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-    if (inSafe < SAFE_ZONE_SIZE) {
+    if (!safeZoneFull) {
       for (let h = 1; h <= SAFE_ZONE_SIZE; h++) seq.push(`safe-${bp}-${h}`);
     } else {
-      seq.push(`outer-${bp}-3`); seq.push(`home-${bp}`);
-      for (let h = 1; h <= 4; h++) seq.push(`side-right-${bp}-${h}`);
+      // Safe zone is full: home hole becomes terminal; exact landing required.
+      seq.push(`outer-${bp}-3`);
+      seq.push(`home-${bp}`);
     }
     return seq;
   }
@@ -647,16 +648,22 @@ function getTrackSequence(peg, player, direction) {
 
     if (holeId === safeEntry && fwd && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
       seq.push(holeId);
-      const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-      if (inSafe < SAFE_ZONE_SIZE) {
+      if (!safeZoneFull) {
         for (let h = 1; h <= SAFE_ZONE_SIZE; h++) seq.push(`safe-${bp}-${h}`);
       } else {
-        seq.push(`outer-${bp}-3`); seq.push(`home-${bp}`);
-        for (let h = 1; h <= 4; h++) seq.push(`side-right-${bp}-${h}`);
+        // Safe zone is full: home hole becomes terminal; exact landing required.
+        seq.push(`outer-${bp}-3`);
+        seq.push(`home-${bp}`);
       }
       break;
     }
     seq.push(holeId);
+
+    // Once safe zone is full, home is the terminal winning hole.
+    // Do not allow movement past home; overshooting becomes illegal.
+    if (safeZoneFull && fwd && holeId === homeHole) {
+      break;
+    }
   }
   return seq;
 }
@@ -748,7 +755,8 @@ function calculateValidMoves() {
           // ── CHOICE: Enter FT when landing on an FT hole ──
           // Also offer enterFastTrack so player can gain FT status on this turn
           // Skip if peg must exit FT area (e.g., just exited bullseye)
-          if (dest.startsWith('ft-') && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
+          // FastTrack entry is clockwise-only (never on backward/4).
+          if (dir === 'clockwise' && dest.startsWith('ft-') && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
             moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
           }
 
@@ -791,7 +799,7 @@ function calculateValidMoves() {
       // FastTrack ring traversal — peg is ON an FT hole but NOT yet in FT mode
       // Offers to enter FT and traverse the inner ring using the card's value
       // Skip if peg just exited bullseye (mustExitFasttrack) — it should head to safe zone
-      if (getHoleType(peg.holeId) === 'fasttrack' && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
+      if (dir === 'clockwise' && getHoleType(peg.holeId) === 'fasttrack' && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
         const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
         const ftSeq = [];
         for (let fi = 1; fi <= 6; fi++) {
@@ -806,7 +814,6 @@ function calculateValidMoves() {
             } else {
               ftSeq.push(`outer-${bp}-3`);
               ftSeq.push(`home-${bp}`);
-              for (let h = 1; h <= 4; h++) ftSeq.push(`side-right-${bp}-${h}`);
             }
             break;
           }
