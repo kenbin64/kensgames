@@ -2777,9 +2777,30 @@
   <!-- Three.js -->
   <!-- Manifold Substrates (Dimensional Programming) -->
   <!-- Game Logic -->
+  <script src="/js/manifold_bridge.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       if (window.Starfighter) Starfighter.init();
+    });
+    // Wire ManifoldBridge after bundle initialises
+    window.addEventListener('load', () => {
+      if (typeof ManifoldBridge === 'undefined') return;
+      ManifoldBridge.init({
+        id: 'starfighter',
+        version: '1.0.0',
+        x: 2,
+        y: 30,
+        exposes: () => {
+          const s = window.Starfighter ? window.Starfighter.getState() : {};
+          return {
+            phase: s.phase ?? null,
+            wave: s.wave ?? 0,
+            score: s.score ?? 0,
+            livesRemaining: s.livesRemaining ?? 0,
+            kills: s.missionStats?.kills ?? 0,
+          };
+        },
+      });
     });
   </script>
   <script src="starfighter.bundle.js?v=601b521831376a98"></script>

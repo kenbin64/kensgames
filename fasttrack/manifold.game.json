@@ -1,0 +1,74 @@
+{
+  "manifold": "fasttrack",
+  "name": "FastTrack",
+  "version": "2.1.0",
+  "status": "production",
+  "dimension": {
+    "x": 3,
+    "y": 45,
+    "z": 135,
+    "_note": "z = x*y = 3 players avg * 45 min avg = 135"
+  },
+  "entry": "index.html",
+  "lobby": "lobby.html",
+  "join": "join.html",
+  "play": "play.html",
+  "substrates": {
+    "auth": "auth_substrate.js",
+    "board": "board_manifold.js",
+    "cards": "card_logic_substrate.js",
+    "deck": "card_deck_substrate.js",
+    "peg": "peg_substrate.js",
+    "ai": "ai_manifold.js",
+    "multiplayer": "multiplayer_client.js",
+    "audio": "audio_substrate.js",
+    "music": "music_substrate.js",
+    "lobby": "lobby_substrate.js",
+    "analytics": "analytics_substrate.js",
+    "moves": "move_generation_substrate.js",
+    "growth": "growth_substrate.js",
+    "potential": "potential_substrate.js"
+  },
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "gameState",
+      "playerCount",
+      "roundTime",
+      "score"
+    ]
+  },
+  "server": {
+    "type": "node",
+    "lobby_port": 3001
+  },
+  "build": {
+    "test_files": [
+      "test_fasttrack_rules.js",
+      "test_game_flows.js"
+    ],
+    "spec": "fasttrack_game_spec.json",
+    "assets": [
+      "*.html",
+      "*.js",
+      "*.css",
+      "assets/**",
+      "manifest.json"
+    ]
+  },
+  "deploy": {
+    "target": "/var/www/kensgames.com/fasttrack/",
+    "type": "static_with_server"
+  },
+  "manifold_compatibility": {
+    "bridge_included": false,
+    "state_exposed": false,
+    "postmessage_protocol": "partial",
+    "todo": [
+      "Include js/manifold_bridge.js in index.html and play.html",
+      "Emit window.__MANIFOLD__ from game_engine_manifold.js",
+      "Wire postMessage events to ManifoldBridge.emit()"
+    ]
+  }
+}

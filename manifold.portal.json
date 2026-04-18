@@ -1,0 +1,145 @@
+{
+  "_comment": "Manifold Portal Root Config — input to the Manifold Compiler. z = x*y is the universal access rule.",
+  "name": "kensgames-portal",
+  "version": "1.0.0",
+  "domain": "kensgames.com",
+  "vps": {
+    "host": "172.81.62.217",
+    "user": "root",
+    "deploy_path": "/var/www/kensgames.com",
+    "server_path": "/opt/butterflyfx/dimensionsos/helix",
+    "ssh_key": "~/.ssh/id_ed25519_mcp",
+    "nginx_reload": true
+  },
+  "dimensions": {
+    "x": "player_count",
+    "y": "play_time_min",
+    "z": "x * y",
+    "_note": "z = xy is the universal access rule; every game must satisfy this"
+  },
+  "portal_pages": [
+    {
+      "name": "home",
+      "file": "index.html"
+    },
+    {
+      "name": "lounge",
+      "file": "lounge.html"
+    },
+    {
+      "name": "discover",
+      "file": "discover.html"
+    },
+    {
+      "name": "arcade",
+      "file": "arcade.css"
+    },
+    {
+      "name": "showcase",
+      "file": "showcase.html"
+    }
+  ],
+  "games": [
+    {
+      "id": "fasttrack",
+      "name": "FastTrack",
+      "path": "fasttrack/",
+      "manifold": "fasttrack/manifold.game.json",
+      "entry": "fasttrack/index.html",
+      "server": "node",
+      "status": "production"
+    },
+    {
+      "id": "brickbreaker3d",
+      "name": "BrickBreaker 3D",
+      "path": "brickbreaker3d/",
+      "manifold": "brickbreaker3d/manifold.game.json",
+      "entry": "brickbreaker3d/index.html",
+      "server": "static",
+      "status": "production"
+    },
+    {
+      "id": "4dtictactoe",
+      "name": "4D Tic-Tac-Toe",
+      "path": "4DTicTacToe/",
+      "manifold": "4DTicTacToe/manifold.game.json",
+      "entry": "4DTicTacToe/index.html",
+      "server": "static",
+      "status": "production"
+    },
+    {
+      "id": "starfighter",
+      "name": "StarFighter",
+      "path": "starfighter/",
+      "manifold": "starfighter/manifold.game.json",
+      "entry": "starfighter/index.html",
+      "server": "node",
+      "status": "production"
+    },
+    {
+      "id": "assemble",
+      "name": "Assemble",
+      "path": "assemble/",
+      "manifold": "assemble/manifold.game.json",
+      "entry": "assemble/index.html",
+      "server": "static",
+      "status": "production"
+    }
+  ],
+  "substrates": {
+    "auth": {
+      "path": "server/auth-handler.js",
+      "type": "node"
+    },
+    "lobby": {
+      "path": "server/lobby-server.js",
+      "type": "node"
+    },
+    "email": {
+      "path": "server/email-service.js",
+      "type": "node"
+    },
+    "leaderboard": {
+      "path": "js/",
+      "type": "static"
+    },
+    "discovery": {
+      "path": "js/",
+      "type": "static"
+    }
+  },
+  "server": {
+    "path": "server/",
+    "entry": "server/index.js",
+    "port": 3000,
+    "runtime": "node",
+    "process_name": "kensgames-server"
+  },
+  "build": {
+    "compiler": "engine/manifold_compiler.py",
+    "output_dir": "dist/",
+    "artifacts": [
+      "dist/manifold.registry.json",
+      "dist/deploy.manifest.json"
+    ]
+  },
+  "deploy": {
+    "strategy": "rsync_then_reload",
+    "excludes": [
+      ".git/",
+      ".github/",
+      "engine/",
+      "node_modules/",
+      "*.sh",
+      "*.md",
+      "*.pdf",
+      "*.test.js",
+      "dist/",
+      ".gitignore"
+    ],
+    "post_deploy": [
+      "pm2 restart kensgames-server || pm2 start /var/www/kensgames.com/server/index.js --name kensgames-server",
+      "nginx -t && systemctl reload nginx"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "manifold": "4dtictactoe",
+  "name": "4D Tic-Tac-Toe",
+  "version": "1.0.0",
+  "status": "production",
+  "dimension": {
+    "x": 2,
+    "y": 12,
+    "z": 24,
+    "_note": "z = x*y = 2 players * 12 min = 24; the game itself is a 4-dimensional manifold (4D board)"
+  },
+  "entry": "index.html",
+  "substrates": {
+    "board": "inline:4DBoard",
+    "moves": "inline:MovementRules",
+    "win": "inline:WinCondition",
+    "render": "inline:CanvasRenderer"
+  },
+  "_note": "Single-file game — all substrates are inline in index.html. Manifold refactor will extract them.",
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "boardState",
+      "currentPlayer",
+      "winner",
+      "dimension"
+    ]
+  },
+  "build": {
+    "assets": [
+      "index.html"
+    ]
+  },
+  "deploy": {
+    "target": "/var/www/kensgames.com/4DTicTacToe/",
+    "type": "static"
+  },
+  "manifold_compatibility": {
+    "bridge_included": false,
+    "state_exposed": false,
+    "postmessage_protocol": false,
+    "todo": [
+      "Extract inline JS into separate substrate files",
+      "Include js/manifold_bridge.js in index.html",
+      "Emit window.__MANIFOLD__ with boardState and currentPlayer",
+      "Wire postMessage events to ManifoldBridge.emit()"
+    ]
+  }
+}

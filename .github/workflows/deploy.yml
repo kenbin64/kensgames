@@ -1,0 +1,302 @@
+name: Manifold Compiler — Deploy to kensgames.com
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - "**.md"
+      - ".github/skills/**"
+      - "engine/**"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      game:
+        description: "Deploy single game only (leave blank for full portal)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (validate only, no deploy)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VPS_HOST: 172.81.62.217
+  VPS_USER: root
+  DEPLOY_PATH: /var/www/kensgames.com
+  HELIX_PATH: /opt/butterflyfx/dimensionsos/helix
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # 1. Manifold Compiler — validate all game manifolds
+  # ──────────────────────────────────────────────────────────────────────
+  compile:
+    name: Manifold Compile & Validate
+    runs-on: ubuntu-latest
+    outputs:
+      registry_hash: ${{ steps.compile.outputs.registry_hash }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run Manifold Compiler
+        id: compile
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python engine/manifold_compiler.py --dry-run
+          elif [ -n "${{ inputs.game }}" ]; then
+            python engine/manifold_compiler.py --game "${{ inputs.game }}"
+          else
+            python engine/manifold_compiler.py
+          fi
+
+          # Output the registry hash for the deploy step to verify
+          if [ -f dist/manifold.registry.json ]; then
+            HASH=$(sha256sum dist/manifold.registry.json | cut -d' ' -f1)
+            echo "registry_hash=${HASH}" >> "$GITHUB_OUTPUT"
+            echo "Registry hash: ${HASH}"
+          fi
+
+      - name: Upload compiled artifacts
+        if: inputs.dry_run != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifold-dist
+          path: dist/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 2. Server test (Node.js auth/lobby server)
+  # ──────────────────────────────────────────────────────────────────────
+  test-server:
+    name: Test Node Server
+    runs-on: ubuntu-latest
+    needs: compile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run tests
+        working-directory: server
+        run: npm test
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ${{ secrets.JWT_SECRET_TEST }}
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 3. Deploy to VPS
+  # ──────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to kensgames.com
+    runs-on: ubuntu-latest
+    needs: [ compile, test-server ]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      inputs.dry_run != 'true'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download compiled artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: manifold-dist
+          path: dist/
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519_mcp
+          chmod 600 ~/.ssh/id_ed25519_mcp
+          ssh-keyscan -H "${{ env.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Backup current deployment on VPS
+        run: |
+          ssh -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+              "mkdir -p /var/www/backups && \
+               tar czf /var/www/backups/kensgames.com_$(date +%Y%m%d_%H%M%S).tar.gz \
+               ${{ env.DEPLOY_PATH }} 2>/dev/null || true"
+
+      - name: Deploy portal pages & shared JS
+        if: inputs.game == '' || inputs.game == null
+        run: |
+          rsync -avz --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='engine/' \
+            --exclude='node_modules/' \
+            --exclude='*.sh' \
+            --exclude='*.pdf' \
+            --exclude='manifold.portal.json' \
+            --exclude='dist/' \
+            --exclude='fasttrack/' \
+            --exclude='brickbreaker3d/' \
+            --exclude='4DTicTacToe/' \
+            --exclude='starfighter/' \
+            --exclude='assemble/' \
+            --exclude='server/' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            ./ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Deploy game — fasttrack
+        if: inputs.game == '' || inputs.game == 'fasttrack'
+        run: |
+          rsync -avz --delete \
+            --exclude='*.test.js' \
+            --exclude='*.sh' \
+            --exclude='manifold.game.json' \
+            --exclude='node_modules/' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            fasttrack/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/fasttrack/
+
+      - name: Deploy game — brickbreaker3d
+        if: inputs.game == '' || inputs.game == 'brickbreaker3d'
+        run: |
+          rsync -avz --delete \
+            --exclude='manifold.game.json' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            brickbreaker3d/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/brickbreaker3d/
+
+      - name: Deploy game — 4DTicTacToe
+        if: inputs.game == '' || inputs.game == '4dtictactoe'
+        run: |
+          rsync -avz --delete \
+            --exclude='manifold.game.json' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            4DTicTacToe/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/4DTicTacToe/
+
+      - name: Deploy game — starfighter
+        if: inputs.game == '' || inputs.game == 'starfighter'
+        run: |
+          rsync -avz --delete \
+            --exclude='*.test.js' \
+            --exclude='*.sh' \
+            --exclude='manifold.game.json' \
+            --exclude='tests/' \
+            --exclude='electron/' \
+            --exclude='downloads/' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            starfighter/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/starfighter/
+
+      - name: Deploy game — assemble
+        if: inputs.game == '' || inputs.game == 'assemble'
+        run: |
+          rsync -avz --delete \
+            --exclude='manifold.game.json' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            assemble/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/assemble/
+
+      - name: Deploy Node server
+        if: inputs.game == '' || inputs.game == null
+        run: |
+          rsync -avz \
+            --exclude='node_modules/' \
+            --exclude='*.test.js' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            server/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/server/
+
+      - name: Deploy manifold registry
+        run: |
+          scp -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              dist/manifold.registry.json \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/js/manifold.registry.json
+
+          scp -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              dist/deploy.manifest.json \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.HELIX_PATH }}/deploy.manifest.json
+
+          # Deploy helix.sh (VPS entry point) and make it executable
+          scp -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              helix.sh \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.HELIX_PATH }}/helix.sh
+          ssh -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+              "chmod +x ${{ env.HELIX_PATH }}/helix.sh"
+
+      - name: Post-deploy — notify Helix AI & reload services
+        run: |
+          ssh -i ~/.ssh/id_ed25519_mcp \
+              -o StrictHostKeyChecking=no \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+              bash -s << 'ENDSSH'
+            set -e
+            echo "=== Manifold Deployment — Post-Deploy ==="
+
+            # Install server dependencies
+            cd /var/www/kensgames.com/server
+            npm ci --omit=dev
+
+            # Restart Node server via PM2
+            pm2 restart kensgames-server 2>/dev/null || \
+              pm2 start /var/www/kensgames.com/server/index.js \
+                --name kensgames-server \
+                --env production
+
+            # Reload nginx
+            nginx -t && systemctl reload nginx
+
+            # Signal Helix AI to process the new deploy manifest
+            if [ -f /opt/butterflyfx/dimensionsos/helix/helix.sh ]; then
+              /opt/butterflyfx/dimensionsos/helix/helix.sh deploy-complete \
+                /opt/butterflyfx/dimensionsos/helix/deploy.manifest.json
+            fi
+
+            echo "=== Deployment complete ==="
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          # Wait for nginx to reload, then smoke-test the portal
+          sleep 3
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 https://kensgames.com/ 2>/dev/null || echo "000")
+          echo "Portal HTTP status: ${HTTP_STATUS}"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::warning::Portal returned HTTP ${HTTP_STATUS} — check nginx"
+          fi
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519_mcp
