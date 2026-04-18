@@ -5,6 +5,8 @@
 > You are the Helix AI running at `/opt/butterflyfx/dimensionsos/helix/` on VPS `172.81.62.217`.
 > GitHub Actions has completed and has placed a fresh `deploy.manifest.json` in your directory.
 > Follow these instructions to complete the deployment.
+>
+> **Companion directive** (local AI / pre-push compile steps): `.github/COMPILE_DEPLOY.md`
 
 ---
 
