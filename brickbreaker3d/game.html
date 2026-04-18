@@ -1,0 +1,191 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrickBreaker 3D | KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0a1a;
+      color: #e8ddd0;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #menu {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 26, 0.92);
+      z-index: 100;
+      gap: 1rem;
+    }
+
+    #menu.hidden {
+      display: none;
+    }
+
+    #menu h1 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1rem, 3vw, 1.8rem);
+      color: #bf00ff;
+      text-shadow: 0 0 20px #bf00ff;
+      margin-bottom: 1rem;
+    }
+
+    #menu .mode-btn {
+      padding: 0.75rem 2rem;
+      background: transparent;
+      border: 2px solid #bf00ff;
+      color: #bf00ff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 3px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    #menu .mode-btn:hover {
+      background: rgba(191, 0, 255, 0.15);
+      box-shadow: 0 0 20px rgba(191, 0, 255, 0.4);
+    }
+
+    #session-start-btn {
+      background: rgba(191, 0, 255, 0.15) !important;
+      border-color: #39ff14 !important;
+      color: #39ff14 !important;
+    }
+
+    #menu .lobby-link {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: #8a7a68;
+      text-decoration: none;
+    }
+
+    #menu .lobby-link:hover {
+      color: #bf00ff;
+    }
+
+    #hud {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(191, 0, 255, 0.3);
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: #bf00ff;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #hud-back {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 200;
+    }
+
+    #hud-back a {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.38rem;
+      color: #8a7a68;
+      text-decoration: none;
+      padding: 0.4rem 0.7rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    #hud-back a:hover {
+      color: #bf00ff;
+      border-color: rgba(191, 0, 255, 0.4);
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="menu">
+    <h1>BRICKBREAKER 3D</h1>
+    <button class="mode-btn" onclick="startGame('easy')">EASY — SOLO</button>
+    <button class="mode-btn" onclick="startGame('hard')">HARD — SOLO</button>
+    <button class="mode-btn" onclick="startGame('multi2')">2 PLAYER</button>
+    <button class="mode-btn" onclick="startGame('multi3')">3 PLAYER</button>
+    <button class="mode-btn" onclick="startGame('multi4')">4 PLAYER</button>
+    <div id="session-actions" style="display:none;text-align:center;margin-top:0.5rem">
+      <div id="session-info" style="font-size:0.65rem;color:#8a7a68;margin-bottom:0.5rem"></div>
+      <button class="mode-btn" id="session-start-btn" onclick="startFromSession()">START SESSION GAME</button>
+    </div>
+    <a href="/brickbreaker3d/lobby.html" class="lobby-link">&#x2190; BACK TO LOBBY</a>
+  </div>
+
+  <div id="hud"></div>
+  <div id="hud-back"><a href="/brickbreaker3d/lobby.html">&#x2190; LOBBY</a></div>
+
+  <!-- Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
+  <!-- Manifold bridge -->
+  <script src="/js/manifold_bridge.js" defer></script>
+  <!-- Profile gate: auth + profile enforcement -->
+  <script src="/js/substrates/profile_gate.js"></script>
+  <!-- Game logic -->
+  <script src="/brickbreaker3d/game.js"></script>
+  <script>
+    'use strict';
+    // Read session params from URL (set by game_sessions.js when game starts)
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+    const sessionBots = parseInt(params.get('bots') || '0');
+    const isGuest = params.get('guest') === 'true';
+
+    if (sessionId) {
+      // Show session start option in menu
+      document.getElementById('session-actions').style.display = 'block';
+      const botsLabel = sessionBots > 0 ? ` + ${sessionBots} bot${sessionBots > 1 ? 's' : ''}` : '';
+      document.getElementById('session-info').textContent = `Session: ${sessionId.slice(-8)}${botsLabel}`;
+    }
+
+    function startFromSession() {
+      // Determine mode based on bots / player count from session
+      const totalPlayers = 1 + sessionBots; // at minimum 1 human + bots
+      let mode = 'easy';
+      if (totalPlayers >= 4) mode = 'multi4';
+      else if (totalPlayers >= 3) mode = 'multi3';
+      else if (totalPlayers >= 2) mode = 'multi2';
+      startGame(mode);
+    }
+  </script>
+</body>
+
+</html>

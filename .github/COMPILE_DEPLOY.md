@@ -171,7 +171,7 @@ git push origin main
 ### Step 7 — Monitor GitHub Actions
 
 Watch the pipeline at:
-`https://github.com/<owner>/manifold/actions`
+`https://github.com/kenbin64/manifold/actions`
 
 Expected jobs (in order):
 1. **Manifold Compile & Validate** — must exit 0
@@ -237,12 +237,12 @@ py -3.12 engine/manifold_compiler.py --validate-only
 ## 8. Game Registry — Current State
 
 | Game ID | Dimension | Entry URL |
-|---------|-----------|-----------|
-| `fasttrack` | x=3 y=45 z=135 | `/fasttrack/lobby.html` |
+|---------|-----------|------------|
+| `fasttrack` | x=3 y=45 z=135 | `/fasttrack/portal.html` |
 | `brickbreaker3d` | x=2 y=22 z=44 | `/brickbreaker3d/lobby.html` |
-| `4dtictactoe` | x=2 y=12 z=24 | `/4DTicTacToe/index.html` |
-| `starfighter` | x=2 y=30 z=60 | `/starfighter/index.html` |
-| `assemble` | x=2 y=20 z=40 | `/assemble/index.html` |
+| `4dtictactoe` | x=2 y=12 z=24 | `/4DTicTacToe/lobby.html` |
+| `starfighter` | x=2 y=30 z=60 | `/starfighter/lobby.html` |
+| `assemble` | x=2 y=20 z=40 | `/assemble/lobby.html` |
 
 To add a new game:
 1. Create `<gameid>/manifold.game.json` (use an existing one as template)

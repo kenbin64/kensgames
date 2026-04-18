@@ -2,6 +2,13 @@
 <html lang="en">
 
 <head>
+    <!-- Auth redirect: logged-in users go straight to lobby -->
+    <script>
+        (function () {
+            var t = localStorage.getItem('kg_token');
+            if (t) { fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (r.ok) window.location.replace('/fasttrack/lobby.html'); }).catch(function () { }); }
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fast Track — Free Online Board Game | Card & Peg Racing | Ken's Games</title>

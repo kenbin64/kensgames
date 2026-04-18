@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Portal</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    /* ── Nav enhancements ───────────────────────────────────────── */
+    .portal-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .portal-nav a {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--dim);
+      text-decoration: none;
+      padding: 0.4rem 0.7rem;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+
+    .portal-nav a:hover,
+    .portal-nav a.active {
+      color: var(--c1);
+      border-color: var(--c1);
+      text-shadow: var(--glow1);
+    }
+
+    /* ── Player tag in header ───────────────────────────────────── */
+    .player-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(0, 255, 255, 0.06);
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      padding: 0.35rem 0.7rem;
+      border-radius: 20px;
+    }
+
+    .player-chip .avatar {
+      font-size: 1.1rem;
+    }
+
+    .player-chip .name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c3);
+      letter-spacing: 1px;
+    }
+
+    /* ── Notification bell ──────────────────────────────────────── */
+    .notif-btn {
+      position: relative;
+      background: transparent;
+      border: none;
+      color: var(--dim);
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0.3rem;
+    }
+
+    .notif-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: var(--c2);
+      color: #fff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.35rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .notif-badge.show {
+      display: block;
+    }
+
+    /* ── Main content ───────────────────────────────────────────── */
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── Welcome hero ───────────────────────────────────────────── */
+    .portal-hero {
+      text-align: center;
+      padding: 2rem 1rem 1.5rem;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+      margin-bottom: 2rem;
+    }
+
+    .portal-hero h1 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.7rem, 2vw, 1.1rem);
+      color: var(--c1);
+      text-shadow: var(--glow1);
+      letter-spacing: 3px;
+      margin-bottom: 0.5rem;
+    }
+
+    .portal-hero p {
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+
+    /* ── Quick stats bar ────────────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .stat-pill {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      color: var(--dim);
+    }
+
+    .stat-pill strong {
+      color: var(--c1);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+    }
+
+    /* ── Games grid ─────────────────────────────────────────────── */
+    .section-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--c2);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+      text-shadow: var(--glow2);
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .game-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--panel-radius);
+      padding: 1.5rem;
+      transition: all 0.25s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--c1);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s;
+    }
+
+    .game-card:hover {
+      border-color: var(--c1);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 255, 255, 0.1);
+    }
+
+    .game-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .game-card .game-icon {
+      font-size: 3rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .game-card .game-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      color: var(--text);
+      letter-spacing: 2px;
+      margin-bottom: 0.5rem;
+    }
+
+    .game-card .game-desc {
+      font-size: 0.78rem;
+      color: var(--dim);
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+
+    .game-card .game-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+    }
+
+    .game-card .game-meta span strong {
+      color: var(--c1);
+    }
+
+    /* ── Play button ────────────────────────────────────────────── */
+    .play-btn {
+      width: 100%;
+      padding: 0.6rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--c1);
+      border: 1px solid var(--c1);
+      transition: all 0.2s;
+    }
+
+    .play-btn:hover {
+      background: var(--c1);
+      color: var(--void);
+      box-shadow: var(--glow1);
+    }
+
+    /* ── Social quick links ─────────────────────────────────────── */
+    .social-strip {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+
+    .social-card {
+      flex: 1;
+      min-width: 140px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--panel-radius);
+      padding: 1rem 1.2rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .social-card:hover {
+      border-color: var(--c2);
+      transform: translateY(-2px);
+    }
+
+    .social-card .sc-icon {
+      font-size: 1.5rem;
+    }
+
+    .social-card .sc-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      color: var(--dim);
+      letter-spacing: 1px;
+    }
+
+    .social-card .sc-count {
+      font-size: 0.72rem;
+      color: var(--c1);
+      margin-top: 0.15rem;
+    }
+
+    /* ── Notifications panel ────────────────────────────────────── */
+    .notif-panel {
+      position: fixed;
+      top: 60px;
+      right: 1rem;
+      width: 320px;
+      background: var(--surface);
+      border: 1px solid var(--c2);
+      border-radius: 8px;
+      box-shadow: var(--glow2);
+      z-index: 200;
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .notif-panel.open {
+      display: block;
+    }
+
+    .notif-panel-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c2);
+    }
+
+    .notif-item {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .notif-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .notif-item.unread {
+      border-left: 3px solid var(--c2);
+    }
+
+    .notif-item .notif-time {
+      color: var(--dim);
+      font-size: 0.65rem;
+      margin-top: 0.25rem;
+    }
+
+    .notif-empty {
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.75rem;
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="gold">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <!-- ── HEADER ─────────────────────────────────────────────────── -->
+  <header class="arcade-header">
+    <a href="/" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+
+    <nav class="portal-nav" id="portal-nav">
+      <a href="/social/friends.html">FRIENDS</a>
+      <a href="/social/guilds.html">GUILDS</a>
+      <a href="/social/leaderboards.html">RANKS</a>
+      <a href="/social/tournaments.html">EVENTS</a>
+    </nav>
+
+    <div class="header-nav">
+      <button class="notif-btn" id="notif-btn" title="Notifications">
+        🔔
+        <span class="notif-badge" id="notif-badge">0</span>
+      </button>
+      <div class="player-chip" id="player-chip" style="display:none">
+        <span class="avatar" id="chip-avatar">🎮</span>
+        <span class="name" id="chip-name">—</span>
+      </div>
+      <button class="arcade-btn" id="logout-btn" style="display:none">LOGOUT</button>
+    </div>
+  </header>
+
+  <!-- ── NOTIFICATION PANEL ──────────────────────────────────────── -->
+  <div class="notif-panel" id="notif-panel">
+    <div class="notif-panel-header">NOTIFICATIONS</div>
+    <div id="notif-list">
+      <div class="notif-empty">No notifications</div>
+    </div>
+  </div>
+
+  <!-- ── MAIN ────────────────────────────────────────────────────── -->
+  <main>
+    <div class="portal-hero">
+      <h1 id="welcome-msg">WELCOME BACK, PLAYER!</h1>
+      <p>Choose your game · Build your legend · Rule the leaderboards</p>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat-pill">Friends online: <strong id="stat-friends-online">—</strong></div>
+      <div class="stat-pill">Guild: <strong id="stat-guild">—</strong></div>
+      <div class="stat-pill">Games played: <strong id="stat-games">—</strong></div>
+    </div>
+
+    <!-- Social quick links -->
+    <div class="section-label">QUICK ACCESS</div>
+    <div class="social-strip">
+      <a class="social-card" href="/social/friends.html">
+        <span class="sc-icon">👥</span>
+        <div>
+          <div class="sc-label">FRIENDS</div>
+          <div class="sc-count" id="qf-count">— online</div>
+        </div>
+      </a>
+      <a class="social-card" href="/social/guilds.html">
+        <span class="sc-icon">⚔️</span>
+        <div>
+          <div class="sc-label">GUILDS</div>
+          <div class="sc-count" id="qg-count">Browse guilds</div>
+        </div>
+      </a>
+      <a class="social-card" href="/social/leaderboards.html">
+        <span class="sc-icon">🏆</span>
+        <div>
+          <div class="sc-label">LEADERBOARDS</div>
+          <div class="sc-count">Top scores</div>
+        </div>
+      </a>
+      <a class="social-card" href="/social/tournaments.html">
+        <span class="sc-icon">🎖️</span>
+        <div>
+          <div class="sc-label">TOURNAMENTS</div>
+          <div class="sc-count" id="qt-count">View events</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Games grid -->
+    <div class="section-label">GAMES</div>
+    <div class="games-grid" id="games-grid">
+      <!-- Populated by JS -->
+    </div>
+  </main>
+
+  <!-- ── GAME LAUNCH MODAL ────────────────────────────────────────── -->
+  <div id="launch-modal"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:none;align-items:center;justify-content:center;">
+    <div
+      style="background:var(--surface);border:1px solid var(--c1);border-radius:12px;padding:2rem;max-width:420px;width:90%">
+      <div class="modal-title" id="launch-game-name" style="color:var(--c1);margin-bottom:1.5rem;font-size:0.7rem;">
+      </div>
+      <div style="display:grid;gap:0.75rem;">
+        <button class="arcade-btn" onclick="launchMode('bot')">⚙️ SINGLE PLAYER vs BOTS</button>
+        <button class="arcade-btn" onclick="launchMode('invite_code')">🔗 INVITE WITH CODE</button>
+        <button class="arcade-btn" onclick="launchMode('invite_friends')">👥 INVITE FRIENDS</button>
+        <button class="arcade-btn" onclick="launchMode('public')">🌐 CREATE PUBLIC GAME</button>
+      </div>
+      <button class="arcade-btn" onclick="closeLaunch()"
+        style="width:100%;margin-top:1rem;color:var(--dim);border-color:var(--dim);">CANCEL</button>
+    </div>
+  </div>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script src="/js/substrates/player_profile_substrate.js" defer></script>
+  <script src="/js/manifold_bridge.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    const GAMES = [
+      { id: 'fasttrack', name: 'FASTTRACK', icon: '🎯', path: '/fasttrack/', desc: 'Tabletop strategy meets speed. Race to control the board.', players: '2–4', minPlay: 15 },
+      { id: 'brickbreaker3d', name: 'BRICKBREAKER 3D', icon: '🧱', path: '/brickbreaker3d/', desc: '3D breakout with nine power-up substrates.', players: '1–4', minPlay: 10 },
+      { id: '4dtictactoe', name: '4D TIC TAC TOE', icon: '✕', path: '/4DTicTacToe/', desc: 'Tic-tac-toe through four dimensions. Can you think 4D?', players: '2', minPlay: 5 },
+      { id: 'starfighter', name: 'STARFIGHTER', icon: '🚀', path: '/starfighter/', desc: 'Space combat with ANPC AI enemies. Survive the waves.', players: '1–4', minPlay: 20 },
+      { id: 'assemble', name: 'ASSEMBLE', icon: '🧩', path: '/assemble/', desc: 'Collaborative puzzle-building. Plan. Build. Solve.', players: '1–4', minPlay: 15 },
+    ];
+
+    let currentLaunchGame = null;
+    let myProfile = null;
+
+    // ── Auth gate ───────────────────────────────────────────────────
+    async function init() {
+      const token = localStorage.getItem('kg_token');
+      if (!token) { window.location.href = '/login/index.html'; return; }
+
+      try {
+        const r = await fetch(`${API}/auth/validate`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      } catch { window.location.href = '/login/index.html'; return; }
+
+      // Load profile
+      try {
+        const pr = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (pr.ok) {
+          myProfile = await pr.json();
+          if (!myProfile.tosAgreed || !myProfile.profileSetup) {
+            window.location.href = '/player/setup.html'; return;
+          }
+          renderProfile(myProfile);
+        }
+      } catch { }
+
+      renderGames();
+      loadNotifications();
+      loadSocialStats();
+    }
+
+    function renderProfile(p) {
+      const avatarMap = window.KG_AVATARS || {};
+      document.getElementById('chip-avatar').textContent = avatarMap[p.avatarId] || p.avatar || '🎮';
+      document.getElementById('chip-name').textContent = p.playername || p.username;
+      document.getElementById('player-chip').style.display = 'flex';
+      document.getElementById('logout-btn').style.display = 'inline-block';
+      document.getElementById('welcome-msg').textContent = `WELCOME BACK, ${(p.playername || p.username).toUpperCase()}!`;
+      document.getElementById('stat-games').textContent = p.stats?.gamesPlayed ?? 0;
+      document.getElementById('stat-guild').textContent = p.guildId ? 'Member' : 'None';
+    }
+
+    function renderGames() {
+      const grid = document.getElementById('games-grid');
+      grid.innerHTML = GAMES.map(g => `
+        <div class="game-card" onclick="openLaunch('${g.id}')">
+          <span class="game-icon">${g.icon}</span>
+          <div class="game-name">${g.name}</div>
+          <div class="game-desc">${g.desc}</div>
+          <div class="game-meta">
+            <span>👥 <strong>${g.players}</strong> players</span>
+            <span>⏱ <strong>~${g.minPlay}min</strong></span>
+          </div>
+          <button class="play-btn">▶ PLAY</button>
+        </div>
+      `).join('');
+    }
+
+    function openLaunch(gameId) {
+      currentLaunchGame = GAMES.find(g => g.id === gameId);
+      if (!currentLaunchGame) return;
+      document.getElementById('launch-game-name').textContent = currentLaunchGame.name;
+      document.getElementById('launch-modal').style.display = 'flex';
+    }
+    function closeLaunch() {
+      document.getElementById('launch-modal').style.display = 'none';
+      currentLaunchGame = null;
+    }
+    function launchMode(mode) {
+      if (!currentLaunchGame) return;
+      closeLaunch();
+      const url = new URL(currentLaunchGame.path, window.location.origin);
+      url.searchParams.set('mode', mode);
+      window.location.href = url.toString();
+    }
+
+    async function loadNotifications() {
+      // Notifications are pushed via WS in lobby-server.js; here we just check count
+      // Placeholder: poll endpoint if implemented
+    }
+
+    async function loadSocialStats() {
+      const token = localStorage.getItem('kg_token');
+      try {
+        const r = await fetch(`${API}/friends`, { headers: { Authorization: `Bearer ${token}` } });
+        if (r.ok) {
+          const d = await r.json();
+          const online = d.friends.filter(f => f.online).length;
+          document.getElementById('stat-friends-online').textContent = online;
+          document.getElementById('qf-count').textContent = `${online} online`;
+        }
+      } catch { }
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('kg_token');
+      localStorage.removeItem('kg_user_id');
+      localStorage.removeItem('kg_username');
+      localStorage.removeItem('kg_display_name');
+      localStorage.removeItem('kg_avatar');
+      window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
+    });
+
+    document.getElementById('notif-btn').addEventListener('click', () => {
+      document.getElementById('notif-panel').classList.toggle('open');
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#notif-btn') && !e.target.closest('#notif-panel')) {
+        document.getElementById('notif-panel').classList.remove('open');
+      }
+    });
+
+    init();
+  </script>
+</body>
+
+</html>

@@ -1,481 +1,561 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
+  <!-- Auth + profile gate: must be logged in AND have playername/avatar -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('kg_token');
+      if (!t) { window.location.replace('/brickbreaker3d/index.html'); return; }
+      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/brickbreaker3d/index.html'); return; }
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
+        }).catch(function () { });
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BrickBreaker 3D Lobby &mdash; KensGames</title>
+  <title>BrickBreaker 3D &mdash; Lobby | KensGames</title>
   <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
-  <link rel="stylesheet" href="/lib/fonts/fonts.css">
-  <link rel="stylesheet" href="/lib/arcade-theme.css">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
   <style>
-    :root {
-      --accent: #FF00FF;
-      --gaccent: 0 0 8px #FF00FF, 0 0 24px #FF00FF;
+    main {
+      position: relative;
+      z-index: 2;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
     }
 
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
+    h1.page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c2);
+      margin-bottom: 0.4rem;
     }
 
-    .lobby-wrap {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
+    .page-sub {
+      font-size: 0.8rem;
+      color: var(--dim);
+      margin-bottom: 2rem;
     }
 
-    .cabinet {
-      width: 220px;
-      margin: 0 auto 32px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      animation: fadeUp .5s ease;
-    }
-
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
-    }
-
-    .cab-top {
-      width: 160px;
-      height: 14px;
-      background: var(--accent);
-      box-shadow: var(--gaccent);
-      border-radius: 4px 4px 0 0;
-    }
-
-    .cab-body {
-      width: 180px;
-      background: rgba(20, 4, 20, .96);
-      border: 2px solid var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 30px rgba(255, 0, 255, .06);
-      border-radius: 0 0 8px 8px;
-      padding: 20px 16px;
-      text-align: center;
-    }
-
-    .cab-screen {
-      width: 100%;
-      height: 90px;
-      background: #0c020c;
-      border: 2px solid rgba(255, 0, 255, .4);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 32px;
-      margin-bottom: 12px;
-      box-shadow: inset 0 0 20px rgba(255, 0, 255, .15);
-    }
-
-    .cab-label {
-      font-family: var(--fa);
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-    }
-
-    .cab-buttons {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      margin-top: 10px;
-    }
-
-    .cab-btn {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--ny);
-      box-shadow: 0 0 6px var(--ny);
-    }
-
-    .cab-btn:nth-child(2) {
-      background: var(--ng);
-      box-shadow: 0 0 6px var(--ng);
-    }
-
-    .cab-btn:nth-child(3) {
-      background: var(--nc);
-      box-shadow: 0 0 6px var(--nc);
-    }
-
-    .player-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: rgba(255, 0, 255, .05);
-      border: 1px solid rgba(255, 0, 255, .2);
-      border-radius: 4px;
-      padding: 12px 18px;
-      margin-bottom: 28px;
-      width: 100%;
-      max-width: 520px;
-    }
-
-    .player-name {
-      font-family: var(--fa);
-      font-size: 13px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-    }
-
-    .player-meta {
-      font-size: 11px;
-      color: var(--txm);
-    }
-
-    .online-count {
-      margin-left: auto;
-      text-align: right;
-      font-family: var(--fa);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .online-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      box-shadow: var(--gaccent);
-      margin-right: 5px;
-      animation: pulse 1.5s ease infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .3
-      }
-    }
-
-    .modes {
+    .lobby-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      width: 100%;
-      max-width: 740px;
-      margin-bottom: 32px;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
     }
 
-    .mode-card {
-      background: rgba(20, 4, 20, .9);
-      border: 2px solid rgba(255, 0, 255, .25);
-      border-radius: 6px;
-      padding: 28px 22px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .25s;
+    @media(max-width: 700px) {
+      .lobby-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
-    .mode-card:hover {
-      border-color: var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 20px rgba(255, 0, 255, .06);
-      transform: translateY(-6px);
+    .panel {
+      background: var(--surface);
+      border: 1px solid rgba(191, 0, 255, 0.18);
+      border-radius: 12px;
+      padding: 1.5rem;
     }
 
-    .mode-icon {
-      font-size: 44px;
-      margin-bottom: 14px;
-      display: block;
-      filter: drop-shadow(0 0 8px currentColor);
+    .panel-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c2);
+      letter-spacing: 3px;
+      margin-bottom: 1.25rem;
     }
 
-    .mode-title {
-      font-family: var(--fa);
-      font-size: 14px;
-      font-weight: 900;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
+    .field-row {
+      margin-bottom: 1rem;
     }
 
-    .mode-desc {
-      font-size: 12px;
-      color: var(--txm);
-      line-height: 1.7;
-      margin-bottom: 18px;
-    }
-
-    .mode-avail {
-      font-family: var(--fa);
-      font-size: 9px;
+    .field-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.36rem;
+      color: var(--dim);
       letter-spacing: 2px;
-      color: var(--ng);
-      text-transform: uppercase;
+      margin-bottom: 0.35rem;
     }
 
-    .private-panel {
-      display: none;
-      width: 100%;
-      max-width: 520px;
-      background: rgba(20, 4, 20, .9);
-      border: 2px solid rgba(255, 0, 255, .3);
-      border-radius: 6px;
-      padding: 28px;
-    }
-
-    .private-panel.open {
-      display: block;
-      animation: fadeUp .3s ease;
-    }
-
-    .priv-tabs {
+    .radio-group {
       display: flex;
-      gap: 0;
-      margin-bottom: 22px;
-      border-bottom: 2px solid rgba(255, 0, 255, .2);
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
 
-    .priv-tab {
-      font-family: var(--fa);
-      font-size: 10px;
+    .radio-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .radio-opt input {
+      accent-color: var(--c2);
+    }
+
+    .select-field {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .select-field:focus {
+      border-color: var(--c2);
+    }
+
+    .sess-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .sess-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      gap: 0.5rem;
+    }
+
+    .sess-info {
+      font-size: 0.78rem;
+      color: var(--dim);
+    }
+
+    .sess-creator {
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .sess-empty {
+      font-size: 0.78rem;
+      color: var(--dim);
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+
+    .lb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    .lb-table th {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.32rem;
+      color: var(--dim);
       letter-spacing: 2px;
-      padding: 8px 16px;
-      background: none;
-      border: none;
-      color: var(--txm);
+      text-align: left;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .lb-table td {
+      padding: 0.5rem 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+    }
+
+    .lb-rank-1 td {
+      color: var(--c2);
+    }
+
+    .lb-me td {
+      background: rgba(191, 0, 255, 0.04);
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 900;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--c2);
+      border-radius: 14px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      color: var(--c2);
+      margin-bottom: 1rem;
+    }
+
+    .players-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+      min-height: 40px;
+    }
+
+    .player-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+    }
+
+    .chip-ready {
+      color: var(--c3);
+    }
+
+    .chip-wait {
+      color: var(--dim);
+    }
+
+    .invite-link-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(191, 0, 255, 0.2);
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      color: var(--c2);
+      letter-spacing: 4px;
+      word-break: break-all;
       cursor: pointer;
-      text-transform: uppercase;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: all .2s;
+      margin-bottom: 0.5rem;
     }
 
-    .priv-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+    .copy-hint {
+      font-size: 0.68rem;
+      color: var(--dim);
+      margin-bottom: 1rem;
     }
 
-    .code-display {
-      font-family: var(--fa);
-      font-size: 36px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
+    .bots-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .bots-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.36rem;
+      color: var(--dim);
+    }
+
+    .status-msg {
+      font-size: 0.75rem;
+      min-height: 1.2em;
+      margin-top: 0.5rem;
+    }
+
+    .status-msg.err {
+      color: #ff4d4d;
+    }
+
+    .status-msg.ok,
+    .status-msg.info {
+      color: var(--c2);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .stat-box {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 0.85rem;
       text-align: center;
-      padding: 20px;
-      background: rgba(255, 0, 255, .05);
-      border: 1px solid rgba(255, 0, 255, .2);
-      border-radius: 4px;
-      margin-bottom: 14px;
-      cursor: pointer;
     }
 
-    .code-hint {
-      font-size: 11px;
-      color: var(--txm);
-      text-align: center;
-      margin-bottom: 16px;
+    .stat-val {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c2);
+      margin-bottom: 0.3rem;
     }
 
-    .btn-acc {
-      background: var(--accent);
-      color: var(--bg);
-      border-color: var(--accent);
-      box-shadow: var(--gaccent);
-    }
-
-    .btn-acc:hover {
-      transform: scale(1.04);
-      box-shadow: var(--gaccent), 0 0 30px var(--accent);
+    .stat-lbl {
+      font-size: 0.65rem;
+      color: var(--dim);
     }
   </style>
-  <script src="/js/analytics.js"></script>
 </head>
 
-<body>
-  <div id="tron-grid"></div>
-  <div id="scanlines"></div>
-  <nav class="arc-nav">
-    <div class="arc-nav-inner">
-      <a href="/" class="arc-logo">KEN<span>S</span>GAMES</a>
-      <ul class="arc-nav-links">
-        <li><a href="/">&#8592; Portal</a></li>
-        <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
-        <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
-        <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>        <li><a href="/assemble/">Assemble</a></li>      </ul>
-      <div class="arc-nav-right" id="nav-avatar"></div>
-    </div>
-  </nav>
-  <div class="lobby-wrap">
-    <div class="cabinet">
-      <div class="cab-top"></div>
-      <div class="cab-body">
-        <div class="cab-screen">&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;<br>&#9679;&#8594;</div>
-        <div class="cab-label">BrickBreaker 3D</div>
-        <div class="cab-buttons">
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-        </div>
-      </div>
-    </div>
-    <div class="player-card">
-      <div class="arc-avatar" id="av-badge" style="font-size:26px;border-color:var(--accent);box-shadow:var(--gaccent)">
-      </div>
-      <div>
-        <div class="player-name" id="p-name">Player</div>
-        <div class="player-meta">3D Arcade &bull; Solo &amp; Head-to-Head</div>
-      </div>
+<body data-mtheme="purple">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+  <div class="m-dim-ticker" aria-hidden="true"></div>
 
-    </div>
-    <div class="modes">
-      <div class="mode-card" onclick="startSolo()">
-        <span class="mode-icon" style="color:#FF00FF">&#127918;</span>
-        <div class="mode-title">Solo Run</div>
-        <div class="mode-desc">Beat your high score against wave after wave of bricks. Unlocks power-ups and new levels.
+  <header class="arcade-header">
+    <a href="/" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav class="header-nav">
+      <a href="/brickbreaker3d/index.html" class="arcade-btn" style="font-size:0.4rem">&#8592; GAME INFO</a>
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">&#x1F9F1; BRICKBREAKER 3D</h1>
+    <p class="page-sub">Smash bricks in three dimensions &#x2014; solo or challenge your crew.</p>
+    <div class="lobby-grid">
+      <div class="panel">
+        <div class="panel-title">START A SESSION</div>
+        <div class="field-row">
+          <div class="field-label">GAME MODE</div>
+          <div class="radio-group">
+            <label class="radio-opt"><input type="radio" name="mode" value="private" checked> Private (invite
+              only)</label>
+            <label class="radio-opt"><input type="radio" name="mode" value="public"> Public (open)</label>
+            <label class="radio-opt"><input type="radio" name="mode" value="solo"> Solo run</label>
+          </div>
         </div>
-        <div class="mode-avail">Available &bull; High score tracked</div>
+        <div class="field-row">
+          <div class="field-label">MAX PLAYERS</div>
+          <select class="select-field" id="max-players-sel">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+          </select>
+        </div>
+        <button class="arcade-btn"
+          style="width:100%;padding:0.75rem;margin-top:0.5rem;border-color:var(--c2);color:var(--c2)" id="create-btn"
+          onclick="createGame()">CREATE GAME</button>
+        <div class="status-msg" id="create-status"></div>
       </div>
-      <div class="mode-card" onclick="startMatchmaker()">
-        <span class="mode-icon" style="color:#00FFFF">&#9889;</span>
-        <div class="mode-title">Head-to-Head</div>
-        <div class="mode-desc">Race a live opponent. First to clear the board wins. Login required.</div>
-        <div class="mode-avail" id="mm-avail">Login required</div>
+      <div class="panel">
+        <div class="panel-title">PUBLIC GAMES <span id="pub-count" style="color:var(--dim);font-size:0.35rem"></span>
+        </div>
+        <ul class="sess-list" id="pub-sess-list">
+          <li class="sess-empty">Loading open sessions&#x2026;</li>
+        </ul>
+        <button class="arcade-btn" style="font-size:0.4rem;padding:0.4rem 0.8rem;margin-top:0.75rem"
+          onclick="loadPublicSessions()">REFRESH</button>
       </div>
-      <div class="mode-card" onclick="togglePrivate()">
-        <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Private Match</div>
-        <div class="mode-desc">Challenge a specific friend. Create a room and share the 6-character code.</div>
-        <div class="mode-avail">No login to join</div>
+      <div class="panel">
+        <div class="panel-title">LEADERBOARD &#x2014; TOP 10</div>
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>PLAYER</th>
+              <th>BEST SCORE</th>
+              <th>MEDALS</th>
+            </tr>
+          </thead>
+          <tbody id="lb-body">
+            <tr>
+              <td colspan="4" style="text-align:center;color:var(--dim);padding:1rem">Loading&#x2026;</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title">MY STATS</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="stat-wins">&#x2014;</div>
+            <div class="stat-lbl">SESSIONS</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-losses">&#x2014;</div>
+            <div class="stat-lbl">WINS</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-rank">&#x2014;</div>
+            <div class="stat-lbl">RANK</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-medals">&#x2014;</div>
+            <div class="stat-lbl">MEDALS</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="private-panel" id="priv-panel">
-      <div class="priv-tabs">
-        <button class="priv-tab active" onclick="privTab('create')">Create Room</button>
-        <button class="priv-tab" onclick="privTab('join')">Join with Code</button>
+  </main>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-title">&#x1F9F1; WAITING FOR PLAYERS</div>
+      <div style="margin-bottom:0.75rem">
+        <div class="field-label"
+          style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.35rem">
+          INVITE CODE</div>
+        <div class="invite-link-box" id="invite-code-display" onclick="copyInviteLink()">------</div>
+        <div class="copy-hint" id="copy-hint">Click to copy invite link</div>
       </div>
-      <div id="priv-create">
-        <div class="code-display" id="room-code" onclick="copyCode()">------</div>
-        <div class="code-hint">Click to copy &bull; Share with opponent</div>
-        <button class="btn btn-acc btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
-          MATCH</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
-          to create a private room</div>
+      <div class="field-label"
+        style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.5rem">
+        PLAYERS</div>
+      <div class="players-row" id="modal-players"></div>
+      <div class="bots-row">
+        <span class="bots-label">BOT PLAYERS:</span>
+        <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem"
+          onclick="adjustBots(-1)">&#x2013;</button>
+        <span id="bot-count"
+          style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c2);min-width:1.5rem;text-align:center">0</span>
+        <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem" onclick="adjustBots(1)">+</button>
+        <span style="font-size:0.72rem;color:var(--dim)">(fill open slots)</span>
       </div>
-      <div id="priv-join" style="display:none">
-        <div class="arc-field"><label>Room Code</label><input class="arc-input" id="join-code" placeholder="ABC123"
-            maxlength="6"
-            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
-        </div>
-        <div class="arc-field"><label>Your Name (guests)</label><input class="arc-input" id="guest-name"
-            placeholder="Brick Destroyer"></div>
-        <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN MATCH</button>
-        <div class="arc-msg" id="join-msg"></div>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+        <button class="arcade-btn" style="flex:1;padding:0.75rem;border-color:var(--c2);color:var(--c2)" id="start-btn"
+          onclick="startGame()">ENTER GAME</button>
+        <button class="arcade-btn"
+          style="padding:0.75rem 1rem;background:transparent;border-color:rgba(255,0,0,0.4);color:#ff4d4d;font-size:0.4rem"
+          onclick="cancelGame()">CANCEL</button>
       </div>
+      <div class="status-msg" id="modal-status"></div>
     </div>
   </div>
-  <script src="/js/substrates/avatar_picker.js"></script>
-  <script src="/js/multiplayer-client.js"></script>
+
+  <script src="/js/substrates/profile_gate.js"></script>
+  <script src="/js/substrates/game_session_substrate.js"></script>
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
   <script>
-    const token = localStorage.getItem('user_token');
-    const username = localStorage.getItem('username') || 'Guest';
-    const av = AvatarPicker.get();
-    document.getElementById('p-name').textContent = username;
-    AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
-    const badge = document.getElementById('av-badge');
-    badge.textContent = av ? av.emoji : '?';
-    if (!av) badge.style.color = 'var(--np)';
-    if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
-
-    if (token) document.getElementById('mm-avail').textContent = 'Available \u2022 Ready';
-
-    // Shared multiplayer client for BrickBreaker3D
-    const bbmp = new KGMultiplayer('brickbreaker');
-    let _bbConnected = false;
-
-    function ensureMpConnected(cb) {
-      if (_bbConnected) { cb(); return; }
-      bbmp.on('authenticated', () => { _bbConnected = true; cb(); });
-      bbmp.connect({ username, token });
+    'use strict';
+    const API = '/api';
+    const GAME = 'brickbreaker3d';
+    const token = localStorage.getItem('kg_token');
+    const AVATARS = { wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👽', ninja: '🥷', astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺', cat: '🐱', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐', diamond: '💎', crown: '👑' };
+    let currentSession = null, currentBots = 0, pollTimer = null;
+    function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function setStatus(id, msg, cls) { const el = document.getElementById(id); if (!el) return; el.className = `status-msg ${cls || ''}`; el.textContent = msg; }
+    async function createGame() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const maxPlayers = parseInt(document.getElementById('max-players-sel').value);
+      document.getElementById('create-btn').disabled = true;
+      setStatus('create-status', 'Creating…', 'info');
+      if (mode === 'solo') {
+        const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo' }) });
+        const d = await r.json();
+        if (d.success && d.gameUrl) { window.location.href = d.gameUrl; return; }
+        setStatus('create-status', d.error || 'Failed', 'err');
+        document.getElementById('create-btn').disabled = false; return;
+      }
+      const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode, maxPlayers }) });
+      const d = await r.json();
+      if (!r.ok || !d.success) { setStatus('create-status', d.error || 'Failed', 'err'); document.getElementById('create-btn').disabled = false; return; }
+      setStatus('create-status', '', '');
+      document.getElementById('create-btn').disabled = false;
+      currentSession = d.session; currentBots = currentSession.bots || 0;
+      openModal(d.code, d.inviteUrl); startPolling(d.sessionId);
     }
-
-    function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/brickbreaker3d/index.html?mode=solo'; }
-
-    function startMatchmaker() {
-      if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
-      ensureMpConnected(() => {
-        bbmp.on('session_update', (s) => {
-          if (s.player_count >= 2) {
-            window.location.href = `/brickbreaker3d/index.html?mode=multi&session=${s.session_id}`;
-          } else {
-            document.getElementById('mm-avail').textContent = 'Searching for opponent...';
-          }
-        });
-        bbmp.matchmake();
-      });
+    async function joinSession(sessionId) {
+      const sr = await fetch(`${API}/sessions/${sessionId}`, { headers: ah() });
+      const sd = await sr.json();
+      if (sd.success && sd.session.code) window.location.href = `/invite/?code=${sd.session.code}&game=${GAME}`;
     }
-
-    function togglePrivate() { const p = document.getElementById('priv-panel'); p.classList.toggle('open'); if (p.classList.contains('open')) generateCode(); }
-    function privTab(tab) { document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab)); document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none'; document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none'; }
-
-    let _code = '';
-    function generateCode() {
-      if (!token) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
-      ensureMpConnected(() => {
-        bbmp.on('session_update', (s) => {
-          _code = s.session_code;
-          document.getElementById('room-code').textContent = _code;
-          document.getElementById('launch-btn').disabled = false;
-          document.getElementById('priv-status').textContent = 'Share code with opponent. You start the match.';
-        });
-        bbmp.createGame({ private: true, maxPlayers: 4 });
-      });
+    async function loadPublicSessions() {
+      const r = await fetch(`${API}/sessions/game/${GAME}/public`, { headers: ah() });
+      const d = await r.json();
+      const list = document.getElementById('pub-sess-list');
+      const count = document.getElementById('pub-count');
+      if (!d.success || !d.sessions.length) { list.innerHTML = '<li class="sess-empty">No open sessions right now</li>'; count.textContent = ''; return; }
+      count.textContent = `(${d.sessions.length})`;
+      list.innerHTML = d.sessions.map(s => `<li class="sess-item"><div><div class="sess-creator">${escHtml(s.players?.[0]?.playername || 'Host')}'s session</div><div class="sess-info">${s.players}/${s.maxPlayers} players${s.bots ? ` + ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</div></div><button class="arcade-btn" style="font-size:0.38rem;padding:0.4rem 0.7rem;border-color:var(--c2);color:var(--c2)" onclick="joinSession('${escHtml(s.sessionId)}')">JOIN</button></li>`).join('');
     }
-
-    function copyCode() { if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; } }
-
-    function launchPrivate() {
-      if (!token) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
-      window.location.href = `/brickbreaker3d/index.html?mode=private&code=${_code}&host=1`;
+    async function loadLeaderboard() {
+      try {
+        const r = await fetch(`${API}/leaderboards/${GAME}?limit=10`, { headers: ah() });
+        const d = await r.json(); const tbody = document.getElementById('lb-body');
+        if (!d.success || !d.entries?.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:1rem">No data yet</td></tr>'; return; }
+        const myId = d.myUserId;
+        tbody.innerHTML = d.entries.map((e, i) => `<tr class="${i === 0 ? 'lb-rank-1' : ''} ${e.userId === myId ? 'lb-me' : ''}"><td>${i + 1}</td><td>${escHtml(e.playername)}</td><td>${e.score || 0}</td><td>${e.medals || 0}</td></tr>`).join('');
+      } catch { }
     }
-
-    function joinPrivate() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('guest-name').value.trim() || 'Guest';
-      const msg = document.getElementById('join-msg');
-      if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      if (!localStorage.getItem('user_token')) { localStorage.setItem('username', name); localStorage.setItem('user_token', 'guest-' + Date.now()); }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      // Use unified server to resolve code and join
-      ensureMpConnected(() => {
-        bbmp.on('code_resolved', (d) => {
-          if (d.found) {
-            window.location.href = `/brickbreaker3d/index.html?mode=private&code=${code}`;
-          } else {
-            msg.textContent = 'Room not found. Check the code.'; msg.className = 'arc-msg err';
-          }
-        });
-        bbmp.resolveCode(code);
-      });
+    async function loadMyStats() {
+      try {
+        const r = await fetch(`${API}/leaderboards/${GAME}/me`, { headers: ah() });
+        const d = await r.json();
+        if (d.success) { document.getElementById('stat-wins').textContent = d.sessions ?? '0'; document.getElementById('stat-losses').textContent = d.wins ?? '0'; document.getElementById('stat-rank').textContent = d.rank ?? '—'; document.getElementById('stat-medals').textContent = d.medals ?? '0'; }
+      } catch { }
     }
+    function openModal(code, inviteUrl) {
+      document.getElementById('invite-code-display').textContent = code || '------';
+      document.getElementById('invite-code-display').dataset.url = inviteUrl || '';
+      document.getElementById('modal-overlay').classList.add('open');
+      renderModalPlayers();
+    }
+    function renderModalPlayers() {
+      if (!currentSession) return;
+      const row = document.getElementById('modal-players');
+      row.innerHTML = currentSession.players.map(p => {
+        const e = AVATARS[p.avatarId] || '🎮'; const crown = p.isCreator ? ' 👑' : '';
+        return `<div class="player-chip">${e} ${escHtml(p.playername)}${crown} <span class="${p.ready ? 'chip-ready' : 'chip-wait'}">${p.ready ? '✔' : '…'}</span></div>`;
+      }).join('');
+      document.getElementById('bot-count').textContent = currentBots;
+    }
+    function copyInviteLink() {
+      const box = document.getElementById('invite-code-display');
+      const url = box.dataset.url || `${window.location.origin}/invite/?code=${box.textContent}&game=${GAME}`;
+      navigator.clipboard.writeText(url).then(() => { document.getElementById('copy-hint').textContent = 'Copied!'; setTimeout(() => { document.getElementById('copy-hint').textContent = 'Click to copy invite link'; }, 2000); });
+    }
+    async function adjustBots(delta) {
+      if (!currentSession) return;
+      const max = (currentSession.maxPlayers || 4) - 1;
+      const newBots = Math.max(0, Math.min(currentBots + delta, max));
+      const r = await fetch(`${API}/sessions/${currentSession.sessionId}/bots`, { method: 'POST', headers: ah(), body: JSON.stringify({ bots: newBots }) });
+      const d = await r.json(); if (d.success) { currentBots = d.bots; document.getElementById('bot-count').textContent = currentBots; }
+    }
+    async function startGame() {
+      if (!currentSession) return;
+      document.getElementById('start-btn').disabled = true; setStatus('modal-status', 'Starting…', 'info');
+      const r = await fetch(`${API}/sessions/${currentSession.sessionId}/start`, { method: 'POST', headers: ah() });
+      const d = await r.json();
+      if (d.success && d.gameUrl) { stopPolling(); window.location.href = d.gameUrl; return; }
+      setStatus('modal-status', d.error || 'Could not start', 'err'); document.getElementById('start-btn').disabled = false;
+    }
+    async function cancelGame() {
+      if (!currentSession) { closeModal(); return; }
+      await fetch(`${API}/sessions/${currentSession.sessionId}`, { method: 'DELETE', headers: ah() });
+      stopPolling(); closeModal();
+    }
+    function closeModal() { stopPolling(); document.getElementById('modal-overlay').classList.remove('open'); currentSession = null; }
+    function startPolling(sessionId) {
+      stopPolling();
+      pollTimer = setInterval(async () => {
+        try {
+          const r = await fetch(`${API}/sessions/${sessionId}`, { headers: ah() });
+          const d = await r.json(); if (!d.success) return;
+          currentSession = d.session; renderModalPlayers();
+          if (d.session.status === 'active' && d.session.gameUrl) { stopPolling(); window.location.href = d.session.gameUrl; }
+        } catch { }
+      }, 3000);
+    }
+    function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+    loadPublicSessions(); loadLeaderboard(); loadMyStats();
   </script>
 </body>
 

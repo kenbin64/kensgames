@@ -7,6 +7,20 @@ const LOBBY_WS = location.protocol === 'https:'
     ? `wss://${location.host}/ws`
     : `ws://${location.hostname}:8765`;
 
+// Superuser identity — immutable, no admin action may target this account
+const SUPERUSER_USERNAME = 'kbingh';
+
+// ── LOGOUT ───────────────────────────────────────────────────
+function adminLogout() {
+  localStorage.removeItem('kg_token');
+  localStorage.removeItem('kg_user_id');
+  localStorage.removeItem('kg_username');
+  localStorage.removeItem('kg_display_name');
+  localStorage.removeItem('kg_avatar');
+  // Clear Cloudflare Access session cookie, redirect to login
+  window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
+}
+
 let ws = null;
 let currentUser = null;
 let allUsers = [];
@@ -14,9 +28,25 @@ let kickTargetId = null;
 
 // ── INIT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('arcade_user');
-    if (!saved) { showNoAccess(); return; }
-    try { currentUser = JSON.parse(saved); } catch(e) { showNoAccess(); return; }
+    // Use the canonical KG token; fall back to legacy arcade_user for back-compat
+    const token = localStorage.getItem('kg_token');
+    const savedLegacy = localStorage.getItem('arcade_user');
+    if (!token && !savedLegacy) { showNoAccess(); return; }
+    if (token) {
+        // Validate token then init
+        fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + token } })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (!d || !d.valid) { localStorage.removeItem('kg_token'); showNoAccess(); return; }
+                currentUser = { username: d.userId, token: token };
+                document.getElementById('admin-user').innerHTML = `<span style="color:var(--green)">▶ ${d.playername || d.userId}</span>`;
+                connectAdmin();
+            })
+            .catch(() => showNoAccess());
+        return;
+    }
+    // Legacy path
+    try { currentUser = JSON.parse(savedLegacy); } catch (e) { showNoAccess(); return; }
     document.getElementById('admin-user').innerHTML = `<span style="color:var(--green)">▶ ${currentUser.username}</span>`;
     connectAdmin();
 });
@@ -46,7 +76,7 @@ function connectAdmin() {
         }
     };
     ws.onmessage = (e) => {
-        try { handleMsg(JSON.parse(e.data)); } catch(err) { console.warn(err); }
+        try { handleMsg(JSON.parse(e.data)); } catch (err) { console.warn(err); }
     };
     ws.onclose = () => setTimeout(connectAdmin, 3000);
 }
@@ -103,16 +133,18 @@ function renderUsers(users) {
     const isSuperuser = currentUser && allUsers.find(u => u.username === currentUser.username)?.role === 'superuser';
 
     tbody.innerHTML = users.map(u => {
+        const isSU = u.username === SUPERUSER_USERNAME || u.role === 'superuser';
         const online = u.online ? '<span class="online-dot on"></span>' : '<span class="online-dot off"></span>';
-        const roleBadge = `<span class="role-badge ${u.role}">${u.role.toUpperCase()}</span>`;
+        const roleBadge = `<span class="role-badge ${u.role}">${u.role.toUpperCase()}${isSU ? ' 🛡' : ''}</span>`;
         const winRate = u.games_played > 0 ? `${u.games_won}/${u.games_played - u.games_won}` : '0/0';
         const joined = u.created_at ? u.created_at.split('T')[0] : '-';
 
         let actions = '';
-        if (u.role !== 'superuser') {
+        // No action may be taken against the superuser account
+        if (!isSU) {
             if (isSuperuser) {
                 if (u.role === 'member') {
-                    actions += `<button class="action-btn promote" onclick="promoteUser('${u.user_id}')">PROMOTE</button>`;
+                    actions += `<button class="action-btn promote" onclick="promoteUser('${u.user_id}','${u.username}')">PROMOTE</button>`;
                 } else if (u.role === 'admin') {
                     actions += `<button class="action-btn demote" onclick="demoteUser('${u.user_id}')">DEMOTE</button>`;
                 }
@@ -143,10 +175,17 @@ function filterUsers() {
 }
 
 // ── ACTIONS ──────────────────────────────────────────────────
-function promoteUser(userId) { send({ type: 'admin_promote', user_id: userId }); }
+function promoteUser(userId, username) {
+    // Admin TOS acknowledgement required before promotion
+    if (!confirm(`Promoting ${username} to Admin.\n\nBy clicking OK you confirm that this user has agreed to the Admin Charter (/tos/admin.html) and understands their responsibilities.`)) return;
+    send({ type: 'admin_promote', user_id: userId });
+}
+
 function demoteUser(userId) { send({ type: 'admin_demote', user_id: userId }); }
 
 function kickUser(userId, username) {
+    // Guard: never allow kicking the superuser via the UI
+    if (username === SUPERUSER_USERNAME) { alert('The superuser account cannot be removed.'); return; }
     kickTargetId = userId;
     document.getElementById('kick-username').textContent = username;
     document.getElementById('kick-reason').value = '';

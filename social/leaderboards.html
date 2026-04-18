@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Leaderboards</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      padding-top: 80px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c3);
+      text-shadow: var(--glow3);
+      letter-spacing: 3px;
+      margin-bottom: 0.4rem;
+    }
+
+    .page-sub {
+      color: var(--dim);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+    }
+
+    .game-tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 0.75rem;
+    }
+
+    .game-tab {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.4rem;
+      padding: 0.45rem 0.75rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--dim);
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+
+    .game-tab.active {
+      color: var(--c3);
+      border-color: var(--c3);
+      background: rgba(57, 255, 20, 0.06);
+    }
+
+    /* Your rank highlight */
+    .my-rank-banner {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(57, 255, 20, 0.06);
+      border: 1px solid var(--c3);
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .my-rank-banner .rank-num {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.9rem;
+      color: var(--c3);
+      min-width: 60px;
+    }
+
+    .my-rank-banner .rank-info {
+      flex: 1;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .my-rank-banner .rank-score {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
+      color: var(--c3);
+    }
+
+    /* Leaderboard table */
+    .lb-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 0.3rem;
+    }
+
+    .lb-table th {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.38rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      padding: 0 1rem 0.6rem;
+      text-align: left;
+    }
+
+    .lb-table th.right {
+      text-align: right;
+    }
+
+    .lb-row td {
+      background: var(--panel-bg);
+      padding: 0.6rem 1rem;
+      border-top: 1px solid var(--panel-border);
+      border-bottom: 1px solid var(--panel-border);
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+
+    .lb-row td:first-child {
+      border-left: 1px solid var(--panel-border);
+      border-radius: 6px 0 0 6px;
+    }
+
+    .lb-row td:last-child {
+      border-right: 1px solid var(--panel-border);
+      border-radius: 0 6px 6px 0;
+      text-align: right;
+    }
+
+    .lb-row:hover td {
+      border-color: rgba(57, 255, 20, 0.3);
+    }
+
+    .lb-row.is-me td {
+      background: rgba(57, 255, 20, 0.07);
+      border-color: rgba(57, 255, 20, 0.4);
+    }
+
+    .rank-medal {
+      font-size: 1rem;
+      min-width: 28px;
+    }
+
+    .rank-num-cell {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      color: var(--dim);
+      min-width: 40px;
+    }
+
+    .lb-avatar {
+      font-size: 1.1rem;
+    }
+
+    .lb-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--text);
+    }
+
+    .lb-score {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      color: var(--c3);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <header class="arcade-header">
+    <a href="/portal.html" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav style="display:flex;gap:0.5rem;">
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+      <a href="/social/guilds.html" class="arcade-btn">GUILDS</a>
+    </nav>
+    <div class="header-nav">
+      <span class="player-tag" id="player-tag"></span>
+      <button class="arcade-btn" id="logout-btn">LOGOUT</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">LEADERBOARDS</div>
+    <div class="page-sub">Top 100 players per game · Your rank highlighted</div>
+
+    <div class="game-tabs" id="game-tabs"></div>
+
+    <div id="my-rank-container"></div>
+
+    <table class="lb-table">
+      <thead>
+        <tr>
+          <th style="width:32px"></th>
+          <th style="width:40px">#</th>
+          <th style="width:36px"></th>
+          <th>PLAYER</th>
+          <th class="right">SCORE</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body">
+        <tr>
+          <td colspan="5" class="empty-state">Loading…</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    let token = localStorage.getItem('kg_token');
+    let myProfile = null;
+    let activeGame = 'global';
+
+    const GAMES = [
+      { id: 'global', label: '🌐 GLOBAL' },
+      { id: 'fasttrack', label: '🎯 FASTTRACK' },
+      { id: 'brickbreaker3d', label: '🧱 BRICKBREAKER' },
+      { id: '4dtictactoe', label: '⊞ 4D TIC-TAC-TOE' },
+      { id: 'starfighter', label: '🚀 STARFIGHTER' },
+      { id: 'assemble', label: '⚙ ASSEMBLE' },
+    ];
+    const MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+    function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
+
+    async function init() {
+      if (!token) { window.location.href = '/login/index.html'; return; }
+      const vr = await fetch(`${API}/auth/validate`, { headers: ah() });
+      if (!vr.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      const pr = await fetch(`${API}/players/me`, { headers: ah() });
+      if (pr.ok) {
+        myProfile = await pr.json();
+        if (!myProfile.tosAgreed || !myProfile.profileSetup) { window.location.href = '/player/setup.html'; return; }
+        document.getElementById('player-tag').textContent = myProfile.playername || myProfile.username;
+      }
+      buildTabs();
+      loadBoard('global');
+    }
+
+    function buildTabs() {
+      const el = document.getElementById('game-tabs');
+      el.innerHTML = GAMES.map(g => `
+        <button class="game-tab${g.id === activeGame ? ' active' : ''}" onclick="loadBoard('${g.id}')">${g.label}</button>
+      `).join('');
+    }
+
+    async function loadBoard(gameId) {
+      activeGame = gameId;
+      document.querySelectorAll('.game-tab').forEach((b, i) => b.classList.toggle('active', GAMES[i].id === gameId));
+
+      const [boardRes, myRes] = await Promise.all([
+        fetch(`${API}/leaderboards/${gameId}`, { headers: ah() }),
+        fetch(`${API}/leaderboards/${gameId}/me`, { headers: ah() }),
+      ]);
+
+      const boardData = boardRes.ok ? await boardRes.json() : { entries: [] };
+      const myData = myRes.ok ? await myRes.json() : null;
+
+      renderMyRank(myData);
+      renderBoard(boardData.entries || [], myData);
+    }
+
+    function renderMyRank(my) {
+      const el = document.getElementById('my-rank-container');
+      if (!my?.rank) { el.innerHTML = ''; return; }
+      el.innerHTML = `
+        <div class="my-rank-banner">
+          <div class="rank-num">#${my.rank}</div>
+          <div class="rank-info">Your current ranking · ${GAMES.find(g => g.id === activeGame)?.label || activeGame}</div>
+          <div class="rank-score">${my.score?.toLocaleString() || 0} pts</div>
+        </div>`;
+    }
+
+    function renderBoard(entries, my) {
+      const tbody = document.getElementById('lb-body');
+      if (!entries.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No scores yet — be the first!</td></tr>'; return; }
+      tbody.innerHTML = entries.slice(0, 100).map((e, i) => {
+        const rank = i + 1;
+        const medal = MEDALS[rank] || '';
+        const isMe = e.userId === myProfile?.userId;
+        const emoji = '🎮';
+        return `<tr class="lb-row${isMe ? ' is-me' : ''}">
+          <td class="rank-medal">${medal}</td>
+          <td class="rank-num-cell">${rank}</td>
+          <td class="lb-avatar">${emoji}</td>
+          <td class="lb-name">${escHtml(e.playername || e.username)}${isMe ? ' <span style="font-size:0.5rem;color:var(--c3)">← YOU</span>' : ''}</td>
+          <td class="lb-score">${e.score?.toLocaleString() || 0}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('kg_token'); window.location.href = '/'; });
+
+    init();
+  </script>
+</body>
+
+</html>

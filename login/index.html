@@ -207,7 +207,18 @@
 
   <script>
     const API = '/api/auth';
-    if (localStorage.getItem('user_token')) window.location.href = '/lobby';
+    // If already logged in, check profileSetup then redirect
+    (async function () {
+      const t = localStorage.getItem('kg_token');
+      if (!t) return;
+      try {
+        const r = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${t}` } });
+        if (!r.ok) { localStorage.removeItem('kg_token'); return; }
+        const d = await r.json();
+        const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
+        window.location.href = d.profileSetup ? redir : `/player/setup.html?redirect=${encodeURIComponent(redir)}`;
+      } catch { }
+    })();
 
     async function handleLogin(e) {
       e.preventDefault();
@@ -220,14 +231,19 @@
         });
         const data = await res.json();
         if (res.ok) {
-          localStorage.setItem('user_token', data.token);
-          localStorage.setItem('user_id', data.userId);
-          localStorage.setItem('username', data.username);
-          localStorage.setItem('display_name', data.displayName);
+          localStorage.setItem('kg_token', data.token);
+          localStorage.setItem('kg_user_id', data.userId);
+          localStorage.setItem('kg_username', data.username);
+          localStorage.setItem('kg_display_name', data.displayName);
           if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar, name: data.displayName }));
           msg.textContent = 'Welcome back!'; msg.className = 'arc-msg ok';
-          const redir = new URLSearchParams(location.search).get('redirect') || '/lobby';
-          setTimeout(() => window.location.href = redir, 700);
+          const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
+          // Check profileSetup then route
+          const vr = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${data.token}` } });
+          const vd = await vr.json();
+          setTimeout(() => {
+            window.location.href = vd.profileSetup ? redir : `/player/setup.html?redirect=${encodeURIComponent(redir)}`;
+          }, 700);
         } else {
           msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'arc-msg err';
         }

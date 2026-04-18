@@ -2,2499 +2,382 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <title>Starfighter Simulator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script>
-    if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
-      window.location.replace('/lobby/');
-    }
+    (function () {
+      // If arriving with a session param (active game), don't redirect
+      var hasSession = /[?&]session=/.test(window.location.search);
+      if (hasSession) return;
+      var t = localStorage.getItem('kg_token');
+      if (!t) return;
+      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.valid) return;
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); return; }
+          window.location.replace('/starfighter/lobby.html');
+        }).catch(function () { });
+    })();
   </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StarFighter � Defend the Manifold | KensGames</title>
+  <meta name="description"
+    content="StarFighter is a multiplayer space combat game. Defend against AI NPC enemy waves, co-op with friends, and survive the manifold.">
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box
-    }
-
-    body {
-      overflow: hidden;
-      background: #000;
-      color: #0ff;
-      font-family: 'Courier New', Courier, monospace;
-      user-select: none
-    }
-
-    body.immersed,
-    body.immersed * {
-      cursor: none !important
-    }
-
-    /* ── Canvas fills entire viewport ── */
-    #game-canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: 1
-    }
-
-    /* ═══════════════════════════════════════
-       CROSSHAIR — always dead center
-       ═══════════════════════════════════════ */
-    #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 44px;
-      height: 44px;
-      pointer-events: none;
-      z-index: 15;
-      display: none
-    }
-
-    #crosshair .ring {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 44px;
-      height: 44px;
-      border: 2px solid rgba(100, 255, 100, 0.7);
-      border-radius: 50%
-    }
-
-    #crosshair .dot {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 4px;
-      height: 4px;
-      background: rgba(100, 255, 100, 0.9);
-      border-radius: 50%
-    }
-
-    #crosshair .h-line {
-      position: absolute;
-      top: 50%;
-      left: -10px;
-      width: 64px;
-      height: 1px;
-      background: rgba(100, 255, 100, 0.5);
-      transform: translateY(-50%)
-    }
-
-    #crosshair .v-line {
-      position: absolute;
-      top: -10px;
-      left: 50%;
-      width: 1px;
-      height: 64px;
-      background: rgba(100, 255, 100, 0.5);
-      transform: translateX(-50%)
-    }
-
-    /* Corner brackets */
-    #crosshair .bracket {
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border-color: rgba(100, 255, 100, 0.6);
-      border-style: solid;
-      border-width: 0
-    }
-
-    #crosshair .bracket.tl {
-      top: -14px;
-      left: -14px;
-      border-top-width: 2px;
-      border-left-width: 2px
-    }
-
-    #crosshair .bracket.tr {
-      top: -14px;
-      right: -14px;
-      border-top-width: 2px;
-      border-right-width: 2px
-    }
-
-    #crosshair .bracket.bl {
-      bottom: -14px;
-      left: -14px;
-      border-bottom-width: 2px;
-      border-left-width: 2px
-    }
-
-    #crosshair .bracket.br {
-      bottom: -14px;
-      right: -14px;
-      border-bottom-width: 2px;
-      border-right-width: 2px
-    }
-
-    /* ── Crosshair TRACKING state — amber ── */
-    #crosshair.tracking .ring {
-      border-color: rgba(255, 180, 50, 0.8)
-    }
-
-    #crosshair.tracking .dot {
-      background: rgba(255, 180, 50, 0.9)
-    }
-
-    #crosshair.tracking .h-line,
-    #crosshair.tracking .v-line {
-      background: rgba(255, 180, 50, 0.5)
-    }
-
-    #crosshair.tracking .bracket {
-      border-color: rgba(255, 180, 50, 0.7)
-    }
-
-    /* ── Crosshair LOCKED state — red, pulsing ── */
-    #crosshair.locked .ring {
-      border-color: rgba(255, 50, 50, 0.9);
-      animation: lockPulse 0.6s ease-in-out infinite
-    }
-
-    #crosshair.locked .dot {
-      background: rgba(255, 50, 50, 1.0)
-    }
-
-    #crosshair.locked .h-line,
-    #crosshair.locked .v-line {
-      background: rgba(255, 50, 50, 0.6)
-    }
-
-    #crosshair.locked .bracket {
-      border-color: rgba(255, 50, 50, 0.8)
-    }
-
-    @keyframes lockPulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: 0.5
-      }
-    }
-
-    /* ── Backstory section visibility ── */
-    #panel-backstory {
-      display: none
-    }
-
-    #controls-panel.show-backstory #panel-backstory {
-      display: block
-    }
-
-    /* ═══════════════════════════════════════
-       MOBILE TOUCH HUD
-       ═══════════════════════════════════════ */
-    #mobile-hud {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 20;
-    }
-
-    /* Nav Sphere — bottom center */
-    #mob-nav-sphere {
-      position: absolute;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 130px;
-      height: 130px;
-      border-radius: 50%;
-      border: 2.5px solid rgba(0, 255, 255, 0.4);
-      background: radial-gradient(circle at 40% 35%, rgba(0, 80, 120, 0.4), rgba(0, 20, 40, 0.6));
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 30px rgba(0, 255, 255, 0.05);
-      pointer-events: auto;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    #mob-nav-sphere.active {
-      border-color: rgba(0, 255, 255, 0.7);
-      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 40px rgba(0, 255, 255, 0.1);
-    }
-
-    #mob-nav-knob {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 44px;
-      height: 44px;
-      margin: -22px 0 0 -22px;
-      background: radial-gradient(circle, rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.15));
-      border: 2px solid rgba(0, 255, 255, 0.7);
-      border-radius: 50%;
-      transition: transform 0.06s ease-out;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-    }
-
-    .mob-nav-label {
-      position: absolute;
-      top: -18px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 9px;
-      color: rgba(0, 255, 255, 0.5);
-      font-family: 'Courier New', monospace;
-      letter-spacing: 2px;
-      pointer-events: none;
-    }
-
-    .mob-nav-thrust-label {
-      position: absolute;
-      bottom: -16px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 8px;
-      color: rgba(0, 255, 200, 0.4);
-      font-family: 'Courier New', monospace;
-      letter-spacing: 1px;
-      pointer-events: none;
-    }
-
-    /* Action button group — top-right, compact */
-    #mob-btn-group {
-      position: absolute;
-      right: 10px;
-      top: 60px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      pointer-events: auto;
-    }
-
-    .mob-btn {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      border: 2px solid rgba(0, 255, 255, 0.4);
-      background: rgba(0, 20, 40, 0.5);
-      color: #0ff;
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      font-weight: bold;
+    .hero {
       text-align: center;
-      pointer-events: auto;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .mob-btn:active,
-    .mob-btn.active {
-      background: rgba(0, 255, 255, 0.2);
-      border-color: #0ff;
-      box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
-    }
-
-    .mob-btn:focus-visible {
-      outline: 1px solid #0ff;
-      outline-offset: 2px;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-    }
-
-    .mob-btn:focus:not(:focus-visible) {
-      outline: none;
-    }
-
-    .mob-lock {
-      border-color: rgba(255, 0, 255, 0.5);
-      color: #f0f;
-    }
-
-    .mob-ab {
-      border-color: rgba(255, 255, 0, 0.5);
-      color: #ff0;
-    }
-
-    .mob-boost {
-      border-color: rgba(0, 160, 255, 0.5);
-      color: #0af;
-    }
-
-    .mob-rtb {
-      border-color: rgba(255, 68, 68, 0.6);
-      color: #f44;
-    }
-
-    /* Hint bar — fades out after 5s */
-    .mob-hint {
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 14px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 4px;
-      color: rgba(0, 255, 255, 0.7);
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      white-space: nowrap;
-      pointer-events: none;
-      animation: hintFade 6s ease forwards;
-    }
-
-    @keyframes hintFade {
-
-      0%,
-      70% {
-        opacity: 1;
-      }
-
-      100% {
-        opacity: 0;
-      }
-    }
-
-    /* Hide desktop console buttons on mobile */
-    @media (max-width: 1023px) and (hover: none) and (pointer: coarse) {
-      #console-buttons {
-        display: none !important;
-      }
-
-      #ctrl-overlay,
-      #ctrl-hamburger {
-        display: none !important;
-      }
-    }
-
-    /* ═══════════════════════════════════════
-       CONSOLE TOGGLE BUTTONS — always-visible white rocket console style
-       ═══════════════════════════════════════ */
-    #console-buttons {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 25;
-      display: flex;
-      gap: 12px;
-      pointer-events: auto
-    }
-
-    #console-buttons .console-btn {
-      padding: 10px 18px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      color: #c8e0f0;
-      background: linear-gradient(180deg, rgba(40, 50, 65, 0.95) 0%, rgba(20, 28, 38, 0.98) 100%);
-      border: 2px solid rgba(100, 130, 170, 0.5);
-      border-top-color: rgba(140, 180, 220, 0.6);
-      border-bottom-color: rgba(40, 60, 80, 0.8);
-      border-radius: 3px;
-      cursor: pointer;
-      text-transform: uppercase;
-      transition: all 0.15s ease;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 6px rgba(0, 0, 0, 0.5),
-        0 0 1px rgba(100, 160, 220, 0.3);
-      position: relative
-    }
-
-    #console-buttons .console-btn::before {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 4px;
-      right: 4px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(180, 210, 240, 0.2), transparent);
-      border-radius: 1px
-    }
-
-    #console-buttons .console-btn:hover,
-    #console-buttons .console-btn:focus-visible {
-      background: linear-gradient(180deg, rgba(50, 65, 85, 0.95) 0%, rgba(30, 40, 55, 0.98) 100%);
-      border-color: rgba(100, 200, 255, 0.6);
-      color: #e0f0ff;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 12px rgba(0, 180, 255, 0.15);
-      outline: 1px solid rgba(0, 200, 255, 0.5);
-      outline-offset: 2px
-    }
-
-    #console-buttons .console-btn:active {
-      background: linear-gradient(180deg, rgba(20, 28, 38, 0.98) 0%, rgba(40, 50, 65, 0.95) 100%);
-      border-top-color: rgba(40, 60, 80, 0.8);
-      border-bottom-color: rgba(140, 180, 220, 0.6);
-      box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.4),
-        0 1px 2px rgba(0, 0, 0, 0.3);
-      transform: translateY(1px)
-    }
-
-    #console-buttons .console-btn:focus:not(:focus-visible) {
-      outline: none
-    }
-
-    #console-buttons .console-btn.active {
-      background: linear-gradient(180deg, rgba(0, 50, 80, 0.95) 0%, rgba(0, 30, 50, 0.98) 100%);
-      border-color: rgba(0, 200, 255, 0.6);
-      color: #0ff;
-      box-shadow:
-        inset 0 1px 0 rgba(0, 255, 255, 0.1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 10px rgba(0, 200, 255, 0.2)
-    }
-
-    #console-buttons .console-btn.pulse-alert {
-      animation: supportPulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes supportPulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-      }
-
-      50% {
-        box-shadow: 0 0 14px rgba(255, 255, 255, 0.4), 0 0 24px currentColor;
-      }
-    }
-
-    /* ═══════════════════════════════════════
-       AVIATION-STYLE BUTTONS — tutorial / prompt overlays
-       ═══════════════════════════════════════ */
-    .avtn-btn {
-      padding: 12px 28px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      border: 2px solid;
-      border-radius: 3px;
-      cursor: pointer;
-      transition: all 0.15s ease;
+      padding: 6rem 1rem 4rem;
       position: relative;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 6px rgba(0, 0, 0, 0.5)
+      z-index: 2
     }
 
-    .avtn-btn::before {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 6px;
-      right: 6px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-      border-radius: 1px
+    .hero-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1.4rem, 5vw, 3rem);
+      color: var(--c3);
+      text-shadow: 0 0 20px var(--c3), 0 0 60px rgba(57, 255, 20, 0.4);
+      line-height: 1.3;
+      margin-bottom: 1rem
     }
 
-    .avtn-btn-green {
-      color: #b0ffc0;
-      background: linear-gradient(180deg, rgba(20, 70, 40, 0.95) 0%, rgba(10, 40, 20, 0.98) 100%);
-      border-color: rgba(80, 200, 120, 0.6);
-      border-top-color: rgba(120, 240, 160, 0.5);
-      border-bottom-color: rgba(30, 80, 40, 0.8)
-    }
-
-    .avtn-btn-green:hover,
-    .avtn-btn-green:focus-visible {
-      background: linear-gradient(180deg, rgba(30, 90, 50, 0.95) 0%, rgba(15, 55, 30, 0.98) 100%);
-      border-color: rgba(100, 255, 140, 0.7);
-      color: #d0ffe0;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(80, 255, 120, 0.2);
-      outline: 1px solid rgba(80, 255, 120, 0.4);
-      outline-offset: 2px
-    }
-
-    .avtn-btn-green:active {
-      background: linear-gradient(180deg, rgba(10, 40, 20, 0.98) 0%, rgba(20, 70, 40, 0.95) 100%);
-      transform: translateY(1px)
-    }
-
-    .avtn-btn-red {
-      color: #ffc0b0;
-      background: linear-gradient(180deg, rgba(80, 30, 20, 0.95) 0%, rgba(45, 15, 10, 0.98) 100%);
-      border-color: rgba(200, 80, 60, 0.6);
-      border-top-color: rgba(240, 120, 100, 0.5);
-      border-bottom-color: rgba(80, 30, 20, 0.8)
-    }
-
-    .avtn-btn-red:hover,
-    .avtn-btn-red:focus-visible {
-      background: linear-gradient(180deg, rgba(100, 40, 28, 0.95) 0%, rgba(60, 22, 15, 0.98) 100%);
-      border-color: rgba(255, 100, 80, 0.7);
-      color: #ffe0d0;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(255, 80, 60, 0.2);
-      outline: 1px solid rgba(255, 100, 80, 0.4);
-      outline-offset: 2px
-    }
-
-    .avtn-btn-red:active {
-      background: linear-gradient(180deg, rgba(45, 15, 10, 0.98) 0%, rgba(80, 30, 20, 0.95) 100%);
-      transform: translateY(1px)
-    }
-
-    .avtn-btn-dim {
-      color: #889;
-      background: linear-gradient(180deg, rgba(35, 35, 40, 0.9) 0%, rgba(20, 20, 25, 0.95) 100%);
-      border-color: rgba(80, 80, 100, 0.4);
-      border-top-color: rgba(100, 100, 120, 0.3);
-      border-bottom-color: rgba(30, 30, 40, 0.6)
-    }
-
-    .avtn-btn-dim:hover,
-    .avtn-btn-dim:focus-visible {
-      background: linear-gradient(180deg, rgba(45, 45, 55, 0.9) 0%, rgba(28, 28, 35, 0.95) 100%);
-      border-color: rgba(120, 120, 150, 0.5);
-      color: #aab;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 2px 6px rgba(0, 0, 0, 0.5),
-        0 0 8px rgba(100, 100, 150, 0.1);
-      outline: 1px solid rgba(100, 100, 150, 0.3);
-      outline-offset: 2px
-    }
-
-    .avtn-select {
-      padding: 6px 12px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      letter-spacing: 1px;
-      color: #c8e0f0;
-      background: linear-gradient(180deg, rgba(30, 40, 55, 0.95) 0%, rgba(15, 22, 32, 0.98) 100%);
-      border: 1px solid rgba(80, 120, 170, 0.4);
-      border-radius: 2px;
-      cursor: pointer;
-      text-transform: uppercase;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.4)
-    }
-
-    .avtn-select:focus {
-      border-color: rgba(0, 200, 255, 0.6);
-      outline: 1px solid rgba(0, 200, 255, 0.3);
-      outline-offset: 1px
-    }
-
-    .avtn-select option {
-      background: #0a1520;
-      color: #c8e0f0
-    }
-
-    /* ═══════════════════════════════════════
-       TUTORIAL LAYOUT CLASSES — used by JS tutorial overlay
-       ═══════════════════════════════════════ */
-    .tut-section {
-      background: rgba(0, 20, 40, 0.5);
-      border: 1px solid rgba(0, 150, 200, 0.15);
-      border-radius: 4px;
-      padding: 14px;
-      margin-bottom: 12px
-    }
-
-    .tut-section-title {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 3px;
-      color: #ffd24a;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      text-shadow: 0 0 8px rgba(255, 210, 74, 0.3)
-    }
-
-    .tut-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px
-    }
-
-    .tut-key-group {
-      background: rgba(0, 10, 25, 0.4);
-      border: 1px solid rgba(0, 100, 150, 0.12);
-      border-radius: 3px;
-      padding: 10px
-    }
-
-    .tut-key-label {
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #0ff;
-      margin-bottom: 6px;
-      text-transform: uppercase
-    }
-
-    .tut-binding {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: #99bbcc;
-      margin-bottom: 3px;
+    .hero-tagline {
+      font-size: 1.05rem;
+      color: var(--dim);
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
       line-height: 1.6
     }
 
-    .tut-key {
-      display: inline-block;
-      padding: 1px 6px;
-      font-size: 10px;
-      font-weight: bold;
-      color: #e0f0ff;
-      background: linear-gradient(180deg, rgba(40, 55, 75, 0.9) 0%, rgba(25, 35, 50, 0.95) 100%);
-      border: 1px solid rgba(80, 130, 180, 0.4);
-      border-radius: 2px;
-      margin-right: 3px;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)
+    .hero-ctas {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap
     }
 
-    /* ═══════════════════════════════════════
-       MISSION BRIEFING PANEL — standalone toggle panel
-       ═══════════════════════════════════════ */
-    #mission-panel {
-      display: none;
-      position: absolute;
-      top: 80px;
-      left: 16px;
-      width: 320px;
-      max-height: 60vh;
-      overflow-y: auto;
-      z-index: 22;
-      background: rgba(0, 10, 20, 0.88);
-      border: 1px solid rgba(0, 255, 255, 0.15);
+    .cta-primary {
+      background: var(--c3);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 2px;
+      padding: 0.85rem 1.6rem;
+      border: none;
       border-radius: 6px;
-      padding: 16px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      color: #0ff;
-      pointer-events: auto
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+      text-decoration: none;
+      display: inline-block
     }
 
-    #mission-panel.open {
-      display: block
+    .cta-primary:hover {
+      box-shadow: 0 0 20px var(--c3)
     }
 
-    #mission-panel h3 {
-      color: #ff8800;
-      font-size: 13px;
-      margin-bottom: 8px;
-      letter-spacing: 2px
-    }
-
-    /* ═══════════════════════════════════════
-       CONTROLS TUTORIAL PANEL — standalone toggle panel
-       ═══════════════════════════════════════ */
-    #tutorial-panel {
-      display: none;
-      position: absolute;
-      top: 80px;
-      right: 16px;
-      width: 320px;
-      max-height: 60vh;
-      overflow-y: auto;
-      z-index: 22;
-      background: rgba(0, 10, 20, 0.88);
-      border: 1px solid rgba(0, 255, 255, 0.15);
+    .cta-secondary {
+      background: transparent;
+      color: var(--text);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 2px;
+      padding: 0.85rem 1.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
-      padding: 16px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      color: #0ff;
-      pointer-events: auto
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block
     }
 
-    #tutorial-panel.open {
-      display: block
+    .cta-secondary:hover {
+      border-color: var(--c3);
+      color: var(--c3)
     }
 
-    #tutorial-panel h3 {
-      color: #0ff;
-      font-size: 13px;
-      margin-bottom: 8px;
-      letter-spacing: 2px
+    section {
+      position: relative;
+      z-index: 2;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem
     }
 
-    #tutorial-panel ul {
+    .section-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 4px;
+      color: var(--c3);
+      margin-bottom: 2rem
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem
+    }
+
+    .feat-card {
+      background: var(--surface);
+      border: 1px solid rgba(57, 255, 20, 0.18);
+      border-radius: 10px;
+      padding: 1.5rem 1.25rem
+    }
+
+    .feat-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.75rem
+    }
+
+    .feat-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      color: var(--text);
+      margin-bottom: 0.5rem
+    }
+
+    .feat-desc {
+      font-size: 0.78rem;
+      color: var(--dim);
+      line-height: 1.5
+    }
+
+    .rules-list {
       list-style: none;
       padding: 0
     }
 
-    #tutorial-panel li {
-      margin-bottom: 4px;
-      line-height: 1.6
-    }
-
-    #tutorial-panel kbd {
-      display: inline-block;
-      padding: 1px 5px;
-      font-size: 10px;
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 2px;
-      color: #0ff;
-      margin-right: 4px
-    }
-
-    /* ═══════════════════════════════════════
-       COMM MARQUEE — very top of screen, above cockpit
-       ═══════════════════════════════════════ */
-    #comm-ticker {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 28px;
-      overflow: hidden;
-      pointer-events: none;
-      z-index: 20;
-      background: linear-gradient(180deg, rgba(0, 10, 20, 0.6) 0%, transparent 100%)
-    }
-
-    #comm-ticker-inner {
+    .rules-list li {
       display: flex;
-      gap: 60px;
-      white-space: nowrap;
-      animation: marquee 30s linear infinite;
-      font-size: 12px;
-      line-height: 28px;
-      padding-left: 100%
+      gap: 0.75rem;
+      align-items: flex-start;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+      color: var(--dim);
+      line-height: 1.5
     }
 
-    @keyframes marquee {
-      0% {
-        transform: translateX(0)
-      }
-
-      100% {
-        transform: translateX(-100%)
-      }
+    .rules-list li::before {
+      content: '?';
+      color: var(--c3);
+      flex-shrink: 0;
+      margin-top: 2px
     }
 
-    #comm-ticker-inner .comm-item {
-      display: inline
+    .invite-box {
+      background: var(--surface);
+      border: 1px solid rgba(57, 255, 20, 0.22);
+      border-radius: 12px;
+      padding: 2rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap
     }
 
-    #comm-ticker-inner .comm-item.base {
-      color: #0ff
-    }
-
-    #comm-ticker-inner .comm-item.ally {
-      color: #0f0
-    }
-
-    #comm-ticker-inner .comm-item.enemy {
-      color: #f00
-    }
-
-    #comm-ticker-inner .comm-item.warning {
-      color: #f60;
-      font-weight: bold
-    }
-
-    /* ═══════════════════════════════════════
-       SHIP PANEL — full-viewport overlay container
-       All cockpit screen overlays live inside this.
-       Shown/hidden by core.js on launch.
-       ═══════════════════════════════════════ */
-    #ship-panel {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 10;
-      display: none
-    }
-
-    /* ═══════════════════════════════════════
-       CONTROLLER WIREFRAME OVERLAY — bottom-right
-       ═══════════════════════════════════════ */
-    #ctrl-overlay {
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
-      z-index: 25;
-      pointer-events: none;
-      opacity: 0.55;
-      transition: opacity 0.3s;
-      display: none
-    }
-
-    #ctrl-overlay:hover {
-      opacity: 0.9
-    }
-
-    #ctrl-overlay svg {
-      display: block;
-      pointer-events: auto
-    }
-
-    #ctrl-overlay .ctrl-label {
-      font-family: 'Courier New', monospace;
-      font-size: 7px;
-      fill: #0ff;
-      dominant-baseline: middle;
-      text-anchor: middle
-    }
-
-    #ctrl-overlay .ctrl-label-action {
-      font-family: 'Courier New', monospace;
-      font-size: 6px;
-      fill: #ff8;
-      dominant-baseline: middle;
-      text-anchor: start
-    }
-
-    #ctrl-overlay .ctrl-wire {
-      fill: none;
-      stroke: rgba(0, 255, 255, 0.4);
-      stroke-width: 1
-    }
-
-    #ctrl-overlay .ctrl-wire-fill {
-      fill: rgba(0, 255, 255, 0.06);
-      stroke: rgba(0, 255, 255, 0.5);
-      stroke-width: 0.8
-    }
-
-    #ctrl-overlay .ctrl-btn-wire {
-      fill: rgba(0, 255, 255, 0.08);
-      stroke: rgba(0, 255, 255, 0.5);
-      stroke-width: 0.6
-    }
-
-    #ctrl-overlay .ctrl-dot {
-      fill: rgba(0, 255, 255, 0.3)
-    }
-
-    /* Mobile hamburger toggle */
-    #ctrl-hamburger {
-      display: none;
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
-      z-index: 26;
-      width: 36px;
-      height: 36px;
-      background: rgba(2, 8, 18, 0.85);
-      border: 1px solid rgba(0, 255, 255, 0.3);
+    .invite-input {
+      flex: 1;
+      min-width: 180px;
+      padding: 0.7rem 1rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
-      cursor: pointer;
-      pointer-events: auto;
-      color: #0ff;
-      font-size: 20px;
-      align-items: center;
-      justify-content: center;
-      line-height: 36px;
-      text-align: center
-    }
-
-    #ctrl-hamburger:hover {
-      background: rgba(0, 40, 80, 0.8)
-    }
-
-    @media(max-width:768px) {
-      #ctrl-overlay {
-        display: none !important;
-        bottom: 60px;
-        right: 10px
-      }
-
-      #ctrl-overlay.mobile-open {
-        display: block !important
-      }
-
-      #ctrl-hamburger {
-        display: flex
-      }
-    }
-
-    /* Keep old panel toggle/panel hidden — replaced by overlay */
-    #controls-toggle {
-      display: none
-    }
-
-    #controls-panel {
-      display: none
-    }
-
-    /* ═══════════════════════════════════════
-       OVERLAYS — countdown, launch, death
-       ═══════════════════════════════════════ */
-    #countdown-display {
-      position: absolute;
-      top: 45%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 60;
-      display: none;
-      font-size: 5em;
-      font-weight: bold;
-      color: #ffff00;
-      text-shadow: 0 0 30px #ffff00;
-      font-family: monospace
-    }
-
-    #launch-prompt {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 60;
-      display: none;
-      animation: flashLaunch 0.6s infinite
-    }
-
-    @keyframes flashLaunch {
-
-      0%,
-      100% {
-        opacity: 1;
-        color: #0f0;
-        text-shadow: 0 0 30px #0f0;
-        font-size: 1.8em
-      }
-
-      50% {
-        opacity: 0.3;
-        color: #00ff00;
-        text-shadow: 0 0 50px #00ff00;
-        font-size: 1.9em
-      }
-    }
-
-    #launch-prompt b {
-      display: block;
-      font-weight: bold;
-      margin: 12px 0;
-      font-family: monospace;
-      letter-spacing: 2px
-    }
-
-    #death-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(20, 0, 0, 0.85);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      font-size: 3em;
-      color: #f00;
-      text-shadow: 0 0 20px #f00;
-      z-index: 100;
-      pointer-events: auto
-    }
-
-    #death-screen button {
-      margin-top: 30px;
-      padding: 10px 20px;
-      font-size: 0.4em;
-      background: #f00;
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
-      pointer-events: auto
-    }
-
-    #death-screen button:hover {
-      background: #c00
-    }
-
-    /* Launch overlays */
-    .launch-overlay-full {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 50
-    }
-
-    /* ═══════════════════════════════════════
-       RESPAWN OVERLAY — fighter lost
-       ═══════════════════════════════════════ */
-    #respawn-overlay {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(40, 0, 0, 0.92);
-      z-index: 95;
-      pointer-events: auto;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      animation: respawnFlash 0.5s ease-out
-    }
-
-    #respawn-overlay.active {
-      display: flex
-    }
-
-    @keyframes respawnFlash {
-      0% {
-        background: rgba(220, 0, 0, 0.7)
-      }
-
-      100% {
-        background: rgba(40, 0, 0, 0.92)
-      }
-    }
-
-    .respawn-reason-text {
-      font-family: monospace;
-      font-size: 1em;
-      color: #ff8888;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 6px
-    }
-
-    .respawn-headline {
-      font-family: monospace;
-      font-size: 3.2em;
-      color: #ff2222;
-      text-shadow: 0 0 30px #f00, 0 0 60px rgba(255, 0, 0, 0.4);
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      margin-bottom: 20px
-    }
-
-    .lives-meter-row {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 10px
-    }
-
-    .lives-pip {
-      font-size: 2.2em;
-      transition: all 0.3s
-    }
-
-    .lives-pip.active {
-      color: #ff4444;
-      text-shadow: 0 0 14px #f00
-    }
-
-    .lives-pip.lost {
-      color: rgba(80, 20, 20, 0.4)
-    }
-
-    .respawn-turns-text {
-      font-family: monospace;
-      font-size: 1.1em;
-      color: #ffaaaa;
-      margin-bottom: 30px
-    }
-
-    .respawn-turns-text strong {
-      color: #ff4444
-    }
-
-    .respawn-btn {
-      padding: 14px 48px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(200, 30, 30, 0.9), rgba(140, 10, 10, 0.95));
-      color: #fff;
-      border: 1px solid rgba(255, 80, 80, 0.5);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
-      pointer-events: auto;
-      transition: all 0.15s
-    }
-
-    .respawn-btn:hover {
-      background: linear-gradient(180deg, rgba(255, 60, 60, 0.95), rgba(200, 20, 20, 0.98));
-      box-shadow: 0 0 35px rgba(255, 0, 0, 0.5)
-    }
-
-    /* ═══════════════════════════════════════
-       WAVE CLEAR OVERLAY — blue flash
-       ═══════════════════════════════════════ */
-    #waveclear-overlay {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 8, 24, 0.93);
-      z-index: 95;
-      pointer-events: auto;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      animation: waveclearFlash 0.5s ease-out
-    }
-
-    #waveclear-overlay.active {
-      display: flex
-    }
-
-    @keyframes waveclearFlash {
-      0% {
-        background: rgba(0, 60, 200, 0.75)
-      }
-
-      100% {
-        background: rgba(0, 8, 24, 0.93)
-      }
-    }
-
-    .waveclear-headline {
-      font-family: monospace;
-      font-size: 2.8em;
-      color: #44ddff;
-      text-shadow: 0 0 30px #0af, 0 0 60px rgba(0, 160, 255, 0.3);
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      margin-bottom: 8px
-    }
-
-    .waveclear-congrats {
-      font-family: monospace;
-      font-size: 1.15em;
-      color: #ffdd44;
+      color: var(--text);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
       letter-spacing: 4px;
-      margin-bottom: 16px
+      outline: none
     }
 
-    .waveclear-kills {
-      font-family: monospace;
-      font-size: 0.95em;
-      color: #88ccff;
-      letter-spacing: 2px;
-      margin-bottom: 36px
+    .invite-input:focus {
+      border-color: var(--c3)
     }
 
-    .waveclear-btn {
-      padding: 14px 48px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(0, 100, 200, 0.9), rgba(0, 60, 140, 0.95));
-      color: #fff;
-      border: 1px solid rgba(0, 180, 255, 0.4);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0, 160, 255, 0.25);
-      pointer-events: auto;
-      transition: all 0.15s
-    }
-
-    .waveclear-btn:hover {
-      background: linear-gradient(180deg, rgba(0, 140, 255, 0.95), rgba(0, 80, 180, 0.98));
-      box-shadow: 0 0 35px rgba(0, 160, 255, 0.5)
-    }
-
-    /* ═══════════════════════════════════════
-       BAY DEBRIEF OVERLAY
-       ═══════════════════════════════════════ */
-    #bay-debrief {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 4, 12, 0.96);
-      z-index: 110;
-      pointer-events: auto;
-      overflow-y: auto;
-      font-family: monospace
-    }
-
-    #bay-debrief.active {
-      display: block
-    }
-
-    .bdr-container {
-      max-width: 740px;
-      margin: 0 auto;
-      padding: 24px 16px
-    }
-
-    .bdr-header {
-      text-align: center;
-      margin-bottom: 18px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.12)
-    }
-
-    #bdr-wave-title {
-      font-size: 1.9em;
-      color: #0ff;
-      letter-spacing: 6px;
-      text-shadow: 0 0 18px #0af;
-      text-transform: uppercase;
-      margin-bottom: 4px
-    }
-
-    #bdr-mission-name {
-      font-size: 0.9em;
-      color: #ffcc44;
-      letter-spacing: 3px;
-      text-transform: uppercase
-    }
-
-    #bdr-callsign-ack {
-      font-size: 0.82em;
-      color: #88ccee;
-      margin-top: 8px;
-      letter-spacing: 1px
-    }
-
-    #bdr-rankup {
-      display: none;
-      text-align: center;
-      background: linear-gradient(135deg, rgba(255, 200, 0, 0.12), rgba(255, 100, 0, 0.08));
-      border: 1px solid rgba(255, 200, 0, 0.4);
-      border-radius: 6px;
-      padding: 14px 24px;
-      margin-bottom: 16px;
-      box-shadow: 0 0 24px rgba(255, 200, 0, 0.12), inset 0 0 30px rgba(255, 180, 0, 0.04)
-    }
-
-    #bdr-rankup.visible {
-      display: block
-    }
-
-    .bdr-rankup-label {
-      font-size: 0.65em;
-      color: #ffcc44;
-      letter-spacing: 5px;
-      margin-bottom: 6px
-    }
-
-    .bdr-rankup-icon {
-      font-size: 2.4em;
-      margin-bottom: 6px
-    }
-
-    #bdr-rankup-name {
-      font-size: 1.5em;
-      color: #fff;
-      letter-spacing: 5px;
-      text-transform: uppercase
-    }
-
-    .bdr-main-cols {
+    .about-card {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      padding: 2rem;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-bottom: 14px
+      gap: 2rem
     }
 
-    @media(max-width:560px) {
-      .bdr-main-cols {
+    @media(max-width:600px) {
+      .about-card {
         grid-template-columns: 1fr
       }
     }
 
-    .bdr-card {
-      background: rgba(0, 14, 28, 0.8);
-      border: 1px solid rgba(0, 255, 255, 0.1);
-      border-radius: 6px;
-      padding: 14px
-    }
-
-    .bdr-card-title {
-      font-size: 0.62em;
-      color: rgba(0, 255, 255, 0.45);
+    .about-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.4rem;
+      color: var(--dim);
       letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.08);
-      padding-bottom: 6px
+      margin-bottom: 0.4rem
     }
 
-    .bdr-stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 0;
-      font-size: 0.78em
+    .about-val {
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.6
     }
 
-    .bdr-stat-label {
-      color: rgba(0, 255, 255, 0.55)
-    }
-
-    .bdr-stat-val {
-      color: #0ff;
-      font-weight: bold
-    }
-
-    .bdr-stat-val.green {
-      color: #00ff88
-    }
-
-    .bdr-stat-val.yellow {
-      color: #ffdd00
-    }
-
-    .bdr-stat-val.red {
-      color: #ff4444
-    }
-
-    .bdr-ship-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      font-size: 0.74em
-    }
-
-    .bdr-ship-label {
-      width: 38px;
-      color: rgba(0, 255, 255, 0.55);
-      text-align: right;
-      flex-shrink: 0
-    }
-
-    .bdr-ship-bar-track {
-      flex: 1;
-      height: 5px;
-      background: rgba(0, 255, 255, 0.08);
-      border: 1px solid rgba(0, 255, 255, 0.12);
-      border-radius: 3px;
-      overflow: hidden
-    }
-
-    .bdr-ship-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.6s ease;
-      width: 0%
-    }
-
-    .bdr-ship-bar-fill.hull {
-      background: linear-gradient(90deg, #00aa44, #00ff66)
-    }
-
-    .bdr-ship-bar-fill.shld {
-      background: linear-gradient(90deg, #0066ff, #00ffff)
-    }
-
-    .bdr-ship-bar-fill.fuel {
-      background: linear-gradient(90deg, #aa8800, #ffcc00)
-    }
-
-    .bdr-ship-bar-fill.torp {
-      background: linear-gradient(90deg, #8800aa, #ff44ff)
-    }
-
-    .bdr-ship-val {
-      width: 36px;
-      color: #0ff;
-      text-align: right;
-      flex-shrink: 0
-    }
-
-    .bdr-cr-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.72em;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(0, 255, 255, 0.08)
-    }
-
-    .bdr-cr-row .label {
-      color: rgba(0, 255, 255, 0.45)
-    }
-
-    #bdr-cr-balance {
-      color: #ffcc44;
-      font-weight: bold
-    }
-
-    .bdr-xp-section {
-      margin-bottom: 14px
-    }
-
-    .bdr-xp-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.68em;
-      color: rgba(0, 255, 255, 0.45);
-      margin-bottom: 4px
-    }
-
-    .bdr-xp-bar-track {
-      width: 100%;
-      height: 7px;
-      background: rgba(0, 255, 255, 0.08);
-      border: 1px solid rgba(0, 255, 255, 0.15);
+    .about-badge {
+      display: inline-block;
+      background: rgba(57, 255, 20, 0.1);
+      border: 1px solid rgba(57, 255, 20, 0.3);
       border-radius: 4px;
-      overflow: hidden
+      padding: 0.15rem 0.5rem;
+      font-size: 0.72rem;
+      color: var(--c3);
+      margin: 0.2rem
     }
 
-    #bdr-xp-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #0088ff, #00ffff);
-      border-radius: 4px;
-      transition: width 0.8s ease
-    }
-
-    .bdr-xp-earned-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      font-size: 0.68em
-    }
-
-    #bdr-xp-delta {
-      color: #88ccee
-    }
-
-    .bdr-earned-chips {
-      display: flex;
-      gap: 12px
-    }
-
-    #bdr-xp-earned {
-      color: #00ffcc
-    }
-
-    #bdr-cr-earned {
-      color: #ffcc44
-    }
-
-    #bdr-bonus-row {
-      display: none;
-      font-size: 0.68em;
-      color: #00ff88;
-      padding: 3px 10px;
-      background: rgba(0, 80, 40, 0.18);
-      border: 1px solid rgba(0, 180, 80, 0.25);
-      border-radius: 3px;
-      margin-top: 5px;
-      text-align: center
-    }
-
-    #bdr-unlocks-section {
-      display: none;
-      margin-bottom: 14px
-    }
-
-    .bdr-unlock-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: rgba(0, 220, 80, 0.06);
-      border: 1px solid rgba(0, 220, 80, 0.22);
-      border-radius: 6px;
-      padding: 12px
-    }
-
-    .bdr-unlock-icon {
-      font-size: 1.7em;
-      flex-shrink: 0
-    }
-
-    .bdr-unlock-text {
-      flex: 1
-    }
-
-    .bdr-unlock-name {
-      font-size: 0.88em;
-      color: #00ff88;
-      font-weight: bold;
-      margin-bottom: 2px
-    }
-
-    .bdr-unlock-desc {
-      font-size: 0.68em;
-      color: #88aa88
-    }
-
-    .bdr-unlock-new {
-      font-size: 0.58em;
-      letter-spacing: 2px;
-      color: #fff;
-      background: #007733;
-      padding: 2px 8px;
-      border-radius: 3px;
-      flex-shrink: 0
-    }
-
-    .bdr-next-card {
-      background: rgba(0, 18, 36, 0.8);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 6px;
-      padding: 14px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 14px
-    }
-
-    .bdr-next-wave-badge {
-      text-align: center;
-      flex-shrink: 0;
-      min-width: 72px
-    }
-
-    .bdr-wave-num {
-      font-size: 2.2em;
-      color: #0ff;
-      line-height: 1;
-      text-shadow: 0 0 10px #0af
-    }
-
-    .bdr-wave-label {
-      font-size: 0.58em;
-      color: rgba(0, 255, 255, 0.45);
-      letter-spacing: 2px
-    }
-
-    .bdr-next-info {
-      flex: 1
-    }
-
-    .bdr-next-title {
-      font-size: 0.85em;
-      color: #ffcc44;
-      margin-bottom: 4px;
-      letter-spacing: 1px
-    }
-
-    .bdr-next-obj {
-      font-size: 0.7em;
-      color: #88aacc;
-      line-height: 1.4
-    }
-
-    .bdr-shop-section {
-      margin-bottom: 14px
-    }
-
-    .bdr-shop-balance {
-      font-size: 0.7em;
-      color: #ffcc44;
-      margin-bottom: 8px
-    }
-
-    .bdr-shop-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 10px;
-      cursor: pointer;
-      background: rgba(0, 10, 20, 0.7);
-      border: 1px solid rgba(0, 255, 255, 0.08);
-      border-radius: 4px;
-      margin-bottom: 4px;
-      transition: all 0.1s
-    }
-
-    .bdr-shop-item:hover {
-      background: rgba(0, 26, 50, 0.8);
-      border-color: rgba(0, 255, 255, 0.25)
-    }
-
-    .bdr-shop-item.cant-afford {
-      opacity: 0.38;
-      cursor: default
-    }
-
-    .bdr-shop-item-left {
-      flex: 1
-    }
-
-    .bdr-shop-item-name {
-      font-size: 0.78em;
-      color: #0ff;
-      margin-bottom: 2px
-    }
-
-    .bdr-shop-item-desc {
-      font-size: 0.63em;
-      color: #445566
-    }
-
-    .bdr-shop-item-cost {
-      font-size: 0.78em;
-      color: #ffcc44;
-      font-weight: bold;
-      flex-shrink: 0;
-      margin-left: 10px
-    }
-
-    #bdr-shop-empty {
-      font-size: 0.68em;
-      color: #334455;
-      text-align: center;
-      padding: 12px
-    }
-
-    .bdr-footer {
-      text-align: center;
-      padding-top: 16px;
-      border-top: 1px solid rgba(0, 255, 255, 0.08)
-    }
-
-    .bdr-launch-btn {
-      padding: 14px 60px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(0, 150, 40, 0.9), rgba(0, 90, 20, 0.95));
-      color: #fff;
-      border: 1px solid rgba(0, 240, 80, 0.35);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0, 200, 60, 0.18);
-      transition: all 0.15s
-    }
-
-    .bdr-launch-btn:hover {
-      background: linear-gradient(180deg, rgba(0, 200, 60, 0.95), rgba(0, 130, 30, 0.98));
-      box-shadow: 0 0 32px rgba(0, 200, 60, 0.35)
-    }
-
-    /* ═══════════════════════════════════════
-       RESPONSIVE — phone collapse
-       ═══════════════════════════════════════ */
-    @media(max-width:600px) {
-      #radar-overlay {
-        width: 121px;
-        height: 121px;
-        bottom: 10px;
-        left: 10px
-      }
-    }
-
-    /* ═══════════════════════════════════════
-       RADAR OVERLAY — bottom-left
-       ═══════════════════════════════════════ */
-    #radar-overlay {
-      position: absolute;
-      bottom: 16px;
-      left: 16px;
-      width: 178px;
-      height: 178px;
-      z-index: 18;
-      pointer-events: none;
-      display: none;
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 50%;
-      overflow: hidden;
-      box-shadow: 0 0 12px rgba(0, 255, 255, 0.15), inset 0 0 8px rgba(0, 0, 0, 0.5)
-    }
-
-    #radar-overlay canvas {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%
-    }
-
-    /* ═══════════════════════════════════════
-       GAMEPLAY HUD — top-right stats overlay
-       ═══════════════════════════════════════ */
-    #gameplay-hud {
-      position: absolute;
-      top: 36px;
-      right: 12px;
-      z-index: 18;
-      pointer-events: none;
-      display: none;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
+    .tos-note {
+      font-size: 0.75rem;
+      color: var(--dim);
       line-height: 1.6;
-      text-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
-      letter-spacing: 1px
+      margin-top: 1rem
     }
 
-    #gameplay-hud .hud-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 2px
+    .tos-note a {
+      color: var(--c3)
     }
 
-    #gameplay-hud .hud-label {
-      color: rgba(0, 255, 255, 0.6);
-      font-size: 10px;
-      width: 52px;
-      text-align: right
-    }
-
-    #gameplay-hud .hud-val {
-      color: #0ff;
-      font-weight: bold;
-      min-width: 36px
-    }
-
-    #gameplay-hud .hud-bar-track {
-      width: 80px;
-      height: 6px;
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-radius: 1px;
-      overflow: hidden
-    }
-
-    #gameplay-hud .hud-bar-fill {
-      height: 100%;
-      transition: width 0.15s ease;
-      border-radius: 1px
-    }
-
-    #gameplay-hud .hud-bar-fill.shield {
-      background: linear-gradient(90deg, #00aaff, #00ffff)
-    }
-
-    #gameplay-hud .hud-bar-fill.fuel {
-      background: linear-gradient(90deg, #ccaa00, #ffff00)
-    }
-
-    #gameplay-hud .hud-bar-fill.hull {
-      background: linear-gradient(90deg, #00aa44, #00ff66)
-    }
-
-    #gameplay-hud .hud-score-row {
-      margin-top: 6px;
-      padding-top: 4px;
-      border-top: 1px solid rgba(0, 255, 255, 0.15)
-    }
-
-    #gameplay-hud .hud-val.warn {
-      color: #ff4444;
-      text-shadow: 0 0 8px #ff0000
-    }
-
-    #gameplay-hud .hud-val.caution {
-      color: #ffaa00;
-      text-shadow: 0 0 8px #ff8800
-    }
-
-    /* ── Hidden utility ── */
-    .hidden {
-      display: none !important
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.72rem;
+      color: var(--dim);
+      position: relative;
+      z-index: 2;
+      border-top: 1px solid rgba(255, 255, 255, 0.06)
     }
   </style>
 </head>
 
-<body>
-
-  <!-- Three.js Container (behind everything) -->
-  <div id="game-canvas"></div>
-
-  <!-- Crosshair — always dead center -->
-  <div id="crosshair">
-    <div class="ring"></div>
-    <div class="dot"></div>
-    <div class="h-line"></div>
-    <div class="v-line"></div>
-    <div class="bracket tl"></div>
-    <div class="bracket tr"></div>
-    <div class="bracket bl"></div>
-    <div class="bracket br"></div>
+<body data-mtheme="green">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+  <div class="m-dim-ticker" aria-hidden="true"></div>
+  <header class="arcade-header">
+    <a href="/" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav class="header-nav">
+      <a href="/starfighter/lobby.html" class="arcade-btn" style="color:#39ff14;border-color:#39ff14">&#8592; LOBBY</a>
+      <a href="/login/index.html" class="arcade-btn" id="signin-btn">SIGN IN</a>
+    </nav>
+  </header>
+  <div class="hero">
+    <div style="font-size:4rem;margin-bottom:1rem">??</div>
+    <h1 class="hero-title">STARFIGHTER</h1>
+    <p class="hero-tagline">Defend the manifold across relentless enemy waves. Fly solo or form a squadron with up to 3
+      friends.</p>
+    <div class="hero-ctas">
+      <button class="cta-primary" id="solo-btn" onclick="KG_LANDING.playSolo(this)">PLAY SOLO � FREE</button>
+      <a href="/login/index.html" class="cta-secondary">SIGN IN FOR CO-OP</a>
+    </div>
   </div>
-
-  <!-- ═══ GAMEPLAY HUD — top-right stats ═══ -->
-  <div id="gameplay-hud">
-    <div class="hud-row">
-      <span class="hud-label">SHIELD</span>
-      <div class="hud-bar-track">
-        <div id="ghud-shield-bar" class="hud-bar-fill shield" style="width:100%"></div>
+  <section>
+    <div class="section-title">FEATURES</div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon">??</div>
+        <div class="feat-name">AI NPC ENEMIES</div>
+        <div class="feat-desc">The ANPC substrate drives enemy behavior � adaptive, reactive AI that responds to your
+          tactics.</div>
       </div>
-      <span id="ghud-shield" class="hud-val">100</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">HULL</span>
-      <div class="hud-bar-track">
-        <div id="ghud-hull-bar" class="hud-bar-fill hull" style="width:100%"></div>
+      <div class="feat-card">
+        <div class="feat-icon">??</div>
+        <div class="feat-name">WAVE PROGRESSION</div>
+        <div class="feat-desc">Each wave brings new enemy formations, faster speeds, and escalating firepower.</div>
       </div>
-      <span id="ghud-hull" class="hud-val">100</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">FUEL</span>
-      <div class="hud-bar-track">
-        <div id="ghud-fuel-bar" class="hud-bar-fill fuel" style="width:100%"></div>
+      <div class="feat-card">
+        <div class="feat-icon">??</div>
+        <div class="feat-name">CO-OP MULTIPLAYER</div>
+        <div class="feat-desc">Join forces with up to 3 friends. Real-time synchronized space combat via WebSocket.
+        </div>
       </div>
-      <span id="ghud-fuel" class="hud-val">100</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">TORPS</span>
-      <span id="ghud-torpedoes" class="hud-val">2</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">WPN</span>
-      <span id="ghud-weapon" class="hud-val" style="color:#00ff88">LASER</span>
-    </div>
-    <div class="hud-row hud-score-row">
-      <span class="hud-label">KILLS</span>
-      <span id="ghud-kills" class="hud-val">0</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">SCORE</span>
-      <span id="ghud-score" class="hud-val">0</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">WAVE</span>
-      <span id="ghud-wave" class="hud-val">1</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">LIVES</span>
-      <span id="ghud-lives" class="hud-val" style="letter-spacing:3px;color:#ff4444;font-size:11px">★★★</span>
-    </div>
-    <div class="hud-row hud-score-row">
-      <span class="hud-label">BOOST</span>
-      <div class="hud-bar-track">
-        <div id="ghud-boost-bar" class="hud-bar-fill fuel" style="width:0%"></div>
+      <div class="feat-card">
+        <div class="feat-icon">??</div>
+        <div class="feat-name">AUDIO-REACTIVE</div>
+        <div class="feat-desc">The soundtrack responds to explosions, power-ups, and enemy waves in real time.</div>
       </div>
-      <span id="ghud-boost" class="hud-val">RDY</span>
+      <div class="feat-card">
+        <div class="feat-icon">?</div>
+        <div class="feat-name">POWER-UP SYSTEM</div>
+        <div class="feat-desc">Collect shields, spread shots, speed boosts, and screen-clearing bombs.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">??</div>
+        <div class="feat-name">WAVE LEADERBOARD</div>
+        <div class="feat-desc">Compete for the highest wave survived. Top pilots earn Starfighter medallions.</div>
+      </div>
     </div>
-    <div class="hud-row">
-      <span class="hud-label">FA</span>
-      <span id="ghud-fa" class="hud-val" style="color:#00ff88">ON</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">MODE</span>
-      <span id="ghud-speed-mode" class="hud-val">CRUISE</span>
-    </div>
-  </div>
-
-  <!-- ═══ RADAR OVERLAY — bottom-left ═══ -->
-  <div id="radar-overlay">
-    <canvas id="radar-canvas" width="324" height="324"></canvas>
-  </div>
-
-  <!-- ═══ COMM MARQUEE — very top ═══ -->
-  <div id="comm-ticker">
-    <div id="comm-ticker-inner">
-      <span class="comm-item base">SYSTEMS ONLINE — AWAITING LAUNCH COMMAND</span>
-    </div>
-  </div>
-
-  <!-- ═══ CONSOLE TOGGLE BUTTONS — aviation rocket module style ═══ -->
-  <div id="console-buttons">
-    <button class="console-btn" id="btn-pause" tabindex="1"
-      onclick="if(window.Starfighter&&Starfighter.togglePause)Starfighter.togglePause()">&#10074;&#10074; PAUSE</button>
-    <button class="console-btn" id="btn-mission" tabindex="2"
-      onclick="document.getElementById('mission-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('tutorial-panel').classList.remove('open');document.getElementById('btn-tutorial').classList.remove('active')">&#9733;
-      MISSION</button>
-    <button class="console-btn" id="btn-tutorial" tabindex="3"
-      onclick="document.getElementById('tutorial-panel').classList.toggle('open');this.classList.toggle('active');document.getElementById('mission-panel').classList.remove('open');document.getElementById('btn-mission').classList.remove('active')">&#9881;
-      CONTROLS</button>
-    <button class="console-btn" id="btn-tutorial-open" tabindex="4"
-      onclick="if(window.Starfighter&&Starfighter.openTutorial)Starfighter.openTutorial()">&#10022; TUTORIAL</button>
-    <button class="console-btn" id="btn-music" tabindex="5"
-      onclick="if(window.SFMusic){const on=SFMusic.toggle();this.classList.toggle('active',on);this.innerHTML=on?'&#9835; MUSIC ON':'&#9835; MUSIC OFF'}">&#9835;
-      MUSIC ON</button>
-    <button class="console-btn" id="btn-exit" tabindex="6"
-      style="background:linear-gradient(180deg,rgba(80,55,20,0.95),rgba(50,30,10,0.98));border-color:rgba(200,150,60,0.5);color:#ffcc88"
-      onclick="if(window.Starfighter&&Starfighter.exitGame)Starfighter.exitGame()">&#10162; EXIT GAME</button>
-    <button class="console-btn" id="btn-rtb" tabindex="7"
-      style="background:linear-gradient(180deg,rgba(80,20,15,0.95),rgba(50,10,8,0.98));border-color:rgba(200,60,50,0.5);color:#ff4444;display:none"
-      onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()">⚠ EMERGENCY RTB</button>
-    <button class="console-btn" id="btn-call-tanker" tabindex="8"
-      style="background:linear-gradient(180deg,rgba(15,60,30,0.95),rgba(8,40,18,0.98));border-color:rgba(0,200,100,0.5);color:#00ff88;display:none"
-      onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽ CALL TANKER</button>
-    <button class="console-btn" id="btn-call-medic" tabindex="9"
-      style="background:linear-gradient(180deg,rgba(60,15,15,0.95),rgba(40,8,8,0.98));border-color:rgba(200,60,60,0.5);color:#ff6666;display:none"
-      onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚ CALL MEDIC</button>
-  </div>
-
-  <!-- Emergency Rescue Button -->
-  <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
-    ⚠ EMERGENCY RESCUE
-    <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
-  </button>
-
-  <!-- ═══ MOBILE TOUCH HUD — shown only on phones/tablets ═══ -->
-  <div id="mobile-hud" style="display:none">
-    <!-- Nav Sphere — bottom center, drag to steer, hold for thrust -->
-    <div id="mob-nav-sphere">
-      <div id="mob-nav-knob"></div>
-      <div class="mob-nav-label">STEER</div>
-      <div class="mob-nav-thrust-label">HOLD = THRUST</div>
-    </div>
-    <!-- Minimal action buttons (top-right corner) -->
-    <div id="mob-btn-group">
-      <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
-      <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
-      <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
-      <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
-      <button id="mob-call-tanker" class="mob-btn" style="display:none;background:rgba(0,80,40,0.8);color:#00ff88"
-        onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽</button>
-      <button id="mob-call-medic" class="mob-btn" style="display:none;background:rgba(80,15,15,0.8);color:#ff6666"
-        onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚</button>
-    </div>
-    <!-- Hint overlay (shown briefly on first load) -->
-    <div id="mob-hint" class="mob-hint">
-      TAP SCREEN = LASERS &nbsp;|&nbsp; TAP ✛ = TORPEDO &nbsp;|&nbsp; SPHERE = STEER + THRUST
-    </div>
-  </div>
-
-  <!-- ═══ MISSION BRIEFING PANEL ═══ -->
-  <div id="mission-panel">
-    <h3>MISSION BRIEFING</h3>
-    <div style="color:#ff8800;font-weight:bold;margin-bottom:6px">YEAR 2387 — EARTH ORBIT</div>
-    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">An alien force — <span style="color:#f0f">HIVE SIGMA</span>
-      — emerged from deep space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate.
-      They don't negotiate. <span style="color:#f44">They consume.</span></p>
-    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">You fly a <span style="color:#0ff">UEDF Mk-IV
-        Starfighter</span> — twin laser cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the
-      <span style="color:#48f">UEDF Battleship Resolute</span> — Earth's last heavy carrier.
-    </p>
-    <p style="color:#ff4;font-weight:bold;line-height:1.7;margin-bottom:12px">If the Resolute falls, the orbital defense
-      line collapses. Protect her at all costs.</p>
-    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
-      Press MISSION button to close</div>
-  </div>
-
-  <!-- ═══ CONTROLS TUTORIAL PANEL ═══ -->
-  <div id="tutorial-panel">
-    <h3>FLIGHT CONTROLS</h3>
-    <ul>
-      <li><kbd>Mouse</kbd> Pitch / Yaw</li>
-      <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
-      <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
-      <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
-      <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
-      <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
-      <li><kbd>V</kbd> Flight Assist ON/OFF</li>
-      <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
-      <li><kbd>R-Click</kbd> Torpedo</li>
-      <li><kbd>T</kbd> Lock Target</li>
-      <li><kbd>R</kbd> Emergency RTB (return to base)</li>
+  </section>
+  <section>
+    <div class="section-title">HOW TO PLAY</div>
+    <ul class="rules-list">
+      <li>Pilot your fighter using arrow keys / WASD or on-screen touch controls.</li>
+      <li>Fire at enemy ships and avoid their projectiles. Your ship has a limited shield.</li>
+      <li>Survive each wave to advance. Enemies increase in speed and firepower with each wave.</li>
+      <li>Collect power-up drops from destroyed enemies � they appear briefly before fading.</li>
+      <li>In co-op mode, your team shares a combined wave counter. Coordinate fire to maximize survival.</li>
+      <li>Game ends when all players lose their shields. Your highest wave is recorded on the leaderboard.</li>
     </ul>
-    <h3 style="margin-top:12px">GAMEPAD</h3>
-    <ul>
-      <li><kbd>R-Stick</kbd> Pitch / Yaw</li>
-      <li><kbd>L-Stick</kbd> Throttle / Strafe</li>
-      <li><kbd>LB/RB</kbd> Roll</li>
-      <li><kbd>RT</kbd> Lasers</li>
-      <li><kbd>LT</kbd> Torpedo</li>
-      <li><kbd>A</kbd> Afterburner</li>
-      <li><kbd>B</kbd> Boost</li>
-      <li><kbd>X</kbd> Flight Assist</li>
-      <li><kbd>Y</kbd> Lock Target</li>
-    </ul>
-    <h3 style="margin-top:12px">MOBILE / TOUCH</h3>
-    <ul>
-      <li><kbd>Sphere</kbd> Drag to steer (pitch / yaw)</li>
-      <li><kbd>Hold</kbd> Touch sphere centre = thrust</li>
-      <li><kbd>Tap</kbd> Tap empty space = lasers</li>
-      <li><kbd>Tap ✛</kbd> Tap crosshair = torpedo</li>
-      <li><kbd>LOCK</kbd> Lock Target</li>
-      <li><kbd>AB</kbd> Afterburner (hold)</li>
-      <li><kbd>BOOST</kbd> Speed burst</li>
-      <li><kbd>RTB</kbd> Emergency return to base</li>
-    </ul>
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);">
-      <h3 style="margin-top:0;color:#ffaa00">WAVE 1 TIP</h3>
-      <p style="font-size:11px;color:#99aabb;margin:4px 0;line-height:1.4">
-        First wave is light patrol &mdash; use it to practice steering, firing lasers, and locking targets. Clear all
-        enemies, then return to base for the next wave.
-      </p>
+  </section>
+  <section>
+    <div class="section-title">JOIN A PRIVATE GAME</div>
+    <div class="invite-box">
+      <input class="invite-input" type="text" id="invite-code-input" placeholder="XXXXXX" maxlength="6"
+        style="text-transform:uppercase">
+      <button class="cta-primary"
+        onclick="KG_LANDING.openInviteJoin(document.getElementById('invite-code-input').value)">JOIN</button>
+      <span style="font-size:0.78rem;color:var(--dim);flex-basis:100%;margin-top:0.5rem">Got an invite code from your
+        squadron? Paste it above � no account needed to join.</span>
     </div>
-    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
-      Press CONTROLS button to close</div>
-  </div>
-
-  <!-- ═══ CONTROLLER WIREFRAME OVERLAY — bottom-right ═══ -->
-  <div id="ctrl-hamburger" onclick="document.getElementById('ctrl-overlay').classList.toggle('mobile-open')">☰</div>
-  <div id="ctrl-overlay">
-    <!-- KEYBOARD + MOUSE wireframe (default) -->
-    <svg id="ctrl-kb" width="220" height="140" viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
-      <!-- Mouse body -->
-      <rect x="150" y="8" width="40" height="60" rx="12" class="ctrl-wire-fill" />
-      <line x1="170" y1="8" x2="170" y2="32" stroke="rgba(0,255,255,0.4)" stroke-width="0.5" />
-      <circle cx="163" cy="18" r="7" class="ctrl-btn-wire" />
-      <circle cx="177" cy="18" r="7" class="ctrl-btn-wire" />
-      <rect x="167" y="30" width="6" height="10" rx="3" class="ctrl-btn-wire" />
-      <text x="163" y="19" class="ctrl-label">L</text>
-      <text x="177" y="19" class="ctrl-label">R</text>
-      <text x="192" y="16" class="ctrl-label-action">FIRE</text>
-      <text x="192" y="24" class="ctrl-label-action">TORP</text>
-      <text x="170" y="54" class="ctrl-label" font-size="5">AIM</text>
-      <!-- Keyboard section -->
-      <rect x="6" y="6" width="130" height="66" rx="4" class="ctrl-wire-fill" />
-      <!-- WASD cluster -->
-      <rect x="32" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="40" y="23" class="ctrl-label">W</text>
-      <rect x="14" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="22" y="41" class="ctrl-label">A</text>
-      <rect x="32" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="40" y="41" class="ctrl-label">S</text>
-      <rect x="50" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="58" y="41" class="ctrl-label">D</text>
-      <!-- QE -->
-      <rect x="14" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="22" y="23" class="ctrl-label">Q</text>
-      <rect x="50" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="58" y="23" class="ctrl-label">E</text>
-      <!-- Shift -->
-      <rect x="14" y="50" width="30" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="29" y="59" class="ctrl-label" font-size="5">SHIFT</text>
-      <!-- F V T -->
-      <rect x="70" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="78" y="23" class="ctrl-label">F</text>
-      <rect x="70" y="32" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="78" y="41" class="ctrl-label">V</text>
-      <rect x="88" y="14" width="16" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="96" y="23" class="ctrl-label">T</text>
-      <!-- Space -->
-      <rect x="50" y="50" width="56" height="14" rx="2" class="ctrl-btn-wire" />
-      <text x="78" y="59" class="ctrl-label" font-size="5">SPACE</text>
-      <!-- Labels -->
-      <text x="4" y="82" class="ctrl-label-action">W/S = Throttle</text>
-      <text x="4" y="91" class="ctrl-label-action">A/D = Strafe</text>
-      <text x="4" y="100" class="ctrl-label-action">Q/E = Roll</text>
-      <text x="4" y="109" class="ctrl-label-action">SHIFT = Afterburner</text>
-      <text x="4" y="118" class="ctrl-label-action">F = Boost V = FA</text>
-      <text x="4" y="127" class="ctrl-label-action">T = Lock SPACE = Fire</text>
-      <text x="4" y="136" class="ctrl-label-action">Tab = Toggle This</text>
-    </svg>
-    <!-- GAMEPAD wireframe -->
-    <svg id="ctrl-gp" width="220" height="140" viewBox="0 0 220 140" style="display:none"
-      xmlns="http://www.w3.org/2000/svg">
-      <!-- Controller body -->
-      <path
-        d="M50,30 Q60,15 110,15 Q160,15 170,30 Q185,65 175,90 Q168,105 155,100 Q145,95 130,85 L90,85 Q75,95 65,100 Q52,105 45,90 Q35,65 50,30Z"
-        class="ctrl-wire-fill" />
-      <!-- Left stick -->
-      <circle cx="80" cy="52" r="12" class="ctrl-btn-wire" />
-      <circle cx="80" cy="52" r="3" class="ctrl-dot" />
-      <text x="80" y="74" class="ctrl-label" font-size="5">THROTTLE</text>
-      <text x="80" y="80" class="ctrl-label" font-size="5">STRAFE</text>
-      <!-- Right stick -->
-      <circle cx="140" cy="65" r="12" class="ctrl-btn-wire" />
-      <circle cx="140" cy="65" r="3" class="ctrl-dot" />
-      <text x="140" y="84" class="ctrl-label" font-size="5">PITCH</text>
-      <text x="140" y="90" class="ctrl-label" font-size="5">YAW</text>
-      <!-- ABXY buttons -->
-      <circle cx="155" cy="42" r="6" class="ctrl-btn-wire" />
-      <text x="155" y="43" class="ctrl-label">Y</text>
-      <circle cx="167" cy="52" r="6" class="ctrl-btn-wire" />
-      <text x="167" y="53" class="ctrl-label">B</text>
-      <circle cx="155" cy="62" r="6" class="ctrl-btn-wire" />
-      <text x="155" y="63" class="ctrl-label">A</text>
-      <circle cx="143" cy="42" r="6" class="ctrl-btn-wire" style="display:none" />
-      <!-- D-pad -->
-      <rect x="62" y="32" width="7" height="7" rx="1" class="ctrl-btn-wire" />
-      <rect x="55" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
-      <rect x="62" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
-      <rect x="69" y="39" width="7" height="7" rx="1" class="ctrl-btn-wire" />
-      <rect x="62" y="46" width="7" height="7" rx="1" class="ctrl-btn-wire" />
-      <!-- Bumpers/Triggers -->
-      <rect x="55" y="18" width="25" height="8" rx="3" class="ctrl-btn-wire" />
-      <text x="67" y="24" class="ctrl-label" font-size="5">LB</text>
-      <rect x="140" y="18" width="25" height="8" rx="3" class="ctrl-btn-wire" />
-      <text x="152" y="24" class="ctrl-label" font-size="5">RB</text>
-      <rect x="55" y="10" width="25" height="7" rx="3" class="ctrl-btn-wire" />
-      <text x="67" y="15" class="ctrl-label" font-size="5">LT</text>
-      <rect x="140" y="10" width="25" height="7" rx="3" class="ctrl-btn-wire" />
-      <text x="152" y="15" class="ctrl-label" font-size="5">RT</text>
-      <!-- Labels -->
-      <text x="4" y="102" class="ctrl-label-action">LB/RB = Roll</text>
-      <text x="4" y="111" class="ctrl-label-action">RT = Fire LT = Torpedo</text>
-      <text x="4" y="120" class="ctrl-label-action">A = Afterburner B = Boost</text>
-      <text x="4" y="129" class="ctrl-label-action">X = Flight Assist Y = Lock</text>
-    </svg>
-    <!-- TOUCH wireframe (phone/tablet) -->
-    <svg id="ctrl-touch" width="180" height="100" viewBox="0 0 180 100" style="display:none"
-      xmlns="http://www.w3.org/2000/svg">
-      <!-- Phone body -->
-      <rect x="10" y="5" width="160" height="90" rx="10" class="ctrl-wire-fill" />
-      <rect x="16" y="10" width="148" height="75" rx="4"
-        style="fill:rgba(0,0,0,0.3);stroke:rgba(0,255,255,0.3);stroke-width:0.5" />
-      <!-- Nav sphere (bottom center) -->
-      <circle cx="90" cy="65" r="18" class="ctrl-btn-wire" />
-      <circle cx="90" cy="65" r="6" class="ctrl-dot" />
-      <text x="90" y="55" class="ctrl-label" font-size="4">DRAG=STEER</text>
-      <text x="90" y="88" class="ctrl-label" font-size="4">HOLD=THRUST</text>
-      <!-- Crosshair (center) -->
-      <line x1="87" y1="38" x2="93" y2="38" stroke="rgba(0,255,255,0.5)" stroke-width="0.5" />
-      <line x1="90" y1="35" x2="90" y2="41" stroke="rgba(0,255,255,0.5)" stroke-width="0.5" />
-      <text x="90" y="30" class="ctrl-label" font-size="4">TAP ✛ = TORPEDO</text>
-      <!-- Tap anywhere -->
-      <text x="90" y="18" class="ctrl-label" font-size="4" fill="rgba(0,255,255,0.5)">TAP SCREEN = LASERS</text>
-    </svg>
-  </div>
-
-  <!-- Keep old panel div for JS compatibility (hidden) -->
-  <div id="controls-toggle" style="display:none">▶</div>
-  <div id="controls-panel" style="display:none">
-    <div id="input-device-status"
-      style="margin-bottom:8px;padding:4px 6px;background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.2);border-radius:3px;font-size:11px;color:#0ff">
-      DEVICE: <span id="detected-device">KEYBOARD + MOUSE</span>
-    </div>
-    <h3>LIVE INPUT</h3>
-    <div id="live-input-values" style="font-size:11px;line-height:1.6;margin-bottom:8px;font-family:monospace">
-      <div>Throttle: <span id="live-throttle" style="color:#0f0">0.00</span></div>
-      <div>Pitch: <span id="live-pitch" style="color:#0f0">0.00</span></div>
-      <div>Yaw: <span id="live-yaw" style="color:#0f0">0.00</span></div>
-      <div>Roll: <span id="live-roll" style="color:#0f0">0.00</span></div>
-      <div>Strafe H: <span id="live-strafe-h" style="color:#0f0">0.00</span></div>
-      <div>Strafe V: <span id="live-strafe-v" style="color:#0f0">0.00</span></div>
-      <div>Speed: <span id="live-speed" style="color:#0f0">0</span> m/s</div>
-      <div>Afterburn: <span id="live-afterburner" style="color:#f80">OFF</span></div>
-      <div>FA: <span id="live-fa" style="color:#0ff">ON</span></div>
-    </div>
-
-    <!-- ═══ BACKSTORY SECTION — only visible in launch bay ═══ -->
-    <div id="panel-backstory">
-      <h3>MISSION BRIEFING</h3>
-      <div style="font-size:10px;color:#8cf;line-height:1.7;margin-bottom:10px">
-        <div style="color:#ff8800;font-weight:bold;margin-bottom:4px">YEAR 2387 — EARTH ORBIT</div>
-        <p style="margin-bottom:6px">An alien force — <span style="color:#f0f">HIVE SIGMA</span> — emerged from deep
-          space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate. They don't
-          negotiate. <span style="color:#f44">They consume.</span></p>
-        <p style="margin-bottom:6px">You fly a <span style="color:#0ff">UEDF Mk-IV Starfighter</span> — twin laser
-          cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the <span style="color:#48f">UEDF
-            Battleship Resolute</span> — Earth's last heavy carrier.</p>
-        <p style="color:#ff4;font-weight:bold">If the Resolute falls, the orbital defense line collapses. Protect her at
-          all costs.</p>
+  </section>
+  <section>
+    <div class="section-title">ABOUT THE GAME</div>
+    <div class="about-card">
+      <div>
+        <div class="about-label">PLAYERS</div><span class="about-badge">1</span><span class="about-badge">2</span><span
+          class="about-badge">3</span><span class="about-badge">4</span>
+        <br><br>
+        <div class="about-label">PLAY TIME</div>
+        <div class="about-val">Endless � until game over</div>
+        <br>
+        <div class="about-label">PLATFORM</div>
+        <div class="about-val">Browser � no download</div>
+      </div>
+      <div>
+        <div class="about-label">TOS</div>
+        <div class="tos-note">By playing StarFighter on KensGames, you agree to our <a href="/tos/index.html">Terms of
+            Service</a>. Solo play is always free. Co-op and leaderboards require a free account.</div>
       </div>
     </div>
-
-    <h3>FLIGHT CONTROLS</h3>
-    <ul>
-      <li><kbd>Mouse</kbd> Pitch / Yaw</li>
-      <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
-      <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
-      <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
-      <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
-      <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
-      <li><kbd>V</kbd> Flight Assist ON/OFF</li>
-      <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
-      <li><kbd>R-Click</kbd> Torpedo</li>
-      <li><kbd>T</kbd> Lock Target</li>
-      <li><kbd>Tab</kbd> Toggle This Panel</li>
-    </ul>
-    <h3 style="margin-top:8px">GAMEPAD</h3>
-    <ul>
-      <li><kbd>R-Stick</kbd> Pitch / Yaw</li>
-      <li><kbd>L-Stick</kbd> Throttle / Strafe</li>
-      <li><kbd>LB/RB</kbd> Roll</li>
-      <li><kbd>RT</kbd> Lasers</li>
-      <li><kbd>LT</kbd> Torpedo</li>
-      <li><kbd>A</kbd> Afterburner</li>
-      <li><kbd>B</kbd> Boost</li>
-      <li><kbd>X</kbd> Flight Assist</li>
-      <li><kbd>Y</kbd> Lock Target</li>
-    </ul>
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:9px;color:#668">
-      Press <kbd>Tab</kbd> to close
+  </section>
+  <footer>
+    <div style="margin-bottom:0.5rem">� 2025 KensGames � <a href="/tos/index.html" style="color:var(--dim)">Terms</a> �
+      <a href="/" style="color:var(--dim)">All Games</a>
     </div>
-  </div>
-
-  <!-- Ship panel: hidden container for JS compat -->
-  <div id="ship-panel" style="display:none">
-    <span id="hud-speed"></span><span id="hud-throttle"></span><span id="hud-fuel"></span>
-    <span id="hud-hull"></span><span id="hud-shields"></span><span id="hud-base-hull"></span>
-    <span id="hud-wave"></span><span id="hud-score"></span><span id="hud-torpedoes"></span>
-    <div id="gauge-speed" class="gauge-fill"></div>
-    <div id="gauge-throttle" class="gauge-fill"></div>
-    <div id="gauge-fuel" class="gauge-fill"></div>
-    <div id="gauge-hull" class="gauge-fill"></div>
-    <div id="gauge-shields" class="gauge-fill"></div>
-    <div id="gauge-base" class="gauge-fill"></div>
-    <div id="hud-message"></div>
-  </div>
-
-  <!-- ═══ OLD ELEMENTS KEPT FOR JS COMPAT (hidden) ═══ -->
-  <div id="comm-log" class="hidden">
-    <div id="comm-messages"></div>
-  </div>
-  <div id="horizon-container" class="hidden">
-    <div id="horizon-inner">
-      <div id="horizon-sky"></div>
-      <div id="horizon-ground"></div>
-      <div id="horizon-line"></div>
+    <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate � z = xy
     </div>
-  </div>
-
-  <!-- Death Screen -->
-  <div id="death-screen">
-    <div>MISSION FAILED</div>
-    <div id="death-reason" style="font-size:0.5em;color:#aaa">The baseship was destroyed.</div>
-    <button onclick="location.reload()">RESTART</button>
-  </div>
-
-  <!-- Countdown / Launch overlays -->
-  <div id="countdown-display">5</div>
-  <div id="launch-prompt">
-    <b>READY TO LAUNCH</b>
-    <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR, PUSH JOYSTICK FORWARD, OR TAP SCREEN</div>
-  </div>
-  <div id="launch-overlay" class="launch-overlay-full" style="background:rgba(0,0,0,0.6)">
-    <div style="text-align:center;color:#0ff;font-size:2.5em;margin-bottom:30px;text-shadow:0 0 20px #0ff">⚡ LAUNCH
-      SEQUENCE ⚡</div>
-    <div style="color:#00ff00;font-size:1.5em;font-weight:bold;text-shadow:0 0 15px #00ff00">ACCELERATING THROUGH
-      TUBE...</div>
-  </div>
-  <div id="launch-countdown" class="launch-overlay-full" style="background:rgba(0,0,0,0.5)">
-    <div style="text-align:center;color:#ff00ff;font-size:3em;font-weight:bold;text-shadow:0 0 30px #ff00ff">CLEAR OF
-      BAY</div>
-    <div style="color:#ffff00;font-size:1.3em;margin-top:20px;text-shadow:0 0 10px #ffff00">ENGAGING ENEMY FORCES...
-    </div>
-  </div>
-
-  <!-- Emergency Rescue Button -->
-  <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
-    ⚠ EMERGENCY RESCUE
-    <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
-  </button>
-
-  <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
-  <div id="loading-screen"
-    style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
-    <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
-      style="max-width:320px;width:80%;margin-bottom:32px;filter:drop-shadow(0 0 20px rgba(0,255,255,0.4))">
-    <div
-      style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
-    </div>
-    <div id="loading-text"
-      style="color:#0ff;font-family:'Courier New',monospace;margin-top:24px;font-size:14px;letter-spacing:2px">
-      INITIALIZING MANIFOLD...</div>
-    <div id="loading-progress"
-      style="width:220px;height:4px;background:rgba(0,255,255,0.1);margin-top:16px;border-radius:2px;overflow:hidden">
-      <div id="loading-bar" style="width:0%;height:100%;background:#0ff;transition:width 0.3s ease;border-radius:2px">
-      </div>
-    </div>
-  </div>
-  <style>
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg)
-      }
-
-      100% {
-        transform: rotate(360deg)
-      }
-    }
-  </style>
-
-  <!-- ═══ RESPAWN OVERLAY — button-based fighter lost screen ═══ -->
-  <div id="respawn-overlay"><!-- content injected by JS --></div>
-
-  <!-- ═══ WAVE CLEAR OVERLAY — blue flash, return to base ═══ -->
-  <div id="waveclear-overlay"><!-- content injected by JS --></div>
-
-  <!-- ═══ BAY DEBRIEF OVERLAY — post-wave acknowledgment + shop ═══ -->
-  <div id="bay-debrief">
-    <div class="bdr-container">
-
-      <!-- Rank-up ceremony banner (hidden until promotion) -->
-      <div id="bdr-rankup">
-        <div class="bdr-rankup-label">★ PROMOTION ★</div>
-        <div class="bdr-rankup-icon" id="bdr-rankup-icon">★</div>
-        <div id="bdr-rankup-name">RANK</div>
-      </div>
-
-      <!-- Header: wave title + callsign acknowledgment -->
-      <div class="bdr-header">
-        <div id="bdr-wave-title">WAVE 1 COMPLETE</div>
-        <div id="bdr-mission-name">FIRST FLIGHT</div>
-        <div id="bdr-callsign-ack"></div>
-      </div>
-
-      <!-- 2-col stats layout -->
-      <div class="bdr-main-cols">
-        <!-- Mission stats -->
-        <div class="bdr-card">
-          <div class="bdr-card-title">Mission Stats</div>
-          <div id="bdr-stats-rows"></div>
-        </div>
-        <!-- Ship status -->
-        <div class="bdr-card">
-          <div class="bdr-card-title">Ship Status — After Refit</div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">HULL</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-hull-fill" class="bdr-ship-bar-fill hull"></div>
-            </div>
-            <div class="bdr-ship-val" id="bdr-hull-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">SHLD</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-shld-fill" class="bdr-ship-bar-fill shld"></div>
-            </div>
-            <div class="bdr-ship-val" id="bdr-shld-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">FUEL</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-fuel-fill" class="bdr-ship-bar-fill fuel"></div>
-            </div>
-            <div class="bdr-ship-val" id="bdr-fuel-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">TORPS</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-torp-fill" class="bdr-ship-bar-fill torp"></div>
-            </div>
-            <div class="bdr-ship-val" id="bdr-torp-val">2/2</div>
-          </div>
-          <div class="bdr-cr-row">
-            <span class="label">CREDITS</span>
-            <span id="bdr-cr-balance">&#8371;0</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- XP / Rank progress -->
-      <div class="bdr-xp-section bdr-card">
-        <div class="bdr-card-title">Rank Progress</div>
-        <div class="bdr-xp-labels">
-          <span id="bdr-rank-cur">ENSIGN</span>
-          <span id="bdr-rank-next">LT. JUNIOR</span>
-        </div>
-        <div class="bdr-xp-bar-track">
-          <div id="bdr-xp-fill"></div>
-        </div>
-        <div class="bdr-xp-earned-row">
-          <span id="bdr-xp-delta">+0 XP this wave</span>
-          <div class="bdr-earned-chips">
-            <span id="bdr-xp-earned">+0 XP</span>
-            <span id="bdr-cr-earned">+&#8371;0</span>
-          </div>
-        </div>
-        <div id="bdr-bonus-row">&#9733; NO DAMAGE BONUS</div>
-      </div>
-
-      <!-- Weapon / capability unlocks -->
-      <div id="bdr-unlocks-section">
-        <div class="bdr-card">
-          <div class="bdr-card-title">New Systems Unlocked</div>
-          <div id="bdr-unlocks-list"></div>
-        </div>
-      </div>
-
-      <!-- Upgrade shop -->
-      <div class="bdr-shop-section bdr-card">
-        <div class="bdr-card-title">Armament Shop</div>
-        <div class="bdr-shop-balance">Available: <span id="bdr-shop-credits">&#8371;0</span></div>
-        <div id="bdr-shop-list"></div>
-        <div id="bdr-shop-empty" style="display:none">No upgrades available at current rank</div>
-      </div>
-
-      <!-- Next wave intel card -->
-      <div class="bdr-next-card">
-        <div class="bdr-next-wave-badge">
-          <div class="bdr-wave-num" id="bdr-next-wave-num">2</div>
-          <div class="bdr-wave-label">NEXT WAVE</div>
-        </div>
-        <div class="bdr-next-info">
-          <div class="bdr-next-title" id="bdr-next-title">BAPTISM OF FIRE</div>
-          <div class="bdr-next-obj" id="bdr-next-objective">Eliminate Vek Corsair scouts before they report fleet
-            position.</div>
-        </div>
-      </div>
-
-      <!-- Launch button -->
-      <div class="bdr-footer">
-        <button class="bdr-launch-btn" onclick="window._bdrLaunch && window._bdrLaunch()">
-          LAUNCH WAVE <span id="bdr-next-wave-num2">2</span> &#9658;
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Victory overlay -->
-  <div id="victory-screen"
-    style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,10,20,0.85);z-index:100;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto">
-    <div style="color:#00ff88;font-family:'Courier New',monospace;font-size:3em;text-shadow:0 0 30px #0f8">VICTORY</div>
-    <div id="victory-reason" style="color:#0ff;font-family:'Courier New',monospace;font-size:1.3em;margin-top:16px">
-      Enemy Base Station Destroyed</div>
-    <div id="victory-score" style="color:#fff;font-family:'Courier New',monospace;font-size:1.5em;margin-top:24px">
-    </div>
-    <button onclick="location.reload()"
-      style="margin-top:30px;padding:10px 20px;font-size:16px;background:#00aa66;color:#fff;border:none;cursor:pointer;border-radius:5px;pointer-events:auto">PLAY
-      AGAIN</button>
-  </div>
-
-  <!-- Manifold Architecture -->
-  <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
-  <!-- Three.js -->
-  <!-- Game Logic -->
-  <script src="/js/manifold_bridge.js"></script>
+  </footer>
+  <script src="/js/substrates/game_session_substrate.js"></script>
+  <script src="/js/substrates/profile_gate.js"></script>
+  <script src="/js/game_landing.js"></script>
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      if (window.Starfighter) Starfighter.init();
-    });
-    // Wire ManifoldBridge after bundle initialises
-    window.addEventListener('load', () => {
-      if (typeof ManifoldBridge === 'undefined') return;
-      ManifoldBridge.init({
-        id: 'starfighter',
-        version: '1.0.0',
-        x: 2,
-        y: 30,
-        exposes: () => {
-          const s = window.Starfighter ? window.Starfighter.getState() : {};
-          return {
-            phase: s.phase ?? null,
-            wave: s.wave ?? 0,
-            score: s.score ?? 0,
-            livesRemaining: s.livesRemaining ?? 0,
-            kills: s.missionStats?.kills ?? 0,
-          };
-        },
-      });
-    });
+    KG_LANDING.init('starfighter', '/starfighter/lobby.html');
+    document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
+    if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
   </script>
-  <script src="starfighter.bundle.js?v=4988fa189fea43d9"></script>
 </body>
 
 </html>

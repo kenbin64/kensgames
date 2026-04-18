@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect 4D — KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --bg: #04040C;
+      --cyan: #00FFFF;
+      --green: #00FF88;
+      --purple: #AA00FF;
+      --p1: #00FFFF;
+      --p2: #FF00AA;
+      --dim: #8888AA;
+      --text: #E0E0FF;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px;
+      background: rgba(4, 4, 20, 0.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    }
+
+    .nav-logo {
+      color: var(--cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 18px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--dim);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--cyan);
+    }
+
+    #c {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #hud {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 20px;
+      pointer-events: none;
+    }
+
+    .hud-player {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 18px;
+      background: rgba(4, 4, 20, 0.78);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.12);
+      min-width: 110px;
+      transition: border-color .3s, box-shadow .3s;
+    }
+
+    .hud-player.active {
+      border-color: var(--p1);
+      box-shadow: 0 0 14px rgba(0, 255, 255, 0.28);
+    }
+
+    .hud-player.p2 {
+      border-color: rgba(255, 0, 170, 0.12);
+    }
+
+    .hud-player.p2.active {
+      border-color: var(--p2);
+      box-shadow: 0 0 14px rgba(255, 0, 170, 0.28);
+    }
+
+    .hud-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    .hud-score {
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .p1c {
+      color: var(--p1);
+      text-shadow: 0 0 10px var(--p1);
+    }
+
+    .p2c {
+      color: var(--p2);
+      text-shadow: 0 0 10px var(--p2);
+    }
+
+    .hud-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      background: rgba(4, 4, 20, 0.78);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.1);
+    }
+
+    #turn-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    #status-msg {
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      min-height: 16px;
+    }
+
+    #col-selector {
+      position: fixed;
+      bottom: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      pointer-events: auto;
+      background: rgba(4, 4, 20, 0.82);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 255, 255, 0.15);
+    }
+
+    .col-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .col-btn {
+      width: 44px;
+      height: 40px;
+      background: rgba(0, 255, 255, 0.05);
+      border: 1px solid rgba(0, 255, 255, 0.18);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 8px;
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: 1px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+    }
+
+    .col-btn:hover:not(:disabled) {
+      background: rgba(0, 255, 255, 0.14);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.22);
+    }
+
+    .col-btn:disabled {
+      opacity: .25;
+      cursor: not-allowed;
+    }
+
+    .col-btn.p2b {
+      color: var(--p2);
+      border-color: rgba(255, 0, 170, 0.18);
+    }
+
+    .col-btn.p2b:hover:not(:disabled) {
+      background: rgba(255, 0, 170, 0.12);
+      border-color: var(--p2);
+      box-shadow: 0 0 10px rgba(255, 0, 170, 0.22);
+    }
+
+    .col-lbl {
+      font-size: 7px;
+      color: var(--dim);
+      letter-spacing: 0;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .ctrl-btn {
+      padding: 7px 16px;
+      background: rgba(0, 255, 255, 0.06);
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(0, 255, 255, 0.14);
+      border-color: var(--cyan);
+    }
+
+    .ctrl-btn.danger {
+      color: #ff4466;
+      border-color: rgba(255, 50, 80, 0.25);
+    }
+
+    .ctrl-btn.danger:hover {
+      background: rgba(255, 50, 80, 0.1);
+      border-color: #ff4466;
+    }
+
+    #result-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.84);
+      backdrop-filter: blur(12px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    #result-overlay.show {
+      display: flex;
+    }
+
+    #result-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 2.6em;
+      letter-spacing: 4px;
+      text-align: center;
+    }
+
+    #result-sub {
+      font-size: 1em;
+      color: var(--dim);
+    }
+
+    .result-btns {
+      display: flex;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    #cam-hint {
+      position: fixed;
+      bottom: 110px;
+      right: 16px;
+      font-size: 10px;
+      color: rgba(80, 100, 120, 0.55);
+      letter-spacing: 1px;
+      text-align: right;
+      line-height: 1.9;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
+    <ul class="nav-links">
+      <li><a href="/4DTicTacToe/lobby.html" style="color:#00ffff;font-weight:700">&#8592; LEAVE GAME</a></li>
+      <li><a href="/">Portal</a></li>
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
+      <li><a href="/assemble/">Assemble</a></li>
+    </ul>
+  </nav>
+
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="hud-player active" id="hud-p1">
+      <div class="hud-name p1c">PLAYER 1</div>
+      <div class="hud-score p1c" id="score-p1">0</div>
+    </div>
+    <div class="hud-center">
+      <div id="turn-label" class="p1c">&#9679; PLAYER 1'S TURN</div>
+      <div id="status-msg">Pick a column to drop your ball</div>
+    </div>
+    <div class="hud-player p2" id="hud-p2">
+      <div class="hud-name p2c">PLAYER 2</div>
+      <div class="hud-score p2c" id="score-p2">0</div>
+    </div>
+  </div>
+
+  <div id="col-selector"><!-- built by JS --></div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="cam-btn" onclick="toggleCamFollow()">CAM: FOLLOW</button>
+    <button class="ctrl-btn" onclick="resetView()">RESET VIEW</button>
+    <button class="ctrl-btn danger" onclick="resetGame()">NEW GAME</button>
+  </div>
+
+  <div id="result-overlay">
+    <div id="result-title"></div>
+    <div id="result-sub"></div>
+    <div class="result-btns">
+      <button class="ctrl-btn" onclick="rematch()">REMATCH</button>
+      <button class="ctrl-btn danger" onclick="resetGame()">NEW GAME</button>
+    </div>
+  </div>
+
+  <div id="cam-hint">Drag to orbit &nbsp;|&nbsp; Scroll to zoom<br>Auto-cam follows ball</div>
+
+  <script src="/js/substrates/profile_gate.js"></script>
+  <script src="/js/manifold_bridge.js"></script>
+  <script src="/lib/three/three.min.js"></script>
+  <script>
+    'use strict';
+    // ═══════════════════════════════════════════════════════════════
+    // CONNECT 4D  —  4x4x4 Schwartz-diamond lattice, gravity ball drop
+    // ═══════════════════════════════════════════════════════════════
+    const GRID = 4, CELL = 2.8, BALL_R = 0.38;
+    const GRAVITY = -30, RESTITUTION = 0.44, DAMPEN = 0.76, SETTLE_V = 0.20;
+    const LATTICE_SADDLE_SCALE = 0.8;
+    const P1 = 1, P2 = 2;
+
+    const board = new Array(GRID * GRID * GRID).fill(0);
+    let scores = [0, 0], currentPlayer = P1, gameOver = false, dropping = false;
+
+    // ── THREE.JS ──────────────────────────────────────────────────
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = false;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x04040C);
+    scene.fog = new THREE.FogExp2(0x04040C, 0.0085);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 800);
+    camera.position.set(14, 18, 22);
+    camera.lookAt(0, 4, 0);
+
+    // ── LIGHTING ──────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x112233, 1.5));
+    const sunLight = new THREE.DirectionalLight(0x88aaff, 1.3);
+    sunLight.position.set(10, 20, 14); scene.add(sunLight);
+    const ptCyan = new THREE.PointLight(0x00ffcc, 2.2, 55); ptCyan.position.set(-8, 10, -8); scene.add(ptCyan);
+    const ptPurp = new THREE.PointLight(0xaa00ff, 1.5, 45); ptPurp.position.set(8, 2, -10); scene.add(ptPurp);
+
+    // ── MATERIALS ─────────────────────────────────────────────────
+    function saddleMat(hex, emHex, op) {
+      return new THREE.MeshPhysicalMaterial({
+        color: hex, emissive: emHex, metalness: 0.25, roughness: 0.18,
+        transparent: true, opacity: op, side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+    }
+    const MAT_CYAN = saddleMat(0x00ccff, 0x002233, 0.32);
+    const MAT_GREEN = saddleMat(0x00ff88, 0x003322, 0.28);
+    const MAT_PURPLE = saddleMat(0xaa00ff, 0x220033, 0.26);
+    const MAT_TUBE = new THREE.MeshPhysicalMaterial({
+      color: 0x223344, emissive: 0x0a0a22, transparent: true, opacity: 0.26,
+      metalness: 0.55, roughness: 0.35, depthWrite: false,
+    });
+    const MAT_P1_PLACED = new THREE.MeshPhysicalMaterial({
+      color: 0x00eeff, emissive: 0x004455, metalness: 0.4, roughness: 0.1,
+      transparent: true, opacity: 0.92,
+    });
+    const MAT_P2_PLACED = new THREE.MeshPhysicalMaterial({
+      color: 0xff0088, emissive: 0x440022, metalness: 0.4, roughness: 0.1,
+      transparent: true, opacity: 0.92,
+    });
+
+    // ── GEOMETRY BUILDERS ─────────────────────────────────────────
+    // z = x·y  saddle surface — the lattice primitive
+    function buildSaddleGeo(segs, scale, flipY) {
+      const verts = [], idx = [];
+      const N = segs, hs = scale;
+      for (let i = 0; i <= N; i++) {
+        for (let j = 0; j <= N; j++) {
+          const x = (i / N * 2 - 1) * hs;
+          const z = (j / N * 2 - 1) * hs;
+          const y = x * z * 0.55 * (flipY ? -1 : 1);
+          verts.push(x, y, z);
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          const a = i * (N + 1) + j, b = a + 1, c = a + (N + 1), d = c + 1;
+          idx.push(a, b, c, b, d, c);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    }
+    const SADDLE_A = buildSaddleGeo(12, LATTICE_SADDLE_SCALE, false);
+    const SADDLE_B = buildSaddleGeo(12, LATTICE_SADDLE_SCALE, true);
+
+    const BALL_GEO = new THREE.SphereGeometry(BALL_R, 22, 22);
+    const RING_GEO = new THREE.TorusGeometry(BALL_R * 1.4, 0.026, 8, 28);
+    const HALO_GEO = new THREE.SphereGeometry(BALL_R * 2.1, 12, 12);
+
+    // ── WORLD POSITION ────────────────────────────────────────────
+    function nodePos(gx, gy, gz) {
+      return new THREE.Vector3(
+        (gx - 1.5) * CELL,
+        (gy - 1.5) * CELL * 0.9 + 0.5,
+        (gz - 1.5) * CELL
+      );
+    }
+
+    // ── LATTICE BUILD ─────────────────────────────────────────────
+    const latticeGroup = new THREE.Group();
+    scene.add(latticeGroup);
+
+    for (let gx = 0; gx < GRID; gx++) {
+      for (let gy = 0; gy < GRID; gy++) {
+        for (let gz = 0; gz < GRID; gz++) {
+          const pos = nodePos(gx, gy, gz);
+          const parity = (gx + gy + gz) % 2;
+          const matIdx = (gx + gy + gz) % 3;
+          const mat = [MAT_CYAN, MAT_GREEN, MAT_PURPLE][matIdx];
+          const saddle = new THREE.Mesh(parity ? SADDLE_B : SADDLE_A, mat);
+
+          // Alternate 90° rotation around Y — creates the 3D alternating lattice
+          saddle.rotation.y = parity ? Math.PI * 0.5 : 0;
+          saddle.position.copy(pos);
+          latticeGroup.add(saddle);
+
+          // Connecting tubes to +X, +Y, +Z neighbours
+          if (gx < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx + 1, gy, gz)));
+          if (gy < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx, gy + 1, gz)));
+          if (gz < GRID - 1) latticeGroup.add(makeTube(pos, nodePos(gx, gy, gz + 1)));
+        }
+      }
+    }
+
+    function makeTube(a, b) {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const len = dir.length();
+      const geo = new THREE.CylinderGeometry(0.042, 0.042, len, 6, 1);
+      const mesh = new THREE.Mesh(geo, MAT_TUBE);
+      mesh.position.copy(a).addScaledVector(dir, 0.5);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      return mesh;
+    }
+
+    // ── SLOT RINGS ────────────────────────────────────────────────
+    const slotRings = [];
+    for (let gx = 0; gx < GRID; gx++) {
+      for (let gy = 0; gy < GRID; gy++) {
+        for (let gz = 0; gz < GRID; gz++) {
+          const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
+            color: 0x112233, transparent: true, opacity: 0.20,
+          }));
+          ring.position.copy(nodePos(gx, gy, gz));
+          ring.rotation.x = Math.PI / 2;
+          ring.userData = { gx, gy, gz };
+          slotRings.push(ring);
+          scene.add(ring);
+        }
+      }
+    }
+
+    // ── PLACED BALLS ──────────────────────────────────────────────
+    const placedBalls = [];
+    function addPlacedBall(gx, gy, gz, player) {
+      const mat = (player === P1 ? MAT_P1_PLACED : MAT_P2_PLACED).clone();
+      const mesh = new THREE.Mesh(BALL_GEO, mat);
+      mesh.position.copy(nodePos(gx, gy, gz));
+      scene.add(mesh);
+      // inner glow
+      const gm = new THREE.Mesh(HALO_GEO, new THREE.MeshBasicMaterial({
+        color: player === P1 ? 0x00ffff : 0xff0088,
+        transparent: true, opacity: 0.12, side: THREE.BackSide,
+      }));
+      gm.position.copy(mesh.position);
+      scene.add(gm);
+      placedBalls.push({ mesh, gm, gx, gy, gz, player });
+    }
+
+    // ── WIN GLOWS ─────────────────────────────────────────────────
+    const winGlows = [];
+    function showWinGlows(line) {
+      const winGeo = new THREE.SphereGeometry(BALL_R * 1.85, 16, 16);
+      line.forEach(([gx, gy, gz]) => {
+        const m = new THREE.Mesh(winGeo, new THREE.MeshBasicMaterial({
+          color: 0xffee00, transparent: true, opacity: 0.40, side: THREE.BackSide,
+        }));
+        m.position.copy(nodePos(gx, gy, gz));
+        scene.add(m); winGlows.push(m);
+      });
+    }
+    function clearWinGlows() { winGlows.forEach(m => scene.remove(m)); winGlows.length = 0; }
+
+    // ── PHYSICS BALL ──────────────────────────────────────────────
+    let physBall = null;
+
+    function spawnPhysBall(gx, gz, player) {
+      if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); }
+      // Find lowest free slot
+      let targetGY = -1;
+      for (let gy = 0; gy < GRID; gy++) {
+        if (getCell(gx, gy, gz) === 0) { targetGY = gy; break; }
+      }
+      if (targetGY === -1) return false;
+
+      const ballMat = new THREE.MeshPhysicalMaterial({
+        color: player === P1 ? 0x00eeff : 0xff0088,
+        emissive: player === P1 ? 0x005566 : 0x660033,
+        emissiveIntensity: 0.65, metalness: 0.3, roughness: 0.08,
+        transparent: true, opacity: 0.97,
+      });
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: player === P1 ? 0x00ffff : 0xff0088,
+        transparent: true, opacity: 0.22, side: THREE.BackSide,
+      });
+      const mesh = new THREE.Mesh(BALL_GEO, ballMat);
+      const halo = new THREE.Mesh(HALO_GEO, haloMat);
+      const startY = nodePos(gx, GRID + 1, gz).y + 1.5;
+      mesh.position.set(nodePos(gx, 0, gz).x, startY, nodePos(gx, 0, gz).z);
+      halo.position.copy(mesh.position);
+      scene.add(mesh); scene.add(halo);
+
+      physBall = {
+        mesh, halo,
+        pos: mesh.position.clone(),
+        vy: -0.5,
+        tx: nodePos(gx, 0, gz).x, tz: nodePos(gx, 0, gz).z,
+        targetSlot: { gx, gy: targetGY, gz },
+        player, settled: false,
+      };
+      return true;
+    }
+
+    // ── BOARD HELPERS ─────────────────────────────────────────────
+    function cellIdx(gx, gy, gz) { return gz * GRID * GRID + gy * GRID + gx; }
+    function getCell(gx, gy, gz) { return board[cellIdx(gx, gy, gz)]; }
+    function setCell(gx, gy, gz, v) { board[cellIdx(gx, gy, gz)] = v; }
+    function lowestFree(gx, gz) { for (let y = 0; y < GRID; y++) if (getCell(gx, y, gz) === 0) return y; return -1; }
+    function colFull(gx, gz) { return lowestFree(gx, gz) === -1; }
+
+    // ── WIN CHECK ────────────────────────────────────────────────
+    const WIN_DIRS = [
+      [1, 0, 0], [0, 1, 0], [0, 0, 1],
+      [1, 1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [1, 0, 1], [1, 0, -1],
+      [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+    ];
+    function checkWin(player) {
+      for (const [dx, dy, dz] of WIN_DIRS) {
+        for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) for (let z = 0; z < GRID; z++) {
+          const line = [];
+          for (let s = 0; s < 4; s++) {
+            const nx = x + dx * s, ny = y + dy * s, nz = z + dz * s;
+            if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || nz < 0 || nz >= GRID) break;
+            if (getCell(nx, ny, nz) !== player) break;
+            line.push([nx, ny, nz]);
+          }
+          if (line.length === 4) return line;
+        }
+      }
+      return null;
+    }
+    function boardFull() { return board.every(v => v !== 0); }
+
+    // ── ORBIT CAMERA ─────────────────────────────────────────────
+    let camFollow = true, camTheta = 0.88, camPhi = 0.52, camRadius = 30;
+    let camTarget = new THREE.Vector3(0, 4, 0);
+    let cDrag = false, cLX = 0, cLY = 0;
+
+    function orbitCam() {
+      camera.position.set(
+        camTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta),
+        camTarget.y + camRadius * Math.cos(camPhi),
+        camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta)
+      );
+      camera.lookAt(camTarget);
+    }
+
+    canvas.addEventListener('mousedown', e => { cDrag = true; cLX = e.clientX; cLY = e.clientY; camFollow = false; updateCamBtn(); });
+    canvas.addEventListener('mouseup', () => cDrag = false);
+    canvas.addEventListener('mouseleave', () => cDrag = false);
+    canvas.addEventListener('mousemove', e => { if (!cDrag) return; camTheta -= (e.clientX - cLX) * 0.008; camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi + (e.clientY - cLY) * 0.008)); cLX = e.clientX; cLY = e.clientY; orbitCam(); });
+    canvas.addEventListener('wheel', e => { camRadius = Math.max(9, Math.min(65, camRadius + e.deltaY * 0.04)); orbitCam(); }, { passive: true });
+    canvas.addEventListener('touchstart', e => { cDrag = true; cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; camFollow = false; updateCamBtn(); }, { passive: true });
+    canvas.addEventListener('touchend', () => cDrag = false);
+    canvas.addEventListener('touchmove', e => { if (!cDrag) return; camTheta -= (e.touches[0].clientX - cLX) * 0.008; camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi + (e.touches[0].clientY - cLY) * 0.008)); cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; orbitCam(); }, { passive: true });
+
+    function toggleCamFollow() { camFollow = !camFollow; updateCamBtn(); }
+    function updateCamBtn() { document.getElementById('cam-btn').textContent = 'CAM: ' + (camFollow ? 'FOLLOW' : 'MANUAL'); }
+    function resetView() { camTheta = 0.88; camPhi = 0.52; camRadius = 30; camTarget.set(0, 4, 0); camFollow = false; updateCamBtn(); orbitCam(); }
+
+    // ── COLUMN SELECTOR UI ───────────────────────────────────────
+    const colSel = document.getElementById('col-selector');
+    const colBtns = [];
+
+    function buildColUI() {
+      colSel.innerHTML = '';
+      colBtns.length = 0;
+      const header = document.createElement('div');
+      header.style.cssText = 'font-family:Orbitron,monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-align:center;margin-bottom:2px;';
+      header.textContent = 'DROP COLUMN  (X → Z ↓)';
+      colSel.appendChild(header);
+      for (let gz = 0; gz < GRID; gz++) {
+        const row = document.createElement('div');
+        row.className = 'col-row';
+        for (let gx = 0; gx < GRID; gx++) {
+          const btn = document.createElement('button');
+          btn.className = 'col-btn';
+          btn.innerHTML = `<span style="font-size:14px;">&#8595;</span><div class="col-lbl">X${gx + 1}&middot;Z${gz + 1}</div>`;
+          btn.dataset.gx = gx; btn.dataset.gz = gz;
+          btn.onclick = () => dropBall(gx, gz);
+          colBtns.push(btn); row.appendChild(btn);
+        }
+        colSel.appendChild(row);
+      }
+    }
+
+    function refreshColBtns() {
+      const isp2 = currentPlayer === P2;
+      colBtns.forEach(btn => {
+        const gx = parseInt(btn.dataset.gx), gz = parseInt(btn.dataset.gz);
+        btn.disabled = dropping || gameOver || colFull(gx, gz);
+        btn.className = 'col-btn' + (isp2 ? ' p2b' : '');
+      });
+    }
+
+    // ── DROP BALL ────────────────────────────────────────────────
+    function dropBall(gx, gz) {
+      if (dropping || gameOver || colFull(gx, gz)) return;
+      dropping = true; refreshColBtns();
+      const ok = spawnPhysBall(gx, gz, currentPlayer);
+      if (!ok) { dropping = false; refreshColBtns(); return; }
+      document.getElementById('status-msg').textContent = 'Dropping...';
+      if (camFollow) {
+        const tp = nodePos(gx, 2, gz);
+        camTarget.set(tp.x * 0.4, 6, tp.z * 0.4);
+        camRadius = 17; camPhi = 0.7; orbitCam();
+      }
+    }
+
+    // ── PHYSICS STEP ─────────────────────────────────────────────
+    function physStep(dt) {
+      if (!physBall || physBall.settled) return;
+      // Lock X/Z to column
+      physBall.pos.x = physBall.tx;
+      physBall.pos.z = physBall.tz;
+      // Gravity
+      physBall.vy += GRAVITY * dt;
+      physBall.pos.y += physBall.vy * dt;
+      // Target floor Y
+      const floorY = nodePos(physBall.targetSlot.gx, physBall.targetSlot.gy, physBall.targetSlot.gz).y;
+      if (physBall.pos.y <= floorY + BALL_R) {
+        if (Math.abs(physBall.vy) < SETTLE_V) {
+          physBall.pos.y = floorY; physBall.vy = 0; physBall.settled = true;
+          onBallSettled(); return;
+        }
+        physBall.pos.y = floorY + BALL_R;
+        physBall.vy = -physBall.vy * RESTITUTION;
+        physBall.vy *= DAMPEN;
+      }
+      physBall.mesh.position.copy(physBall.pos);
+      physBall.halo.position.copy(physBall.pos);
+      if (camFollow) {
+        camTarget.y += (physBall.pos.y - 1.5 - camTarget.y) * 0.12;
+        orbitCam();
+      }
+    }
+
+    function onBallSettled() {
+      const { gx, gy, gz } = physBall.targetSlot, player = physBall.player;
+      scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
+      setCell(gx, gy, gz, player);
+      addPlacedBall(gx, gy, gz, player);
+
+      // Flash ring
+      const ring = slotRings.find(r => r.userData.gx === gx && r.userData.gy === gy && r.userData.gz === gz);
+      if (ring) { ring.material.color.setHex(player === P1 ? 0x00ffff : 0xff0088); ring.material.opacity = 0.55; setTimeout(() => { ring.material.color.setHex(0x112233); ring.material.opacity = 0.20; }, 700); }
+
+      // Check win / draw
+      const wl = checkWin(player);
+      if (wl) {
+        gameOver = true; scores[player - 1]++;
+        document.getElementById('score-p' + (player)).textContent = scores[player - 1];
+        showWinGlows(wl);
+        showResult(player === P1 ? 'PLAYER 1 WINS' : 'PLAYER 2 WINS', dirLabel(wl), player === P1 ? '#00ffff' : '#ff0088');
+        dropping = false; refreshColBtns(); return;
+      }
+      if (boardFull()) {
+        gameOver = true; showResult('DRAW', 'The lattice is full.', '#ffee00');
+        dropping = false; refreshColBtns(); return;
+      }
+      currentPlayer = currentPlayer === P1 ? P2 : P1;
+      updateHUD(); dropping = false; refreshColBtns();
+      if (camFollow) setTimeout(() => { camTarget.set(0, 4, 0); camRadius = 30; camPhi = 0.52; orbitCam(); }, 700);
+    }
+
+    function dirLabel(line) {
+      if (!line || line.length < 2) return '';
+      const [x0, y0, z0] = line[0], [x1, y1, z1] = line[1], parts = [];
+      if (x1 !== x0) parts.push('X'); if (y1 !== y0) parts.push('Y'); if (z1 !== z0) parts.push('Z');
+      return parts.length === 1 ? '4 in a row — ' + parts[0] + ' axis' : '4 in a row — ' + parts.join('/') + ' diagonal';
+    }
+
+    // ── HUD ───────────────────────────────────────────────────────
+    function updateHUD() {
+      const lbl = document.getElementById('turn-label');
+      if (currentPlayer === P1) {
+        lbl.textContent = '&#9679; PLAYER 1\'S TURN'; lbl.style.color = 'var(--p1)';
+        document.getElementById('hud-p1').classList.add('active');
+        document.getElementById('hud-p2').classList.remove('active');
+      } else {
+        lbl.textContent = '&#9679; PLAYER 2\'S TURN'; lbl.style.color = 'var(--p2)';
+        document.getElementById('hud-p1').classList.remove('active');
+        document.getElementById('hud-p2').classList.add('active');
+      }
+      document.getElementById('status-msg').textContent = 'Pick a column (X \u00B7 Z) to drop';
+    }
+
+    function showResult(title, sub, color) {
+      document.getElementById('result-title').textContent = title;
+      document.getElementById('result-title').style.color = color;
+      document.getElementById('result-sub').textContent = sub;
+      document.getElementById('result-overlay').classList.add('show');
+    }
+
+    // ── GAME CONTROL ─────────────────────────────────────────────
+    function resetGame() {
+      board.fill(0); currentPlayer = P1; gameOver = false; dropping = false;
+      placedBalls.forEach(b => { scene.remove(b.mesh); scene.remove(b.gm); }); placedBalls.length = 0;
+      clearWinGlows();
+      if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
+      document.getElementById('result-overlay').classList.remove('show');
+      updateHUD(); refreshColBtns();
+      camFollow = true; updateCamBtn(); camTarget.set(0, 4, 0); camRadius = 30; camPhi = 0.52; orbitCam();
+    }
+    function rematch() {
+      scores = [0, 0];
+      document.getElementById('score-p1').textContent = '0';
+      document.getElementById('score-p2').textContent = '0';
+      resetGame();
+    }
+
+    // ── RENDER LOOP ───────────────────────────────────────────────
+    let lastT = 0, idleRot = 0;
+    function animate(t) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t;
+      // Gentle idle rotation of the whole lattice when no ball in flight
+      if (!dropping) { idleRot += dt * 0.05; latticeGroup.rotation.y = Math.sin(idleRot) * 0.045; }
+      physStep(dt);
+      if (!camFollow) orbitCam();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ── INIT ─────────────────────────────────────────────────────
+    buildColUI(); updateHUD(); refreshColBtns(); orbitCam();
+    requestAnimationFrame(animate);
+
+    // ── MANIFOLD BRIDGE ───────────────────────────────────────────
+    if (typeof ManifoldBridge !== 'undefined') {
+      ManifoldBridge.init({
+        id: '4dtictactoe',
+        version: '1.0.0',
+        x: 2,
+        y: 12,
+        exposes: () => ({
+          currentPlayer,
+          scores: [...scores],
+          gameOver,
+          boardFilled: board.filter(v => v !== 0).length,
+        }),
+      });
+    }
+  </script>
+</body>
+
+</html>

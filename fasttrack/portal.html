@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -6,19 +6,19 @@
   <script>
     (function () {
       var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/starfighter/index.html'); return; }
+      if (!t) { window.location.replace('/fasttrack/index.html'); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/starfighter/index.html'); return; }
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/fasttrack/index.html'); return; }
           if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
         }).catch(function () { });
     })();
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarFighter — Lobby | KensGames</title>
-  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <title>FastTrack — Portal Lobby | KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/ftLogo.png" type="image/png">
   <link rel="stylesheet" href="/arcade.css">
   <link rel="stylesheet" href="/css/manifold_3d.css">
   <style>
@@ -33,7 +33,7 @@
     h1.page-title {
       font-family: 'Press Start 2P', monospace;
       font-size: 0.75rem;
-      color: var(--c3);
+      color: var(--c1);
       margin-bottom: 0.4rem;
     }
 
@@ -57,7 +57,7 @@
 
     .panel {
       background: var(--surface);
-      border: 1px solid rgba(57, 255, 20, 0.18);
+      border: 1px solid rgba(0, 255, 255, 0.18);
       border-radius: 12px;
       padding: 1.5rem;
     }
@@ -65,7 +65,7 @@
     .panel-title {
       font-family: 'Press Start 2P', monospace;
       font-size: 0.45rem;
-      color: var(--c3);
+      color: var(--c1);
       letter-spacing: 3px;
       margin-bottom: 1.25rem;
     }
@@ -97,7 +97,7 @@
     }
 
     .radio-opt input {
-      accent-color: var(--c3);
+      accent-color: var(--c1);
     }
 
     .select-field {
@@ -112,7 +112,7 @@
     }
 
     .select-field:focus {
-      border-color: var(--c3);
+      border-color: var(--c1);
     }
 
     .sess-list {
@@ -169,11 +169,11 @@
     }
 
     .lb-rank-1 td {
-      color: var(--c3);
+      color: var(--c1);
     }
 
     .lb-me td {
-      background: rgba(57, 255, 20, 0.04);
+      background: rgba(0, 255, 255, 0.04);
     }
 
     .modal-overlay {
@@ -192,7 +192,7 @@
 
     .modal {
       background: var(--surface);
-      border: 1px solid var(--c3);
+      border: 1px solid var(--c1);
       border-radius: 14px;
       padding: 2rem;
       width: 100%;
@@ -204,7 +204,7 @@
     .modal-title {
       font-family: 'Press Start 2P', monospace;
       font-size: 0.6rem;
-      color: var(--c3);
+      color: var(--c1);
       margin-bottom: 1rem;
     }
 
@@ -228,7 +228,7 @@
     }
 
     .chip-ready {
-      color: var(--c3);
+      color: var(--c1);
     }
 
     .chip-wait {
@@ -237,12 +237,12 @@
 
     .invite-link-box {
       background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(57, 255, 20, 0.2);
+      border: 1px solid rgba(0, 255, 255, 0.2);
       border-radius: 6px;
       padding: 0.6rem 0.75rem;
       font-family: 'Press Start 2P', monospace;
       font-size: 0.5rem;
-      color: var(--c3);
+      color: var(--c1);
       letter-spacing: 4px;
       word-break: break-all;
       cursor: pointer;
@@ -280,7 +280,7 @@
 
     .status-msg.ok,
     .status-msg.info {
-      color: var(--c3);
+      color: var(--c1);
     }
 
     .stats-grid {
@@ -299,7 +299,7 @@
     .stat-val {
       font-family: 'Press Start 2P', monospace;
       font-size: 0.75rem;
-      color: var(--c3);
+      color: var(--c1);
       margin-bottom: 0.3rem;
     }
 
@@ -307,10 +307,23 @@
       font-size: 0.65rem;
       color: var(--dim);
     }
+
+    .classic-link {
+      display: block;
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.72rem;
+      color: var(--dim);
+      text-decoration: none;
+    }
+
+    .classic-link:hover {
+      color: var(--c1);
+    }
   </style>
 </head>
 
-<body data-mtheme="green">
+<body data-mtheme="cyan">
   <div class="scanlines"></div>
   <canvas id="gyroid-bg"></canvas>
   <div class="m-dim-ticker" aria-hidden="true"></div>
@@ -320,19 +333,20 @@
       <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
     </a>
     <nav class="header-nav">
-      <a href="/starfighter/index.html" class="arcade-btn" style="font-size:0.4rem">&#8592; GAME INFO</a>
+      <a href="/fasttrack/index.html" class="arcade-btn" style="font-size:0.4rem">&#8592; GAME INFO</a>
       <a href="/portal.html" class="arcade-btn">PORTAL</a>
     </nav>
   </header>
 
   <main>
-    <h1 class="page-title">&#x1F680; STARFIGHTER</h1>
-    <p class="page-sub">Defend the galaxy &#x2014; solo or with your squadron. Form a flight wing and launch.</p>
+    <h1 class="page-title">&#x1F3CE; FAST TRACK</h1>
+    <p class="page-sub">Race your pegs around the board &#x2014; solo with AI or invite up to 4 friends via portal code.
+    </p>
     <div class="lobby-grid">
       <div class="panel">
-        <div class="panel-title">LAUNCH MISSION</div>
+        <div class="panel-title">CREATE GAME</div>
         <div class="field-row">
-          <div class="field-label">MISSION TYPE</div>
+          <div class="field-label">GAME TYPE</div>
           <div class="radio-group">
             <label class="radio-opt"><input type="radio" name="mode" value="private" checked> Private (invite
               only)</label>
@@ -341,23 +355,24 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="field-label">SQUADRON SIZE</div>
+          <div class="field-label">MAX PLAYERS</div>
           <select class="select-field" id="max-players-sel">
-            <option value="2">2 pilots</option>
-            <option value="3">3 pilots</option>
-            <option value="4" selected>4 pilots</option>
+            <option value="2">2 players</option>
+            <option value="3">3 players</option>
+            <option value="4" selected>4 players</option>
           </select>
         </div>
         <button class="arcade-btn"
-          style="width:100%;padding:0.75rem;margin-top:0.5rem;border-color:var(--c3);color:var(--c3)" id="create-btn"
+          style="width:100%;padding:0.75rem;margin-top:0.5rem;border-color:var(--c1);color:var(--c1)" id="create-btn"
           onclick="createGame()">LAUNCH LOBBY</button>
         <div class="status-msg" id="create-status"></div>
+        <a href="/fasttrack/lobby.html" class="classic-link">Switch to classic FastTrack lobby &#x2192;</a>
       </div>
       <div class="panel">
-        <div class="panel-title">OPEN MISSIONS <span id="pub-count" style="color:var(--dim);font-size:0.35rem"></span>
+        <div class="panel-title">OPEN GAMES <span id="pub-count" style="color:var(--dim);font-size:0.35rem"></span>
         </div>
         <ul class="sess-list" id="pub-sess-list">
-          <li class="sess-empty">Loading open missions&#x2026;</li>
+          <li class="sess-empty">Loading open games&#x2026;</li>
         </ul>
         <button class="arcade-btn" style="font-size:0.4rem;padding:0.4rem 0.8rem;margin-top:0.75rem"
           onclick="loadPublicSessions()">REFRESH</button>
@@ -368,7 +383,7 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>PILOT</th>
+              <th>PLAYER</th>
               <th>BEST SCORE</th>
               <th>MEDALS</th>
             </tr>
@@ -381,15 +396,15 @@
         </table>
       </div>
       <div class="panel">
-        <div class="panel-title">MY PILOT STATS</div>
+        <div class="panel-title">MY STATS</div>
         <div class="stats-grid">
           <div class="stat-box">
             <div class="stat-val" id="stat-wins">&#x2014;</div>
-            <div class="stat-lbl">MISSIONS</div>
+            <div class="stat-lbl">GAMES</div>
           </div>
           <div class="stat-box">
             <div class="stat-val" id="stat-losses">&#x2014;</div>
-            <div class="stat-lbl">VICTORIES</div>
+            <div class="stat-lbl">WINS</div>
           </div>
           <div class="stat-box">
             <div class="stat-val" id="stat-rank">&#x2014;</div>
@@ -406,7 +421,7 @@
 
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
-      <div class="modal-title">&#x1F680; STAGING &#x2014; WAITING FOR PILOTS</div>
+      <div class="modal-title">&#x1F3CE; WAITING ROOM</div>
       <div style="margin-bottom:0.75rem">
         <div class="field-label"
           style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.35rem">
@@ -416,23 +431,23 @@
       </div>
       <div class="field-label"
         style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.5rem">
-        PILOTS</div>
+        PLAYERS</div>
       <div class="players-row" id="modal-players"></div>
       <div class="bots-row">
-        <span class="bots-label">AI WINGMEN:</span>
+        <span class="bots-label">AI BOTS:</span>
         <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem"
           onclick="adjustBots(-1)">&#x2013;</button>
         <span id="bot-count"
-          style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c3);min-width:1.5rem;text-align:center">0</span>
+          style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c1);min-width:1.5rem;text-align:center">0</span>
         <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem" onclick="adjustBots(1)">+</button>
         <span style="font-size:0.72rem;color:var(--dim)">(fill open slots)</span>
       </div>
       <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
-        <button class="arcade-btn" style="flex:1;padding:0.75rem;border-color:var(--c3);color:var(--c3)" id="start-btn"
-          onclick="startGame()">LAUNCH MISSION</button>
+        <button class="arcade-btn" style="flex:1;padding:0.75rem;border-color:var(--c1);color:var(--c1)" id="start-btn"
+          onclick="startGame()">START GAME</button>
         <button class="arcade-btn"
           style="padding:0.75rem 1rem;background:transparent;border-color:rgba(255,0,0,0.4);color:#ff4d4d;font-size:0.4rem"
-          onclick="cancelGame()">ABORT</button>
+          onclick="cancelGame()">CANCEL</button>
       </div>
       <div class="status-msg" id="modal-status"></div>
     </div>
@@ -445,7 +460,7 @@
   <script>
     'use strict';
     const API = '/api';
-    const GAME = 'starfighter';
+    const GAME = 'fasttrack';
     const token = localStorage.getItem('kg_token');
     const AVATARS = { wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👽', ninja: '🥷', astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺', cat: '🐱', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐', diamond: '💎', crown: '👑' };
     let currentSession = null, currentBots = 0, pollTimer = null;
@@ -482,9 +497,9 @@
       const d = await r.json();
       const list = document.getElementById('pub-sess-list');
       const count = document.getElementById('pub-count');
-      if (!d.success || !d.sessions.length) { list.innerHTML = '<li class="sess-empty">No open missions right now</li>'; count.textContent = ''; return; }
+      if (!d.success || !d.sessions.length) { list.innerHTML = '<li class="sess-empty">No open games right now</li>'; count.textContent = ''; return; }
       count.textContent = `(${d.sessions.length})`;
-      list.innerHTML = d.sessions.map(s => `<li class="sess-item"><div><div class="sess-creator">${escHtml(s.players?.[0]?.playername || 'Host')}'s mission</div><div class="sess-info">${s.players}/${s.maxPlayers} pilots${s.bots ? ` + ${s.bots} AI wingman${s.bots > 1 ? 's' : ''}` : ''}</div></div><button class="arcade-btn" style="font-size:0.38rem;padding:0.4rem 0.7rem;border-color:var(--c3);color:var(--c3)" onclick="joinSession('${escHtml(s.sessionId)}')">JOIN</button></li>`).join('');
+      list.innerHTML = d.sessions.map(s => `<li class="sess-item"><div><div class="sess-creator">${escHtml(s.players?.[0]?.playername || 'Host')}'s game</div><div class="sess-info">${s.players}/${s.maxPlayers} players${s.bots ? ` + ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</div></div><button class="arcade-btn" style="font-size:0.38rem;padding:0.4rem 0.7rem;border-color:var(--c1);color:var(--c1)" onclick="joinSession('${escHtml(s.sessionId)}')">JOIN</button></li>`).join('');
     }
     async function loadLeaderboard() {
       try {

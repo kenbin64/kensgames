@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Guilds</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      padding-top: 80px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c2);
+      text-shadow: var(--glow2);
+      letter-spacing: 3px;
+      margin-bottom: 0.4rem;
+    }
+
+    .page-sub {
+      color: var(--dim);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+    }
+
+    .top-bar {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.65rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--c2);
+    }
+
+    .guilds-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .guild-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .guild-card:hover {
+      border-color: var(--c2);
+      transform: translateY(-3px);
+    }
+
+    .guild-tag-badge {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c2);
+      border: 1px solid var(--c2);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      margin-bottom: 0.5rem;
+    }
+
+    .guild-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--text);
+      letter-spacing: 1px;
+      margin-bottom: 0.5rem;
+    }
+
+    .guild-meta {
+      font-size: 0.75rem;
+      color: var(--dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .guild-join-btn {
+      width: 100%;
+      padding: 0.5rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      background: transparent;
+      border: 1px solid var(--c2);
+      color: var(--c2);
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+
+    .guild-join-btn:hover {
+      background: var(--c2);
+      color: #fff;
+    }
+
+    .guild-join-btn.mine {
+      border-color: var(--c3);
+      color: var(--c3);
+    }
+
+    .guild-join-btn.mine:hover {
+      background: var(--c3);
+      color: var(--void);
+    }
+
+    /* Create modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--c2);
+      border-radius: 10px;
+      padding: 2rem;
+      max-width: 460px;
+      width: 90%;
+      box-shadow: var(--glow2);
+    }
+
+    .modal-title-sm {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      color: var(--c2);
+      margin-bottom: 1.5rem;
+    }
+
+    .field-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-bottom: 0.4rem;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      margin-bottom: 1rem;
+    }
+
+    .field-input:focus {
+      border-color: var(--c2);
+    }
+
+    .field-hint {
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-top: -0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .tos-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      font-size: 0.75rem;
+      color: var(--text);
+      margin-bottom: 1.2rem;
+    }
+
+    .tos-row a {
+      color: var(--c2);
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .modal-btns button {
+      flex: 1;
+    }
+
+    .status-msg {
+      font-size: 0.75rem;
+      margin-top: 0.75rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .status-msg.err {
+      color: #ff4d4d;
+    }
+
+    .status-msg.ok {
+      color: var(--c3);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+
+    /* Join modal */
+    #join-modal .modal-box {
+      border-color: var(--c1);
+    }
+
+    #join-modal .modal-title-sm {
+      color: var(--c1);
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <header class="arcade-header">
+    <a href="/portal.html" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav style="display:flex;gap:0.5rem;">
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+      <a href="/social/friends.html" class="arcade-btn">FRIENDS</a>
+    </nav>
+    <div class="header-nav">
+      <span class="player-tag" id="player-tag"></span>
+      <button class="arcade-btn" id="logout-btn">LOGOUT</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">GUILDS</div>
+    <div class="page-sub">Create or join a guild to unlock chat, tournaments, and team play</div>
+
+    <div class="top-bar">
+      <input class="search-input" type="text" id="search-q" placeholder="Search guilds…" oninput="filterGuilds()">
+      <button class="arcade-btn accent" onclick="openCreateModal()" id="create-btn">+ CREATE GUILD</button>
+    </div>
+
+    <div class="guilds-grid" id="guilds-grid">
+      <div class="empty-state">Loading guilds…</div>
+    </div>
+  </main>
+
+  <!-- CREATE GUILD MODAL -->
+  <div class="modal-overlay" id="create-modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title-sm">⚔️ CREATE NEW GUILD</div>
+      <div class="field-label">GUILD NAME</div>
+      <input class="field-input" type="text" id="guild-name" placeholder="The Neon Blades" maxlength="40">
+      <div class="field-hint">3–40 characters</div>
+      <div class="field-label">GUILD TAG</div>
+      <input class="field-input" type="text" id="guild-tag" placeholder="NB" maxlength="5">
+      <div class="field-hint">2–5 alphanumeric · shown as [TAG]</div>
+      <div class="tos-row">
+        <input type="checkbox" id="guild-tos-check" style="margin-top:2px;accent-color:#bf00ff">
+        <label for="guild-tos-check">I agree to the <a href="/tos/guild.html" target="_blank">Guild Terms of Service</a>
+          and will uphold the rules of fair play and respectful moderation.</label>
+      </div>
+      <div class="modal-btns">
+        <button class="arcade-btn" onclick="closeCreateModal()">CANCEL</button>
+        <button class="arcade-btn accent" onclick="createGuild()">CREATE</button>
+      </div>
+      <div class="status-msg" id="create-status"></div>
+    </div>
+  </div>
+
+  <!-- JOIN REQUEST MODAL -->
+  <div class="modal-overlay" id="join-modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title-sm">REQUEST TO JOIN <span id="join-guild-name"></span></div>
+      <div class="field-label">OPTIONAL NOTE</div>
+      <textarea class="field-input" id="join-note" placeholder="Hi, I'd like to join…" maxlength="200"
+        style="resize:vertical;min-height:80px;"></textarea>
+      <div class="field-hint">Max 200 characters</div>
+      <div class="tos-row">
+        <input type="checkbox" id="join-tos-check" style="margin-top:2px;accent-color:#00ffff">
+        <label for="join-tos-check">I agree to the <a href="/tos/guild.html" target="_blank">Guild TOS</a></label>
+      </div>
+      <div class="modal-btns">
+        <button class="arcade-btn" onclick="closeJoinModal()">CANCEL</button>
+        <button class="arcade-btn" onclick="submitJoin()" style="border-color:var(--c1);color:var(--c1);">SEND
+          REQUEST</button>
+      </div>
+      <div class="status-msg" id="join-status"></div>
+    </div>
+  </div>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    let token = localStorage.getItem('kg_token');
+    let myProfile = null;
+    let allGuilds = [];
+    let pendingJoinGuildId = null;
+
+    function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
+
+    async function init() {
+      if (!token) { window.location.href = '/login/index.html'; return; }
+      const vr = await fetch(`${API}/auth/validate`, { headers: ah() });
+      if (!vr.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      const pr = await fetch(`${API}/players/me`, { headers: ah() });
+      if (pr.ok) {
+        myProfile = await pr.json();
+        if (!myProfile.tosAgreed || !myProfile.profileSetup) { window.location.href = '/player/setup.html'; return; }
+        document.getElementById('player-tag').textContent = myProfile.playername || myProfile.username;
+        if (myProfile.guildId) {
+          document.getElementById('create-btn').textContent = 'MY GUILD';
+          document.getElementById('create-btn').onclick = () => window.location.href = `/social/guild.html?id=${myProfile.guildId}`;
+        }
+      }
+      loadGuilds();
+    }
+
+    async function loadGuilds() {
+      const r = await fetch(`${API}/guilds`, { headers: ah() });
+      const d = await r.json();
+      allGuilds = d.guilds || [];
+      renderGuilds(allGuilds);
+    }
+
+    function renderGuilds(list) {
+      const grid = document.getElementById('guilds-grid');
+      if (!list.length) { grid.innerHTML = '<div class="empty-state">No guilds yet — create the first one!</div>'; return; }
+      grid.innerHTML = list.map(g => {
+        const isMine = myProfile?.guildId === g.guildId;
+        const btnLabel = isMine ? '→ ENTER GUILD' : 'REQUEST TO JOIN';
+        const btnCls = isMine ? 'guild-join-btn mine' : 'guild-join-btn';
+        const onclick = isMine ? `window.location.href='/social/guild.html?id=${g.guildId}'`
+          : `openJoinModal('${g.guildId}','${escHtml(g.name)}')`;
+        return `<div class="guild-card" onclick="${onclick}">
+          <div class="guild-tag-badge">[${g.tag}]</div>
+          <div class="guild-name">${escHtml(g.name)}</div>
+          <div class="guild-meta">👥 ${g.memberCount} members · Founded ${new Date(g.createdAt).toLocaleDateString()}</div>
+          <button class="${btnCls}" onclick="${onclick}">${btnLabel}</button>
+        </div>`;
+      }).join('');
+    }
+
+    function filterGuilds() {
+      const q = document.getElementById('search-q').value.toLowerCase();
+      renderGuilds(allGuilds.filter(g => g.name.toLowerCase().includes(q) || g.tag.toLowerCase().includes(q)));
+    }
+
+    function openCreateModal() {
+      if (myProfile?.guildId) { window.location.href = `/social/guild.html?id=${myProfile.guildId}`; return; }
+      document.getElementById('create-modal').style.display = 'flex';
+    }
+    function closeCreateModal() { document.getElementById('create-modal').style.display = 'none'; }
+
+    async function createGuild() {
+      if (!document.getElementById('guild-tos-check').checked) { alert('Please agree to the Guild TOS'); return; }
+      const name = document.getElementById('guild-name').value.trim();
+      const tag = document.getElementById('guild-tag').value.trim();
+      const st = document.getElementById('create-status');
+
+      // Record guild TOS first
+      await fetch(`${API}/players/tos/agree`, { method: 'POST', headers: ah(), body: JSON.stringify({ tosType: 'guild' }) });
+
+      const r = await fetch(`${API}/guilds/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ name, tag }) });
+      const d = await r.json();
+      if (d.success) {
+        st.className = 'status-msg ok'; st.textContent = `Guild "${name}" created!`;
+        setTimeout(() => { window.location.href = `/social/guild.html?id=${d.guildId}`; }, 800);
+      } else {
+        st.className = 'status-msg err'; st.textContent = d.error || 'Failed';
+      }
+    }
+
+    function openJoinModal(guildId, name) {
+      if (myProfile?.guildId) { alert('Leave your current guild before joining another.'); return; }
+      pendingJoinGuildId = guildId;
+      document.getElementById('join-guild-name').textContent = name;
+      document.getElementById('join-note').value = '';
+      document.getElementById('join-tos-check').checked = false;
+      document.getElementById('join-modal').style.display = 'flex';
+    }
+    function closeJoinModal() { document.getElementById('join-modal').style.display = 'none'; pendingJoinGuildId = null; }
+
+    async function submitJoin() {
+      if (!document.getElementById('join-tos-check').checked) { alert('Please agree to the Guild TOS'); return; }
+      const note = document.getElementById('join-note').value.trim();
+      const st = document.getElementById('join-status');
+
+      await fetch(`${API}/players/tos/agree`, { method: 'POST', headers: ah(), body: JSON.stringify({ tosType: 'guild' }) });
+
+      const r = await fetch(`${API}/guilds/${pendingJoinGuildId}/join`, { method: 'POST', headers: ah(), body: JSON.stringify({ note }) });
+      const d = await r.json();
+      if (d.success) {
+        st.className = 'status-msg ok'; st.textContent = 'Request sent! Wait for guildmaster approval.';
+        setTimeout(closeJoinModal, 1500);
+      } else {
+        st.className = 'status-msg err'; st.textContent = d.error || 'Failed';
+      }
+    }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('kg_token'); window.location.href = '/'; });
+
+    init();
+  </script>
+</body>
+
+</html>

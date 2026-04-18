@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assemble — Build Anything | KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --dim: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warn: #d29922;
+      --fail: #f85149;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      z-index: 200;
+    }
+
+    .nav-logo {
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--dim);
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────────── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    #c {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── SIDEBAR PANELS ─────────────────────────────────────── */
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .part-category {
+      margin-bottom: 14px;
+    }
+
+    .cat-label {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .part-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .part-btn {
+      aspect-ratio: 1;
+      background: rgba(88, 166, 255, 0.05);
+      border: 1px solid rgba(88, 166, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 4px;
+      font-size: 9px;
+      color: var(--text);
+      position: relative;
+    }
+
+    .part-btn:hover {
+      background: rgba(88, 166, 255, 0.12);
+      border-color: var(--accent);
+    }
+
+    .part-btn .icon {
+      font-size: 20px;
+    }
+
+    .part-btn .lbl {
+      font-size: 7px;
+      text-align: center;
+      line-height: 1.2;
+      opacity: 0.8;
+    }
+
+    /* ── TOOLTIP ────────────────────────────────────────────── */
+    .tooltip {
+      position: fixed;
+      background: rgba(22, 27, 34, 0.98);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      pointer-events: none;
+      z-index: 500;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      max-width: 280px;
+    }
+
+    .tooltip.show {
+      display: block;
+    }
+
+    .tooltip-title {
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .tooltip-desc {
+      font-size: 13px;
+      color: var(--dim);
+    }
+
+    /* ── PROPERTIES PANEL ───────────────────────────────────── */
+    #props {
+      display: none;
+    }
+
+    #props.show {
+      display: block;
+    }
+
+    .prop-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .prop-label {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .prop-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      width: 120px;
+    }
+
+    .prop-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* ── CONTROLS BAR ───────────────────────────────────────── */
+    .controls-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      background: var(--panel);
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      padding: 8px 16px;
+      background: rgba(88, 166, 255, 0.08);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 6px;
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(88, 166, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    .ctrl-btn.active {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .ctrl-btn.danger {
+      color: var(--fail);
+      border-color: rgba(248, 81, 73, 0.3);
+    }
+
+    .ctrl-btn.danger:hover {
+      background: rgba(248, 81, 73, 0.12);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .ctrl-separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    .grid-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .grid-control input[type="range"] {
+      width: 80px;
+    }
+
+    /* ── ROTATION SPHERE ────────────────────────────────────── */
+    .rotation-sphere {
+      position: fixed;
+      width: 180px;
+      height: 180px;
+      display: none;
+      pointer-events: none;
+      z-index: 400;
+    }
+
+    .rotation-sphere.show {
+      display: block;
+      pointer-events: all;
+    }
+
+    .rotation-sphere canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── STATUS BAR ─────────────────────────────────────────── */
+    .status-bar {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 100;
+      background: var(--panel);
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      line-height: 1.6;
+      min-width: 220px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      color: var(--dim);
+    }
+
+    .stat-val {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .stat-val.good {
+      color: var(--success);
+    }
+
+    .stat-val.bad {
+      color: var(--fail);
+    }
+
+    /* ── HELP HINT ──────────────────────────────────────────── */
+    .help-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      z-index: 100;
+      font-size: 10px;
+      color: rgba(139, 148, 158, 0.6);
+      line-height: 1.8;
+      pointer-events: none;
+      max-width: 240px;
+    }
+
+    /* ── MODAL ──────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.75);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .modal-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+
+    .modal-body {
+      font-size: 12px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────────────────── */
+    .sidebar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover {
+      background: #484f58;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
+    <ul class="nav-links">
+      <li><a href="/assemble/lobby.html" style="color:#00ffff;font-weight:700">&#8592; LEAVE GAME</a></li>
+      <li><a href="/">Portal</a></li>
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/4DTicTacToe/">Connect 4D</a></li>
+    </ul>
+  </nav>
+
+  <div class="workspace">
+    <!-- LEFT SIDEBAR: Parts palette + properties -->
+    <aside class="sidebar">
+      <div class="panel-section">
+        <div class="panel-title">PART LIBRARY</div>
+        <div id="parts-palette">
+          <!-- Built by JS -->
+        </div>
+      </div>
+
+      <div class="panel-section" id="props">
+        <div class="panel-title">PROPERTIES</div>
+        <div id="props-content">
+          <div class="prop-row">
+            <span class="prop-label">Position X</span>
+            <input type="number" class="prop-input" id="prop-x" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Y</span>
+            <input type="number" class="prop-input" id="prop-y" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Position Z</span>
+            <input type="number" class="prop-input" id="prop-z" step="0.5">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Rotation Y</span>
+            <input type="number" class="prop-input" id="prop-ry" step="15" min="-180" max="180">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Label</span>
+            <input type="text" class="prop-input" id="prop-label" placeholder="(optional)">
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: 3D canvas -->
+    <div class="canvas-wrap">
+      <canvas id="c"></canvas>
+
+      <div class="status-bar">
+        <div class="stat-row">
+          <span class="stat-label">Parts:</span>
+          <span class="stat-val" id="stat-parts">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Connections:</span>
+          <span class="stat-val" id="stat-conns">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Powered:</span>
+          <span class="stat-val" id="stat-powered">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Mass:</span>
+          <span class="stat-val" id="stat-mass">0 kg</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Status:</span>
+          <span class="stat-val good" id="stat-status">Ready</span>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <button class="ctrl-btn active" id="btn-snap" onclick="toggleSnap()">📍 SNAP: ON</button>
+        <div class="grid-control">
+          <label>Grid:</label>
+          <input type="range" id="grid-slider" min="0.1" max="2" step="0.1" value="0.5"
+            oninput="updateGridSize(this.value)">
+          <span id="grid-val">0.5</span>
+        </div>
+        <div class="ctrl-separator"></div>
+        <button class="ctrl-btn" id="btn-run" onclick="toggleSim()">▶ RUN</button>
+        <button class="ctrl-btn" onclick="deleteSelected()" disabled id="btn-delete">DELETE</button>
+        <button class="ctrl-btn" onclick="saveContraption()">💾 SAVE</button>
+        <button class="ctrl-btn" onclick="loadContraption()">📂 LOAD</button>
+        <button class="ctrl-btn danger" onclick="clearAll()">CLEAR ALL</button>
+      </div>
+
+      <div class="help-hint">
+        <b>Left-click</b> part → <b>Click</b> scene to pick up → <b>Drag</b> to move → <b>Click</b> to drop<br>
+        <b>Right-click</b> while holding part for 3D rotation sphere<br>
+        <b>Drag canvas</b> to orbit | <b>Scroll</b> to zoom
+      </div>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title" id="tooltip-title">Part Name</div>
+    <div class="tooltip-desc" id="tooltip-desc">Description</div>
+  </div>
+
+  <!-- Rotation Sphere (for 3D rotation control) -->
+  <div class="rotation-sphere" id="rotation-sphere">
+    <canvas id="rotation-canvas" width="180" height="180"></canvas>
+  </div>
+
+  <!-- Result Modal -->
+  <div class="modal-overlay" id="result-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="result-title">SUCCESS!</div>
+      <div class="modal-body" id="result-body">Your contraption is structurally sound and running.</div>
+      <div class="modal-btns">
+        <button class="ctrl-btn" onclick="closeModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/substrates/profile_gate.js"></script>
+  <script src="/lib/three/three.min.js"></script>
+  <script src="/lib/three/OrbitControls.js"></script>
+  <script type="module">
+    'use strict';
+
+    import { PARTS, PART_MAP, CATEGORIES } from './parts.js';
+    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js';
+
+    // ═══════════════════════════════════════════════════════════════
+    // GLOBAL STATE
+    // ═══════════════════════════════════════════════════════════════
+    const engine = new AssembleEngine();
+    const renderer = new AssembleRenderer(document.getElementById('c'), engine);
+
+    let selectedTool = null;  // partId when placing
+    let selectedNode = null;  // nodeId when editing
+    let placementMode = false;
+    let ghostVisible = false;
+    let snapEnabled = true;
+    let gridSize = 0.5;
+    let draggedNode = null;   // node being dragged
+    let dragOffset = new THREE.Vector3();
+    let isDragging = false;
+    let rotationMode = false;
+    let rotSphere = null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // BUILD PARTS PALETTE
+    // ═══════════════════════════════════════════════════════════════
+    const palette = document.getElementById('parts-palette');
+    const grouped = {};
+    PARTS.forEach(p => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+
+    for (const cat of CATEGORIES) {
+      const parts = grouped[cat] || [];
+      if (!parts.length) continue;
+
+      const catDiv = document.createElement('div');
+      catDiv.className = 'part-category';
+      catDiv.innerHTML = `<span class="cat-label">${cat.toUpperCase()}</span><div class="part-grid" data-cat="${cat}"></div>`;
+      palette.appendChild(catDiv);
+
+      const grid = catDiv.querySelector('.part-grid');
+      parts.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'part-btn';
+        btn.dataset.partId = p.id;
+        btn.innerHTML = `<div class="icon">${p.icon}</div><div class="lbl">${p.label}</div>`;
+        btn.onclick = () => selectTool(p.id);
+        // Tooltip
+        btn.addEventListener('mouseenter', e => showTooltip(e, p.label, `Category: ${p.category} | Mass: ${p.mass}kg`));
+        btn.addEventListener('mouseleave', hideTooltip);
+        grid.appendChild(btn);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TOOLTIP
+    // ═══════════════════════════════════════════════════════════════
+    const tooltip = document.getElementById('tooltip');
+    const tooltipTitle = document.getElementById('tooltip-title');
+    const tooltipDesc = document.getElementById('tooltip-desc');
+
+    function showTooltip(e, title, desc) {
+      tooltipTitle.textContent = title;
+      tooltipDesc.textContent = desc;
+      tooltip.classList.add('show');
+      updateTooltipPos(e);
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('show');
+    }
+
+    function updateTooltipPos(e) {
+      const x = e.clientX + 15;
+      const y = e.clientY + 15;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    document.addEventListener('mousemove', e => {
+      if (tooltip.classList.contains('show')) {
+        updateTooltipPos(e);
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // TOOL SELECTION
+    // ═══════════════════════════════════════════════════════════════
+    function selectTool(partId) {
+      selectedTool = partId;
+      placementMode = true;
+      document.querySelectorAll('.part-btn').forEach(b => b.style.background = 'rgba(88,166,255,0.05)');
+      const btn = document.querySelector(`[data-part-id="${partId}"]`);
+      if (btn) btn.style.background = 'rgba(88,166,255,0.25)';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SNAP & GRID CONTROLS
+    // ═══════════════════════════════════════════════════════════════
+    window.toggleSnap = function () {
+      snapEnabled = !snapEnabled;
+      const btn = document.getElementById('btn-snap');
+      if (snapEnabled) {
+        btn.textContent = '📍 SNAP: ON';
+        btn.classList.add('active');
+      } else {
+        btn.textContent = '📍 SNAP: OFF';
+        btn.classList.remove('active');
+      }
+    };
+
+    window.updateGridSize = function (val) {
+      gridSize = parseFloat(val);
+      document.getElementById('grid-val').textContent = val;
+      // Update renderer grid
+      renderer.updateGrid(gridSize);
+    };
+
+    function snapPosition(pos) {
+      if (!snapEnabled) return pos;
+      return {
+        x: Math.round(pos.x / gridSize) * gridSize,
+        y: Math.round(pos.y / gridSize) * gridSize,
+        z: Math.round(pos.z / gridSize) * gridSize,
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CANVAS INTERACTION - New drag & drop model
+    // ═══════════════════════════════════════════════════════════════
+    const canvas = document.getElementById('c');
+    let mouseDownPos = null;
+    let mouseMoved = false;
+
+    canvas.addEventListener('mousedown', e => {
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+      mouseMoved = false;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (mouseDownPos) {
+        const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+        if (dist > 3) mouseMoved = true;
+      }
+
+      // Ghost preview when in placement mode
+      if (placementMode && selectedTool && !isDragging) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          renderer.showGhost(selectedTool, snapped, null);
+          ghostVisible = true;
+        }
+      }
+
+      // Drag existing part
+      if (isDragging && draggedNode) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const node = engine.nodes.get(draggedNode);
+          if (node) {
+            const newPos = {
+              x: pt.x + dragOffset.x,
+              y: 0.5,
+              z: pt.z + dragOffset.z
+            };
+            const snapped = snapPosition(newPos);
+            node.position.x = snapped.x;
+            node.position.y = snapped.y;
+            node.position.z = snapped.z;
+            renderer.updateMeshTransform(node);
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', e => {
+      if (e.button === 0) { // Left click only
+        if (isDragging) {
+          // Always drop if we're currently dragging
+          stopDragging();
+        } else if (!mouseMoved && mouseDownPos) {
+          // Only process click if mouse didn't move (for picking up parts)
+          handleCanvasClick(e);
+        }
+      }
+      mouseDownPos = null;
+      mouseMoved = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (isDragging && draggedNode) {
+        showRotationSphere(e);
+      }
+    });
+
+    function handleCanvasClick(e) {
+      if (engine.running) return;
+
+      if (placementMode && selectedTool) {
+        // Place new part
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          const node = engine.addNode(selectedTool, snapped, { x: 0, y: 0, z: 0 });
+          renderer._addMesh(node);
+          placementMode = false;
+          selectedTool = null;
+          renderer.hideGhost();
+          // Immediately pick up the newly placed part
+          startDragging(node.id, e);
+          updateStats();
+        }
+      } else {
+        // Pick up existing part
+        const nodeId = renderer.pick(e.clientX, e.clientY);
+        if (nodeId) {
+          startDragging(nodeId, e);
+        } else {
+          deselectNode();
+        }
+      }
+    }
+
+    function startDragging(nodeId, e) {
+      draggedNode = nodeId;
+      isDragging = true;
+      selectNode(nodeId);
+      renderer.controls.enabled = false; // Disable orbit while dragging
+
+      const node = engine.nodes.get(nodeId);
+      const pt = raycastToGround(e);
+      if (node && pt) {
+        dragOffset.set(node.position.x - pt.x, 0, node.position.z - pt.z);
+      }
+    }
+
+    function stopDragging() {
+      isDragging = false;
+      draggedNode = null;
+      renderer.controls.enabled = true;
+      dragOffset.set(0, 0, 0);
+    }
+
+    function raycastToGround(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(mouse, renderer.camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const pt = new THREE.Vector3();
+      ray.ray.intersectPlane(plane, pt);
+      return pt;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ROTATION SPHERE (3D rotation control)
+    // ═══════════════════════════════════════════════════════════════
+    const rotSphereDiv = document.getElementById('rotation-sphere');
+    const rotCanvas = document.getElementById('rotation-canvas');
+    const rotCtx = rotCanvas.getContext('2d');
+    let rotDragStart = null;
+
+    function showRotationSphere(e) {
+      rotSphereDiv.style.left = (e.clientX - 90) + 'px';
+      rotSphereDiv.style.top = (e.clientY - 90) + 'px';
+      rotSphereDiv.classList.add('show');
+      drawRotationSphere();
+    }
+
+    function hideRotationSphere() {
+      rotSphereDiv.classList.remove('show');
+    }
+
+    function drawRotationSphere() {
+      const w = 180, h = 180, cx = w / 2, cy = h / 2, r = 80;
+      rotCtx.clearRect(0, 0, w, h);
+
+      // Outer circle
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.lineWidth = 2;
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // X axis (red)
+      rotCtx.strokeStyle = '#f85149';
+      rotCtx.lineWidth = 1.5;
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx - r, cy);
+      rotCtx.lineTo(cx + r, cy);
+      rotCtx.stroke();
+
+      // Y axis (green)
+      rotCtx.strokeStyle = '#3fb950';
+      rotCtx.beginPath();
+      rotCtx.moveTo(cx, cy - r);
+      rotCtx.lineTo(cx, cy + r);
+      rotCtx.stroke();
+
+      // Z axis (blue circle)
+      rotCtx.strokeStyle = '#58a6ff';
+      rotCtx.beginPath();
+      rotCtx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+      rotCtx.stroke();
+
+      // Labels
+      rotCtx.fillStyle = '#c9d1d9';
+      rotCtx.font = '11px Orbitron';
+      rotCtx.fillText('X', cx + r + 8, cy + 4);
+      rotCtx.fillText('Y', cx - 4, cy - r - 8);
+      rotCtx.fillText('Z', cx + r * 0.6 + 8, cy - r * 0.6 - 8);
+    }
+
+    rotCanvas.addEventListener('mousedown', e => {
+      const rect = rotCanvas.getBoundingClientRect();
+      rotDragStart = {
+        x: e.clientX - rect.left - 90,
+        y: e.clientY - rect.top - 90
+      };
+    });
+
+    rotCanvas.addEventListener('mousemove', e => {
+      if (!rotDragStart || !draggedNode) return;
+      const rect = rotCanvas.getBoundingClientRect();
+      const dx = (e.clientX - rect.left - 90) - rotDragStart.x;
+      const dy = (e.clientY - rect.top - 90) - rotDragStart.y;
+
+      const node = engine.nodes.get(draggedNode);
+      if (node) {
+        // Rotate based on mouse drag
+        node.rotation.y += dx * 0.02;
+        node.rotation.x -= dy * 0.02;
+        renderer.updateMeshTransform(node);
+        updatePropertiesPanel();
+      }
+
+      rotDragStart.x += dx;
+      rotDragStart.y += dy;
+    });
+
+    rotCanvas.addEventListener('mouseup', () => {
+      rotDragStart = null;
+    });
+
+    rotSphereDiv.addEventListener('mouseleave', () => {
+      hideRotationSphere();
+      rotDragStart = null;
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // NODE SELECTION & PROPERTIES
+    // ═══════════════════════════════════════════════════════════════
+    function selectNode(nodeId) {
+      selectedNode = nodeId;
+      renderer.select(nodeId);
+      document.getElementById('btn-delete').disabled = false;
+      const node = engine.nodes.get(nodeId);
+      if (!node) return;
+
+      // Show properties panel
+      document.getElementById('props').classList.add('show');
+      updatePropertiesPanel();
+    }
+
+    function updatePropertiesPanel() {
+      const node = engine.nodes.get(selectedNode);
+      if (!node) return;
+      document.getElementById('prop-x').value = node.position.x.toFixed(2);
+      document.getElementById('prop-y').value = node.position.y.toFixed(2);
+      document.getElementById('prop-z').value = node.position.z.toFixed(2);
+      document.getElementById('prop-ry').value = (node.rotation.y * 180 / Math.PI).toFixed(0);
+      document.getElementById('prop-label').value = node.label || '';
+    }
+
+    function deselectNode() {
+      selectedNode = null;
+      renderer.select(null);
+      document.getElementById('btn-delete').disabled = true;
+      document.getElementById('props').classList.remove('show');
+    }
+
+    // Property inputs update node
+    ['prop-x', 'prop-y', 'prop-z', 'prop-ry', 'prop-label'].forEach(id => {
+      const inp = document.getElementById(id);
+      inp.addEventListener('input', () => {
+        if (!selectedNode) return;
+        const node = engine.nodes.get(selectedNode);
+        if (!node) return;
+        if (id === 'prop-x') node.position.x = parseFloat(inp.value) || 0;
+        if (id === 'prop-y') node.position.y = parseFloat(inp.value) || 0;
+        if (id === 'prop-z') node.position.z = parseFloat(inp.value) || 0;
+        if (id === 'prop-ry') node.rotation.y = (parseFloat(inp.value) || 0) * Math.PI / 180;
+        if (id === 'prop-label') node.label = inp.value;
+        renderer.updateMeshTransform(node);
+      });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // SIMULATION CONTROL
+    // ═══════════════════════════════════════════════════════════════
+    window.toggleSim = function () {
+      if (engine.running) {
+        engine.stop();
+        document.getElementById('btn-run').innerHTML = '▶ RUN';
+        document.getElementById('btn-run').classList.remove('active');
+      } else {
+        engine.start();
+        document.getElementById('btn-run').innerHTML = '⏹ STOP';
+        document.getElementById('btn-run').classList.add('active');
+        // Check if it works or fails
+        setTimeout(() => {
+          const stats = engine.stats();
+          if (stats.structurallySound && stats.powered > 0) {
+            showModal('SUCCESS!', `Your contraption is running! ${stats.powered} parts powered, total mass ${stats.totalMass} kg.`, 'good');
+          } else if (!stats.structurallySound) {
+            showModal('FAILURE!', `Structural failure detected. Check for overload, fractures, or electrical shorts.`, 'bad');
+          } else if (stats.powered === 0 && stats.total > 0) {
+            showModal('NO POWER', `No power sources detected. Add a motor, battery, or engine to run your contraption.`, 'warn');
+          }
+        }, 500);
+      }
+    };
+
+    window.deleteSelected = function () {
+      if (!selectedNode) return;
+      engine.removeNode(selectedNode);
+      renderer._removeMesh(engine.nodes.get(selectedNode) || { id: selectedNode });
+      deselectNode();
+      updateStats();
+    };
+
+    window.clearAll = function () {
+      if (!confirm('Clear entire workspace?')) return;
+      for (const id of [...engine.nodes.keys()]) {
+        engine.removeNode(id);
+      }
+      updateStats();
+    };
+
+    window.saveContraption = function () {
+      const data = engine.serialise();
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contraption_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.loadContraption = function () {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            engine.load(data);
+            // Rebuild meshes
+            for (const node of engine.nodes.values()) {
+              renderer._addMesh(node);
+            }
+            for (const conn of engine.connections.values()) {
+              renderer._addConnLine(conn);
+            }
+            updateStats();
+          } catch (err) {
+            alert('Failed to load: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // STATS UPDATE
+    // ═══════════════════════════════════════════════════════════════
+    function updateStats() {
+      const s = engine.stats();
+      document.getElementById('stat-parts').textContent = s.total;
+      document.getElementById('stat-conns').textContent = s.connections;
+      document.getElementById('stat-powered').textContent = s.powered;
+      document.getElementById('stat-mass').textContent = s.totalMass + ' kg';
+      const statEl = document.getElementById('stat-status');
+      if (engine.running) {
+        if (s.structurallySound) {
+          statEl.textContent = 'Running';
+          statEl.className = 'stat-val good';
+        } else {
+          statEl.textContent = 'FAILED';
+          statEl.className = 'stat-val bad';
+        }
+      } else {
+        statEl.textContent = 'Ready';
+        statEl.className = 'stat-val';
+      }
+    }
+
+    engine.on('simStep', () => updateStats());
+    engine.on('failure', ({ node, mode }) => {
+      console.warn(`FAILURE: ${node.partDef.label} — ${mode}`);
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODAL
+    // ═══════════════════════════════════════════════════════════════
+    function showModal(title, body, type) {
+      document.getElementById('result-title').textContent = title;
+      document.getElementById('result-body').textContent = body;
+      const titleEl = document.getElementById('result-title');
+      titleEl.style.color = type === 'good' ? 'var(--success)' : type === 'bad' ? 'var(--fail)' : 'var(--warn)';
+      document.getElementById('result-modal').classList.add('show');
+    }
+
+    window.closeModal = function () {
+      document.getElementById('result-modal').classList.remove('show');
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER LOOP
+    // ═══════════════════════════════════════════════════════════════
+    let lastTime = 0;
+    function animate(t) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((t - lastTime) / 1000, 0.05);
+      lastTime = t;
+      engine.step(dt);
+      renderer.render();
+    }
+
+    animate(0);
+    updateStats();
+
+    // Expose engine for ManifoldBridge (non-module scripts can't import ES modules)
+    window.__assembleEngine = engine;
+  </script>
+  <script src="/js/manifold_bridge.js"></script>
+  <script>
+    // ManifoldBridge init — runs after module script has set window.__assembleEngine
+    window.addEventListener('load', () => {
+      if (typeof ManifoldBridge === 'undefined') return;
+      ManifoldBridge.init({
+        id: 'assemble',
+        version: '1.0.0',
+        x: 2,
+        y: 20,
+        exposes: () => {
+          const eng = window.__assembleEngine;
+          if (!eng) return { running: false, partCount: 0 };
+          return {
+            running: eng.running,
+            partCount: eng.nodes ? eng.nodes.size : 0,
+            connCount: eng.connections ? eng.connections.size : 0,
+          };
+        },
+      });
+    });
+  </script>
+</body>
+
+</html>

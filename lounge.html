@@ -8,6 +8,8 @@
     <meta name="description"
         content="Multiplayer game lobbies, real-time matchmaking, and global leaderboards on the Manifold Gaming Portal">
     <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <!-- Redirect authenticated users to the new portal -->
+    <script>if (localStorage.getItem('kg_token')) { window.location.replace('/portal.html'); }</script>
     <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
 
     <style>
@@ -368,7 +370,7 @@
             }
         }
     </style>
-  <script src="/js/analytics.js"></script>
+    <script src="/js/analytics.js"></script>
 </head>
 
 <body>
@@ -563,8 +565,13 @@
         }
 
         function handleLogout() {
+            localStorage.removeItem('kg_token');
+            localStorage.removeItem('kg_user_id');
+            localStorage.removeItem('kg_username');
+            localStorage.removeItem('kg_display_name');
+            localStorage.removeItem('kg_avatar');
             sessionStorage.removeItem('user_session');
-            window.location.href = '/';
+            window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
         }
 
         function renderGlobalLeaderboard() {

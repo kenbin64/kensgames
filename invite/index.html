@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Game — KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── Card ── */
+    .invite-card {
+      background: var(--surface);
+      border: 1px solid var(--c1);
+      border-radius: 14px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.08);
+    }
+
+    .card-game-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-game-icon {
+      font-size: 2rem;
+    }
+
+    .card-game-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      color: var(--c1);
+      text-shadow: var(--glow1);
+    }
+
+    .card-game-sub {
+      font-size: 0.75rem;
+      color: var(--dim);
+      margin-top: 0.2rem;
+    }
+
+    .section-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.4rem;
+      color: var(--dim);
+      letter-spacing: 3px;
+      margin-bottom: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    /* Who's in */
+    .players-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+      min-height: 44px;
+    }
+
+    .player-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.75rem;
+    }
+
+    .player-chip .chip-ready {
+      color: var(--c3);
+      font-size: 0.6rem;
+    }
+
+    .player-chip .chip-wait {
+      color: var(--dim);
+      font-size: 0.6rem;
+    }
+
+    /* Setup form */
+    .setup-form {
+      display: none;
+    }
+
+    .setup-form.active {
+      display: block;
+    }
+
+    .field-row {
+      margin-bottom: 1.1rem;
+    }
+
+    .field-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.4rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-bottom: 0.4rem;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .field-input:focus {
+      border-color: var(--c1);
+    }
+
+    .field-err {
+      font-size: 0.7rem;
+      color: #ff4d4d;
+      margin-top: 0.3rem;
+      display: none;
+    }
+
+    /* Avatar grid */
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .av-btn {
+      aspect-ratio: 1;
+      font-size: 1.4rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .av-btn:hover {
+      border-color: rgba(0, 255, 255, 0.4);
+    }
+
+    .av-btn.selected {
+      border-color: var(--c1);
+      background: rgba(0, 255, 255, 0.1);
+      box-shadow: 0 0 8px var(--c1);
+    }
+
+    /* TOS */
+    .tos-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      font-size: 0.75rem;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+    }
+
+    .tos-row a {
+      color: var(--c1);
+    }
+
+    /* Waiting room */
+    .waiting-room {
+      display: none;
+    }
+
+    .waiting-room.active {
+      display: block;
+    }
+
+    .waiting-hint {
+      font-size: 0.78rem;
+      color: var(--dim);
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+
+    .my-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .ready-indicator {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.48rem;
+    }
+
+    .ready-indicator.ready {
+      color: var(--c3);
+    }
+
+    .ready-indicator.not-ready {
+      color: var(--dim);
+    }
+
+    /* Post-game sign-up */
+    .post-game {
+      display: none;
+    }
+
+    .post-game.active {
+      display: block;
+    }
+
+    .post-game-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      color: var(--c3);
+      margin-bottom: 0.75rem;
+    }
+
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-bottom: 0.6rem;
+      transition: border-color 0.2s;
+      text-decoration: none;
+    }
+
+    .oauth-btn:hover {
+      border-color: var(--c1);
+    }
+
+    .oauth-icon {
+      font-size: 1.2rem;
+    }
+
+    .status-msg {
+      font-size: 0.75rem;
+      text-align: center;
+      margin-top: 0.75rem;
+      min-height: 1em;
+    }
+
+    .status-msg.err {
+      color: #ff4d4d;
+    }
+
+    .status-msg.ok {
+      color: var(--c3);
+    }
+
+    .status-msg.info {
+      color: var(--c1);
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      margin: 1.25rem 0;
+    }
+
+    .code-display {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 1.2rem;
+      color: var(--c1);
+      letter-spacing: 8px;
+      text-align: center;
+      padding: 0.75rem;
+      border: 1px solid rgba(0, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(0, 255, 255, 0.04);
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+  <div class="m-dim-ticker" aria-hidden="true"></div>
+
+  <header class="arcade-header">
+    <a href="/" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <div class="header-nav">
+      <a href="/login/index.html" class="arcade-btn" id="signin-btn">SIGN IN</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="invite-card">
+
+      <!-- Game badge + code display -->
+      <div class="card-game-badge">
+        <div class="card-game-icon" id="game-icon">🎮</div>
+        <div>
+          <div class="card-game-name" id="game-name">Loading…</div>
+          <div class="card-game-sub" id="game-sub">Private game invite</div>
+        </div>
+      </div>
+
+      <div class="code-display" id="code-display">------</div>
+
+      <!-- Who's in -->
+      <div class="section-label">WHO'S IN</div>
+      <div class="players-row" id="players-row"></div>
+
+      <!-- PHASE 1: Setup form (guest) -->
+      <div class="setup-form" id="setup-form">
+        <div class="field-row">
+          <div class="field-label">YOUR NAME IN THIS GAME</div>
+          <input class="field-input" type="text" id="inp-playername" placeholder="Enter a display name…" maxlength="20">
+          <div class="field-err" id="err-playername">2–20 alphanumeric characters</div>
+        </div>
+
+        <div class="section-label">CHOOSE YOUR AVATAR</div>
+        <div class="avatar-grid" id="avatar-grid"></div>
+
+        <div class="tos-row">
+          <input type="checkbox" id="tos-check" style="margin-top:2px;accent-color:#00ffff">
+          <label for="tos-check">
+            I agree to the <a href="/tos/index.html" target="_blank">Terms of Service</a>.
+            I understand this is a guest session — no account will be created.
+          </label>
+        </div>
+
+        <button class="arcade-btn" style="width:100%;padding:0.8rem" id="join-btn" onclick="submitJoin()">JOIN
+          GAME</button>
+        <div class="status-msg" id="join-status"></div>
+      </div>
+
+      <!-- PHASE 2: Waiting room -->
+      <div class="waiting-room" id="waiting-room">
+        <div class="waiting-hint">You're in! Hit <strong style="color:var(--c3)">READY</strong> when you're set. The
+          game creator will start once everyone is ready.</div>
+
+        <div class="my-status-row">
+          <span class="ready-indicator not-ready" id="my-ready-indicator">● NOT READY</span>
+          <button class="arcade-btn" id="ready-btn" onclick="toggleReady()">READY UP</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">WAITING FOR HOST TO START</div>
+        <div style="font-size:0.78rem;color:var(--dim)" id="waiting-sub">The game creator can add bot players before
+          starting.</div>
+        <div class="status-msg info" id="waiting-status">Polling for updates…</div>
+      </div>
+
+      <!-- PHASE 3: Post-game sign-up -->
+      <div class="post-game" id="post-game">
+        <div class="post-game-title">🎉 GAME OVER!</div>
+        <p style="font-size:0.82rem;color:var(--dim);margin-bottom:1.5rem;line-height:1.6">
+          Want to save your progress, earn medallions, and play again with friends?<br>Create a free account — it takes
+          30 seconds.
+        </p>
+        <a class="oauth-btn" href="/login/index.html?provider=google">
+          <span class="oauth-icon">🔵</span> Continue with Google
+        </a>
+        <a class="oauth-btn" href="/register/index.html">
+          <span class="oauth-icon">🎮</span> Create a KensGames account
+        </a>
+        <div class="divider"></div>
+        <a href="javascript:void(0)" onclick="backToGame()"
+          style="display:block;text-align:center;font-size:0.75rem;color:var(--dim)">No thanks, continue as guest</a>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    const AVATARS = [
+      { id: 'wizard', emoji: '🧙' }, { id: 'knight', emoji: '🛡️' },
+      { id: 'robot', emoji: '🤖' }, { id: 'alien', emoji: '👽' },
+      { id: 'ninja', emoji: '🥷' }, { id: 'astronaut', emoji: '👨‍🚀' },
+      { id: 'dragon', emoji: '🐉' }, { id: 'phoenix', emoji: '🦅' },
+      { id: 'fox', emoji: '🦊' }, { id: 'wolf', emoji: '🐺' },
+      { id: 'cat', emoji: '🐱' }, { id: 'ghost', emoji: '👻' },
+      { id: 'skull', emoji: '💀' }, { id: 'fire', emoji: '🔥' },
+      { id: 'lightning', emoji: '⚡' }, { id: 'star', emoji: '⭐' },
+      { id: 'diamond', emoji: '💎' }, { id: 'crown', emoji: '👑' },
+    ];
+    const GAME_META = {
+      fasttrack: { icon: '🎯', name: 'FastTrack', sub: 'Card & Peg Racing Board Game' },
+      brickbreaker3d: { icon: '🧱', name: 'BrickBreaker 3D', sub: '3D Arcade Brick Breaker' },
+      '4dtictactoe': { icon: '⊞', name: '4D Tic-Tac-Toe', sub: 'Four-Dimensional Strategy' },
+      starfighter: { icon: '🚀', name: 'StarFighter', sub: 'Multiplayer Space Combat' },
+      assemble: { icon: '⚙', name: 'Assemble', sub: 'Collaborative Building Puzzle' },
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    const inviteCode = (params.get('code') || '').toUpperCase();
+    const gameIdHint = params.get('game') || '';
+
+    let sessionId = null;
+    let guestToken = null;
+    let authToken = localStorage.getItem('kg_token');
+    let selectedAvatar = 'robot';
+    let pollTimer = null;
+    let myReady = false;
+    let phase = 'setup'; // setup | waiting | started | ended
+
+    function ah(extra) {
+      const t = guestToken || authToken;
+      return { Authorization: t ? `Bearer ${t}` : '', 'Content-Type': 'application/json', ...extra };
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    async function init() {
+      if (!inviteCode) { showError('No invite code in URL. Ask your host to reshare the link.'); return; }
+
+      // Fill game meta from hint
+      const meta = GAME_META[gameIdHint] || { icon: '🎮', name: 'Game', sub: 'Private invite' };
+      document.getElementById('game-icon').textContent = meta.icon;
+      document.getElementById('game-name').textContent = meta.name;
+      document.getElementById('game-sub').textContent = meta.sub;
+      document.getElementById('code-display').textContent = inviteCode;
+
+      buildAvatarGrid();
+
+      // If already logged in, skip setup and join directly
+      if (authToken) {
+        const vr = await fetch(`${API}/auth/validate`, { headers: { Authorization: `Bearer ${authToken}` } });
+        if (vr.ok) {
+          document.getElementById('signin-btn').style.display = 'none';
+          await authJoin();
+          return;
+        } else {
+          authToken = null;
+          localStorage.removeItem('kg_token');
+        }
+      }
+
+      // Show setup form
+      setPhase('setup');
+    }
+
+    function buildAvatarGrid() {
+      const grid = document.getElementById('avatar-grid');
+      grid.innerHTML = AVATARS.map(a => `
+        <button class="av-btn${a.id === selectedAvatar ? ' selected' : ''}" onclick="selectAvatar('${a.id}')" title="${a.id}">${a.emoji}</button>
+      `).join('');
+    }
+
+    function selectAvatar(id) {
+      selectedAvatar = id;
+      document.querySelectorAll('.av-btn').forEach((b, i) => b.classList.toggle('selected', AVATARS[i].id === id));
+    }
+
+    // ── Join flow ─────────────────────────────────────────────────────────
+    async function submitJoin() {
+      const name = document.getElementById('inp-playername').value.trim();
+      const errEl = document.getElementById('err-playername');
+      if (!/^[A-Za-z0-9_ ]{2,20}$/.test(name)) {
+        errEl.style.display = 'block'; return;
+      }
+      errEl.style.display = 'none';
+
+      if (!document.getElementById('tos-check').checked) {
+        setStatus('join-status', 'Please agree to the Terms of Service', 'err'); return;
+      }
+
+      document.getElementById('join-btn').disabled = true;
+      setStatus('join-status', 'Joining…', 'info');
+
+      const r = await fetch(`${API}/sessions/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: inviteCode, playername: name, avatarId: selectedAvatar }),
+      });
+      const d = await r.json();
+
+      if (!r.ok || !d.success) {
+        setStatus('join-status', d.error || 'Could not join', 'err');
+        document.getElementById('join-btn').disabled = false;
+        return;
+      }
+
+      guestToken = d.guestToken;
+      sessionId = d.sessionId;
+      renderPlayers(d.session.players);
+      setPhase('waiting');
+      startPolling();
+    }
+
+    async function authJoin() {
+      setStatus('join-status', 'Joining as your account…', 'info');
+      const r = await fetch(`${API}/sessions/join`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: inviteCode }),
+      });
+      const d = await r.json();
+
+      if (!r.ok || !d.success) {
+        // Fall back to guest setup form
+        setPhase('setup');
+        setStatus('join-status', d.error || 'Could not auto-join', 'err');
+        return;
+      }
+      sessionId = d.sessionId;
+      renderPlayers(d.session.players);
+      setPhase('waiting');
+      startPolling();
+    }
+
+    // ── Waiting room ──────────────────────────────────────────────────────
+    async function toggleReady() {
+      if (!sessionId) return;
+      const r = await fetch(`${API}/sessions/${sessionId}/ready`, { method: 'POST', headers: ah() });
+      const d = await r.json();
+      if (d.success) {
+        myReady = d.ready;
+        updateReadyUI();
+        renderPlayers(d.session.players);
+      }
+    }
+
+    function updateReadyUI() {
+      const ind = document.getElementById('my-ready-indicator');
+      const btn = document.getElementById('ready-btn');
+      ind.className = `ready-indicator ${myReady ? 'ready' : 'not-ready'}`;
+      ind.textContent = myReady ? '✔ READY' : '● NOT READY';
+      btn.textContent = myReady ? 'UNREADY' : 'READY UP';
+    }
+
+    function startPolling() {
+      stopPolling();
+      pollTimer = setInterval(pollSession, 3000);
+    }
+    function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+    async function pollSession() {
+      if (!sessionId) return;
+      try {
+        const r = await fetch(`${API}/sessions/${sessionId}`, { headers: ah() });
+        if (!r.ok) return;
+        const d = await r.json();
+        const s = d.session;
+
+        renderPlayers(s.players);
+
+        if (s.status === 'active' && s.gameUrl) {
+          stopPolling();
+          setStatus('waiting-status', 'Game starting…', 'ok');
+          setTimeout(() => { window.location.href = s.gameUrl + `&guest=${!!guestToken}`; }, 1200);
+          return;
+        }
+
+        const ready = s.players.filter(p => p.ready).length;
+        const total = s.players.length;
+        setStatus('waiting-status', `${ready}/${total} players ready`, 'info');
+      } catch { }
+    }
+
+    function renderPlayers(players) {
+      const row = document.getElementById('players-row');
+      row.innerHTML = players.map(p => {
+        const avatarObj = AVATARS.find(a => a.id === p.avatarId);
+        const emoji = avatarObj?.emoji || '🎮';
+        const readyCls = p.ready ? 'chip-ready' : 'chip-wait';
+        const readyTxt = p.ready ? '✔' : '…';
+        const crown = p.isCreator ? ' 👑' : '';
+        return `<div class="player-chip">${emoji} ${escHtml(p.playername)}${crown} <span class="${readyCls}">${readyTxt}</span></div>`;
+      }).join('');
+    }
+
+    // ── Post game ─────────────────────────────────────────────────────────
+    function showPostGame() { setPhase('ended'); }
+    function backToGame() { /* just dismiss modal */ setPhase('waiting'); }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function setPhase(p) {
+      phase = p;
+      document.getElementById('setup-form').classList.toggle('active', p === 'setup');
+      document.getElementById('waiting-room').classList.toggle('active', p === 'waiting');
+      document.getElementById('post-game').classList.toggle('active', p === 'ended');
+    }
+
+    function setStatus(elId, msg, cls) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.className = `status-msg ${cls || ''}`;
+      el.textContent = msg;
+    }
+
+    function showError(msg) {
+      document.querySelector('.invite-card').innerHTML = `
+        <div style="text-align:center;padding:2rem">
+          <div style="font-size:2rem;margin-bottom:1rem">❌</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:0.5rem;color:#ff4d4d;margin-bottom:1rem">ERROR</div>
+          <div style="font-size:0.82rem;color:var(--dim)">${escHtml(msg)}</div>
+          <a href="/" class="arcade-btn" style="display:inline-block;margin-top:1.5rem">HOME</a>
+        </div>`;
+    }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    init();
+  </script>
+</body>
+
+</html>

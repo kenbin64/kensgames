@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Friends</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      position: relative;
+      z-index: 2;
+      padding-top: 80px;
+    }
+
+    .page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c1);
+      text-shadow: var(--glow1);
+      letter-spacing: 3px;
+      margin-bottom: 0.4rem;
+    }
+
+    .page-sub {
+      color: var(--dim);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 0.75rem;
+    }
+
+    .tab-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      padding: 0.5rem 0.9rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--dim);
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      color: var(--c1);
+      border-color: var(--c1);
+      background: rgba(0, 255, 255, 0.06);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Search */
+    .search-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--c1);
+    }
+
+    .search-btn {
+      padding: 0.65rem 1.2rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      background: transparent;
+      border: 1px solid var(--c1);
+      color: var(--c1);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .search-btn:hover {
+      background: var(--c1);
+      color: var(--void);
+    }
+
+    /* Player rows */
+    .player-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .player-row:hover {
+      border-color: rgba(0, 255, 255, 0.3);
+    }
+
+    .p-avatar {
+      font-size: 1.6rem;
+    }
+
+    .p-online-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .p-online-dot.on {
+      background: var(--c3);
+      box-shadow: 0 0 6px var(--c3);
+    }
+
+    .p-online-dot.off {
+      background: #444;
+    }
+
+    .p-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.48rem;
+      color: var(--text);
+      letter-spacing: 1px;
+    }
+
+    .p-sub {
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-top: 0.2rem;
+    }
+
+    .p-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .p-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.38rem;
+      padding: 0.35rem 0.6rem;
+      cursor: pointer;
+      border-radius: 3px;
+      border: 1px solid;
+      background: transparent;
+      transition: all 0.2s;
+    }
+
+    .p-btn.add {
+      color: var(--c3);
+      border-color: var(--c3);
+    }
+
+    .p-btn.add:hover {
+      background: var(--c3);
+      color: var(--void);
+    }
+
+    .p-btn.remove {
+      color: #ff4d4d;
+      border-color: #ff4d4d;
+    }
+
+    .p-btn.remove:hover {
+      background: #ff4d4d;
+      color: #fff;
+    }
+
+    .p-btn.block {
+      color: var(--dim);
+      border-color: var(--dim);
+    }
+
+    .p-btn.block:hover {
+      background: var(--dim);
+      color: var(--void);
+    }
+
+    .p-btn.view {
+      color: var(--c1);
+      border-color: var(--c1);
+    }
+
+    .p-btn.view:hover {
+      background: var(--c1);
+      color: var(--void);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--dim);
+      padding: 3rem;
+      font-size: 0.85rem;
+    }
+
+    /* Friend request note modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--c1);
+      border-radius: 10px;
+      padding: 2rem;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .modal-title-sm {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--c1);
+      margin-bottom: 1rem;
+    }
+
+    .modal-textarea {
+      width: 100%;
+      padding: 0.75rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.85rem;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+    }
+
+    .modal-textarea:focus {
+      border-color: var(--c1);
+    }
+
+    .modal-hint {
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin: 0.4rem 0 1rem;
+    }
+
+    .modal-tos-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      font-size: 0.75rem;
+      color: var(--text);
+    }
+
+    .modal-tos-row a {
+      color: var(--c1);
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    .modal-btns button {
+      flex: 1;
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <header class="arcade-header">
+    <a href="/portal.html" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav style="display:flex;gap:0.5rem;">
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+      <a href="/social/guilds.html" class="arcade-btn">GUILDS</a>
+      <a href="/social/leaderboards.html" class="arcade-btn">RANKS</a>
+    </nav>
+    <div class="header-nav">
+      <span class="player-tag" id="player-tag"></span>
+      <button class="arcade-btn" id="logout-btn">LOGOUT</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">FRIENDS</div>
+    <div class="page-sub">Connect with players · Invite to private games · See who's online</div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('friends')">FRIENDS <span id="count-friends"></span></button>
+      <button class="tab-btn" onclick="switchTab('requests')">REQUESTS <span id="count-requests"></span></button>
+      <button class="tab-btn" onclick="switchTab('search')">FIND PLAYERS</button>
+      <button class="tab-btn" onclick="switchTab('blocked')">BLOCKED</button>
+    </div>
+
+    <!-- Friends list -->
+    <div class="tab-content active" id="tab-friends">
+      <div class="player-list" id="list-friends">
+        <div class="empty-state">Loading friends…</div>
+      </div>
+    </div>
+
+    <!-- Requests -->
+    <div class="tab-content" id="tab-requests">
+      <div class="player-list" id="list-requests">
+        <div class="empty-state">No pending requests</div>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="tab-content" id="tab-search">
+      <div class="search-row">
+        <input class="search-input" type="text" id="search-q" placeholder="Search by username or playername…"
+          onkeydown="if(event.key==='Enter')doSearch()">
+        <button class="search-btn" onclick="doSearch()">SEARCH</button>
+      </div>
+      <div class="player-list" id="list-search">
+        <div class="empty-state">Search for other players</div>
+      </div>
+    </div>
+
+    <!-- Blocked -->
+    <div class="tab-content" id="tab-blocked">
+      <div class="player-list" id="list-blocked">
+        <div class="empty-state">No blocked players</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Friend request modal -->
+  <div class="modal-overlay" id="req-modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title-sm">SEND FRIEND REQUEST</div>
+      <div style="font-size:0.8rem;color:var(--dim);margin-bottom:0.75rem">To: <strong id="req-target-name"
+          style="color:var(--c1)"></strong></div>
+      <textarea class="modal-textarea" id="req-note" placeholder="Optional: add a short note…"
+        maxlength="200"></textarea>
+      <div class="modal-hint">Max 200 characters</div>
+      <div class="modal-tos-row">
+        <input type="checkbox" id="req-tos-check" style="margin-top:2px;accent-color:#00ffff">
+        <label for="req-tos-check">I agree to the <a href="/tos/index.html#social" target="_blank">Friend &amp; Social
+            TOS</a></label>
+      </div>
+      <div class="modal-btns">
+        <button class="arcade-btn" onclick="closeReqModal()">CANCEL</button>
+        <button class="arcade-btn accent" id="req-send-btn" onclick="sendRequest()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    let token = localStorage.getItem('kg_token');
+    let myId = null;
+    let pendingReqTarget = null;
+
+    const avatarMap = {};
+
+    function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
+
+    async function init() {
+      if (!token) { window.location.href = '/login/index.html'; return; }
+      try {
+        const vr = await fetch(`${API}/auth/validate`, { headers: ah() });
+        if (!vr.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+        const me = await fetch(`${API}/players/me`, { headers: ah() });
+        if (me.ok) {
+          const p = await me.json();
+          if (!p.tosAgreed || !p.profileSetup) { window.location.href = '/player/setup.html'; return; }
+          myId = p.userId;
+          document.getElementById('player-tag').textContent = p.playername || p.username;
+        }
+      } catch { window.location.href = '/login/index.html'; return; }
+
+      loadFriends();
+      loadRequests();
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', b.textContent.toLowerCase().startsWith(name.slice(0, 4)));
+      });
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById(`tab-${name}`)?.classList.add('active');
+    }
+
+    async function loadFriends() {
+      const r = await fetch(`${API}/friends`, { headers: ah() });
+      const d = await r.json();
+      const el = document.getElementById('list-friends');
+      document.getElementById('count-friends').textContent = d.friends?.length ? `(${d.friends.length})` : '';
+      if (!d.friends?.length) { el.innerHTML = '<div class="empty-state">No friends yet — search to find players</div>'; return; }
+      el.innerHTML = d.friends.map(f => playerRow(f, 'friend')).join('');
+    }
+
+    async function loadRequests() {
+      const r = await fetch(`${API}/friends/requests`, { headers: ah() });
+      const d = await r.json();
+      const el = document.getElementById('list-requests');
+      document.getElementById('count-requests').textContent = d.requests?.length ? `(${d.requests.length})` : '';
+      if (!d.requests?.length) { el.innerHTML = '<div class="empty-state">No pending requests</div>'; return; }
+      el.innerHTML = d.requests.map(f => requestRow(f)).join('');
+    }
+
+    async function doSearch() {
+      const q = document.getElementById('search-q').value.trim();
+      if (q.length < 2) return;
+      const r = await fetch(`${API}/players/search?q=${encodeURIComponent(q)}`, { headers: ah() });
+      const d = await r.json();
+      const el = document.getElementById('list-search');
+      if (!d.results?.length) { el.innerHTML = '<div class="empty-state">No players found</div>'; return; }
+      el.innerHTML = d.results.filter(p => p.userId !== myId).map(p => playerRow(p, 'search')).join('');
+    }
+
+    function playerRow(p, type) {
+      const emoji = avatarMap[p.avatarId] || '🎮';
+      const onlineCls = p.online ? 'on' : 'off';
+      const actions = type === 'friend'
+        ? `<button class="p-btn view" onclick="viewProfile(${p.userId})">PROFILE</button>
+           <button class="p-btn remove" onclick="removeFriend(${p.userId})">REMOVE</button>
+           <button class="p-btn block" onclick="blockUser(${p.userId})">BLOCK</button>`
+        : `<button class="p-btn add" onclick="openReqModal(${p.userId},'${escHtml(p.playername || p.username)}')">ADD FRIEND</button>
+           <button class="p-btn block" onclick="blockUser(${p.userId})">BLOCK</button>`;
+      return `<div class="player-row">
+        <div class="p-avatar">${emoji}</div>
+        <div class="p-online-dot ${onlineCls}"></div>
+        <div><div class="p-name">${escHtml(p.playername || p.username)}</div><div class="p-sub">${p.online ? 'Online' : 'Offline'}</div></div>
+        <div class="p-actions">${actions}</div>
+      </div>`;
+    }
+
+    function requestRow(r) {
+      const emoji = avatarMap[r.avatarId] || '🎮';
+      return `<div class="player-row">
+        <div class="p-avatar">${emoji}</div>
+        <div><div class="p-name">${escHtml(r.playername || r.username)}</div><div class="p-sub">${escHtml(r.note || 'No note')}</div></div>
+        <div class="p-actions">
+          <button class="p-btn add" onclick="respondRequest(${r.fromUserId},true)">ACCEPT</button>
+          <button class="p-btn remove" onclick="respondRequest(${r.fromUserId},false)">DECLINE</button>
+        </div>
+      </div>`;
+    }
+
+    function openReqModal(userId, name) {
+      pendingReqTarget = userId;
+      document.getElementById('req-target-name').textContent = name;
+      document.getElementById('req-note').value = '';
+      document.getElementById('req-tos-check').checked = false;
+      document.getElementById('req-modal').style.display = 'flex';
+    }
+    function closeReqModal() { document.getElementById('req-modal').style.display = 'none'; pendingReqTarget = null; }
+
+    async function sendRequest() {
+      if (!document.getElementById('req-tos-check').checked) { alert('Please agree to the Friend TOS'); return; }
+      const note = document.getElementById('req-note').value.trim();
+      const r = await fetch(`${API}/friends/request`, {
+        method: 'POST', headers: ah(),
+        body: JSON.stringify({ toUserId: pendingReqTarget, note }),
+      });
+      const d = await r.json();
+      closeReqModal();
+      alert(d.success ? 'Friend request sent!' : (d.error || 'Failed'));
+    }
+
+    async function respondRequest(fromUserId, accept) {
+      await fetch(`${API}/friends/respond`, { method: 'POST', headers: ah(), body: JSON.stringify({ fromUserId, accept }) });
+      loadFriends(); loadRequests();
+    }
+
+    async function removeFriend(userId) {
+      if (!confirm('Remove this friend?')) return;
+      await fetch(`${API}/friends/${userId}`, { method: 'DELETE', headers: ah() });
+      loadFriends();
+    }
+
+    async function blockUser(userId) {
+      if (!confirm('Block this user? They will not be able to contact you.')) return;
+      const r = await fetch(`${API}/friends/block`, { method: 'POST', headers: ah(), body: JSON.stringify({ targetUserId: userId }) });
+      const d = await r.json();
+      alert(d.success ? 'User blocked' : (d.error || 'Failed'));
+      loadFriends();
+    }
+
+    function viewProfile(userId) { window.location.href = `/player/profile.html?id=${userId}`; }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('kg_token'); window.location.href = '/'; });
+
+    init();
+  </script>
+</body>
+
+</html>

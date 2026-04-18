@@ -991,12 +991,13 @@
     }
 
     function logout() {
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('user_id');
-      localStorage.removeItem('username');
-      localStorage.removeItem('display_name');
+      localStorage.removeItem('kg_token');
+      localStorage.removeItem('kg_user_id');
+      localStorage.removeItem('kg_username');
+      localStorage.removeItem('kg_display_name');
       localStorage.removeItem('kg_avatar');
-      window.location.href = '/';
+      localStorage.removeItem('user_token'); // legacy key
+      window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
     }
   </script>
 </body>

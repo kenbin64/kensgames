@@ -37,8 +37,15 @@ app.use(cors({
 // TODO: Import manifold-core when server runs in Node environment
 // For now using mock manifold - will be replaced with real manifold integration
 
-let manifoldData = {}; // Mock manifold storage
+const { manifoldData } = require('./store'); // Shared in-memory store
 let nextUserId = 1;
+
+// Superuser email addresses — accounts registered with these emails are
+// automatically granted isSuperuser=true, isAdmin=true, adminLevel=3.
+const SUPERUSER_EMAILS = [
+  'kenetics.art@gmail.com',
+  'ken.bingham64@gmail.com',
+];
 
 // Initialize recovery manager with mock manifold
 const recoveryManager = new PasswordRecoveryManager(manifoldData);
@@ -164,9 +171,9 @@ app.post('/api/auth/register', async (req, res) => {
       emailVerified: true,
       verificationCodeHash: verificationCodeHash,
       verificationCodeExpiry: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
-      isAdmin: false,
-      isSuperuser: false,
-      adminLevel: 0, // 0=user, 1=mod, 2=admin, 3=superuser
+      isAdmin: SUPERUSER_EMAILS.includes(email ? email.toLowerCase() : ''),
+      isSuperuser: SUPERUSER_EMAILS.includes(email ? email.toLowerCase() : ''),
+      adminLevel: SUPERUSER_EMAILS.includes(email ? email.toLowerCase() : '') ? 3 : 0,
       stats: { gamesPlayed: 0, totalScore: 0 },
       preferences: { theme: 'light' },
       createdAt: Date.now()
@@ -296,11 +303,25 @@ app.get('/api/auth/validate', (req, res) => {
       return res.status(401).json({ valid: false, error: decoded.error });
     }
 
+    // Look up user to return profile state — gates need this in one request
+    let profileSetup = false, playername = null, avatarId = null;
+    for (const key in manifoldData) {
+      if (manifoldData[key].userId === decoded.userId) {
+        profileSetup = manifoldData[key].profileSetup || false;
+        playername = manifoldData[key].playername || null;
+        avatarId = manifoldData[key].avatarId || null;
+        break;
+      }
+    }
+
     return res.status(200).json({
       valid: true,
       userId: decoded.userId,
       sessionId: decoded.sessionId,
-      expiresAt: decoded.exp * 1000 // Convert to milliseconds
+      expiresAt: decoded.exp * 1000,
+      profileSetup,
+      playername,
+      avatarId,
     });
   } catch (error) {
     console.error('Validate error:', error);
@@ -732,9 +753,16 @@ app.post('/api/admin/user/:username/suspend', requireSuperuser, (req, res) => {
   try {
     const { username } = req.params;
 
+    if (username === 'kbingh') {
+      return res.status(403).json({ success: false, error: 'The superuser account cannot be suspended' });
+    }
+
     const userData = readUserFromManifold(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    if (userData.isSuperuser) {
+      return res.status(403).json({ success: false, error: 'Cannot suspend a superuser account' });
     }
 
     writeUserToManifold(username, {
@@ -762,9 +790,16 @@ app.post('/api/admin/user/:username/ban', requireSuperuser, (req, res) => {
   try {
     const { username } = req.params;
 
+    if (username === 'kbingh') {
+      return res.status(403).json({ success: false, error: 'The superuser account cannot be banned' });
+    }
+
     const userData = readUserFromManifold(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    if (userData.isSuperuser) {
+      return res.status(403).json({ success: false, error: 'Cannot ban a superuser account' });
     }
 
     writeUserToManifold(username, {
@@ -828,6 +863,25 @@ app.use((err, req, res, next) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE ROUTES
+// ═══════════════════════════════════════════════════════════════════════════
+const playersRouter = require('./routes/players');
+const friendsRouter = require('./routes/friends');
+const guildsRouter = require('./routes/guilds');
+const chatRouter = require('./routes/chat');
+const leaderboardRouter = require('./routes/leaderboards');
+const tournamentsRouter = require('./routes/tournaments');
+const gameSessionsRouter = require('./routes/game_sessions');
+
+app.use('/api/players', playersRouter);
+app.use('/api/friends', friendsRouter);
+app.use('/api/guilds', guildsRouter);
+app.use('/api/chat', chatRouter);
+app.use('/api/leaderboards', leaderboardRouter);
+app.use('/api/tournaments', tournamentsRouter);
+app.use('/api/sessions', gameSessionsRouter);
 // START SERVER
 // ═══════════════════════════════════════════════════════════════════════════
 

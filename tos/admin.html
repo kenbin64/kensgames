@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Admin Charter</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      padding-top: 80px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
+      color: var(--c3);
+      text-shadow: var(--glow3);
+      letter-spacing: 3px;
+      margin-bottom: 0.4rem;
+    }
+
+    .updated {
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-bottom: 2.5rem;
+    }
+
+    .tos-body {
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.8;
+    }
+
+    .tos-body h2 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.52rem;
+      color: var(--c3);
+      letter-spacing: 2px;
+      margin: 2rem 0 0.75rem;
+    }
+
+    .tos-body p {
+      margin-bottom: 1rem;
+    }
+
+    .tos-body ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .tos-body li {
+      margin-bottom: 0.4rem;
+    }
+
+    .tos-body a {
+      color: var(--c3);
+    }
+
+    .warning-box {
+      background: rgba(57, 255, 20, 0.05);
+      border: 1px solid var(--c3);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <header class="arcade-header">
+    <a href="/portal.html" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <div class="header-nav">
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+      <a href="/tos/index.html" class="arcade-btn">GENERAL TOS</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">ADMIN CHARTER</div>
+    <div class="updated">Last updated: June 2025 · For Portal administrators only · Applies in addition to all other TOS
+    </div>
+
+    <div class="tos-body">
+
+      <div class="warning-box">
+        <p>By accepting an admin role on kensgames.com you agree to the responsibilities and restrictions in this
+          Charter. Violation of this Charter may result in immediate removal of admin privileges and account suspension.
+        </p>
+      </div>
+
+      <h2>1. ADMIN LEVELS</h2>
+      <p>The Portal uses a 4-tier admin system:</p>
+      <ul>
+        <li><strong>Level 0 — Regular User</strong>: No admin privileges</li>
+        <li><strong>Level 1 — Moderator</strong>: Can warn users and review reports</li>
+        <li><strong>Level 2 — Admin</strong>: Can suspend users, manage tournaments, review guilds</li>
+        <li><strong>Level 3 — Super Admin</strong>: Can promote/demote admins, manage all content</li>
+        <li><strong>Superuser (kbingh)</strong>: Full authority — cannot be demoted or removed by any admin</li>
+      </ul>
+
+      <h2>2. ADMIN RESPONSIBILITIES</h2>
+      <p>As a Portal administrator you agree to:</p>
+      <ul>
+        <li>Enforce the General TOS and Guild TOS fairly and consistently</li>
+        <li>Not use admin tools to target users based on personal disputes</li>
+        <li>Document your moderation decisions in the admin console</li>
+        <li>Treat all users with impartiality regardless of guild membership, personal relationships, or competitive
+          standing</li>
+        <li>Keep admin credentials and Portal access secure</li>
+      </ul>
+
+      <h2>3. PROHIBITED ADMIN ACTIONS</h2>
+      <p>Administrators are expressly prohibited from:</p>
+      <ul>
+        <li>Attempting to demote, suspend, or remove the superuser account (kbingh)</li>
+        <li>Using admin powers to give unfair advantages in games or leaderboards</li>
+        <li>Accessing or exposing other users' private information</li>
+        <li>Sharing admin credentials or granting unauthorized access</li>
+        <li>Retaliating against users who file complaints about admin conduct</li>
+      </ul>
+
+      <h2>4. SUPERUSER AUTHORITY</h2>
+      <p>The superuser account (<strong>kbingh</strong> / kenetics.art@gmail.com) has final authority over all Portal
+        decisions. The superuser:</p>
+      <ul>
+        <li>Cannot be removed, suspended, or demoted by any admin action</li>
+        <li>Has override authority on all moderation decisions</li>
+        <li>Is the final arbiter of appeals escalated beyond guild or admin level</li>
+      </ul>
+
+      <h2>5. ACCOUNTABILITY</h2>
+      <p>All admin actions are logged with timestamps and actor identity. Logs are reviewed periodically. Admins found
+        to be abusing their role will have privileges revoked immediately.</p>
+
+      <h2>6. ACCEPTING THIS CHARTER</h2>
+      <p>Admin privileges will not be granted until this Charter has been reviewed and accepted. Existing administrators
+        who have not yet accepted this Charter will be prompted to do so on their next admin console login.</p>
+
+    </div>
+  </main>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+</body>
+
+</html>

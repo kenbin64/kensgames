@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌀 Manifold Discovery - Game Explorer</title>
     <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+    <!-- Redirect authenticated users to the new portal -->
+    <script>if (localStorage.getItem('kg_token')) { window.location.replace('/portal.html'); }</script>
     <link rel="stylesheet" href="../../../lib/fonts/fonts.css">
 
     <style>

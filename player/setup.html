@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Setup Your Profile</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .setup-wrap {
+      max-width: 560px;
+      width: 90%;
+      background: var(--panel-bg);
+      border: 1px solid var(--c1);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.08);
+    }
+
+    .setup-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c1);
+      text-shadow: var(--glow1);
+      text-align: center;
+      letter-spacing: 3px;
+      margin-bottom: 0.5rem;
+    }
+
+    .setup-sub {
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Stepper ─────────────────────────────────────────────────── */
+    .steps {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: background 0.3s;
+    }
+
+    .step-dot.active {
+      background: var(--c1);
+      box-shadow: var(--glow1);
+    }
+
+    .step-dot.done {
+      background: var(--c3);
+    }
+
+    /* ── Step panels ─────────────────────────────────────────────── */
+    .step-panel {
+      display: none;
+    }
+
+    .step-panel.active {
+      display: block;
+    }
+
+    /* TOS */
+    .tos-box {
+      height: 220px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.78rem;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 1.2rem;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .tos-box h3 {
+      color: var(--text);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .tos-box p {
+      margin-bottom: 0.75rem;
+    }
+
+    .tos-agree-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tos-agree-row input[type=checkbox] {
+      margin-top: 3px;
+      accent-color: var(--c1);
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .tos-agree-row label {
+      font-size: 0.78rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .tos-agree-row a {
+      color: var(--c1);
+    }
+
+    /* Playername */
+    .field-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c2);
+      letter-spacing: 2px;
+      margin-bottom: 0.5rem;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field-input:focus {
+      border-color: var(--c1);
+      box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.12);
+    }
+
+    .field-hint {
+      font-size: 0.72rem;
+      color: var(--dim);
+      margin-top: 0.4rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .field-error {
+      color: #ff4d4d;
+      font-size: 0.72rem;
+      margin-top: 0.3rem;
+    }
+
+    /* Avatar grid */
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .avatar-opt {
+      font-size: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .avatar-opt:hover {
+      border-color: var(--dim);
+      transform: scale(1.1);
+    }
+
+    .avatar-opt.selected {
+      border-color: var(--c1);
+      box-shadow: var(--glow1);
+      background: rgba(0, 255, 255, 0.08);
+      transform: scale(1.1);
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-next {
+      flex: 1;
+      padding: 0.75rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border: 1px solid var(--c1);
+      color: var(--c1);
+      background: transparent;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-next:hover:not(:disabled) {
+      background: var(--c1);
+      color: var(--void);
+      box-shadow: var(--glow1);
+    }
+
+    .btn-next:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-back {
+      background: transparent;
+      border: 1px solid var(--dim);
+      color: var(--dim);
+    }
+
+    .btn-back:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    .setup-status {
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.78rem;
+      margin-top: 1rem;
+      min-height: 1.2em;
+    }
+
+    .setup-status.err {
+      color: #ff4d4d;
+    }
+
+    .setup-status.ok {
+      color: var(--c3);
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <div class="setup-wrap">
+    <div class="setup-title">SETUP PROFILE</div>
+    <div class="setup-sub">One-time setup required before playing</div>
+
+    <div class="steps">
+      <div class="step-dot active" id="dot-0"></div>
+      <div class="step-dot" id="dot-1"></div>
+      <div class="step-dot" id="dot-2"></div>
+    </div>
+
+    <!-- ── Step 0: TOS ────────────────────────────────────────────── -->
+    <div class="step-panel active" id="step-0">
+      <div class="field-label">TERMS OF SERVICE</div>
+      <div class="tos-box">
+        <h3>KensGames.com Terms of Service</h3>
+        <p>Welcome to KensGames.com. By using this portal you agree to the following terms.</p>
+        <p><strong>1. Conduct.</strong> You will treat all players with respect. Harassment, hate speech, cheating, or
+          exploitation of bugs is not permitted.</p>
+        <p><strong>2. Account.</strong> You are responsible for maintaining the security of your account. You may not
+          share or transfer accounts.</p>
+        <p><strong>3. Content.</strong> You will not post or transmit any content that is illegal, offensive, or
+          infringes on the rights of others.</p>
+        <p><strong>4. Games.</strong> Game outcomes are final. Do not attempt to manipulate game results through
+          technical means.</p>
+        <p><strong>5. Guilds & Social.</strong> Guild membership is subject to additional Guild TOS. Blocking,
+          reporting, and moderation tools are provided for your safety.</p>
+        <p><strong>6. Privacy.</strong> Your playername and avatar are visible to other players. Your email is private.
+          See our Privacy Policy for details.</p>
+        <p><strong>7. Enforcement.</strong> KensGames administrators reserve the right to suspend or ban accounts for
+          violations of these terms without prior notice.</p>
+        <p><strong>8. Changes.</strong> These terms may be updated at any time. Continued use of the portal constitutes
+          acceptance.</p>
+        <p>Full Terms of Service: <a href="/tos/" target="_blank">kensgames.com/tos/</a></p>
+      </div>
+
+      <div class="tos-agree-row">
+        <input type="checkbox" id="tos-check">
+        <label for="tos-check">
+          I have read and agree to the <a href="/tos/" target="_blank">KensGames Terms of Service</a>.
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-next" id="btn-tos-next" disabled onclick="gotoStep(1)">AGREE &amp; CONTINUE →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 1: Playername ─────────────────────────────────────── -->
+    <div class="step-panel" id="step-1">
+      <div class="field-label">CHOOSE YOUR PLAYERNAME</div>
+      <input class="field-input" type="text" id="playername-input" placeholder="e.g. NeonKnight_42" maxlength="20"
+        autocomplete="off" oninput="onPlayernameInput()">
+      <div class="field-hint">3–20 characters · letters, numbers, underscore only · visible to all players</div>
+      <div class="field-error" id="pn-error"></div>
+
+      <div class="btn-row">
+        <button class="btn-next btn-back" onclick="gotoStep(0)">← BACK</button>
+        <button class="btn-next" id="btn-pn-next" disabled onclick="gotoStep(2)">NEXT →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Avatar ─────────────────────────────────────────── -->
+    <div class="step-panel" id="step-2">
+      <div class="field-label">CHOOSE YOUR AVATAR</div>
+      <div class="avatar-grid" id="avatar-grid"></div>
+      <div class="field-error" id="av-error"></div>
+
+      <div class="btn-row">
+        <button class="btn-next btn-back" onclick="gotoStep(1)">← BACK</button>
+        <button class="btn-next" id="btn-av-next" disabled onclick="submitSetup()">ENTER THE PORTAL →</button>
+      </div>
+    </div>
+
+    <div class="setup-status" id="setup-status"></div>
+  </div>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    const AVATARS = [
+      { id: 'wizard', emoji: '🧙' }, { id: 'knight', emoji: '🛡️' },
+      { id: 'robot', emoji: '🤖' }, { id: 'alien', emoji: '👾' },
+      { id: 'ninja', emoji: '🥷' }, { id: 'astronaut', emoji: '👨‍🚀' },
+      { id: 'dragon', emoji: '🐉' }, { id: 'phoenix', emoji: '🦅' },
+      { id: 'fox', emoji: '🦊' }, { id: 'wolf', emoji: '🐺' },
+      { id: 'cat', emoji: '😼' }, { id: 'ghost', emoji: '👻' },
+      { id: 'skull', emoji: '💀' }, { id: 'fire', emoji: '🔥' },
+      { id: 'lightning', emoji: '⚡' }, { id: 'star', emoji: '⭐' },
+      { id: 'diamond', emoji: '💎' }, { id: 'crown', emoji: '👑' },
+    ];
+
+    // Expose avatar map globally for portal.html
+    window.KG_AVATARS = Object.fromEntries(AVATARS.map(a => [a.id, a.emoji]));
+
+    let currentStep = 0;
+    let selectedAvatar = null;
+
+    // ── Auth gate ────────────────────────────────────────────────────
+    async function init() {
+      const token = localStorage.getItem('kg_token');
+      if (!token) { window.location.href = '/login/index.html'; return; }
+
+      try {
+        const r = await fetch(`${API}/auth/validate`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      } catch { window.location.href = '/login/index.html'; return; }
+
+      // If already set up, go straight to portal
+      try {
+        const pr = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (pr.ok) {
+          const p = await pr.json();
+          if (p.tosAgreed && p.profileSetup) { window.location.href = '/portal.html'; return; }
+        }
+      } catch { }
+
+      buildAvatarGrid();
+      document.getElementById('tos-check').addEventListener('change', e => {
+        document.getElementById('btn-tos-next').disabled = !e.target.checked;
+      });
+    }
+
+    function buildAvatarGrid() {
+      const grid = document.getElementById('avatar-grid');
+      grid.innerHTML = AVATARS.map(a => `
+        <div class="avatar-opt" id="av-${a.id}" onclick="selectAvatar('${a.id}')" title="${a.id}">${a.emoji}</div>
+      `).join('');
+    }
+
+    function gotoStep(n) {
+      if (n === 1 && currentStep === 0) {
+        // TOS → record agreement
+      }
+      document.getElementById(`step-${currentStep}`).classList.remove('active');
+      document.getElementById(`dot-${currentStep}`).classList.remove('active');
+      document.getElementById(`dot-${currentStep}`).classList.add('done');
+      currentStep = n;
+      document.getElementById(`step-${n}`).classList.add('active');
+      document.getElementById(`dot-${n}`).classList.add('active');
+      document.getElementById(`dot-${n}`).classList.remove('done');
+    }
+
+    function onPlayernameInput() {
+      const val = document.getElementById('playername-input').value;
+      const valid = /^[A-Za-z0-9_]{3,20}$/.test(val);
+      const errEl = document.getElementById('pn-error');
+      if (!valid && val.length > 0) {
+        errEl.textContent = val.length < 3 ? 'Too short (min 3)' : 'Letters, numbers, underscore only';
+      } else {
+        errEl.textContent = '';
+      }
+      document.getElementById('btn-pn-next').disabled = !valid;
+    }
+
+    function selectAvatar(id) {
+      document.querySelectorAll('.avatar-opt').forEach(el => el.classList.remove('selected'));
+      document.getElementById(`av-${id}`)?.classList.add('selected');
+      selectedAvatar = id;
+      document.getElementById('btn-av-next').disabled = false;
+    }
+
+    async function submitSetup() {
+      const token = localStorage.getItem('kg_token');
+      const playername = document.getElementById('playername-input').value.trim();
+      const statusEl = document.getElementById('setup-status');
+
+      if (!token || !playername || !selectedAvatar) return;
+
+      statusEl.className = 'setup-status';
+      statusEl.textContent = 'Saving…';
+
+      try {
+        // 1. Record TOS agreement
+        await fetch(`${API}/players/tos/agree`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tosType: 'general' }),
+        });
+
+        // 2. Setup profile
+        const r = await fetch(`${API}/players/setup`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playername, avatarId: selectedAvatar }),
+        });
+
+        const data = await r.json();
+        if (!r.ok) {
+          statusEl.className = 'setup-status err';
+          statusEl.textContent = data.error || 'Setup failed';
+          return;
+        }
+
+        statusEl.className = 'setup-status ok';
+        statusEl.textContent = '✓ Profile created! Entering portal…';
+        setTimeout(() => { window.location.href = '/portal.html'; }, 1000);
+      } catch {
+        statusEl.className = 'setup-status err';
+        statusEl.textContent = 'Network error. Please try again.';
+      }
+    }
+
+    init();
+  </script>
+</body>
+
+</html>

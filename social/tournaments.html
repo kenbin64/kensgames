@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — Tournaments</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      padding-top: 80px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .page-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--c1);
+      text-shadow: var(--glow1);
+      letter-spacing: 3px;
+      margin-bottom: 0.4rem;
+    }
+
+    .page-sub {
+      color: var(--dim);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+    }
+
+    .section-head {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 3px;
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .section-head.live {
+      color: #ff4d4d;
+      text-shadow: 0 0 8px #ff4d4d;
+    }
+
+    .section-head.upcoming {
+      color: var(--c1);
+    }
+
+    .section-head.past {
+      color: var(--dim);
+    }
+
+    .tournaments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .t-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      transition: all 0.2s;
+    }
+
+    .t-card.live {
+      border-color: rgba(255, 77, 77, 0.5);
+    }
+
+    .t-card.upcoming {
+      border-color: rgba(0, 255, 255, 0.3);
+    }
+
+    .t-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .t-status-badge {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.38rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      margin-bottom: 0.75rem;
+      letter-spacing: 1px;
+    }
+
+    .t-status-badge.live {
+      background: rgba(255, 77, 77, 0.15);
+      color: #ff4d4d;
+      border: 1px solid #ff4d4d;
+    }
+
+    .t-status-badge.upcoming {
+      background: rgba(0, 255, 255, 0.08);
+      color: var(--c1);
+      border: 1px solid var(--c1);
+    }
+
+    .t-status-badge.completed {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--dim);
+      border: 1px solid var(--dim);
+    }
+
+    .t-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--text);
+      letter-spacing: 1px;
+      margin-bottom: 0.5rem;
+    }
+
+    .t-game {
+      font-size: 0.75rem;
+      color: var(--c3);
+      margin-bottom: 0.5rem;
+    }
+
+    .t-desc {
+      font-size: 0.78rem;
+      color: var(--dim);
+      margin-bottom: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .t-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .t-prize {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      color: #ffcc00;
+    }
+
+    .t-results {
+      margin-top: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 0.75rem;
+    }
+
+    .t-results-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.38rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-bottom: 0.5rem;
+    }
+
+    .t-result-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      font-size: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .t-result-rank {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.42rem;
+      min-width: 30px;
+      color: var(--dim);
+    }
+
+    .t-result-name {
+      flex: 1;
+      color: var(--text);
+    }
+
+    .t-result-score {
+      color: var(--c3);
+    }
+
+    .empty-state {
+      color: var(--dim);
+      font-size: 0.8rem;
+      padding: 1rem 0;
+    }
+  </style>
+  <script src="/js/analytics.js" defer></script>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <header class="arcade-header">
+    <a href="/portal.html" style="text-decoration:none">
+      <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
+    </a>
+    <nav style="display:flex;gap:0.5rem;">
+      <a href="/portal.html" class="arcade-btn">PORTAL</a>
+      <a href="/social/guilds.html" class="arcade-btn">GUILDS</a>
+      <a href="/social/leaderboards.html" class="arcade-btn">RANKS</a>
+    </nav>
+    <div class="header-nav">
+      <span class="player-tag" id="player-tag"></span>
+      <button class="arcade-btn" id="logout-btn">LOGOUT</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">TOURNAMENTS</div>
+    <div class="page-sub">Guild and open competitions · Check the schedule and results</div>
+
+    <div class="section-head live">🔴 LIVE NOW</div>
+    <div class="tournaments-grid" id="grid-live">
+      <div class="empty-state">Loading…</div>
+    </div>
+
+    <div class="section-head upcoming">UPCOMING</div>
+    <div class="tournaments-grid" id="grid-upcoming">
+      <div class="empty-state">Loading…</div>
+    </div>
+
+    <div class="section-head past">COMPLETED</div>
+    <div class="tournaments-grid" id="grid-completed">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </main>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    let token = localStorage.getItem('kg_token');
+
+    function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
+
+    async function init() {
+      if (!token) { window.location.href = '/login/index.html'; return; }
+      const vr = await fetch(`${API}/auth/validate`, { headers: ah() });
+      if (!vr.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      const pr = await fetch(`${API}/players/me`, { headers: ah() });
+      if (pr.ok) {
+        const p = await pr.json();
+        if (!p.tosAgreed || !p.profileSetup) { window.location.href = '/player/setup.html'; return; }
+        document.getElementById('player-tag').textContent = p.playername || p.username;
+      }
+      loadTournaments();
+    }
+
+    async function loadTournaments() {
+      const r = await fetch(`${API}/tournaments`, { headers: ah() });
+      if (!r.ok) return;
+      const d = await r.json();
+      const all = d.tournaments || [];
+
+      const live = all.filter(t => t.status === 'live');
+      const upcoming = all.filter(t => t.status === 'upcoming');
+      const completed = all.filter(t => t.status === 'completed');
+
+      renderGrid('grid-live', live, 'No live tournaments right now');
+      renderGrid('grid-upcoming', upcoming, 'No upcoming tournaments scheduled');
+      renderGrid('grid-completed', completed, 'No past tournaments');
+    }
+
+    function renderGrid(elId, list, emptyMsg) {
+      const el = document.getElementById(elId);
+      if (!list.length) { el.innerHTML = `<div class="empty-state">${emptyMsg}</div>`; return; }
+      el.innerHTML = list.map(t => tournamentCard(t)).join('');
+    }
+
+    function tournamentCard(t) {
+      const statusLabel = { live: '● LIVE', upcoming: '◆ UPCOMING', completed: '✓ COMPLETED' }[t.status];
+      const badgeCls = t.status;
+      const startStr = t.startDate ? new Date(t.startDate).toLocaleDateString() : 'TBA';
+      const endStr = t.endDate ? new Date(t.endDate).toLocaleDateString() : 'TBA';
+      const prizeHtml = t.prize ? `<div class="t-prize">🏆 ${escHtml(t.prize)}</div>` : '';
+
+      let resultsHtml = '';
+      if (t.status === 'completed' && t.results?.length) {
+        const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+        resultsHtml = `<div class="t-results">
+          <div class="t-results-title">RESULTS</div>
+          ${t.results.slice(0, 3).map((r, i) => `
+            <div class="t-result-row">
+              <div class="t-result-rank">${medals[i + 1] || `#${i + 1}`}</div>
+              <div class="t-result-name">${escHtml(r.playername || r.userId)}</div>
+              <div class="t-result-score">${r.score?.toLocaleString() || '-'}</div>
+            </div>`).join('')}
+        </div>`;
+      }
+
+      return `<div class="t-card ${t.status}">
+        <div class="t-status-badge ${badgeCls}">${statusLabel}</div>
+        <div class="t-name">${escHtml(t.name)}</div>
+        <div class="t-game">${escHtml(t.game || 'Open')}</div>
+        <div class="t-desc">${escHtml(t.description || '')}</div>
+        <div class="t-meta"><span>${startStr} – ${endStr}</span><span>${t.participants || 0} players</span></div>
+        ${prizeHtml}
+        ${resultsHtml}
+      </div>`;
+    }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('kg_token'); window.location.href = '/'; });
+
+    init();
+  </script>
+</body>
+
+</html>
