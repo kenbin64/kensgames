@@ -822,7 +822,8 @@
       display: none !important
     }
   </style>
-  </head>
+  <script src="/js/manifold_bridge.js"></script>
+</head>
 
 <body data-mtheme="green">
   <div class="scanlines"></div>
@@ -891,129 +892,133 @@
       <span class="hud-label">MODE</span>
       <span id="ghud-speed-mode" class="hud-val">CRUISE</span>
     </div>
-  </div>
-
-  <!-- â•â•â• RADAR OVERLAY â€” bottom-left â•â•â• -->
-  <div id="radar-overlay">
-    <canvas id="radar-canvas" width="324" height="324"></canvas>
-  </div>
-
-  <!-- â•â•â• TRAINING SKIP BUTTON â€” shown during wave 1 training â•â•â• -->
-  <button id="training-skip-btn"
-    style="display:none;position:absolute;top:16px;right:16px;z-index:60;padding:10px 22px;font-family:'Courier New',monospace;font-size:0.95em;font-weight:bold;color:#00ffcc;background:rgba(0,40,40,0.7);border:1px solid rgba(0,255,200,0.4);border-radius:6px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;backdrop-filter:blur(4px);transition:all 0.2s"
-    onmouseover="this.style.borderColor='#00ffcc';this.style.background='rgba(0,255,200,0.2)'"
-    onmouseout="this.style.borderColor='rgba(0,255,200,0.4)';this.style.background='rgba(0,40,40,0.7)'"
-    onclick="if(window.Starfighter&&Starfighter._skipTraining)Starfighter._skipTraining()">
-    âœ• SKIP TRAINING
-  </button>
-
-  <!-- â•â•â• COMM MARQUEE â€” very top â•â•â• -->
-  <div id="comm-ticker">
-    <div id="comm-ticker-inner">
-      <span class="comm-item base">SYSTEMS ONLINE â€” AWAITING LAUNCH COMMAND</span>
     </div>
-  </div>
 
-  <!-- â•â•â• CONSOLE TOGGLE BUTTONS â€” streamlined: Pause + Leave only â•â•â• -->
-  <div id="console-buttons">
-    <button class="console-btn" id="btn-pause" tabindex="1"
-      onclick="if(window.Starfighter&&Starfighter.togglePause)Starfighter.togglePause()">&#10074;&#10074; PAUSE</button>
-    <button class="console-btn" id="btn-exit" tabindex="2"
-      style="background:linear-gradient(180deg,rgba(80,55,20,0.95),rgba(50,30,10,0.98));border-color:rgba(200,150,60,0.5);color:#ffcc88"
-      onclick="if(window.Starfighter&&Starfighter.exitGame)Starfighter.exitGame()">&#10162; LEAVE GAME</button>
-    <!-- Hidden: btn-rtb kept for JS compatibility but never shown -->
-    <button class="console-btn" id="btn-rtb" style="display:none"
-      onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()"></button>
-    <button class="console-btn" id="btn-mission" style="display:none" aria-hidden="true"></button>
-    <button class="console-btn" id="btn-tutorial" style="display:none" aria-hidden="true"></button>
-    <button class="console-btn" id="btn-call-tanker" style="display:none"
-      onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()"></button>
-    <button class="console-btn" id="btn-call-medic" style="display:none"
-      onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()"></button>
-  </div>
-
-  <!-- Emergency Rescue Button -->
-  <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
-    âš  EMERGENCY RESCUE
-    <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
-  </button>
-
-  <!-- Countermeasures Button -->
-  <button id="cm-deploy-btn" onclick="window.SFThreatSys && SFThreatSys.deployCM()">
-    ðŸŽ¯ DEPLOY COUNTERMEASURES
-  </button>
-
-  <!-- Countermeasures Gauge -->
-  <div id="cm-gauge-container">
-    <div id="cm-gauge-label">Countermeasures Available</div>
-    <div id="cm-gauge-bar">
-      <div id="cm-gauge-fill"></div>
-      <div id="cm-count">12</div>
+    <!-- â•â•â• RADAR OVERLAY â€” bottom-left â•â•â• -->
+    <div id="radar-overlay">
+      <canvas id="radar-canvas" width="324" height="324"></canvas>
     </div>
-  </div>
 
-  <!-- Threat Alerts -->
-  <div id="lock-alert">âš  LOCK WARNING</div>
-  <div id="incoming-alert">âš  INCOMING</div>
+    <!-- â•â•â• TRAINING SKIP BUTTON â€” shown during wave 1 training â•â•â• -->
+    <button id="training-skip-btn"
+      style="display:none;position:absolute;top:16px;right:16px;z-index:60;padding:10px 22px;font-family:'Courier New',monospace;font-size:0.95em;font-weight:bold;color:#00ffcc;background:rgba(0,40,40,0.7);border:1px solid rgba(0,255,200,0.4);border-radius:6px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;backdrop-filter:blur(4px);transition:all 0.2s"
+      onmouseover="this.style.borderColor='#00ffcc';this.style.background='rgba(0,255,200,0.2)'"
+      onmouseout="this.style.borderColor='rgba(0,255,200,0.4)';this.style.background='rgba(0,40,40,0.7)'"
+      onclick="if(window.Starfighter&&Starfighter._skipTraining)Starfighter._skipTraining()">
+      âœ• SKIP TRAINING
+    </button>
 
-  <!-- â•â•â• MOBILE TOUCH HUD â€” shown only on phones/tablets â•â•â• -->
-  <div id="mobile-hud" style="display:none">
-    <!-- Nav Sphere â€” bottom center, drag to steer, hold for thrust -->
-    <div id="mob-nav-sphere">
-      <div id="mob-nav-knob"></div>
-      <div class="mob-nav-label">STEER</div>
-      <div class="mob-nav-thrust-label">HOLD = THRUST</div>
+    <!-- â•â•â• COMM MARQUEE â€” very top â•â•â• -->
+    <div id="comm-ticker">
+      <div id="comm-ticker-inner">
+        <span class="comm-item base">SYSTEMS ONLINE â€” AWAITING LAUNCH COMMAND</span>
+      </div>
     </div>
-    <!-- Minimal action buttons (top-right corner) -->
-    <div id="mob-btn-group">
-      <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
-      <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
-      <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
-      <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
-      <button id="mob-call-tanker" class="mob-btn" style="display:none;background:rgba(0,80,40,0.8);color:#00ff88"
-        onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">â›½</button>
-      <button id="mob-call-medic" class="mob-btn" style="display:none;background:rgba(80,15,15,0.8);color:#ff6666"
-        onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">âœš</button>
-    </div>
-    <!-- Hint overlay (shown briefly on first load) -->
-    <div id="mob-hint" class="mob-hint">
-      TAP SCREEN = LASERS &nbsp;|&nbsp; TAP âœ› = TORPEDO &nbsp;|&nbsp; SPHERE = STEER + THRUST
-    </div>
-  </div>
 
-  <!-- â•â•â• MISSION BRIEFING PANEL â•â•â• -->
-  <div id="mission-panel">
-    <h3>MISSION BRIEFING</h3>
-    <div style="color:#ff8800;font-weight:bold;margin-bottom:6px">YEAR 2387 â€” EARTH ORBIT</div>
-    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">An alien force â€” <span style="color:#f0f">HIVE SIGMA</span>
-      â€” emerged from deep space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate.
-      They don't negotiate. <span style="color:#f44">They consume.</span></p>
-    <p style="color:#8cf;line-height:1.7;margin-bottom:8px">You fly a <span style="color:#0ff">UEDF Mk-IV
-        Starfighter</span> â€” twin laser cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from the
-      <span style="color:#48f">UEDF Battleship Resolute</span> â€” Earth's last heavy carrier.
-    </p>
-    <p style="color:#ff4;font-weight:bold;line-height:1.7;margin-bottom:12px">If the Resolute falls, the orbital defense
-      line collapses. Protect her at all costs.</p>
-    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
-      Press MISSION button to close</div>
-  </div>
+    <!-- â•â•â• CONSOLE TOGGLE BUTTONS â€” streamlined: Pause + Leave only â•â•â• -->
+    <div id="console-buttons">
+      <button class="console-btn" id="btn-pause" tabindex="1"
+        onclick="if(window.Starfighter&&Starfighter.togglePause)Starfighter.togglePause()">&#10074;&#10074;
+        PAUSE</button>
+      <button class="console-btn" id="btn-exit" tabindex="2"
+        style="background:linear-gradient(180deg,rgba(80,55,20,0.95),rgba(50,30,10,0.98));border-color:rgba(200,150,60,0.5);color:#ffcc88"
+        onclick="if(window.Starfighter&&Starfighter.exitGame)Starfighter.exitGame()">&#10162; LEAVE GAME</button>
+      <!-- Hidden: btn-rtb kept for JS compatibility but never shown -->
+      <button class="console-btn" id="btn-rtb" style="display:none"
+        onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()"></button>
+      <button class="console-btn" id="btn-mission" style="display:none" aria-hidden="true"></button>
+      <button class="console-btn" id="btn-tutorial" style="display:none" aria-hidden="true"></button>
+      <button class="console-btn" id="btn-call-tanker" style="display:none"
+        onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()"></button>
+      <button class="console-btn" id="btn-call-medic" style="display:none"
+        onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()"></button>
+    </div>
 
-  <!-- â•â•â• CONTROLS TUTORIAL PANEL â•â•â• -->
-  <div id="tutorial-panel">
-    <h3>FLIGHT CONTROLS</h3>
-    <ul>
-      <li><kbd>Mouse</kbd> Pitch / Yaw</li>
-      <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
-      <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
-      <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
-      <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
-      <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
-      <li><kbd>V</kbd> Flight Assist ON/OFF</li>
-      <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
-      <li><kbd>R-Click</kbd> Torpedo</li>
-      <li><kbd>T</kbd> Lock Target</li>
-      <li><kbd>R</kbd> Emergency RTB (return to base)</li>
-    </ul>
+    <!-- Emergency Rescue Button -->
+    <button id="rescue-btn" onclick="window.SFRescue && SFRescue.requestRescue()">
+      âš  EMERGENCY RESCUE
+      <span class="rescue-uses" id="rescue-uses">3 USES LEFT</span>
+    </button>
+
+    <!-- Countermeasures Button -->
+    <button id="cm-deploy-btn" onclick="window.SFThreatSys && SFThreatSys.deployCM()">
+      ðŸŽ¯ DEPLOY COUNTERMEASURES
+    </button>
+
+    <!-- Countermeasures Gauge -->
+    <div id="cm-gauge-container">
+      <div id="cm-gauge-label">Countermeasures Available</div>
+      <div id="cm-gauge-bar">
+        <div id="cm-gauge-fill"></div>
+        <div id="cm-count">12</div>
+      </div>
+    </div>
+
+    <!-- Threat Alerts -->
+    <div id="lock-alert">âš  LOCK WARNING</div>
+    <div id="incoming-alert">âš  INCOMING</div>
+
+    <!-- â•â•â• MOBILE TOUCH HUD â€” shown only on phones/tablets â•â•â• -->
+    <div id="mobile-hud" style="display:none">
+      <!-- Nav Sphere â€” bottom center, drag to steer, hold for thrust -->
+      <div id="mob-nav-sphere">
+        <div id="mob-nav-knob"></div>
+        <div class="mob-nav-label">STEER</div>
+        <div class="mob-nav-thrust-label">HOLD = THRUST</div>
+      </div>
+      <!-- Minimal action buttons (top-right corner) -->
+      <div id="mob-btn-group">
+        <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
+        <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
+        <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
+        <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
+        <button id="mob-call-tanker" class="mob-btn" style="display:none;background:rgba(0,80,40,0.8);color:#00ff88"
+          onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">â›½</button>
+        <button id="mob-call-medic" class="mob-btn" style="display:none;background:rgba(80,15,15,0.8);color:#ff6666"
+          onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">âœš</button>
+      </div>
+      <!-- Hint overlay (shown briefly on first load) -->
+      <div id="mob-hint" class="mob-hint">
+        TAP SCREEN = LASERS &nbsp;|&nbsp; TAP âœ› = TORPEDO &nbsp;|&nbsp; SPHERE = STEER + THRUST
+      </div>
+    </div>
+
+    <!-- â•â•â• MISSION BRIEFING PANEL â•â•â• -->
+    <div id="mission-panel">
+      <h3>MISSION BRIEFING</h3>
+      <div style="color:#ff8800;font-weight:bold;margin-bottom:6px">YEAR 2387 â€” EARTH ORBIT</div>
+      <p style="color:#8cf;line-height:1.7;margin-bottom:8px">An alien force â€” <span style="color:#f0f">HIVE
+          SIGMA</span>
+        â€” emerged from deep space. Their ships are organic-metallic hybrids: grown, not built. They don't communicate.
+        They don't negotiate. <span style="color:#f44">They consume.</span></p>
+      <p style="color:#8cf;line-height:1.7;margin-bottom:8px">You fly a <span style="color:#0ff">UEDF Mk-IV
+          Starfighter</span> â€” twin laser cannons, proton torpedoes, afterburner, full 6-DOF control. You launch from
+        the
+        <span style="color:#48f">UEDF Battleship Resolute</span> â€” Earth's last heavy carrier.
+      </p>
+      <p style="color:#ff4;font-weight:bold;line-height:1.7;margin-bottom:12px">If the Resolute falls, the orbital
+        defense
+        line collapses. Protect her at all costs.</p>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,255,0.15);font-size:10px;color:#668">
+        Press MISSION button to close</div>
+    </div>
+
+    <!-- â•â•â• CONTROLS TUTORIAL PANEL â•â•â• -->
+    <div id="tutorial-panel">
+      <h3>FLIGHT CONTROLS</h3>
+      <ul>
+        <li><kbd>Mouse</kbd> Pitch / Yaw</li>
+        <li><kbd>W</kbd> <kbd>S</kbd> Throttle (burn / reverse)</li>
+        <li><kbd>A</kbd> <kbd>D</kbd> Strafe (RCS burst)</li>
+        <li><kbd>Q</kbd> <kbd>E</kbd> Roll</li>
+        <li><kbd>Shift</kbd> Afterburner (high fuel)</li>
+        <li><kbd>F</kbd> Boost (3s burst, 25 fuel)</li>
+        <li><kbd>V</kbd> Flight Assist ON/OFF</li>
+        <li><kbd>L-Click</kbd> <kbd>Space</kbd> Lasers</li>
+        <li><kbd>R-Click</kbd> Torpedo</li>
+        <li><kbd>T</kbd> Lock Target</li>
+        <li><kbd>R</kbd> Emergency RTB (return to base)</li>
+      </ul>
   </section>
   <section>
     <div class="section-title">JOIN A PRIVATE GAME</div>
@@ -1047,267 +1052,272 @@
     </div>
   </section>
   <footer>
-    <div style="margin-bottom:0.5rem">ï¿½ 2025 KensGames ï¿½ <a href="/tos/index.html" style="color:var(--dim)">Terms</a> ï¿½
+    <div style="margin-bottom:0.5rem">ï¿½ 2025 KensGames ï¿½ <a href="/tos/index.html"
+        style="color:var(--dim)">Terms</a> ï¿½
       <a href="/" style="color:var(--dim)">All Games</a>
     </div>
-    <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate ï¿½ z = xy
+    <div style="color:var(--dim);opacity:0.5;font-size:0.65rem">Manifold = Expression + Attributes + Substrate ï¿½ z =
+      xy
     </div>
-  </div>
-
-  <!-- Death Screen -->
-  <div id="death-screen">
-    <div>MISSION FAILED</div>
-    <div id="death-reason" style="font-size:0.5em;color:#aaa">The baseship was destroyed.</div>
-    <div id="death-auto-msg" style="font-size:0.45em;color:#446688;margin-top:16px;letter-spacing:2px">RETURNING TO BASE
-      IN <span id="death-countdown">8</span>s</div>
-  </div>
-
-  <!-- Elimination Screen (non-leader, all lives lost) -->
-  <div id="eliminated-overlay"
-    style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.88);flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee;text-align:center;">
-    <div style="font-size:2em;letter-spacing:6px;color:#ff4422;text-transform:uppercase;margin-bottom:6px;">ELIMINATED
     </div>
-    <div id="elim-reason" style="font-size:0.8em;color:#aa6644;letter-spacing:3px;margin-bottom:20px;"></div>
-    <table style="border-collapse:collapse;min-width:300px;font-size:13px;margin-bottom:18px;">
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Wave Reached</td>
-        <td id="elim-wave" style="color:#0ff;font-weight:bold;text-align:right;"></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Total Kills</td>
-        <td id="elim-kills" style="color:#0ff;font-weight:bold;text-align:right;"></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Score</td>
-        <td id="elim-score" style="color:#0ff;font-weight:bold;text-align:right;"></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Accuracy</td>
-        <td id="elim-accuracy" style="color:#0ff;font-weight:bold;text-align:right;"></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Flight Time</td>
-        <td id="elim-time" style="color:#0ff;font-weight:bold;text-align:right;"></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 16px 3px 0;color:#88aacc;">Rank</td>
-        <td id="elim-rank" style="color:#ffd700;font-weight:bold;text-align:right;"></td>
-      </tr>
-    </table>
-    <div id="elim-next"
-      style="font-size:11px;color:#88aacc;letter-spacing:1px;margin-bottom:24px;max-width:360px;line-height:1.6;"></div>
-    <div style="font-size:10px;color:#446688;letter-spacing:2px;">REDEPLOYING IN <span id="elim-countdown">10</span>s
-    </div>
-    <div id="spectator-msg" style="display:none;margin-top:12px;font-size:11px;color:#0ff;letter-spacing:2px;">
-      SPECTATING â€” watching your squad fight on</div>
-  </div>
 
-  <!-- Countdown / Launch overlays -->
-  <div id="countdown-display">5</div>
-  <div id="launch-prompt">
-    <b>READY TO LAUNCH</b>
-    <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR &nbsp;Â·&nbsp; PUSH JOYSTICK FORWARD &nbsp;Â·&nbsp; TAP
-      SCREEN</div>
-  </div>
-  <div id="launch-overlay" class="launch-overlay-full" style="background:rgba(0,0,0,0.6)">
-    <div style="text-align:center;color:#0ff;font-size:2.5em;margin-bottom:30px;text-shadow:0 0 20px #0ff">âš¡ LAUNCH
-      SEQUENCE âš¡</div>
-    <div style="color:#00ff00;font-size:1.5em;font-weight:bold;text-shadow:0 0 15px #00ff00">ACCELERATING THROUGH
-      TUBE...</div>
-  </div>
-  <div id="launch-countdown" class="launch-overlay-full" style="background:rgba(0,0,0,0.5)">
-    <div style="text-align:center;color:#ff00ff;font-size:3em;font-weight:bold;text-shadow:0 0 30px #ff00ff">CLEAR OF
-      BAY</div>
-    <div style="color:#ffff00;font-size:1.3em;margin-top:20px;text-shadow:0 0 10px #ffff00">ENGAGING ENEMY FORCES...
+    <!-- Death Screen -->
+    <div id="death-screen">
+      <div>MISSION FAILED</div>
+      <div id="death-reason" style="font-size:0.5em;color:#aaa">The baseship was destroyed.</div>
+      <div id="death-auto-msg" style="font-size:0.45em;color:#446688;margin-top:16px;letter-spacing:2px">RETURNING TO
+        BASE
+        IN <span id="death-countdown">8</span>s</div>
     </div>
-  </div>
 
-  <!-- â•â•â• LOADING SPINNER â€” shown until all assets preloaded â•â•â• -->
-  <!-- Fullscreen resume overlay + button (hidden until ESC exits immersion) -->
-  <div id="fs-resume-overlay"></div>
-  <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO RESUME</div>
-
-  <div id="loading-screen"
-    style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
-    <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
-      style="max-width:320px;width:80%;margin-bottom:32px;filter:drop-shadow(0 0 20px rgba(0,255,255,0.4))">
-    <div
-      style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
+    <!-- Elimination Screen (non-leader, all lives lost) -->
+    <div id="eliminated-overlay"
+      style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.88);flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee;text-align:center;">
+      <div style="font-size:2em;letter-spacing:6px;color:#ff4422;text-transform:uppercase;margin-bottom:6px;">ELIMINATED
+      </div>
+      <div id="elim-reason" style="font-size:0.8em;color:#aa6644;letter-spacing:3px;margin-bottom:20px;"></div>
+      <table style="border-collapse:collapse;min-width:300px;font-size:13px;margin-bottom:18px;">
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Wave Reached</td>
+          <td id="elim-wave" style="color:#0ff;font-weight:bold;text-align:right;"></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Total Kills</td>
+          <td id="elim-kills" style="color:#0ff;font-weight:bold;text-align:right;"></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Score</td>
+          <td id="elim-score" style="color:#0ff;font-weight:bold;text-align:right;"></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Accuracy</td>
+          <td id="elim-accuracy" style="color:#0ff;font-weight:bold;text-align:right;"></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Flight Time</td>
+          <td id="elim-time" style="color:#0ff;font-weight:bold;text-align:right;"></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 16px 3px 0;color:#88aacc;">Rank</td>
+          <td id="elim-rank" style="color:#ffd700;font-weight:bold;text-align:right;"></td>
+        </tr>
+      </table>
+      <div id="elim-next"
+        style="font-size:11px;color:#88aacc;letter-spacing:1px;margin-bottom:24px;max-width:360px;line-height:1.6;">
+      </div>
+      <div style="font-size:10px;color:#446688;letter-spacing:2px;">REDEPLOYING IN <span id="elim-countdown">10</span>s
+      </div>
+      <div id="spectator-msg" style="display:none;margin-top:12px;font-size:11px;color:#0ff;letter-spacing:2px;">
+        SPECTATING â€” watching your squad fight on</div>
     </div>
-    <div id="loading-text"
-      style="color:#0ff;font-family:'Courier New',monospace;margin-top:24px;font-size:14px;letter-spacing:2px">
-      INITIALIZING MANIFOLD...</div>
-    <div id="loading-progress"
-      style="width:220px;height:4px;background:rgba(0,255,255,0.1);margin-top:16px;border-radius:2px;overflow:hidden">
-      <div id="loading-bar" style="width:0%;height:100%;background:#0ff;transition:width 0.3s ease;border-radius:2px">
+
+    <!-- Countdown / Launch overlays -->
+    <div id="countdown-display">5</div>
+    <div id="launch-prompt">
+      <b>READY TO LAUNCH</b>
+      <div style="font-size:0.8em;color:#ffff00">PRESS SPACEBAR &nbsp;Â·&nbsp; PUSH JOYSTICK FORWARD &nbsp;Â·&nbsp; TAP
+        SCREEN</div>
+    </div>
+    <div id="launch-overlay" class="launch-overlay-full" style="background:rgba(0,0,0,0.6)">
+      <div style="text-align:center;color:#0ff;font-size:2.5em;margin-bottom:30px;text-shadow:0 0 20px #0ff">âš¡ LAUNCH
+        SEQUENCE âš¡</div>
+      <div style="color:#00ff00;font-size:1.5em;font-weight:bold;text-shadow:0 0 15px #00ff00">ACCELERATING THROUGH
+        TUBE...</div>
+    </div>
+    <div id="launch-countdown" class="launch-overlay-full" style="background:rgba(0,0,0,0.5)">
+      <div style="text-align:center;color:#ff00ff;font-size:3em;font-weight:bold;text-shadow:0 0 30px #ff00ff">CLEAR OF
+        BAY</div>
+      <div style="color:#ffff00;font-size:1.3em;margin-top:20px;text-shadow:0 0 10px #ffff00">ENGAGING ENEMY FORCES...
       </div>
     </div>
-  </div>
-  <style>
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg)
+
+    <!-- â•â•â• LOADING SPINNER â€” shown until all assets preloaded â•â•â• -->
+    <!-- Fullscreen resume overlay + button (hidden until ESC exits immersion) -->
+    <div id="fs-resume-overlay"></div>
+    <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO RESUME</div>
+
+    <div id="loading-screen"
+      style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
+      <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
+        style="max-width:320px;width:80%;margin-bottom:32px;filter:drop-shadow(0 0 20px rgba(0,255,255,0.4))">
+      <div
+        style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
+      </div>
+      <div id="loading-text"
+        style="color:#0ff;font-family:'Courier New',monospace;margin-top:24px;font-size:14px;letter-spacing:2px">
+        INITIALIZING MANIFOLD...</div>
+      <div id="loading-progress"
+        style="width:220px;height:4px;background:rgba(0,255,255,0.1);margin-top:16px;border-radius:2px;overflow:hidden">
+        <div id="loading-bar" style="width:0%;height:100%;background:#0ff;transition:width 0.3s ease;border-radius:2px">
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg)
+        }
+
+        100% {
+          transform: rotate(360deg)
+        }
       }
+    </style>
 
-      100% {
-        transform: rotate(360deg)
-      }
-    }
-  </style>
+    <!-- â•â•â• RESPAWN OVERLAY â€” button-based fighter lost screen â•â•â• -->
+    <div id="respawn-overlay"><!-- content injected by JS --></div>
 
-  <!-- â•â•â• RESPAWN OVERLAY â€” button-based fighter lost screen â•â•â• -->
-  <div id="respawn-overlay"><!-- content injected by JS --></div>
+    <!-- â•â•â• WAVE CLEAR OVERLAY â€” blue flash, return to base â•â•â• -->
+    <div id="waveclear-overlay"><!-- content injected by JS --></div>
 
-  <!-- â•â•â• WAVE CLEAR OVERLAY â€” blue flash, return to base â•â•â• -->
-  <div id="waveclear-overlay"><!-- content injected by JS --></div>
+    <!-- â•â•â• BAY DEBRIEF OVERLAY â€” post-wave acknowledgment + shop â•â•â• -->
+    <div id="bay-debrief">
+      <div class="bdr-container">
 
-  <!-- â•â•â• BAY DEBRIEF OVERLAY â€” post-wave acknowledgment + shop â•â•â• -->
-  <div id="bay-debrief">
-    <div class="bdr-container">
-
-      <!-- Rank-up ceremony banner (hidden until promotion) -->
-      <div id="bdr-rankup">
-        <div class="bdr-rankup-label">â˜… PROMOTION â˜…</div>
-        <div class="bdr-rankup-icon" id="bdr-rankup-icon">â˜…</div>
-        <div id="bdr-rankup-name">RANK</div>
-      </div>
-
-      <!-- Header: wave title + callsign acknowledgment -->
-      <div class="bdr-header">
-        <div id="bdr-wave-title">WAVE 1 COMPLETE</div>
-        <div id="bdr-mission-name">FIRST FLIGHT</div>
-        <div id="bdr-callsign-ack"></div>
-      </div>
-
-      <!-- 2-col stats layout -->
-      <div class="bdr-main-cols">
-        <!-- Mission stats -->
-        <div class="bdr-card">
-          <div class="bdr-card-title">Mission Stats</div>
-          <div id="bdr-stats-rows"></div>
+        <!-- Rank-up ceremony banner (hidden until promotion) -->
+        <div id="bdr-rankup">
+          <div class="bdr-rankup-label">â˜… PROMOTION â˜…</div>
+          <div class="bdr-rankup-icon" id="bdr-rankup-icon">â˜…</div>
+          <div id="bdr-rankup-name">RANK</div>
         </div>
-        <!-- Ship status -->
-        <div class="bdr-card">
-          <div class="bdr-card-title">Ship Status â€” After Refit</div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">HULL</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-hull-fill" class="bdr-ship-bar-fill hull"></div>
+
+        <!-- Header: wave title + callsign acknowledgment -->
+        <div class="bdr-header">
+          <div id="bdr-wave-title">WAVE 1 COMPLETE</div>
+          <div id="bdr-mission-name">FIRST FLIGHT</div>
+          <div id="bdr-callsign-ack"></div>
+        </div>
+
+        <!-- 2-col stats layout -->
+        <div class="bdr-main-cols">
+          <!-- Mission stats -->
+          <div class="bdr-card">
+            <div class="bdr-card-title">Mission Stats</div>
+            <div id="bdr-stats-rows"></div>
+          </div>
+          <!-- Ship status -->
+          <div class="bdr-card">
+            <div class="bdr-card-title">Ship Status â€” After Refit</div>
+            <div class="bdr-ship-row">
+              <div class="bdr-ship-label">HULL</div>
+              <div class="bdr-ship-bar-track">
+                <div id="bdr-hull-fill" class="bdr-ship-bar-fill hull"></div>
+              </div>
+              <div class="bdr-ship-val" id="bdr-hull-pct">100%</div>
             </div>
-            <div class="bdr-ship-val" id="bdr-hull-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">SHLD</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-shld-fill" class="bdr-ship-bar-fill shld"></div>
+            <div class="bdr-ship-row">
+              <div class="bdr-ship-label">SHLD</div>
+              <div class="bdr-ship-bar-track">
+                <div id="bdr-shld-fill" class="bdr-ship-bar-fill shld"></div>
+              </div>
+              <div class="bdr-ship-val" id="bdr-shld-pct">100%</div>
             </div>
-            <div class="bdr-ship-val" id="bdr-shld-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">FUEL</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-fuel-fill" class="bdr-ship-bar-fill fuel"></div>
+            <div class="bdr-ship-row">
+              <div class="bdr-ship-label">FUEL</div>
+              <div class="bdr-ship-bar-track">
+                <div id="bdr-fuel-fill" class="bdr-ship-bar-fill fuel"></div>
+              </div>
+              <div class="bdr-ship-val" id="bdr-fuel-pct">100%</div>
             </div>
-            <div class="bdr-ship-val" id="bdr-fuel-pct">100%</div>
-          </div>
-          <div class="bdr-ship-row">
-            <div class="bdr-ship-label">TORPS</div>
-            <div class="bdr-ship-bar-track">
-              <div id="bdr-torp-fill" class="bdr-ship-bar-fill torp"></div>
+            <div class="bdr-ship-row">
+              <div class="bdr-ship-label">TORPS</div>
+              <div class="bdr-ship-bar-track">
+                <div id="bdr-torp-fill" class="bdr-ship-bar-fill torp"></div>
+              </div>
+              <div class="bdr-ship-val" id="bdr-torp-val">2/2</div>
             </div>
-            <div class="bdr-ship-val" id="bdr-torp-val">2/2</div>
-          </div>
-          <div class="bdr-cr-row">
-            <span class="label">CREDITS</span>
-            <span id="bdr-cr-balance">&#8371;0</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- XP / Rank progress -->
-      <div class="bdr-xp-section bdr-card">
-        <div class="bdr-card-title">Rank Progress</div>
-        <div class="bdr-xp-labels">
-          <span id="bdr-rank-cur">ENSIGN</span>
-          <span id="bdr-rank-next">LT. JUNIOR</span>
-        </div>
-        <div class="bdr-xp-bar-track">
-          <div id="bdr-xp-fill"></div>
-        </div>
-        <div class="bdr-xp-earned-row">
-          <span id="bdr-xp-delta">+0 XP this wave</span>
-          <div class="bdr-earned-chips">
-            <span id="bdr-xp-earned">+0 XP</span>
-            <span id="bdr-cr-earned">+&#8371;0</span>
+            <div class="bdr-cr-row">
+              <span class="label">CREDITS</span>
+              <span id="bdr-cr-balance">&#8371;0</span>
+            </div>
           </div>
         </div>
-        <div id="bdr-bonus-row">&#9733; NO DAMAGE BONUS</div>
-      </div>
 
-      <!-- Weapon / capability unlocks -->
-      <div id="bdr-unlocks-section">
-        <div class="bdr-card">
-          <div class="bdr-card-title">New Systems Unlocked</div>
-          <div id="bdr-unlocks-list"></div>
+        <!-- XP / Rank progress -->
+        <div class="bdr-xp-section bdr-card">
+          <div class="bdr-card-title">Rank Progress</div>
+          <div class="bdr-xp-labels">
+            <span id="bdr-rank-cur">ENSIGN</span>
+            <span id="bdr-rank-next">LT. JUNIOR</span>
+          </div>
+          <div class="bdr-xp-bar-track">
+            <div id="bdr-xp-fill"></div>
+          </div>
+          <div class="bdr-xp-earned-row">
+            <span id="bdr-xp-delta">+0 XP this wave</span>
+            <div class="bdr-earned-chips">
+              <span id="bdr-xp-earned">+0 XP</span>
+              <span id="bdr-cr-earned">+&#8371;0</span>
+            </div>
+          </div>
+          <div id="bdr-bonus-row">&#9733; NO DAMAGE BONUS</div>
         </div>
-      </div>
 
-      <!-- Upgrade shop -->
-      <div class="bdr-shop-section bdr-card">
-        <div class="bdr-card-title">Armament Shop</div>
-        <div class="bdr-shop-balance">Available: <span id="bdr-shop-credits">&#8371;0</span></div>
-        <div id="bdr-shop-list"></div>
-        <div id="bdr-shop-empty" style="display:none">No upgrades available at current rank</div>
-      </div>
-
-      <!-- Next wave intel card -->
-      <div class="bdr-next-card">
-        <div class="bdr-next-wave-badge">
-          <div class="bdr-wave-num" id="bdr-next-wave-num">2</div>
-          <div class="bdr-wave-label">NEXT WAVE</div>
+        <!-- Weapon / capability unlocks -->
+        <div id="bdr-unlocks-section">
+          <div class="bdr-card">
+            <div class="bdr-card-title">New Systems Unlocked</div>
+            <div id="bdr-unlocks-list"></div>
+          </div>
         </div>
-        <div class="bdr-next-info">
-          <div class="bdr-next-title" id="bdr-next-title">BAPTISM OF FIRE</div>
-          <div class="bdr-next-obj" id="bdr-next-objective">Eliminate Vek Corsair scouts before they report fleet
-            position.</div>
-        </div>
-      </div>
 
-      <!-- Auto-launch countdown (replaces button) -->
-      <div class="bdr-footer">
-        <div id="bdr-auto-launch"
-          style="text-align:center;padding:14px 0;font-family:monospace;color:#0ff;font-size:12px;letter-spacing:2px">
-          LAUNCHING WAVE <span id="bdr-next-wave-num2">2</span> IN <span id="bdr-countdown-secs">8</span>s...
+        <!-- Upgrade shop -->
+        <div class="bdr-shop-section bdr-card">
+          <div class="bdr-card-title">Armament Shop</div>
+          <div class="bdr-shop-balance">Available: <span id="bdr-shop-credits">&#8371;0</span></div>
+          <div id="bdr-shop-list"></div>
+          <div id="bdr-shop-empty" style="display:none">No upgrades available at current rank</div>
         </div>
-      </div>
 
+        <!-- Next wave intel card -->
+        <div class="bdr-next-card">
+          <div class="bdr-next-wave-badge">
+            <div class="bdr-wave-num" id="bdr-next-wave-num">2</div>
+            <div class="bdr-wave-label">NEXT WAVE</div>
+          </div>
+          <div class="bdr-next-info">
+            <div class="bdr-next-title" id="bdr-next-title">BAPTISM OF FIRE</div>
+            <div class="bdr-next-obj" id="bdr-next-objective">Eliminate Vek Corsair scouts before they report fleet
+              position.</div>
+          </div>
+        </div>
+
+        <!-- Auto-launch countdown (replaces button) -->
+        <div class="bdr-footer">
+          <div id="bdr-auto-launch"
+            style="text-align:center;padding:14px 0;font-family:monospace;color:#0ff;font-size:12px;letter-spacing:2px">
+            LAUNCHING WAVE <span id="bdr-next-wave-num2">2</span> IN <span id="bdr-countdown-secs">8</span>s...
+          </div>
+        </div>
+
+      </div>
     </div>
-  </div>
 
-  <!-- Victory overlay -->
-  <div id="victory-screen"
-    style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,10,20,0.85);z-index:100;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto">
-    <div style="color:#00ff88;font-family:'Courier New',monospace;font-size:3em;text-shadow:0 0 30px #0f8">VICTORY</div>
-    <div id="victory-reason" style="color:#0ff;font-family:'Courier New',monospace;font-size:1.3em;margin-top:16px">
-      Enemy Base Station Destroyed</div>
-    <div id="victory-score" style="color:#fff;font-family:'Courier New',monospace;font-size:1.5em;margin-top:24px">
+    <!-- Victory overlay -->
+    <div id="victory-screen"
+      style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,10,20,0.85);z-index:100;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto">
+      <div style="color:#00ff88;font-family:'Courier New',monospace;font-size:3em;text-shadow:0 0 30px #0f8">VICTORY
+      </div>
+      <div id="victory-reason" style="color:#0ff;font-family:'Courier New',monospace;font-size:1.3em;margin-top:16px">
+        Enemy Base Station Destroyed</div>
+      <div id="victory-score" style="color:#fff;font-family:'Courier New',monospace;font-size:1.5em;margin-top:24px">
+      </div>
+      <button onclick="location.reload()"
+        style="margin-top:30px;padding:10px 20px;font-size:16px;background:#00aa66;color:#fff;border:none;cursor:pointer;border-radius:5px;pointer-events:auto">PLAY
+        AGAIN</button>
     </div>
-    <button onclick="location.reload()"
-      style="margin-top:30px;padding:10px 20px;font-size:16px;background:#00aa66;color:#fff;border:none;cursor:pointer;border-radius:5px;pointer-events:auto">PLAY
-      AGAIN</button>
-  </div>
 
-  <!-- Manifold Architecture -->
-  <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
-  <!-- Three.js -->
-  <!-- Manifold Substrates (Dimensional Programming) -->
-  <!-- Game Logic -->
-  <script>
-    KG_LANDING.init('starfighter', '/starfighter/lobby.html');
-    document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
-    if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
-  </script>
-  <script src="starfighter.bundle.js?v=a4da92ba33eb7312"></script>
+    <!-- Manifold Architecture -->
+    <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
+    <!-- Three.js -->
+    <!-- Manifold Substrates (Dimensional Programming) -->
+    <!-- Game Logic -->
+    <script>
+      KG_LANDING.init('starfighter', '/starfighter/lobby.html');
+      document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
+      if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
+    </script>
+    <script src="starfighter.bundle.js?v=a4da92ba33eb7312"></script>
 </body>
 
 </html>

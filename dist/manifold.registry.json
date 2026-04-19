@@ -1,0 +1,164 @@
+{
+  "_schema": "1.0",
+  "_compiled": "2026-04-19T21:28:44.781135+00:00",
+  "portal": "kensgames-portal",
+  "domain": "kensgames.com",
+  "dimensions": {
+    "x": "player_count",
+    "y": "play_time_min",
+    "z": "x * y",
+    "_note": "z = xy is the universal access rule; every game must satisfy this"
+  },
+  "games": [
+    {
+      "id": "fasttrack",
+      "name": "FastTrack",
+      "version": "2.1.0",
+      "path": "fasttrack/",
+      "entry": "index.html",
+      "lobby": "lobby.html",
+      "status": "production",
+      "dimension": {
+        "x": 3,
+        "y": 45,
+        "z": 135
+      },
+      "substrates": [
+        "auth",
+        "board",
+        "cards",
+        "deck",
+        "peg",
+        "ai",
+        "multiplayer",
+        "audio",
+        "music",
+        "lobby",
+        "analytics",
+        "moves",
+        "growth",
+        "potential"
+      ],
+      "bridge": "window.__MANIFOLD__",
+      "deploy": {
+        "target": "/var/www/kensgames.com/fasttrack/",
+        "type": "static_with_server"
+      }
+    },
+    {
+      "id": "brickbreaker3d",
+      "name": "BrickBreaker 3D",
+      "version": "1.0.0",
+      "path": "brickbreaker3d/",
+      "entry": "index.html",
+      "lobby": "lobby.html",
+      "status": "production",
+      "dimension": {
+        "x": 2,
+        "y": 22,
+        "z": 44
+      },
+      "substrates": [
+        "physics",
+        "graphics",
+        "audio",
+        "game_logic",
+        "multiplayer",
+        "persistence",
+        "ai",
+        "ui",
+        "admin"
+      ],
+      "bridge": "window.__MANIFOLD__",
+      "deploy": {
+        "target": "/var/www/kensgames.com/brickbreaker3d/",
+        "type": "static"
+      }
+    },
+    {
+      "id": "4dtictactoe",
+      "name": "4D Tic-Tac-Toe",
+      "version": "1.0.0",
+      "path": "4DTicTacToe/",
+      "entry": "index.html",
+      "lobby": null,
+      "status": "production",
+      "dimension": {
+        "x": 2,
+        "y": 12,
+        "z": 24
+      },
+      "substrates": [
+        "board",
+        "moves",
+        "win",
+        "render"
+      ],
+      "bridge": "window.__MANIFOLD__",
+      "deploy": {
+        "target": "/var/www/kensgames.com/4DTicTacToe/",
+        "type": "static"
+      }
+    },
+    {
+      "id": "starfighter",
+      "name": "StarFighter",
+      "version": "1.0.0",
+      "path": "starfighter/",
+      "entry": "index.html",
+      "lobby": null,
+      "status": "production",
+      "dimension": {
+        "x": 2,
+        "y": 30,
+        "z": 60
+      },
+      "substrates": [
+        "core",
+        "input",
+        "audio",
+        "music",
+        "manifold",
+        "geometry",
+        "audio_sub",
+        "native",
+        "anpc",
+        "hive_queen",
+        "spectrum",
+        "rendering",
+        "progression",
+        "music_comp",
+        "sfx_comp",
+        "phrase_comp"
+      ],
+      "bridge": "window.__MANIFOLD__",
+      "deploy": {
+        "target": "/var/www/kensgames.com/starfighter/",
+        "type": "static_with_server"
+      }
+    },
+    {
+      "id": "assemble",
+      "name": "Assemble",
+      "version": "1.0.0",
+      "path": "assemble/",
+      "entry": "index.html",
+      "lobby": null,
+      "status": "production",
+      "dimension": {
+        "x": 2,
+        "y": 20,
+        "z": 40
+      },
+      "substrates": [
+        "assembler",
+        "parts"
+      ],
+      "bridge": "window.__MANIFOLD__",
+      "deploy": {
+        "target": "/var/www/kensgames.com/assemble/",
+        "type": "static"
+      }
+    }
+  ]
+}

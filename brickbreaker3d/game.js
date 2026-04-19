@@ -17,26 +17,26 @@ const REFLECTION_UPDATE_EVERY = 8; // update cubemap every N frames
 let balls = [], paddles = [], bricks = [], players = [];
 
 // Manifold substrate -- all physics constants and pure math
-const BC            = BB.C;
-const PHI           = BB.PHI;
-const LAYER_BOOST   = BB.LAYER_BOOST;
-const BRICK_COLORS  = BB.BRICK_HEX;
+const BC = BB.C;
+const PHI = BB.PHI;
+const LAYER_BOOST = BB.LAYER_BOOST;
+const BRICK_COLORS = BB.BRICK_HEX;
 const PLAYER_COLORS = BB.PLAYER_HEX;
-const COLORS        = { cyan: 0x00ffff, dark: 0x0a0a1a };
+const COLORS = { cyan: 0x00ffff, dark: 0x0a0a1a };
 
 // Geometry shortcuts (used 10+ times in physics/collision loops)
-const BALL_RADIUS      = BC.BALL_R;
-const PADDLE_RADIUS    = BC.PADDLE_R;
+const BALL_RADIUS = BC.BALL_R;
+const PADDLE_RADIUS = BC.PADDLE_R;
 const PADDLE_THICKNESS = BC.PADDLE_THICK;
-const PADDLE_BEVEL     = BC.PADDLE_BEVEL;
+const PADDLE_BEVEL = BC.PADDLE_BEVEL;
 
 // Dynamic arena dimensions (set per-game by BB.arenaLens in buildArena)
 const ARENA_HEIGHT = BC.ARENA_H;
-let ARENA_WIDTH  = BC.ARENA_BASE_W;
-let HALF_H       = BC.ARENA_H / 2;
-let HALF_W       = ARENA_WIDTH / 2;
-let WALL_INNER   = HALF_W - 1;
-let PADDLE_Y     = BB.arenaLens(1).paddleY;
+let ARENA_WIDTH = BC.ARENA_BASE_W;
+let HALF_H = BC.ARENA_H / 2;
+let HALF_W = ARENA_WIDTH / 2;
+let WALL_INNER = HALF_W - 1;
+let PADDLE_Y = BB.arenaLens(1).paddleY;
 let PADDLE_BOUND = HALF_W - 5;
 
 // Clamp ball Three.js velocity to substrate speed range
@@ -152,8 +152,8 @@ function buildArena(numPlayers) {
 
     // Apply arena dimensions from BB manifold substrate
     const _a = BB.arenaLens(numPlayers);
-    ARENA_WIDTH = _a.width;  HALF_W = _a.halfW;  HALF_H = _a.halfH;
-    WALL_INNER  = _a.wallInner;  PADDLE_BOUND = _a.paddleBound;  PADDLE_Y = _a.paddleY;
+    ARENA_WIDTH = _a.width; HALF_W = _a.halfW; HALF_H = _a.halfH;
+    WALL_INNER = _a.wallInner; PADDLE_BOUND = _a.paddleBound; PADDLE_Y = _a.paddleY;
 
     // Update camera to see full arena
     camera.position.set(0, -2, ARENA_WIDTH * 1.6);
@@ -289,7 +289,6 @@ function createBricks() {
         bricks.push(mesh);
     });
 }
-}
 
 function setupPlayers() {
     balls.forEach(b => scene.remove(b));
@@ -302,7 +301,7 @@ function setupPlayers() {
         players.push({ id: i, score: 0, alive: true, color: PLAYER_COLORS[i], lives });
 
     for (let i = 0; i < numPlayers; i++) {
-        const pi  = BB.paddleInit(i, paddleRadius);
+        const pi = BB.paddleInit(i, paddleRadius);
         const geo = new THREE.CylinderGeometry(paddleRadius * PADDLE_BEVEL, paddleRadius, PADDLE_THICKNESS, 48, 1, false);
         const mat = new THREE.MeshPhysicalMaterial({
             color: PLAYER_COLORS[i], metalness: 0.35, roughness: 0.22, clearcoat: 1.0, clearcoatRoughness: 0.12,
@@ -325,12 +324,11 @@ function setupPlayers() {
         spawnBall(0, baseSpeed, false);
     }
 }
-}
 
 function spawnBall(ownerIdx, baseSpeed, isMulti) {
     const init = BB.ballInit(ownerIdx, baseSpeed, isMulti);
     const { position: ip, velocity: iv, spin: _s, ...scalars } = init;
-    const mat  = new THREE.MeshPhysicalMaterial({
+    const mat = new THREE.MeshPhysicalMaterial({
         color: 0xcccccc, metalness: 0.85, roughness: 0.16, clearcoat: 1.0, clearcoatRoughness: 0.10,
     });
     applyReflectionsToMaterial(mat, 1.25);
@@ -339,12 +337,11 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     b.castShadow = b.receiveShadow = true;
     b.position.copy(ip);
     b.velocity = new THREE.Vector3().copy(iv);
-    b.spin     = new THREE.Vector3();
+    b.spin = new THREE.Vector3();
     Object.assign(b, scalars);
     scene.add(b);
     balls.push(b);
     return b;
-}
 }
 
 function onMouseMove(e) {

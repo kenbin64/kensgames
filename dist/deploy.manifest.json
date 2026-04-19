@@ -1,0 +1,139 @@
+{
+  "_schema": "1.0",
+  "_compiled": "2026-04-19T21:28:44.781831+00:00",
+  "portal": "kensgames-portal",
+  "vps": {
+    "host": "172.81.62.217",
+    "user": "root",
+    "deploy_path": "/var/www/kensgames.com",
+    "server_path": "/opt/butterflyfx/dimensionsos/helix",
+    "ssh_key": "~/.ssh/id_ed25519_mcp",
+    "nginx_reload": true
+  },
+  "steps": [
+    {
+      "step": "deploy_portal_pages",
+      "files": [
+        "index.html",
+        "lounge.html",
+        "discover.html",
+        "arcade.css",
+        "showcase.html"
+      ],
+      "destination": "/var/www/kensgames.com",
+      "type": "rsync"
+    },
+    {
+      "step": "deploy_shared_js",
+      "source": "js/",
+      "destination": "/var/www/kensgames.com/js/",
+      "type": "rsync"
+    },
+    {
+      "step": "deploy_auth_pages",
+      "source_dirs": [
+        "login/",
+        "register/",
+        "forgot-password/",
+        "reset-password/",
+        "verify-email/"
+      ],
+      "destination": "/var/www/kensgames.com",
+      "type": "rsync"
+    },
+    {
+      "step": "deploy_game_fasttrack",
+      "source": "fasttrack/",
+      "destination": "/var/www/kensgames.com/fasttrack/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_brickbreaker3d",
+      "source": "brickbreaker3d/",
+      "destination": "/var/www/kensgames.com/brickbreaker3d/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_4dtictactoe",
+      "source": "4dtictactoe/",
+      "destination": "/var/www/kensgames.com/4DTicTacToe/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_starfighter",
+      "source": "starfighter/",
+      "destination": "/var/www/kensgames.com/starfighter/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_assemble",
+      "source": "assemble/",
+      "destination": "/var/www/kensgames.com/assemble/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_server",
+      "source": "server/",
+      "destination": "/var/www/kensgames.com/server/",
+      "type": "rsync"
+    },
+    {
+      "step": "post_deploy",
+      "commands": [
+        "pm2 restart kensgames-server || pm2 start /var/www/kensgames.com/server/index.js --name kensgames-server",
+        "nginx -t && systemctl reload nginx"
+      ],
+      "type": "shell"
+    },
+    {
+      "step": "deploy_registry",
+      "source": "dist/manifold.registry.json",
+      "destination": "/var/www/kensgames.com/js/manifold.registry.json",
+      "type": "rsync"
+    }
+  ],
+  "server": {
+    "path": "server/",
+    "entry": "server/index.js",
+    "port": 3000,
+    "runtime": "node",
+    "process_name": "kensgames-server"
+  },
+  "excludes": [
+    ".git/",
+    ".github/",
+    "engine/",
+    "node_modules/",
+    "*.sh",
+    "*.md",
+    "*.pdf",
+    "*.test.js",
+    "dist/",
+    ".gitignore"
+  ]
+}
