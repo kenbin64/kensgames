@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KensGames — World Class Arcade Portal</title>
+    <title>Manifold — z = x·y | kensgames.com</title>
     <meta name="description"
-        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D, Alien Space Attack, 4D TicTacToe and Assemble. Powered by a geometry-driven game engine unlike anything else.">
+        content="Manifold — a dimensional programming paradigm where every game, player, score and session is a coordinate on z = x·y (the hyperbolic paraboloid). Five live WebGL games. One geometric substrate.">
 
     <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
     <link rel="apple-touch-icon" href="/assets/images/logo/logo_thumbnail.png">
@@ -620,6 +620,99 @@
         .console-foot .go:hover {
             background: rgba(0, 255, 65, 0.12);
             transform: translateX(2px);
+        }
+
+        /* ── Manifold hero visual ─────────────────────────────── */
+        .manifold-hero-visual {
+            position: relative;
+            z-index: 1;
+            flex: 0 0 auto;
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #manifold-surface {
+            width: 100%;
+            height: 320px;
+            border-radius: 10px;
+            border: 1.5px solid rgba(0, 255, 255, 0.18);
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.07), inset 0 0 20px rgba(153, 0, 255, 0.06);
+            cursor: grab;
+            display: block;
+            background: transparent;
+        }
+
+        #manifold-surface:active {
+            cursor: grabbing;
+        }
+
+        .surface-eq {
+            font-size: 20px;
+            color: var(--neon-yellow);
+            font-weight: 800;
+            letter-spacing: .12em;
+            text-shadow: 0 0 18px rgba(255, 232, 0, 0.55);
+        }
+
+        .surface-hint {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: .05em;
+            text-align: center;
+        }
+
+        .dim-strip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .dim-node {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            border: 1.5px solid rgba(0, 255, 255, 0.2);
+            color: var(--text-muted);
+            letter-spacing: .05em;
+        }
+
+        .dim-node.dim-active {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+        }
+
+        .dim-node.dim-highlight {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: 0 0 10px rgba(153, 0, 255, 0.25);
+        }
+
+        .dim-arrow {
+            font-size: 11px;
+            color: rgba(136, 136, 170, 0.4);
+        }
+
+        .manifold-coord {
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            color: var(--text-muted);
+            margin: 3px 0 5px;
+            letter-spacing: .04em;
+        }
+
+        .coord-eq {
+            color: rgba(0, 255, 255, 0.45);
+        }
+
+        .coord-z {
+            color: var(--neon-yellow);
         }
 
         .hero-cta {
@@ -1459,6 +1552,14 @@
                 grid-template-columns: 1fr;
             }
 
+            .manifold-hero-visual {
+                width: 100%;
+            }
+
+            #manifold-surface {
+                height: 240px;
+            }
+
             .footer-inner {
                 grid-template-columns: 1fr;
             }
@@ -1535,11 +1636,15 @@
 
         <div class="hero-layout">
             <div class="hero-copy">
-                <div class="hero-eyebrow">&#9655; Insert Coin To Continue &#9655;</div>
-                <h1>KENS<span class="accent">GAMES</span></h1>
-                <div class="hero-sub">World Class Arcade Portal &mdash; Est. 2026</div>
-                <p>A new breed of arcade gaming where every game, every score, and every player exists in a unified
-                    geometric space. No ads. No pay-to-win. Just pure skill.</p>
+                <div class="hero-eyebrow">&#9655; Dimensional Programming Paradigm &#9655;</div>
+                <h1>MANI<span class="accent">FOLD</span></h1>
+                <div class="hero-sub"><span
+                        style="color:var(--neon-yellow);letter-spacing:.08em">z&nbsp;=&nbsp;x&nbsp;&middot;&nbsp;y</span>&nbsp;&mdash;&nbsp;The
+                    Architecture Is The Surface</div>
+                <p>A dimensional programming paradigm where games are mathematical proofs. Every player, score, and
+                    session is a coordinate on a continuous geometric surface governed by&nbsp;<code
+                        style="color:var(--neon-yellow);background:rgba(255,232,0,0.1);padding:2px 6px;border-radius:3px">z&nbsp;=&nbsp;x&nbsp;&middot;&nbsp;y</code>.
+                    Five games. One substrate. The gyroid behind you renders live.</p>
                 <div class="hero-cta">
                     <a class="btn-play" href="/lobby/"
                         style="text-decoration:none;display:inline-flex;align-items:center">&#9654; ENTER ARCADE</a>
@@ -1547,81 +1652,29 @@
                         style="background:transparent;color:var(--neon-cyan);border:2px solid var(--neon-cyan);box-shadow:var(--glow-cyan);text-decoration:none;display:inline-flex;align-items:center"
                         href="/fasttrack/">GUEST MODE</a>
                 </div>
-                <div class="hero-note">Free account &nbsp;&#9632;&nbsp; Global leaderboards &nbsp;&#9632;&nbsp;
-                    Cross-game
-                    achievements &nbsp;&#9632;&nbsp; No credit card</div>
+                <div class="hero-note"><span
+                        style="color:var(--neon-yellow)">z&nbsp;=&nbsp;x&middot;y</span>&nbsp;&#9632;&nbsp;
+                    &phi;&nbsp;=&nbsp;1.618&nbsp;&#9632;&nbsp; Schwartz&nbsp;D-surface&nbsp;&#9632;&nbsp;
+                    WebGL&nbsp;live</div>
             </div>
 
-            <div class="arcade-wall" aria-label="Arcade consoles">
-                <div class="console" role="group" aria-label="FastTrack console">
-                    <div class="console-head">
-                        <div class="console-title">FastTrack</div>
-                        <div class="console-tag">2–4 players</div>
-                    </div>
-                    <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.png"
-                            src="/assets/images/fasttrack_lobby.png" alt="FastTrack" loading="eager" decoding="async"
-                            fetchpriority="high" />
-                    </div>
-                    <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                                src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.png"
-                                src="/assets/images/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
-                        <button class="go" onclick="goToGame('/fasttrack/')">PLAY &#9654;</button>
-                    </div>
-                </div>
-
-                <div class="console" role="group" aria-label="BrickBreaker 3D console"
-                    style="border-color: rgba(255,0,255,0.22)">
-                    <div class="console-head">
-                        <div class="console-title">BrickBreaker 3D</div>
-                        <div class="console-tag">solo / multiplayer</div>
-                    </div>
-                    <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_lobby.png"
-                            src="/assets/images/brickbreaker3D_lobby.png" alt="BrickBreaker 3D" loading="lazy"
-                            decoding="async" fetchpriority="low" />
-                    </div>
-                    <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_landing.png"
-                                src="/assets/images/assembler_landing.png" alt="Assemble" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_lobby.png"
-                                src="/assets/images/assembler_lobby.png" alt="Assemble Lobby" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
-                        <button class="go" onclick="goToGame('/brickbreaker3d/')">PLAY &#9654;</button>
-                    </div>
-                </div>
-
-                <div class="console" role="group" aria-label="Alien Space Attack console"
-                    style="border-color: rgba(255,232,0,0.22)">
-                    <div class="console-head">
-                        <div class="console-title">Alien Space Attack</div>
-                        <div class="console-tag">first-person 3D</div>
-                    </div>
-                    <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.png"
-                            src="/assets/images/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                            decoding="async" fetchpriority="low" />
-                    </div>
-                    <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.png"
-                                src="/assets/images/fasttrack_lobby.png" alt="FastTrack" loading="lazy" decoding="async"
-                                fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                                src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
-                        <button class="go" onclick="goToGame('/starfighter/')">PLAY &#9654;</button>
-                    </div>
+            <div class="manifold-hero-visual" aria-label="Interactive saddle surface z = x·y">
+                <canvas id="manifold-surface" aria-hidden="true"></canvas>
+                <div class="surface-eq">z&nbsp;=&nbsp;x&nbsp;&middot;&nbsp;y</div>
+                <div class="surface-hint">drag to rotate &nbsp;&#9632;&nbsp; hyperbolic paraboloid &nbsp;&#9632;&nbsp;
+                    the core primitive</div>
+                <div class="dim-strip">
+                    <div class="dim-node" title="0D — Point">0D</div>
+                    <div class="dim-arrow">&#8594;</div>
+                    <div class="dim-node" title="1D — Line">1D</div>
+                    <div class="dim-arrow">&#8594;</div>
+                    <div class="dim-node dim-active" title="2D — z = x·y saddle surface">2D</div>
+                    <div class="dim-arrow">&#8594;</div>
+                    <div class="dim-node" title="3D — game space">3D</div>
+                    <div class="dim-arrow">&#8594;</div>
+                    <div class="dim-node dim-highlight" title="4D — hypercube / TicTacToe">4D</div>
+                    <div class="dim-arrow">&#8594;</div>
+                    <div class="dim-node" title="nD — substrate">&#8734;D</div>
                 </div>
             </div>
         </div>
@@ -1640,8 +1693,8 @@
 
     <section class="page-section" id="games">
         <div class="section-header">
-            <div class="section-eyebrow">&#9632; Now Playing &#9632;</div>
-            <h2 class="section-title">Featured Games</h2>
+            <div class="section-eyebrow">&#9632; Manifold Demonstrations &#9632;</div>
+            <h2 class="section-title">Dimensional Substrates</h2>
         </div>
         <div class="games-grid">
 
@@ -1655,6 +1708,8 @@
                 <div class="game-info">
                     <div>
                         <div class="game-title">FastTrack</div>
+                        <div class="manifold-coord">x<span class="coord-eq">=</span>3 &nbsp; y<span
+                                class="coord-eq">=</span>45 &nbsp; <span class="coord-z">z&nbsp;=&nbsp;135</span></div>
                         <div class="game-meta">
                             <span class="game-tag">2&ndash;4 Players</span>
                             <span class="game-tag">Strategy</span>
@@ -1683,6 +1738,8 @@
                 <div class="game-info">
                     <div>
                         <div class="game-title">BrickBreaker 3D</div>
+                        <div class="manifold-coord">x<span class="coord-eq">=</span>2 &nbsp; y<span
+                                class="coord-eq">=</span>22 &nbsp; <span class="coord-z">z&nbsp;=&nbsp;44</span></div>
                         <div class="game-meta">
                             <span class="game-tag">Solo</span>
                             <span class="game-tag">Multiplayer</span>
@@ -1706,6 +1763,8 @@
                 <div class="game-info">
                     <div>
                         <div class="game-title">Alien Space Attack</div>
+                        <div class="manifold-coord">x<span class="coord-eq">=</span>2 &nbsp; y<span
+                                class="coord-eq">=</span>30 &nbsp; <span class="coord-z">z&nbsp;=&nbsp;60</span></div>
                         <div class="game-meta">
                             <span class="game-tag">First Person</span>
                             <span class="game-tag">Space Combat</span>
@@ -1737,6 +1796,8 @@
                 <div class="game-info">
                     <div>
                         <div class="game-title">4D TicTacToe</div>
+                        <div class="manifold-coord">x<span class="coord-eq">=</span>2 &nbsp; y<span
+                                class="coord-eq">=</span>12 &nbsp; <span class="coord-z">z&nbsp;=&nbsp;24</span></div>
                         <div class="game-meta">
                             <span class="game-tag">1&ndash;4 Players</span>
                             <span class="game-tag">Strategy</span>
@@ -1765,6 +1826,8 @@
                 <div class="game-info">
                     <div>
                         <div class="game-title">Assemble</div>
+                        <div class="manifold-coord">x<span class="coord-eq">=</span>2 &nbsp; y<span
+                                class="coord-eq">=</span>20 &nbsp; <span class="coord-z">z&nbsp;=&nbsp;40</span></div>
                         <div class="game-meta">
                             <span class="game-tag">1 Player</span>
                             <span class="game-tag">Physics</span>
@@ -2176,6 +2239,7 @@
         </div>
     </footer>
 
+    <script src="/js/manifold-surface.js" defer></script>
     <script src="/js/manifold.js?v=7"></script>
     <script src="/js/manifold_reality.js" defer></script>
     <script src="/js/manifold_panels.js" defer></script>
