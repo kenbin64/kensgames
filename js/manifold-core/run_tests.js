@@ -8,6 +8,12 @@ const path = require('path');
 // Load all manifold core modules
 const coreDir = __dirname;
 
+// Provide a window.Manifold shim so manifold_surface.js delegates correctly in Node
+if (typeof window === 'undefined') {
+  const Manifold = require(path.join(coreDir, '../manifold.js'));
+  global.window = { Manifold };
+}
+
 console.log('Loading manifold core modules...\n');
 
 // Load modules using require

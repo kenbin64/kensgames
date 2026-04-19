@@ -81,9 +81,15 @@ class Manifold:
             "sin": math.sin, "cos": math.cos, "tan": math.tan,
             "sqrt": math.sqrt, "abs": abs,
             "pi": math.pi, "e": math.e,
-            "__builtins__": {},
+            "__builtins__": {"abs": abs, "round": round, "min": min, "max": max},
         }
+        # Validate that no name in the expression escapes the whitelist.
+        # compile() gives us a code object; co_names lists every identifier used.
         code = compile(expr_str, "<dsl>", "eval")
+        _allowed = set(_safe_globals) | {"x", "y", "t"}
+        _unknown = set(code.co_names) - _allowed
+        if _unknown:
+            raise ValueError(f"DSL expression uses disallowed names: {_unknown}")
 
         def _expr(x: float, y: float, t: float = 0.0) -> float:
             return eval(code, _safe_globals, {"x": x, "y": y, "t": t})  # noqa: S307
@@ -121,7 +127,10 @@ class NPC(Manifold):
             expression=lambda x, y, t=0.0: x * y * math.sin(t),
         )
         self.cognition = Substrate(goal=goal, drives=["curiosity", "survival"])
-        self.motion    = Manifold.from_dsl(f"{name}_motion", "x*y * sin(t)")
+        # Internal motion substrate — constructed directly to avoid polluting
+        # the global _registry with NPC-internal names.
+        _motion_expr = lambda x, y, t=0.0: x * y * math.sin(t)
+        object.__setattr__(self, 'motion', Substrate(evaluate=_motion_expr))
         self.emotion   = Substrate(state=emotion_state, valence=0.7, arousal=0.5)
         self.dialogue  = Substrate(corpus=f"{name}_corpus", style="terse")
 

@@ -1,28 +1,15 @@
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * SUBSTRATE BASE CLASS
- * ═══════════════════════════════════════════════════════════════════════════
+﻿/**
+ * SUBSTRATE BASE CLASS -- z = x*y^2 lens foundation
  *
- * Abstract "lens" that reads from manifold and transforms data for a specific domain.
+ * A substrate is a pure lens: read manifold coordinates, return domain data.
+ * Cache is write-invalidated (not time-based) -- consistent with lens purity.
+ * A clock-expiry cache stores temporal state inside a lens -- violates purity.
  *
- * Example:
- *   class PhysicsSubstrate extends SubstrateBase {
- *     name() { return 'physics'; }
- *     extract(coordinate) {
- *       const raw = this.manifold.read(coordinate);
- *       return {
- *         mass: raw.mass || 1000,
- *         thrust: raw.thrust || 50,
- *         inertia: raw.inertia || 0.9
- *       };
- *     }
- *   }
- *
- * All substrates follow the same pattern:
- * 1. Read raw data from manifold coordinate
- * 2. Transform/extract domain-specific properties
- * 3. Apply defaults if missing
- * 4. Return structured data
+ * Contract for subclasses:
+ *   name()              -> unique string id
+ *   extract(coordinate) -> read manifold.read(coordinate), return domain object
+ *   validate(data)      -> return bool
+ *   getSchema()         -> return schema descriptor (optional)
  */
 
 class SubstrateBase {
@@ -31,231 +18,90 @@ class SubstrateBase {
     this.config = config;
     this._cache = new Map();
     this._listeners = new Map();
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // OVERRIDE THESE IN SUBCLASSES
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Unique name for this substrate
-   * @returns {string}
-   */
-  name() {
-    return 'substrate-base';
-  }
-
-  /**
-   * Extract domain-specific data from a manifold coordinate
-   * @param {Array|Object} coordinate - Position on manifold
-   * @returns {Object} Domain-specific data
-   */
-  extract(coordinate) {
-    return this.manifold.read(coordinate) || {};
-  }
-
-  /**
-   * Validate that extracted data is correctly structured
-   * @param {Object} data - Data to validate
-   * @returns {boolean}
-   */
-  validate(data) {
-    return true; // Override in subclasses
-  }
-
-  /**
-   * Get schema for this substrate's data
-   * @returns {Object} JSON Schema
-   */
-  getSchema() {
-    return {};
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STANDARD OPERATIONS AVAILABLE TO ALL SUBSTRATES
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Extract with caching
-   * @param {Array|Object} coordinate
-   * @param {Object} options - { useCache: true, expiry: 5000 }
-   * @returns {Object}
-   */
-  extractCached(coordinate, options = {}) {
-    const { useCache = true, expiry = 5000 } = options;
-    const hash = this._coordinateHash(coordinate);
-
-    if (useCache && this._cache.has(hash)) {
-      const cached = this._cache.get(hash);
-      if (Date.now() - cached.timestamp < expiry) {
-        return cached.data;
-      }
-    }
-
-    const data = this.extract(coordinate);
-
-    if (useCache) {
-      this._cache.set(hash, {
-        data: data,
-        timestamp: Date.now()
+    // Write-invalidated cache: evict on manifold write, not on a clock.
+    if (manifold && manifold.on) {
+      manifold.on('write', (entry) => {
+        if (entry && entry.coordinate !== undefined)
+          this._cache.delete(this._hash(entry.coordinate));
       });
     }
+  }
 
+  // -- Override in subclasses -----------------------------------------------
+  name()              { return 'substrate-base'; }
+  extract(coordinate) { return this.manifold.read(coordinate) || {}; }
+  validate(data)      { return true; }
+  getSchema()         { return {}; }
+
+  // -- Standard operations --------------------------------------------------
+
+  // Extract with write-invalidated cache (safe to call every frame)
+  extractCached(coordinate) {
+    const h = this._hash(coordinate);
+    if (this._cache.has(h)) return this._cache.get(h);
+    const data = this.extract(coordinate);
+    this._cache.set(h, data);
     return data;
   }
 
-  /**
-   * Extract data for multiple coordinates
-   * @param {Array} coordinates - Array of coordinates
-   * @returns {Array} Extracted data for each coordinate
-   */
-  extractBatch(coordinates) {
-    return coordinates.map(coord => this.extract(coord));
-  }
+  // Batch extract -- coordinates is any iterable
+  extractBatch(coordinates) { return Array.from(coordinates, c => this.extract(c)); }
 
-  /**
-   * Extract nearby data (query manifold proximity + extract)
-   * @param {Array|Object} center - Center coordinate
-   * @param {number} radius - Search radius
-   * @returns {Array} Extracted data from nearby coordinates
-   */
+  // Extract from manifold neighborhood
   extractNearby(center, radius = 10) {
-    const nearby = this.manifold.queryNearby(center, radius);
-    return nearby.map(entry => ({
-      coordinate: entry.coordinate,
-      data: this.extract(entry.coordinate),
-      distance: entry.distance
-    }));
+    return this.manifold.queryNearby(center, radius)
+      .map(e => ({ coordinate: e.coordinate, data: this.extract(e.coordinate), distance: e.distance }));
   }
 
-  /**
-   * Watch for changes to a coordinate
-   * @param {Array|Object} coordinate
-   * @param {Function} callback - Called when data changes
-   * @returns {string} Listener ID (for removal)
-   */
+  // Register a change listener for a coordinate; returns an id for removal
   watch(coordinate, callback) {
-    const hash = this._coordinateHash(coordinate);
-    const listenerId = `${hash}-${Date.now()}`;
-
-    if (!this._listeners.has(hash)) {
-      this._listeners.set(hash, []);
-    }
-
-    this._listeners.get(hash).push({ id: listenerId, callback });
-    return listenerId;
+    const h = this._hash(coordinate);
+    const id = h + '-' + (Math.random() * 1e9 | 0);
+    if (!this._listeners.has(h)) this._listeners.set(h, []);
+    this._listeners.get(h).push({ id, callback });
+    return id;
   }
 
-  /**
-   * Stop watching a coordinate
-   * @param {string} listenerId
-   */
+  // Remove a previously registered listener
   unwatch(listenerId) {
-    for (const [, listeners] of this._listeners) {
-      const idx = listeners.findIndex(l => l.id === listenerId);
-      if (idx >= 0) {
-        listeners.splice(idx, 1);
-        break;
-      }
+    for (const [h, list] of this._listeners) {
+      const next = list.filter(l => l.id !== listenerId);
+      if (next.length < list.length) { this._listeners.set(h, next); return; }
     }
   }
 
-  /**
-   * Notify listeners of changes
-   * @param {Array|Object} coordinate
-   * @param {Object} newData
-   */
+  // Fire all listeners for a coordinate (call from subclasses on mutation)
   notifyListeners(coordinate, newData) {
-    const hash = this._coordinateHash(coordinate);
-    const listeners = this._listeners.get(hash);
-
-    if (listeners) {
-      listeners.forEach(l => {
-        try {
-          l.callback(newData);
-        } catch (error) {
-          console.error(`Error in listener for ${this.name()}:`, error);
-        }
-      });
-    }
+    const list = this._listeners.get(this._hash(coordinate));
+    if (list) for (const { callback } of list) { try { callback(newData); } catch (e) {} }
   }
 
-  /**
-   * Clear cache for a coordinate (or all if not specified)
-   * @param {Array|Object} coordinate - Optional
-   */
+  // Evict one or all cache entries
   clearCache(coordinate) {
-    if (coordinate) {
-      this._cache.delete(this._coordinateHash(coordinate));
-    } else {
-      this._cache.clear();
-    }
+    coordinate ? this._cache.delete(this._hash(coordinate)) : this._cache.clear();
   }
 
-  /**
-   * Get cache statistics
-   * @returns {Object}
-   */
+  // Diagnostic snapshot
   getCacheStats() {
     return {
       substrateName: this.name(),
       cachedItems: this._cache.size,
-      listeners: Array.from(this._listeners.values()).reduce((sum, arr) => sum + arr.length, 0)
+      listeners: [...this._listeners.values()].reduce((n, a) => n + a.length, 0),
     };
   }
 
-  /**
-   * Transform data using a pipeline of functions
-   * @param {Object} data
-   * @param {Array} transformers - Array of functions
-   * @returns {Object}
-   */
-  transform(data, transformers) {
-    let result = data;
-    for (const transformer of transformers) {
-      result = transformer(result);
-    }
-    return result;
+  // -- Internal -------------------------------------------------------------
+
+  // Fast coordinate hash -- no JSON.stringify; join is O(n) and allocation-free
+  _hash(coord) {
+    if (Array.isArray(coord)) return coord.join(':');
+    if (coord !== null && typeof coord === 'object') return Object.values(coord).join(':');
+    return String(coord);
   }
 
-  /**
-   * Merge data from this substrate with another
-   * @param {Object} thisData - Data from this substrate
-   * @param {Object} otherData - Data from another substrate
-   * @param {Function} merger - Custom merge function
-   * @returns {Object}
-   */
-  merge(thisData, otherData, merger = null) {
-    if (merger) {
-      return merger(thisData, otherData);
-    }
-    return { ...thisData, ...otherData };
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // INTERNAL UTILITIES
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  _coordinateHash(coordinate) {
-    if (Array.isArray(coordinate)) {
-      return coordinate.map(v => {
-        if (typeof v === 'number') return v.toFixed(6);
-        return String(v);
-      }).join(':');
-    }
-    if (typeof coordinate === 'object') {
-      return JSON.stringify(coordinate);
-    }
-    return String(coordinate);
-  }
+  // Backward-compat alias
+  _coordinateHash(coord) { return this._hash(coord); }
 }
 
-// Export for Node.js/CommonJS
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SubstrateBase;
-}
-
-// Expose globally in browser
-if (typeof window !== 'undefined') {
-  window.SubstrateBase = SubstrateBase;
-}
+if (typeof module !== 'undefined' && module.exports) module.exports = SubstrateBase;
+if (typeof window !== 'undefined') window.SubstrateBase = SubstrateBase;

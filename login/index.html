@@ -4,16 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KensGames — Game Portal</title>
-  <script>
-    // Login is handled by Cloudflare Access.
-    // Respect any ?redirect= param so post-login destination works correctly.
-    (function () {
-      var redir = new URLSearchParams(location.search).get('redirect');
-      var dest = (redir && redir.startsWith('/')) ? redir : '/lobby/';
-      window.location.replace(dest);
-    })();
-  </script>
+  <title>Sign In — KensGames</title>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
@@ -165,6 +156,7 @@
     }
   </style>
   <script src="/js/analytics.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 
 <body>
@@ -199,6 +191,8 @@
           <input class="arc-input" type="password" id="l-pass"
             placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required autocomplete="current-password">
         </div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark"
+          style="margin-top:12px;margin-bottom:4px;"></div>
         <button type="submit" class="btn btn-c btn-full" style="margin-top:4px;">&#9654; SIGN IN</button>
         <div class="arc-msg" id="l-msg"></div>
       </form>
@@ -235,9 +229,13 @@
       const msg = document.getElementById('l-msg');
       msg.textContent = 'Authenticating...'; msg.className = 'arc-msg';
       try {
+        const tsToken = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
+        if (!tsToken) {
+          msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return;
+        }
         const res = await fetch(`${API}/login`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: document.getElementById('l-user').value, password: document.getElementById('l-pass').value })
+          body: JSON.stringify({ username: document.getElementById('l-user').value, password: document.getElementById('l-pass').value, turnstileToken: tsToken })
         });
         const data = await res.json();
         if (res.ok) {

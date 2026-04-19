@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -615,6 +615,7 @@
   </div>
 
   <script src="/js/manifold_bridge.js"></script>
+  <script src="/4DTicTacToe/board_manifold_substrate.js"></script>
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/GLTFLoader.js"></script>
   <script type="module">
@@ -639,9 +640,10 @@
       return Number.isFinite(v) ? Math.max(0, v) : 0;
     })();
 
-    const board = new Array(GRID * GRID * GRID).fill(0);
+    // ── Board state is owned entirely by BoardManifold substrate ──────────
+    // BoardManifold loaded via <script> below; the raw `board` array is gone.
+    // All reads/writes go through the substrate's lenses and expressions.
     let scores = [0, 0], currentPlayer = P1, gameOver = false, dropping = false;
-    let turnsTaken = 0;
 
     const playerNames = { [P1]: 'PLAYER 1', [P2]: 'PLAYER 2' };
     (function initPlayerHeaderFromUrl() {
@@ -1407,7 +1409,7 @@
       const n = nearestSlot(pos);
       if (!n) return null;
       if (n.d2 > SETTLE_SLOT_R2) return null;
-      if (getCell(n.gx, n.gy, n.gz) !== 0) return null;
+      if (BoardManifold.getCell(n.gx, n.gy, n.gz) !== 0) return null;
       return { gx: n.gx, gy: n.gy, gz: n.gz };
     }
 
@@ -1452,52 +1454,26 @@
     }
 
     // â”€â”€ BOARD HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    function cellIdx(gx, gy, gz) { return gz * GRID * GRID + gy * GRID + gx; }
-    function getCell(gx, gy, gz) { return board[cellIdx(gx, gy, gz)]; }
-    function setCell(gx, gy, gz, v) { board[cellIdx(gx, gy, gz)] = v; }
-    function lowestFree(gx, gz) { for (let y = 0; y < GRID; y++) if (getCell(gx, y, gz) === 0) return y; return -1; }
-    function colFull(gx, gz) { return lowestFree(gx, gz) === -1; }
 
     function updateMiniInfoPanel() {
-      if (miniGridEl) {
-        let gridHtml = '';
-        for (let gy = GRID - 1; gy >= 0; gy--) {
-          gridHtml += `<div class="mini-layer"><div class="mini-layer-label">Y${gy}</div><div class="mini-grid">`;
-          for (let gz = GRID - 1; gz >= 0; gz--) {
-            for (let gx = 0; gx < GRID; gx++) {
-              const v = getCell(gx, gy, gz);
-              const cls = v === P1 ? 't1' : (v === P2 ? 't2' : '');
-              gridHtml += `<div class="mini-cell ${cls}" title="(${gx},${gy},${gz})"></div>`;
-            }
+      if (!miniGridEl) return;
+      let gridHtml = '';
+      // Iterate within 3D: scan all (gx, gy, gz) in the volume substrate
+      for (let gy = GRID - 1; gy >= 0; gy--) {
+        gridHtml += `<div class="mini-layer"><div class="mini-layer-label">Y${gy}</div><div class="mini-grid">`;
+        for (let gz = GRID - 1; gz >= 0; gz--) {
+          for (let gx = 0; gx < GRID; gx++) {
+            const v = BoardManifold.getCell(gx, gy, gz);
+            const cls = v === P1 ? "t1" : (v === P2 ? "t2" : "");
+            // manifoldValue lens: m = gx*gy*gz (rendered as tooltip hint)
+            const mv = BoardManifold.manifoldValue(gx, gy, gz);
+            gridHtml += `<div class="mini-cell ${cls}" title="(${gx},${gy},${gz}) m=${mv}"></div>`;
           }
-          gridHtml += `</div></div>`;
         }
-        miniGridEl.innerHTML = gridHtml;
+        gridHtml += "</div></div>";
       }
+      miniGridEl.innerHTML = gridHtml;
     }
-
-    // â”€â”€ WIN CHECK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const WIN_DIRS = [
-      [1, 0, 0], [0, 1, 0], [0, 0, 1],
-      [1, 1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [1, 0, 1], [1, 0, -1],
-      [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
-    ];
-    function checkWin(player) {
-      for (const [dx, dy, dz] of WIN_DIRS) {
-        for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) for (let z = 0; z < GRID; z++) {
-          const line = [];
-          for (let s = 0; s < 4; s++) {
-            const nx = x + dx * s, ny = y + dy * s, nz = z + dz * s;
-            if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || nz < 0 || nz >= GRID) break;
-            if (getCell(nx, ny, nz) !== player) break;
-            line.push([nx, ny, nz]);
-          }
-          if (line.length === 4) return line;
-        }
-      }
-      return null;
-    }
-    function boardFull() { return board.every(v => v !== 0); }
 
     // â”€â”€ ORBIT CAMERA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Corner view + 30Â° elevation above the horizon.
@@ -1734,10 +1710,10 @@
 
       const { gx, gy, gz } = slot;
       lastSettledSlot = { gx, gy, gz };
-      setCell(gx, gy, gz, player);
+      BoardManifold.setCell(gx, gy, gz, player);
       addPlacedBall(gx, gy, gz, player);
       updateMiniInfoPanel();
-      turnsTaken++;
+      // turnCount is a derived lens — no manual increment needed
 
       const ring = slotRings.find(r => r.userData.gx === gx && r.userData.gy === gy && r.userData.gz === gz);
       if (ring) {
@@ -1749,7 +1725,7 @@
         }, 700);
       }
 
-      const wl = checkWin(player);
+      const wl = BoardManifold.checkWin(player);
       if (wl) {
         gameOver = true;
         scores[player - 1]++;
@@ -1761,7 +1737,7 @@
         snapToDefaultOrbit();
         return;
       }
-      if (boardFull()) {
+      if (BoardManifold.boardFull()) {
         gameOver = true;
         showResult('DRAW', 'The lattice is full.', '#ffee00');
         dropping = false;
@@ -1786,18 +1762,13 @@
       // Always snap back after settle.
     }
 
-    function dirLabel(line) {
-      if (!line || line.length < 2) return '';
-      const [x0, y0, z0] = line[0], [x1, y1, z1] = line[1], parts = [];
-      if (x1 !== x0) parts.push('X'); if (y1 !== y0) parts.push('Y'); if (z1 !== z0) parts.push('Z');
-      return parts.length === 1 ? '4 in a row â€” ' + parts[0] + ' axis' : '4 in a row â€” ' + parts.join('/') + ' diagonal';
-    }
+    function dirLabel(line) { return BoardManifold.dirLabel(line); }
 
     // â”€â”€ HUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function updateHUD() {
       const lbl = document.getElementById('turn-label');
       const turnCountEl = document.getElementById('turn-count');
-      if (turnCountEl) turnCountEl.textContent = 'TURNS: ' + turnsTaken;
+      if (turnCountEl) turnCountEl.textContent = 'TURNS: ' + BoardManifold.turnCount();
       if (currentPlayer === P1) {
         lbl.textContent = 'â— ' + playerNames[P1] + "'S TURN"; lbl.style.color = 'var(--p1)';
         document.getElementById('hud-p1').classList.add('active');
@@ -1823,7 +1794,7 @@
 
     // â”€â”€ GAME CONTROL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function resetGame() {
-      board.fill(0); currentPlayer = P1; gameOver = false; dropping = false; turnsTaken = 0;
+      BoardManifold.reset(); currentPlayer = P1; gameOver = false; dropping = false;
       placedBalls.forEach(b => {
         scene.remove(b.mesh);
         if (b.body) world.removeBody(b.body);
@@ -2093,7 +2064,7 @@
         physBall.forceSettleAt += dt;
         if (physBall.forceSettleAt > 1.25) {
           const n = nearestSlot(physBall.mesh.position);
-          if (n && getCell(n.gx, n.gy, n.gz) === 0) {
+          if (n && BoardManifold.getCell(n.gx, n.gy, n.gz) === 0) {
             onBallSettled({ gx: n.gx, gy: n.gy, gz: n.gz });
           } else {
             // If no empty slot is available nearby, abort the drop instead of locking turns.

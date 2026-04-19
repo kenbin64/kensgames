@@ -4,12 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KensGames — Game Portal</title>
-  <meta http-equiv="refresh" content="0; url=/lobby/">
-  <script>
-    // Login is handled by Cloudflare Access.
-    window.location.replace('/lobby/');
-  </script>
+  <title>Join Free — KensGames</title>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
@@ -147,6 +142,7 @@
     }
   </style>
   <script src="/js/analytics.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 
 <body>
@@ -200,6 +196,8 @@
           <label>Confirm Password</label>
           <input class="arc-input" type="password" id="r-pass2" placeholder="Repeat password" required minlength="8">
         </div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark"
+          style="margin-top:12px;margin-bottom:4px;"></div>
         <button type="submit" class="submit-reg">&#9654; CREATE ACCOUNT</button>
         <div class="arc-msg" id="r-msg"></div>
       </form>
@@ -220,6 +218,10 @@
       if (pass !== document.getElementById('r-pass2').value) {
         msg.textContent = 'Passwords do not match'; msg.className = 'arc-msg err'; return;
       }
+      const tsToken = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
+      if (!tsToken) {
+        msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return;
+      }
       msg.textContent = 'Creating account...'; msg.className = 'arc-msg';
       try {
         const res = await fetch('/api/auth/register', {
@@ -228,7 +230,8 @@
             username: document.getElementById('r-user').value,
             displayName: document.getElementById('r-display').value || document.getElementById('r-user').value,
             email: document.getElementById('r-email').value,
-            password: pass
+            password: pass,
+            turnstileToken: tsToken
           })
         });
         const data = await res.json();

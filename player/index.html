@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — KensGames</title>
+  <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="stylesheet" href="/css/manifold_3d.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+
+    /* ── Page Layout ─────────────────────────────────────────────── */
+    .profile-page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+    }
+
+    /* ── Back bar ────────────────────────────────────────────────── */
+    .back-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .back-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--dim);
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .back-btn:hover {
+      border-color: var(--c1);
+      color: var(--c1);
+    }
+
+    /* ── Profile header ──────────────────────────────────────────── */
+    .profile-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+      background: var(--panel-bg);
+      border: 1px solid var(--c1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.07);
+    }
+
+    .avatar-large {
+      font-size: 4rem;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      border: 2px solid var(--c1);
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .avatar-large:hover::after {
+      content: '✎';
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 0.75rem;
+      color: var(--c1);
+    }
+
+    .profile-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .profile-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 1rem;
+      color: var(--c1);
+      text-shadow: var(--glow1);
+      margin-bottom: 0.3rem;
+    }
+
+    .profile-locked {
+      font-size: 0.68rem;
+      color: var(--dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .profile-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .stat-chip {
+      font-size: 0.68rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--dim);
+    }
+
+    /* ── Medallion strip ─────────────────────────────────────────── */
+    .medallion-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .medallion-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.68rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 20px;
+      border: 1px solid;
+      font-weight: 600;
+    }
+
+    .med-bronze {
+      border-color: #CD7F32;
+      color: #CD7F32;
+    }
+
+    .med-silver {
+      border-color: #C0C0C0;
+      color: #C0C0C0;
+    }
+
+    .med-gold {
+      border-color: #FFD700;
+      color: #FFD700;
+    }
+
+    .med-platinum {
+      border-color: #E5E4E2;
+      color: #E5E4E2;
+    }
+
+    .med-diamond {
+      border-color: #B9F2FF;
+      color: #B9F2FF;
+      text-shadow: 0 0 6px rgba(185, 242, 255, 0.6);
+    }
+
+    /* ── Tabs ────────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 0.35rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      padding: 0.6rem 1.2rem;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--dim);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: -1px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      border-bottom-color: var(--c1);
+      color: var(--c1);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* ── Section card ────────────────────────────────────────────── */
+    .section-card {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-card h3 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      color: var(--c2);
+      letter-spacing: 2px;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Friends list ────────────────────────────────────────────── */
+    .friend-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .friend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .friend-item:last-child {
+      border-bottom: none;
+    }
+
+    .friend-avatar {
+      font-size: 1.4rem;
+    }
+
+    .friend-name {
+      flex: 1;
+      font-size: 0.85rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-dot.online {
+      background: #44ff88;
+      box-shadow: 0 0 6px rgba(68, 255, 136, 0.6);
+    }
+
+    .friend-actions {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-sm {
+      padding: 0.25rem 0.6rem;
+      font-size: 0.65rem;
+      border-radius: 4px;
+      border: 1px solid;
+      cursor: pointer;
+      background: transparent;
+      transition: all 0.18s;
+    }
+
+    .btn-sm.danger {
+      border-color: #ff4d4d;
+      color: #ff4d4d;
+    }
+
+    .btn-sm.danger:hover {
+      background: rgba(255, 77, 77, 0.15);
+    }
+
+    .btn-sm.primary {
+      border-color: var(--c1);
+      color: var(--c1);
+    }
+
+    .btn-sm.primary:hover {
+      background: rgba(0, 255, 255, 0.1);
+    }
+
+    /* ── Search input ────────────────────────────────────────────── */
+    .search-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 0.55rem 0.9rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--c1);
+    }
+
+    .search-btn {
+      padding: 0.55rem 1.1rem;
+      border: 1px solid var(--c1);
+      color: var(--c1);
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: all 0.2s;
+    }
+
+    .search-btn:hover {
+      background: var(--c1);
+      color: var(--void);
+    }
+
+    /* ── Settings toggles ────────────────────────────────────────── */
+    .pref-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .pref-row:last-child {
+      border-bottom: none;
+    }
+
+    .pref-label {
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .pref-desc {
+      font-size: 0.7rem;
+      color: var(--dim);
+      margin-top: 0.2rem;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      cursor: pointer;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.1);
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked+.toggle-track {
+      background: rgba(0, 255, 255, 0.25);
+    }
+
+    .toggle input:checked+.toggle-track::after {
+      transform: translateX(20px);
+      background: var(--c1);
+      box-shadow: var(--glow1);
+    }
+
+    /* ── Guild cards ─────────────────────────────────────────────── */
+    .guild-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.85rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .guild-card:hover {
+      border-color: var(--c1);
+    }
+
+    .guild-tag {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--c2);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      min-width: 52px;
+      text-align: center;
+    }
+
+    .guild-info {
+      flex: 1;
+    }
+
+    .guild-name {
+      font-size: 0.85rem;
+    }
+
+    .guild-meta {
+      font-size: 0.68rem;
+      color: var(--dim);
+      margin-top: 0.2rem;
+    }
+
+    .guild-action {
+      font-size: 0.68rem;
+      color: var(--c1);
+    }
+
+    /* ── Avatar change modal ─────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--c1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 600px;
+      width: 92%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.12);
+    }
+
+    .modal-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--c1);
+      margin-bottom: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .av-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .av-tab {
+      padding: 0.28rem 0.6rem;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.63rem;
+      cursor: pointer;
+      color: var(--dim);
+      background: transparent;
+      transition: all 0.18s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .av-tab:hover {
+      border-color: var(--c1);
+      color: var(--text);
+    }
+
+    .av-tab.active {
+      border-color: var(--c1);
+      color: var(--c1);
+      background: rgba(0, 255, 255, 0.08);
+    }
+
+    .av-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .av-opt {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+      border-radius: 7px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      background: rgba(0, 0, 0, 0.2);
+      transition: all 0.18s;
+    }
+
+    .av-opt:hover {
+      border-color: var(--dim);
+      transform: scale(1.1);
+    }
+
+    .av-opt.selected {
+      border-color: var(--c1);
+      background: rgba(0, 255, 255, 0.08);
+      transform: scale(1.1);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+    }
+
+    .btn-modal-cancel {
+      padding: 0.55rem 1.2rem;
+      border: 1px solid var(--dim);
+      color: var(--dim);
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.72rem;
+    }
+
+    .btn-modal-save {
+      padding: 0.55rem 1.2rem;
+      border: 1px solid var(--c1);
+      color: var(--c1);
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      transition: all 0.2s;
+    }
+
+    .btn-modal-save:hover {
+      background: var(--c1);
+      color: var(--void);
+    }
+
+    /* ── Status messages ─────────────────────────────────────────── */
+    .status-msg {
+      font-size: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 5px;
+      margin-bottom: 0.75rem;
+      display: none;
+    }
+
+    .status-msg.show {
+      display: block;
+    }
+
+    .status-msg.ok {
+      background: rgba(68, 255, 136, 0.1);
+      color: #44ff88;
+      border: 1px solid rgba(68, 255, 136, 0.3);
+    }
+
+    .status-msg.err {
+      background: rgba(255, 77, 77, 0.1);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 77, 77, 0.3);
+    }
+
+    .empty-msg {
+      color: var(--dim);
+      font-size: 0.8rem;
+      padding: 0.5rem 0;
+    }
+  </style>
+</head>
+
+<body data-mtheme="cyan">
+  <div class="scanlines"></div>
+  <canvas id="gyroid-bg"></canvas>
+
+  <div class="profile-page">
+    <!-- Back bar -->
+    <div class="back-bar">
+      <a class="back-btn" href="/portal.html">← Portal</a>
+    </div>
+
+    <!-- Profile header -->
+    <div class="profile-header">
+      <div class="avatar-large" id="hdr-avatar" onclick="openAvatarModal()" title="Click to change avatar">🎮</div>
+      <div class="profile-info">
+        <div class="profile-name" id="hdr-name">Loading…</div>
+        <div class="profile-locked">Playername is permanent · cannot be changed</div>
+        <div class="profile-stats">
+          <span class="stat-chip" id="stat-joined">Joined: —</span>
+          <span class="stat-chip" id="stat-games">Games: 0</span>
+        </div>
+        <div class="medallion-strip" id="medallion-strip"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('profile')">Profile</button>
+      <button class="tab-btn" onclick="switchTab('friends')">Friends</button>
+      <button class="tab-btn" onclick="switchTab('guilds')">Guilds</button>
+      <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- ── Profile tab ───────────────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-profile">
+      <div class="section-card">
+        <h3>MEDALLIONS</h3>
+        <div id="medallion-detail">
+          <p class="empty-msg">No ranked matches played yet. Play public multiplayer games to earn medallions.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Friends tab ──────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-friends">
+      <div class="section-card">
+        <h3>ADD FRIEND</h3>
+        <div class="search-row">
+          <input class="search-input" type="text" id="friend-search-input" placeholder="Search by playername…"
+            maxlength="20">
+          <button class="search-btn" onclick="searchPlayer()">Search</button>
+        </div>
+        <div id="player-search-results"></div>
+      </div>
+      <div class="section-card">
+        <h3>MY FRIENDS</h3>
+        <div class="status-msg" id="friend-status"></div>
+        <ul class="friend-list" id="friends-list">
+          <li class="empty-msg">Loading…</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── Guilds tab ────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-guilds">
+      <div class="section-card" id="my-guild-section">
+        <h3>MY GUILD</h3>
+        <div id="my-guild-content">
+          <p class="empty-msg">Loading…</p>
+        </div>
+      </div>
+      <div class="section-card">
+        <h3>BROWSE GUILDS</h3>
+        <div class="search-row">
+          <input class="search-input" type="text" id="guild-search-input" placeholder="Search guilds…" maxlength="40">
+          <button class="search-btn" onclick="searchGuilds()">Search</button>
+        </div>
+        <div id="guild-list"></div>
+      </div>
+    </div>
+
+    <!-- ── Settings tab ─────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="section-card">
+        <h3>AUDIO</h3>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Music</div>
+            <div class="pref-desc">Background music during games</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pref-music" checked onchange="savePref('music_enabled', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Sound Effects</div>
+            <div class="pref-desc">Game sound effects and notifications</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pref-sound" checked onchange="savePref('sound_enabled', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>DISPLAY</h3>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Show Online Status</div>
+            <div class="pref-desc">Let friends see when you're online</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pref-online" checked onchange="savePref('show_online_status', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Notifications</div>
+            <div class="pref-desc">Game invites and friend activity</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pref-notif" checked onchange="savePref('notifications_enabled', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>ACCOUNT</h3>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Playername</div>
+            <div class="pref-desc" id="settings-pname">—</div>
+          </div>
+          <span style="font-size:0.68rem;color:var(--dim)">Permanent</span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <div class="pref-label">Terms of Service</div>
+            <div class="pref-desc" id="settings-tos">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Avatar change modal ──────────────────────────────────────── -->
+  <div class="modal-overlay" id="avatar-modal">
+    <div class="modal-box">
+      <div class="modal-title">CHOOSE AVATAR</div>
+      <div class="av-tabs" id="modal-av-tabs"></div>
+      <div class="av-grid" id="modal-av-grid"></div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeAvatarModal()">Cancel</button>
+        <button class="btn-modal-save" onclick="saveAvatar()">Save Avatar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/manifold_reality.js" defer></script>
+  <script>
+    'use strict';
+
+    const API = '/api';
+    let _player = null;
+    let _token = null;
+    let _activeTab = 'profile';
+    let _modalCategory = null;
+    let _modalSelected = null;
+
+    // ── Avatar categories (mirrors setup.html) ────────────────────────
+    const AVATAR_CATEGORIES = [
+      {
+        id: 'people', label: '👥 People', avatars: [
+          { id: 'p_f_light', e: '👩🏻' }, { id: 'p_m_light', e: '👨🏻' }, { id: 'p_f_med', e: '👩🏽' }, { id: 'p_m_med', e: '👨🏽' },
+          { id: 'p_f_dark', e: '👩🏿' }, { id: 'p_m_dark', e: '👨🏿' }, { id: 'p_f_tan', e: '👩🏾' }, { id: 'p_m_tan', e: '👨🏾' },
+          { id: 'p_blonde_f', e: '👱‍♀️' }, { id: 'p_blonde_m', e: '👱‍♂️' }, { id: 'p_red_f', e: '👩‍🦰' }, { id: 'p_red_m', e: '👨‍🦰' },
+          { id: 'p_curly_f', e: '👩‍🦱' }, { id: 'p_curly_m', e: '👨‍🦱' }, { id: 'p_silver_f', e: '👩‍🦳' }, { id: 'p_silver_m', e: '👨‍🦳' },
+          { id: 'p_bald', e: '🧑‍🦲' }, { id: 'p_beard', e: '🧔' }, { id: 'ninja', e: '🥷' }, { id: 'cowboy', e: '🤠' },
+          { id: 'p_mech_f', e: '👩‍🔧' }, { id: 'p_mech_m', e: '👨‍🔧' }, { id: 'p_art_f', e: '👩‍🎨' }, { id: 'p_art_m', e: '👨‍🎨' },
+        ]
+      },
+      {
+        id: 'science', label: '🔬 Science', avatars: [
+          { id: 'sci_f', e: '👩‍🔬' }, { id: 'sci_m', e: '👨‍🔬' }, { id: 'robot', e: '🤖' }, { id: 'alien', e: '👽' }, { id: 'alien_px', e: '👾' },
+          { id: 'dna', e: '🧬' }, { id: 'micro', e: '🔬' }, { id: 'brain', e: '🧠' }, { id: 'atom', e: '⚛️' }, { id: 'flask', e: '⚗️' }, { id: 'nerd', e: '🤓' }, { id: 'cyborg', e: '🦾' },
+        ]
+      },
+      {
+        id: 'fantasy', label: '🦄 Fantasy', avatars: [
+          { id: 'wizard_f', e: '🧙‍♀️' }, { id: 'wizard_m', e: '🧙‍♂️' }, { id: 'elf_f', e: '🧝‍♀️' }, { id: 'elf_m', e: '🧝‍♂️' },
+          { id: 'vampire_m', e: '🧛‍♂️' }, { id: 'vampire_f', e: '🧛‍♀️' }, { id: 'mermaid', e: '🧜‍♀️' }, { id: 'fairy', e: '🧚‍♀️' },
+          { id: 'hero_f', e: '🦸‍♀️' }, { id: 'hero_m', e: '🦸‍♂️' }, { id: 'villain_f', e: '🦹‍♀️' }, { id: 'villain_m', e: '🦹‍♂️' },
+          { id: 'dragon', e: '🐉' }, { id: 'unicorn', e: '🦄' }, { id: 'ghost', e: '👻' }, { id: 'skull', e: '💀' }, { id: 'crown', e: '👑' }, { id: 'crystal', e: '🔮' },
+        ]
+      },
+      {
+        id: 'sports', label: '⚽ Sports', avatars: [
+          { id: 'sp_soccer', e: '⚽' }, { id: 'sp_bball', e: '🏀' }, { id: 'sp_football', e: '🏈' }, { id: 'sp_baseball', e: '⚾' },
+          { id: 'sp_tennis', e: '🎾' }, { id: 'sp_hockey', e: '🏒' }, { id: 'sp_race', e: '🏎️' }, { id: 'sp_martial', e: '🥋' },
+          { id: 'sp_swim', e: '🏊' }, { id: 'sp_climb', e: '🧗' }, { id: 'sp_run_f', e: '🏃‍♀️' }, { id: 'sp_run_m', e: '🏃‍♂️' },
+        ]
+      },
+      {
+        id: 'animals', label: '🦁 Animals', avatars: [
+          { id: 'lion', e: '🦁' }, { id: 'tiger', e: '🐯' }, { id: 'bear', e: '🐻' }, { id: 'fox', e: '🦊' }, { id: 'wolf', e: '🐺' }, { id: 'cat', e: '😼' },
+          { id: 'eagle', e: '🦅' }, { id: 'owl', e: '🦉' }, { id: 'dolphin', e: '🐬' }, { id: 'shark', e: '🦈' }, { id: 'butterfly', e: '🦋' }, { id: 'penguin', e: '🐧' },
+          { id: 'panda', e: '🐼' }, { id: 'octopus', e: '🐙' }, { id: 'rabbit', e: '🐰' }, { id: 'snake', e: '🐍' },
+        ]
+      },
+      {
+        id: 'toys', label: '🎮 Toys', avatars: [
+          { id: 'toy_stick', e: '🕹️' }, { id: 'toy_dice', e: '🎲' }, { id: 'toy_chess', e: '♟️' }, { id: 'toy_puzzle', e: '🧩' },
+          { id: 'toy_darts', e: '🎯' }, { id: 'toy_yoyo', e: '🪀' }, { id: 'toy_teddy', e: '🧸' }, { id: 'toy_kite', e: '🪁' },
+          { id: 'toy_boom', e: '🪃' }, { id: 'toy_balloon', e: '🎈' }, { id: 'toy_magic', e: '🪄' }, { id: 'toy_blocks', e: '🧱' },
+        ]
+      },
+      {
+        id: 'space', label: '🚀 Space', avatars: [
+          { id: 'rocket', e: '🚀' }, { id: 'ufo', e: '🛸' }, { id: 'astro_f', e: '👩‍🚀' }, { id: 'astro_m', e: '👨‍🚀' },
+          { id: 'planet', e: '🪐' }, { id: 'star', e: '⭐' }, { id: 'comet', e: '☄️' }, { id: 'moon', e: '🌙' },
+          { id: 'galaxy', e: '🌌' }, { id: 'satellite', e: '🛰️' }, { id: 'telescope', e: '🔭' }, { id: 'blackhole', e: '🕳️' },
+        ]
+      },
+      {
+        id: 'hobbies', label: '🎨 Hobbies', avatars: [
+          { id: 'hb_guitar', e: '🎸' }, { id: 'hb_palette', e: '🎨' }, { id: 'hb_camera', e: '📷' }, { id: 'hb_book', e: '📚' },
+          { id: 'hb_gym', e: '🏋️' }, { id: 'hb_chef', e: '👨‍🍳' }, { id: 'hb_music', e: '🎵' }, { id: 'hb_drum', e: '🥁' },
+          { id: 'hb_gamepad', e: '🎮' }, { id: 'hb_bike', e: '🚴' }, { id: 'hb_surf', e: '🏄' }, { id: 'hb_dart', e: '🎯' },
+        ]
+      },
+    ];
+
+    window.KG_AVATARS = {};
+    AVATAR_CATEGORIES.forEach(cat => cat.avatars.forEach(a => { window.KG_AVATARS[a.id] = a.e; }));
+
+    function avatarEmoji(id) { return window.KG_AVATARS[id] || '🎮'; }
+
+    // ── Auth gate + init ──────────────────────────────────────────────
+    async function init() {
+      _token = localStorage.getItem('kg_token');
+      if (!_token) {
+        window.location.href = '/login/index.html?redirect=' + encodeURIComponent(location.pathname);
+        return;
+      }
+
+      try {
+        const r = await fetch(`${API}/auth/validate`, { headers: { Authorization: `Bearer ${_token}` } });
+        if (!r.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
+      } catch { window.location.href = '/login/index.html'; return; }
+
+      const pr = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${_token}` } });
+      if (!pr.ok) { window.location.href = '/portal.html'; return; }
+      _player = (await pr.json());
+      if (!_player.profileSetup) { window.location.href = '/player/setup.html'; return; }
+
+      renderHeader();
+      loadMedallions();
+      loadFriends();
+      loadMyGuild();
+      loadPrefs();
+    }
+
+    function renderHeader() {
+      document.getElementById('hdr-avatar').textContent = avatarEmoji(_player.avatarId);
+      document.getElementById('hdr-name').textContent = _player.playername;
+      document.getElementById('settings-pname').textContent = _player.playername;
+
+      if (_player.tosAgreedAt) {
+        const d = new Date(_player.tosAgreedAt * 1000 || _player.tosAgreedAt);
+        document.getElementById('settings-tos').textContent = `Agreed ${d.toLocaleDateString()}`;
+      }
+
+      const joined = _player.joinedAt || _player.createdAt;
+      if (joined) {
+        const d = new Date(joined);
+        document.getElementById('stat-joined').textContent = `Joined: ${d.toLocaleDateString()}`;
+      }
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────
+    function switchTab(name) {
+      _activeTab = name;
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        const tabs = ['profile', 'friends', 'guilds', 'settings'];
+        b.classList.toggle('active', tabs[i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`tab-${name}`)?.classList.add('active');
+    }
+
+    // ── Medallions ────────────────────────────────────────────────────
+    const GAME_NAMES = {
+      fasttrack: 'FastTrack', brickbreaker3d: 'BrickBreaker 3D',
+      '4dtictactoe': '4D Tic-Tac-Toe', assemble: 'Assemble', starfighter: 'StarFighter',
+    };
+    const MED_CLASS = { bronze: 'med-bronze', silver: 'med-silver', gold: 'med-gold', platinum: 'med-platinum', diamond: 'med-diamond' };
+
+    async function loadMedallions() {
+      try {
+        const r = await fetch(`${API}/players/medallions`, { headers: { Authorization: `Bearer ${_token}` } });
+        if (!r.ok) return;
+        const { medallions } = await r.json();
+        if (!medallions || !medallions.length) return;
+
+        // Header strip (compact)
+        const strip = document.getElementById('medallion-strip');
+        strip.innerHTML = medallions.map(m =>
+          `<span class="medallion-chip ${MED_CLASS[m.level] || ''}">${GAME_NAMES[m.game_id] || m.game_id} · ${m.level.toUpperCase()}</span>`
+        ).join('');
+
+        // Profile tab detail
+        const detail = document.getElementById('medallion-detail');
+        detail.innerHTML = medallions.map(m => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <div>
+            <div style="font-size:0.85rem">${GAME_NAMES[m.game_id] || m.game_id}</div>
+            <div style="font-size:0.68rem;color:var(--dim);margin-top:0.2rem">${m.games_won}W / ${m.games_played - m.games_won}L · ${m.xp} XP</div>
+          </div>
+          <span class="medallion-chip ${MED_CLASS[m.level] || ''}">${m.level.toUpperCase()}</span>
+        </div>
+      `).join('');
+
+        document.getElementById('stat-games').textContent = `Games: ${medallions.reduce((s, m) => s + m.games_played, 0)}`;
+      } catch { }
+    }
+
+    // ── Friends ───────────────────────────────────────────────────────
+    async function loadFriends() {
+      try {
+        const r = await fetch(`${API}/players/friends`, { headers: { Authorization: `Bearer ${_token}` } });
+        if (!r.ok) return;
+        const { friends } = await r.json();
+        renderFriends(friends);
+      } catch { }
+    }
+
+    function renderFriends(friends) {
+      const list = document.getElementById('friends-list');
+      if (!friends || !friends.length) {
+        list.innerHTML = '<li class="empty-msg">No friends yet. Search above to add someone.</li>';
+        return;
+      }
+      const now = Math.floor(Date.now() / 1000);
+      list.innerHTML = friends.map(f => {
+        const online = f.last_seen && (now - f.last_seen) < 300;
+        return `<li class="friend-item">
+        <div class="status-dot${online ? ' online' : ''}"></div>
+        <span class="friend-avatar">${avatarEmoji(f.avatar_id)}</span>
+        <span class="friend-name">${f.player_name}</span>
+        <div class="friend-actions">
+          <button class="btn-sm danger" onclick="removeFriend('${f.player_name}')">Remove</button>
+          <button class="btn-sm danger" onclick="blockPlayer('${f.player_name}')">Block</button>
+        </div>
+      </li>`;
+      }).join('');
+    }
+
+    async function searchPlayer() {
+      const q = document.getElementById('friend-search-input').value.trim();
+      if (q.length < 2) return;
+      const res = document.getElementById('player-search-results');
+      res.innerHTML = '<p class="empty-msg">Searching…</p>';
+      try {
+        const r = await fetch(`${API}/players/search?q=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${_token}` } });
+        const data = await r.json();
+        if (!data.results || !data.results.length) {
+          res.innerHTML = '<p class="empty-msg">No players found.</p>'; return;
+        }
+        res.innerHTML = data.results
+          .filter(p => p.userId !== _player.userId)
+          .map(p => `<div class="friend-item">
+          <span class="friend-avatar">${avatarEmoji(p.avatarId)}</span>
+          <span class="friend-name">${p.playername}</span>
+          <button class="btn-sm primary" onclick="addFriend('${p.playername}')">+ Add</button>
+        </div>`).join('');
+      } catch { res.innerHTML = '<p class="empty-msg">Search failed.</p>'; }
+    }
+
+    async function addFriend(playerName) {
+      const s = document.getElementById('friend-status');
+      try {
+        const r = await fetch(`${API}/players/friends/add`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName }),
+        });
+        const data = await r.json();
+        showStatus('friend-status', data.success ? 'ok' : 'err', data.message || data.error || '');
+        if (data.success) loadFriends();
+      } catch { showStatus('friend-status', 'err', 'Network error'); }
+    }
+
+    async function removeFriend(playerName) {
+      try {
+        const r = await fetch(`${API}/players/friends/remove`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName }),
+        });
+        if (r.ok) { showStatus('friend-status', 'ok', `${playerName} removed`); loadFriends(); }
+      } catch { }
+    }
+
+    async function blockPlayer(playerName) {
+      if (!confirm(`Block ${playerName}? This will also remove them from your friends list.`)) return;
+      try {
+        const r = await fetch(`${API}/players/blocks/add`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName }),
+        });
+        const data = await r.json();
+        showStatus('friend-status', data.success ? 'ok' : 'err', data.message || data.error || '');
+        if (data.success) loadFriends();
+      } catch { }
+    }
+
+    // ── Guilds ────────────────────────────────────────────────────────
+    async function loadMyGuild() {
+      const el = document.getElementById('my-guild-content');
+      try {
+        const r = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${_token}` } });
+        const data = await r.json();
+        if (data.guildId) {
+          el.innerHTML = `<div class="guild-card">
+          <div class="guild-tag">${data.guildRole?.toUpperCase() || 'MEMBER'}</div>
+          <div class="guild-info">
+            <div class="guild-name">Guild #${data.guildId}</div>
+            <div class="guild-meta">Role: ${data.guildRole || 'member'}</div>
+          </div>
+        </div>`;
+        } else {
+          el.innerHTML = '<p class="empty-msg">You are not in a guild. Browse or search to join one below.</p>';
+        }
+      } catch { el.innerHTML = '<p class="empty-msg">Could not load guild info.</p>'; }
+      loadPublicGuilds();
+    }
+
+    async function loadPublicGuilds() {
+      const el = document.getElementById('guild-list');
+      try {
+        const r = await fetch(`${API}/guilds`, { headers: { Authorization: `Bearer ${_token}` } });
+        if (!r.ok) { el.innerHTML = '<p class="empty-msg">Could not load guilds.</p>'; return; }
+        const data = await r.json();
+        const guilds = data.guilds || data;
+        if (!guilds || !guilds.length) { el.innerHTML = '<p class="empty-msg">No public guilds found.</p>'; return; }
+        el.innerHTML = guilds.slice(0, 20).map(g => `
+        <div class="guild-card">
+          <div class="guild-tag">[${g.tag}]</div>
+          <div class="guild-info">
+            <div class="guild-name">${g.name}</div>
+            <div class="guild-meta">${g.member_count || 0} members · Min: ${g.min_medallion || 'none'}</div>
+          </div>
+          <button class="btn-sm primary" onclick="requestJoinGuild(${g.id}, '${g.name}')">Request</button>
+        </div>
+      `).join('');
+      } catch { el.innerHTML = '<p class="empty-msg">Could not load guilds.</p>'; }
+    }
+
+    function searchGuilds() {
+      const q = document.getElementById('guild-search-input').value.trim().toLowerCase();
+      document.querySelectorAll('#guild-list .guild-card').forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    }
+
+    async function requestJoinGuild(guildId, guildName) {
+      alert(`Join request to "${guildName}" — Guild system coming soon!`);
+    }
+
+    // ── Preferences ───────────────────────────────────────────────────
+    async function loadPrefs() {
+      try {
+        const r = await fetch(`${API}/players/preferences`, { headers: { Authorization: `Bearer ${_token}` } });
+        if (!r.ok) return;
+        const { prefs } = await r.json();
+        if (prefs.music_enabled !== undefined) document.getElementById('pref-music').checked = prefs.music_enabled !== 'false';
+        if (prefs.sound_enabled !== undefined) document.getElementById('pref-sound').checked = prefs.sound_enabled !== 'false';
+        if (prefs.show_online_status !== undefined) document.getElementById('pref-online').checked = prefs.show_online_status !== 'false';
+        if (prefs.notifications_enabled !== undefined) document.getElementById('pref-notif').checked = prefs.notifications_enabled !== 'false';
+      } catch { }
+    }
+
+    async function savePref(key, value) {
+      try {
+        await fetch(`${API}/players/preferences`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: String(value) }),
+        });
+      } catch { }
+    }
+
+    // ── Avatar modal ──────────────────────────────────────────────────
+    function openAvatarModal() {
+      _modalSelected = _player.avatarId;
+      renderModalCategory(AVATAR_CATEGORIES[0].id);
+      document.getElementById('avatar-modal').classList.add('open');
+    }
+
+    function closeAvatarModal() {
+      document.getElementById('avatar-modal').classList.remove('open');
+    }
+
+    function renderModalCategory(catId) {
+      _modalCategory = catId;
+      const cat = AVATAR_CATEGORIES.find(c => c.id === catId) || AVATAR_CATEGORIES[0];
+      document.getElementById('modal-av-tabs').innerHTML = AVATAR_CATEGORIES.map(c =>
+        `<button class="av-tab${c.id === catId ? ' active' : ''}" onclick="renderModalCategory('${c.id}')">${c.label}</button>`
+      ).join('');
+      document.getElementById('modal-av-grid').innerHTML = cat.avatars.map(a =>
+        `<div class="av-opt${_modalSelected === a.id ? ' selected' : ''}" onclick="selectModalAvatar('${a.id}')">${a.e}</div>`
+      ).join('');
+    }
+
+    function selectModalAvatar(id) {
+      _modalSelected = id;
+      document.querySelectorAll('#modal-av-grid .av-opt').forEach(el => el.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+    }
+
+    async function saveAvatar() {
+      if (!_modalSelected) return;
+      try {
+        const r = await fetch(`${API}/players/profile`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatarId: _modalSelected }),
+        });
+        if (r.ok) {
+          _player.avatarId = _modalSelected;
+          document.getElementById('hdr-avatar').textContent = avatarEmoji(_modalSelected);
+          closeAvatarModal();
+        }
+      } catch { }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+    function showStatus(elId, type, msg) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.className = `status-msg show ${type}`;
+      el.textContent = msg;
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    init();
+  </script>
+</body>
+
+</html>

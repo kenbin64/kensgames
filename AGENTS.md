@@ -1,5 +1,52 @@
 # AGENTS.md
 
+---
+
+## Dimensional Programming Model
+
+Everything in this codebase is expressed as a **dimension**. Each higher dimension is a single point viewed from the next dimension up. Moving down collapses a whole into a point; moving up expands a point into a whole.
+
+```
+0D  void / scalar      — a single value; no extent
+1D  point → line       — a length of points
+2D  line  → plane      — a width of lines
+3D  plane → volume     — a height of planes
+4D  volume → object    — an object as a point in the next void
+nD  recurse upward     — every whole at level n is a point at level n+1
+```
+
+### Laws
+
+| Law | Statement |
+|-----|-----------|
+| **Identity** | `Manifold = Expression + Attributes + Substrate` |
+| **Universal access** | `z = x · y` — the higher dimension derives and contains the lower |
+| **Recursion scope** | Recurse **between** dimensions; never try to recurse within one |
+| **Iteration scope** | Iterate **within** a dimension; never iterate across dimension boundaries |
+| **Collapse** | Any n-D whole is a single point at dimension n+1 |
+| **Expansion** | Any point at dimension n+1 unfolds into a full n-D manifold |
+
+### Practical application in this repo
+
+- **Substrate files** operate at one dimension. A board substrate (3D) never owns time logic (4D) — time is a separate lens one dimension up.
+- **Lenses** are pure functions that project a manifold at dimension n into a value at dimension n-1 or n+1. They never store state.
+- **Iteration** inside a substrate scans cells within its own dimensional layer (e.g. looping over `x`, `y`, `z` within 3D is fine).
+- **Cross-dimension calls** are expressed as a recursive call to the next substrate, passing the collapsed point as input — not as nested loops that cross layers.
+- **Win detection** in a 3D board is a 1D line scan *within* 3D space — valid. Checking time-ordered history across turns is a 4D concern — belongs in a separate turn substrate.
+
+### Dimension map for this project
+
+| Dimension | Layer | Examples in repo |
+|-----------|-------|-----------------|
+| 0D | Scalar value | Token owner (0/1/2), score, a single color |
+| 1D | Sequence | A win-line of 4 cells, a melody phrase, a camera path |
+| 2D | Plane | Column grid (gx, gz), a texture, the HUD layout |
+| 3D | Volume | The 4×4×4 game board, a mesh, a room |
+| 4D | Temporal | Turn history, animation timeline, session state |
+| 5D+ | Conceptual | Game theory payoff matrix, player intent, story arc |
+
+---
+
 ## Workspace Shape
 
 - This repo is primarily a browser-first, static HTML/CSS/vanilla-JS site rooted at `/var/www/kensgames.com`.

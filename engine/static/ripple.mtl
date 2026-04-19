@@ -1,0 +1,9 @@
+# Manifold MTL — ripple
+newmtl ripple
+Ka 0.5333 0.6667 0.8000
+Kd 0.5333 0.6667 0.8000
+Ks 0.0000 0.0000 0.0000
+Ke 0.0000 0.0000 0.0000
+Ns 64
+illum 2
+map_Kd water

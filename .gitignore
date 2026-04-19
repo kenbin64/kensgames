@@ -16,6 +16,10 @@ server/server.log
 .DS_Store
 Thumbs.db
 
+# SQLite database — VPS only, never committed
+server/kensgames.db
+server/*.db
+
 # Editor
 .idea/
 .vscode/settings.json
@@ -29,6 +33,9 @@ starfighter/starfighter.bundle.js
 starfighter/starfighter.bundle.js.gz
 starfighter/index.html.gz
 starfighter/index.src.html
+
+# Chomp — work in progress, not deployed
+Chomp!WallyTheCairnsCrocodileAdventure/
 starfighter/nginx_starfighter.conf
 4DTicTacToe/assets/models/*.glb
 

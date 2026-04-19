@@ -6,6 +6,9 @@
 > This directive governs every compile-and-deploy operation for the kensgames.com portal.
 > Follow steps in order. Do not skip validation. Do not push if the compiler fails.
 
+**Directive version: 2.0** — Updated April 2026 to reflect portal retool:
+SQLite player DB, kg-session.js, player profile pages, avatar picker, medallion system.
+
 ---
 
 ## 1. What You Are Doing
@@ -46,11 +49,17 @@ The entry point for VPS post-deploy is `AGENTS.md` (Helix reads it automatically
 | `manifold.portal.json` | Root portal config — source of truth for all games |
 | `*/manifold.game.json` | Per-game manifold descriptor (one per game directory) |
 | `js/manifold_bridge.js` | Shared browser bridge — included by every game |
+| `js/kg-session.js` | Shared auth/session module — included by every authenticated page |
 | `dist/manifold.registry.json` | Compiler output — portal reads this at runtime |
 | `dist/deploy.manifest.json` | Compiler output — Helix AI reads this on VPS |
 | `helix.sh` | VPS entry point — deployed to `/opt/butterflyfx/dimensionsos/helix/` |
 | `.github/workflows/deploy.yml` | GitHub Actions pipeline |
 | `AGENTS.md` | VPS Helix AI instructions |
+| `server/db.js` | SQLite persistent store (players, guilds, friends, medallions, prefs) |
+| `server/routes/players.js` | Player profile API — 14 endpoints |
+| `server/kensgames.db` | **VPS only** — SQLite database file; never committed to git |
+| `player/setup.html` | First-login avatar/playername setup page |
+| `player/index.html` | Player profile page (tabs: Profile, Friends, Guilds, Settings) |
 
 ---
 
@@ -149,11 +158,31 @@ All games must show `tag=True` (or `tag=OK`).
 # Check any JS files you modified
 node --check arcade.js
 node --check js/manifold_bridge.js
+node --check js/kg-session.js
 node --check brickbreaker3d/game.js
 node --check server/index.js
+node --check server/db.js
+node --check server/routes/players.js
 ```
 
 No output = no syntax errors.
+
+### Step 5b — Verify kg-session.js coverage
+
+`/js/kg-session.js` must be present on every authenticated portal/game page that
+is **not** a public landing page. Verify it is included where needed:
+
+```powershell
+# Windows PowerShell — check portal + player pages
+@("portal.html","player/setup.html","player/index.html") | ForEach-Object {
+  $c = Get-Content $_ -Raw
+  "$_  kg-session=$($c -match 'kg-session\.js')"
+}
+```
+
+- `portal.html` must have `data-kg-no-init="true"` on `<body>` (portal manages its own auth flow; kg-session.js only provides `window.KG_AVATARS`).
+- `player/setup.html` and `player/index.html` rely on kg-session.js for auth gating.
+- Game HTML files (`fasttrack/`, `4DTicTacToe/`, etc.) may include kg-session.js for the player chip and `KGSession.musicEnabled` / `KGSession.soundEnabled` controls.
 
 ### Step 6 — Commit and Push
 
@@ -228,6 +257,10 @@ py -3.12 engine/manifold_compiler.py --validate-only
 | `dist/` missing | Create it: `mkdir dist` then recompile |
 | `node --check` fails | Fix syntax before committing |
 | Bridge tag missing from a game | Add `<script src="/js/manifold_bridge.js"></script>` to the game's HTML |
+| `kg-session.js` missing from authenticated page | Add `<script src="/js/kg-session.js"></script>` to `<head>` |
+| `portal.html` shows double player chip | Ensure `<body data-kg-no-init="true">` is set on portal.html |
+| `better-sqlite3` build fails on VPS | Ensure Node.js version matches; try `npm rebuild better-sqlite3` |
+| DB file missing after deploy | First server start creates `server/kensgames.db` automatically — check PM2 logs |
 | GitHub Actions compile job fails | Read log — usually a `manifold.game.json` change broke a validation |
 | VPS deploy fails | Check `AGENTS.md` for rollback procedure |
 | Smoke test returns non-200 | Check nginx config on VPS; may be CDN cache delay |
@@ -260,20 +293,40 @@ To add a new game:
 |--------|----------|
 | `VPS_SSH_KEY` | SSH into `172.81.62.217` for rsync + PM2 |
 | `JWT_SECRET_TEST` | Server test suite |
+| `TURNSTILE_SECRET` | Cloudflare Turnstile server-side verification (login/register) |
+
+## 10. Environment Variables (VPS — set in `/etc/environment` or PM2 ecosystem)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SECRET` | ✅ | JWT signing key — must match between restarts |
+| `TURNSTILE_SECRET` | ✅ prod | Cloudflare Turnstile secret key |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | ✅ | Email delivery for password reset / verify |
+| `NODE_ENV` | ✅ | Set to `production` on VPS |
+| `PORT` | — | Auth server port (default 3000) |
+| `DB_PATH` | — | Override SQLite path (default `server/kensgames.db`) |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | — | Discord OAuth |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Google OAuth |
+| `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | — | Facebook OAuth |
 
 ---
 
-## 10. Key Paths
+## 11. Key Paths
 
 | Location | Path |
 |----------|------|
 | Portal web root (VPS) | `/var/www/kensgames.com/` |
 | Helix AI directory (VPS) | `/opt/butterflyfx/dimensionsos/helix/` |
 | Manifold registry (VPS) | `/var/www/kensgames.com/js/manifold.registry.json` |
+| Shared session module (VPS) | `/var/www/kensgames.com/js/kg-session.js` |
+| Player profile pages (VPS) | `/var/www/kensgames.com/player/` |
+| SQLite database (VPS) | `/var/www/kensgames.com/server/kensgames.db` |
 | Deploy log (VPS) | `/opt/butterflyfx/dimensionsos/helix/deploy.log` |
 | Backups (VPS) | `/var/www/backups/` |
+
+> **Never commit `kensgames.db`** — it is listed in `.gitignore`. It is created automatically on first server start via `server/db.js`.
 
 ---
 
 *Axiom: z = xy · Everything is a point in a higher dimension and a whole in a lower.*
-*Directive version: 1.0 · kensgames.com*
+*Directive version: 2.0 · kensgames.com · Updated April 2026*

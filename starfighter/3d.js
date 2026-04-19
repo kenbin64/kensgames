@@ -174,15 +174,16 @@ const SF3D = (function () {
     const DOT_DIST = {
         // Increased so ships are visible as actual models well before engagement.
         enemy: 7000, predator: 10000, interceptor: 7000, bomber: 8000,
-        dreadnought: 6000, 'alien-baseship': 8000, tanker: 8000, medic: 10000,
-        rescue: 4000, 'science-ship': 12000,
-        ally: 700, baseship: 8000, station: 150000, earth: 200000, moon: 150000,
+        dreadnought: 6000, 'alien-baseship': 8000, tanker: 10000, medic: 12000,
+        rescue: 6000, 'science-ship': 14000,
+        wingman: 6000, ally: 5000,
+        baseship: 8000, station: 150000, earth: 200000, moon: 150000,
         'hive-queen': 10000,
         laser: 600, machinegun: 400, torpedo: 800, plasma: 600,
         egg: 500, youngling: 400,
     };
     const CULL_DIST = 50000; // beyond this, skip entirely (except celestials)
-    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship', 'rescue', 'science-ship']);
+    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship', 'rescue', 'science-ship', 'wingman', 'tanker', 'medic', 'ally']);
     const DOT_COLORS = {
         enemy: 0xff2222, predator: 0xcc0000, interceptor: 0xff4444, bomber: 0xff3333,
         dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0x00ff88, medic: 0x44ffcc,
@@ -2843,6 +2844,26 @@ const SF3D = (function () {
             if (e.type === 'laser' && mesh.userData && mesh.userData.isLaserBolt) {
                 _updateLaserBoltUniforms(mesh, e, 0.016);
                 _emitBoltTrail(e);
+            }
+
+            // Wingman / allied ship engine glow — slow pulse on engine emissive + nav beacon
+            if ((e.type === 'wingman' || e.type === 'ally' || e.type === 'tanker' || e.type === 'medic') && mesh) {
+                const ePulse = 0.65 + 0.35 * Math.sin(_frameTime * 0.0038 + (e.id.charCodeAt ? e.id.charCodeAt(0) : 0) * 2.17);
+                mesh.traverse(child => {
+                    if (!child.isMesh) return;
+                    if (child.userData.engineGlow) {
+                        if (child.material && child.material.emissiveIntensity !== undefined) {
+                            child.material.emissiveIntensity = 0.35 + 0.65 * ePulse;
+                        }
+                    }
+                    // Nav beacon on non-wingman support vessels
+                    if (child.userData.navBeacon) {
+                        if (child.material && child.material.emissiveIntensity !== undefined) {
+                            const navPulse = 0.5 + 0.5 * Math.abs(Math.sin(_frameTime * 0.0021 + (e.id.charCodeAt ? e.id.charCodeAt(0) : 0) * 2.3));
+                            child.material.emissiveIntensity = 1.2 * navPulse;
+                        }
+                    }
+                });
             }
         }
 

@@ -11,11 +11,14 @@
 
 const express = require('express');
 const cors = require('cors');
+const https = require('https');
+const querystring = require('querystring');
 require('dotenv').config();
 
 const AuthHandler = require('./auth-handler');
 const EncryptionService = require('./encryption');
 const EmailService = require('./email-service');
+const { PlayerDB } = require('./db'); // initialize DB schema on first require
 const PasswordRecoveryManager = require('./password-recovery');
 
 // Initialize Express
@@ -39,6 +42,41 @@ app.use(cors({
 
 const { manifoldData } = require('./store'); // Shared in-memory store
 let nextUserId = 1;
+
+// ─── Cloudflare Turnstile verification ────────────────────────────────────
+const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET;
+
+function verifyTurnstile(token, remoteip) {
+  return new Promise((resolve) => {
+    if (!TURNSTILE_SECRET) {
+      // Secret not configured — fail open in dev, fail closed in production
+      if (process.env.NODE_ENV === 'production') { resolve(false); }
+      else { resolve(true); }
+      return;
+    }
+    const body = querystring.stringify({
+      secret: TURNSTILE_SECRET,
+      response: token,
+      ...(remoteip ? { remoteip } : {})
+    });
+    const req = https.request({
+      hostname: 'challenges.cloudflare.com',
+      path: '/turnstile/v0/siteverify',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data).success === true); }
+        catch { resolve(false); }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.write(body);
+    req.end();
+  });
+}
 
 // Superuser email addresses — accounts registered with these emails are
 // automatically granted isSuperuser=true, isAdmin=true, adminLevel=3.
@@ -188,6 +226,17 @@ app.get('/api/auth/access-session', async (req, res) => {
     sessions.push(session);
     writeUserToManifold(username, { sessions, lastLoginAt: Date.now() });
 
+    // Upsert SQLite player record — creates on first login, updates last_seen otherwise
+    let profileSetup = false, playername = null, avatarId = null;
+    try {
+      const dbPlayer = PlayerDB.ensurePlayer(userData.userId, email);
+      profileSetup = dbPlayer ? dbPlayer.profile_setup === 1 : false;
+      playername = dbPlayer ? dbPlayer.player_name : null;
+      avatarId = dbPlayer ? dbPlayer.avatar_id : null;
+    } catch (dbErr) {
+      console.error('DB ensurePlayer error:', dbErr.message);
+    }
+
     return res.status(200).json({
       success: true,
       token,
@@ -195,6 +244,9 @@ app.get('/api/auth/access-session', async (req, res) => {
       username,
       displayName: userData.displayName || username,
       email,
+      profileSetup,
+      playername,
+      avatarId,
     });
   } catch (error) {
     console.error('Access session error:', error);
@@ -208,7 +260,13 @@ app.get('/api/auth/access-session', async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, email, password, avatar } = req.body;
+    const { username, email, password, avatar, turnstileToken } = req.body;
+
+    // Verify Turnstile challenge
+    const tsOk = await verifyTurnstile(turnstileToken, req.ip);
+    if (!tsOk) {
+      return res.status(400).json({ success: false, error: 'Security check failed. Please try again.' });
+    }
 
     // Validate username
     const usernameCheck = authHandler.validateUsername(username);
@@ -305,7 +363,13 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, turnstileToken } = req.body;
+
+    // Verify Turnstile challenge
+    const tsOk = await verifyTurnstile(turnstileToken, req.ip);
+    if (!tsOk) {
+      return res.status(400).json({ success: false, error: 'Security check failed. Please try again.' });
+    }
 
     // Validate input
     if (!username) {

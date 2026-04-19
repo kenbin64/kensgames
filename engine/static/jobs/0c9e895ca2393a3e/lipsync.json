@@ -1,0 +1,245 @@
+{
+  "fps": 24,
+  "frames": [
+    {
+      "t": 0.0,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.0417,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.0833,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.125,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.1667,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.2083,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.25,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.2917,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.3333,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.375,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.4167,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.4583,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.5,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.5417,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.5833,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.625,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.6667,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.7083,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.75,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.7917,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.8333,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.875,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.9167,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 0.9583,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.0,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.0417,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.0833,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.125,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.1667,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.2083,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.25,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.2917,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.3333,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.375,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.4167,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.4583,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.5,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.5417,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.5833,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.625,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.6667,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.7083,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.75,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.7917,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.8333,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.875,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.9167,
+      "viseme": "SIL",
+      "weights": {}
+    },
+    {
+      "t": 1.9583,
+      "viseme": "SIL",
+      "weights": {}
+    }
+  ]
+}

@@ -55,10 +55,29 @@ wave = Manifold.register(
 
 # ---------------------------------------------------------------------------
 # CLI: export all examples to static/
+#
+# Usage:
+#   python examples.py                  # Three.js JSON for all manifolds
+#   python examples.py mountain         # Three.js JSON for one manifold
+#   python examples.py --blender        # OBJ+MTL + PLY for all manifolds
+#   python examples.py --unity          # Unity prefab JSON + C# for all
+#   python examples.py --all            # All formats for all manifolds
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
-    names = sys.argv[1:] or list(Manifold._registry.keys())
+    from export_blender import export_obj, export_ply
+    from export_unity   import export_unity
+
+    args  = sys.argv[1:]
+    fmt   = {"--blender", "--unity", "--all"} & set(args)
+    names = [a for a in args if not a.startswith("--")] or list(Manifold._registry.keys())
+
     for name in names:
         instance = Runtime.observe(name)
-        export_to_json(instance, path=f"static/{name}.json", res=120, scale=1.0)
+        if not fmt or "--all" in fmt:
+            export_to_json(instance, path=f"static/{name}.json", res=120, scale=1.0)
+        if "--blender" in fmt or "--all" in fmt:
+            export_obj(instance, stem=f"static/{name}", res=120, scale=1.0)
+            export_ply(instance, stem=f"static/{name}", res=120, scale=1.0)
+        if "--unity" in fmt or "--all" in fmt:
+            export_unity(instance, stem=f"static/{name}", res=120, scale=1.0)

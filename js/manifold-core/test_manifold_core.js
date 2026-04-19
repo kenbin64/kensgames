@@ -136,7 +136,7 @@ test('ManifoldSurface: Euclidean Distance', () => {
 
 test('ManifoldSurface: Manifold Z Calculation', () => {
   const z = ManifoldSurface.calculateZ(3, 4);
-  assertEqual(z, 12, 'Z = x * y formula');
+  assertEqual(z, 12, 'Z = x·y portal dimensional law (3×4=12)');
 });
 
 // ─────────────────────────────────────────────────────────────────────────

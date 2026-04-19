@@ -1,0 +1,57 @@
+{
+  "manifold": "chomp-wally",
+  "name": "Chomp! Wally the Cairns Crocodile Adventure",
+  "version": "1.0.0",
+  "status": "production",
+  "dimension": {
+    "x": 1,
+    "y": 8,
+    "z": 8,
+    "_note": "z = x*y = 1 player * 8 levels = 8; game is a 3D volume manifold (Cairns estuary)"
+  },
+  "entry": "index.html",
+  "game": "game.html",
+  "substrates": {
+    "player": "inline:WallySubstrate",
+    "world": "inline:EstuaryWorldSubstrate",
+    "prey": "inline:PreySubstrate",
+    "hazards": "inline:HazardSubstrate",
+    "camera": "inline:ThirdPersonCameraSubstrate",
+    "audio": "inline:AudioSubstrate",
+    "ui": "inline:HUDSubstrate",
+    "scoring": "inline:ScoringSubstrate"
+  },
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "score",
+      "level",
+      "health",
+      "chomp_streak",
+      "wallyPosition"
+    ]
+  },
+  "world": {
+    "setting": "Cairns estuary — mangroves, mudflats, tidal river",
+    "levels": 8,
+    "biomes": [
+      "estuary",
+      "mangrove_forest",
+      "mudflat",
+      "open_river",
+      "reef_shallows",
+      "tourist_boardwalk",
+      "storm_drain",
+      "open_sea"
+    ]
+  },
+  "physics": {
+    "model": "phi_swimming",
+    "_note": "Wally's swim speed, chomp arc, and tail-sweep radius all scale by golden ratio φ ≈ 1.618 per upgrade tier"
+  },
+  "deploy": {
+    "target": "/var/www/kensgames.com/Chomp!WallyTheCairnsCrocodileAdventure/",
+    "type": "static"
+  }
+}

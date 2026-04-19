@@ -8,6 +8,7 @@
   <link rel="icon" href="/fasttrack/assets/images/icon-192.png" type="image/png">
   <link rel="stylesheet" href="/arcade.css">
   <link rel="stylesheet" href="/css/manifold_3d.css">
+  <script src="/js/kg-session.js"></script>
   <style>
     /* ── Nav enhancements ───────────────────────────────────────── */
     .portal-nav {
@@ -354,7 +355,7 @@
   <script src="/js/analytics.js" defer></script>
 </head>
 
-<body data-mtheme="gold">
+<body data-mtheme="gold" data-kg-no-init="true">
   <div class="scanlines"></div>
   <canvas id="gyroid-bg"></canvas>
 
@@ -376,10 +377,10 @@
         🔔
         <span class="notif-badge" id="notif-badge">0</span>
       </button>
-      <div class="player-chip" id="player-chip" style="display:none">
+      <a class="player-chip" id="player-chip" href="/player/" style="display:none;text-decoration:none">
         <span class="avatar" id="chip-avatar">🎮</span>
         <span class="name" id="chip-name">—</span>
-      </div>
+      </a>
       <button class="arcade-btn" id="logout-btn" style="display:none">LOGOUT</button>
     </div>
   </header>

@@ -85,7 +85,7 @@ class CompilerError(Exception):
 
 def validate_dimension(game_id: str, dim: dict) -> list[str]:
     """
-    Validate that z == x * y (universal access rule).
+    Validate that z == x * y  (universal access rule).
     Returns list of error strings (empty → valid).
     """
     errors: list[str] = []

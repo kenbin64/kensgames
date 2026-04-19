@@ -548,16 +548,20 @@ const Manifold = (() => {
   // ══════════════════════════════════════════════════════════════════════════
 
   function distance(a, b) {
-    const dx = (a.position?.x ?? a.x) - (b.position?.x ?? b.x);
-    const dy = (a.position?.y ?? a.y) - (b.position?.y ?? b.y);
-    const dz = (a.position?.z ?? (a.x * a.y)) - (b.position?.z ?? (b.x * b.y));
+    const ax = a.position?.x ?? a.x, ay = a.position?.y ?? a.y;
+    const bx = b.position?.x ?? b.x, by = b.position?.y ?? b.y;
+    const dx = ax - bx;
+    const dy = ay - by;
+    const dz = (a.position?.z ?? _z(ax, ay)) - (b.position?.z ?? _z(bx, by));
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
   function distanceSq(a, b) {
-    const dx = (a.position?.x ?? a.x) - (b.position?.x ?? b.x);
-    const dy = (a.position?.y ?? a.y) - (b.position?.y ?? b.y);
-    const dz = (a.position?.z ?? (a.x * a.y)) - (b.position?.z ?? (b.x * b.y));
+    const ax = a.position?.x ?? a.x, ay = a.position?.y ?? a.y;
+    const bx = b.position?.x ?? b.x, by = b.position?.y ?? b.y;
+    const dx = ax - bx;
+    const dy = ay - by;
+    const dz = (a.position?.z ?? _z(ax, ay)) - (b.position?.z ?? _z(bx, by));
     return dx * dx + dy * dy + dz * dz;
   }
 
@@ -670,6 +674,7 @@ const Manifold = (() => {
   function write(coordinate, data) {
     const hash = _coordHash(coordinate);
     _data.set(hash, { coordinate, data, timestamp: Date.now() });
+    _emit('write', null, { coordinate, data });
     return hash;
   }
 
@@ -779,7 +784,7 @@ const Manifold = (() => {
     // Core equations (exposed for game-side derivations)
     z: _z,               // z = xy²  — two inputs, one quadratic output
     m: _m,               // m = xyz  — three inputs, one multiplicative output
-    surface: _surface,    // Schwartz Diamond + gyroid + blend at (x,y)
+    surfaceAt: _surface,  // Schwartz Diamond + gyroid + blend at (x,y) → {gyroid,diamond,blend,m}
     position3d: _position3d,
 
     // Ingestion (data → two numbers, source dropped)

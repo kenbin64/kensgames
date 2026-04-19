@@ -1,0 +1,5 @@
+newmtl stub_mat
+Kd 0.6 0.7 0.9
+Ka 0.1 0.1 0.1
+Ks 0.3 0.3 0.3
+Ns 32

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Chomp! Wally — Play</title>
+
+  <!-- Press Start 2P for retro score font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d1a22;
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    /* ── Canvas ────────────────────────────────────────────── */
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+    }
+
+    /* ── Flash overlay ─────────────────────────────────────── */
+    #flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: #ffdd00;
+      opacity: 0;
+      transition: opacity 0.12s ease-out;
+      z-index: 5;
+    }
+
+    /* ── Loading screen ────────────────────────────────────── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0d1a22;
+      z-index: 100;
+    }
+
+    #loading h1 {
+      color: #4a7c3f;
+      font-size: clamp(1rem, 3vw, 1.6rem);
+      letter-spacing: 0.1em;
+      margin-bottom: 1.6rem;
+      text-shadow: 0 0 20px #4a7c3f;
+    }
+
+    .load-bar-wrap {
+      width: 240px;
+      height: 14px;
+      border: 2px solid #4a7c3f;
+      border-radius: 3px;
+    }
+
+    .load-bar-fill {
+      height: 100%;
+      background: #4a7c3f;
+      animation: loadpulse 1.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes loadpulse {
+      from {
+        width: 10%
+      }
+
+      to {
+        width: 90%
+      }
+    }
+
+    #loading p {
+      color: #668855;
+      font-size: 0.55rem;
+      margin-top: 1rem;
+    }
+
+    /* ── HUD ───────────────────────────────────────────────── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      display: none;
+    }
+
+    /* Top bar */
+    #hud-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65) 0%, transparent 100%);
+    }
+
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .hud-label {
+      font-size: 0.42rem;
+      color: #aabbcc;
+      letter-spacing: 0.08em;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    .hud-bar-bg {
+      width: 90px;
+      height: 8px;
+      background: rgba(0, 0, 0, 0.55);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .hud-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.2s;
+    }
+
+    #bar-health {
+      background: linear-gradient(to right, #e84040, #ff7070);
+      width: 100%;
+    }
+
+    #bar-hunger {
+      background: linear-gradient(to right, #d08020, #f0b840);
+      width: 100%;
+    }
+
+    #bar-score {
+      background: linear-gradient(to right, #2080c0, #40c0ff);
+      width: 0%;
+    }
+
+    .hud-score-block {
+      margin-left: auto;
+      text-align: right;
+    }
+
+    #hud-score {
+      font-size: clamp(0.8rem, 2vw, 1.1rem);
+      color: #f0c040;
+      text-shadow: 0 0 10px #f0c040aa;
+    }
+
+    #hud-streak {
+      font-size: 0.6rem;
+      color: #ff8840;
+    }
+
+    /* Level name tag */
+    #hud-level-name {
+      position: absolute;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.5rem;
+      color: rgba(255, 255, 255, 0.55);
+      letter-spacing: 0.15em;
+      text-shadow: 1px 1px 4px #000;
+      white-space: nowrap;
+    }
+
+    /* Depth indicator */
+    #hud-depth {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.42rem;
+      color: #88ccff;
+      text-shadow: 1px 1px 3px #000;
+      writing-mode: vertical-rl;
+      letter-spacing: 0.1em;
+    }
+
+    /* Combo label */
+    #combo-label {
+      position: absolute;
+      left: 50%;
+      top: 35%;
+      transform: translateX(-50%);
+      font-size: clamp(0.8rem, 2.5vw, 1.3rem);
+      color: #f0c040;
+      text-shadow: 0 0 18px #f0c040, 0 0 6px #fff;
+      letter-spacing: 0.1em;
+      opacity: 0;
+      transition: opacity 0.25s;
+      pointer-events: none;
+    }
+
+    /* Controls hint */
+    #controls-hint {
+      position: absolute;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.38rem;
+      color: rgba(255, 255, 255, 0.35);
+      text-align: center;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+    }
+
+    /* ── Mobile controls ───────────────────────────────────── */
+    #mobile-controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: none;
+      padding: 12px 20px;
+      align-items: flex-end;
+      justify-content: space-between;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    @media (pointer: coarse) {
+      #mobile-controls {
+        display: flex;
+      }
+    }
+
+    #joystick {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: all;
+      touch-action: none;
+      position: relative;
+    }
+
+    #joystick-knob {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.22);
+      border: 2px solid rgba(255, 255, 255, 0.55);
+      transition: none;
+      position: relative;
+    }
+
+    .action-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      pointer-events: all;
+      touch-action: none;
+      border: 3px solid;
+      gap: 3px;
+    }
+
+    #btn-chomp {
+      background: rgba(200, 40, 30, 0.75);
+      border-color: #ff6055;
+      color: #fff;
+    }
+
+    #btn-sweep {
+      background: rgba(30, 100, 180, 0.70);
+      border-color: #40c0ff;
+      color: #fff;
+    }
+
+    .btn-icon {
+      font-size: 1.4em;
+    }
+
+    /* ── Pause overlay ─────────────────────────────────────── */
+    #pause-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.72);
+      z-index: 50;
+      gap: 22px;
+    }
+
+    #pause-overlay h2 {
+      font-size: clamp(1rem, 3vw, 1.8rem);
+      color: #f0c040;
+      text-shadow: 0 0 20px #f0c040;
+      letter-spacing: 0.1em;
+    }
+
+    .ov-btn {
+      padding: 14px 32px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.55rem, 1.5vw, 0.75rem);
+      background: transparent;
+      border: 2px solid #f0c040;
+      color: #f0c040;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .ov-btn:hover {
+      background: #f0c040;
+      color: #0d1a22;
+    }
+
+    /* ── End screen overlay ────────────────────────────────── */
+    #end-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.82);
+      z-index: 60;
+      gap: 20px;
+    }
+
+    #end-title {
+      font-size: clamp(1.2rem, 4vw, 2.2rem);
+      color: #f0c040;
+      text-shadow: 0 0 30px #f0c040;
+      letter-spacing: 0.12em;
+    }
+
+    #end-grade {
+      font-size: clamp(2rem, 6vw, 4rem);
+      color: #40ffaa;
+      text-shadow: 0 0 40px #40ffaa;
+    }
+
+    #end-score {
+      font-size: clamp(0.7rem, 2vw, 1rem);
+      color: #aabbcc;
+    }
+
+    .end-btns {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #end-next {
+      background: #4a7c3f;
+      border-color: #88cc66;
+      color: #fff;
+    }
+
+    #end-next:hover {
+      background: #66aa44;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Three.js canvas -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Colour flash for chomp feedback -->
+  <div id="flash"></div>
+
+  <!-- Loading screen -->
+  <div id="loading">
+    <h1>CHOMP!</h1>
+    <div class="load-bar-wrap">
+      <div class="load-bar-fill"></div>
+    </div>
+    <p>Wally is stalking...</p>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-top">
+      <!-- Health -->
+      <div class="hud-stat">
+        <span class="hud-label">HEALTH</span>
+        <div class="hud-bar-bg">
+          <div class="hud-bar-fill" id="bar-health"></div>
+        </div>
+      </div>
+      <!-- Hunger -->
+      <div class="hud-stat">
+        <span class="hud-label">HUNGER</span>
+        <div class="hud-bar-bg">
+          <div class="hud-bar-fill" id="bar-hunger"></div>
+        </div>
+      </div>
+      <!-- Progress -->
+      <div class="hud-stat">
+        <span class="hud-label">PROGRESS</span>
+        <div class="hud-bar-bg">
+          <div class="hud-bar-fill" id="bar-score"></div>
+        </div>
+      </div>
+      <!-- Score -->
+      <div class="hud-score-block">
+        <div id="hud-score">0</div>
+        <div id="hud-streak"></div>
+      </div>
+    </div>
+
+    <div id="hud-level-name"></div>
+
+    <div id="hud-depth">SURFACE</div>
+
+    <!-- Combo pop -->
+    <div id="combo-label"></div>
+
+    <!-- Key hints (desktop) -->
+    <div id="controls-hint">
+      WASD/ARROWS — SWIM &nbsp;|&nbsp; SPACE — CHOMP &nbsp;|&nbsp; SHIFT — TAIL SWEEP &nbsp;|&nbsp; Q/E — DIVE/RISE
+      &nbsp;|&nbsp; ESC — PAUSE
+    </div>
+  </div>
+
+  <!-- Mobile controls -->
+  <div id="mobile-controls">
+    <div id="joystick">
+      <div id="joystick-knob"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+      <button class="action-btn" id="btn-chomp">
+        <span class="btn-icon">🦷</span>CHOMP
+      </button>
+      <button class="action-btn" id="btn-sweep">
+        <span class="btn-icon">🌊</span>SWEEP
+      </button>
+    </div>
+  </div>
+
+  <!-- Pause overlay -->
+  <div id="pause-overlay">
+    <h2>PAUSED</h2>
+    <button class="ov-btn" onclick="togglePause()">RESUME</button>
+    <button class="ov-btn" onclick="location.href='index.html'">QUIT</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="end-overlay">
+    <div id="end-title">LEVEL CLEAR!</div>
+    <div id="end-grade">A</div>
+    <div id="end-score">Score: 0</div>
+    <div class="end-btns">
+      <button class="ov-btn" id="end-next">NEXT LEVEL &rarr;</button>
+      <button class="ov-btn" onclick="location.reload()">RETRY</button>
+      <button class="ov-btn" onclick="location.href='index.html'">MENU</button>
+    </div>
+  </div>
+
+  <!-- ── Scripts ──────────────────────────────────────────── -->
+  <!-- Three.js r152 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+  <!-- Manifold substrate -->
+  <script src="wally_manifold.js"></script>
+
+  <!-- Game engine -->
+  <script src="game.js"></script>
+
+  <!-- Level name injection after game boots -->
+  <script>
+    window.addEventListener('load', () => {
+      // Small delay so levelData is populated
+      setTimeout(() => {
+        const ld = window.__MANIFOLD__ && window.__MANIFOLD__.level;
+        const levels = WALLY.LEVELS;
+        const id = parseInt(new URLSearchParams(location.search).get('level') || '1');
+        const lvl = levels.find(l => l.id === id);
+        if (lvl) {
+          const el = document.getElementById('hud-level-name');
+          if (el) el.textContent = `LEVEL ${lvl.id} — ${lvl.name.toUpperCase()}`;
+        }
+      }, 500);
+    });
+  </script>
+</body>
+
+</html>

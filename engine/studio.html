@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manifold AI Studio</title>
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0d0f14;
+      --surface: #161a23;
+      --surface2: #1f2535;
+      --border: #2a3148;
+      --accent: #5b8cff;
+      --accent2: #c06bff;
+      --success: #3ecf8e;
+      --warn: #f59e42;
+      --error: #ff5f5f;
+      --text: #e0e6f0;
+      --text2: #8896b3;
+      --radius: 8px;
+      --phi: 1.618;
+      --gap: 16px;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: var(--gap);
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    header .logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: .04em;
+    }
+
+    header nav {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+
+    header nav button {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text2);
+      padding: 5px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: .85rem;
+      transition: all .15s;
+    }
+
+    header nav button.active,
+    header nav button:hover {
+      border-color: var(--border);
+      color: var(--text);
+      background: var(--surface2);
+    }
+
+    #app {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: 1fr;
+      gap: 0;
+      overflow: hidden;
+      height: calc(100vh - 53px);
+    }
+
+    /* ── Sidebar (controls) ──────────────────────────────────────────── */
+    #sidebar {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: var(--gap);
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      background: var(--surface);
+    }
+
+    .card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--gap);
+    }
+
+    .card h3 {
+      font-size: .8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      font-size: .82rem;
+      color: var(--text2);
+      margin-bottom: 4px;
+    }
+
+    input[type=text],
+    input[type=number],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: .85rem;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color .15s;
+      font-family: var(--font);
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .row>* {
+      flex: 1;
+    }
+
+    /* Preset pills */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .preset-pill {
+      padding: 7px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: .78rem;
+      cursor: pointer;
+      color: var(--text2);
+      text-align: center;
+      transition: all .15s;
+      line-height: 1.3;
+    }
+
+    .preset-pill:hover,
+    .preset-pill.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(91, 140, 255, .08);
+    }
+
+    /* Generate button */
+    #btn-generate {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .03em;
+      transition: opacity .15s, transform .1s;
+    }
+
+    #btn-generate:hover {
+      opacity: .9;
+    }
+
+    #btn-generate:active {
+      transform: scale(.98);
+    }
+
+    #btn-generate:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    /* Progress */
+    #progress-wrap {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #progress-wrap.visible {
+      display: flex;
+    }
+
+    .progress-bar-track {
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width .3s ease;
+    }
+
+    #progress-msg {
+      font-size: .78rem;
+      color: var(--text2);
+    }
+
+    /* Job history list */
+    #job-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .job-item {
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: border-color .15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .8rem;
+    }
+
+    .job-item:hover {
+      border-color: var(--accent);
+    }
+
+    .job-item .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-queued {
+      background: var(--text2);
+    }
+
+    .dot-running {
+      background: var(--warn);
+      animation: pulse 1s infinite;
+    }
+
+    .dot-done {
+      background: var(--success);
+    }
+
+    .dot-failed {
+      background: var(--error);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .4;
+      }
+    }
+
+    .job-item .job-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .job-item .job-time {
+      color: var(--text2);
+      font-size: .72rem;
+      flex-shrink: 0;
+    }
+
+    /* ── Main canvas (preview) ───────────────────────────────────────── */
+    #canvas-area {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #canvas-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-size: .82rem;
+      color: var(--text2);
+    }
+
+    #canvas-toolbar .breadcrumb {
+      margin-right: auto;
+    }
+
+    #preview-area {
+      flex: 1;
+      overflow: auto;
+      padding: var(--gap);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    /* Preview panels */
+    .preview-empty {
+      margin: auto;
+      text-align: center;
+      color: var(--text2);
+    }
+
+    .preview-empty .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+      opacity: .3;
+    }
+
+    .preview-empty p {
+      font-size: .85rem;
+    }
+
+    .preview-image img {
+      max-width: 100%;
+      max-height: calc(100vh - 200px);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .preview-audio audio {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .preview-json pre {
+      font-size: .78rem;
+      background: var(--surface2);
+      padding: var(--gap);
+      border-radius: var(--radius);
+      overflow: auto;
+      max-height: 60vh;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .preview-storyboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .preview-storyboard img {
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+    }
+
+    .preview-3d {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .preview-3d .obj-info {
+      font-size: .8rem;
+      color: var(--text2);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* Output links */
+    .output-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .output-link {
+      padding: 5px 12px;
+      font-size: .78rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      transition: background .15s;
+    }
+
+    .output-link:hover {
+      background: rgba(91, 140, 255, .1);
+    }
+
+    /* Pipeline step track */
+    .pipeline-track {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      font-size: .75rem;
+    }
+
+    .step-chip {
+      padding: 3px 9px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text2);
+    }
+
+    .step-chip.done {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .step-chip.running {
+      border-color: var(--warn);
+      color: var(--warn);
+      animation: pulse 1s infinite;
+    }
+
+    .step-chip.failed {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .step-arrow {
+      color: var(--text2);
+    }
+
+    /* ── Toast ───────────────────────────────────────────────────────── */
+    #toast-area {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1000;
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: .83rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, .4);
+      animation: slideIn .2s ease;
+      max-width: 320px;
+    }
+
+    .toast.error {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .toast.success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <span class="logo">◈ MANIFOLD STUDIO</span>
+    <nav>
+      <button class="active" data-tab="generate">Generate</button>
+      <button data-tab="pipeline">Pipeline</button>
+      <button data-tab="jobs">Jobs</button>
+    </nav>
+  </header>
+
+  <div id="app">
+    <!-- ── Sidebar ────────────────────────────────────────────────── -->
+    <aside id="sidebar">
+
+      <!-- Substrate selector -->
+      <div class="card" id="tab-generate">
+        <h3>Substrate</h3>
+        <div class="preset-grid" id="substrate-pills">
+          <div class="preset-pill active" data-substrate="TextToImageSubstrate">Text → Image</div>
+          <div class="preset-pill" data-substrate="ImageTo3DSubstrate">Image → 3D</div>
+          <div class="preset-pill" data-substrate="TextTo3DSubstrate">Text → 3D</div>
+          <div class="preset-pill" data-substrate="AutoRigSubstrate">Rig Mesh</div>
+          <div class="preset-pill" data-substrate="TextToAnimationSubstrate">Text → Anim</div>
+          <div class="preset-pill" data-substrate="LipSyncSubstrate">Lip Sync</div>
+          <div class="preset-pill" data-substrate="MeshAnimationSubstrate">Mesh Anim</div>
+          <div class="preset-pill" data-substrate="MusicGenSubstrate">Music Gen</div>
+          <div class="preset-pill" data-substrate="TTSSubstrate">Text → Speech</div>
+          <div class="preset-pill" data-substrate="SFXGenSubstrate">SFX Gen</div>
+          <div class="preset-pill" data-substrate="AudioMixSubstrate">Audio Mix</div>
+          <div class="preset-pill" data-substrate="StoryboardSubstrate">Storyboard</div>
+        </div>
+      </div>
+
+      <!-- Dynamic input form -->
+      <div class="card">
+        <h3>Input</h3>
+        <div id="input-form"></div>
+      </div>
+
+      <!-- Pipeline preset card (hidden by default) -->
+      <div class="card" id="tab-pipeline" style="display:none">
+        <h3>Pipeline Preset</h3>
+        <div class="preset-grid" id="pipeline-pills">
+          <div class="preset-pill active" data-preset="character_creation">Character</div>
+          <div class="preset-pill" data-preset="scene_audio">Scene Audio</div>
+          <div class="preset-pill" data-preset="storyboard">Storyboard</div>
+          <div class="preset-pill" data-preset="full_production">Full Production</div>
+        </div>
+        <div id="pipeline-form" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Progress -->
+      <div id="progress-wrap">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div id="progress-msg">Queued…</div>
+        <div class="pipeline-track" id="pipeline-track"></div>
+      </div>
+
+      <button id="btn-generate">Generate</button>
+
+      <!-- Job history -->
+      <div class="card" id="tab-jobs" style="display:none">
+        <h3>Recent Jobs</h3>
+        <ul id="job-list"></ul>
+      </div>
+    </aside>
+
+    <!-- ── Preview area ───────────────────────────────────────────── -->
+    <section id="canvas-area">
+      <div id="canvas-toolbar">
+        <span class="breadcrumb" id="breadcrumb">No output yet</span>
+        <div class="output-links" id="output-links"></div>
+      </div>
+      <div id="preview-area">
+        <div class="preview-empty">
+          <div class="icon">⬡</div>
+          <p>Run a substrate to see output here</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast-area"></div>
+
+  <script>
+    /* ══════════════════════════════════════════════════════════════
+       Manifold Studio — vanilla JS, no framework
+       API base: /api  (FastAPI server_studio.py)
+       ══════════════════════════════════════════════════════════════ */
+
+    const API = (window.STUDIO_API_BASE ?? '') + '/api';
+
+    /* ── Substrate schemas ──────────────────────────────────────── */
+    const SCHEMAS = {
+      TextToImageSubstrate: [
+        { key: 'prompt', label: 'Prompt', type: 'textarea', default: 'a majestic wolf in neon-lit forest' },
+        { key: 'width', label: 'Width', type: 'number', default: 512 },
+        { key: 'height', label: 'Height', type: 'number', default: 512 },
+        { key: 'steps', label: 'Steps', type: 'number', default: 30 },
+        { key: 'seed', label: 'Seed', type: 'number', default: '' },
+      ],
+      ImageTo3DSubstrate: [
+        { key: 'source', label: 'Source image URL / path', type: 'text', default: '' },
+        { key: 'format', label: 'Format', type: 'select', options: ['obj', 'glb'], default: 'obj' },
+      ],
+      TextTo3DSubstrate: [
+        { key: 'prompt', label: 'Prompt', type: 'textarea', default: 'a gyroid lattice structure' },
+        { key: 'seed', label: 'Seed', type: 'number', default: '' },
+      ],
+      AutoRigSubstrate: [
+        { key: 'source', label: 'OBJ path / URL', type: 'text', default: '' },
+        { key: 'skeleton', label: 'Skeleton', type: 'select', options: ['biped', 'quadruped', 'hand'], default: 'biped' },
+      ],
+      TextToAnimationSubstrate: [
+        { key: 'prompt', label: 'Motion prompt', type: 'textarea', default: 'walk forward confidently' },
+        { key: 'duration', label: 'Duration (s)', type: 'number', default: 3 },
+        { key: 'fps', label: 'FPS', type: 'number', default: 30 },
+      ],
+      LipSyncSubstrate: [
+        { key: 'source', label: 'Audio path / URL', type: 'text', default: '' },
+        { key: 'text', label: 'Transcript', type: 'textarea', default: '' },
+        { key: 'fps', label: 'FPS', type: 'number', default: 60 },
+      ],
+      MeshAnimationSubstrate: [
+        { key: 'rig', label: 'Rig JSON path', type: 'text', default: '' },
+        { key: 'motion', label: 'BVH path', type: 'text', default: '' },
+      ],
+      MusicGenSubstrate: [
+        { key: 'prompt', label: 'Music prompt', type: 'textarea', default: 'epic orchestral battle theme' },
+        { key: 'duration', label: 'Duration (s)', type: 'number', default: 10 },
+        { key: 'seed', label: 'Seed', type: 'number', default: '' },
+      ],
+      TTSSubstrate: [
+        { key: 'text', label: 'Text', type: 'textarea', default: 'The manifold expands in all dimensions.' },
+        { key: 'voice', label: 'Voice', type: 'text', default: 'v2/en_speaker_6' },
+        { key: 'speed', label: 'Speed', type: 'number', default: 1.0 },
+        { key: 'pitch', label: 'Pitch', type: 'number', default: 1.0 },
+      ],
+      SFXGenSubstrate: [
+        { key: 'prompt', label: 'SFX description', type: 'textarea', default: 'a sword clashing on metal armour' },
+        { key: 'duration', label: 'Duration (s)', type: 'number', default: 2 },
+        { key: 'seed', label: 'Seed', type: 'number', default: '' },
+      ],
+      AudioMixSubstrate: [
+        {
+          key: '_tracks_help', label: '', type: 'info',
+          text: 'Provide a JSON array of track objects: [{source, gain_db, offset, loop}]'
+        },
+        {
+          key: 'tracks_json', label: 'Tracks (JSON)', type: 'textarea',
+          default: '[{"source":"","gain_db":0,"offset":0}]'
+        },
+        { key: 'normalize', label: 'Normalize', type: 'select', options: ['true', 'false'], default: 'true' },
+      ],
+      StoryboardSubstrate: [
+        {
+          key: 'script', label: 'Script / narrative', type: 'textarea',
+          default: 'A knight enters a dark cave. She discovers a glowing crystal. A dragon awakens.'
+        },
+        { key: 'panels', label: 'Panels', type: 'number', default: 6 },
+        { key: 'cols', label: 'Columns', type: 'number', default: 3 },
+        { key: 'style', label: 'Style', type: 'text', default: 'cinematic storyboard sketch, dramatic lighting' },
+      ],
+    };
+
+    const PIPELINE_SCHEMAS = {
+      character_creation: [
+        { key: 'prompt', label: 'Character prompt', type: 'textarea', default: 'a dwarf warrior with a battle axe' },
+        { key: 'skeleton', label: 'Skeleton', type: 'select', options: ['biped', 'quadruped', 'hand'], default: 'biped' },
+        { key: 'animation_prompt', label: 'Animation', type: 'text', default: 'idle breath cycle' },
+        { key: 'duration', label: 'Anim duration', type: 'number', default: 3 },
+      ],
+      scene_audio: [
+        { key: 'scene', label: 'Scene description', type: 'textarea', default: 'tense dungeon exploration' },
+        { key: 'narration', label: 'Narration text', type: 'textarea', default: 'Silence. Then a distant growl.' },
+        { key: 'voice', label: 'TTS voice', type: 'text', default: 'v2/en_speaker_6' },
+        { key: 'sfx_prompt', label: 'SFX', type: 'text', default: 'monster growl' },
+        { key: 'duration', label: 'Music duration (s)', type: 'number', default: 15 },
+        { key: 'sfx_duration', label: 'SFX duration (s)', type: 'number', default: 2 },
+        { key: 'narration_offset', label: 'Narration offset', type: 'number', default: 1 },
+        { key: 'sfx_offset', label: 'SFX offset', type: 'number', default: 5 },
+      ],
+      storyboard: [
+        { key: 'script', label: 'Script', type: 'textarea', default: 'Hero wakes. Hero trains. Hero fights. Hero wins.' },
+        { key: 'panels', label: 'Panels', type: 'number', default: 6 },
+        { key: 'cols', label: 'Columns', type: 'number', default: 3 },
+        { key: 'style', label: 'Style', type: 'text', default: 'cinematic storyboard sketch' },
+      ],
+      full_production: [
+        { key: 'character_prompt', label: 'Character', type: 'textarea', default: 'female elf archer' },
+        { key: 'animation_prompt', label: 'Animation', type: 'text', default: 'walking forward' },
+        { key: 'music_prompt', label: 'Music', type: 'text', default: 'adventure theme' },
+        { key: 'narration', label: 'Narration', type: 'textarea', default: 'A new adventure begins.' },
+        { key: 'sfx_prompt', label: 'SFX', type: 'text', default: 'arrow whoosh' },
+        { key: 'duration', label: 'Duration (s)', type: 'number', default: 10 },
+      ],
+    };
+
+    /* ── State ────────────────────────────────────────────────────── */
+    let activeTab = 'generate';
+    let activeSubstrate = 'TextToImageSubstrate';
+    let activePipeline = 'character_creation';
+    let currentJobId = null;
+    let wsConn = null;
+    let jobHistory = JSON.parse(sessionStorage.getItem('studio_jobs') || '[]');
+
+    /* ── Tab navigation ────────────────────────────────────────────── */
+    document.querySelectorAll('header nav button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('header nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeTab = btn.dataset.tab;
+        renderSidebar();
+      });
+    });
+
+    function renderSidebar() {
+      document.getElementById('tab-generate').style.display = activeTab === 'generate' ? '' : 'none';
+      document.getElementById('tab-pipeline').style.display = activeTab === 'pipeline' ? '' : 'none';
+      document.getElementById('tab-jobs').style.display = activeTab === 'jobs' ? '' : 'none';
+
+      if (activeTab === 'generate') {
+        renderInputForm(SCHEMAS[activeSubstrate] || [], 'input-form');
+      } else if (activeTab === 'pipeline') {
+        renderInputForm(PIPELINE_SCHEMAS[activePipeline] || [], 'pipeline-form');
+      } else if (activeTab === 'jobs') {
+        renderJobList();
+      }
+    }
+
+    /* ── Substrate pills ───────────────────────────────────────────── */
+    document.querySelectorAll('#substrate-pills .preset-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#substrate-pills .preset-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        activeSubstrate = pill.dataset.substrate;
+        renderInputForm(SCHEMAS[activeSubstrate] || [], 'input-form');
+      });
+    });
+
+    document.querySelectorAll('#pipeline-pills .preset-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#pipeline-pills .preset-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        activePipeline = pill.dataset.preset;
+        renderInputForm(PIPELINE_SCHEMAS[activePipeline] || [], 'pipeline-form');
+      });
+    });
+
+    /* ── Form builder ──────────────────────────────────────────────── */
+    function renderInputForm(fields, targetId) {
+      const form = document.getElementById(targetId);
+      if (!form) return;
+      form.innerHTML = '';
+      fields.forEach(f => {
+        if (f.type === 'info') {
+          const div = document.createElement('div');
+          div.style.cssText = 'font-size:.75rem;color:var(--text2);margin-bottom:8px;';
+          div.textContent = f.text;
+          form.appendChild(div);
+          return;
+        }
+        const wrap = document.createElement('div');
+        wrap.style.marginBottom = '10px';
+
+        const lbl = document.createElement('label');
+        lbl.textContent = f.label;
+        lbl.htmlFor = `field-${f.key}`;
+        wrap.appendChild(lbl);
+
+        let el;
+        if (f.type === 'textarea') {
+          el = document.createElement('textarea');
+          el.rows = 3;
+        } else if (f.type === 'select') {
+          el = document.createElement('select');
+          (f.options || []).forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            if (opt === f.default) o.selected = true;
+            el.appendChild(o);
+          });
+        } else {
+          el = document.createElement('input');
+          el.type = f.type || 'text';
+        }
+
+        el.id = `field-${f.key}`;
+        el.dataset.key = f.key;
+        if (f.default !== undefined && f.default !== '') el.value = f.default;
+        wrap.appendChild(el);
+        form.appendChild(wrap);
+      });
+    }
+
+    function collectForm(fields, formId) {
+      const form = document.getElementById(formId);
+      const data = {};
+      fields.forEach(f => {
+        if (f.type === 'info') return;
+        const el = form?.querySelector(`#field-${f.key}`);
+        if (!el) return;
+        let v = el.value.trim();
+        if (v === '') return;
+        if (f.type === 'number') { v = parseFloat(v); if (isNaN(v)) return; }
+        if (f.key === 'tracks_json') {
+          try { data.tracks = JSON.parse(v); } catch { toast('Tracks JSON is invalid', 'error'); }
+          return;
+        }
+        if (f.key === 'normalize') { data.normalize = (v === 'true'); return; }
+        data[f.key] = v;
+      });
+      return data;
+    }
+
+    /* ── Generate button ───────────────────────────────────────────── */
+    document.getElementById('btn-generate').addEventListener('click', async () => {
+      if (activeTab === 'generate') {
+        await submitGenerate();
+      } else if (activeTab === 'pipeline') {
+        await submitPipeline();
+      }
+    });
+
+    async function submitGenerate() {
+      const schema = SCHEMAS[activeSubstrate] || [];
+      const input = collectForm(schema, 'input-form');
+      if (!input) return;
+
+      setGenerating(true);
+      showProgress(0, 'Submitting…');
+
+      try {
+        const res = await apiFetch(`/generate/${activeSubstrate}`, 'POST', input);
+        const { job_id } = res;
+        currentJobId = job_id;
+        addJobToHistory(job_id, activeSubstrate);
+        openProgressWS(job_id, activeSubstrate, () => pollJob(job_id, activeSubstrate));
+      } catch (e) {
+        toast(e.message, 'error');
+        setGenerating(false);
+      }
+    }
+
+    async function submitPipeline() {
+      const schema = PIPELINE_SCHEMAS[activePipeline] || [];
+      const input = collectForm(schema, 'pipeline-form');
+      if (!input) return;
+
+      setGenerating(true);
+      showProgress(0, 'Starting pipeline…');
+      renderPipelineTrack(activePipeline, []);
+
+      try {
+        const res = await apiFetch('/pipeline', 'POST', { preset: activePipeline, input });
+        // Pipeline returns immediately with job_id for the first step,
+        // or a list of job_ids. Poll each.
+        if (res.job_id) {
+          currentJobId = res.job_id;
+          addJobToHistory(res.job_id, `pipeline:${activePipeline}`);
+          openProgressWS(res.job_id, activePipeline, () => pollJob(res.job_id, activePipeline));
+        } else if (Array.isArray(res.results)) {
+          showPipelineResults(res.results);
+          setGenerating(false);
+        }
+      } catch (e) {
+        toast(e.message, 'error');
+        setGenerating(false);
+      }
+    }
+
+    /* ── WebSocket progress ────────────────────────────────────────── */
+    function openProgressWS(jobId, label, onDone) {
+      if (wsConn) { wsConn.close(); wsConn = null; }
+
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const base = (window.STUDIO_API_BASE ?? `${proto}://${location.host}`).replace(/^http/, 'ws');
+      const url = `${base}/ws/progress/${jobId}`;
+
+      wsConn = new WebSocket(url);
+      wsConn.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          showProgress(msg.progress ?? 0, msg.message ?? '');
+        } catch { /* ignore */ }
+      };
+      wsConn.onclose = () => { onDone?.(); };
+      wsConn.onerror = () => { onDone?.(); };
+    }
+
+    async function pollJob(jobId, label) {
+      try {
+        const job = await apiFetch(`/jobs/${jobId}`, 'GET');
+        updateJobInHistory(jobId, job.status);
+        if (job.status === 'done') {
+          showProgress(1.0, 'Complete');
+          renderPreview(job, label);
+          setGenerating(false);
+          toast('Done!', 'success');
+        } else if (job.status === 'failed') {
+          showProgress(0, `Failed: ${job.error ?? 'unknown error'}`);
+          setGenerating(false);
+          toast(`Job failed: ${job.error ?? ''}`, 'error');
+        } else {
+          setTimeout(() => pollJob(jobId, label), 1500);
+        }
+      } catch (e) {
+        setGenerating(false);
+      }
+    }
+
+    /* ── Preview renderer ──────────────────────────────────────────── */
+    function renderPreview(job, label) {
+      const out = job.output || {};
+      const url = out.url || '';
+      const area = document.getElementById('preview-area');
+      const links = document.getElementById('output-links');
+      document.getElementById('breadcrumb').textContent =
+        `${label} · job ${job.job_id.slice(0, 8)}`;
+
+      links.innerHTML = '';
+      if (url) {
+        const a = document.createElement('a');
+        a.href = url; a.target = '_blank';
+        a.className = 'output-link';
+        a.textContent = '⬇ Download';
+        links.appendChild(a);
+      }
+
+      // Detect type by extension
+      const ext = (url.split('?')[0].split('.').pop() || '').toLowerCase();
+
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+        area.innerHTML = `<div class="preview-image"><img src="${url}" alt="output"></div>`;
+
+      } else if (['wav', 'mp3', 'ogg', 'flac'].includes(ext)) {
+        area.innerHTML = `
+      <div class="preview-audio" style="width:100%;max-width:520px">
+        <p style="margin-bottom:8px;color:var(--text2);font-size:.82rem">${url}</p>
+        <audio controls src="${url}"></audio>
+      </div>`;
+
+      } else if (['obj', 'glb', 'gltf'].includes(ext)) {
+        area.innerHTML = `
+      <div class="preview-3d">
+        <div class="obj-info">
+          <strong>3D Asset</strong><br>
+          <span style="color:var(--text2)">${url}</span><br><br>
+          <em style="font-size:.75rem">Open in Blender or drag into a Three.js viewer.
+          Use the Download link above.</em>
+        </div>
+      </div>`;
+
+      } else if (ext === 'json') {
+        fetch(url).then(r => r.json()).then(data => {
+          area.innerHTML = `<div class="preview-json"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        }).catch(() => {
+          area.innerHTML = `<div class="preview-json"><pre>${url}</pre></div>`;
+        });
+
+      } else if (url.endsWith('storyboard.png')) {
+        // Storyboard: show full grid + individual panels link
+        area.innerHTML = `
+      <div class="preview-image">
+        <img src="${url}" alt="storyboard" style="max-width:100%">
+      </div>`;
+        const a2 = document.createElement('a');
+        a2.href = url.replace('storyboard.png', 'storyboard.json');
+        a2.target = '_blank'; a2.className = 'output-link';
+        a2.textContent = 'Metadata JSON';
+        links.appendChild(a2);
+
+      } else {
+        area.innerHTML = `
+      <div class="preview-empty">
+        <div class="icon">✓</div>
+        <p>Job complete. Use the download link above.</p>
+        <p style="margin-top:6px;font-size:.75rem;color:var(--text2)">${url}</p>
+      </div>`;
+      }
+    }
+
+    /* ── Pipeline results ──────────────────────────────────────────── */
+    function showPipelineResults(results) {
+      if (!results?.length) return;
+      const last = results[results.length - 1];
+      const fakeJob = { job_id: last.job_id, output: { url: last.url }, status: 'done' };
+      renderPreview(fakeJob, `pipeline (${results.length} steps)`);
+
+      const track = document.getElementById('pipeline-track');
+      track.innerHTML = results.map((r, i) =>
+        `<span class="step-chip done">${r.substrate.replace('Substrate', '')}</span>` +
+        (i < results.length - 1 ? '<span class="step-arrow">→</span>' : '')
+      ).join('');
+    }
+
+    function renderPipelineTrack(preset, doneSteps) {
+      const steps = (PIPELINE_SCHEMAS[preset] || []).filter(f => f.type !== 'info');
+      // Just show substrate names from the preset key names — placeholder
+      const track = document.getElementById('pipeline-track');
+      track.innerHTML = '';
+    }
+
+    /* ── Job history ───────────────────────────────────────────────── */
+    function addJobToHistory(id, substrate) {
+      jobHistory.unshift({ id, substrate, status: 'running', time: Date.now() });
+      if (jobHistory.length > 30) jobHistory.pop();
+      sessionStorage.setItem('studio_jobs', JSON.stringify(jobHistory));
+      if (activeTab === 'jobs') renderJobList();
+    }
+
+    function updateJobInHistory(id, status) {
+      const j = jobHistory.find(x => x.id === id);
+      if (j) { j.status = status; sessionStorage.setItem('studio_jobs', JSON.stringify(jobHistory)); }
+      if (activeTab === 'jobs') renderJobList();
+    }
+
+    function renderJobList() {
+      const list = document.getElementById('job-list');
+      list.innerHTML = '';
+      jobHistory.forEach(j => {
+        const li = document.createElement('li');
+        li.className = 'job-item';
+        li.innerHTML = `
+      <span class="status-dot dot-${j.status}"></span>
+      <span class="job-name">${j.substrate}</span>
+      <span class="job-time">${_ago(j.time)}</span>`;
+        li.addEventListener('click', () => {
+          apiFetch(`/jobs/${j.id}`, 'GET').then(job => renderPreview(job, j.substrate));
+        });
+        list.appendChild(li);
+      });
+    }
+
+    function _ago(ts) {
+      const s = Math.floor((Date.now() - ts) / 1000);
+      if (s < 60) return `${s}s ago`;
+      if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+      return `${Math.floor(s / 3600)}h ago`;
+    }
+
+    /* ── UI helpers ────────────────────────────────────────────────── */
+    function setGenerating(on) {
+      const btn = document.getElementById('btn-generate');
+      btn.disabled = on;
+      btn.textContent = on ? 'Generating…' : 'Generate';
+    }
+
+    function showProgress(frac, msg) {
+      const wrap = document.getElementById('progress-wrap');
+      wrap.classList.add('visible');
+      document.getElementById('progress-fill').style.width = `${Math.round(frac * 100)}%`;
+      document.getElementById('progress-msg').textContent = msg || '';
+    }
+
+    function toast(msg, type = '') {
+      const area = document.getElementById('toast-area');
+      const div = document.createElement('div');
+      div.className = `toast ${type}`;
+      div.textContent = msg;
+      area.appendChild(div);
+      setTimeout(() => div.remove(), 4000);
+    }
+
+    /* ── API fetch ─────────────────────────────────────────────────── */
+    async function apiFetch(path, method = 'GET', body = null) {
+      const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(`${API}${path}`, opts);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => res.statusText);
+        throw new Error(`${method} ${path} → ${res.status}: ${txt}`);
+      }
+      return res.json();
+    }
+
+    /* ── Boot ──────────────────────────────────────────────────────── */
+    renderSidebar();
+  </script>
+</body>
+
+</html>

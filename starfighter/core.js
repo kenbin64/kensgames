@@ -2910,6 +2910,23 @@ const Starfighter = (function () {
             state._waveClearKills = null;
             state._waveClearPlayerKills = null;
 
+            // Tactical briefing comm during bay prep — fills the 3s silence with mission context
+            const _bdrMission = state._currentMission;
+            if (_bdrMission && state.wave > 1) {
+                setTimeout(() => {
+                    if (state.phase === 'bay-ready') {
+                        addComm(_crew('tactical'), `Wave ${state.wave}: ${_bdrMission.name || 'Combat Patrol'}. ${_bdrMission.obj || 'Engage and destroy all hostiles.'}`, 'warning');
+                    }
+                }, 600);
+                if (_bdrMission.boss) {
+                    setTimeout(() => {
+                        if (state.phase === 'bay-ready') {
+                            addComm(_crew('sensor'), `Intel confirms hostile commander: ${_bdrMission.boss.name}. ${_bdrMission.boss.desc}. Treat as priority target.`, 'warning');
+                        }
+                    }, 2000);
+                }
+            }
+
             // Auto-launch after 3 seconds in bay (player can still press Space to skip)
             setTimeout(() => {
                 if (state.phase === 'bay-ready') {

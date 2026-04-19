@@ -172,9 +172,11 @@
     /* Avatar grid */
     .avatar-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 0.5rem;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 0.4rem;
       margin-bottom: 1.5rem;
+      max-height: 280px;
+      overflow-y: auto;
     }
 
     .avatar-opt {
@@ -200,6 +202,37 @@
       box-shadow: var(--glow1);
       background: rgba(0, 255, 255, 0.08);
       transform: scale(1.1);
+    }
+
+    /* Avatar category tabs */
+    .av-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .av-tab {
+      padding: 0.3rem 0.65rem;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 0.65rem;
+      cursor: pointer;
+      color: var(--dim);
+      background: transparent;
+      transition: all 0.18s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .av-tab:hover {
+      border-color: var(--c1);
+      color: var(--text);
+    }
+
+    .av-tab.active {
+      border-color: var(--c1);
+      color: var(--c1);
+      background: rgba(0, 255, 255, 0.08);
     }
 
     /* Buttons */
@@ -297,10 +330,14 @@
         <p><strong>6. Privacy.</strong> Your playername and avatar are visible to other players. Your email is private.
           See our Privacy Policy for details.</p>
         <p><strong>7. Enforcement.</strong> KensGames administrators reserve the right to suspend or ban accounts for
-          violations of these terms without prior notice.</p>
-        <p><strong>8. Changes.</strong> These terms may be updated at any time. Continued use of the portal constitutes
+          violations of these terms without prior notice. Using the site illegally, violating sportsmanship standards,
+          or harassing other players may result in permanent removal.</p>
+        <p><strong>8. Disclaimer.</strong> KensGames.com is provided &ldquo;as is&rdquo; without warranty of any kind.
+          The site owners accept no legal liability for software defects, data loss, or service interruptions.</p>
+        <p><strong>9. Changes.</strong> These terms may be updated at any time. Continued use of the portal constitutes
           acceptance.</p>
-        <p>Full Terms of Service: <a href="/tos/" target="_blank">kensgames.com/tos/</a></p>
+        <p>Full Terms of Service: <a href="/tos/" target="_blank">kensgames.com/tos/</a><br>
+          Contact / DMCA / Bug reports: <a href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a></p>
       </div>
 
       <div class="tos-agree-row">
@@ -332,6 +369,7 @@
     <!-- ── Step 2: Avatar ─────────────────────────────────────────── -->
     <div class="step-panel" id="step-2">
       <div class="field-label">CHOOSE YOUR AVATAR</div>
+      <div class="av-tabs" id="av-tabs"></div>
       <div class="avatar-grid" id="avatar-grid"></div>
       <div class="field-error" id="av-error"></div>
 
@@ -350,23 +388,94 @@
     'use strict';
 
     const API = '/api';
-    const AVATARS = [
-      { id: 'wizard', emoji: '🧙' }, { id: 'knight', emoji: '🛡️' },
-      { id: 'robot', emoji: '🤖' }, { id: 'alien', emoji: '👾' },
-      { id: 'ninja', emoji: '🥷' }, { id: 'astronaut', emoji: '👨‍🚀' },
-      { id: 'dragon', emoji: '🐉' }, { id: 'phoenix', emoji: '🦅' },
-      { id: 'fox', emoji: '🦊' }, { id: 'wolf', emoji: '🐺' },
-      { id: 'cat', emoji: '😼' }, { id: 'ghost', emoji: '👻' },
-      { id: 'skull', emoji: '💀' }, { id: 'fire', emoji: '🔥' },
-      { id: 'lightning', emoji: '⚡' }, { id: 'star', emoji: '⭐' },
-      { id: 'diamond', emoji: '💎' }, { id: 'crown', emoji: '👑' },
+    const AVATAR_CATEGORIES = [
+      {
+        id: 'people', label: '👥 People', avatars: [
+          { id: 'p_f_light', e: '👩🏻' }, { id: 'p_m_light', e: '👨🏻' },
+          { id: 'p_f_med', e: '👩🏽' }, { id: 'p_m_med', e: '👨🏽' },
+          { id: 'p_f_dark', e: '👩🏿' }, { id: 'p_m_dark', e: '👨🏿' },
+          { id: 'p_f_tan', e: '👩🏾' }, { id: 'p_m_tan', e: '👨🏾' },
+          { id: 'p_blonde_f', e: '👱‍♀️' }, { id: 'p_blonde_m', e: '👱‍♂️' },
+          { id: 'p_red_f', e: '👩‍🦰' }, { id: 'p_red_m', e: '👨‍🦰' },
+          { id: 'p_curly_f', e: '👩‍🦱' }, { id: 'p_curly_m', e: '👨‍🦱' },
+          { id: 'p_silver_f', e: '👩‍🦳' }, { id: 'p_silver_m', e: '👨‍🦳' },
+          { id: 'p_bald', e: '🧑‍🦲' }, { id: 'p_beard', e: '🧔' },
+          { id: 'ninja', e: '🥷' }, { id: 'cowboy', e: '🤠' },
+          { id: 'p_mech_f', e: '👩‍🔧' }, { id: 'p_mech_m', e: '👨‍🔧' },
+          { id: 'p_art_f', e: '👩‍🎨' }, { id: 'p_art_m', e: '👨‍🎨' },
+        ]
+      },
+      {
+        id: 'science', label: '🔬 Science', avatars: [
+          { id: 'sci_f', e: '👩‍🔬' }, { id: 'sci_m', e: '👨‍🔬' },
+          { id: 'robot', e: '🤖' }, { id: 'alien', e: '👽' }, { id: 'alien_px', e: '👾' },
+          { id: 'dna', e: '🧬' }, { id: 'micro', e: '🔬' }, { id: 'brain', e: '🧠' },
+          { id: 'atom', e: '⚛️' }, { id: 'flask', e: '⚗️' }, { id: 'nerd', e: '🤓' }, { id: 'cyborg', e: '🦾' },
+        ]
+      },
+      {
+        id: 'fantasy', label: '🦄 Fantasy', avatars: [
+          { id: 'wizard_f', e: '🧙‍♀️' }, { id: 'wizard_m', e: '🧙‍♂️' },
+          { id: 'elf_f', e: '🧝‍♀️' }, { id: 'elf_m', e: '🧝‍♂️' },
+          { id: 'vampire_m', e: '🧛‍♂️' }, { id: 'vampire_f', e: '🧛‍♀️' },
+          { id: 'mermaid', e: '🧜‍♀️' }, { id: 'fairy', e: '🧚‍♀️' },
+          { id: 'hero_f', e: '🦸‍♀️' }, { id: 'hero_m', e: '🦸‍♂️' },
+          { id: 'villain_f', e: '🦹‍♀️' }, { id: 'villain_m', e: '🦹‍♂️' },
+          { id: 'dragon', e: '🐉' }, { id: 'unicorn', e: '🦄' }, { id: 'ghost', e: '👻' },
+          { id: 'skull', e: '💀' }, { id: 'crown', e: '👑' }, { id: 'crystal', e: '🔮' },
+        ]
+      },
+      {
+        id: 'sports', label: '⚽ Sports', avatars: [
+          { id: 'sp_soccer', e: '⚽' }, { id: 'sp_bball', e: '🏀' }, { id: 'sp_football', e: '🏈' },
+          { id: 'sp_baseball', e: '⚾' }, { id: 'sp_tennis', e: '🎾' }, { id: 'sp_hockey', e: '🏒' },
+          { id: 'sp_race', e: '🏎️' }, { id: 'sp_martial', e: '🥋' },
+          { id: 'sp_swim', e: '🏊' }, { id: 'sp_climb', e: '🧗' },
+          { id: 'sp_run_f', e: '🏃‍♀️' }, { id: 'sp_run_m', e: '🏃‍♂️' },
+        ]
+      },
+      {
+        id: 'animals', label: '🦁 Animals', avatars: [
+          { id: 'lion', e: '🦁' }, { id: 'tiger', e: '🐯' }, { id: 'bear', e: '🐻' },
+          { id: 'fox', e: '🦊' }, { id: 'wolf', e: '🐺' }, { id: 'cat', e: '😼' },
+          { id: 'eagle', e: '🦅' }, { id: 'owl', e: '🦉' }, { id: 'dolphin', e: '🐬' },
+          { id: 'shark', e: '🦈' }, { id: 'butterfly', e: '🦋' }, { id: 'penguin', e: '🐧' },
+          { id: 'panda', e: '🐼' }, { id: 'octopus', e: '🐙' }, { id: 'rabbit', e: '🐰' }, { id: 'snake', e: '🐍' },
+        ]
+      },
+      {
+        id: 'toys', label: '🎮 Toys', avatars: [
+          { id: 'toy_stick', e: '🕹️' }, { id: 'toy_dice', e: '🎲' }, { id: 'toy_chess', e: '♟️' },
+          { id: 'toy_puzzle', e: '🧩' }, { id: 'toy_darts', e: '🎯' }, { id: 'toy_yoyo', e: '🪀' },
+          { id: 'toy_teddy', e: '🧸' }, { id: 'toy_kite', e: '🪁' },
+          { id: 'toy_boom', e: '🪃' }, { id: 'toy_balloon', e: '🎈' }, { id: 'toy_magic', e: '🪄' }, { id: 'toy_blocks', e: '🧱' },
+        ]
+      },
+      {
+        id: 'space', label: '🚀 Space', avatars: [
+          { id: 'rocket', e: '🚀' }, { id: 'ufo', e: '🛸' },
+          { id: 'astro_f', e: '👩‍🚀' }, { id: 'astro_m', e: '👨‍🚀' },
+          { id: 'planet', e: '🪐' }, { id: 'star', e: '⭐' }, { id: 'comet', e: '☄️' }, { id: 'moon', e: '🌙' },
+          { id: 'galaxy', e: '🌌' }, { id: 'satellite', e: '🛰️' }, { id: 'telescope', e: '🔭' }, { id: 'blackhole', e: '🕳️' },
+        ]
+      },
+      {
+        id: 'hobbies', label: '🎨 Hobbies', avatars: [
+          { id: 'hb_guitar', e: '🎸' }, { id: 'hb_palette', e: '🎨' }, { id: 'hb_camera', e: '📷' },
+          { id: 'hb_book', e: '📚' }, { id: 'hb_gym', e: '🏋️' }, { id: 'hb_chef', e: '👨‍🍳' },
+          { id: 'hb_music', e: '🎵' }, { id: 'hb_drum', e: '🥁' },
+          { id: 'hb_gamepad', e: '🎮' }, { id: 'hb_bike', e: '🚴' }, { id: 'hb_surf', e: '🏄' }, { id: 'hb_dart', e: '🎯' },
+        ]
+      },
     ];
 
-    // Expose avatar map globally for portal.html
-    window.KG_AVATARS = Object.fromEntries(AVATARS.map(a => [a.id, a.emoji]));
+    // Flat map for portal-wide access (avatarId → emoji)
+    window.KG_AVATARS = {};
+    AVATAR_CATEGORIES.forEach(cat => cat.avatars.forEach(a => { window.KG_AVATARS[a.id] = a.e; }));
 
     let currentStep = 0;
     let selectedAvatar = null;
+    let activeCategory = AVATAR_CATEGORIES[0].id;
 
     // ── Auth gate ────────────────────────────────────────────────────
     async function init() {
@@ -393,11 +502,21 @@
       });
     }
 
-    function buildAvatarGrid() {
+    function buildAvatarGrid(categoryId) {
+      activeCategory = categoryId || AVATAR_CATEGORIES[0].id;
+      const cat = AVATAR_CATEGORIES.find(c => c.id === activeCategory) || AVATAR_CATEGORIES[0];
+
+      // Render tabs
+      const tabsEl = document.getElementById('av-tabs');
+      tabsEl.innerHTML = AVATAR_CATEGORIES.map(c =>
+        `<button class="av-tab${c.id === activeCategory ? ' active' : ''}" onclick="buildAvatarGrid('${c.id}')">${c.label}</button>`
+      ).join('');
+
+      // Render grid for this category
       const grid = document.getElementById('avatar-grid');
-      grid.innerHTML = AVATARS.map(a => `
-        <div class="avatar-opt" id="av-${a.id}" onclick="selectAvatar('${a.id}')" title="${a.id}">${a.emoji}</div>
-      `).join('');
+      grid.innerHTML = cat.avatars.map(a =>
+        `<div class="avatar-opt${selectedAvatar === a.id ? ' selected' : ''}" id="av-${a.id}" onclick="selectAvatar('${a.id}')" title="${a.id}">${a.e}</div>`
+      ).join('');
     }
 
     function gotoStep(n) {

@@ -16,76 +16,37 @@ and can be signed by the security substrate before serving.
 
 import json
 import hashlib
-import math
 from pathlib import Path
 from typing import Union
 
 from manifold_core import Manifold, ManifoldInstance
+from manifold_mesh import tessellate
 
 
 # ---------------------------------------------------------------------------
-# Core tessellator
+# Three.js format adapter
 # ---------------------------------------------------------------------------
 
 def manifold_to_three(
-    manifold: Manifold,
+    manifold: Union[Manifold, ManifoldInstance],
     res: int = 100,
     scale: float = 1.0,
     t: float = 0.0,
 ) -> dict:
     """
-    Tessellate a 2-D manifold surface into a triangle mesh.
+    Return a Three.js-compatible mesh dict from the shared tessellator.
 
-    Samples the expression on a (res × res) grid over [-1, 1]² and
-    emits two triangles per quad cell.
-
-    Parameters
-    ----------
-    manifold : Manifold  surface to tessellate
-    res      : int       grid resolution (number of steps per axis)
-    scale    : float     uniform scale applied to all coordinates
-    t        : float     time parameter passed to the expression
-
-    Returns
-    -------
-    dict with keys: name, vertices, faces, attributes
+    Three.js only needs vertices + faces (normals/UVs optional here);
+    the full mesh is available via manifold_mesh.tessellate() directly.
     """
-    vertices: list[list[float]] = []
-    faces:    list[list[int]]  = []
-
-    step = 2.0 / res  # step size in [-1, 1] range
-
-    for i in range(res):
-        for j in range(res):
-            # Four corners of the current quad cell
-            x0 = -1.0 + i * step
-            y0 = -1.0 + j * step
-            x1 = x0 + step
-            y1 = y0 + step
-
-            z00 = manifold.evaluate(x0, y0, t)
-            z10 = manifold.evaluate(x1, y0, t)
-            z01 = manifold.evaluate(x0, y1, t)
-            z11 = manifold.evaluate(x1, y1, t)
-
-            base = len(vertices)
-
-            vertices.extend([
-                [round(x0 * scale, 6), round(y0 * scale, 6), round(z00 * scale, 6)],
-                [round(x1 * scale, 6), round(y0 * scale, 6), round(z10 * scale, 6)],
-                [round(x0 * scale, 6), round(y1 * scale, 6), round(z01 * scale, 6)],
-                [round(x1 * scale, 6), round(y1 * scale, 6), round(z11 * scale, 6)],
-            ])
-
-            # Two triangles: lower-left and upper-right of the quad
-            faces.append([base,     base + 1, base + 2])
-            faces.append([base + 1, base + 3, base + 2])
-
+    mesh = tessellate(manifold, res=res, scale=scale, t=t)
     return {
-        "name":       manifold.name,
-        "vertices":   vertices,
-        "faces":      faces,
-        "attributes": manifold.attributes,
+        "name":       mesh["name"],
+        "vertices":   mesh["vertices"],
+        "normals":    mesh["normals"],
+        "uvs":        mesh["uvs"],
+        "faces":      mesh["faces"],
+        "attributes": mesh["attributes"],
     }
 
 
@@ -98,13 +59,10 @@ def _sign_payload(data: dict) -> dict:
     Attach a SHA-256 content hash to the exported data.
     The browser viewer verifies this before rendering.
     """
-    payload_bytes = json.dumps(
-        {k: v for k, v in data.items() if k != "hash"},
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
-    data["hash"] = hashlib.sha256(payload_bytes).hexdigest()
-    return data
+    # Build output as a new dict — avoids mutating the caller's reference.
+    payload = {k: v for k, v in data.items() if k != "hash"}
+    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    return {**payload, "hash": hashlib.sha256(payload_bytes).hexdigest()}
 
 
 # ---------------------------------------------------------------------------

@@ -68,54 +68,66 @@ class PhysicsSubstrate extends SubstrateBase {
   // PHYSICS CALCULATIONS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Update body velocities based on forces and time delta
-   */
+  // Pure (immutable) — returns new arrays; fine for non-hot-path use
   updateVelocities(bodies, forces, timestep = 0.016) {
     return bodies.map(body => {
       if (body.isStatic) return body;
-
       const mass = body.mass || 1;
-      const acceleration = {
-        x: (forces[body.id]?.x || 0) / mass,
-        y: (forces[body.id]?.y || 0) / mass,
-        z: (forces[body.id]?.z || 0) / mass
-      };
-
+      const f = forces[body.id];
       return {
         ...body,
         velocity: {
-          x: (body.velocity?.x || 0) + acceleration.x * timestep,
-          y: (body.velocity?.y || 0) + acceleration.y * timestep,
-          z: (body.velocity?.z || 0) + acceleration.z * timestep
+          x: (body.velocity?.x || 0) + (f?.x || 0) / mass * timestep,
+          y: (body.velocity?.y || 0) + (f?.y || 0) / mass * timestep,
+          z: (body.velocity?.z || 0) + (f?.z || 0) / mass * timestep,
         }
       };
     });
   }
 
-  /**
-   * Update body positions based on velocities
-   */
   updatePositions(bodies, timestep = 0.016) {
+    const drag = this.config.airResistance || 0.99;
     return bodies.map(body => {
       if (body.isStatic) return body;
-
-      const airResistance = this.config.airResistance || 0.99;
-
       return {
         ...body,
         position: {
           x: (body.position?.x || 0) + (body.velocity?.x || 0) * timestep,
           y: (body.position?.y || 0) + (body.velocity?.y || 0) * timestep,
-          z: (body.position?.z || 0) + (body.velocity?.z || 0) * timestep
+          z: (body.position?.z || 0) + (body.velocity?.z || 0) * timestep,
         },
         velocity: {
-          x: (body.velocity?.x || 0) * airResistance,
-          y: (body.velocity?.y || 0) * airResistance,
-          z: (body.velocity?.z || 0) * (this.config.gravity !== 0 ? airResistance : airResistance)
+          x: (body.velocity?.x || 0) * drag,
+          y: (body.velocity?.y || 0) * drag,
+          z: (body.velocity?.z || 0) * drag,
         }
       };
     });
+  }
+
+  // In-place (mutating) — zero GC per call; preferred inside game loops
+  updateVelocitiesInPlace(bodies, forces, dt = 0.016) {
+    for (const b of bodies) {
+      if (b.isStatic) continue;
+      const m = b.mass || 1, f = forces[b.id];
+      if (!f) continue;
+      b.velocity.x += f.x / m * dt;
+      b.velocity.y += f.y / m * dt;
+      b.velocity.z += f.z / m * dt;
+    }
+  }
+
+  updatePositionsInPlace(bodies, dt = 0.016) {
+    const drag = this.config.airResistance || 0.99;
+    for (const b of bodies) {
+      if (b.isStatic) continue;
+      b.position.x += b.velocity.x * dt;
+      b.position.y += b.velocity.y * dt;
+      b.position.z += b.velocity.z * dt;
+      b.velocity.x *= drag;
+      b.velocity.y *= drag;
+      b.velocity.z *= drag;
+    }
   }
 
   /**
@@ -196,8 +208,9 @@ class PhysicsSubstrate extends SubstrateBase {
 
   _extractBodies(raw) {
     if (Array.isArray(raw.bodies)) {
+      let seq = 0;
       return raw.bodies.map(b => ({
-        id: b.id || `body-${Date.now()}`,
+        id: b.id || `body-${++seq}`,
         mass: b.mass || 1,
         position: b.position || { x: 0, y: 0, z: 0 },
         velocity: b.velocity || { x: 0, y: 0, z: 0 },
@@ -234,14 +247,7 @@ class PhysicsSubstrate extends SubstrateBase {
   }
 
   _getDefaults() {
-    return {
-      bodies: [],
-      gravity: 0,
-      airResistance: 0.99,
-      collisionGroups: {},
-      constraints: [],
-      timestamp: Date.now()
-    };
+    return { bodies: [], gravity: 0, airResistance: 0.99, collisionGroups: {}, constraints: [] };
   }
 }
 

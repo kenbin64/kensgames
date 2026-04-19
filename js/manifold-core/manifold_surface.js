@@ -35,7 +35,7 @@ const ManifoldSurface = (() => {
       }
       return Math.sqrt(sum);
     },
-    calculateZ(x, y) { return x * y; },
+    calculateZ(x, y) { return x * y; },  // z = x·y — portal dimensional law (AGENTS.md)
     getStats() {
       return M() ? M().stats() : { totalCoordinates: 0, dimensions: 0 };
     },

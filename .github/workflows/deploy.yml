@@ -8,6 +8,7 @@ on:
       - ".github/skills/**"
       - "engine/**"
       - "docs/**"
+      - "Chomp!WallyTheCairnsCrocodileAdventure/**"
   workflow_dispatch:
     inputs:
       game:
@@ -166,6 +167,7 @@ jobs:
             --exclude='starfighter/' \
             --exclude='assemble/' \
             --exclude='server/' \
+            --exclude='Chomp!WallyTheCairnsCrocodileAdventure/' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
             ./ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/

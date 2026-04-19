@@ -16,119 +16,35 @@ const REFLECTION_UPDATE_EVERY = 8; // update cubemap every N frames
 // Game objects
 let balls = [], paddles = [], bricks = [], players = [];
 
-const BRICK_COLORS = { red: 0xcc2222, orange: 0xcc7700, yellow: 0xbbbb00, green: 0x22aa22 };
-const PLAYER_COLORS = [0x00ccff, 0xff3366, 0x39ff14, 0xffaa00]; // cyan, pink, green, orange
-const COLORS = { cyan: 0x00ffff, dark: 0x0a0a1a };
-const PHI = 1.618;
-const BALL_RADIUS = 1;
-const PADDLE_RADIUS = 4.5;
-const PADDLE_THICKNESS = 0.85;
-const PADDLE_BEVEL = 0.94; // top radius ratio to create a subtle bevel
+// Manifold substrate -- all physics constants and pure math
+const BC            = BB.C;
+const PHI           = BB.PHI;
+const LAYER_BOOST   = BB.LAYER_BOOST;
+const BRICK_COLORS  = BB.BRICK_HEX;
+const PLAYER_COLORS = BB.PLAYER_HEX;
+const COLORS        = { cyan: 0x00ffff, dark: 0x0a0a1a };
 
-// Ball speeds
-const SPEED_EASY = 0.25;
-const SPEED_HARD = 0.4;
-const SPEED_MULTI = 0.3;
+// Geometry shortcuts (used 10+ times in physics/collision loops)
+const BALL_RADIUS      = BC.BALL_R;
+const PADDLE_RADIUS    = BC.PADDLE_R;
+const PADDLE_THICKNESS = BC.PADDLE_THICK;
+const PADDLE_BEVEL     = BC.PADDLE_BEVEL;
 
-// Ball dynamics (pseudo-physics)
-// NOTE: Units are per-frame; tuned to keep the existing “feel” while adding arch + chaos.
-const GRAVITY = 0.00075;              // downward acceleration (adds an arc)
-const FREE_FLIGHT_DRAG = 0.99935;     // slow energy bleed (walls/ceiling restore)
-const MIN_BALL_SPEED = 0.22;          // never let a ball become too weak to reach bricks
-const MAX_BALL_SPEED = 0.85;
-const WALL_BOOST = 1.035;
-const CEILING_BOOST = 1.06;
-const WALL_BOOST_ADD = 0.004;
-const CEILING_BOOST_ADD = 0.006;
-const BRICK_ABSORB_BASE = 0.968;      // bricks absorb energy
-const BRICK_ABSORB_SPEED_FACTOR = 0.08; // more energy => more absorption
-const BRICK_DEFLECT = 0.030;          // random nudge on brick hits
-const WALL_DEFLECT = 0.012;           // small random nudge on wall/ceiling hits
-const TURBULENCE_DECAY = 0.987;
-const TURBULENCE_MAX = 0.08;
-const TURBULENCE_BRICK_ADD = 0.022;
-const TURBULENCE_WALL_ADD = 0.010;
+// Dynamic arena dimensions (set per-game by BB.arenaLens in buildArena)
+const ARENA_HEIGHT = BC.ARENA_H;
+let ARENA_WIDTH  = BC.ARENA_BASE_W;
+let HALF_H       = BC.ARENA_H / 2;
+let HALF_W       = ARENA_WIDTH / 2;
+let WALL_INNER   = HALF_W - 1;
+let PADDLE_Y     = BB.arenaLens(1).paddleY;
+let PADDLE_BOUND = HALF_W - 5;
 
-const PADDLE_LAUNCH_EASY = 0.34;
-const PADDLE_LAUNCH_HARD = 0.42;
-const PADDLE_LAUNCH_MULTI = 0.38;
-
-function fib1to4(n) {
-    // Fibonacci starting at F1=1, F2=1
-    switch (n) {
-        case 1: return 1;
-        case 2: return 1;
-        case 3: return 2;
-        case 4: return 3;
-        default: return 1;
-    }
-}
-// Spin physics constants
-const MAGNUS_STRENGTH = 0.002;  // how much spin curves the ball per frame
-const SPIN_DECAY = 0.998;       // spin friction per frame (slow decay)
-const SPIN_TRANSFER = 0.3;     // how much tangential collision force becomes spin
-
+// Clamp ball Three.js velocity to substrate speed range
 function clampBallEnergyAndSpeed(ball) {
-    if (!ball || !ball.velocity) return;
-    ball.baseSpeed = THREE.MathUtils.clamp(ball.baseSpeed ?? SPEED_EASY, MIN_BALL_SPEED, MAX_BALL_SPEED);
+    ball.baseSpeed = THREE.MathUtils.clamp(ball.baseSpeed ?? BC.SPEED_EASY, BC.MIN_SPEED, BC.MAX_SPEED);
     const spd = ball.velocity.length();
     if (spd > 0.0001) ball.velocity.multiplyScalar(ball.baseSpeed / spd);
 }
-
-function nudgeVelocity(ball, amount) {
-    if (!ball || !ball.velocity) return;
-    ball.velocity.x += (Math.random() - 0.5) * amount;
-    ball.velocity.y += (Math.random() - 0.5) * (amount * 0.35);
-    ball.velocity.z += (Math.random() - 0.5) * amount;
-}
-
-function estimateTimeToY(ball, targetY) {
-    // Solve: y(t) = y0 + vy*t - 0.5*g*t^2 = targetY
-    // => 0.5*g*t^2 - vy*t + (targetY - y0) = 0
-    const y0 = ball.position.y;
-    const vy = ball.velocity.y;
-    const a = 0.5 * GRAVITY;
-    const b = -vy;
-    const c = (targetY - y0);
-    const disc = b * b - 4 * a * c;
-    if (disc <= 0 || Math.abs(a) < 1e-9) {
-        const denom = Math.abs(vy) > 1e-6 ? Math.abs(vy) : 1e-6;
-        return Math.max(0, Math.abs(y0 - targetY) / denom);
-    }
-    const sqrtD = Math.sqrt(disc);
-    const t1 = (-b + sqrtD) / (2 * a);
-    const t2 = (-b - sqrtD) / (2 * a);
-    const t = Math.max(t1, t2);
-    return Number.isFinite(t) && t > 0 ? t : 0;
-}
-
-// Golden ratio speed boosts per brick layer (bottom→top = mild→intense)
-// Layer 3 (green): φ^0.25 ≈ 1.12, Layer 2 (yellow): φ^0.5 ≈ 1.27
-// Layer 1 (orange): φ^0.75 ≈ 1.44, Layer 0 (red): φ^1 ≈ 1.618
-const LAYER_BOOST = [
-    Math.pow(PHI, 1.0),   // red:    ×1.618
-    Math.pow(PHI, 0.75),  // orange: ×1.44
-    Math.pow(PHI, 0.5),   // yellow: ×1.27
-    Math.pow(PHI, 0.25)   // green:  ×1.12
-];
-
-// Dynamic arena dimensions — wider with more paddles, height stays fixed
-const ARENA_HEIGHT = 50;  // always 50 tall
-let ARENA_WIDTH = 50;     // X and Z — grows with player count
-let HALF_H = 25;          // half height (constant)
-let HALF_W = 25;          // half width (dynamic)
-let WALL_INNER = 24;      // ball bounce boundary
-let PADDLE_Y = -24.5;     // paddle Y position
-let PADDLE_BOUND = 20;    // paddle movement clamp
-
-function setArenaSize(numPlayers) {
-    // 1 player: 50, 2: 60, 3: 70, 4: 80
-    ARENA_WIDTH = 50 + (numPlayers - 1) * 10;
-    HALF_W = ARENA_WIDTH / 2;
-    WALL_INNER = HALF_W - 1;
-    PADDLE_BOUND = HALF_W - 5;
-}
-
 // Arena meshes that get rebuilt per game
 let arenaObjects = [];
 
@@ -234,7 +150,10 @@ function buildArena(numPlayers) {
     bricks.forEach(b => scene.remove(b));
     bricks = [];
 
-    setArenaSize(numPlayers);
+    // Apply arena dimensions from BB manifold substrate
+    const _a = BB.arenaLens(numPlayers);
+    ARENA_WIDTH = _a.width;  HALF_W = _a.halfW;  HALF_H = _a.halfH;
+    WALL_INNER  = _a.wallInner;  PADDLE_BOUND = _a.paddleBound;  PADDLE_Y = _a.paddleY;
 
     // Update camera to see full arena
     camera.position.set(0, -2, ARENA_WIDTH * 1.6);
@@ -355,180 +274,77 @@ function createArenaWalls() {
 }
 
 function createBricks() {
-    const colors = [BRICK_COLORS.red, BRICK_COLORS.orange, BRICK_COLORS.yellow, BRICK_COLORS.green];
-
-    // Fit bricks to arena width — compute how many fit
-    const gap = 0.15;
-    const brickH = 1.0;
-    const brickW = PHI * 3;                           // ≈ 4.854
-    const brickD = brickW;
-    const gridSpacing = brickW + gap;
-    const layerStride = brickH + gap;
-    const ceilingGap = PHI * PHI * PHI;               // ≈ 4.236
-    const topLayerY = HALF_H - ceilingGap - brickH / 2;
-
-    // Number of bricks that fit across the arena width
-    const numAcross = Math.floor(ARENA_WIDTH / gridSpacing);
-    const offset = (numAcross - 1) * gridSpacing / 2; // center the grid
-
-    for (let layer = 0; layer < 4; layer++) {
-        const yPos = topLayerY - layer * layerStride;
-        for (let row = 0; row < numAcross; row++) {
-            for (let col = 0; col < numAcross; col++) {
-                const geo = new THREE.BoxGeometry(brickW, brickH, brickD);
-                const mat = new THREE.MeshPhysicalMaterial({
-                    color: colors[layer],
-                    transparent: true,
-                    opacity: 0.7,
-                    roughness: 0.05,
-                    metalness: 0.15,
-                    clearcoat: 1.0,
-                    clearcoatRoughness: 0.05
-                });
-                applyReflectionsToMaterial(mat, 1.15);
-                const brick = new THREE.Mesh(geo, mat);
-                brick.castShadow = true;
-                brick.receiveShadow = true;
-                brick.position.set(
-                    col * gridSpacing - offset,
-                    yPos,
-                    row * gridSpacing - offset
-                );
-                brick.health = 1;
-                brick.layer = layer; // track which layer for speed boost
-                scene.add(brick);
-                bricks.push(brick);
-            }
-        }
-    }
+    BB.brickLayout(ARENA_WIDTH).forEach(b => {
+        const mat = new THREE.MeshPhysicalMaterial({
+            color: b.color, transparent: true, opacity: 0.7,
+            roughness: 0.05, metalness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.05,
+        });
+        applyReflectionsToMaterial(mat, 1.15);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), mat);
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.position.set(b.x, b.y, b.z);
+        mesh.health = 1;
+        mesh.layer = b.layer;
+        scene.add(mesh);
+        bricks.push(mesh);
+    });
+}
 }
 
 function setupPlayers() {
-    // Clean up old objects
     balls.forEach(b => scene.remove(b));
     paddles.forEach(p => scene.remove(p));
     balls = []; paddles = []; players = [];
 
-    const isMulti = gameMode.startsWith('multi');
-    const numPlayers = isMulti ? parseInt(gameMode.slice(5)) : 1;
-    const ballsPerPlayer = isMulti ? fib1to4(numPlayers) : 1;
-    const numBalls = isMulti ? (numPlayers * ballsPerPlayer) : 1; // solo = 1 ball at a time
-    const baseSpeed = isMulti ? SPEED_MULTI : (gameMode === 'easy' ? SPEED_EASY : SPEED_HARD);
-    // Lives scaling: 1p=5, 2p=4, 3p=3, 4p=2
-    // Solo difficulty is speed-based; lives stay at 5.
-    const lives = isMulti ? Math.max(2, 6 - numPlayers) : 5;
+    const { numPlayers, isMulti, baseSpeed, lives, ballsPerPlayer, paddleRadius } = BB.modeLens(gameMode);
 
-    // Create players
-    for (let i = 0; i < numPlayers; i++) {
+    for (let i = 0; i < numPlayers; i++)
         players.push({ id: i, score: 0, alive: true, color: PLAYER_COLORS[i], lives });
-    }
 
-    // Paddle size scales down with more players
-    // 1p: 4.5, 2p: 3.8, 3p: 3.2, 4p: 2.8
-    const basePaddleRadius = PADDLE_RADIUS - (numPlayers - 1) * 0.6;
-
-    // Create paddles
-    const startPositions = [
-        [0, 0], [-10, -10], [10, 10], [-10, 10]
-    ];
     for (let i = 0; i < numPlayers; i++) {
-        // Flat circular paddle with a subtle bevel
-        const geo = new THREE.CylinderGeometry(
-            basePaddleRadius * PADDLE_BEVEL,
-            basePaddleRadius,
-            PADDLE_THICKNESS,
-            48,
-            1,
-            false
-        );
+        const pi  = BB.paddleInit(i, paddleRadius);
+        const geo = new THREE.CylinderGeometry(paddleRadius * PADDLE_BEVEL, paddleRadius, PADDLE_THICKNESS, 48, 1, false);
         const mat = new THREE.MeshPhysicalMaterial({
-            color: PLAYER_COLORS[i],
-            metalness: 0.35,
-            roughness: 0.22,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.12,
+            color: PLAYER_COLORS[i], metalness: 0.35, roughness: 0.22, clearcoat: 1.0, clearcoatRoughness: 0.12,
         });
         applyReflectionsToMaterial(mat, 1.1);
         const p = new THREE.Mesh(geo, mat);
-        p.castShadow = true;
-        p.receiveShadow = true;
-
-        // Keep the paddle slightly above the floor so it throws a clear shadow.
-        p.position.set(startPositions[i][0], -HALF_H + (PADDLE_THICKNESS * 0.5) + 0.22, startPositions[i][1]);
+        p.castShadow = p.receiveShadow = true;
+        p.position.set(pi.x, PADDLE_Y, pi.z);
         p.playerId = i;
-        p.paddleRadius = basePaddleRadius;
-        p.baseRadius = basePaddleRadius;
+        p.paddleRadius = p.baseRadius = paddleRadius;
         p.ceilingPenaltyApplied = false;
         scene.add(p);
         paddles.push(p);
     }
 
-    // Create balls
     if (isMulti) {
-        for (let ownerIdx = 0; ownerIdx < numPlayers; ownerIdx++) {
-            for (let k = 0; k < ballsPerPlayer; k++) {
-                spawnBall(ownerIdx, baseSpeed, true);
-            }
-        }
+        for (let i = 0; i < numPlayers; i++)
+            for (let k = 0; k < ballsPerPlayer; k++) spawnBall(i, baseSpeed, true);
     } else {
-        for (let i = 0; i < numBalls; i++) {
-            spawnBall(i % numPlayers, baseSpeed, false);
-        }
+        spawnBall(0, baseSpeed, false);
     }
+}
 }
 
 function spawnBall(ownerIdx, baseSpeed, isMulti) {
-    // In multiplayer: ball starts neutral (not scored) but is *liable* to an owner.
-    const color = isMulti ? 0xcccccc : 0xcccccc;
-    const geo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
-    const mat = new THREE.MeshPhysicalMaterial({
-        color,
-        metalness: 0.85,
-        roughness: 0.16,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.10,
+    const init = BB.ballInit(ownerIdx, baseSpeed, isMulti);
+    const { position: ip, velocity: iv, spin: _s, ...scalars } = init;
+    const mat  = new THREE.MeshPhysicalMaterial({
+        color: 0xcccccc, metalness: 0.85, roughness: 0.16, clearcoat: 1.0, clearcoatRoughness: 0.10,
     });
     applyReflectionsToMaterial(mat, 1.25);
     if (isMulti) { mat.emissive = new THREE.Color(0x000000); mat.emissiveIntensity = 0.0; }
-    const b = new THREE.Mesh(geo, mat);
-    b.castShadow = true;
-    b.receiveShadow = true;
-
-    const angle = Math.random() * Math.PI * 2;
-    const vx = Math.sin(angle) * baseSpeed * 0.6;
-    const vz = Math.cos(angle) * baseSpeed * 0.4;
-    b.velocity = new THREE.Vector3(vx, baseSpeed, vz);
-
-    // Spawn near owner's paddle position (or center for solo)
-    if (isMulti) {
-        const startPositions = [[0, 0], [-10, -10], [10, 10], [-10, 10]];
-        const sp = startPositions[ownerIdx] || [0, 0];
-        b.position.set(sp[0] + (Math.random() - 0.5) * 4, -10, sp[1] + (Math.random() - 0.5) * 4);
-    } else {
-        const offset = new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
-        b.position.set(0, -10, 0).add(offset);
-    }
-
-    // belongsTo: visual/scoring "current color" owner; -1 means neutral/unclaimed
-    b.belongsTo = isMulti ? -1 : -1;
-    // liabilityOwner: who loses a life if THIS ball falls through
-    b.liabilityOwner = isMulti ? ownerIdx : -1;
-    // lastTouchedBy: who gets points for bricks hit (only when >= 0)
-    b.lastTouchedBy = isMulti ? -1 : ownerIdx;
-    b.owner = ownerIdx;          // kept for AI compatibility
-    b.alive = true;
-    b.baseSpeed = baseSpeed;
-    b.spawnBaseSpeed = baseSpeed; // baseline for non-multiplicative layer boosts
-    b.turbulence = 0;
-    // Bricks are built top-down: layer 0 is highest (closest to ceiling), last index is lowest.
-    // Track the *highest* layer reached so far as the smallest layer index hit.
-    b.highestLayerReached = (Array.isArray(LAYER_BOOST) && LAYER_BOOST.length)
-        ? (LAYER_BOOST.length - 1)
-        : 3;
-    b.spin = new THREE.Vector3(0, 0, 0); // angular velocity (spin axis × magnitude)
+    const b = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS, 32, 32), mat);
+    b.castShadow = b.receiveShadow = true;
+    b.position.copy(ip);
+    b.velocity = new THREE.Vector3().copy(iv);
+    b.spin     = new THREE.Vector3();
+    Object.assign(b, scalars);
     scene.add(b);
     balls.push(b);
     return b;
+}
 }
 
 function onMouseMove(e) {
@@ -595,7 +411,7 @@ function updateAIPaddles() {
         // Priority 1: Save MY liability ball (the one that will cost me a life) if it's falling
         const myBall = balls.find(b => b.alive && b.liabilityOwner === i && b.velocity.y < 0);
         if (myBall) {
-            const t = estimateTimeToY(myBall, catchY);
+            const t = BB.estimateTimeToY(myBall.position, myBall.velocity, catchY);
             targetX = myBall.position.x + myBall.velocity.x * t;
             targetZ = myBall.position.z + myBall.velocity.z * t;
             aimBall = myBall;
@@ -609,7 +425,7 @@ function updateAIPaddles() {
             let stealBall = null, stealDist = myDist;
             balls.forEach(b => {
                 if (!b.alive || b.liabilityOwner === i || b.velocity.y >= 0) return;
-                const st = estimateTimeToY(b, catchY);
+                const st = BB.estimateTimeToY(b.position, b.velocity, catchY);
                 const sx = b.position.x + b.velocity.x * st;
                 const sz = b.position.z + b.velocity.z * st;
                 const sd = Math.sqrt(Math.pow(sx - p.position.x, 2) + Math.pow(sz - p.position.z, 2));
@@ -626,7 +442,7 @@ function updateAIPaddles() {
             let bestBall = null, bestTime = Infinity;
             balls.forEach(b => {
                 if (!b.alive || b.velocity.y >= 0) return;
-                const t = estimateTimeToY(b, catchY);
+                const t = BB.estimateTimeToY(b.position, b.velocity, catchY);
                 const lx = b.position.x + b.velocity.x * t;
                 const lz = b.position.z + b.velocity.z * t;
                 const d = Math.sqrt(Math.pow(lx - p.position.x, 2) + Math.pow(lz - p.position.z, 2));
@@ -653,7 +469,7 @@ function updateAIPaddles() {
                     const rivalBall = balls.find(b => b.alive && b.liabilityOwner === rivalIdx && b.velocity.y < 0);
                     if (rivalBall) {
                         // Block between rival paddle and their ball's landing
-                        const t = estimateTimeToY(rivalBall, catchY);
+                        const t = BB.estimateTimeToY(rivalBall.position, rivalBall.velocity, catchY);
                         const landX = rivalBall.position.x + rivalBall.velocity.x * t;
                         const landZ = rivalBall.position.z + rivalBall.velocity.z * t;
                         targetX = (rivalPaddle.position.x + landX) / 2;
@@ -675,8 +491,8 @@ function updateAIPaddles() {
         // Imperfect aim: more energy/turbulence => harder to predict
         if (aimBall) {
             const turb = aimBall.turbulence || 0;
-            const spd = aimBall.baseSpeed || SPEED_EASY;
-            const err = 0.35 + turb * 14 + Math.max(0, spd - MIN_BALL_SPEED) * 3.2;
+            const spd = aimBall.baseSpeed || BC.SPEED_EASY;
+            const err = 0.35 + turb * 14 + Math.max(0, spd - BC.MIN_SPEED) * 3.2;
             targetX += (Math.random() - 0.5) * err;
             targetZ += (Math.random() - 0.5) * err;
         }
@@ -820,18 +636,18 @@ function animate() {
         if (!b.alive) return;
 
         // Free-flight energy bleed (walls/ceiling restore energy)
-        b.baseSpeed *= FREE_FLIGHT_DRAG;
-        if (b.baseSpeed < MIN_BALL_SPEED) b.baseSpeed = MIN_BALL_SPEED;
+        b.baseSpeed *= BC.DRAG;
+        if (b.baseSpeed < BC.MIN_SPEED) b.baseSpeed = BC.MIN_SPEED;
 
         // Magnus effect: spin curves the ball's trajectory
         // Force = spin × velocity (cross product)
         if (b.spin && b.spin.lengthSq() > 0.0001) {
             const magnus = new THREE.Vector3().crossVectors(b.spin, b.velocity);
-            magnus.multiplyScalar(MAGNUS_STRENGTH);
+            magnus.multiplyScalar(BC.MAGNUS);
             b.velocity.add(magnus);
 
             // Spin decays over time (air friction)
-            b.spin.multiplyScalar(SPIN_DECAY);
+            b.spin.multiplyScalar(BC.SPIN_DECAY);
 
             // Visual: rotate ball mesh based on spin
             b.rotation.x += b.spin.x * 0.1;
@@ -840,14 +656,14 @@ function animate() {
         }
 
         // Gravity adds a visible arc
-        b.velocity.y -= GRAVITY;
+        b.velocity.y -= BC.GRAVITY;
 
         // Turbulence adds small unpredictable curving so trajectories aren't precomputable
         if (b.turbulence && b.turbulence > 0.00001) {
             b.velocity.x += (Math.random() - 0.5) * b.turbulence;
             b.velocity.z += (Math.random() - 0.5) * b.turbulence;
             b.velocity.y += (Math.random() - 0.5) * (b.turbulence * 0.22);
-            b.turbulence *= TURBULENCE_DECAY;
+            b.turbulence *= BC.TURB_DECAY;
         }
 
         // Clamp to the current energy (baseSpeed)
@@ -861,26 +677,26 @@ function animate() {
         if (b.position.x > WALL_INNER) {
             b.position.x = WALL_INNER; b.velocity.x *= -1;
             // Wall normal is (-1,0,0), tangential is Y and Z
-            b.spin.y += b.velocity.z * SPIN_TRANSFER;
-            b.spin.z -= b.velocity.y * SPIN_TRANSFER;
+            b.spin.y += b.velocity.z * BC.SPIN_TRANSFER;
+            b.spin.z -= b.velocity.y * BC.SPIN_TRANSFER;
             wallHit = true;
         }
         if (b.position.x < -WALL_INNER) {
             b.position.x = -WALL_INNER; b.velocity.x *= -1;
-            b.spin.y -= b.velocity.z * SPIN_TRANSFER;
-            b.spin.z += b.velocity.y * SPIN_TRANSFER;
+            b.spin.y -= b.velocity.z * BC.SPIN_TRANSFER;
+            b.spin.z += b.velocity.y * BC.SPIN_TRANSFER;
             wallHit = true;
         }
         if (b.position.z > WALL_INNER) {
             b.position.z = WALL_INNER; b.velocity.z *= -1;
-            b.spin.y -= b.velocity.x * SPIN_TRANSFER;
-            b.spin.x += b.velocity.y * SPIN_TRANSFER;
+            b.spin.y -= b.velocity.x * BC.SPIN_TRANSFER;
+            b.spin.x += b.velocity.y * BC.SPIN_TRANSFER;
             wallHit = true;
         }
         if (b.position.z < -WALL_INNER) {
             b.position.z = -WALL_INNER; b.velocity.z *= -1;
-            b.spin.y += b.velocity.x * SPIN_TRANSFER;
-            b.spin.x -= b.velocity.y * SPIN_TRANSFER;
+            b.spin.y += b.velocity.x * BC.SPIN_TRANSFER;
+            b.spin.x -= b.velocity.y * BC.SPIN_TRANSFER;
             wallHit = true;
         }
 
@@ -889,14 +705,14 @@ function animate() {
             b.position.y = HALF_H - 1;
             b.velocity.y = -Math.abs(b.velocity.y);
             // Ceiling normal is (0,-1,0), tangential is X and Z
-            b.spin.x += b.velocity.z * SPIN_TRANSFER;
-            b.spin.z -= b.velocity.x * SPIN_TRANSFER;
+            b.spin.x += b.velocity.z * BC.SPIN_TRANSFER;
+            b.spin.z -= b.velocity.x * BC.SPIN_TRANSFER;
             ceilingHit = true;
 
             // Ceiling restores energy so balls keep reaching bricks
-            b.baseSpeed = Math.min(MAX_BALL_SPEED, b.baseSpeed * CEILING_BOOST + CEILING_BOOST_ADD);
-            b.turbulence = Math.min(TURBULENCE_MAX, (b.turbulence || 0) + TURBULENCE_WALL_ADD);
-            nudgeVelocity(b, WALL_DEFLECT);
+            b.baseSpeed = Math.min(BC.MAX_SPEED, b.baseSpeed * BC.CEILING_BOOST + BC.CEILING_BOOST_ADD);
+            b.turbulence = Math.min(BC.TURB_MAX, (b.turbulence || 0) + BC.TURB_WALL);
+            BB.nudge(b.velocity, BC.WALL_DEFLECT);
 
             // Reduce the paddle of whoever last touched this ball by golden ratio (.618)
             // ONLY the first time a paddle gets hit by this penalty
@@ -912,9 +728,9 @@ function animate() {
 
         if (!ceilingHit && wallHit) {
             // Walls re-energize, but less than the ceiling
-            b.baseSpeed = Math.min(MAX_BALL_SPEED, b.baseSpeed * WALL_BOOST + WALL_BOOST_ADD);
-            b.turbulence = Math.min(TURBULENCE_MAX, (b.turbulence || 0) + TURBULENCE_WALL_ADD);
-            nudgeVelocity(b, WALL_DEFLECT);
+            b.baseSpeed = Math.min(BC.MAX_SPEED, b.baseSpeed * BC.WALL_BOOST + BC.WALL_BOOST_ADD);
+            b.turbulence = Math.min(BC.TURB_MAX, (b.turbulence || 0) + BC.TURB_WALL);
+            BB.nudge(b.velocity, BC.WALL_DEFLECT);
             clampBallEnergyAndSpeed(b);
         }
 
@@ -936,7 +752,7 @@ function animate() {
                 const pR = paddle.paddleRadius;
                 if (dist < pR + BALL_RADIUS) {
                     // Paddle re-energizes the ball: always enough to reach the ceiling if unobstructed
-                    const launch = isMulti ? PADDLE_LAUNCH_MULTI : (gameMode === 'easy' ? PADDLE_LAUNCH_EASY : PADDLE_LAUNCH_HARD);
+                    const launch = isMulti ? BC.PADDLE_LAUNCH_MULTI : (gameMode === 'easy' ? BC.PADDLE_LAUNCH_EASY : BC.PADDLE_LAUNCH_HARD);
                     b.baseSpeed = Math.max(b.baseSpeed, launch);
 
                     // Aim upward with a controllable horizontal component based on hit offset
@@ -953,11 +769,11 @@ function animate() {
                     );
 
                     // Slight randomness so repeated hits don't create a deterministic loop
-                    nudgeVelocity(b, 0.018);
+                    BB.nudge(b.velocity, 0.018);
 
                     // Transfer spin from tangential components
-                    b.spin.x += b.velocity.z * SPIN_TRANSFER;
-                    b.spin.z -= b.velocity.x * SPIN_TRANSFER;
+                    b.spin.x += b.velocity.z * BC.SPIN_TRANSFER;
+                    b.spin.z -= b.velocity.x * BC.SPIN_TRANSFER;
 
                     clampBallEnergyAndSpeed(b);
 
@@ -1016,7 +832,7 @@ function animate() {
                             });
                         } else {
                             // Respawn a fresh neutral ball liable to that player
-                            spawnBall(liable, SPEED_MULTI, true);
+                            spawnBall(liable, BC.SPEED_MULTI, true);
                         }
                     }
 
@@ -1042,7 +858,7 @@ function animate() {
                         endGame('Game Over');
                     } else {
                         // Respawn a new ball
-                        const spd = gameMode === 'easy' ? SPEED_EASY : SPEED_HARD;
+                        const spd = gameMode === 'easy' ? BC.SPEED_EASY : BC.SPEED_HARD;
                         spawnBall(0, spd, false);
                     }
                 }
@@ -1111,17 +927,17 @@ function animate() {
                 }
 
                 // Bricks absorb energy; higher-energy impacts get absorbed more.
-                const speedFactor = Math.max(0, b.baseSpeed - MIN_BALL_SPEED);
+                const speedFactor = Math.max(0, b.baseSpeed - BC.MIN_SPEED);
                 const absorb = THREE.MathUtils.clamp(
-                    BRICK_ABSORB_BASE - speedFactor * BRICK_ABSORB_SPEED_FACTOR,
+                    BC.BRICK_ABSORB - speedFactor * BC.BRICK_ABSORB_SF,
                     0.90,
-                    BRICK_ABSORB_BASE
+                    BC.BRICK_ABSORB
                 );
                 b.baseSpeed *= absorb;
 
                 // Extra randomness on brick hits so the AI can't precompute a clean trajectory
-                b.turbulence = Math.min(TURBULENCE_MAX, (b.turbulence || 0) + TURBULENCE_BRICK_ADD);
-                nudgeVelocity(b, BRICK_DEFLECT);
+                b.turbulence = Math.min(BC.TURB_MAX, (b.turbulence || 0) + BC.TURB_BRICK);
+                BB.nudge(b.velocity, BC.BRICK_DEFLECT);
 
                 // Layer boost (non-multiplicative): only when reaching a higher brick layer for the first time.
                 // Higher bricks are smaller layer indices (layer 0 is highest).
@@ -1131,12 +947,12 @@ function animate() {
                     const boost = LAYER_BOOST[brick.layer] || 1;
                     const layerFactor = 1 + (boost - 1) * 0.35;
                     const baseline = (typeof b.spawnBaseSpeed === 'number') ? b.spawnBaseSpeed : b.baseSpeed;
-                    const target = Math.min(MAX_BALL_SPEED, baseline * layerFactor);
+                    const target = Math.min(BC.MAX_SPEED, baseline * layerFactor);
                     b.baseSpeed = Math.max(b.baseSpeed, target);
                 }
 
                 // Never allow energy to fall below the safe minimum
-                if (b.baseSpeed < MIN_BALL_SPEED) b.baseSpeed = MIN_BALL_SPEED;
+                if (b.baseSpeed < BC.MIN_SPEED) b.baseSpeed = BC.MIN_SPEED;
                 clampBallEnergyAndSpeed(b);
             }
         });

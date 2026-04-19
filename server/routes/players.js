@@ -18,6 +18,7 @@ const express = require('express');
 const router = express.Router();
 const AuthHandler = require('../auth-handler');
 const { manifoldData } = require('../store');
+const { PlayerDB } = require('../db');
 
 const authHandler = new AuthHandler();
 
@@ -63,10 +64,13 @@ router.get('/check-playername', (req, res) => {
   if (!PLAYERNAME_RE.test(name)) {
     return res.json({ available: false, error: 'Invalid format' });
   }
-  const taken = Object.keys(manifoldData).some(
+  // Check SQLite first (authoritative), fall back to in-memory
+  const dbTaken = PlayerDB.isNameTaken(name, -1);
+  if (dbTaken) return res.json({ available: false });
+  const memTaken = Object.keys(manifoldData).some(
     k => manifoldData[k].playername?.toLowerCase() === name.toLowerCase()
   );
-  return res.json({ available: !taken });
+  return res.json({ available: !memTaken });
 });
 
 // ── GET /api/players/me ──────────────────────────────────────────────────────
@@ -74,24 +78,30 @@ router.get('/me', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
+  // Merge authoritative SQLite data when available
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  const guild = dbPlayer ? PlayerDB.getPlayerGuild(dbPlayer.id) : null;
+  const prefs = dbPlayer ? PlayerDB.getPrefs(dbPlayer.id) : {};
+
   return res.json({
     success: true,
     userId: user.userId,
     username: user.username,
     email: user.email,
-    playername: user.playername || null,
+    playername: (dbPlayer && dbPlayer.player_name) || user.playername || null,
     avatar: user.avatar,
-    avatarId: user.avatarId || null,
-    profileSetup: user.profileSetup || false,
-    tosAgreed: user.tosAgreed || false,
-    tosAgreedAt: user.tosAgreedAt || null,
-    isAdmin: user.isAdmin || false,
-    isSuperuser: user.isSuperuser || false,
+    avatarId: (dbPlayer && dbPlayer.avatar_id) || user.avatarId || null,
+    profileSetup: (dbPlayer ? dbPlayer.profile_setup === 1 : false) || user.profileSetup || false,
+    tosAgreed: (dbPlayer ? dbPlayer.tos_agreed === 1 : false) || user.tosAgreed || false,
+    tosAgreedAt: (dbPlayer && dbPlayer.tos_agreed_at) || user.tosAgreedAt || null,
+    isAdmin: (dbPlayer ? dbPlayer.is_admin === 1 : false) || user.isAdmin || false,
+    isSuperuser: (dbPlayer ? dbPlayer.is_superuser === 1 : false) || user.isSuperuser || false,
     adminLevel: user.adminLevel || 0,
     adminTosAgreed: user.adminTosAgreed || false,
     stats: user.stats || {},
-    guildId: user.guildId || null,
-    guildRole: user.guildRole || null,
+    guildId: (guild && guild.id) || user.guildId || null,
+    guildRole: (guild && guild.role) || user.guildRole || null,
+    prefs,
   });
 });
 
@@ -100,7 +110,7 @@ router.post('/tos/agree', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-  const { tosType } = req.body; // 'general' | 'guild' | 'admin'
+  const { tosType, version } = req.body; // tosType: 'general' | 'guild' | 'admin'
   const allowed = ['general', 'guild', 'admin'];
   if (!allowed.includes(tosType)) {
     return res.status(400).json({ success: false, error: 'Invalid TOS type' });
@@ -115,17 +125,26 @@ router.post('/tos/agree', requireAuth, (req, res) => {
   user[updateTsKey] = Date.now();
   user.lastModified = Date.now();
 
+  // Persist general TOS to SQLite
+  if (tosType === 'general') {
+    try { PlayerDB.agreeTOS(req.userId, version || '1.0'); } catch { }
+  }
+
   return res.json({ success: true, message: `${tosType} TOS recorded` });
 });
 
 // ── POST /api/players/setup ─────────────────────────────────────────────────
-// First-login: playername + avatar (requires tosAgreed)
+// First-login: playername + avatar (requires tosAgreed). Playername is PERMANENT.
 router.post('/setup', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
   if (!user.tosAgreed) {
-    return res.status(403).json({ success: false, error: 'Must agree to TOS before setup' });
+    // Also check DB in case TOS was agreed in a previous session
+    const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+    if (!dbPlayer || dbPlayer.tos_agreed !== 1) {
+      return res.status(403).json({ success: false, error: 'Must agree to TOS before setup' });
+    }
   }
 
   if (user.profileSetup) {
@@ -138,7 +157,10 @@ router.post('/setup', requireAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Playername must be 3-20 characters: letters, numbers, underscore only' });
   }
 
-  // Check playername uniqueness
+  // Check uniqueness — DB first, then in-memory
+  if (PlayerDB.isNameTaken(playername, req.userId)) {
+    return res.status(409).json({ success: false, error: 'Playername already taken' });
+  }
   for (const key of Object.keys(manifoldData)) {
     if (manifoldData[key].playername?.toLowerCase() === playername.toLowerCase() &&
       manifoldData[key].userId !== req.userId) {
@@ -155,6 +177,9 @@ router.post('/setup', requireAuth, (req, res) => {
   user.profileSetup = true;
   user.lastModified = Date.now();
 
+  // Persist to SQLite (playername is locked forever)
+  try { PlayerDB.setupProfile(req.userId, playername.trim(), avatarId); } catch { }
+
   return res.json({
     success: true,
     message: 'Profile setup complete!',
@@ -164,12 +189,12 @@ router.post('/setup', requireAuth, (req, res) => {
 });
 
 // ── POST /api/players/profile ───────────────────────────────────────────────
-// Update playername or avatar after initial setup — blocked mid-game
+// Update avatar only — playername is PERMANENT and cannot be changed.
 router.post('/profile', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-  // Block changes while user is in an active session
+  // Block changes while user is in an active game session
   const { sessionsData } = require('../store');
   for (const sid of Object.keys(sessionsData)) {
     const sess = sessionsData[sid];
@@ -178,23 +203,11 @@ router.post('/profile', requireAuth, (req, res) => {
     }
   }
 
-  const { playername, avatarId } = req.body;
-
-  if (playername !== undefined) {
-    if (!PLAYERNAME_RE.test(playername)) {
-      return res.status(400).json({ success: false, error: 'Playername must be 3-20 characters: letters, numbers, underscore only' });
-    }
-    for (const key of Object.keys(manifoldData)) {
-      if (manifoldData[key].playername?.toLowerCase() === playername.toLowerCase() &&
-        manifoldData[key].userId !== req.userId) {
-        return res.status(409).json({ success: false, error: 'Playername already taken' });
-      }
-    }
-    user.playername = playername.trim();
-  }
+  const { avatarId } = req.body;
 
   if (avatarId !== undefined) {
     user.avatarId = avatarId;
+    try { PlayerDB.updateAvatar(req.userId, avatarId); } catch { }
   }
 
   user.lastModified = Date.now();
@@ -247,6 +260,143 @@ router.get('/online', requireAuth, (req, res) => {
     }
   }
   return res.json({ success: true, online });
+});
+
+// ── GET /api/players/preferences ─────────────────────────────────────────────
+router.get('/preferences', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+  const prefs = PlayerDB.getPrefs(dbPlayer.id);
+  return res.json({ success: true, prefs });
+});
+
+// ── POST /api/players/preferences ────────────────────────────────────────────
+// Body: { key: string, value: string } or { prefs: { key: value, ... } }
+router.post('/preferences', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  const ALLOWED_KEYS = new Set([
+    'music_enabled', 'sound_enabled', 'chat_visible',
+    'theme', 'lang', 'show_online_status', 'notifications_enabled',
+  ]);
+
+  const updates = req.body.prefs || (req.body.key ? { [req.body.key]: req.body.value } : {});
+  const changed = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (!ALLOWED_KEYS.has(k)) continue;
+    PlayerDB.setPref(dbPlayer.id, k, v);
+    changed[k] = v;
+  }
+  return res.json({ success: true, changed });
+});
+
+// ── GET /api/players/medallions ───────────────────────────────────────────────
+router.get('/medallions', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+  const medallions = PlayerDB.getMedallions(dbPlayer.id);
+  return res.json({ success: true, medallions });
+});
+
+// ── GET /api/players/favorites ────────────────────────────────────────────────
+router.get('/favorites', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+  const favorites = PlayerDB.getFavorites(dbPlayer.id);
+  return res.json({ success: true, favorites });
+});
+
+// ── POST /api/players/favorites/toggle ───────────────────────────────────────
+// Body: { gameId: string }  — toggles favorite on/off, returns new state
+router.post('/favorites/toggle', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+  const { gameId } = req.body;
+  if (!gameId || typeof gameId !== 'string') {
+    return res.status(400).json({ success: false, error: 'gameId required' });
+  }
+  const added = PlayerDB.toggleFavorite(dbPlayer.id, gameId.slice(0, 64));
+  return res.json({ success: true, gameId, favorited: added });
+});
+
+// ── GET /api/players/friends ──────────────────────────────────────────────────
+router.get('/friends', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+  const friends = PlayerDB.getFriends(dbPlayer.id);
+  return res.json({ success: true, friends });
+});
+
+// ── POST /api/players/friends/add ─────────────────────────────────────────────
+// Body: { playerName: string }  — adds mutual friendship
+router.post('/friends/add', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  const { playerName } = req.body;
+  if (!playerName) return res.status(400).json({ success: false, error: 'playerName required' });
+
+  const target = PlayerDB.getByPlayerName(playerName);
+  if (!target) return res.status(404).json({ success: false, error: 'Player not found' });
+  if (target.id === dbPlayer.id) return res.status(400).json({ success: false, error: 'Cannot add yourself' });
+  if (PlayerDB.isBlocked(target.id, dbPlayer.id)) {
+    return res.status(403).json({ success: false, error: 'Cannot add this player' });
+  }
+  PlayerDB.addFriend(dbPlayer.id, target.id);
+  return res.json({ success: true, message: `${target.player_name} added as friend` });
+});
+
+// ── POST /api/players/friends/remove ──────────────────────────────────────────
+// Body: { playerName: string }
+router.post('/friends/remove', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  const { playerName } = req.body;
+  if (!playerName) return res.status(400).json({ success: false, error: 'playerName required' });
+
+  const target = PlayerDB.getByPlayerName(playerName);
+  if (!target) return res.status(404).json({ success: false, error: 'Player not found' });
+  PlayerDB.removeFriend(dbPlayer.id, target.id);
+  return res.json({ success: true });
+});
+
+// ── POST /api/players/blocks/add ──────────────────────────────────────────────
+// Body: { playerName: string } — also removes mutual friendship
+router.post('/blocks/add', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  const { playerName } = req.body;
+  if (!playerName) return res.status(400).json({ success: false, error: 'playerName required' });
+
+  const target = PlayerDB.getByPlayerName(playerName);
+  if (!target) return res.status(404).json({ success: false, error: 'Player not found' });
+  if (target.id === dbPlayer.id) return res.status(400).json({ success: false, error: 'Cannot block yourself' });
+
+  PlayerDB.addBlock(dbPlayer.id, target.id);
+  return res.json({ success: true, message: `${target.player_name} blocked` });
+});
+
+// ── POST /api/players/blocks/remove ───────────────────────────────────────────
+// Body: { playerName: string } — 24h cooldown enforced
+router.post('/blocks/remove', requireAuth, (req, res) => {
+  const dbPlayer = PlayerDB.getByKgUserId(req.userId);
+  if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  const { playerName } = req.body;
+  if (!playerName) return res.status(400).json({ success: false, error: 'playerName required' });
+
+  const target = PlayerDB.getByPlayerName(playerName);
+  if (!target) return res.status(404).json({ success: false, error: 'Player not found' });
+
+  try {
+    PlayerDB.removeBlock(dbPlayer.id, target.id);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 module.exports = router;
