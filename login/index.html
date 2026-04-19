@@ -218,16 +218,15 @@
 
   <script>
     const API = '/api/auth';
-    // If already logged in, check profileSetup then redirect
+    // If already logged in, redirect to destination (profile setup is prompted by the lobby)
     (async function () {
       const t = localStorage.getItem('kg_token');
       if (!t) return;
       try {
         const r = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${t}` } });
         if (!r.ok) { localStorage.removeItem('kg_token'); return; }
-        const d = await r.json();
         const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
-        window.location.href = d.profileSetup ? redir : `/player/setup.html?redirect=${encodeURIComponent(redir)}`;
+        window.location.href = redir;
       } catch { }
     })();
 
@@ -249,11 +248,8 @@
           if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar, name: data.displayName }));
           msg.textContent = 'Welcome back!'; msg.className = 'arc-msg ok';
           const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
-          // Check profileSetup then route
-          const vr = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${data.token}` } });
-          const vd = await vr.json();
           setTimeout(() => {
-            window.location.href = vd.profileSetup ? redir : `/player/setup.html?redirect=${encodeURIComponent(redir)}`;
+            window.location.href = redir;
           }, 700);
         } else {
           msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'arc-msg err';
