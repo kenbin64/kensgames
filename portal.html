@@ -550,8 +550,9 @@
     }
     function launchMode(mode) {
       if (!currentLaunchGame) return;
+      const game = currentLaunchGame;   // capture before closeLaunch() nulls it
       closeLaunch();
-      const url = new URL(currentLaunchGame.path, window.location.origin);
+      const url = new URL(game.path, window.location.origin);
       url.searchParams.set('mode', mode);
       window.location.href = url.toString();
     }
