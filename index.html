@@ -64,27 +64,6 @@
             pointer-events: none;
         }
 
-        /* ── Manifold helix banner — full width below nav ── */
-        #manifold-corner {
-            display: block;
-            position: relative;
-            width: 100%;
-            height: 170px;
-            z-index: 10;
-            border-bottom: 1.5px solid rgba(0, 255, 255, 0.22);
-            box-shadow:
-                0 4px 32px rgba(0, 255, 255, 0.08),
-                0 2px 12px rgba(153, 0, 255, 0.06);
-            cursor: crosshair;
-            image-rendering: auto;
-        }
-
-        @media (max-width: 600px) {
-            #manifold-corner {
-                height: 110px;
-            }
-        }
-
         /* ── Tron grid overlay ── */
         #tron-grid {
             position: fixed;
@@ -1669,9 +1648,6 @@
         </nav>
     </header>
 
-    <canvas id="manifold-corner"
-        aria-label="Double helix — z = x·y manifold, two surfaces at 90°. Move cursor for harmonic tone."></canvas>
-
     <section class="hero">
         <div class="scene" aria-hidden="true">
             <svg class="arch" viewBox="0 0 1200 320" xmlns="http://www.w3.org/2000/svg">
@@ -1737,15 +1713,15 @@
                         <div class="console-tag">2–4 players</div>
                     </div>
                     <div class="console-screen">
-                        <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="eager" decoding="async"
-                            fetchpriority="high" />
+                        <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="eager"
+                            decoding="async" fetchpriority="high" />
                     </div>
                     <div class="console-foot">
                         <div class="mini">
-                            <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" />
-                            <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                                decoding="async" />
+                            <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                                loading="lazy" decoding="async" />
+                            <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
+                                loading="lazy" decoding="async" />
                         </div>
                         <button class="go" onclick="goToGame('/fasttrack/')">PLAY &#9654;</button>
                     </div>
@@ -1777,15 +1753,15 @@
                         <div class="console-tag">first-person 3D</div>
                     </div>
                     <div class="console-screen">
-                        <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                            decoding="async" />
+                        <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
+                            loading="lazy" decoding="async" />
                     </div>
                     <div class="console-foot">
                         <div class="mini">
                             <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="lazy"
                                 decoding="async" />
-                            <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" />
+                            <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                                loading="lazy" decoding="async" />
                         </div>
                         <button class="go" onclick="goToGame('/starfighter/')">PLAY &#9654;</button>
                     </div>
@@ -1815,8 +1791,8 @@
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
                     <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/fasttrack_lobby.png"
-                        src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy" decoding="async"
-                        fetchpriority="low">
+                        src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy"
+                        decoding="async" fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
@@ -1842,8 +1818,8 @@
                         decoding="async" fetchpriority="low">
                     <div class="thumb-strip" aria-hidden="true">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_lobby.png"
-                            src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby" loading="lazy"
-                            decoding="async" fetchpriority="low">
+                            src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby"
+                            loading="lazy" decoding="async" fetchpriority="low">
                     </div>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
@@ -1920,8 +1896,8 @@
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
                     <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_landing.png"
-                        src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy" decoding="async"
-                        fetchpriority="low">
+                        src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
+                        decoding="async" fetchpriority="low">
                     <div class="thumb-strip" aria-hidden="true">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_lobby.png"
                             src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble lobby" loading="lazy"
@@ -2324,7 +2300,6 @@
     </footer>
 
     <script src="/js/manifold.js?v=7"></script>
-    <script src="/js/manifold_corner.js" defer></script>
     <script src="/js/manifold_reality.js" defer></script>
     <script src="/js/manifold_panels.js" defer></script>
     <script src="/js/substrates/avatar_picker.js"></script>
