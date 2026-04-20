@@ -92,7 +92,7 @@ function showLoggedIn(identity) {
 
   container.innerHTML = `
     ${welcomeHtml}
-    <a href="https://kensgames.com/cdn-cgi/access/logout?redirectUrl=https://kensgames.com/" class="${classes.logout}" style="text-decoration:none;display:inline-flex;align-items:center">LOG OUT</a>
+    <a href="https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/" class="${classes.logout}" style="text-decoration:none;display:inline-flex;align-items:center">LOG OUT</a>
   `;
 
   // Best-effort: unify Access login with the site's own JWT token.

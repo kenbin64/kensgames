@@ -188,8 +188,7 @@
     sessionStorage.removeItem('kg_guest_token');
     sessionStorage.removeItem('kg_guest_name');
     sessionStorage.removeItem('kg_guest_avatar');
-    var dest = encodeURIComponent(redirect || '/login/');
-    window.location.href = '/cdn-cgi/access/logout?redirect=' + dest;
+    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
   }
 
   // Expose avatar map for pages that need it

@@ -789,7 +789,7 @@ const AuthUI = {
             this.onLogoutSuccess();
         }
 
-        window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?redirectUrl=https://kensgames.com/';
+        window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
     },
 
     // ============================================================

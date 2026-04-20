@@ -150,7 +150,7 @@
       localStorage.removeItem('kg_displayName');
       sessionStorage.removeItem('kg_music_override');
       const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      window.location.href = isLocal ? '/login/' : '/cdn-cgi/access/logout';
+      window.location.href = isLocal ? '/login/' : 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
     },
   };
 

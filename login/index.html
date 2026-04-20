@@ -214,7 +214,7 @@
           btn.onmouseout = () => (btn.style.backgroundColor = "#f6821f");
 
           if (isLoggedIn()) {
-            btn.href = `${TEAM_DOMAIN}/cdn-cgi/access/logout?redirect_url=${encodeURIComponent(window.location.origin)}`;
+            btn.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
             btn.textContent = "Log Out";
           } else {
             // After CF login, return to this login page so the bridge can exchange for kg_token,

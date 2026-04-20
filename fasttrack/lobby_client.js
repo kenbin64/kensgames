@@ -652,7 +652,7 @@ function handleRegister(event) {
 function logout() {
     send({ type: 'logout' });
     closeModal('profile-modal');
-    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?redirectUrl=https://kensgames.com/';
+    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
 }
 
 function showPrivateGameJoin() {
