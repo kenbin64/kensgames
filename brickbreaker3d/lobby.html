@@ -329,7 +329,7 @@
             btn.onmouseover = function () { btn.style.backgroundColor = "#e5741a"; };
             btn.onmouseout = function () { btn.style.backgroundColor = "#f6821f"; };
             if (isLoggedIn()) {
-              btn.href = APP_DOMAIN + "/cdn-cgi/access/logout?redirect_url=" + encodeURIComponent(APP_DOMAIN);
+              btn.href = "https://kensgames.com/cdn-cgi/access/logout?returnTo=/kensgames.com/lobby";
               btn.textContent = "Log Out";
             } else {
               btn.href = TEAM_DOMAIN + "/cdn-cgi/access/login?" + new URLSearchParams({ kid: APP_AUD, redirect_url: APP_DOMAIN + "/lobby" });
