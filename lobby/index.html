@@ -516,6 +516,286 @@
       border-color: var(--cyan)
     }
 
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 20px 22px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      padding: 6px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all .2s;
+    }
+
+    .filter-chip:hover,
+    .filter-chip.active {
+      background: rgba(0, 255, 255, 0.12);
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.25);
+    }
+
+    /* ── Continue Playing Strip ── */
+    #continue-section {
+      display: none;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 8px 40px 24px;
+    }
+
+    #continue-section h3 {
+      font-size: 12px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .continue-chips {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .continue-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px 10px 12px;
+      background: var(--card);
+      border: 1px solid rgba(0, 255, 255, 0.18);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+      text-decoration: none;
+    }
+
+    .continue-chip:hover {
+      border-color: var(--cyan);
+      box-shadow: var(--gcyan);
+      transform: translateY(-2px);
+    }
+
+    .continue-chip .cc-icon {
+      font-size: 22px;
+    }
+
+    .continue-chip .cc-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .continue-chip .cc-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .continue-chip .cc-meta {
+      font-size: 10px;
+      color: var(--green);
+      letter-spacing: 1px;
+    }
+
+    /* ── Live Count Pill ── */
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--green);
+      background: rgba(0, 255, 65, 0.08);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 10px;
+      padding: 2px 8px;
+      margin-top: 6px;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    /* ── Daily Pick Banner ── */
+    .daily-pick-banner {
+      max-width: 1400px;
+      margin: 0 auto 8px;
+      padding: 0 40px;
+    }
+
+    .daily-pick-inner {
+      border: 1px solid rgba(255, 232, 0, 0.3);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(255, 232, 0, 0.04), rgba(255, 100, 0, 0.04));
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .daily-pick-inner:hover {
+      border-color: var(--yellow);
+      box-shadow: var(--gyellow);
+    }
+
+    .daily-pick-icon {
+      font-size: 28px;
+      flex: 0 0 auto;
+    }
+
+    .daily-pick-info {
+      flex: 1;
+    }
+
+    .daily-pick-label {
+      font-size: 10px;
+      color: var(--yellow);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .daily-pick-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .daily-pick-desc {
+      font-size: 12px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .daily-pick-cta {
+      padding: 8px 20px;
+      border: 2px solid rgba(255, 232, 0, 0.5);
+      border-radius: 6px;
+      background: rgba(255, 232, 0, 0.08);
+      color: var(--yellow);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+      flex: 0 0 auto;
+    }
+
+    .daily-pick-cta:hover {
+      background: rgba(255, 232, 0, 0.2);
+      box-shadow: var(--gyellow);
+    }
+
+    /* ── Mode buttons ── */
+    .btn-bots {
+      padding: 7px 14px;
+      border: 2px solid rgba(255, 165, 0, 0.4);
+      border-radius: 5px;
+      background: rgba(255, 140, 0, 0.08);
+      color: #ffaa33;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all .2s;
+      letter-spacing: .5px;
+    }
+
+    .btn-bots:hover {
+      background: rgba(255, 140, 0, 0.2);
+      border-color: #ffaa33;
+      box-shadow: 0 0 10px rgba(255, 140, 0, 0.3);
+    }
+
+    .btn-mp {
+      padding: 7px 14px;
+      border: 2px solid rgba(0, 255, 255, 0.35);
+      border-radius: 5px;
+      background: rgba(0, 255, 255, 0.07);
+      color: var(--cyan);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all .2s;
+      letter-spacing: .5px;
+    }
+
+    .btn-mp:hover {
+      background: rgba(0, 255, 255, 0.18);
+      border-color: var(--cyan);
+      box-shadow: var(--gcyan);
+    }
+
+    /* ── Share button ── */
+    .btn-share {
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 0, 255, 0.3);
+      border-radius: 4px;
+      background: rgba(255, 0, 255, 0.06);
+      color: var(--pink);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all .2s;
+    }
+
+    .btn-share:hover {
+      background: rgba(255, 0, 255, 0.15);
+      border-color: var(--pink);
+    }
+
+    /* ── Featured badge ── */
+    .badge-pick {
+      background: linear-gradient(135deg, var(--yellow), var(--orange));
+      color: #000;
+      font-size: 9px;
+      font-weight: 900;
+      border-radius: 3px;
+      padding: 2px 6px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Play count ── */
+    .game-play-count {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+
+    .game-play-count span {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
     /* ── Join Code Section ── */
     .join-section {
       max-width: 600px;
@@ -778,12 +1058,16 @@
     <p>Your arcade command center. Pick a game, join a lobby, invite friends, or jump in with AI opponents.</p>
     <div class="stats-bar">
       <div class="stat-item">
-        <div class="stat-val">3</div>
+        <div class="stat-val">5</div>
         <div class="stat-label">Games</div>
       </div>
       <div class="stat-item">
         <div class="stat-val">♾</div>
         <div class="stat-label">Free to Play</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="online-count">—</div>
+        <div class="stat-label">Online Now</div>
       </div>
     </div>
   </div>
@@ -793,6 +1077,25 @@
     <button class="qa-btn" onclick="quickPlay()">&#9654; Quick Play</button>
     <button class="qa-btn pink" onclick="scrollTo('#join')">&#128273; Join with Code</button>
     <button class="qa-btn gold" onclick="changeAvatar()">&#127912; Change Avatar</button>
+  </div>
+
+  <!-- Continue Playing -->
+  <div id="continue-section">
+    <h3>&#9654;&#65039; Continue Playing</h3>
+    <div class="continue-chips" id="continue-chips"></div>
+  </div>
+
+  <!-- Daily Pick -->
+  <div class="daily-pick-banner" id="daily-pick-banner"></div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-chip active" onclick="filterGames('all', this)">All Games</button>
+    <button class="filter-chip" onclick="filterGames('multiplayer', this)">Multiplayer</button>
+    <button class="filter-chip" onclick="filterGames('solo', this)">Solo</button>
+    <button class="filter-chip" onclick="filterGames('strategy', this)">Strategy</button>
+    <button class="filter-chip" onclick="filterGames('3d', this)">3D</button>
+    <button class="filter-chip" onclick="filterGames('arcade', this)">Arcade</button>
   </div>
 
   <!-- Featured Games -->
@@ -845,10 +1148,11 @@
         emoji: '&#9646;&#9646;&#9646;&#9644;&#9645;&#9646;&#9646;&#9646;',
         bg: 'linear-gradient(135deg,#1a2d0a,#0a1a05)',
         icon: '&#x1F3CE;&#xFE0F;',
-        tags: ['2-4 Players', 'Strategy', 'Board Game'],
+        tags: ['Strategy', 'Board Game', 'vs Bots', 'Multiplayer'],
         desc: 'Lightning-fast multiplayer board game. Race pieces across a dynamic board, block opponents, play your hand. Features 5-Card Draw variant.',
         multiplayer: true,
-        url: '/fasttrack/',
+        hasBots: true,
+        url: '/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium',
         lobbyUrl: '/fasttrack/lobby.html',
         thumb: '/assets/images/fasttrack_lobby.png',
       },
@@ -858,9 +1162,10 @@
         emoji: '&#9632;&#9633;&#9632;&#9633;&#9632;&#9633;&#9632;&#9633;',
         bg: 'linear-gradient(135deg,#0f1220,#070a12)',
         icon: '&#x1F9F0;',
-        tags: ['Creative', 'Builder', 'Sandbox'],
+        tags: ['Creative', 'Builder', 'Sandbox', 'Solo'],
         desc: 'Build anything from parts. A creative sandbox for assembling components into machines, circuits, and art.',
         multiplayer: false,
+        hasBots: false,
         url: '/assemble/',
         lobbyUrl: '',
         thumb: '/assets/images/assembler_lobby.png',
@@ -871,11 +1176,12 @@
         emoji: '&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;',
         bg: 'linear-gradient(135deg,#1a0a2d,#0a0518)',
         icon: '&#x1F9F1;',
-        tags: ['Solo', 'Multiplayer', 'Arcade'],
+        tags: ['Arcade', 'Solo', 'Multiplayer'],
         desc: 'Classic breakout reimagined in full 3D. Walls of bricks stretch into depth, ball curves through space. Power-ups warp physics.',
         multiplayer: true,
-        url: '/brickbreaker3d/',
-        lobbyUrl: '/brickbreaker3d/',
+        hasBots: false,
+        url: '/brickbreaker3d/game.html',
+        lobbyUrl: '/brickbreaker3d/lobby.html',
         thumb: '/assets/images/brickbreaker3D_lobby.png',
       },
       {
@@ -884,9 +1190,10 @@
         emoji: '&#9650;&#9660;&#9650;&#9660;&#9650;&#9660;&#9650;&#9660;',
         bg: 'linear-gradient(135deg,#0a1a2d,#020814)',
         icon: '&#x1F680;',
-        tags: ['First Person', 'Space Combat', '3D'],
+        tags: ['First Person', '3D', 'vs Bots', 'Multiplayer'],
         desc: 'First-person deep-space combat in real-time 3D. Waves of alien formations with tactical AI. Dodge, strafe, and blast your way to the top.',
         multiplayer: true,
+        hasBots: true,
         url: '/starfighter/',
         lobbyUrl: '/starfighter/lobby.html',
         thumb: '/assets/images/starfighter_landing.png',
@@ -897,11 +1204,12 @@
         emoji: '&#10060;&#11093;&#10060;&#11093;&#10060;&#11093;&#10060;&#11093;',
         bg: 'linear-gradient(135deg,#0d0a2d,#14081a)',
         icon: '&#x1F9CA;',
-        tags: ['1-4 Players', 'Strategy', '3D / 4D'],
+        tags: ['Strategy', '3D / 4D', 'vs Bots', 'Multiplayer'],
         desc: 'Multi-dimensional TicTacToe across 3D and 4D hypercubes. CSS 3D rendered boards you can rotate. Win across any axis — including the 4th dimension.',
         multiplayer: true,
+        hasBots: true,
         url: '/4DTicTacToe/',
-        lobbyUrl: '/4DTicTacToe/',
+        lobbyUrl: '/4DTicTacToe/lobby.html',
         thumb: '/assets/images/logo/logo_thumbnail.png',
       }
     ];
@@ -920,9 +1228,13 @@
     function init() {
       KGPlayerProfile.ensure(true, () => {
         updateUserPill();
-        renderGames();
+        renderGames('all');
         renderLeaderboard();
+        renderContinuePlaying();
+        renderDailyPick();
         updateStats();
+        fetchLiveStats();
+        setInterval(fetchLiveStats, 30000);
 
         if (window.KGImgAtlas && typeof window.KGImgAtlas.apply === 'function') {
           window.KGImgAtlas.apply(document);
@@ -943,29 +1255,49 @@
     // ═══════════════════════════════════════════════════════════
     // RENDER GAMES
     // ═══════════════════════════════════════════════════════════
-    function renderGames() {
+    function renderGames(filterTag) {
       const grid = document.getElementById('games-grid');
-      grid.innerHTML = GAMES.map(g => {
-        const s = liveStats[g.id];
+      const dailyId = getDailyFeaturedId();
+      const tag = (filterTag || 'all').toLowerCase();
+
+      const filtered = GAMES.filter(g => {
+        if (tag === 'all') return true;
+        if (tag === 'multiplayer') return g.multiplayer;
+        if (tag === 'solo') return !g.multiplayer || g.tags.some(t => /solo/i.test(t));
+        return g.tags.some(t => t.toLowerCase().includes(tag));
+      });
+
+      grid.innerHTML = filtered.map(g => {
+        const isDaily = g.id === dailyId;
+        const playCount = getPlayCount(g.id);
+        const playerCount = (liveStats[g.id] && liveStats[g.id].players) ? liveStats[g.id].players : null;
         const thumb = g.thumb || '';
         const thumbImg = thumb
           ? `<img class="game-thumb-img" data-imgatlas="auto" data-pngsrc="${thumb}" src="${thumb}" alt="${g.title}">`
           : '';
         return `
-        <div class="game-card" onclick="goToGame('${g.url}')">
+        <div class="game-card" data-tags="${g.tags.join(',').toLowerCase()}" data-mp="${g.multiplayer}" onclick="goToGame('${g.url}')">
           <div class="game-thumb" style="background:${g.bg}">
             ${thumbImg}
-            <span class="game-badge badge-live">&#9679; LIVE</span>
+            ${isDaily ? '<span class="game-badge badge-pick" style="top:8px;right:8px">&#9733; TODAY</span>' : '<span class="game-badge badge-live">&#9679; LIVE</span>'}
             ${g.multiplayer ? '<span class="game-badge badge-mp" style="top:12px;right:auto;left:12px">MP</span>' : ''}
           </div>
           <div class="game-body">
             <div class="game-name">${g.title}</div>
             <div class="game-tags">${g.tags.map(t => '<span class="game-tag">' + t + '</span>').join('')}</div>
+            ${playerCount ? `<div class="live-pill"><span class="live-dot"></span>${playerCount} playing now</div>` : ''}
             <div class="game-desc">${g.desc}</div>
+            ${playCount > 0 ? `<div class="game-play-count">You've played <span>${playCount}</span> time${playCount !== 1 ? 's' : ''}</div>` : ''}
             <div class="game-actions" onclick="event.stopPropagation()">
-              <button class="btn-play" onclick="goToGame('${g.url}')">&#9654; PLAY</button>
-              ${g.lobbyUrl ? '<button class="btn-lobby" onclick="goToGame(\'' + g.lobbyUrl + '\')">GAME LOBBY</button>' : ''}
-              ${g.multiplayer ? '<button class="btn-lobby" onclick="createRoom(\'' + g.id + '\')">CREATE ROOM</button>' : ''}
+              ${g.hasBots
+                ? '<button class="btn-bots" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.url + '\')">&#x1F916; VS BOTS</button>'
+                : '<button class="btn-play" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.url + '\')">&#9654; SOLO</button>'
+              }
+              ${g.multiplayer && g.lobbyUrl
+                ? '<button class="btn-mp" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.lobbyUrl + '\')">&#128101; MULTIPLAYER</button>'
+                : ''
+              }
+              <button class="btn-share" onclick="shareGame('${g.id}', '${g.title}', '${g.url}')">&#128279; Share</button>
             </div>
           </div>
         </div>`;
@@ -1092,7 +1424,171 @@
     }
 
     function updateStats() {
-      // Stats will be driven by real analytics when available
+      // Stats driven by real analytics — see fetchLiveStats()
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PLAY TRACKING (localStorage)
+    // ═══════════════════════════════════════════════════════════
+    const HISTORY_KEY = 'kg_play_history';   // {gameId: {count, last, title, url, icon}}
+    const MAX_RECENT = 4;
+
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}'); } catch { return {}; }
+    }
+
+    function trackPlay(gameId) {
+      const game = GAMES.find(g => g.id === gameId);
+      if (!game) return;
+      const h = getHistory();
+      const entry = h[gameId] || { count: 0 };
+      entry.count = (entry.count || 0) + 1;
+      entry.last = Date.now();
+      entry.title = game.title;
+      entry.url = game.lobbyUrl || game.url;
+      entry.icon = game.icon;
+      h[gameId] = entry;
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    }
+
+    function getPlayCount(gameId) {
+      const h = getHistory();
+      return (h[gameId] && h[gameId].count) || 0;
+    }
+
+    function trackAndPlay(gameId, url) {
+      trackPlay(gameId);
+      goToGame(url);
+    }
+
+    function renderContinuePlaying() {
+      const h = getHistory();
+      const recent = Object.values(h)
+        .filter(e => e.last)
+        .sort((a, b) => b.last - a.last)
+        .slice(0, MAX_RECENT);
+
+      const section = document.getElementById('continue-section');
+      if (!recent.length) { section.style.display = 'none'; return; }
+
+      section.style.display = 'block';
+      const chips = document.getElementById('continue-chips');
+      chips.innerHTML = recent.map(e => {
+        const ago = timeAgo(e.last);
+        return `<a class="continue-chip" href="${e.url}" onclick="event.preventDefault();trackAndPlay('${Object.keys(h).find(k => h[k].title === e.title)}', '${e.url}')">
+          <span class="cc-icon">${e.icon || '🎮'}</span>
+          <span class="cc-info">
+            <span class="cc-name">${e.title}</span>
+            <span class="cc-meta">RESUME &bull; ${ago}</span>
+          </span>
+        </a>`;
+      }).join('');
+    }
+
+    function timeAgo(ts) {
+      const diff = Date.now() - ts;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+      return Math.floor(diff / 86400000) + 'd ago';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FILTER GAMES
+    // ═══════════════════════════════════════════════════════════
+    let activeFilter = 'all';
+
+    function filterGames(tag, btn) {
+      activeFilter = tag;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderGames(tag);
+      if (window.KGImgAtlas && typeof window.KGImgAtlas.apply === 'function') {
+        window.KGImgAtlas.apply(document.getElementById('games-grid'));
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DAILY PICK
+    // ═══════════════════════════════════════════════════════════
+    function getDailyFeaturedId() {
+      const day = Math.floor(Date.now() / 86400000);
+      return GAMES[day % GAMES.length].id;
+    }
+
+    function renderDailyPick() {
+      const id = getDailyFeaturedId();
+      const game = GAMES.find(g => g.id === id);
+      if (!game) return;
+      const banner = document.getElementById('daily-pick-banner');
+      banner.innerHTML = `<div class="daily-pick-inner" onclick="trackAndPlay('${game.id}', '${game.lobbyUrl || game.url}')">
+        <span class="daily-pick-icon">${game.icon}</span>
+        <div class="daily-pick-info">
+          <div class="daily-pick-label">&#9733; Today's Featured Game</div>
+          <div class="daily-pick-title">${game.title}</div>
+          <div class="daily-pick-desc">${game.desc.split('.')[0]}.</div>
+        </div>
+        <button class="daily-pick-cta">PLAY NOW</button>
+      </div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // LIVE STATS POLLING
+    // ═══════════════════════════════════════════════════════════
+    function fetchLiveStats() {
+      fetch('/api/stats/live', { headers: { 'Accept': 'application/json' } })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          let total = 0;
+          GAMES.forEach(g => {
+            if (data[g.id]) {
+              liveStats[g.id] = data[g.id];
+              total += (data[g.id].players || 0);
+            }
+          });
+          if (total > 0) {
+            const el = document.getElementById('online-count');
+            if (el) el.textContent = total;
+          }
+          // Re-render game cards with live counts (preserve current filter)
+          renderGames(activeFilter);
+          if (window.KGImgAtlas && typeof window.KGImgAtlas.apply === 'function') {
+            window.KGImgAtlas.apply(document.getElementById('games-grid'));
+          }
+        })
+        .catch(() => { /* fail silently — API may not exist yet */ });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // SHARE
+    // ═══════════════════════════════════════════════════════════
+    function shareGame(gameId, title, url) {
+      const shareUrl = window.location.origin + url;
+      const text = `Play ${title} on KensGames — free, no ads, no login required!`;
+      if (navigator.share) {
+        navigator.share({ title, text, url: shareUrl }).catch(() => { });
+      } else {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast('Link copied! 📋');
+        }).catch(() => {
+          prompt('Copy this link:', shareUrl);
+        });
+      }
+    }
+
+    function showToast(msg) {
+      let t = document.getElementById('kg-toast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'kg-toast';
+        t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid var(--cyan);color:#fff;padding:10px 22px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:var(--gcyan);transition:opacity .3s;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2500);
     }
 
     function logout() {
