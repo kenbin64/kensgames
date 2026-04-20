@@ -1223,7 +1223,7 @@ function createBilliardRoom() {
   const WAINSCOT_TOP = 130;  // must match WAINSCOT_H below
   const brickH = ROOM_HEIGHT - WAINSCOT_TOP;  // height of brick section
   const brickTexLoader = new THREE.TextureLoader();
-  const brickTex = brickTexLoader.load('/assets/masterImageFile/Brick texture.png');
+  const brickTex = brickTexLoader.load('/assets/masterImageFile/Brick texture.webp');
   brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping;
   brickTex.colorSpace = THREE.SRGBColorSpace;
 
@@ -1679,7 +1679,7 @@ function createBilliardRoom() {
   // ── NEON SIGN IMAGE — right wall, between the two paintings ────
   {
     const neonImgLoader = new THREE.TextureLoader();
-    const neonImgTex = neonImgLoader.load('/assets/masterImageFile/fastTrack_neon.png');
+    const neonImgTex = neonImgLoader.load('/assets/masterImageFile/fastTrack_neon.webp');
     neonImgTex.colorSpace = THREE.SRGBColorSpace;
 
     // Sign dimensions — fits the ~300 unit gap comfortably
