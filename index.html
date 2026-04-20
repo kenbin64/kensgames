@@ -64,6 +64,28 @@
             pointer-events: none;
         }
 
+        /* ── Manifold corner widget ── */
+        #manifold-corner {
+            position: fixed;
+            top: 76px;
+            left: 12px;
+            width: 230px;
+            height: 230px;
+            z-index: 50;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.28);
+            box-shadow:
+                0 0 18px rgba(0, 255, 255, 0.18),
+                0 0 40px rgba(153, 0, 255, 0.10),
+                inset 0 0 12px rgba(0, 255, 255, 0.04);
+            pointer-events: none;
+            image-rendering: auto;
+        }
+
+        @media (max-width: 860px) {
+            #manifold-corner { display: none; }
+        }
+
         /* ── Tron grid overlay ── */
         #tron-grid {
             position: fixed;
@@ -1624,6 +1646,7 @@
 
 <body data-mtheme="gold">
     <canvas id="gyroid-bg"></canvas>
+    <canvas id="manifold-corner" aria-hidden="true"></canvas>
     <div id="tron-grid"></div>
     <div id="scanlines"></div>
     <div class="arcade-symbols" id="arcade-symbols"></div>
@@ -2300,6 +2323,7 @@
     </footer>
 
     <script src="/js/manifold.js?v=7"></script>
+    <script src="/js/manifold_corner.js" defer></script>
     <script src="/js/manifold_reality.js" defer></script>
     <script src="/js/manifold_panels.js" defer></script>
     <script src="/js/substrates/avatar_picker.js"></script>
