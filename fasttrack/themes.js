@@ -928,12 +928,12 @@ FastTrackThemes.register('billiard', {
     _paintingFrames: [],
 
     paintings: [
-        'assets/images/art/bridge.png',
-        'assets/images/art/chess.png',
-        'assets/images/art/DrivingTheHerd.png',
-        'assets/images/art/pigs.png',
-        'assets/images/art/lighthouse.png',
-        'assets/images/art/parot.png'
+        '/assets/masterImageFile/bridge.png',
+        '/assets/masterImageFile/chess.png',
+        '/assets/masterImageFile/DrivingTheHerd.png',
+        '/assets/masterImageFile/pigs.png',
+        '/assets/masterImageFile/lighthouse.png',
+        '/assets/masterImageFile/parrot.png'
     ],
 
     // Store chandelier meshes for hide/show during gameplay

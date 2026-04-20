@@ -7,7 +7,7 @@
   <title>Game Portal &mdash; KensGames</title>
   <meta name="description"
     content="KensGames Game Portal &mdash; browse games, join lobbies, create matches, invite friends, and compete on leaderboards.">
-  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="icon" href="/assets/masterImageFile/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <script src="/js/imgatlas.js?v=20260418" defer></script>
   <style>
@@ -472,48 +472,9 @@
       letter-spacing: 1px
     }
 
-    .game-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap
-    }
-
-    .btn-play {
-      padding: 8px 20px;
-      border: 2px solid var(--green);
-      border-radius: 4px;
-      background: rgba(0, 255, 65, 0.1);
-      color: var(--green);
-      font-weight: 700;
-      font-size: 13px;
+    /* card cursor indicator */
+    .game-card {
       cursor: pointer;
-      transition: all .2s;
-      text-transform: uppercase;
-      letter-spacing: 1px
-    }
-
-    .btn-play:hover {
-      background: var(--green);
-      color: var(--bg);
-      box-shadow: var(--ggreen)
-    }
-
-    .btn-lobby {
-      padding: 8px 16px;
-      border: 2px solid rgba(0, 255, 255, 0.3);
-      border-radius: 4px;
-      background: rgba(0, 255, 255, 0.06);
-      color: var(--cyan);
-      font-weight: 600;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all .2s;
-      letter-spacing: 1px
-    }
-
-    .btn-lobby:hover {
-      background: rgba(0, 255, 255, 0.2);
-      border-color: var(--cyan)
     }
 
     /* ── Filter Bar ── */
@@ -716,61 +677,197 @@
       box-shadow: var(--gyellow);
     }
 
-    /* ── Mode buttons ── */
-    .btn-bots {
-      padding: 7px 14px;
-      border: 2px solid rgba(255, 165, 0, 0.4);
-      border-radius: 5px;
-      background: rgba(255, 140, 0, 0.08);
-      color: #ffaa33;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 700;
-      transition: all .2s;
-      letter-spacing: .5px;
+    /* ── Game Modal ── */
+    #game-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(6px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
 
-    .btn-bots:hover {
-      background: rgba(255, 140, 0, 0.2);
-      border-color: #ffaa33;
-      box-shadow: 0 0 10px rgba(255, 140, 0, 0.3);
+    #game-modal-overlay.open {
+      display: flex;
     }
 
-    .btn-mp {
-      padding: 7px 14px;
-      border: 2px solid rgba(0, 255, 255, 0.35);
-      border-radius: 5px;
-      background: rgba(0, 255, 255, 0.07);
+    .game-modal {
+      background: var(--card);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 12px;
+      max-width: 480px;
+      width: 100%;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.6);
+      animation: modal-in .2s ease;
+    }
+
+    @keyframes modal-in {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .gm-thumb {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .gm-thumb-bg {
+      width: 100%;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+    }
+
+    .gm-body {
+      padding: 24px;
+    }
+
+    .gm-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .gm-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .gm-tag {
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      background: rgba(0, 255, 255, 0.08);
+      border: 1px solid rgba(0, 255, 255, 0.18);
       color: var(--cyan);
-      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .gm-desc {
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .gm-meta {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+
+    .gm-meta-item {
+      text-align: center;
+    }
+
+    .gm-meta-val {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--yellow);
+      text-shadow: var(--gyellow);
+    }
+
+    .gm-meta-label {
+      font-size: 10px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .gm-live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       font-size: 12px;
-      font-weight: 700;
+      color: var(--green);
+      background: rgba(0, 255, 65, 0.08);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 10px;
+      padding: 4px 12px;
+      margin-bottom: 22px;
+    }
+
+    .gm-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-enter-lobby {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid var(--cyan);
+      border-radius: 6px;
+      background: rgba(0, 255, 255, 0.1);
+      color: var(--cyan);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
       transition: all .2s;
-      letter-spacing: .5px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
-    .btn-mp:hover {
-      background: rgba(0, 255, 255, 0.18);
-      border-color: var(--cyan);
+    .btn-enter-lobby:hover {
+      background: rgba(0, 255, 255, 0.22);
       box-shadow: var(--gcyan);
+      transform: translateY(-1px);
     }
 
-    /* ── Share button ── */
-    .btn-share {
-      padding: 6px 12px;
+    .btn-modal-share {
+      padding: 12px 16px;
       border: 1px solid rgba(255, 0, 255, 0.3);
-      border-radius: 4px;
+      border-radius: 6px;
       background: rgba(255, 0, 255, 0.06);
       color: var(--pink);
+      font-size: 14px;
       cursor: pointer;
-      font-size: 11px;
-      font-weight: 700;
       transition: all .2s;
     }
 
-    .btn-share:hover {
+    .btn-modal-share:hover {
       background: rgba(255, 0, 255, 0.15);
       border-color: var(--pink);
+    }
+
+    .gm-close {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+      transition: color .15s;
+    }
+
+    .gm-close:hover {
+      color: #fff;
+    }
+
+    .game-modal {
+      position: relative;
     }
 
     /* ── Featured badge ── */
@@ -1033,8 +1130,8 @@
 
   <header>
     <nav>
-      <a href="/" class="logo"><img class="logo-img" data-imgatlas="auto" data-pngsrc="/assets/images/logo/icon.png"
-          src="/assets/images/logo/icon.png" alt="KensGames" />KEN<span>S</span>GAMES</a>
+      <a href="/" class="logo"><img class="logo-img" data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/icon.png"
+          src="/assets/masterImageFile/icon.png" alt="KensGames" />KEN<span>S</span>GAMES</a>
       <ul class="nav-links">
         <li><a href="#games">Games</a></li>
         <li><a href="#join">Join Code</a></li>
@@ -1150,11 +1247,12 @@
         icon: '&#x1F3CE;&#xFE0F;',
         tags: ['Strategy', 'Board Game', 'vs Bots', 'Multiplayer'],
         desc: 'Lightning-fast multiplayer board game. Race pieces across a dynamic board, block opponents, play your hand. Features 5-Card Draw variant.',
+        players: '2 – 4',
         multiplayer: true,
         hasBots: true,
         url: '/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium',
         lobbyUrl: '/fasttrack/lobby.html',
-        thumb: '/assets/images/fasttrack_lobby.png',
+        thumb: '/assets/masterImageFile/fasttrack_lobby.png',
       },
       {
         id: 'assemble',
@@ -1164,11 +1262,12 @@
         icon: '&#x1F9F0;',
         tags: ['Creative', 'Builder', 'Sandbox', 'Solo'],
         desc: 'Build anything from parts. A creative sandbox for assembling components into machines, circuits, and art.',
+        players: '1',
         multiplayer: false,
         hasBots: false,
         url: '/assemble/',
         lobbyUrl: '',
-        thumb: '/assets/images/assembler_lobby.png',
+        thumb: '/assets/masterImageFile/assembler_lobby.png',
       },
       {
         id: 'brickbreaker3d',
@@ -1178,11 +1277,12 @@
         icon: '&#x1F9F1;',
         tags: ['Arcade', 'Solo', 'Multiplayer'],
         desc: 'Classic breakout reimagined in full 3D. Walls of bricks stretch into depth, ball curves through space. Power-ups warp physics.',
+        players: '1 – 4',
         multiplayer: true,
         hasBots: false,
         url: '/brickbreaker3d/game.html',
         lobbyUrl: '/brickbreaker3d/lobby.html',
-        thumb: '/assets/images/brickbreaker3D_lobby.png',
+        thumb: '/assets/masterImageFile/brickbreaker3D_lobby.png',
       },
       {
         id: 'starfighter',
@@ -1192,11 +1292,12 @@
         icon: '&#x1F680;',
         tags: ['First Person', '3D', 'vs Bots', 'Multiplayer'],
         desc: 'First-person deep-space combat in real-time 3D. Waves of alien formations with tactical AI. Dodge, strafe, and blast your way to the top.',
+        players: '1 – 4',
         multiplayer: true,
         hasBots: true,
         url: '/starfighter/',
         lobbyUrl: '/starfighter/lobby.html',
-        thumb: '/assets/images/starfighter_landing.png',
+        thumb: '/assets/masterImageFile/starfighter_landing.png',
       },
       {
         id: 'tictactoe',
@@ -1206,11 +1307,12 @@
         icon: '&#x1F9CA;',
         tags: ['Strategy', '3D / 4D', 'vs Bots', 'Multiplayer'],
         desc: 'Multi-dimensional TicTacToe across 3D and 4D hypercubes. CSS 3D rendered boards you can rotate. Win across any axis — including the 4th dimension.',
+        players: '1 – 4',
         multiplayer: true,
         hasBots: true,
         url: '/4DTicTacToe/',
         lobbyUrl: '/4DTicTacToe/lobby.html',
-        thumb: '/assets/images/logo/logo_thumbnail.png',
+        thumb: '/assets/masterImageFile/manifold.png',
       }
     ];
 
@@ -1276,7 +1378,7 @@
           ? `<img class="game-thumb-img" data-imgatlas="auto" data-pngsrc="${thumb}" src="${thumb}" alt="${g.title}">`
           : '';
         return `
-        <div class="game-card" data-tags="${g.tags.join(',').toLowerCase()}" data-mp="${g.multiplayer}" onclick="goToGame('${g.url}')">
+        <div class="game-card" data-tags="${g.tags.join(',').toLowerCase()}" data-mp="${g.multiplayer}" onclick="openGameModal('${g.id}')">
           <div class="game-thumb" style="background:${g.bg}">
             ${thumbImg}
             ${isDaily ? '<span class="game-badge badge-pick" style="top:8px;right:8px">&#9733; TODAY</span>' : '<span class="game-badge badge-live">&#9679; LIVE</span>'}
@@ -1286,19 +1388,6 @@
             <div class="game-name">${g.title}</div>
             <div class="game-tags">${g.tags.map(t => '<span class="game-tag">' + t + '</span>').join('')}</div>
             ${playerCount ? `<div class="live-pill"><span class="live-dot"></span>${playerCount} playing now</div>` : ''}
-            <div class="game-desc">${g.desc}</div>
-            ${playCount > 0 ? `<div class="game-play-count">You've played <span>${playCount}</span> time${playCount !== 1 ? 's' : ''}</div>` : ''}
-            <div class="game-actions" onclick="event.stopPropagation()">
-              ${g.hasBots
-                ? '<button class="btn-bots" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.url + '\')">&#x1F916; VS BOTS</button>'
-                : '<button class="btn-play" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.url + '\')">&#9654; SOLO</button>'
-              }
-              ${g.multiplayer && g.lobbyUrl
-                ? '<button class="btn-mp" onclick="trackAndPlay(\'' + g.id + '\', \'' + g.lobbyUrl + '\')">&#128101; MULTIPLAYER</button>'
-                : ''
-              }
-              <button class="btn-share" onclick="shareGame('${g.id}', '${g.title}', '${g.url}')">&#128279; Share</button>
-            </div>
           </div>
         </div>`;
       }).join('');
@@ -1601,7 +1690,119 @@
       window.location.href = '/cdn-cgi/access/logout?redirect=' + encodeURIComponent('/login/');
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // GAME MODAL
+    // ═══════════════════════════════════════════════════════════
+    function openGameModal(gameId) {
+      const g = GAMES.find(x => x.id === gameId);
+      if (!g) return;
+
+      const dest = g.lobbyUrl || g.url;
+      const thumb = g.thumb || '';
+      const liveCount = window._liveStats && window._liveStats[gameId];
+      const playCount = JSON.parse(localStorage.getItem('kg_plays') || '{}')[gameId] || 0;
+
+      // Thumbnail or emoji fallback
+      const imgEl = document.getElementById('gm-thumb');
+      const bgEl = document.getElementById('gm-thumb-bg');
+      if (thumb) {
+        imgEl.src = thumb;
+        imgEl.alt = g.title;
+        imgEl.style.display = 'block';
+        bgEl.style.display = 'none';
+      } else {
+        imgEl.style.display = 'none';
+        bgEl.style.display = 'flex';
+        bgEl.innerHTML = g.icon || '🎮';
+      }
+
+      document.getElementById('gm-title').textContent = g.title;
+
+      // Tags
+      const tagsEl = document.getElementById('gm-tags');
+      tagsEl.innerHTML = g.tags.map(t => `<span class="gm-tag">${t}</span>`).join('');
+
+      // Description
+      document.getElementById('gm-desc').textContent = g.desc;
+
+      // Players
+      document.getElementById('gm-players-val').textContent = g.players || '—';
+
+      // Live count
+      const liveEl = document.getElementById('gm-live');
+      if (liveCount) {
+        liveEl.textContent = `⬤ ${liveCount} playing now`;
+        liveEl.style.display = 'inline-flex';
+      } else {
+        liveEl.style.display = 'none';
+      }
+
+      // Play count
+      const pcEl = document.getElementById('gm-playcount');
+      if (playCount > 0) {
+        pcEl.textContent = playCount;
+        pcEl.closest('.gm-meta-item').style.display = 'block';
+      } else {
+        pcEl.closest('.gm-meta-item').style.display = 'none';
+      }
+
+      // Enter lobby button
+      document.getElementById('gm-enter').onclick = () => {
+        trackPlay(gameId);
+        window.location.href = dest;
+      };
+
+      // Share button
+      document.getElementById('gm-share').onclick = () => shareGame(gameId, g.title, dest);
+
+      document.getElementById('game-modal-overlay').classList.add('open');
+    }
+
+    function closeGameModal() {
+      document.getElementById('game-modal-overlay').classList.remove('open');
+    }
+
+    // Close on backdrop click
+    document.getElementById('game-modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) closeGameModal();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeGameModal();
+    });
+
   </script>
+
+  <!-- Game Modal -->
+  <div id="game-modal-overlay">
+    <div class="game-modal">
+      <button class="gm-close" onclick="closeGameModal()" aria-label="Close">&#x2715;</button>
+      <img id="gm-thumb" class="gm-thumb" src="" alt="" style="display:none">
+      <div id="gm-thumb-bg" class="gm-thumb-bg" style="display:none"></div>
+      <div class="gm-body">
+        <div id="gm-title" class="gm-title"></div>
+        <div id="gm-tags" class="gm-tags"></div>
+        <p id="gm-desc" class="gm-desc"></p>
+        <div class="gm-meta">
+          <div class="gm-meta-item">
+            <div id="gm-players-val" class="gm-meta-val"></div>
+            <div class="gm-meta-label">Players</div>
+          </div>
+          <div class="gm-meta-item">
+            <div id="gm-playcount" class="gm-meta-val"></div>
+            <div class="gm-meta-label">Your Plays</div>
+          </div>
+        </div>
+        <div id="gm-live" class="gm-live-pill" style="display:none"></div>
+        <div class="gm-actions">
+          <button id="gm-enter" class="btn-enter-lobby">&#9654; Enter Lobby</button>
+          <button id="gm-share" class="btn-modal-share" title="Share">&#128279;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

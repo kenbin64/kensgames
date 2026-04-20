@@ -110,7 +110,7 @@ function ingestArt() {
       return resolve();
     }
     const dataUrl = typeof ART_DATA !== 'undefined' && ART_DATA[key];
-    const src = dataUrl || `assets/images/art/${key}`;
+    const src = dataUrl || `/assets/masterImageFile/${key}`;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -1223,7 +1223,7 @@ function createBilliardRoom() {
   const WAINSCOT_TOP = 130;  // must match WAINSCOT_H below
   const brickH = ROOM_HEIGHT - WAINSCOT_TOP;  // height of brick section
   const brickTexLoader = new THREE.TextureLoader();
-  const brickTex = brickTexLoader.load('assets/images/art/Brick texture.png');
+  const brickTex = brickTexLoader.load('/assets/masterImageFile/Brick texture.png');
   brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping;
   brickTex.colorSpace = THREE.SRGBColorSpace;
 
@@ -1679,7 +1679,7 @@ function createBilliardRoom() {
   // ── NEON SIGN IMAGE — right wall, between the two paintings ────
   {
     const neonImgLoader = new THREE.TextureLoader();
-    const neonImgTex = neonImgLoader.load('assets/images/art/fastTrack_neon.png');
+    const neonImgTex = neonImgLoader.load('/assets/masterImageFile/fastTrack_neon.png');
     neonImgTex.colorSpace = THREE.SRGBColorSpace;
 
     // Sign dimensions — fits the ~300 unit gap comfortably
@@ -2710,7 +2710,7 @@ function _showArtOverlay(art) {
 
   // Image source: manifold ART_DATA base64, else direct file path
   const dataUrl = (typeof ART_DATA !== 'undefined') && ART_DATA[art.file];
-  document.getElementById('ago-img').src = dataUrl || `assets/images/art/${art.file}`;
+  document.getElementById('ago-img').src = dataUrl || `/assets/masterImageFile/${art.file}`;
   document.getElementById('ago-title').textContent = art.title || art.file.replace('.png', '');
   document.getElementById('ago-details').textContent =
     `${art.artist || 'Unknown'}  ·  ${art.medium || ''}  ·  ${art.year || ''}`;

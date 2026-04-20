@@ -6,11 +6,11 @@
   <script>
     (function () {
       var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/starfighter/index.html'); return; }
+      if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/starfighter/lobby.html')); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/starfighter/index.html'); return; }
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/starfighter/lobby.html')); return; }
           if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
         }).catch(function () { });
     })();
@@ -18,7 +18,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alien Space Attack Lobby &mdash; KensGames</title>
-  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="icon" href="/assets/masterImageFile/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
@@ -315,7 +315,7 @@
   <div id="scanlines"></div>
   <nav class="arc-nav">
     <div class="arc-nav-inner">
-      <a href="/" class="arc-logo"><img src="/assets/images/logo/icon.png" alt="KensGames"
+      <a href="/" class="arc-logo"><img src="/assets/masterImageFile/icon.png" alt="KensGames"
           style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <ul class="arc-nav-links">
         <li><a href="/">&#8592; Portal</a></li>

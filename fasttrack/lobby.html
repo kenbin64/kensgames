@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Fast Track - Lobby</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="/assets/images/logo/icon.png">
-  <link rel="apple-touch-icon" href="/assets/images/logo/logo_thumbnail.png">
+  <link rel="icon" type="image/png" href="/assets/masterImageFile/icon.png">
+  <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
   <meta name="theme-color" content="#07040f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -35,52 +35,37 @@
     </div>
 
     <div class="auth-card card">
-      <div class="auth-tabs">
-        <button class="auth-tab active" onclick="showAuthTab('login')">Login</button>
-        <button class="auth-tab" onclick="showAuthTab('register')">Register</button>
-      </div>
-
-      <!-- Login Form -->
-      <form id="login-form" onsubmit="handleLogin(event)">
-        <div class="input-group">
-          <label>Username</label>
-          <input type="text" class="input" id="login-username" placeholder="Enter username" required>
-        </div>
-        <div class="input-group">
-          <label>Password</label>
-          <input type="password" class="input" id="login-password" placeholder="Enter password" required>
-        </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
-      </form>
-
-      <!-- Register Form -->
-      <form id="register-form" style="display: none;" onsubmit="handleRegister(event)">
-        <div class="input-group">
-          <label>Username</label>
-          <input type="text" class="input" id="register-username" placeholder="Choose username" required minlength="3">
-        </div>
-        <div class="input-group">
-          <label>Password</label>
-          <input type="password" class="input" id="register-password" placeholder="Choose password" required
-            minlength="4">
-        </div>
-        <div class="input-group">
-          <label>Email (optional)</label>
-          <input type="email" class="input" id="register-email" placeholder="your@email.com">
-        </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
-      </form>
-
+      <a class="btn btn-primary private-game-btn" id="cf-login-btn" href="#"
+        style="display:block;text-align:center;text-decoration:none;margin-bottom:8px;">
+        🔑 Sign In
+      </a>
+      <a class="btn btn-primary private-game-btn" id="cf-create-private-btn" href="#"
+        style="display:block;text-align:center;text-decoration:none;margin-bottom:8px;">
+        🔒 Create Private Game
+      </a>
+      <script>
+        (function () {
+          var TEAM = 'https://butterflyfx.cloudflareaccess.com';
+          var AUD = '551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95';
+          var loginBtn = document.getElementById('cf-login-btn');
+          var privateBtn = document.getElementById('cf-create-private-btn');
+          if (loginBtn) {
+            loginBtn.href = TEAM + '/cdn-cgi/access/login?' +
+              new URLSearchParams({ kid: AUD, redirect_url: window.location.origin + '/fasttrack/lobby.html' });
+          }
+          if (privateBtn) {
+            privateBtn.href = TEAM + '/cdn-cgi/access/login?' +
+              new URLSearchParams({ kid: AUD, redirect_url: window.location.origin + '/fasttrack/lobby.html?action=private' });
+          }
+        })();
+      </script>
       <div class="auth-divider"><span>or play without login</span></div>
-
       <button class="btn btn-secondary private-game-btn" onclick="showPrivateGameJoin()">
         🎟️ Join Private Game
       </button>
       <button class="btn btn-secondary private-game-btn" onclick="playOfflineWithAI()">
         🤖 Play Offline vs Bots
       </button>
-      <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 0.75rem; text-align: center;">🔒 Sign in to
-        create private games</p>
     </div>
   </div>
 
