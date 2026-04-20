@@ -72,6 +72,7 @@ async function ensureUserTokenFromAccess() {
         if (!data || !data.success || !data.token) return existing;
         try {
             localStorage.setItem('user_token', data.token);
+            localStorage.setItem('kg_token', data.token); // keep both keys in sync
             if (data.username) localStorage.setItem('username', data.username);
             if (data.displayName) localStorage.setItem('display_name', data.displayName);
             if (data.userId != null) localStorage.setItem('user_id', String(data.userId));

@@ -180,48 +180,99 @@
       <div class="login-title">Sign In</div>
       <div class="login-sub">Enter your credentials, player</div>
 
-      <form onsubmit="handleLogin(event)">
-        <div class="arc-field">
-          <label>Username or Email</label>
-          <input class="arc-input" type="text" id="l-user" placeholder="player@kensgames.com" required
-            autocomplete="username">
-        </div>
-        <div class="arc-field">
-          <label>Password</label>
-          <input class="arc-input" type="password" id="l-pass"
-            placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required autocomplete="current-password">
-        </div>
-        <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark"
-          style="margin-top:12px;margin-bottom:4px;"></div>
-        <button type="submit" class="btn btn-c btn-full" style="margin-top:4px;">&#9654; SIGN IN</button>
-        <div class="arc-msg" id="l-msg"></div>
-      </form>
+      <div id="cf-access-btn"></div>
 
-      <div class="divider">or</div>
-      <button class="oauth-btn" onclick="oauthLogin('google')">&#9654; Continue with Google</button>
-      <button class="oauth-btn" onclick="oauthLogin('discord')">&#9654; Continue with Discord</button>
-      <button class="oauth-btn" onclick="oauthLogin('facebook')">&#9654; Continue with Facebook</button>
+      <script>
+        (function () {
+          const TEAM_DOMAIN = "https://butterflyfx.cloudflareaccess.com";
+          const APP_AUD = "551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95";
 
-      <div class="login-footer">
-        <a href="/forgot-password">Forgot password?</a>
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        No account? <a href="/register">Join free</a>
-      </div>
+          function isLoggedIn() {
+            return document.cookie
+              .split(";")
+              .some((c) => c.trim().startsWith("CF_Authorization="));
+          }
+
+          const container = document.getElementById("cf-access-btn");
+          if (!container) return;
+
+          const btn = document.createElement("a");
+          btn.style.cssText = `
+            display: inline-block;
+            padding: 10px 24px;
+            background-color: #f6821f;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+          `;
+          btn.onmouseover = () => (btn.style.backgroundColor = "#e5741a");
+          btn.onmouseout = () => (btn.style.backgroundColor = "#f6821f");
+
+          if (isLoggedIn()) {
+            btn.href = `${TEAM_DOMAIN}/cdn-cgi/access/logout?redirect_url=${encodeURIComponent(window.location.origin)}`;
+            btn.textContent = "Log Out";
+          } else {
+            // After CF login, return to this login page so the bridge can exchange for kg_token,
+            // then the startup script above will redirect to the original ?redirect= destination.
+            const redirectParam = new URLSearchParams(location.search).get('redirect') || '/lobby/';
+            const returnUrl = window.location.origin + '/login/?redirect=' + encodeURIComponent(redirectParam);
+            btn.href = `${TEAM_DOMAIN}/cdn-cgi/access/login?${new URLSearchParams({
+              kid: APP_AUD,
+              redirect_url: returnUrl
+            })}`;
+            btn.textContent = "Log In with Cloudflare";
+          }
+
+          container.appendChild(btn);
+        })();
+      </script>
     </div>
   </div>
 
   <script>
     const API = '/api/auth';
-    // If already logged in, redirect to destination (profile setup is prompted by the lobby)
+    // On load: try existing kg_token, then try CF Access bridge, then show login UI.
     (async function () {
+      const redir = new URLSearchParams(location.search).get('redirect') || '/lobby/';
+
+      // 1. If we already have a valid kg_token, skip to destination
       const t = localStorage.getItem('kg_token');
-      if (!t) return;
+      if (t) {
+        try {
+          const r = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${t}` } });
+          if (r.ok) {
+            const d = await r.json();
+            if (d && d.valid) { window.location.replace(redir); return; }
+          }
+          localStorage.removeItem('kg_token');
+        } catch { }
+      }
+
+      // 2. Try Cloudflare Access bridge — user may have just returned from CF login
       try {
-        const r = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${t}` } });
-        if (!r.ok) { localStorage.removeItem('kg_token'); return; }
-        const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
-        window.location.href = redir;
+        const r = await fetch('/api/auth/access-session', {
+          method: 'GET', credentials: 'include',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.success && d.token) {
+            localStorage.setItem('kg_token', d.token);
+            localStorage.setItem('user_token', d.token);
+            if (d.username) localStorage.setItem('kg_username', d.username);
+            if (d.displayName) localStorage.setItem('kg_display_name', d.displayName);
+            if (d.userId != null) localStorage.setItem('kg_user_id', String(d.userId));
+            window.location.replace(redir);
+            return;
+          }
+        }
       } catch { }
+      // 3. No token found — login UI is already visible, nothing more to do
     })();
 
     async function handleLogin(e) {

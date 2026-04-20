@@ -8,9 +8,11 @@
         const p = new URLSearchParams(window.location.search);
         const isPlay = p.has('mode') || p.has('code') || p.has('session');
         if (!isPlay) {
-          // Treat /starfighter/ as the landing; gameplay lives behind explicit modes/codes.
-          window.location.replace('/starfighter/lobby.html');
-          return;
+          // Only send to lobby if already authenticated; otherwise stay on landing page.
+          if (localStorage.getItem('kg_token')) {
+            window.location.replace('/starfighter/lobby.html');
+            return;
+          }
         }
 
         // Public solo: ensure minimal local profile exists.
@@ -22,6 +24,9 @@
       }
     })();
   </script>
+  <!-- Auth enforcement: sign-in required (invite-code guests allowed) -->
+  <script src="/js/substrates/profile_gate.js"></script>
+  <script>KG_GATE.require({ allowGuest: true });</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StarFighter ï¿½ Defend the Manifold | KensGames</title>
