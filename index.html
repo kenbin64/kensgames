@@ -64,26 +64,25 @@
             pointer-events: none;
         }
 
-        /* ── Manifold corner widget ── */
+        /* ── Manifold helix banner — full width below nav ── */
         #manifold-corner {
-            position: fixed;
-            top: 76px;
-            left: 12px;
-            width: 230px;
-            height: 230px;
-            z-index: 50;
-            border-radius: 10px;
-            border: 1px solid rgba(0, 255, 255, 0.28);
+            display: block;
+            position: relative;
+            width: 100%;
+            height: 170px;
+            z-index: 10;
+            border-bottom: 1.5px solid rgba(0, 255, 255, 0.22);
             box-shadow:
-                0 0 18px rgba(0, 255, 255, 0.18),
-                0 0 40px rgba(153, 0, 255, 0.10),
-                inset 0 0 12px rgba(0, 255, 255, 0.04);
-            pointer-events: none;
+                0 4px 32px rgba(0, 255, 255, 0.08),
+                0 2px 12px rgba(153, 0, 255, 0.06);
+            cursor: crosshair;
             image-rendering: auto;
         }
 
-        @media (max-width: 860px) {
-            #manifold-corner { display: none; }
+        @media (max-width: 600px) {
+            #manifold-corner {
+                height: 110px;
+            }
         }
 
         /* ── Tron grid overlay ── */
@@ -1646,7 +1645,6 @@
 
 <body data-mtheme="gold">
     <canvas id="gyroid-bg"></canvas>
-    <canvas id="manifold-corner" aria-hidden="true"></canvas>
     <div id="tron-grid"></div>
     <div id="scanlines"></div>
     <div class="arcade-symbols" id="arcade-symbols"></div>
@@ -1670,6 +1668,9 @@
             </div>
         </nav>
     </header>
+
+    <canvas id="manifold-corner"
+        aria-label="Double helix — z = x·y manifold, two surfaces at 90°. Move cursor for harmonic tone."></canvas>
 
     <section class="hero">
         <div class="scene" aria-hidden="true">
