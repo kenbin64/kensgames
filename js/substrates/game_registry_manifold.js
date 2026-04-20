@@ -99,7 +99,7 @@ const GameRegistryManifold = (() => {
       author: 'Ken\'s Games Team (Zenxy Edition)',
       version: '1.0.0',
       entryPoint: '/brickbreaker3d/play.html?mode=solo',
-      icon: '/assets/images/logo/logo_thumbnail.png',
+      icon: '/assets/masterImageFile/logo_thumbnail.svg',
       thumbnail: '/brickbreaker3d/assets/images/arcade.png',
 
       manifold: {
@@ -134,7 +134,7 @@ const GameRegistryManifold = (() => {
       author: 'Ken\'s Games Team (Zenxy Edition)',
       version: '1.0.0',
       entryPoint: '/brickbreaker3d/play.html?mode=multi',
-      icon: '/assets/images/logo/logo_thumbnail.png',
+      icon: '/assets/masterImageFile/logo_thumbnail.svg',
       thumbnail: '/brickbreaker3d/assets/images/multiplayer.png',
 
       manifold: {

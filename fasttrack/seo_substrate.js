@@ -41,7 +41,7 @@ const SEOSubstrate = (() => {
         url: 'https://kensgames.com/fasttrack/',
         image: 'https://kensgames.com/fasttrack/assets/images/og-preview.png',
         screenshot: 'https://kensgames.com/fasttrack/assets/images/screenshot-game.png',
-        logo: 'https://kensgames.com/assets/masterImageFile/icon.png',
+        logo: 'https://kensgames.com/assets/masterImageFile/icon.svg',
         themeColor: '#1a1a2e',
         locale: 'en_US',
         category: 'GameApplication',

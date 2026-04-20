@@ -442,6 +442,38 @@ const PlayerDB = {
       LIMIT 1
     `).get(playerId);
   },
+
+  // ── Admin queries (no PII — email never returned) ─────────────────────────
+
+  /** List all set-up players with aggregate stats. No email returned. */
+  adminList(query, limit, offset) {
+    const q = query ? `%${query}%` : '%';
+    return db().prepare(`
+      SELECT p.id, p.player_name, p.avatar_id, p.status, p.created_at, p.last_seen,
+             p.is_admin, p.is_superuser, p.manifold_x, p.manifold_y,
+             COALESCE(SUM(m.games_played), 0) AS total_games,
+             COALESCE(SUM(m.games_won),   0) AS total_wins
+      FROM players p
+      LEFT JOIN medallions m ON m.player_id = p.id
+      WHERE p.profile_setup = 1 AND p.player_name LIKE ?
+      GROUP BY p.id
+      ORDER BY p.last_seen DESC
+      LIMIT ? OFFSET ?
+    `).all(q, Math.min(limit || 50, 200), offset || 0);
+  },
+
+  /** Aggregate counts for admin dashboard header. */
+  adminStats() {
+    return db().prepare(`
+      SELECT
+        COUNT(*)                                                         AS total,
+        SUM(CASE WHEN status = 'active'    THEN 1 ELSE 0 END)          AS active,
+        SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END)          AS suspended,
+        SUM(profile_setup)                                               AS setup_complete,
+        SUM(CASE WHEN last_seen > unixepoch() - 86400 THEN 1 ELSE 0 END) AS seen_today
+      FROM players
+    `).get();
+  },
 };
 
 module.exports = { db, PlayerDB, hashEmail, xpToLevel, MEDALLION_LEVELS, MEDALLION_MIN_XP };

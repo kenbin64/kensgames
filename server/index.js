@@ -1044,6 +1044,55 @@ app.use('/api/chat', chatRouter);
 app.use('/api/leaderboards', leaderboardRouter);
 app.use('/api/tournaments', tournamentsRouter);
 app.use('/api/sessions', gameSessionsRouter);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: GET /api/admin/players — PII-safe player list from SQLite
+// Returns player_name, avatar_id, status, dates, game stats. NO email.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/admin/players', requireSuperuser, (req, res) => {
+  try {
+    const q = (req.query.q || '').trim().slice(0, 80);
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const players = PlayerDB.adminList(q, limit, offset);
+    const stats = PlayerDB.adminStats();
+    return res.json({ success: true, players, stats, query: q, limit, offset });
+  } catch (err) {
+    console.error('Admin players error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list players' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/toggle-suspend
+// Flips active ↔ suspended. Superuser account (kbingh) is protected.
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/toggle-suspend', requireSuperuser, (req, res) => {
+  try {
+    const { name } = req.params;
+    if (!name || name.length > 30) {
+      return res.status(400).json({ success: false, error: 'Invalid player name' });
+    }
+    if (name.toLowerCase() === 'kbingh') {
+      return res.status(403).json({ success: false, error: 'Cannot modify superuser account' });
+    }
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (player.is_superuser) {
+      return res.status(403).json({ success: false, error: 'Cannot modify a superuser account' });
+    }
+    const newStatus = player.status === 'suspended' ? 'active' : 'suspended';
+    const reason = newStatus === 'suspended'
+      ? ((req.body && req.body.reason) || 'Admin action')
+      : null;
+    PlayerDB.setStatus(player.kg_user_id, newStatus, reason, null);
+    console.log(`Admin toggle: ${name} → ${newStatus}`);
+    return res.json({ success: true, player_name: name, status: newStatus });
+  } catch (err) {
+    console.error('Toggle suspend error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to toggle suspend' });
+  }
+});
 // START SERVER
 // ═══════════════════════════════════════════════════════════════════════════
 
