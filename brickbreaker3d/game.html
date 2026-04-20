@@ -187,6 +187,15 @@
       else if (totalPlayers >= 2) mode = 'multi2';
       startGame(mode);
     }
+
+    // Auto-launch when arriving from the lobby (session URL)
+    if (sessionId) {
+      window.addEventListener('load', function () {
+        // initScene() + animate() are also on 'load' in game.js (registered first)
+        // so by the time this runs the scene is ready
+        startFromSession();
+      });
+    }
   </script>
 </body>
 

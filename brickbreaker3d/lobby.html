@@ -368,18 +368,27 @@
           <div class="field-row">
             <div class="field-label">GAME MODE</div>
             <div class="radio-group">
-              <label class="radio-opt"><input type="radio" name="mode" value="private" checked> Private (invite
+              <label class="radio-opt"><input type="radio" name="mode" value="private" checked onchange="onModeChange()"> Private (invite
                 only)</label>
-              <label class="radio-opt"><input type="radio" name="mode" value="public"> Public (open)</label>
-              <label class="radio-opt"><input type="radio" name="mode" value="solo"> Solo run</label>
+              <label class="radio-opt"><input type="radio" name="mode" value="public" onchange="onModeChange()"> Public (open)</label>
+              <label class="radio-opt"><input type="radio" name="mode" value="solo" onchange="onModeChange()"> Solo run</label>
             </div>
           </div>
-          <div class="field-row">
+          <div class="field-row" id="max-players-row">
             <div class="field-label">MAX PLAYERS</div>
             <select class="select-field" id="max-players-sel">
               <option value="2">2</option>
               <option value="3">3</option>
               <option value="4" selected>4</option>
+            </select>
+          </div>
+          <div class="field-row" id="solo-bots-row" style="display:none">
+            <div class="field-label">BOT OPPONENTS</div>
+            <select class="select-field" id="solo-bots-sel">
+              <option value="0">None (pure solo)</option>
+              <option value="1" selected>1 Bot</option>
+              <option value="2">2 Bots</option>
+              <option value="3">3 Bots</option>
             </select>
           </div>
           <button class="arcade-btn"
@@ -471,8 +480,7 @@
         <div class="status-msg" id="modal-status"></div>
       </div>
     </div>
-    <<<<<<< HEAD <script src="/js/substrates/profile_gate.js">
-      </script>
+    <script src="/js/substrates/profile_gate.js"></script>
       <script src="/js/substrates/game_session_substrate.js"></script>
       <script src="/js/manifold_reality.js" defer></script>
       <script src="/js/manifold_panels.js" defer></script>
@@ -492,7 +500,8 @@
           document.getElementById('create-btn').disabled = true;
           setStatus('create-status', 'Creating…', 'info');
           if (mode === 'solo') {
-            const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo' }) });
+            const bots = parseInt(document.getElementById('solo-bots-sel').value);
+            const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo', bots }) });
             const d = await r.json();
             if (d.success && d.gameUrl) { window.location.href = d.gameUrl; return; }
             setStatus('create-status', d.error || 'Failed', 'err');
@@ -589,6 +598,11 @@
           }, 3000);
         }
         function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+        function onModeChange() {
+          const mode = document.querySelector('input[name="mode"]:checked').value;
+          document.getElementById('solo-bots-row').style.display = mode === 'solo' ? 'block' : 'none';
+          document.getElementById('max-players-row').style.display = mode === 'solo' ? 'none' : 'block';
+        }
         loadPublicSessions(); loadLeaderboard(); loadMyStats();
       </script>
 </body>

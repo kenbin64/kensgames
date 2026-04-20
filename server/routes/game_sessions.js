@@ -162,17 +162,19 @@ router.post('/create', (req, res) => {
   if (!GAMES[gameId]) return res.status(400).json({ success: false, error: 'Unknown game' });
   const gameDef = GAMES[gameId];
 
-  // Solo mode: no auth needed, exactly 1 bot
+  // Solo mode: no auth needed, player chooses 0-3 bots
   if (mode === 'solo') {
-    bots = 1;
+    // bots already clamped to 0-3 above; default to 1 if not specified
+    if (isNaN(bots) || req.body.bots === undefined) bots = 1;
+    const maxPlayers = 1 + bots;
     const sessionId = generateId('sess');
     const code = generateCode();
     sessionsData[sessionId] = {
       sessionId, gameId, mode: 'solo',
       status: 'active', // solo starts immediately
-      code, players: [], bots: 1,
-      maxPlayers: 2, createdAt: Date.now(), startedAt: Date.now(),
-      gameUrl: `${gameDef.gamePath}?session=${sessionId}&mode=solo`,
+      code, players: [], bots,
+      maxPlayers, createdAt: Date.now(), startedAt: Date.now(),
+      gameUrl: `${gameDef.gamePath}?session=${sessionId}&bots=${bots}&mode=solo`,
     };
     return res.json({ success: true, sessionId, gameUrl: sessionsData[sessionId].gameUrl });
   }
