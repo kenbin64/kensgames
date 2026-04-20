@@ -17,8 +17,7 @@ function adminLogout() {
     localStorage.removeItem('kg_username');
     localStorage.removeItem('kg_display_name');
     localStorage.removeItem('kg_avatar');
-    // Clear Cloudflare Access session cookie, redirect to home
-    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
+    window.location.href = '/login/';
 }
 
 let ws = null;

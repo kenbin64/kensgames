@@ -63,6 +63,40 @@ class EmailService {
   }
 
   /**
+   * Send 6-digit OTP code for password reset
+   */
+  async sendOTPEmail(email, username, code) {
+    try {
+      const mailOptions = {
+        from: this.emailFrom,
+        to: email,
+        subject: '🔐 KensGames Password Reset Code',
+        html: `
+          <div style="font-family:'Courier New',monospace;background:#0a0a1a;color:#00ffff;max-width:560px;margin:0 auto;padding:32px;border:1px solid #00ffff;">
+            <h1 style="color:#ff00ff;text-align:center;letter-spacing:4px;margin-bottom:4px;">KENSGAMES</h1>
+            <p style="color:#888;text-align:center;font-size:11px;letter-spacing:2px;margin-top:0;">PASSWORD RESET</p>
+            <hr style="border:none;border-top:1px solid rgba(0,255,255,0.2);margin:20px 0;">
+            <p>Hello <strong style="color:#ff00ff;">${this.escapeHtml(username)}</strong>,</p>
+            <p>Your password reset code is:</p>
+            <div style="text-align:center;margin:28px 0;">
+              <span style="background:#0d0d2e;border:2px solid #ff00ff;color:#ff00ff;font-size:40px;font-weight:bold;letter-spacing:12px;padding:16px 28px;display:inline-block;">${this.escapeHtml(code)}</span>
+            </div>
+            <p style="color:#ff4d4d;font-size:13px;">⏰ Expires in 15 minutes. Do not share this code.</p>
+            <p style="color:#666;font-size:12px;">If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border:none;border-top:1px solid rgba(0,255,255,0.1);margin:24px 0;">
+            <p style="color:#444;font-size:11px;text-align:center;">© 2026 KensGames. All rights reserved.</p>
+          </div>
+        `,
+        text: `KensGames Password Reset\n\nYour code: ${code}\n\nExpires in 15 minutes. Do not share this code.\n\nIf you didn't request this, ignore this email.`
+      };
+      return await this.sendEmail(mailOptions);
+    } catch (error) {
+      console.error('OTP email error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Send password recovery email
    */
   async sendPasswordRecoveryEmail(email, token, username) {

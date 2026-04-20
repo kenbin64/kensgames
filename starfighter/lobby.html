@@ -517,6 +517,35 @@
         </div>
       </div>
 
+      <!-- Bot Staging Modal (Solo mode) -->
+      <div class="modal-overlay" id="bot-staging-overlay">
+        <div class="modal">
+          <div class="modal-title">&#x1F680; SOLO MISSION &#x2014; BUILD YOUR SQUADRON</div>
+          <div class="field-label"
+            style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.5rem">
+            PILOTS</div>
+          <div class="players-row" id="staging-players"></div>
+          <div class="bots-row">
+            <span class="bots-label">AI WINGMEN:</span>
+            <button class="arcade-btn" id="staging-add-bot"
+              style="padding:0.4rem 1rem;font-size:0.55rem;border-color:var(--c3);color:var(--c3)"
+              onclick="addStagingBot()">+ ADD BOT</button>
+            <button class="arcade-btn" id="staging-remove-bot" style="padding:0.4rem 1rem;font-size:0.55rem"
+              onclick="removeStagingBot()" disabled>&#x2013; REMOVE</button>
+            <span id="staging-bot-count"
+              style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c3);min-width:1.5rem;text-align:center">0</span><span
+              style="font-size:0.72rem;color:var(--dim)"> / 3</span>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem">
+            <button class="arcade-btn" id="staging-launch"
+              style="flex:1;padding:0.75rem;border-color:var(--c3);color:var(--c3)" onclick="launchSoloGame()"
+              disabled>&#x25B6; LAUNCH MISSION</button>
+            <button class="arcade-btn" style="padding:0.75rem 1rem" onclick="closeBotStaging()">CANCEL</button>
+          </div>
+          <div class="status-msg" id="staging-status"></div>
+        </div>
+      </div>
+
       <script src="/js/substrates/profile_gate.js"></script>
       <script src="/js/substrates/game_session_substrate.js"></script>
       <script src="/js/manifold_reality.js" defer></script>
@@ -531,18 +560,64 @@
         function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
         function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
         function setStatus(id, msg, cls) { const el = document.getElementById(id); if (!el) return; el.className = `status-msg ${cls || ''}`; el.textContent = msg; }
+        const BOT_NAMES = ['NOVA', 'REX', 'BLAZE', 'VIPER', 'STORM', 'TITAN'];
+        const BOT_AVATARS = ['🤖', '👾', '🛸', '🔥', '⚡', '🦾'];
+        let stagingBots = [];
+
+        function openBotStaging() {
+          stagingBots = [];
+          renderStagingModal();
+          document.getElementById('bot-staging-overlay').classList.add('open');
+        }
+        function closeBotStaging() {
+          document.getElementById('bot-staging-overlay').classList.remove('open');
+          document.getElementById('create-btn').disabled = false;
+          setStatus('create-status', '', '');
+        }
+        function renderStagingModal() {
+          const playerName = document.getElementById('p-name')?.textContent || 'Pilot';
+          const playerAvatar = document.getElementById('av-badge')?.textContent || '🚀';
+          let html = `<div class="player-chip"><span class="chip-ready">&#x2713;</span> ${escHtml(playerAvatar)} ${escHtml(playerName)}</div>`;
+          stagingBots.forEach(bot => {
+            html += `<div class="player-chip"><span style="color:#888">&#x1F916;</span> ${escHtml(bot.avatar)} ${escHtml(bot.name)}</div>`;
+          });
+          document.getElementById('staging-players').innerHTML = html;
+          document.getElementById('staging-bot-count').textContent = stagingBots.length;
+          document.getElementById('staging-add-bot').disabled = stagingBots.length >= 3;
+          document.getElementById('staging-remove-bot').disabled = stagingBots.length === 0;
+          document.getElementById('staging-launch').disabled = stagingBots.length === 0;
+        }
+        function addStagingBot() {
+          if (stagingBots.length >= 3) return;
+          const i = stagingBots.length;
+          stagingBots.push({ name: BOT_NAMES[i] || `BOT-${i + 1}`, avatar: BOT_AVATARS[i] || '🤖' });
+          renderStagingModal();
+        }
+        function removeStagingBot() {
+          if (stagingBots.length === 0) return;
+          stagingBots.pop();
+          renderStagingModal();
+        }
+        async function launchSoloGame() {
+          const bots = stagingBots.length;
+          document.getElementById('staging-launch').disabled = true;
+          setStatus('staging-status', 'Launching\u2026', 'info');
+          const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo', bots }) });
+          const d = await r.json();
+          if (d.success && d.gameUrl) { window.location.href = d.gameUrl; return; }
+          setStatus('staging-status', d.error || 'Failed', 'err');
+          document.getElementById('staging-launch').disabled = false;
+        }
+
         async function createGame() {
           const mode = document.querySelector('input[name="mode"]:checked').value;
           const maxPlayers = parseInt(document.getElementById('max-players-sel').value);
           document.getElementById('create-btn').disabled = true;
-          setStatus('create-status', 'CreatingÃ¢â‚¬Â¦', 'info');
           if (mode === 'solo') {
-            const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo' }) });
-            const d = await r.json();
-            if (d.success && d.gameUrl) { window.location.href = d.gameUrl; return; }
-            setStatus('create-status', d.error || 'Failed', 'err');
-            document.getElementById('create-btn').disabled = false; return;
+            openBotStaging();
+            return;
           }
+          setStatus('create-status', 'Creating\u2026', 'info');
           const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode, maxPlayers }) });
           const d = await r.json();
           if (!r.ok || !d.success) { setStatus('create-status', d.error || 'Failed', 'err'); document.getElementById('create-btn').disabled = false; return; }

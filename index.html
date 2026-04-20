@@ -11,6 +11,7 @@
     <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
     <link rel="stylesheet" href="/lib/fonts/fonts.css">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
         /* ═══════════════════════════════════════════════════════════
@@ -224,10 +225,10 @@
             z-index: 10;
             width: 100%;
             background: linear-gradient(90deg,
-                rgba(0,0,0,0.92) 0%,
-                rgba(10,0,30,0.96) 50%,
-                rgba(0,0,0,0.92) 100%);
-            border-bottom: 1px solid rgba(0,255,255,0.25);
+                    rgba(0, 0, 0, 0.92) 0%,
+                    rgba(10, 0, 30, 0.96) 50%,
+                    rgba(0, 0, 0, 0.92) 100%);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.25);
             overflow: hidden;
             height: 36px;
             display: flex;
@@ -238,7 +239,8 @@
         .marquee-bar::after {
             content: '';
             position: absolute;
-            top: 0; bottom: 0;
+            top: 0;
+            bottom: 0;
             width: 80px;
             z-index: 2;
             pointer-events: none;
@@ -246,12 +248,12 @@
 
         .marquee-bar::before {
             left: 0;
-            background: linear-gradient(90deg, rgba(4,4,12,1), transparent);
+            background: linear-gradient(90deg, rgba(4, 4, 12, 1), transparent);
         }
 
         .marquee-bar::after {
             right: 0;
-            background: linear-gradient(270deg, rgba(4,4,12,1), transparent);
+            background: linear-gradient(270deg, rgba(4, 4, 12, 1), transparent);
         }
 
         .marquee-track {
@@ -266,8 +268,13 @@
         }
 
         @keyframes marquee-scroll {
-            0%   { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-50%);
+            }
         }
 
         .marquee-item {
@@ -283,15 +290,38 @@
             line-height: 1;
         }
 
-        .marquee-item.c { color: var(--neon-cyan);   text-shadow: 0 0 10px var(--neon-cyan);   }
-        .marquee-item.p { color: var(--neon-pink);   text-shadow: 0 0 10px var(--neon-pink);   }
-        .marquee-item.y { color: var(--neon-yellow); text-shadow: 0 0 10px var(--neon-yellow); }
-        .marquee-item.g { color: var(--neon-green);  text-shadow: 0 0 10px var(--neon-green);  }
-        .marquee-item.o { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
-        .marquee-item.v { color: var(--neon-purple); text-shadow: 0 0 10px var(--neon-purple); }
+        .marquee-item.c {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        .marquee-item.p {
+            color: var(--neon-pink);
+            text-shadow: 0 0 10px var(--neon-pink);
+        }
+
+        .marquee-item.y {
+            color: var(--neon-yellow);
+            text-shadow: 0 0 10px var(--neon-yellow);
+        }
+
+        .marquee-item.g {
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .marquee-item.o {
+            color: var(--neon-orange);
+            text-shadow: 0 0 10px var(--neon-orange);
+        }
+
+        .marquee-item.v {
+            color: var(--neon-purple);
+            text-shadow: 0 0 10px var(--neon-purple);
+        }
 
         .marquee-sep {
-            color: rgba(255,255,255,0.2);
+            color: rgba(255, 255, 255, 0.2);
             font-size: 14px;
         }
 
@@ -366,6 +396,110 @@
         .btn-ghost:hover {
             color: var(--neon-cyan);
             border-color: var(--neon-cyan);
+        }
+
+        /* Locked play buttons (shown when not logged in) */
+        .btn-green.kg-locked,
+        .go.kg-locked {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Solo play button — always enabled */
+        .btn-solo {
+            padding: 10px 18px;
+            font-size: 11px;
+            background: transparent;
+            color: var(--neon-yellow);
+            border: 2px solid var(--neon-yellow);
+            font-weight: 700;
+            box-shadow: inset 0 0 10px rgba(255, 232, 0, 0.1);
+            font-family: var(--font-arcade);
+            cursor: pointer;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-radius: 3px;
+            transition: all 0.25s;
+        }
+
+        .btn-solo:hover {
+            background: rgba(255, 232, 0, 0.12);
+            box-shadow: 0 0 14px rgba(255, 232, 0, 0.5);
+        }
+
+        /* Dual button row on game cards */
+        .game-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .game-btns .btn-green,
+        .game-btns .btn-solo {
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        /* Play-button tooltip */
+        .kg-tip-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        .kg-tip-wrap .kg-tip {
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: rgba(4, 4, 20, .97);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 6px 12px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, .35);
+            transition: opacity .15s ease;
+            z-index: 999;
+        }
+
+        .kg-tip-wrap .kg-tip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--neon-cyan);
+        }
+
+        .kg-tip-wrap:hover .kg-tip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Hide sign-in tooltip when logged in */
+        body.kg-auth .kg-tip-wrap .kg-tip:not(.kg-tip-free) {
+            display: none;
+        }
+
+        /* Free-play tooltip (green accent) */
+        .kg-tip-wrap .kg-tip.kg-tip-free {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: 0 0 10px rgba(0, 255, 65, .35);
+        }
+
+        .kg-tip-wrap .kg-tip.kg-tip-free::after {
+            border-top-color: var(--neon-green);
         }
 
         .btn-green {
@@ -1271,10 +1405,39 @@
             border: 2px solid var(--neon-cyan);
             border-radius: 8px;
             box-shadow: var(--glow-cyan), 0 0 60px rgba(0, 255, 255, 0.15);
-            padding: 36px;
+            padding: 0;
             width: 90%;
             max-width: 440px;
+            max-height: min(92vh, 780px);
             position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            flex-shrink: 0;
+            padding: 36px 36px 0;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 36px 36px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 255, 255, .3) transparent;
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 255, .3);
+            border-radius: 3px;
         }
 
         .modal-close {
@@ -1286,10 +1449,43 @@
             background: none;
             border: none;
             padding: 4px 8px;
+            z-index: 1;
         }
 
         .modal-close:hover {
             color: var(--neon-cyan);
+        }
+
+        .modal-tos-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 12px 0 14px;
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 255, 255, .15);
+            border-radius: 4px;
+            background: rgba(0, 255, 255, .03);
+        }
+
+        .modal-tos-row input[type="checkbox"] {
+            margin-top: 2px;
+            flex-shrink: 0;
+            accent-color: var(--neon-cyan);
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+
+        .modal-tos-row label {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            cursor: pointer;
+        }
+
+        .modal-tos-row a {
+            color: var(--neon-cyan);
+            text-decoration: none;
         }
 
         .modal-tabs {
@@ -1695,7 +1891,6 @@
         }
     </style>
     <script src="/js/analytics.js"></script>
-    <script src="/js/access_status.js" defer></script>
     <script src="/js/imgatlas.js?v=20260418" defer></script>
 </head>
 
@@ -1775,7 +1970,7 @@
                 <li><a href="#tos">Terms</a></li>
             </ul>
             <div class="nav-auth">
-                <div id="kg-player"></div>
+                <div id="kg-player" style="display:none"></div>
                 <div id="access-status"></div>
             </div>
         </nav>
@@ -1831,9 +2026,12 @@
                     <strong style="color:var(--neon-yellow)">These five games are the proof of concept.</strong>
                 </p>
                 <div class="hero-cta">
-                    <a class="btn-play" href="/fasttrack/3d.html?offline=true&amp;ai_players=1&amp;ai_level=medium"
-                        style="text-decoration:none;display:inline-flex;align-items:center">&#9654; QUICK PLAY vs
-                        BOTS</a>
+                    <span class="kg-tip-wrap">
+                        <a class="btn-play" href="/fasttrack/3d.html?offline=true&amp;ai_players=1&amp;ai_level=medium"
+                            style="text-decoration:none;display:inline-flex;align-items:center">&#9654; QUICK PLAY vs
+                            BOTS</a>
+                        <span class="kg-tip kg-tip-free">&#9733; No login required for solo play</span>
+                    </span>
                 </div>
                 <div class="hero-note">Sign in to play free for a limited time &nbsp;&#9632;&nbsp; No credit card
                     required</div>
@@ -1847,25 +2045,35 @@
                     </div>
                     <div class="console-screen">
                         <picture>
-                        <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="eager"
-                            decoding="async" fetchpriority="high" />
+                            <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
+                            <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="eager"
+                                decoding="async" fetchpriority="high" />
                         </picture>
                     </div>
                     <div class="console-foot">
                         <div class="mini">
                             <picture>
-                        <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
-                                loading="lazy" decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                                    loading="lazy" decoding="async" />
+                            </picture>
                             <picture>
-                        <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
-                                loading="lazy" decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
+                                    loading="lazy" decoding="async" />
+                            </picture>
                         </div>
-                        <button class="go" onclick="goToGame('/fasttrack/')">PLAY &#9654;</button>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <button class="go"
+                                style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
+                                onclick="location.href='/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium'">&#9654;
+                                SOLO</button>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="go kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div class="console" role="group" aria-label="BrickBreaker 3D console"
@@ -1876,25 +2084,34 @@
                     </div>
                     <div class="console-screen">
                         <picture>
-                        <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D" loading="lazy"
-                            decoding="async" />
+                            <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
+                            <img src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D"
+                                loading="lazy" decoding="async" />
                         </picture>
                     </div>
                     <div class="console-foot">
                         <div class="mini">
                             <picture>
-                        <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
-                                decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
+                                    decoding="async" />
+                            </picture>
                             <picture>
-                        <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble Lobby" loading="lazy"
-                                decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble Lobby"
+                                    loading="lazy" decoding="async" />
+                            </picture>
                         </div>
-                        <button class="go" onclick="goToGame('/brickbreaker3d/')">PLAY &#9654;</button>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <button class="go"
+                                style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
+                                onclick="location.href='/brickbreaker3d/game.html?offline=true'">&#9654; SOLO</button>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="go kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div class="console" role="group" aria-label="Alien Space Attack console"
@@ -1905,25 +2122,34 @@
                     </div>
                     <div class="console-screen">
                         <picture>
-                        <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
-                            loading="lazy" decoding="async" />
+                            <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
+                            <img src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
+                                loading="lazy" decoding="async" />
                         </picture>
                     </div>
                     <div class="console-foot">
                         <div class="mini">
                             <picture>
-                        <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="lazy"
-                                decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack" loading="lazy"
+                                    decoding="async" />
+                            </picture>
                             <picture>
-                        <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
-                        <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
-                                loading="lazy" decoding="async" />
-                        </picture>
+                                <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
+                                <img src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                                    loading="lazy" decoding="async" />
+                            </picture>
                         </div>
-                        <button class="go" onclick="goToGame('/starfighter/')">PLAY &#9654;</button>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <button class="go"
+                                style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
+                                onclick="location.href='/starfighter/game.html?offline=true'">&#9654; SOLO</button>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="go kg-multi" onclick="goToGame('/starfighter/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1953,9 +2179,9 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/fasttrack_lobby.png"
-                        src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy"
-                        decoding="async" fetchpriority="low">
-                        </picture>
+                            src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy"
+                            decoding="async" fetchpriority="low">
+                    </picture>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
@@ -1970,7 +2196,16 @@
                             speed. Race your pieces across a dynamic board, block opponents, and play your hand right.
                             Features 5-Card Draw variant for high-stakes rounds. Skill always wins.</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/fasttrack/')">PLAY FASTTRACK &#9654;</button>
+                    <div class="game-btns">
+                        <button class="btn-solo"
+                            onclick="location.href='/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium'">&#9654;
+                            PLAY SOLO</button>
+                        <span class="kg-tip-wrap" style="flex:1;">
+                            <button class="btn-green kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
+                                MULTIPLAYER</button>
+                            <span class="kg-tip" id="tip-card-fasttrack">Sign in to unlock multiplayer</span>
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -1979,15 +2214,15 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_landing.png"
-                        src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                        decoding="async" fetchpriority="low">
-                        </picture>
+                            src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                            loading="lazy" decoding="async" fetchpriority="low">
+                    </picture>
                     <div class="thumb-strip" aria-hidden="true">
                         <picture>
-                        <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_lobby.png"
-                            src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby"
-                            loading="lazy" decoding="async" fetchpriority="low">
+                            <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_lobby.png"
+                                src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby"
+                                loading="lazy" decoding="async" fetchpriority="low">
                         </picture>
                     </div>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
@@ -2004,7 +2239,15 @@
                             depth &mdash; your ball curves through space. Power-ups warp physics. Global leaderboard
                             tracks every point. Solo or head-to-head: who clears the board fastest?</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/brickbreaker3d/')">PLAY BRICKBREAKER &#9654;</button>
+                    <div class="game-btns">
+                        <button class="btn-solo"
+                            onclick="location.href='/brickbreaker3d/game.html?offline=true'">&#9654; PLAY SOLO</button>
+                        <span class="kg-tip-wrap" style="flex:1;">
+                            <button class="btn-green kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
+                                MULTIPLAYER</button>
+                            <span class="kg-tip" id="tip-card-brickbreaker">Sign in to unlock multiplayer</span>
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -2013,9 +2256,9 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/starfighter_landing.png"
-                        src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                        decoding="async" fetchpriority="low">
-                        </picture>
+                            src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
+                            loading="lazy" decoding="async" fetchpriority="low">
+                    </picture>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
@@ -2031,7 +2274,15 @@
                             way to the top of the galactic kill board.</div>
                     </div>
                     <div>
-                        <button class="btn-green" onclick="goToGame('/starfighter/')">PLAY ALIEN ATTACK &#9654;</button>
+                        <div class="game-btns">
+                            <button class="btn-solo"
+                                onclick="location.href='/starfighter/game.html?offline=true'">&#9654; PLAY SOLO</button>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="btn-green kg-multi" onclick="goToGame('/starfighter/')">&#9654;&#9654;
+                                    MULTIPLAYER</button>
+                                <span class="kg-tip" id="tip-card-starfighter">Sign in to unlock multiplayer</span>
+                            </span>
+                        </div>
                         <div class="game-download-link">
                             or download for
                             <a href="/starfighter/downloads/Starfighter-Setup.exe">Windows</a> |
@@ -2047,9 +2298,9 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/manifold.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/manifold.png"
-                        src="/assets/masterImageFile/manifold.png" alt="4D TicTacToe" loading="lazy" decoding="async"
-                        fetchpriority="low">
-                        </picture>
+                            src="/assets/masterImageFile/manifold.png" alt="4D TicTacToe" loading="lazy"
+                            decoding="async" fetchpriority="low">
+                    </picture>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
@@ -2064,7 +2315,15 @@
                             3&times;3&times;3&times;3 hypercube with 76 winning lines your brain can't visualize. Play
                             solo against the AI, pass-and-play locally, or challenge a friend online.</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/4DTicTacToe/')">PLAY 4D TICTACTOE &#9654;</button>
+                    <div class="game-btns">
+                        <button class="btn-solo" onclick="location.href='/4DTicTacToe/game.html?offline=true'">&#9654;
+                            PLAY SOLO</button>
+                        <span class="kg-tip-wrap" style="flex:1;">
+                            <button class="btn-green kg-multi" onclick="goToGame('/4DTicTacToe/')">&#9654;&#9654;
+                                MULTIPLAYER</button>
+                            <span class="kg-tip" id="tip-card-4d">Sign in to unlock multiplayer</span>
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -2073,15 +2332,15 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_landing.png"
-                        src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
-                        decoding="async" fetchpriority="low">
-                        </picture>
+                            src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
+                            decoding="async" fetchpriority="low">
+                    </picture>
                     <div class="thumb-strip" aria-hidden="true">
                         <picture>
-                        <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_lobby.png"
-                            src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble lobby" loading="lazy"
-                            decoding="async" fetchpriority="low">
+                            <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_lobby.png"
+                                src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble lobby" loading="lazy"
+                                decoding="async" fetchpriority="low">
                         </picture>
                     </div>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
@@ -2098,7 +2357,15 @@
                             electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally
                             sound, it runs. If not, watch it fail spectacularly.</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/assemble/')">BUILD CONTRAPTION &#9654;</button>
+                    <div class="game-btns">
+                        <button class="btn-solo" onclick="location.href='/assemble/game.html?offline=true'">&#9654; PLAY
+                            SOLO</button>
+                        <span class="kg-tip-wrap" style="flex:1;">
+                            <button class="btn-green kg-multi" onclick="goToGame('/assemble/')">&#9654;&#9654;
+                                MULTIPLAYER</button>
+                            <span class="kg-tip" id="tip-card-assemble">Sign in to unlock multiplayer</span>
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -2183,61 +2450,110 @@
 
     <div class="modal-overlay" id="auth-modal">
         <div class="modal">
-            <button class="modal-close" onclick="closeModal()">&#10005;</button>
-            <div class="modal-tabs">
-                <button class="modal-tab active" onclick="switchTab('login')">Sign In</button>
-                <button class="modal-tab" onclick="switchTab('register')">Join Free</button>
-                <button class="modal-tab" onclick="switchTab('forgot')">Forgot Password</button>
-            </div>
-            <div class="modal-panel active" id="panel-login">
-                <h3>Sign In</h3>
-                <div class="modal-sub">Welcome back, player. Your stats await.</div>
-                <form onsubmit="handleLogin(event)">
-                    <div class="form-group"><label>Email or Username</label><input type="text" id="login-user"
-                            placeholder="player@kensgames.com" required></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="login-pass"
-                            placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required></div>
-                    <button type="submit" class="form-submit">&#9654; SIGN IN</button>
-                    <div class="form-msg" id="login-msg"></div>
-                </form>
-                <div style="margin-top:20px;border-top:1px solid rgba(0,255,255,0.1);padding-top:20px">
-                    <button class="btn-ghost" style="width:100%;margin-bottom:8px"
-                        onclick="oauthLogin('google')">Continue with Google</button>
-                    <button class="btn-ghost" style="width:100%;" onclick="oauthLogin('discord')">Continue with
-                        Discord</button>
+            <div class="modal-header">
+                <button class="modal-close" onclick="closeModal()">&#10005;</button>
+                <div class="modal-tabs">
+                    <button class="modal-tab active" onclick="switchTab('login')">Sign In</button>
+                    <button class="modal-tab" onclick="switchTab('register')">Join Free</button>
+                    <button class="modal-tab" onclick="switchTab('forgot')">Forgot Password</button>
                 </div>
-                <div class="form-footer">No account? <a onclick="switchTab('register')">Join free</a> &nbsp;|&nbsp; <a
-                        onclick="switchTab('forgot')">Forgot password?</a></div>
-            </div>
-            <div class="modal-panel" id="panel-register">
-                <h3>Join Free</h3>
-                <div class="modal-sub">Create your player profile. Zero cost, forever.</div>
-                <form onsubmit="handleRegister(event)">
-                    <div class="form-group"><label>Username</label><input type="text" id="reg-username"
-                            placeholder="ArcadeHero99" required minlength="3"></div>
-                    <div class="form-group"><label>Email</label><input type="email" id="reg-email"
-                            placeholder="you@email.com" required></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="reg-pass"
-                            placeholder="Min 8 characters" required minlength="8"></div>
-                    <button type="submit" class="form-submit"
-                        style="background:var(--neon-pink);box-shadow:var(--glow-pink)">&#9654; CREATE ACCOUNT</button>
-                    <div class="form-msg" id="reg-msg"></div>
-                </form>
-                <div class="form-footer">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
-            </div>
-            <div class="modal-panel" id="panel-forgot">
-                <h3>Reset Password</h3>
-                <div class="modal-sub">Enter your email and we will send a reset link.</div>
-                <form onsubmit="handleForgot(event)">
-                    <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email"
-                            placeholder="you@email.com" required></div>
-                    <button type="submit" class="form-submit"
-                        style="background:var(--neon-purple);border-color:var(--neon-purple);box-shadow:var(--glow-pink)">&#9654;
-                        SEND RESET LINK</button>
-                    <div class="form-msg" id="forgot-msg"></div>
-                </form>
-                <div class="form-footer"><a onclick="switchTab('login')">&#8592; Back to Sign In</a></div>
-            </div>
+            </div><!-- /modal-header -->
+            <div class="modal-body">
+                <div class="modal-panel active" id="panel-login">
+                    <h3>Sign In</h3>
+                    <div class="modal-sub">Welcome back, player. Your stats await.</div>
+                    <form onsubmit="handleLogin(event)">
+                        <div class="form-group"><label>Playername</label><input type="text" id="login-user"
+                                placeholder="YourPlayername" required autocomplete="username"></div>
+                        <div class="form-group"><label>Password</label><input type="password" id="login-pass"
+                                placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required
+                                autocomplete="current-password"></div>
+                        <div style="text-align:right;margin-top:-4px;margin-bottom:12px">
+                            <a onclick="switchTab('forgot')"
+                                style="font-size:11px;color:var(--text-muted);cursor:pointer;">Forgot password?</a>
+                        </div>
+                        <button type="submit" class="form-submit">&#9654; SIGN IN</button>
+                        <div class="form-msg" id="login-msg"></div>
+                    </form>
+                    <div class="form-footer">No account? <a onclick="switchTab('register')">Join free</a></div>
+                </div>
+                <div class="modal-panel" id="panel-register">
+                    <h3>Join Free</h3>
+                    <div class="modal-sub">Create your player profile. Zero cost, forever.</div>
+                    <form onsubmit="handleRegister(event)" id="modal-reg-form">
+                        <div class="form-group"><label>Playername</label><input type="text" id="reg-username"
+                                placeholder="ArcadeHero99" required minlength="3" maxlength="20" autocomplete="username"
+                                oninput="checkUsername(this.value)">
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">3–20 chars &middot;
+                                letters,
+                                numbers, underscore &middot; visible to all players</div>
+                            <div id="reg-username-err" style="font-size:11px;min-height:14px;margin-top:2px;"></div>
+                        </div>
+                        <div class="form-group"><label>Email</label><input type="email" id="reg-email"
+                                placeholder="you@email.com" required autocomplete="email"
+                                oninput="checkEmail(this.value)">
+                            <div id="reg-email-err" style="font-size:11px;min-height:14px;margin-top:2px;"></div>
+                        </div>
+                        <div class="form-group"><label>Password</label><input type="password" id="reg-pass"
+                                placeholder="Min 8 chars, A–Z, 0–9, !#$_" required minlength="8"
+                                autocomplete="new-password" oninput="checkModalPW(this.value)">
+                            <div id="modal-pw-rules" style="font-size:11px;line-height:1.8;margin-top:4px;">
+                                <span id="mpr-len" style="display:block;color:var(--text-muted);">&#9632; At least 8
+                                    characters</span>
+                                <span id="mpr-cap" style="display:block;color:var(--text-muted);">&#9632; At least 1
+                                    uppercase letter (A–Z)</span>
+                                <span id="mpr-dig" style="display:block;color:var(--text-muted);">&#9632; At least 1
+                                    digit
+                                    (0–9)</span>
+                                <span id="mpr-spc" style="display:block;color:var(--text-muted);">&#9632; At least 1
+                                    special
+                                    char (!&nbsp;&nbsp;#&nbsp;&nbsp;$&nbsp;&nbsp;_)</span>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Confirm Password</label><input type="password" id="reg-pass2"
+                                placeholder="Repeat password" required minlength="8" autocomplete="new-password"
+                                oninput="checkPassMatch()">
+                            <div id="reg-pass2-err" style="font-size:11px;min-height:14px;margin-top:2px;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Choose Your Avatar</label>
+                            <div id="modal-av-tabs" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+                            </div>
+                            <div id="modal-av-grid"
+                                style="display:grid;grid-template-columns:repeat(8,1fr);gap:3px;max-height:140px;overflow-y:auto;margin-bottom:4px;">
+                            </div>
+                            <div id="modal-av-hint" style="font-size:11px;color:var(--text-muted);">Pick an avatar to
+                                represent you in every game</div>
+                        </div>
+                        <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark"
+                            style="margin-bottom:6px;"></div>
+                        <div class="modal-tos-row">
+                            <input type="checkbox" id="modal-tos">
+                            <label for="modal-tos">I agree to the <a href="/tos/" target="_blank"
+                                    rel="noopener">KensGames Terms of Service</a>. By checking this box I confirm I am
+                                at least 13 years old and accept all terms and conditions.</label>
+                        </div>
+                        <button type="submit" class="form-submit"
+                            style="background:var(--neon-pink);box-shadow:var(--glow-pink)">&#9654; CREATE
+                            ACCOUNT</button>
+                        <div class="form-msg" id="reg-msg"></div>
+                    </form>
+                    <div class="form-footer">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
+                </div>
+                <div class="modal-panel" id="panel-forgot">
+                    <h3>Reset Password</h3>
+                    <div class="modal-sub">Enter your email and we will send a reset link.</div>
+                    <form onsubmit="handleForgot(event)">
+                        <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email"
+                                placeholder="you@email.com" required></div>
+                        <button type="submit" class="form-submit"
+                            style="background:var(--neon-purple);border-color:var(--neon-purple);box-shadow:var(--glow-pink)">&#9654;
+                            SEND RESET LINK</button>
+                        <div class="form-msg" id="forgot-msg"></div>
+                    </form>
+                    <div class="form-footer"><a onclick="switchTab('login')">&#8592; Back to Sign In</a></div>
+                </div>
+            </div><!-- /modal-body -->
         </div>
     </div>
 
@@ -2516,7 +2832,105 @@
             document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
             document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
             document.getElementById('panel-' + tab).classList.add('active');
+            if (tab === 'register') buildModalAvGrid(modalAvCat);
         }
+
+        // ── Inline field validation helpers ─────────────────────────────────
+        let _unameTimer = null;
+        function fieldErr(id, msg, ok) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = msg;
+            el.style.color = ok ? 'var(--neon-green)' : '#ff4d4d';
+        }
+
+        function checkEmail(val) {
+            const ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val.trim());
+            fieldErr('reg-email-err', ok ? '' : (val ? 'Enter a valid email address' : ''), ok);
+        }
+
+        function checkPassMatch() {
+            const p1 = document.getElementById('reg-pass').value;
+            const p2 = document.getElementById('reg-pass2').value;
+            if (!p2) { fieldErr('reg-pass2-err', '', true); return; }
+            const ok = p1 === p2;
+            fieldErr('reg-pass2-err', ok ? 'Passwords match ✓' : 'Passwords do not match', ok);
+        }
+
+        function checkModalPW(val) {
+            const set = (id, ok) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.style.color = val.length === 0 ? 'var(--text-muted)' : (ok ? 'var(--neon-green)' : '#ff4d4d');
+                el.textContent = (ok ? '✓' : '✗') + el.textContent.slice(1);
+            };
+            set('mpr-len', val.length >= 8);
+            set('mpr-cap', /[A-Z]/.test(val));
+            set('mpr-dig', /[0-9]/.test(val));
+            set('mpr-spc', /[!#$_]/.test(val));
+            checkPassMatch();
+        }
+
+        function pwValid(val) {
+            return val.length >= 8 && /[A-Z]/.test(val) && /[0-9]/.test(val) && /[!#$_]/.test(val);
+        }
+
+        function checkUsername(val) {
+            clearTimeout(_unameTimer);
+            const v = val.trim();
+            if (!v) { fieldErr('reg-username-err', '', true); return; }
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(v)) {
+                fieldErr('reg-username-err', '3–20 chars: letters, numbers, underscore only', false); return;
+            }
+            fieldErr('reg-username-err', 'Checking...', true);
+            _unameTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch('/api/auth/check-username?username=' + encodeURIComponent(v));
+                    const d = await r.json();
+                    if (d.available) fieldErr('reg-username-err', v + ' is available ✓', true);
+                    else fieldErr('reg-username-err', d.error || (v + ' is already taken'), false);
+                } catch { fieldErr('reg-username-err', '', true); }
+            }, 500);
+        }
+
+        // ── Avatar picker data (shared with setup page) ─────────────────────
+        const MODAL_AV_CATS = [
+            { id: 'people', label: '👥', avatars: [{ id: 'p_f_light', e: '👩🏻' }, { id: 'p_m_light', e: '👨🏻' }, { id: 'p_f_med', e: '👩🏽' }, { id: 'p_m_med', e: '👨🏽' }, { id: 'p_f_dark', e: '👩🏿' }, { id: 'p_m_dark', e: '👨🏿' }, { id: 'ninja', e: '🥷' }, { id: 'cowboy', e: '🤠' }, { id: 'p_mech_f', e: '👩‍🔧' }, { id: 'p_mech_m', e: '👨‍🔧' }, { id: 'p_art_f', e: '👩‍🎨' }, { id: 'p_art_m', e: '👨‍🎨' }, { id: 'nerd', e: '🤓' }, { id: 'p_bald', e: '🧑‍🦲' }, { id: 'p_beard', e: '🧔' }, { id: 'p_blonde_f', e: '👱‍♀️' }] },
+            { id: 'fantasy', label: '🦄', avatars: [{ id: 'wizard_f', e: '🧙‍♀️' }, { id: 'wizard_m', e: '🧙‍♂️' }, { id: 'elf_f', e: '🧝‍♀️' }, { id: 'elf_m', e: '🧝‍♂️' }, { id: 'vampire_m', e: '🧛‍♂️' }, { id: 'hero_f', e: '🦸‍♀️' }, { id: 'hero_m', e: '🦸‍♂️' }, { id: 'dragon', e: '🐉' }, { id: 'unicorn', e: '🦄' }, { id: 'ghost', e: '👻' }, { id: 'skull', e: '💀' }, { id: 'crown', e: '👑' }, { id: 'crystal', e: '🔮' }] },
+            { id: 'science', label: '🔬', avatars: [{ id: 'sci_f', e: '👩‍🔬' }, { id: 'sci_m', e: '👨‍🔬' }, { id: 'robot', e: '🤖' }, { id: 'alien', e: '👽' }, { id: 'alien_px', e: '👾' }, { id: 'dna', e: '🧬' }, { id: 'brain', e: '🧠' }, { id: 'atom', e: '⚛️' }, { id: 'cyborg', e: '🦾' }] },
+            { id: 'animals', label: '🦁', avatars: [{ id: 'lion', e: '🦁' }, { id: 'tiger', e: '🐯' }, { id: 'bear', e: '🐻' }, { id: 'fox', e: '🦊' }, { id: 'wolf', e: '🐺' }, { id: 'cat', e: '😼' }, { id: 'eagle', e: '🦅' }, { id: 'owl', e: '🦉' }, { id: 'dolphin', e: '🐬' }, { id: 'shark', e: '🦈' }, { id: 'butterfly', e: '🦋' }, { id: 'panda', e: '🐼' }, { id: 'octopus', e: '🐙' }, { id: 'rabbit', e: '🐰' }] },
+            { id: 'space', label: '🚀', avatars: [{ id: 'rocket', e: '🚀' }, { id: 'ufo', e: '🛸' }, { id: 'astro_f', e: '👩‍🚀' }, { id: 'astro_m', e: '👨‍🚀' }, { id: 'planet', e: '🪐' }, { id: 'star', e: '⭐' }, { id: 'comet', e: '☄️' }, { id: 'moon', e: '🌙' }, { id: 'galaxy', e: '🌌' }] },
+            { id: 'toys', label: '🎮', avatars: [{ id: 'toy_stick', e: '🕹️' }, { id: 'toy_dice', e: '🎲' }, { id: 'toy_chess', e: '♟️' }, { id: 'toy_puzzle', e: '🧩' }, { id: 'toy_darts', e: '🎯' }, { id: 'toy_magic', e: '🪄' }, { id: 'toy_teddy', e: '🧸' }, { id: 'toy_gamepad', e: '🎮' }] },
+        ];
+        let modalSelAv = null, modalAvCat = 'people';
+
+        function buildModalAvGrid(catId) {
+            modalAvCat = catId || 'people';
+            const cat = MODAL_AV_CATS.find(c => c.id === modalAvCat) || MODAL_AV_CATS[0];
+            const tabStyle = (active) => `cursor:pointer;padding:3px 8px;border-radius:12px;border:1px solid ${active ? 'var(--neon-pink)' : 'rgba(255,0,255,.25)'};font-size:13px;background:${active ? 'rgba(255,0,255,.1)' : 'transparent'};`;
+            document.getElementById('modal-av-tabs').innerHTML = MODAL_AV_CATS.map(c =>
+                `<span style="${tabStyle(c.id === modalAvCat)}" onclick="buildModalAvGrid('${c.id}')">${c.label}</span>`
+            ).join('');
+            const cellStyle = (sel) => `font-size:1.3rem;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:5px;cursor:pointer;border:2px solid ${sel ? 'var(--neon-pink)' : 'transparent'};background:${sel ? 'rgba(255,0,255,.1)' : 'rgba(0,0,0,.2)'};`;
+            document.getElementById('modal-av-grid').innerHTML = cat.avatars.map(a =>
+                `<div style="${cellStyle(modalSelAv === a.id)}" id="mav-${a.id}" onclick="selectModalAv('${a.id}')">${a.e}</div>`
+            ).join('');
+        }
+
+        function selectModalAv(id) {
+            document.querySelectorAll('#modal-av-grid div').forEach(el => {
+                el.style.border = '2px solid transparent';
+                el.style.background = 'rgba(0,0,0,.2)';
+            });
+            const el = document.getElementById('mav-' + id);
+            if (el) { el.style.border = '2px solid var(--neon-pink)'; el.style.background = 'rgba(255,0,255,.1)'; }
+            modalSelAv = id;
+            document.getElementById('modal-av-hint').style.color = 'var(--neon-green)';
+            document.getElementById('modal-av-hint').textContent = 'Avatar selected ✓';
+        }
+
+        // Build avatar grid once DOM is ready
+        document.addEventListener('DOMContentLoaded', () => buildModalAvGrid());
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -2525,14 +2939,28 @@
             try {
                 const res = await fetch('/api/auth/login', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: document.getElementById('login-user').value, password: document.getElementById('login-pass').value })
+                    body: JSON.stringify({
+                        username: document.getElementById('login-user').value.trim(),
+                        password: document.getElementById('login-pass').value
+                    })
                 });
                 const data = await res.json();
                 if (res.ok) {
+                    localStorage.setItem('kg_token', data.token);
                     localStorage.setItem('user_token', data.token);
-                    localStorage.setItem('username', data.username || data.user?.username);
-                    msg.textContent = 'Welcome back!'; msg.className = 'form-msg ok';
-                    setTimeout(() => { closeModal(); window.location.href = '/lobby'; }, 800);
+                    localStorage.setItem('kg_user_id', String(data.userId || ''));
+                    localStorage.setItem('kg_username', data.username || '');
+                    localStorage.setItem('kg_display_name', data.displayName || '');
+                    localStorage.setItem('display_name', data.displayName || data.username || '');
+                    localStorage.setItem('username', data.username || '');
+                    if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar }));
+                    if (!data.profileSetup) {
+                        closeModal();
+                        window.location.href = '/player/setup.html?redirect=' + encodeURIComponent(location.pathname + location.search);
+                        return;
+                    }
+                    msg.textContent = 'Welcome back, ' + (data.displayName || data.username || 'Player') + '!'; msg.className = 'form-msg ok';
+                    setTimeout(() => { closeModal(); if (window.KGNav) KGNav.refresh(); }, 700);
                 } else {
                     msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'form-msg err';
                 }
@@ -2542,16 +2970,68 @@
         async function handleRegister(e) {
             e.preventDefault();
             const msg = document.getElementById('reg-msg');
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const pass = document.getElementById('reg-pass').value;
+            const pass2 = document.getElementById('reg-pass2').value;
+
+            // username format
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+                fieldErr('reg-username-err', '3–20 chars: letters, numbers, underscore only', false);
+                document.getElementById('reg-username').focus(); return;
+            }
+            // email format
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+                fieldErr('reg-email-err', 'Enter a valid email address', false);
+                document.getElementById('reg-email').focus(); return;
+            }
+            // password strength
+            if (!pwValid(pass)) {
+                msg.textContent = 'Password does not meet the requirements shown above'; msg.className = 'form-msg err';
+                document.getElementById('reg-pass').focus(); return;
+            }
+            // passwords match
+            if (pass !== pass2) {
+                fieldErr('reg-pass2-err', 'Passwords do not match', false);
+                document.getElementById('reg-pass2').focus(); return;
+            }
+            // check username availability one last time
+            try {
+                const chk = await fetch('/api/auth/check-username?username=' + encodeURIComponent(username));
+                const chkData = await chk.json();
+                if (!chkData.available) {
+                    fieldErr('reg-username-err', chkData.error || (username + ' is already taken'), false);
+                    document.getElementById('reg-username').focus(); return;
+                }
+            } catch { /* network error — let server validate */ }
+            if (!modalSelAv) {
+                document.getElementById('modal-av-hint').style.color = '#ff4d4d';
+                document.getElementById('modal-av-hint').textContent = 'Please choose an avatar';
+                return;
+            }
+            if (!document.getElementById('modal-tos').checked) {
+                msg.textContent = 'You must agree to the Terms of Service to continue'; msg.className = 'form-msg err'; return;
+            }
+            const tsToken = document.querySelector('#modal-reg-form [name="cf-turnstile-response"]')?.value || '';
+            if (!tsToken) { msg.textContent = 'Please complete the security check'; msg.className = 'form-msg err'; return; }
             msg.textContent = 'Creating account...'; msg.className = 'form-msg';
             try {
                 const res = await fetch('/api/auth/register', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: document.getElementById('reg-username').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value })
+                    body: JSON.stringify({
+                        username,
+                        displayName: username,
+                        email,
+                        password: pass,
+                        avatar: modalSelAv,
+                        turnstileToken: tsToken,
+                        tosAgreed: true
+                    })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    msg.textContent = 'Account created! Check your email to verify.'; msg.className = 'form-msg ok';
-                    setTimeout(() => switchTab('login'), 2500);
+                    msg.textContent = 'Account created! Sign in to continue.'; msg.className = 'form-msg ok';
+                    setTimeout(() => switchTab('login'), 2000);
                 } else {
                     msg.textContent = data.error || data.message || 'Registration failed'; msg.className = 'form-msg err';
                 }
@@ -2565,25 +3045,20 @@
             try {
                 const res = await fetch('/api/auth/forgot-password', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: document.getElementById('forgot-email').value })
+                    body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() })
                 });
                 const data = await res.json();
-                msg.textContent = res.ok ? 'Reset link sent - check your inbox' : (data.error || data.message || 'Error');
+                msg.textContent = res.ok ? 'Reset link sent — check your inbox and spam folder' : (data.error || data.message || 'Error');
                 msg.className = 'form-msg ' + (res.ok ? 'ok' : 'err');
             } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
         }
-
-        function oauthLogin(provider) { window.location.href = '/api/auth/' + provider; }
         function playAsGuest() {
-            localStorage.setItem('user_token', 'guest-' + Date.now());
-            // Let the player choose a real profile even as a guest.
-            localStorage.removeItem('username');
-            localStorage.removeItem('display_name');
-            KGPlayerProfile.ensure(true, () => { window.location.href = '/lobby/'; });
+            openModal('auth-modal');
         }
         function goToGame(path) {
-            // Player profile required before entering any game.
-            KGPlayerProfile.ensure(true, () => { window.location.href = path; });
+            if (!localStorage.getItem('kg_token')) { openModal('auth-modal'); return; }
+            // path like '/fasttrack/' → lobby is '/fasttrack/lobby'
+            window.location.href = path.replace(/\/$/, '') + '/lobby';
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
         const urlParam = new URLSearchParams(location.search).get('modal');
@@ -2601,6 +3076,77 @@
             } else {
                 run();
             }
+        })();
+    </script>
+    <script>
+        // KGNav — auth-aware nav and play-button state manager
+        (function () {
+            function jwtPayload(t) {
+                try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); }
+                catch { return null; }
+            }
+            function getKgUser() {
+                var t = localStorage.getItem('kg_token');
+                if (!t) return null;
+                var p = jwtPayload(t);
+                if (!p || (p.exp && p.exp < Date.now() / 1000)) { localStorage.removeItem('kg_token'); return null; }
+                return p;
+            }
+            function kgLogout() {
+                ['kg_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar', 'display_name', 'username', 'user_token'].forEach(function (k) { localStorage.removeItem(k); });
+                window.location.href = '/login/';
+            }
+            window.kgLogout = kgLogout;
+            function applyNav(user) {
+                var statusEl = document.getElementById('access-status');
+                var playerEl = document.getElementById('kg-player');
+                document.body.classList.toggle('kg-auth', !!user);
+                if (user) {
+                    if (playerEl) playerEl.style.display = '';
+                    if (statusEl) statusEl.innerHTML = '<button class="btn-ghost" onclick="kgLogout()">LOG OUT</button>';
+                } else {
+                    if (playerEl) playerEl.style.display = 'none';
+                    if (statusEl) statusEl.innerHTML = '<button class="btn-login" onclick="openModal(\'auth-modal\')">LOG IN</button>';
+                }
+            }
+            function applyPlayState(user) {
+                document.querySelectorAll('.kg-multi').forEach(function (btn) {
+                    if (user) { btn.classList.remove('kg-locked'); }
+                    else { btn.classList.add('kg-locked'); }
+                });
+            }
+            // Also fix goToGame to work after CF-Access bridge sets kg_token
+            function patchGoToGame() {
+                window.goToGame = function (path) {
+                    if (!localStorage.getItem('kg_token')) { if (typeof openModal === 'function') openModal('auth-modal'); return; }
+                    window.location.href = path.replace(/\/$/, '') + '/lobby';
+                };
+            }
+            async function initKGNav() {
+                var user = getKgUser();
+                if (user) {
+                    if (user.displayName) localStorage.setItem('display_name', user.displayName);
+                    if (user.username) localStorage.setItem('username', user.username);
+                }
+                applyNav(user);
+                applyPlayState(user);
+                if (user && window.KGPlayerProfile) KGPlayerProfile.autoAttach();
+                patchGoToGame();
+            }
+            window.KGNav = {
+                refresh: function () {
+                    var user = getKgUser();
+                    if (user) {
+                        if (user.displayName) localStorage.setItem('display_name', user.displayName);
+                        if (user.username) localStorage.setItem('username', user.username);
+                    }
+                    applyNav(user);
+                    applyPlayState(user);
+                    if (window.KGPlayerProfile) KGPlayerProfile.autoAttach();
+                }
+            };
+            if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initKGNav); }
+            else { initKGNav(); }
         })();
     </script>
 </body>

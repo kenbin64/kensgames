@@ -44,3 +44,5 @@ starfighter/downloads/
 downloads/
 starfighter/electron/
 starfighter/native/
+server/*.db-shm
+server/*.db-wal

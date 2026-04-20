@@ -488,12 +488,16 @@
         if (!r.ok) { localStorage.removeItem('kg_token'); window.location.href = '/login/index.html'; return; }
       } catch { window.location.href = '/login/index.html'; return; }
 
-      // If already set up, go straight to portal
+      // If already set up, go straight to destination
       try {
         const pr = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${token}` } });
         if (pr.ok) {
           const p = await pr.json();
-          if (p.tosAgreed && p.profileSetup) { window.location.href = '/portal.html'; return; }
+          if (p.tosAgreed && p.profileSetup) {
+            const dest = new URLSearchParams(location.search).get('redirect') || '/';
+            window.location.href = dest;
+            return;
+          }
         }
       } catch { }
 
@@ -585,8 +589,9 @@
         }
 
         statusEl.className = 'setup-status ok';
-        statusEl.textContent = '✓ Profile created! Entering portal…';
-        setTimeout(() => { window.location.href = '/portal.html'; }, 1000);
+        statusEl.textContent = '\u2713 Profile created! Entering portal\u2026';
+        const dest = new URLSearchParams(location.search).get('redirect') || '/';
+        setTimeout(() => { window.location.href = dest; }, 1000);
       } catch {
         statusEl.className = 'setup-status err';
         statusEl.textContent = 'Network error. Please try again.';

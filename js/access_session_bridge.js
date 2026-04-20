@@ -6,53 +6,14 @@
  * ask for a second sign-in.
  */
 
+// CF Access bridge removed — auth is handled via /api/auth/login or /api/auth/google.
 (function () {
-  async function ensure(options) {
-    const opts = options || {};
-
+  function ensure() {
     let existing = null;
-    try { existing = localStorage.getItem('user_token'); } catch { /* ignore */ }
-
-    if (existing && !opts.force) {
-      return { token: existing, source: 'localStorage' };
-    }
-
-    // If Cloudflare Access is not enabled for this environment/page,
-    // this call will fail or return non-200.
-    let res;
-    try {
-      res = await fetch('/api/auth/access-session', {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' },
-      });
-    } catch {
-      return null;
-    }
-
-    if (!res || !res.ok) return null;
-
-    let data;
-    try { data = await res.json(); } catch { return null; }
-    if (!data || !data.success || !data.token) return null;
-
-    try {
-      localStorage.setItem('user_token', data.token);
-      if (data.username) localStorage.setItem('username', data.username);
-      if (data.displayName) localStorage.setItem('display_name', data.displayName);
-      if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
-    } catch { /* ignore */ }
-
-    return {
-      token: data.token,
-      username: data.username,
-      displayName: data.displayName,
-      userId: data.userId,
-      source: 'access-session'
-    };
+    try { existing = localStorage.getItem('kg_token') || localStorage.getItem('user_token'); } catch { /* ignore */ }
+    if (existing) return Promise.resolve({ token: existing, source: 'localStorage' });
+    return Promise.resolve(null);
   }
-
-  // Expose a tiny API for lobbies to use.
   if (typeof window !== 'undefined') {
     window.KGAccessSession = { ensure };
   }

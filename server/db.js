@@ -7,8 +7,13 @@
  *   y = normalized activity (sessions / 1000)         — 0.0 → 1.0
  *   z = x * y  → composite rank surface (Relation Surface)
  *
- * No PII is stored directly — emails are SHA-256 hashed on entry.
- * Admin pages show player_name only, never email.
+ * PII policy:
+ *   - email stored as SHA-256 hash (email_hash) for fast lookups
+ *   - email also stored AES-256-GCM encrypted (email_enc) for superuser-only retrieval
+ *   - passwords: bcrypt-hashed in manifold JSON (never in SQLite)
+ *   - player_name is the only public identifier
+ *   - game stats, avatar, manifold coords are non-PII and stored plaintext
+ *   - admin notes stored encrypted in admins table
  */
 'use strict';
 
@@ -18,6 +23,48 @@ const crypto = require('crypto');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'kensgames.db');
 let _db = null;
+
+// ─── PII encryption (AES-256-GCM) ────────────────────────────────────────────
+// ENCRYPTION_KEY must be exactly 64 hex chars (= 32 bytes) in .env
+const _PII_KEY = (() => {
+  const hex = process.env.ENCRYPTION_KEY;
+  if (hex && hex.length === 64) return Buffer.from(hex, 'hex');
+  console.warn('[db] ENCRYPTION_KEY missing or wrong length — PII encryption disabled');
+  return null;
+})();
+
+const PiiCrypto = {
+  /** Encrypt any string value; returns "base64iv.base64cipher.base64tag" or null */
+  encrypt(val) {
+    if (val === null || val === undefined || !_PII_KEY) return null;
+    try {
+      const iv = crypto.randomBytes(12);
+      const c = crypto.createCipheriv('aes-256-gcm', _PII_KEY, iv);
+      let enc = c.update(String(val), 'utf8', 'base64');
+      enc += c.final('base64');
+      const tag = c.getAuthTag();
+      return `${iv.toString('base64')}.${enc}.${tag.toString('base64')}`;
+    } catch (e) {
+      console.error('[PiiCrypto] encrypt error:', e.message);
+      return null;
+    }
+  },
+  /** Decrypt an encrypted string; returns original value or null */
+  decrypt(enc) {
+    if (!enc || !_PII_KEY) return null;
+    try {
+      const parts = enc.split('.');
+      if (parts.length !== 3) return null;
+      const iv = Buffer.from(parts[0], 'base64');
+      const tag = Buffer.from(parts[2], 'base64');
+      const d = crypto.createDecipheriv('aes-256-gcm', _PII_KEY, iv);
+      d.setAuthTag(tag);
+      let out = d.update(parts[1], 'base64', 'utf8');
+      out += d.final('utf8');
+      return out;
+    } catch { return null; }
+  }
+};
 
 function db() {
   if (!_db) {
@@ -47,6 +94,7 @@ function _initSchema(d) {
       status          TEXT    NOT NULL DEFAULT 'active',
       suspended_until INTEGER,
       ban_reason      TEXT,
+      favorite_game   TEXT,
       is_admin        INTEGER NOT NULL DEFAULT 0,
       is_superuser    INTEGER NOT NULL DEFAULT 0,
       manifold_x      REAL    NOT NULL DEFAULT 0.0,
@@ -175,7 +223,30 @@ function _initSchema(d) {
       expires_at       INTEGER,
       created_at       INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    -- ── Admin roster ───────────────────────────────────────────────────────
+    -- is_superuser=1 is a protected hidden field; only 1 active superuser allowed.
+    -- Partial unique index enforces the single-superuser constraint at the DB level.
+    CREATE TABLE IF NOT EXISTS admins (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id      INTEGER UNIQUE NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      is_superuser   INTEGER NOT NULL DEFAULT 0,
+      granted_by     INTEGER REFERENCES players(id),
+      granted_at     INTEGER NOT NULL DEFAULT (unixepoch()),
+      notes_enc      TEXT,
+      last_action_at INTEGER,
+      revoked_at     INTEGER,
+      revoked_by     INTEGER REFERENCES players(id),
+      active         INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_one_superuser
+      ON admins(is_superuser) WHERE is_superuser=1 AND active=1;
+    CREATE INDEX IF NOT EXISTS idx_admins_player ON admins(player_id);
   `);
+
+  // ── Safe schema migrations ─────────────────────────────────────────────
+  // Add email_enc column if upgrading from an older schema
+  try { d.exec('ALTER TABLE players ADD COLUMN email_enc TEXT'); } catch { }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -201,16 +272,25 @@ const PlayerDB = {
 
   // ── Core ─────────────────────────────────────────────────────────────────
 
-  /** Called on every successful login — upserts record, touches last_seen */
-  ensurePlayer(kgUserId, email) {
+  /** Called on every successful login — upserts record, touches last_seen.
+   *  Pass emailEnc (AES-256-GCM encrypted email) so it's stored/updated. */
+  ensurePlayer(kgUserId, email, emailEnc) {
     const d = db();
     const hash = hashEmail(email || '');
+    const enc = emailEnc || PiiCrypto.encrypt(email || '') || null;
     const existing = d.prepare('SELECT * FROM players WHERE kg_user_id = ?').get(kgUserId);
     if (existing) {
-      d.prepare('UPDATE players SET last_seen = unixepoch() WHERE id = ?').run(existing.id);
-      return existing;
+      // Update last_seen and backfill email_enc if not already set
+      if (enc && !existing.email_enc) {
+        d.prepare('UPDATE players SET last_seen=unixepoch(), email_enc=? WHERE id=?').run(enc, existing.id);
+      } else {
+        d.prepare('UPDATE players SET last_seen=unixepoch() WHERE id=?').run(existing.id);
+      }
+      return d.prepare('SELECT * FROM players WHERE id=?').get(existing.id);
     }
-    const info = d.prepare('INSERT INTO players (kg_user_id, email_hash) VALUES (?, ?)').run(kgUserId, hash);
+    const info = d.prepare(
+      'INSERT INTO players (kg_user_id, email_hash, email_enc) VALUES (?,?,?)'
+    ).run(kgUserId, hash, enc);
     return d.prepare('SELECT * FROM players WHERE id = ?').get(info.lastInsertRowid);
   },
 
@@ -466,14 +546,159 @@ const PlayerDB = {
   adminStats() {
     return db().prepare(`
       SELECT
-        COUNT(*)                                                         AS total,
-        SUM(CASE WHEN status = 'active'    THEN 1 ELSE 0 END)          AS active,
-        SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END)          AS suspended,
-        SUM(profile_setup)                                               AS setup_complete,
-        SUM(CASE WHEN last_seen > unixepoch() - 86400 THEN 1 ELSE 0 END) AS seen_today
+        COUNT(*)                                                              AS total,
+        SUM(CASE WHEN status = 'active'    THEN 1 ELSE 0 END)               AS active,
+        SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END)               AS suspended,
+        SUM(CASE WHEN status = 'banned'    THEN 1 ELSE 0 END)               AS banned,
+        SUM(profile_setup)                                                    AS setup_complete,
+        SUM(CASE WHEN last_seen > unixepoch() - 86400 THEN 1 ELSE 0 END)    AS seen_today,
+        SUM(CASE WHEN is_admin=1 OR is_superuser=1 THEN 1 ELSE 0 END)       AS admins
       FROM players
     `).get();
   },
 };
 
-module.exports = { db, PlayerDB, hashEmail, xpToLevel, MEDALLION_LEVELS, MEDALLION_MIN_XP };
+// ─── AdminDB — admin roster + permission operations ───────────────────────────
+const AdminDB = {
+
+  /** Fetch active admin record for a player (null if not an admin) */
+  getAdminRecord(playerId) {
+    return db().prepare('SELECT * FROM admins WHERE player_id=? AND active=1').get(playerId);
+  },
+
+  isAdmin(playerId) {
+    return !!db().prepare('SELECT 1 FROM admins WHERE player_id=? AND active=1').get(playerId);
+  },
+
+  isSuperuser(playerId) {
+    return !!db().prepare('SELECT 1 FROM admins WHERE player_id=? AND is_superuser=1 AND active=1').get(playerId);
+  },
+
+  /** Get the single active superuser's full record (null if none) */
+  getSuperuser() {
+    return db().prepare(`
+      SELECT a.*, p.player_name, p.avatar_id
+      FROM admins a JOIN players p ON p.id=a.player_id
+      WHERE a.is_superuser=1 AND a.active=1
+    `).get();
+  },
+
+  /** List all active admins ordered: superuser first */
+  listAdmins() {
+    return db().prepare(`
+      SELECT a.*, p.player_name, p.avatar_id,
+             g.player_name AS granted_by_name
+      FROM admins a
+      JOIN players p ON p.id=a.player_id
+      LEFT JOIN players g ON g.id=a.granted_by
+      WHERE a.active=1
+      ORDER BY a.is_superuser DESC, a.granted_at ASC
+    `).all();
+  },
+
+  /**
+   * Grant admin (or superuser) status.
+   * isSuperuser=true is protected: will throw if a superuser already exists.
+   * grantedBy = player_id of actor (null for system/bootstrap).
+   */
+  promoteAdmin(playerId, grantedBy, isSuperuser, notes) {
+    if (isSuperuser) {
+      const existing = db().prepare('SELECT 1 FROM admins WHERE is_superuser=1 AND active=1').get();
+      if (existing) throw new Error('A superuser already exists. Use transferSuperuser() instead.');
+    }
+    const notesEnc = notes ? PiiCrypto.encrypt(notes) : null;
+    const existing = db().prepare('SELECT id FROM admins WHERE player_id=?').get(playerId);
+    if (existing) {
+      // Re-activate (was previously revoked)
+      db().prepare(
+        'UPDATE admins SET active=1, is_superuser=?, granted_by=?, granted_at=unixepoch(), revoked_at=NULL, revoked_by=NULL, notes_enc=? WHERE player_id=?'
+      ).run(isSuperuser ? 1 : 0, grantedBy || null, notesEnc, playerId);
+    } else {
+      db().prepare(
+        'INSERT INTO admins (player_id, is_superuser, granted_by, notes_enc) VALUES (?,?,?,?)'
+      ).run(playerId, isSuperuser ? 1 : 0, grantedBy || null, notesEnc);
+    }
+    // Keep denormalized columns in sync
+    db().prepare('UPDATE players SET is_admin=1, is_superuser=? WHERE id=?')
+      .run(isSuperuser ? 1 : 0, playerId);
+  },
+
+  /**
+   * Revoke admin status. Protected: cannot revoke an active superuser via this method.
+   * revokedBy = player_id of actor.
+   */
+  revokeAdmin(playerId, revokedBy) {
+    const rec = db().prepare('SELECT * FROM admins WHERE player_id=? AND active=1').get(playerId);
+    if (!rec) return; // not an admin — no-op
+    if (rec.is_superuser) throw new Error('Cannot revoke superuser via revokeAdmin. Use transferSuperuser() instead.');
+    db().prepare(
+      'UPDATE admins SET active=0, revoked_at=unixepoch(), revoked_by=? WHERE player_id=?'
+    ).run(revokedBy || null, playerId);
+    db().prepare('UPDATE players SET is_admin=0, is_superuser=0 WHERE id=?').run(playerId);
+  },
+
+  /**
+   * Transfer superuser role from one player to another atomically.
+   * The former superuser is demoted to regular admin (not revoked).
+   */
+  transferSuperuser(fromPlayerId, toPlayerId) {
+    const t = db().transaction(() => {
+      // Demote current superuser → regular admin
+      db().prepare('UPDATE admins SET is_superuser=0 WHERE player_id=? AND active=1').run(fromPlayerId);
+      db().prepare('UPDATE players SET is_superuser=0 WHERE id=?').run(fromPlayerId);
+      // Promote new player to superuser (create or update)
+      const existing = db().prepare('SELECT id FROM admins WHERE player_id=? AND active=1').get(toPlayerId);
+      if (existing) {
+        db().prepare('UPDATE admins SET is_superuser=1 WHERE player_id=?').run(toPlayerId);
+      } else {
+        db().prepare(
+          'INSERT INTO admins (player_id, is_superuser, granted_by) VALUES (?,1,?)'
+        ).run(toPlayerId, fromPlayerId);
+      }
+      db().prepare('UPDATE players SET is_admin=1, is_superuser=1 WHERE id=?').run(toPlayerId);
+    });
+    t();
+  },
+
+  /** Touch last_action_at timestamp for an admin */
+  updateLastAction(playerId) {
+    db().prepare('UPDATE admins SET last_action_at=unixepoch() WHERE player_id=?').run(playerId);
+  },
+
+  /** List suspended players for superuser review (most recent first) */
+  listSuspended() {
+    return db().prepare(`
+      SELECT p.id, p.player_name, p.avatar_id, p.status, p.suspended_until,
+             p.ban_reason, p.is_admin,
+             a.action AS last_action_type, a.reason AS last_action_reason,
+             a.created_at AS action_at,
+             actor.player_name AS action_by
+      FROM players p
+      LEFT JOIN admin_actions a ON a.id = (
+        SELECT id FROM admin_actions WHERE target_player_id=p.id ORDER BY created_at DESC LIMIT 1
+      )
+      LEFT JOIN players actor ON actor.id = a.admin_player_id
+      WHERE p.status = 'suspended'
+      ORDER BY a.created_at DESC
+    `).all();
+  },
+
+  /** List banned players */
+  listBanned() {
+    return db().prepare(`
+      SELECT p.id, p.player_name, p.avatar_id, p.status,
+             p.ban_reason, p.is_admin,
+             a.action AS last_action_type, a.created_at AS action_at,
+             actor.player_name AS action_by
+      FROM players p
+      LEFT JOIN admin_actions a ON a.id = (
+        SELECT id FROM admin_actions WHERE target_player_id=p.id AND action='ban' ORDER BY created_at DESC LIMIT 1
+      )
+      LEFT JOIN players actor ON actor.id = a.admin_player_id
+      WHERE p.status = 'banned'
+      ORDER BY a.created_at DESC
+    `).all();
+  },
+};
+
+module.exports = { db, PlayerDB, AdminDB, PiiCrypto, hashEmail, xpToLevel, MEDALLION_LEVELS, MEDALLION_MIN_XP };

@@ -118,6 +118,58 @@ class PasswordRecoveryManager {
   }
 
   /**
+   * Generate 6-digit OTP code for password reset
+   */
+  generateOTPCode(email) {
+    const code = String(crypto.randomInt(100000, 999999));
+    const emailHash = crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
+    const key = `otp-${emailHash}`;
+    this.manifold[key] = {
+      code,
+      email: email.toLowerCase(),
+      createdAt: Date.now(),
+      expiresAt: Date.now() + this.tokenExpiryMs,
+      used: false,
+      attempts: 0
+    };
+    console.log(`🔢 OTP generated for ${email}, expires in ${this.tokenExpiryMinutes}m`);
+    return code;
+  }
+
+  /**
+   * Validate OTP code
+   */
+  validateOTPCode(email, code) {
+    const emailHash = crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
+    const key = `otp-${emailHash}`;
+    const data = this.manifold[key];
+    if (!data) return { valid: false, error: 'Code not found or expired. Request a new code.' };
+    if (data.used) return { valid: false, error: 'Code already used. Request a new one.' };
+    if (Date.now() > data.expiresAt) {
+      delete this.manifold[key];
+      return { valid: false, error: 'Code expired. Request a new one.' };
+    }
+    data.attempts = (data.attempts || 0) + 1;
+    if (data.attempts > 5) {
+      data.used = true;
+      return { valid: false, error: 'Too many attempts. Request a new code.' };
+    }
+    if (data.code !== String(code).trim()) {
+      return { valid: false, error: `Incorrect code. ${5 - data.attempts} attempt${5 - data.attempts === 1 ? '' : 's'} remaining.` };
+    }
+    return { valid: true, email: data.email };
+  }
+
+  /**
+   * Consume (mark used) an OTP code after successful reset
+   */
+  consumeOTPCode(email) {
+    const emailHash = crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
+    const key = `otp-${emailHash}`;
+    if (this.manifold[key]) { this.manifold[key].used = true; }
+  }
+
+  /**
    * Mark recovery token as used (consumed)
    * Prevents token reuse
    */

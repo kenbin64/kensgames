@@ -56,31 +56,12 @@ function isGuestToken(token) {
     return !token || String(token).startsWith('guest-');
 }
 
-async function ensureUserTokenFromAccess() {
-    // If we already have a non-guest token, keep it.
-    const existing = getSiteAuthToken();
-    if (!isGuestToken(existing)) return existing;
-
-    try {
-        const res = await fetch('/api/auth/access-session', {
-            method: 'GET',
-            credentials: 'include',
-            headers: { 'Accept': 'application/json' },
-        });
-        if (!res.ok) return existing;
-        const data = await res.json();
-        if (!data || !data.success || !data.token) return existing;
-        try {
-            localStorage.setItem('user_token', data.token);
-            localStorage.setItem('kg_token', data.token); // keep both keys in sync
-            if (data.username) localStorage.setItem('username', data.username);
-            if (data.displayName) localStorage.setItem('display_name', data.displayName);
-            if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
-        } catch (e) { /* ignore */ }
-        return data.token;
-    } catch (e) {
-        return existing;
-    }
+function ensureUserTokenFromAccess() {
+    // CF Access bridge removed — returns existing localStorage token.
+    return Promise.resolve(getSiteAuthToken());
+} catch (e) {
+    return existing;
+}
 }
 
 function getSiteUsernameFallback() {
@@ -652,7 +633,8 @@ function handleRegister(event) {
 function logout() {
     send({ type: 'logout' });
     closeModal('profile-modal');
-    window.location.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
+    ['kg_token', 'user_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar', 'username', 'display_name', 'user_id'].forEach(k => localStorage.removeItem(k));
+    window.location.href = '/login/';
 }
 
 function showPrivateGameJoin() {

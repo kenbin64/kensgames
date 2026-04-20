@@ -1,581 +1,401 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>KensGames Admin</title>
   <style>
-    :root {
-      --bg: #0a0a0f;
-      --card: #111118;
-      --cyan: #00ffff;
-      --green: #00ff41;
-      --pink: #ff00ff;
-      --yellow: #ffe600;
-      --orange: #ff8c00;
-      --red: #ff3333;
-      --dim: #888;
-      --txm: #aaa;
-      --font: 'Courier New', monospace;
-      --gcyan: 0 0 12px rgba(0, 255, 255, .35);
-      --ggreen: 0 0 12px rgba(0, 255, 65, .35);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background: var(--bg);
-      color: #e0e0e0;
-      font-family: var(--font);
-      min-height: 100vh;
-    }
-
-    /* ── Header ── */
-    .adm-header {
-      background: linear-gradient(135deg, #0d0d1a, #111130);
-      border-bottom: 2px solid var(--cyan);
-      padding: 16px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .adm-title {
-      font-size: 20px;
-      font-weight: 900;
-      color: var(--cyan);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      text-shadow: var(--gcyan);
-    }
-
-    .adm-who {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--txm);
-    }
-
-    .adm-who .av {
-      font-size: 22px;
-    }
-
-    .adm-who .name {
-      color: var(--yellow);
-      font-weight: 700;
-    }
-
-    .adm-badge {
-      padding: 3px 10px;
-      border: 1px solid var(--yellow);
-      border-radius: 10px;
-      color: var(--yellow);
-      font-size: 10px;
-      letter-spacing: 2px;
-    }
-
-    /* ── Stats bar ── */
-    .adm-stats {
-      display: flex;
-      gap: 16px;
-      padding: 20px 28px;
-      flex-wrap: wrap;
-    }
-
-    .stat-card {
-      background: var(--card);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 14px 22px;
-      min-width: 120px;
-      text-align: center;
-    }
-
-    .stat-card .val {
-      font-size: 28px;
-      font-weight: 900;
-      color: var(--cyan);
-      text-shadow: var(--gcyan);
-    }
-
-    .stat-card.warn .val {
-      color: var(--orange);
-      text-shadow: 0 0 12px rgba(255, 140, 0, .4);
-    }
-
-    .stat-card.danger .val {
-      color: var(--red);
-      text-shadow: 0 0 12px rgba(255, 51, 51, .4);
-    }
-
-    .stat-card .lbl {
-      font-size: 10px;
-      color: var(--dim);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-top: 4px;
-    }
-
-    /* ── Search + toolbar ── */
-    .adm-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 28px 20px;
-      flex-wrap: wrap;
-    }
-
-    .search-wrap {
-      position: relative;
-      flex: 1;
-      max-width: 420px;
-    }
-
-    .search-wrap input {
-      width: 100%;
-      padding: 10px 14px 10px 38px;
-      background: var(--card);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 6px;
-      color: #fff;
-      font-family: var(--font);
-      font-size: 14px;
-      outline: none;
-      transition: border-color .2s;
-    }
-
-    .search-wrap input:focus {
-      border-color: var(--cyan);
-    }
-
-    .search-wrap .icon {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--dim);
-      font-size: 14px;
-    }
-
-    .adm-refresh {
-      padding: 10px 18px;
-      background: rgba(0, 255, 255, 0.08);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 6px;
-      color: var(--cyan);
-      cursor: pointer;
-      font-family: var(--font);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      transition: all .2s;
-    }
-
-    .adm-refresh:hover {
-      background: rgba(0, 255, 255, 0.18);
-    }
-
-    .result-count {
-      font-size: 12px;
-      color: var(--dim);
-    }
-
-    /* ── Table ── */
-    .adm-table-wrap {
-      padding: 0 28px 40px;
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    thead th {
-      text-align: left;
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-      color: var(--cyan);
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      transition: background .15s;
-    }
-
-    tbody tr:hover {
-      background: rgba(0, 255, 255, 0.04);
-    }
-
-    tbody td {
-      padding: 10px 12px;
-      vertical-align: middle;
-      color: var(--txm);
-      white-space: nowrap;
-    }
-
-    .td-av {
-      font-size: 22px;
-      text-align: center;
-      width: 42px;
-    }
-
-    .td-name {
-      color: #fff;
-      font-weight: 700;
-      font-size: 14px;
-    }
-
-    .td-name.superuser {
-      color: var(--yellow);
-    }
-
-    .badge-su {
-      display: inline-block;
-      font-size: 9px;
-      padding: 1px 6px;
-      border-radius: 8px;
-      background: rgba(255, 230, 0, 0.15);
-      border: 1px solid var(--yellow);
-      color: var(--yellow);
-      margin-left: 6px;
-      vertical-align: middle;
-      letter-spacing: 1px;
-    }
-
-    .status-active {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      background: rgba(0, 255, 65, 0.1);
-      border: 1px solid rgba(0, 255, 65, 0.3);
-      color: var(--green);
-    }
-
-    .status-suspended {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      background: rgba(255, 140, 0, 0.1);
-      border: 1px solid rgba(255, 140, 0, 0.35);
-      color: var(--orange);
-    }
-
-    .btn-toggle {
-      padding: 6px 14px;
-      border-radius: 5px;
-      font-family: var(--font);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: all .2s;
-      border: 1px solid;
-    }
-
-    .btn-toggle.suspend {
-      background: rgba(255, 140, 0, 0.08);
-      border-color: rgba(255, 140, 0, 0.35);
-      color: var(--orange);
-    }
-
-    .btn-toggle.suspend:hover {
-      background: rgba(255, 140, 0, 0.22);
-      border-color: var(--orange);
-    }
-
-    .btn-toggle.unsuspend {
-      background: rgba(0, 255, 65, 0.08);
-      border-color: rgba(0, 255, 65, 0.3);
-      color: var(--green);
-    }
-
-    .btn-toggle.unsuspend:hover {
-      background: rgba(0, 255, 65, 0.2);
-      border-color: var(--green);
-    }
-
-    .btn-toggle:disabled {
-      opacity: 0.35;
-      cursor: default;
-    }
-
-    /* ── Empty / loading ── */
-    .adm-msg {
-      text-align: center;
-      padding: 48px;
-      color: var(--dim);
-      font-size: 14px;
-    }
-
-    /* ── Toast ── */
-    #toast {
-      display: none;
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1a1a2e;
-      border: 1px solid var(--cyan);
-      color: #fff;
-      padding: 10px 24px;
-      border-radius: 8px;
-      font-size: 13px;
-      z-index: 999;
-      box-shadow: var(--gcyan);
-    }
+    :root{--bg:#0a0a0f;--card:#111118;--cyan:#00ffff;--green:#00ff41;--pink:#ff00ff;--yel:#ffe600;--ora:#ff8c00;--red:#ff3333;--dim:#888;--txm:#aaa;--font:'Courier New',monospace;--gcyan:0 0 12px rgba(0,255,255,.35)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:#e0e0e0;font-family:var(--font);min-height:100vh}
+    .hdr{background:linear-gradient(135deg,#0d0d1a,#111130);border-bottom:2px solid var(--cyan);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .hdr-title{font-size:18px;font-weight:900;color:var(--cyan);letter-spacing:3px;text-shadow:var(--gcyan)}
+    .hdr-who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txm)}
+    .hdr-av{font-size:22px}.hdr-name{color:var(--yel);font-weight:700}
+    .role-badge{padding:3px 10px;border-radius:10px;font-size:10px;letter-spacing:2px;font-weight:700;border:1px solid}
+    .role-badge.su{color:var(--yel);border-color:var(--yel);background:rgba(255,230,0,.08)}
+    .role-badge.adm{color:var(--cyan);border-color:var(--cyan);background:rgba(0,255,255,.08)}
+    .tabs{display:flex;gap:0;border-bottom:1px solid rgba(0,255,255,.15);padding:0 28px;flex-wrap:wrap}
+    .tab{padding:12px 20px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s}
+    .tab:hover{color:var(--txm)}.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+    .tab .cnt{display:inline-block;background:rgba(255,140,0,.2);border:1px solid rgba(255,140,0,.4);color:var(--ora);border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;vertical-align:middle}
+    .tab .cnt.red{background:rgba(255,51,51,.2);border-color:rgba(255,51,51,.4);color:var(--red)}
+    .pane{display:none;padding:24px 28px 48px}.pane.active{display:block}
+    .stats-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+    .stat{background:var(--card);border:1px solid rgba(0,255,255,.15);border-radius:8px;padding:12px 20px;min-width:110px;text-align:center}
+    .stat .val{font-size:26px;font-weight:900;color:var(--cyan);text-shadow:var(--gcyan)}
+    .stat.warn .val{color:var(--ora);text-shadow:0 0 12px rgba(255,140,0,.4)}
+    .stat.danger .val{color:var(--red);text-shadow:0 0 12px rgba(255,51,51,.4)}
+    .stat.gold .val{color:var(--yel);text-shadow:0 0 12px rgba(255,230,0,.4)}
+    .stat .lbl{font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px}
+    .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .srch-wrap{position:relative;flex:1;max-width:400px}
+    .srch-wrap input{width:100%;padding:9px 12px 9px 36px;background:var(--card);border:1px solid rgba(0,255,255,.25);border-radius:6px;color:#fff;font-family:var(--font);font-size:13px;outline:none;transition:border-color .2s}
+    .srch-wrap input:focus{border-color:var(--cyan)}.srch-wrap .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:13px}
+    .btn-sm{padding:9px 16px;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;border:1px solid}
+    .btn-sm.cyan{background:rgba(0,255,255,.08);border-color:rgba(0,255,255,.25);color:var(--cyan)}.btn-sm.cyan:hover{background:rgba(0,255,255,.18)}
+    .rc{font-size:12px;color:var(--dim)}
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{text-align:left;padding:9px 11px;border-bottom:1px solid rgba(0,255,255,.2);color:var(--cyan);font-size:10px;letter-spacing:2px;text-transform:uppercase;white-space:nowrap}
+    tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s}
+    tbody tr:hover{background:rgba(0,255,255,.035)}
+    tbody td{padding:9px 11px;vertical-align:middle;color:var(--txm);white-space:nowrap}
+    .td-av{font-size:21px;text-align:center;width:40px}.td-name{color:#fff;font-weight:700;font-size:14px}
+    .badge-su{display:inline-block;font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,230,0,.12);border:1px solid var(--yel);color:var(--yel);margin-left:5px;vertical-align:middle;letter-spacing:1px}
+    .badge-adm{display:inline-block;font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,255,255,.1);border:1px solid var(--cyan);color:var(--cyan);margin-left:5px;vertical-align:middle;letter-spacing:1px}
+    .s-active{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:1px;background:rgba(0,255,65,.1);border:1px solid rgba(0,255,65,.3);color:var(--green)}
+    .s-suspended{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:1px;background:rgba(255,140,0,.1);border:1px solid rgba(255,140,0,.35);color:var(--ora)}
+    .s-banned{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:1px;background:rgba(255,51,51,.1);border:1px solid rgba(255,51,51,.35);color:var(--red)}
+    .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .btn-act{padding:5px 12px;border-radius:5px;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;border:1px solid}
+    .btn-act:disabled{opacity:.35;cursor:default}
+    .btn-act.sus{background:rgba(255,140,0,.08);border-color:rgba(255,140,0,.35);color:var(--ora)}.btn-act.sus:hover:not(:disabled){background:rgba(255,140,0,.22);border-color:var(--ora)}
+    .btn-act.unsus{background:rgba(0,255,65,.08);border-color:rgba(0,255,65,.3);color:var(--green)}.btn-act.unsus:hover:not(:disabled){background:rgba(0,255,65,.2);border-color:var(--green)}
+    .btn-act.ban{background:rgba(255,51,51,.08);border-color:rgba(255,51,51,.3);color:var(--red)}.btn-act.ban:hover:not(:disabled){background:rgba(255,51,51,.2);border-color:var(--red)}
+    .btn-act.unban{background:rgba(0,255,65,.08);border-color:rgba(0,255,65,.3);color:var(--green)}.btn-act.unban:hover:not(:disabled){background:rgba(0,255,65,.2);border-color:var(--green)}
+    .btn-act.mkadm{background:rgba(0,255,255,.06);border-color:rgba(0,255,255,.25);color:var(--cyan)}.btn-act.mkadm:hover:not(:disabled){background:rgba(0,255,255,.16)}
+    .btn-act.rvadm{background:rgba(255,0,255,.06);border-color:rgba(255,0,255,.25);color:var(--pink)}.btn-act.rvadm:hover:not(:disabled){background:rgba(255,0,255,.16)}
+    .prot{color:var(--dim);font-size:11px}
+    .adm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:8px}
+    .adm-card{background:var(--card);border:1px solid rgba(0,255,255,.15);border-radius:10px;padding:18px 20px}
+    .adm-card.su-card{border-color:rgba(255,230,0,.4)}
+    .adm-card-name{font-size:16px;font-weight:900;color:#fff;margin-bottom:4px}
+    .adm-card-meta{font-size:11px;color:var(--dim);margin-bottom:12px}
+    .adm-card-acts{display:flex;gap:8px;flex-wrap:wrap}
+    .msg{text-align:center;padding:48px;color:var(--dim);font-size:14px}
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+    .modal-bg.open{display:flex}
+    .modal{background:#141420;border:1px solid var(--cyan);border-radius:12px;padding:28px;width:100%;max-width:420px;position:relative}
+    .modal h3{color:var(--cyan);margin-bottom:16px;font-size:15px;letter-spacing:2px}
+    .modal label{display:block;font-size:11px;color:var(--dim);margin-bottom:5px;letter-spacing:1px;text-transform:uppercase}
+    .modal input,.modal textarea{width:100%;padding:10px 12px;background:var(--card);border:1px solid rgba(0,255,255,.2);border-radius:6px;color:#fff;font-family:var(--font);font-size:13px;outline:none;margin-bottom:14px}
+    .modal input:focus,.modal textarea:focus{border-color:var(--cyan)}.modal textarea{resize:vertical;min-height:72px}
+    .modal-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+    .btn-cancel{padding:9px 18px;background:transparent;border:1px solid var(--dim);border-radius:6px;color:var(--dim);cursor:pointer;font-family:var(--font);font-size:12px;transition:all .2s}.btn-cancel:hover{border-color:#aaa;color:#aaa}
+    .btn-confirm{padding:9px 20px;border-radius:6px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;border:1px solid}
+    .btn-confirm.red{background:rgba(255,51,51,.12);border-color:var(--red);color:var(--red)}.btn-confirm.red:hover{background:rgba(255,51,51,.28)}
+    .btn-confirm.orange{background:rgba(255,140,0,.12);border-color:var(--ora);color:var(--ora)}.btn-confirm.orange:hover{background:rgba(255,140,0,.28)}
+    .btn-confirm.cyan{background:rgba(0,255,255,.1);border-color:var(--cyan);color:var(--cyan)}.btn-confirm.cyan:hover{background:rgba(0,255,255,.22)}
+    .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;line-height:1}.modal-close:hover{color:#fff}
+    .modal-err{color:var(--red);font-size:12px;margin-bottom:10px;display:none}
+    #toast{display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid var(--cyan);color:#fff;padding:10px 22px;border-radius:8px;font-size:13px;z-index:999;box-shadow:var(--gcyan)}
   </style>
 </head>
-
 <body>
-
-  <header class="adm-header">
-    <div class="adm-title">&#9652; KensGames Admin</div>
-    <div class="adm-who">
-      <span class="av" id="adm-av">&#x1F680;</span>
-      <span class="name" id="adm-name">kbingh</span>
-      <span class="adm-badge">SUPERUSER</span>
+  <header class="hdr">
+    <div class="hdr-title">&#9652; KensGames Admin</div>
+    <div class="hdr-who">
+      <span class="hdr-av" id="hdr-av">&#x1F680;</span>
+      <span class="hdr-name" id="hdr-name">—</span>
+      <span class="role-badge" id="role-badge">ADMIN</span>
     </div>
   </header>
-
-  <!-- Stats -->
-  <div class="adm-stats" id="adm-stats">
-    <div class="stat-card">
-      <div class="val" id="st-total">—</div>
-      <div class="lbl">Total Players</div>
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('players',this)">Players</button>
+    <button class="tab" onclick="switchTab('suspensions',this)" id="tab-sus">Suspensions <span class="cnt" id="sus-count" style="display:none">0</span></button>
+    <button class="tab su-only" onclick="switchTab('banned',this)" id="tab-ban">Banned <span class="cnt red" id="ban-count" style="display:none">0</span></button>
+    <button class="tab su-only" onclick="switchTab('admins',this)">Admins</button>
+  </nav>
+  <div class="pane active" id="pane-players">
+    <div class="stats-row">
+      <div class="stat"><div class="val" id="st-total">—</div><div class="lbl">Total</div></div>
+      <div class="stat"><div class="val" id="st-active">—</div><div class="lbl">Active</div></div>
+      <div class="stat warn"><div class="val" id="st-sus">—</div><div class="lbl">Suspended</div></div>
+      <div class="stat danger"><div class="val" id="st-ban">—</div><div class="lbl">Banned</div></div>
+      <div class="stat"><div class="val" id="st-today">—</div><div class="lbl">Seen Today</div></div>
+      <div class="stat gold"><div class="val" id="st-admins">—</div><div class="lbl">Admins</div></div>
     </div>
-    <div class="stat-card">
-      <div class="val" id="st-active">—</div>
-      <div class="lbl">Active</div>
+    <div class="toolbar">
+      <div class="srch-wrap"><span class="ico">&#128269;</span><input type="text" id="srch" placeholder="Search player name…" autocomplete="off"></div>
+      <button class="btn-sm cyan" onclick="loadPlayers()">&#8635; Refresh</button>
+      <span class="rc" id="rc"></span>
     </div>
-    <div class="stat-card warn">
-      <div class="val" id="st-suspended">—</div>
-      <div class="lbl">Suspended</div>
-    </div>
-    <div class="stat-card">
-      <div class="val" id="st-today">—</div>
-      <div class="lbl">Seen Today</div>
-    </div>
-    <div class="stat-card">
-      <div class="val" id="st-setup">—</div>
-      <div class="lbl">Profiles Set Up</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Player Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Last Seen</th><th>Games</th><th>Wins</th><th>Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="9" class="msg">Loading…</td></tr></tbody>
+      </table>
     </div>
   </div>
-
-  <!-- Toolbar -->
-  <div class="adm-toolbar">
-    <div class="search-wrap">
-      <span class="icon">&#128269;</span>
-      <input type="text" id="search-input" placeholder="Search player name…" autocomplete="off">
+  <div class="pane" id="pane-suspensions">
+    <h2 style="color:var(--ora);font-size:14px;letter-spacing:2px;margin-bottom:20px">&#9646; ACTIVE SUSPENSIONS</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Player Name</th><th>Role</th><th>Reason</th><th>Action By</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="sus-tbody"><tr><td colspan="7" class="msg">Loading…</td></tr></tbody>
+      </table>
     </div>
-    <button class="adm-refresh" onclick="load()">&#8635; Refresh</button>
-    <span class="result-count" id="result-count"></span>
   </div>
-
-  <!-- Table -->
-  <div class="adm-table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          <th>Player Name</th>
-          <th>Status</th>
-          <th>Joined</th>
-          <th>Last Seen</th>
-          <th>Games</th>
-          <th>Wins</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="adm-tbody">
-        <tr>
-          <td colspan="8" class="adm-msg">Loading…</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="pane" id="pane-banned">
+    <h2 style="color:var(--red);font-size:14px;letter-spacing:2px;margin-bottom:20px">&#9888; BANNED PLAYERS</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Player Name</th><th>Role</th><th>Ban Reason</th><th>Banned By</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="ban-tbody"><tr><td colspan="7" class="msg">Loading…</td></tr></tbody>
+      </table>
+    </div>
   </div>
-
+  <div class="pane" id="pane-admins">
+    <h2 style="color:var(--cyan);font-size:14px;letter-spacing:2px;margin-bottom:20px">&#9824; ADMIN ROSTER</h2>
+    <div class="adm-grid" id="adm-grid"><div class="msg">Loading…</div></div>
+  </div>
+  <!-- Reason Modal -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+      <h3 id="modal-title">CONFIRM ACTION</h3>
+      <div class="modal-err" id="modal-err"></div>
+      <label id="modal-label">Reason (optional)</label>
+      <textarea id="modal-reason" placeholder="Enter reason…" maxlength="300"></textarea>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-confirm" id="modal-confirm-btn" onclick="confirmModal()">Confirm</button>
+      </div>
+    </div>
+  </div>
+  <!-- Make Admin Modal -->
+  <div class="modal-bg" id="mkadm-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="document.getElementById('mkadm-modal').classList.remove('open')">&#10005;</button>
+      <h3>GRANT ADMIN</h3>
+      <div class="modal-err" id="mkadm-err"></div>
+      <label>Internal Notes (encrypted, optional)</label>
+      <textarea id="mkadm-notes" placeholder="E.g. Trusted moderator" maxlength="300"></textarea>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="document.getElementById('mkadm-modal').classList.remove('open')">Cancel</button>
+        <button class="btn-confirm cyan" id="mkadm-btn" onclick="confirmMakeAdmin()">Grant Admin</button>
+      </div>
+    </div>
+  </div>
   <div id="toast"></div>
+<script>
+const AV={wizard:'🧙',knight:'🛡️',robot:'🤖',alien:'👾',ninja:'🥷',astronaut:'👨‍🚀',dragon:'🐉',phoenix:'🦅',fox:'🦊',wolf:'🐺',cat:'😼',ghost:'👻',skull:'💀',fire:'🔥',lightning:'⚡',star:'⭐',diamond:'💎',crown:'👑',rocket:'🚀',ufo:'🛸',satellite:'🛰️',comet:'☄️',planet:'🪐',soccer:'⚽',basketball:'🏀',tennis:'🎾',baseball:'⚾',lion:'🦁',tiger:'🐯',bear:'🐻',panda:'🐼',owl:'🦉',gamepad:'🎮',dice:'🎲',joystick:'🕹️',chess:'♟️',wizard2:'🔮',alchemist:'⚗️',laser:'🔬',dna:'🧬',unicorn:'🦄',griffin:'🦅',fairy:'🧚',demon:'👹',cowboy:'🤠',pirate:'🏴‍☠️',samurai:'⚔️'};
+const tok=localStorage.getItem('kg_token');
+let _isSU=false,_myName='',_debounce,_modalAction=null,_modalTarget=null,_mkAdmTarget=null;
 
-  <script>
-    // ── Avatar emoji map (must match player/setup.html) ──────────────────────
-    const AV = {
-      wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👾', ninja: '🥷',
-      astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺',
-      cat: '😼', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐',
-      diamond: '💎', crown: '👑', rocket: '🚀', ufo: '🛸', satellite: '🛰️',
-      comet: '☄️', planet: '🪐',
-      soccer: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
-      lion: '🦁', tiger: '🐯', bear: '🐻', panda: '🐼', owl: '🦉',
-      gamepad: '🎮', dice: '🎲', joystick: '🕹️', chess: '♟️',
-      wizard2: '🔮', alchemist: '⚗️', laser: '🔬', dna: '🧬',
-      unicorn: '🦄', griffin: '🦅', fairy: '🧚', demon: '👹',
-      cowboy: '🤠', pirate: '🏴‍☠️', samurai: '⚔️',
-      'p_f_med': '🎮', // default fallback
-    };
+async function init(){
+  if(!tok)return gotoLogin();
+  try{
+    const r=await fetch('/api/players/me',{headers:{Authorization:'Bearer '+tok}});
+    const d=await r.json();
+    if(!d.success)return gotoLogin();
+    if(!d.isAdmin&&!d.isSuperuser)return gotoLogin();
+    _isSU=!!d.isSuperuser;_myName=d.playername||d.username||'Admin';
+    document.getElementById('hdr-name').textContent=_myName;
+    document.getElementById('hdr-av').textContent=AV[d.avatarId]||'🚀';
+    const b=document.getElementById('role-badge');
+    if(_isSU){b.textContent='SUPERUSER';b.className='role-badge su';}else{b.textContent='ADMIN';b.className='role-badge adm';}
+    if(!_isSU)document.querySelectorAll('.su-only').forEach(el=>el.style.display='none');
+  }catch{return gotoLogin();}
+  loadPlayers();loadSuspensions();
+  if(_isSU){loadBanned();loadAdmins();}
+}
+function gotoLogin(){window.location.replace('/login/?redirect='+encodeURIComponent('/admin/'));}
 
-    const token = localStorage.getItem('kg_token');
-    let _debounce;
+function switchTab(id,btn){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');btn.classList.add('active');
+  if(id==='suspensions')loadSuspensions();
+  if(id==='banned'&&_isSU)loadBanned();
+  if(id==='admins'&&_isSU)loadAdmins();
+}
 
-    // ── Auth guard — must be superuser ────────────────────────────────────────
-    async function init() {
-      if (!token) { return redirect(); }
-      try {
-        const r = await fetch('/api/players/me', { headers: { Authorization: 'Bearer ' + token } });
-        const d = await r.json();
-        if (!d.success || !d.isSuperuser) return redirect();
-        document.getElementById('adm-name').textContent = d.playername || d.username || 'Admin';
-        const avEmoji = AV[d.avatarId] || '🚀';
-        document.getElementById('adm-av').textContent = avEmoji;
-      } catch { return redirect(); }
-      load();
-    }
+async function loadPlayers(q){
+  q=q!==undefined?q:document.getElementById('srch').value.trim();
+  try{
+    const r=await fetch('/api/admin/players?limit=100&q='+encodeURIComponent(q),{headers:{Authorization:'Bearer '+tok}});
+    if(r.status===401||r.status===403)return gotoLogin();
+    const d=await r.json();
+    if(!d.success){toast('Error: '+d.error);return;}
+    renderStats(d.stats);renderPlayers(d.players);
+    document.getElementById('rc').textContent=d.players.length+' player'+(d.players.length!==1?'s':'');
+  }catch{toast('Network error');}
+}
 
-    function redirect() {
-      window.location.replace('/login/?redirect=' + encodeURIComponent('/admin/'));
-    }
+function renderStats(s){
+  if(!s)return;
+  document.getElementById('st-total').textContent=s.total??'—';
+  document.getElementById('st-active').textContent=s.active??'—';
+  document.getElementById('st-sus').textContent=s.suspended??'—';
+  document.getElementById('st-ban').textContent=s.banned??'—';
+  document.getElementById('st-today').textContent=s.seen_today??'—';
+  document.getElementById('st-admins').textContent=s.admins??'—';
+  const sc=document.getElementById('sus-count');if(s.suspended>0){sc.textContent=s.suspended;sc.style.display='';}else sc.style.display='none';
+  const bc=document.getElementById('ban-count');if(s.banned>0&&_isSU){bc.textContent=s.banned;bc.style.display='';}else bc.style.display='none';
+}
 
-    // ── Load players ──────────────────────────────────────────────────────────
-    async function load(q) {
-      q = q !== undefined ? q : document.getElementById('search-input').value.trim();
-      const url = '/api/admin/players?limit=100&q=' + encodeURIComponent(q);
-      try {
-        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-        if (r.status === 401 || r.status === 403) return redirect();
-        const d = await r.json();
-        if (!d.success) { showToast('Error: ' + d.error); return; }
-        renderStats(d.stats);
-        renderTable(d.players);
-        document.getElementById('result-count').textContent =
-          d.players.length + ' player' + (d.players.length !== 1 ? 's' : '');
-      } catch (e) {
-        showToast('Network error');
+function renderPlayers(players){
+  const tbody=document.getElementById('tbody');
+  if(!players||!players.length){tbody.innerHTML='<tr><td colspan="9" class="msg">No players found.</td></tr>';return;}
+  tbody.innerHTML=players.map(p=>{
+    const av=AV[p.avatar_id]||'🎮';
+    const nm=esc(p.player_name||'—');
+    const isSU=p.is_superuser===1,isAdm=p.is_admin===1;
+    const st=p.status||'active';
+    const badges=isSU?'<span class="badge-su">SU</span>':(isAdm?'<span class="badge-adm">ADMIN</span>':'');
+    let acts='';
+    if(isSU){acts='<span class="prot">Protected</span>';}
+    else{
+      if(st==='suspended')acts+=`<button class="btn-act unsus" onclick="doAction('unsuspend','${nm}',this)">&#9654; Unsuspend</button>`;
+      else if(st==='active'&&(_isSU||!isAdm))acts+=`<button class="btn-act sus" onclick="promptReason('suspend','${nm}','Suspend ${nm}?','orange',this)">&#9632; Suspend</button>`;
+      if(_isSU){
+        if(st==='banned')acts+=` <button class="btn-act unban" onclick="doAction('unban','${nm}',this)">&#9654; Unban</button>`;
+        else acts+=` <button class="btn-act ban" onclick="promptReason('ban','${nm}','Ban ${nm} permanently?','red',this)">&#9888; Ban</button>`;
+        if(!isAdm)acts+=` <button class="btn-act mkadm" onclick="openMakeAdmin('${nm}')">&#8679; Admin</button>`;
+        else acts+=` <button class="btn-act rvadm" onclick="promptReason('revoke-admin','${nm}','Revoke admin from ${nm}?','cyan',this)">&#8681; Revoke</button>`;
       }
+      if(!acts)acts='<span class="prot">—</span>';
     }
+    return `<tr>
+      <td class="td-av">${av}</td>
+      <td class="td-name">${nm}${badges}</td>
+      <td style="font-size:11px;color:var(--dim)">${isSU?'<span style="color:var(--yel)">Superuser</span>':isAdm?'<span style="color:var(--cyan)">Admin</span>':'Player'}</td>
+      <td><span class="s-${st}">${st.toUpperCase()}</span></td>
+      <td>${p.created_at?fmtDate(p.created_at):'—'}</td>
+      <td>${p.last_seen?fmtAgo(p.last_seen):'—'}</td>
+      <td>${p.total_games??0}</td>
+      <td>${p.total_wins??0}</td>
+      <td><div class="acts">${acts}</div></td>
+    </tr>`;
+  }).join('');
+}
 
-    // ── Render stats bar ─────────────────────────────────────────────────────
-    function renderStats(s) {
-      if (!s) return;
-      document.getElementById('st-total').textContent = s.total ?? '—';
-      document.getElementById('st-active').textContent = s.active ?? '—';
-      document.getElementById('st-suspended').textContent = s.suspended ?? '—';
-      document.getElementById('st-today').textContent = s.seen_today ?? '—';
-      document.getElementById('st-setup').textContent = s.setup_complete ?? '—';
-    }
+async function loadSuspensions(){
+  try{
+    const r=await fetch('/api/admin/suspensions',{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok)return;const d=await r.json();if(!d.success)return;
+    const tbody=document.getElementById('sus-tbody');
+    if(!d.players||!d.players.length){tbody.innerHTML='<tr><td colspan="7" class="msg">No suspended players.</td></tr>';return;}
+    tbody.innerHTML=d.players.map(p=>{
+      const nm=esc(p.player_name||'—'),isAdm=p.is_admin===1;
+      const badge=isAdm?'<span class="badge-adm">ADMIN</span>':'';
+      const canUnsus=_isSU||!isAdm;
+      return `<tr>
+        <td class="td-av">${AV[p.avatar_id]||'🎮'}</td>
+        <td class="td-name">${nm}${badge}</td>
+        <td style="font-size:11px;color:var(--dim)">${isAdm?'<span style="color:var(--cyan)">Admin</span>':'Player'}</td>
+        <td style="max-width:200px;white-space:normal;font-size:12px">${esc(p.last_action_reason||'—')}</td>
+        <td style="font-size:12px;color:var(--cyan)">${esc(p.action_by||'—')}</td>
+        <td>${p.action_at?fmtDate(p.action_at):'—'}</td>
+        <td><div class="acts">
+          ${canUnsus?`<button class="btn-act unsus" onclick="doAction('unsuspend','${nm}',this)">&#9654; Unsuspend</button>`:'<span class="prot">SU Only</span>'}
+          ${_isSU?`<button class="btn-act ban" onclick="promptReason('ban','${nm}','Ban ${nm} permanently?','red',this)">&#9888; Ban</button>`:''}
+        </div></td>
+      </tr>`;
+    }).join('');
+  }catch(e){console.error(e);}
+}
 
-    // ── Render player table ──────────────────────────────────────────────────
-    function renderTable(players) {
-      const tbody = document.getElementById('adm-tbody');
-      if (!players || players.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="adm-msg">No players found.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = players.map(p => {
-        const av = AV[p.avatar_id] || '🎮';
-        const name = esc(p.player_name || '—');
-        const isSU = p.is_superuser === 1;
-        const status = p.status || 'active';
-        const joined = p.created_at ? fmtDate(p.created_at) : '—';
-        const seen = p.last_seen ? fmtAgo(p.last_seen) : '—';
-        const games = p.total_games ?? 0;
-        const wins = p.total_wins ?? 0;
-        const canAct = !isSU;
-        const isSusp = status === 'suspended';
-        const btnCls = isSusp ? 'unsuspend' : 'suspend';
-        const btnLbl = isSusp ? '&#9654; Unsuspend' : '&#9632; Suspend';
-        return `<tr>
-          <td class="td-av">${av}</td>
-          <td class="td-name ${isSU ? 'superuser' : ''}">${name}${isSU ? '<span class="badge-su">SU</span>' : ''}</td>
-          <td><span class="status-${status}">${status.toUpperCase()}</span></td>
-          <td>${joined}</td>
-          <td>${seen}</td>
-          <td>${games}</td>
-          <td>${wins}</td>
-          <td>${canAct
-            ? `<button class="btn-toggle ${btnCls}" onclick="toggleSuspend('${name}', this)">${btnLbl}</button>`
-            : '<span style="color:var(--dim);font-size:11px">Protected</span>'
-          }</td>
-        </tr>`;
-      }).join('');
-    }
+async function loadBanned(){
+  try{
+    const r=await fetch('/api/admin/banned',{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok)return;const d=await r.json();if(!d.success)return;
+    const tbody=document.getElementById('ban-tbody');
+    if(!d.players||!d.players.length){tbody.innerHTML='<tr><td colspan="7" class="msg">No banned players.</td></tr>';return;}
+    tbody.innerHTML=d.players.map(p=>{
+      const nm=esc(p.player_name||'—');
+      return `<tr>
+        <td class="td-av">${AV[p.avatar_id]||'🎮'}</td>
+        <td class="td-name">${nm}</td>
+        <td style="font-size:11px;color:var(--dim)">Player</td>
+        <td style="max-width:200px;white-space:normal;font-size:12px">${esc(p.ban_reason||'—')}</td>
+        <td style="font-size:12px;color:var(--cyan)">${esc(p.action_by||'—')}</td>
+        <td>${p.action_at?fmtDate(p.action_at):'—'}</td>
+        <td><button class="btn-act unban" onclick="doAction('unban','${nm}',this)">&#9654; Unban</button></td>
+      </tr>`;
+    }).join('');
+  }catch(e){console.error(e);}
+}
 
-    // ── Toggle suspend ───────────────────────────────────────────────────────
-    async function toggleSuspend(playerName, btn) {
-      btn.disabled = true;
-      try {
-        const r = await fetch('/api/admin/players/' + encodeURIComponent(playerName) + '/toggle-suspend', {
-          method: 'POST',
-          headers: {
-            Authorization: 'Bearer ' + token,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ reason: 'Admin panel action' })
-        });
-        const d = await r.json();
-        if (d.success) {
-          showToast(playerName + ' → ' + d.status.toUpperCase());
-          load();
-        } else {
-          showToast('Error: ' + d.error);
-          btn.disabled = false;
-        }
-      } catch {
-        showToast('Network error');
-        btn.disabled = false;
-      }
-    }
+async function loadAdmins(){
+  try{
+    const r=await fetch('/api/admin/admins',{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok)return;const d=await r.json();if(!d.success)return;
+    const grid=document.getElementById('adm-grid');
+    if(!d.admins||!d.admins.length){grid.innerHTML='<div class="msg">No admins.</div>';return;}
+    grid.innerHTML=d.admins.map(a=>{
+      const nm=esc(a.player_name||'—'),isSU=a.is_superuser===1,isMe=a.player_name===_myName;
+      const badge=isSU?'<span class="badge-su">SUPERUSER</span>':'<span class="badge-adm">ADMIN</span>';
+      const rvBtn=!isSU&&!isMe?`<button class="btn-act rvadm" onclick="promptReason('revoke-admin','${nm}','Revoke admin from ${nm}?','cyan',this)">&#8681; Revoke</button>`:'';
+      const byLine=a.granted_by_name?`Granted by <span style="color:var(--cyan)">${esc(a.granted_by_name)}</span>`:'System designation';
+      return `<div class="adm-card ${isSU?'su-card':''}">
+        <div class="adm-card-name">${AV[a.avatar_id]||'🎮'} ${nm} ${badge}</div>
+        <div class="adm-card-meta">${byLine}<br>${fmtDate(a.granted_at)}</div>
+        <div class="adm-card-acts">${rvBtn}</div>
+      </div>`;
+    }).join('');
+  }catch(e){console.error(e);}
+}
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function esc(s) {
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+async function doAction(action,name,btn){
+  if(btn)btn.disabled=true;
+  const ep=action==='unsuspend'?`/api/admin/players/${enc(name)}/unsuspend`:action==='unban'?`/api/admin/players/${enc(name)}/unban`:null;
+  if(!ep){if(btn)btn.disabled=false;return;}
+  try{
+    const r=await fetch(ep,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({})});
+    const d=await r.json();
+    if(d.success){toast(name+' → '+(d.status||'done').toUpperCase());loadPlayers();loadSuspensions();if(_isSU)loadBanned();}
+    else{toast('Error: '+d.error);if(btn)btn.disabled=false;}
+  }catch{toast('Network error');if(btn)btn.disabled=false;}
+}
 
-    function fmtDate(unix) {
-      return new Date(unix * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
+function promptReason(action,name,title,color,srcBtn){
+  _modalAction=action;_modalTarget=name;
+  document.getElementById('modal-title').textContent=title;
+  const cb=document.getElementById('modal-confirm-btn');
+  cb.className='btn-confirm '+color;
+  cb.textContent=action==='ban'?'Ban Player':action==='suspend'?'Suspend':action==='revoke-admin'?'Revoke Admin':'Confirm';
+  document.getElementById('modal-reason').value='';
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-bg').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-bg').classList.remove('open');}
 
-    function fmtAgo(unix) {
-      const diff = Math.floor(Date.now() / 1000) - unix;
-      if (diff < 60) return 'just now';
-      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return Math.floor(diff / 86400) + 'd ago';
-    }
+async function confirmModal(){
+  const reason=document.getElementById('modal-reason').value.trim();
+  const btn=document.getElementById('modal-confirm-btn');
+  const errEl=document.getElementById('modal-err');
+  btn.disabled=true;errEl.style.display='none';
+  const eps={'suspend':`/api/admin/players/${enc(_modalTarget)}/suspend`,'ban':`/api/admin/players/${enc(_modalTarget)}/ban`,'revoke-admin':`/api/admin/players/${enc(_modalTarget)}/revoke-admin`};
+  const ep=eps[_modalAction];
+  if(!ep){btn.disabled=false;return;}
+  try{
+    const r=await fetch(ep,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({reason:reason||'Admin action'})});
+    const d=await r.json();btn.disabled=false;
+    if(d.success){closeModal();toast(_modalTarget+' — action applied');loadPlayers();loadSuspensions();if(_isSU){loadBanned();loadAdmins();}}
+    else{errEl.textContent=d.error||'Action failed';errEl.style.display='block';}
+  }catch{btn.disabled=false;errEl.textContent='Network error';errEl.style.display='block';}
+}
 
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.style.display = 'block';
-      clearTimeout(t._t);
-      t._t = setTimeout(() => { t.style.display = 'none'; }, 3000);
-    }
+function openMakeAdmin(name){
+  _mkAdmTarget=name;
+  document.getElementById('mkadm-notes').value='';
+  document.getElementById('mkadm-err').style.display='none';
+  document.getElementById('mkadm-modal').classList.add('open');
+}
+async function confirmMakeAdmin(){
+  const notes=document.getElementById('mkadm-notes').value.trim();
+  const btn=document.getElementById('mkadm-btn'),errEl=document.getElementById('mkadm-err');
+  btn.disabled=true;errEl.style.display='none';
+  try{
+    const r=await fetch(`/api/admin/players/${enc(_mkAdmTarget)}/make-admin`,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({notes})});
+    const d=await r.json();btn.disabled=false;
+    if(d.success){document.getElementById('mkadm-modal').classList.remove('open');toast(_mkAdmTarget+' is now an admin');loadPlayers();loadAdmins();}
+    else{errEl.textContent=d.error||'Failed';errEl.style.display='block';}
+  }catch{btn.disabled=false;errEl.textContent='Network error';errEl.style.display='block';}
+}
 
-    // ── Search debounce ───────────────────────────────────────────────────────
-    document.getElementById('search-input').addEventListener('input', () => {
-      clearTimeout(_debounce);
-      _debounce = setTimeout(() => load(), 320);
-    });
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function enc(s){return encodeURIComponent(s);}
+function fmtDate(unix){return new Date(unix*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtAgo(unix){const d=Math.floor(Date.now()/1000)-unix;if(d<60)return 'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>{t.style.display='none';},3200);}
 
-    init();
-  </script>
+document.getElementById('srch').addEventListener('input',()=>{clearTimeout(_debounce);_debounce=setTimeout(()=>loadPlayers(),320);});
+document.getElementById('modal-bg').addEventListener('click',function(e){if(e.target===this)closeModal();});
+init();
+</script>
 </body>
-
 </html>

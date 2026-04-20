@@ -313,31 +313,32 @@
         <li><a href="/assemble/">Assemble</a></li>
       </ul>
       <div class="arc-nav-right">
-        <div id="cf-access-btn"></div>
-        <script>
-          (function () {
-            const TEAM_DOMAIN = "https://butterflyfx.cloudflareaccess.com";
-            const APP_AUD = "551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95";
-            const APP_DOMAIN = "https://kensgames.com";
-            function isLoggedIn() {
-              return document.cookie.split(";").some(function (c) { return c.trim().startsWith("CF_Authorization="); });
-            }
-            var container = document.getElementById("cf-access-btn");
-            if (!container) return;
-            var btn = document.createElement("a");
-            btn.style.cssText = "display:inline-block;padding:8px 18px;background-color:#f6821f;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:background-color 0.2s";
-            btn.onmouseover = function () { btn.style.backgroundColor = "#e5741a"; };
-            btn.onmouseout = function () { btn.style.backgroundColor = "#f6821f"; };
-            if (isLoggedIn()) {
-              btn.href = "https://kensgames.com/cdn-cgi/access/logout?returnTo=/kensgames.com/lobby";
-              btn.textContent = "Log Out";
-            } else {
-              btn.href = TEAM_DOMAIN + "/cdn-cgi/access/login?" + new URLSearchParams({ kid: APP_AUD, redirect_url: APP_DOMAIN + "/lobby" });
-              btn.textContent = "Log In";
-            }
-            container.appendChild(btn);
-          })();
-        </script>
+        <div id="cf-access-btn">
+          <script>
+            (function () {
+              var t = localStorage.getItem('kg_token');
+              var btn = document.createElement('a');
+              btn.style.cssText = 'display:inline-block;padding:8px 18px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border-radius:6px;';
+              if (t) {
+                btn.textContent = 'Log Out';
+                btn.style.background = '#334466';
+                btn.style.color = '#fff';
+                btn.href = '#';
+                btn.onclick = function () {
+                  ['kg_token', 'user_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar'].forEach(function (k) { localStorage.removeItem(k); });
+                  window.location.href = '/login/';
+                  return false;
+                };
+              } else {
+                btn.textContent = 'Log In';
+                btn.style.background = '#0099ff';
+                btn.style.color = '#fff';
+                btn.href = '/login/?redirect=' + encodeURIComponent(window.location.pathname);
+              }
+              document.getElementById('cf-access-btn').appendChild(btn);
+            })();
+          </script>
+        </div>
       </div>
     </div>
   </nav>

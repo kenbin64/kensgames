@@ -59,31 +59,7 @@ class KGMultiplayer {
 
     const isGuestToken = (t) => !t || String(t).startsWith('guest-');
 
-    // If the visitor is already authenticated via Cloudflare Access, mint a real
-    // KensGames JWT token so games don't require a second login.
-    if (isGuestToken(token)) {
-      try {
-        const res = await fetch('/api/auth/access-session', {
-          method: 'GET',
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' },
-        });
-        if (res && res.ok) {
-          const data = await res.json();
-          if (data && data.success && data.token) {
-            token = data.token;
-            // Prefer Access-issued identity fields
-            if (data.username) this.username = data.username;
-            try {
-              localStorage.setItem('user_token', data.token);
-              if (data.username) localStorage.setItem('username', data.username);
-              if (data.displayName) localStorage.setItem('display_name', data.displayName);
-              if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
-            } catch { /* ignore */ }
-          }
-        }
-      } catch { /* ignore */ }
-    }
+    // CF Access bridge removed — token comes from localStorage only.
 
     // Ensure guests get a stable token so the server can derive a stable guest id.
     // (JWT tokens for signed-in users are preserved as-is.)

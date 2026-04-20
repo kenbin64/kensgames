@@ -15,6 +15,18 @@
   <link rel="stylesheet" href="assets/css/lobby.css">
   <link rel="stylesheet" href="assets/css/lobby-inline.css">
   <script src="/js/analytics.js"></script>
+  <script>
+    (function () {
+      var t = localStorage.getItem('kg_token');
+      if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
+      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); }
+        }).catch(function () { });
+    })();
+  </script>
 </head>
 
 <body>
@@ -26,8 +38,8 @@
     <span class="music-icon">🔇</span><span class="music-label">Music Off</span>
   </button>
 
-  <!-- Auth Screen -->
-  <div id="auth-screen" class="auth-screen">
+  <!-- Auth Screen (hidden: auth gate redirects before this shows) -->
+  <div id="auth-screen" class="auth-screen" style="display:none;">
     <div class="auth-logo">
       <img src="assets/images/icon-192.png" alt="Fast Track">
       <h1>Fast Track</h1>
@@ -45,17 +57,13 @@
       </a>
       <script>
         (function () {
-          var TEAM = 'https://butterflyfx.cloudflareaccess.com';
-          var AUD = '551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95';
           var loginBtn = document.getElementById('cf-login-btn');
           var privateBtn = document.getElementById('cf-create-private-btn');
           if (loginBtn) {
-            loginBtn.href = TEAM + '/cdn-cgi/access/login?' +
-              new URLSearchParams({ kid: AUD, redirect_url: window.location.origin + '/fasttrack/lobby.html' });
+            loginBtn.href = '/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html');
           }
           if (privateBtn) {
-            privateBtn.href = TEAM + '/cdn-cgi/access/login?' +
-              new URLSearchParams({ kid: AUD, redirect_url: window.location.origin + '/fasttrack/lobby.html?action=private' });
+            privateBtn.href = '/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html?action=private');
           }
         })();
       </script>
@@ -69,11 +77,14 @@
     </div>
   </div>
 
-  <!-- Main App (hidden until logged in) -->
-  <div id="main-app" style="display: none;">
+  <!-- Main App -->
+  <div id="main-app">
     <!-- Header -->
     <header class="header">
       <div class="logo">
+        <a href="/"
+          style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:0.4rem;opacity:0.7;font-size:0.75rem;margin-right:0.75rem;"
+          title="Back to Portal">&#8592;</a>
         <img src="assets/images/icon-72.png" class="logo-icon" alt="">
         <span>Fast Track</span>
       </div>

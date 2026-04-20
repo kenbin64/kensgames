@@ -18,7 +18,7 @@ require('dotenv').config();
 const AuthHandler = require('./auth-handler');
 const EncryptionService = require('./encryption');
 const EmailService = require('./email-service');
-const { PlayerDB } = require('./db'); // initialize DB schema on first require
+const { PlayerDB, AdminDB, PiiCrypto } = require('./db'); // initialize DB schema on first require
 const PasswordRecoveryManager = require('./password-recovery');
 
 // Initialize Express
@@ -166,70 +166,103 @@ function sanitizeUsernameFromEmail(email) {
   return `player_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-app.get('/api/auth/access-session', async (req, res) => {
+// Cloudflare Access bridge removed — use /api/auth/google or /api/auth/login instead.
+app.get('/api/auth/access-session', (req, res) => {
+  return res.status(410).json({ success: false, error: 'Cloudflare Access bridge removed. Use /api/auth/login or /api/auth/google.' });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: verify a Google ID token via Google's tokeninfo endpoint
+// ═══════════════════════════════════════════════════════════════════════════
+function verifyGoogleIdToken(credential) {
+  return new Promise((resolve, reject) => {
+    const path = `/oauth2/v3/tokeninfo?id_token=${encodeURIComponent(credential)}`;
+    https.get({ hostname: 'oauth2.googleapis.com', path, headers: { 'Accept': 'application/json' } }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve({ ok: res.statusCode === 200, status: res.statusCode, payload: JSON.parse(data) }); }
+        catch { reject(new Error('Invalid JSON from Google tokeninfo')); }
+      });
+    }).on('error', reject);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: POST /api/auth/google
+// ═══════════════════════════════════════════════════════════════════════════
+// Accepts a Google ID token (from Sign In With Google / One Tap), verifies it,
+// and returns a KensGames JWT — creating the account automatically on first login.
+app.post('/api/auth/google', async (req, res) => {
   try {
-    const emailHeader = req.headers['cf-access-authenticated-user-email']
-      || req.headers['cf-access-authenticated-user-email'.toLowerCase()]
-      || req.headers['cf-access-user-email']
-      || req.headers['x-authenticated-user-email'];
-
-    const idHeader = req.headers['cf-access-authenticated-user-id']
-      || req.headers['cf-access-authenticated-user-id'.toLowerCase()]
-      || req.headers['x-authenticated-user-id'];
-
-    const email = (emailHeader ? String(emailHeader).trim().toLowerCase() : '');
-    if (!email || !email.includes('@')) {
-      return res.status(401).json({ success: false, error: 'Not authenticated via Access' });
+    const { credential } = req.body;
+    if (!credential || typeof credential !== 'string') {
+      return res.status(400).json({ success: false, error: 'No Google credential provided' });
     }
 
-    // If a KensGames account already exists for this email, reuse it.
-    let userData = readUserFromManifoldByEmail(email);
+    // Verify with Google
+    const result = await verifyGoogleIdToken(credential);
+    if (!result.ok) {
+      return res.status(401).json({ success: false, error: 'Invalid Google token' });
+    }
 
+    const info = result.payload;
+
+    // Validate audience
+    const expectedAud = process.env.GOOGLE_CLIENT_ID;
+    if (expectedAud && info.aud !== expectedAud) {
+      return res.status(401).json({ success: false, error: 'Token audience mismatch' });
+    }
+
+    const email = (info.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, error: 'No email in Google token' });
+    }
+
+    // Find or create KensGames account
+    let userData = readUserFromManifoldByEmail(email);
     let username;
+
     if (userData && userData.username) {
       username = userData.username;
     } else {
       username = sanitizeUsernameFromEmail(email);
-
-      // Ensure uniqueness if a different account already uses the derived username.
       const existingByName = readUserFromManifold(username);
       if (existingByName && existingByName.email && existingByName.email !== email) {
         username = `${username.slice(0, 18)}_${Math.random().toString(36).slice(2, 6)}`;
       }
-
-      // Create a passwordless account bound to Access identity.
-      const userCoord = getOrCreateUserCoordinate(username, 3);
+      const userCoord = getOrCreateUserCoordinate(username, 4); // authMethod 4 = Google
+      const isSuperuser = SUPERUSER_EMAILS.includes(email);
       userData = writeUserToManifold(username, {
         ...userCoord,
         username,
         email,
-        displayName: userCoord.displayName || username,
+        displayName: info.name || info.given_name || username,
+        googleSub: info.sub,
+        avatar: '🎮',
         emailVerified: true,
         status: 'active',
-        accessUserId: idHeader ? String(idHeader) : undefined,
+        isAdmin: isSuperuser,
+        isSuperuser: isSuperuser,
+        adminLevel: isSuperuser ? 3 : 0,
+        stats: { gamesPlayed: 0, totalScore: 0 },
+        createdAt: Date.now(),
       });
     }
 
-    // Create session token
+    // Mint a KensGames JWT
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const token = authHandler.generateToken(userData.userId, sessionId);
-
-    const session = {
-      id: sessionId,
-      token: token,
-      createdAt: Date.now(),
-      lastActivityAt: Date.now(),
-      method: 'access',
-    };
-
+    const session = { id: sessionId, token, createdAt: Date.now(), lastActivityAt: Date.now(), method: 'google' };
     const sessions = userData.sessions || [];
     sessions.push(session);
     writeUserToManifold(username, { sessions, lastLoginAt: Date.now() });
 
-    // Upsert SQLite player record — creates on first login, updates last_seen otherwise
+    // Upsert SQLite player record
     let profileSetup = false, playername = null, avatarId = null;
     try {
-      const dbPlayer = PlayerDB.ensurePlayer(userData.userId, email);
+      const emailEnc = PiiCrypto.encrypt(email || '');
+      const dbPlayer = PlayerDB.ensurePlayer(userData.userId, email, emailEnc);
       profileSetup = dbPlayer ? dbPlayer.profile_setup === 1 : false;
       playername = dbPlayer ? dbPlayer.player_name : null;
       avatarId = dbPlayer ? dbPlayer.avatar_id : null;
@@ -243,15 +276,28 @@ app.get('/api/auth/access-session', async (req, res) => {
       userId: userData.userId,
       username,
       displayName: userData.displayName || username,
+      avatar: userData.avatar,
       email,
       profileSetup,
       playername,
       avatarId,
     });
   } catch (error) {
-    console.error('Access session error:', error);
-    return res.status(500).json({ success: false, error: 'Access session failed' });
+    console.error('Google auth error:', error);
+    return res.status(500).json({ success: false, error: 'Google authentication failed' });
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: GET /api/auth/check-username?username=...
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/auth/check-username', (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ available: false, error: 'Missing username' });
+  const check = authHandler.validateUsername(username);
+  if (!check.valid) return res.json({ available: false, error: check.error });
+  const taken = PlayerDB.isNameTaken(username);
+  res.json({ available: !taken });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -260,12 +306,17 @@ app.get('/api/auth/access-session', async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, email, password, avatar, turnstileToken } = req.body;
+    const { username, email, password, avatar, turnstileToken, tosAgreed } = req.body;
 
     // Verify Turnstile challenge
     const tsOk = await verifyTurnstile(turnstileToken, req.ip);
     if (!tsOk) {
       return res.status(400).json({ success: false, error: 'Security check failed. Please try again.' });
+    }
+
+    // TOS must be accepted
+    if (!tosAgreed) {
+      return res.status(400).json({ success: false, error: 'You must agree to the Terms of Service to register.' });
     }
 
     // Validate username
@@ -336,6 +387,15 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     writeUserToManifold(username, userData);
+
+    // Record player + TOS agreement in SQLite
+    try {
+      const emailEnc = PiiCrypto.encrypt(email ? email.toLowerCase() : '');
+      const dbPlayer = PlayerDB.ensurePlayer(userCoord.userId, email ? email.toLowerCase() : null, emailEnc);
+      if (dbPlayer) PlayerDB.agreeTOS(userCoord.userId, '1.0');
+    } catch (dbErr) {
+      console.error('DB register error:', dbErr.message);
+    }
 
     // Send verification email (non-blocking — don't await)
     if (email) {
@@ -433,6 +493,16 @@ app.post('/api/auth/login', async (req, res) => {
       lastLoginAt: Date.now()
     });
 
+    // Check profile setup via SQLite
+    let profileSetup = false;
+    try {
+      const emailEnc = PiiCrypto.encrypt(userData.email || '');
+      const dbPlayer = PlayerDB.ensurePlayer(userData.userId, userData.email, emailEnc);
+      profileSetup = dbPlayer ? dbPlayer.profile_setup === 1 : false;
+    } catch (dbErr) {
+      console.error('DB ensurePlayer error:', dbErr.message);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -440,7 +510,8 @@ app.post('/api/auth/login', async (req, res) => {
       userId: userData.userId,
       username: username,
       displayName: userData.displayName,
-      avatar: userData.avatar
+      avatar: userData.avatar,
+      profileSetup,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -488,6 +559,87 @@ app.get('/api/auth/validate', (req, res) => {
   } catch (error) {
     console.error('Validate error:', error);
     return res.status(500).json({ valid: false, error: 'Validation failed' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: POST /api/auth/send-reset-code  — send 6-digit OTP to email
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.post('/api/auth/send-reset-code', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, error: 'Valid email required' });
+    }
+
+    // Always respond success to prevent email enumeration
+    const userData = readUserFromManifoldByEmail(email);
+    if (!userData) {
+      return res.status(200).json({ success: true, message: 'If that email is registered, a code has been sent.' });
+    }
+
+    const code = recoveryManager.generateOTPCode(email);
+    try {
+      await emailService.sendOTPEmail(email, userData.username, code);
+      console.log(`✓ Reset OTP sent to ${email}`);
+    } catch (emailErr) {
+      console.error('OTP email failed:', emailErr);
+      return res.status(500).json({ success: false, error: 'Failed to send code. Please try again.' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Code sent. Check your inbox (and spam folder).' });
+  } catch (err) {
+    console.error('send-reset-code error:', err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: POST /api/auth/reset-with-code  — verify OTP + set new password
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.post('/api/auth/reset-with-code', async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) {
+      return res.status(400).json({ success: false, error: 'Email, code, and new password are required' });
+    }
+
+    // Validate OTP
+    const otpResult = recoveryManager.validateOTPCode(email, code);
+    if (!otpResult.valid) {
+      return res.status(401).json({ success: false, error: otpResult.error });
+    }
+
+    // Validate password strength
+    const pwCheck = authHandler.validatePassword(password);
+    if (!pwCheck.valid) {
+      return res.status(400).json({ success: false, error: pwCheck.error });
+    }
+
+    // Find user
+    const userData = readUserFromManifoldByEmail(email);
+    if (!userData) {
+      return res.status(404).json({ success: false, error: 'Account not found' });
+    }
+
+    // Hash and save
+    const passwordHash = await authHandler.hashPassword(password);
+    writeUserToManifold(userData.username, {
+      passwordHash,
+      lastPasswordChangeAt: Date.now(),
+      sessions: []
+    });
+
+    // Consume the OTP
+    recoveryManager.consumeOTPCode(email);
+    console.log(`✓ Password reset via OTP for ${userData.username}`);
+
+    return res.status(200).json({ success: true, message: 'Password updated. You can now sign in.' });
+  } catch (err) {
+    console.error('reset-with-code error:', err);
+    return res.status(500).json({ success: false, error: 'Password reset failed' });
   }
 });
 
@@ -749,271 +901,340 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 // ADMIN ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Middleware to check if user is superuser
- */
+// ── Middleware: superuser only (checks admins table in SQLite) ────────────
 function requireSuperuser(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'No token provided' });
-  }
-
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) return res.status(401).json({ success: false, error: 'Authentication required' });
   const decoded = authHandler.verifyToken(token);
-  if (decoded.error) {
-    return res.status(401).json({ success: false, error: 'Invalid token' });
-  }
-
-  // Find user and check if superuser
-  const userId = decoded.userId;
-  let isAdmin = false;
-
-  for (const key in manifoldData) {
-    if (manifoldData[key].userId === userId && manifoldData[key].isSuperuser) {
-      isAdmin = true;
-      break;
-    }
-  }
-
-  if (!isAdmin) {
+  if (decoded.error) return res.status(401).json({ success: false, error: 'Invalid token' });
+  const player = PlayerDB.getByKgUserId(decoded.userId);
+  if (!player) return res.status(401).json({ success: false, error: 'Player not found' });
+  if (!AdminDB.isSuperuser(player.id)) {
     return res.status(403).json({ success: false, error: 'Superuser access required' });
   }
+  req.actorId = player.id;
+  req.actorName = player.player_name;
+  req.isSuperuser = true;
+  next();
+}
 
-  req.userId = userId;
+// ── Middleware: admin OR superuser ────────────────────────────────────────
+function requireAdmin(req, res, next) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) return res.status(401).json({ success: false, error: 'Authentication required' });
+  const decoded = authHandler.verifyToken(token);
+  if (decoded.error) return res.status(401).json({ success: false, error: 'Invalid token' });
+  const player = PlayerDB.getByKgUserId(decoded.userId);
+  if (!player) return res.status(401).json({ success: false, error: 'Player not found' });
+  const rec = AdminDB.getAdminRecord(player.id);
+  if (!rec) return res.status(403).json({ success: false, error: 'Admin access required' });
+  req.actorId = player.id;
+  req.actorName = player.player_name;
+  req.isSuperuser = !!rec.is_superuser;
   next();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: POST /api/admin/promote-superuser
+// ENDPOINT: POST /api/admin/init-superuser
+// One-time bootstrap — only works when NO superuser exists yet.
+// Requires ADMIN_INIT_SECRET env var.
 // ─────────────────────────────────────────────────────────────────────────────
-
-app.post('/api/admin/promote-superuser', (req, res) => {
+app.post('/api/admin/init-superuser', (req, res) => {
   try {
-    const { username } = req.body;
-
-    if (!username) {
+    const existing = AdminDB.getSuperuser();
+    if (existing) {
+      return res.status(403).json({ success: false, error: 'Superuser already designated' });
+    }
+    const { username, secret } = req.body;
+    const initSecret = process.env.ADMIN_INIT_SECRET;
+    if (!initSecret || !secret || secret !== initSecret) {
+      return res.status(403).json({ success: false, error: 'Invalid secret' });
+    }
+    if (!username || typeof username !== 'string') {
       return res.status(400).json({ success: false, error: 'Username required' });
     }
-
-    const userData = readUserFromManifold(username);
-    if (!userData) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    if (userData.isSuperuser) {
-      return res.status(400).json({ success: false, error: 'Already a superuser' });
-    }
-
-    writeUserToManifold(username, {
-      isAdmin: true,
-      isSuperuser: true,
-      adminLevel: 3,
-      promotedAt: Date.now()
-    });
-
-    console.log(`✓ ${username} promoted to superuser`);
-
-    return res.status(200).json({
-      success: true,
-      message: `${username} is now a superuser`,
-      username: username,
-      adminLevel: 3
-    });
-  } catch (error) {
-    console.error('Promote superuser error:', error);
-    return res.status(500).json({ success: false, error: 'Promotion failed' });
+    const player = PlayerDB.getByPlayerName(username.trim());
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    AdminDB.promoteAdmin(player.id, null, true, 'Initial superuser designation');
+    console.log(`[init-superuser] ${player.player_name} designated as superuser`);
+    return res.json({ success: true, message: `${player.player_name} is now superuser` });
+  } catch (err) {
+    console.error('Init superuser error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: GET /api/admin/users (requires superuser)
+// ENDPOINT: GET /api/admin/me — returns caller's admin role info
 // ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/admin/me', requireAdmin, (req, res) => {
+  const rec = AdminDB.getAdminRecord(req.actorId);
+  return res.json({
+    success: true,
+    isSuperuser: !!rec.is_superuser,
+    isAdmin: true,
+    grantedAt: rec.granted_at
+  });
+});
 
-app.get('/api/admin/users', requireSuperuser, (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: GET /api/admin/players — player list (admin or superuser)
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/admin/players', requireAdmin, (req, res) => {
   try {
-    const users = [];
-
-    for (const key in manifoldData) {
-      if (key.startsWith('user-')) {
-        const user = manifoldData[key];
-        users.push({
-          userId: user.userId,
-          username: user.username,
-          email: user.email,
-          displayName: user.displayName,
-          avatar: user.avatar,
-          status: user.status,
-          emailVerified: user.emailVerified,
-          isAdmin: user.isAdmin,
-          isSuperuser: user.isSuperuser,
-          adminLevel: user.adminLevel,
-          createdAt: user.createdAt,
-          lastLoginAt: user.lastLoginAt
-        });
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      users: users,
-      totalUsers: users.length
-    });
-  } catch (error) {
-    console.error('Get users error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to get users' });
+    const q = (req.query.q || '').trim().slice(0, 80);
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const players = PlayerDB.adminList(q, limit, offset);
+    const stats = PlayerDB.adminStats();
+    return res.json({ success: true, players, stats, query: q, limit, offset });
+  } catch (err) {
+    console.error('Admin players error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list players' });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: GET /api/admin/stats (requires superuser)
+// ENDPOINT: GET /api/admin/admins — list admin roster (superuser only)
 // ─────────────────────────────────────────────────────────────────────────────
-
-app.get('/api/admin/stats', requireSuperuser, (req, res) => {
+app.get('/api/admin/admins', requireSuperuser, (req, res) => {
   try {
-    let totalUsers = 0;
-    let activeUsers = 0;
-    let bannedUsers = 0;
-    let suspendedUsers = 0;
-    let admins = 0;
-    let superusers = 0;
-
-    for (const key in manifoldData) {
-      if (key.startsWith('user-')) {
-        const user = manifoldData[key];
-        totalUsers++;
-
-        if (user.status === 'active') activeUsers++;
-        if (user.status === 'banned') bannedUsers++;
-        if (user.status === 'suspended') suspendedUsers++;
-        if (user.isAdmin) admins++;
-        if (user.isSuperuser) superusers++;
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      stats: {
-        totalUsers: totalUsers,
-        activeUsers: activeUsers,
-        bannedUsers: bannedUsers,
-        suspendedUsers: suspendedUsers,
-        admins: admins,
-        superusers: superusers,
-        timestamp: Date.now()
-      }
-    });
-  } catch (error) {
-    console.error('Get stats error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to get stats' });
+    const admins = AdminDB.listAdmins();
+    return res.json({ success: true, admins });
+  } catch (err) {
+    console.error('Admin list error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list admins' });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: POST /api/admin/user/:username/suspend (requires superuser)
+// ENDPOINT: GET /api/admin/suspensions — suspended players (admin or superuser)
 // ─────────────────────────────────────────────────────────────────────────────
-
-app.post('/api/admin/user/:username/suspend', requireSuperuser, (req, res) => {
+app.get('/api/admin/suspensions', requireAdmin, (req, res) => {
   try {
-    const { username } = req.params;
-
-    if (username === 'kbingh') {
-      return res.status(403).json({ success: false, error: 'The superuser account cannot be suspended' });
-    }
-
-    const userData = readUserFromManifold(username);
-    if (!userData) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    if (userData.isSuperuser) {
-      return res.status(403).json({ success: false, error: 'Cannot suspend a superuser account' });
-    }
-
-    writeUserToManifold(username, {
-      status: 'suspended',
-      suspendedAt: Date.now()
-    });
-
-    console.log(`⚠️ ${username} suspended`);
-
-    return res.status(200).json({
-      success: true,
-      message: `${username} has been suspended`
-    });
-  } catch (error) {
-    console.error('Suspend user error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to suspend user' });
+    const players = AdminDB.listSuspended();
+    return res.json({ success: true, players });
+  } catch (err) {
+    console.error('Suspensions list error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list suspensions' });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: POST /api/admin/user/:username/ban (requires superuser)
+// ENDPOINT: GET /api/admin/banned — banned players (superuser only)
 // ─────────────────────────────────────────────────────────────────────────────
-
-app.post('/api/admin/user/:username/ban', requireSuperuser, (req, res) => {
+app.get('/api/admin/banned', requireSuperuser, (req, res) => {
   try {
-    const { username } = req.params;
-
-    if (username === 'kbingh') {
-      return res.status(403).json({ success: false, error: 'The superuser account cannot be banned' });
-    }
-
-    const userData = readUserFromManifold(username);
-    if (!userData) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    if (userData.isSuperuser) {
-      return res.status(403).json({ success: false, error: 'Cannot ban a superuser account' });
-    }
-
-    writeUserToManifold(username, {
-      status: 'banned',
-      bannedAt: Date.now()
-    });
-
-    console.log(`🚫 ${username} banned`);
-
-    return res.status(200).json({
-      success: true,
-      message: `${username} has been banned`
-    });
-  } catch (error) {
-    console.error('Ban user error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to ban user' });
+    const players = AdminDB.listBanned();
+    return res.json({ success: true, players });
+  } catch (err) {
+    console.error('Banned list error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list banned' });
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: POST /api/admin/user/:username/activate (requires superuser)
+// ENDPOINT: POST /api/admin/players/:name/suspend — admin OR superuser
+// Cannot suspend a superuser.
 // ─────────────────────────────────────────────────────────────────────────────
-
-app.post('/api/admin/user/:username/activate', requireSuperuser, (req, res) => {
+app.post('/api/admin/players/:name/suspend', requireAdmin, (req, res) => {
   try {
-    const { username } = req.params;
-
-    const userData = readUserFromManifold(username);
-    if (!userData) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (AdminDB.isSuperuser(player.id)) {
+      return res.status(403).json({ success: false, error: 'Cannot suspend the superuser' });
     }
-
-    writeUserToManifold(username, {
-      status: 'active',
-      emailVerified: true
-    });
-
-    console.log(`✓ ${username} activated by admin`);
-
-    return res.status(200).json({
-      success: true,
-      message: `${username} has been activated`
-    });
-  } catch (error) {
-    console.error('Activate user error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to activate user' });
+    // Non-superuser admins cannot suspend other admins
+    if (!req.isSuperuser && AdminDB.isAdmin(player.id)) {
+      return res.status(403).json({ success: false, error: 'Only the superuser can suspend admins' });
+    }
+    if (player.status === 'suspended') {
+      return res.status(400).json({ success: false, error: 'Already suspended' });
+    }
+    const reason = (req.body && typeof req.body.reason === 'string')
+      ? req.body.reason.trim().slice(0, 200) : 'Admin action';
+    PlayerDB.setStatus(player.kg_user_id, 'suspended', reason, null);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'suspend', reason, null);
+    AdminDB.updateLastAction(req.actorId);
+    console.log(`[admin] ${req.actorName} suspended ${name}`);
+    return res.json({ success: true, player_name: name, status: 'suspended' });
+  } catch (err) {
+    console.error('Suspend error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to suspend' });
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/unsuspend — admin OR superuser
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/unsuspend', requireAdmin, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (player.status !== 'suspended') {
+      return res.status(400).json({ success: false, error: 'Player is not suspended' });
+    }
+    PlayerDB.setStatus(player.kg_user_id, 'active', null, null);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'unsuspend', null, null);
+    AdminDB.updateLastAction(req.actorId);
+    console.log(`[admin] ${req.actorName} unsuspended ${name}`);
+    return res.json({ success: true, player_name: name, status: 'active' });
+  } catch (err) {
+    console.error('Unsuspend error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to unsuspend' });
+  }
+});
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/ban — SUPERUSER ONLY
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/ban', requireSuperuser, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (AdminDB.isSuperuser(player.id)) {
+      return res.status(403).json({ success: false, error: 'The superuser cannot be banned' });
+    }
+    const reason = (req.body && typeof req.body.reason === 'string')
+      ? req.body.reason.trim().slice(0, 500) : 'Banned by superuser';
+    PlayerDB.setStatus(player.kg_user_id, 'banned', reason, null);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'ban', reason, null);
+    AdminDB.updateLastAction(req.actorId);
+    console.log(`[superuser] ${req.actorName} banned ${name}`);
+    return res.json({ success: true, player_name: name, status: 'banned' });
+  } catch (err) {
+    console.error('Ban error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to ban' });
+  }
+});
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/unban — SUPERUSER ONLY
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/unban', requireSuperuser, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (player.status !== 'banned') {
+      return res.status(400).json({ success: false, error: 'Player is not banned' });
+    }
+    PlayerDB.setStatus(player.kg_user_id, 'active', null, null);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'unban', null, null);
+    AdminDB.updateLastAction(req.actorId);
+    console.log(`[superuser] ${req.actorName} unbanned ${name}`);
+    return res.json({ success: true, player_name: name, status: 'active' });
+  } catch (err) {
+    console.error('Unban error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to unban' });
+  }
+});
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/make-admin — SUPERUSER ONLY
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/make-admin', requireSuperuser, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (AdminDB.isAdmin(player.id)) {
+      return res.status(400).json({ success: false, error: 'Already an admin' });
+    }
+    const notes = (req.body && typeof req.body.notes === 'string')
+      ? req.body.notes.trim().slice(0, 300) : null;
+    AdminDB.promoteAdmin(player.id, req.actorId, false, notes);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'make-admin', notes, null);
+    console.log(`[superuser] ${req.actorName} promoted ${name} to admin`);
+    return res.json({ success: true, player_name: name, is_admin: true });
+  } catch (err) {
+    console.error('Make-admin error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to promote admin' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/players/:name/revoke-admin — SUPERUSER ONLY
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/revoke-admin', requireSuperuser, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (player.id === req.actorId) {
+      return res.status(403).json({ success: false, error: 'Cannot revoke your own superuser role' });
+    }
+    AdminDB.revokeAdmin(player.id, req.actorId);
+    PlayerDB.recordAdminAction(req.actorId, player.id, 'revoke-admin', null, null);
+    console.log(`[superuser] ${req.actorName} revoked admin from ${name}`);
+    return res.json({ success: true, player_name: name, is_admin: false });
+  } catch (err) {
+    console.error('Revoke-admin error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to revoke admin' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENDPOINT: POST /api/admin/transfer-superuser — SUPERUSER ONLY
+// Transfers the superuser role to another player (superuser becomes regular admin)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/transfer-superuser', requireSuperuser, (req, res) => {
+  try {
+    const { toUsername, confirm } = req.body;
+    if (!toUsername || confirm !== 'TRANSFER') {
+      return res.status(400).json({ success: false, error: 'Provide toUsername and confirm="TRANSFER"' });
+    }
+    const target = PlayerDB.getByPlayerName(toUsername.trim());
+    if (!target) return res.status(404).json({ success: false, error: 'Target player not found' });
+    if (target.id === req.actorId) {
+      return res.status(400).json({ success: false, error: 'Already superuser' });
+    }
+    AdminDB.transferSuperuser(req.actorId, target.id);
+    PlayerDB.recordAdminAction(req.actorId, target.id, 'transfer-superuser', null, null);
+    console.log(`[superuser] ${req.actorName} transferred superuser to ${target.player_name}`);
+    return res.json({ success: true, newSuperuser: target.player_name });
+  } catch (err) {
+    console.error('Transfer-superuser error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to transfer superuser' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY: toggle-suspend (kept for backward compat — now uses requireAdmin)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/admin/players/:name/toggle-suspend', requireAdmin, (req, res) => {
+  try {
+    const name = (req.params.name || '').trim().slice(0, 40);
+    if (!name) return res.status(400).json({ success: false, error: 'Invalid player name' });
+    const player = PlayerDB.getByPlayerName(name);
+    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
+    if (AdminDB.isSuperuser(player.id)) {
+      return res.status(403).json({ success: false, error: 'Cannot modify the superuser account' });
+    }
+    if (!req.isSuperuser && AdminDB.isAdmin(player.id)) {
+      return res.status(403).json({ success: false, error: 'Only the superuser can suspend admins' });
+    }
+    const newStatus = player.status === 'suspended' ? 'active' : 'suspended';
+    const reason = (req.body && req.body.reason) || 'Admin action';
+    PlayerDB.setStatus(player.kg_user_id, newStatus, newStatus === 'suspended' ? reason : null, null);
+    PlayerDB.recordAdminAction(req.actorId, player.id, newStatus === 'suspended' ? 'suspend' : 'unsuspend', reason, null);
+    AdminDB.updateLastAction(req.actorId);
+    console.log(`[admin] ${req.actorName} toggled ${name} → ${newStatus}`);
+    return res.json({ success: true, player_name: name, status: newStatus });
+  } catch (err) {
+    console.error('Toggle suspend error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to toggle suspend' });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ERROR HANDLING
@@ -1023,8 +1244,6 @@ app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
-
-// ═══════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FEATURE ROUTES
@@ -1045,66 +1264,12 @@ app.use('/api/leaderboards', leaderboardRouter);
 app.use('/api/tournaments', tournamentsRouter);
 app.use('/api/sessions', gameSessionsRouter);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: GET /api/admin/players — PII-safe player list from SQLite
-// Returns player_name, avatar_id, status, dates, game stats. NO email.
-// ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/admin/players', requireSuperuser, (req, res) => {
-  try {
-    const q = (req.query.q || '').trim().slice(0, 80);
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-    const players = PlayerDB.adminList(q, limit, offset);
-    const stats = PlayerDB.adminStats();
-    return res.json({ success: true, players, stats, query: q, limit, offset });
-  } catch (err) {
-    console.error('Admin players error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to list players' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ENDPOINT: POST /api/admin/players/:name/toggle-suspend
-// Flips active ↔ suspended. Superuser account (kbingh) is protected.
-// ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/admin/players/:name/toggle-suspend', requireSuperuser, (req, res) => {
-  try {
-    const { name } = req.params;
-    if (!name || name.length > 30) {
-      return res.status(400).json({ success: false, error: 'Invalid player name' });
-    }
-    if (name.toLowerCase() === 'kbingh') {
-      return res.status(403).json({ success: false, error: 'Cannot modify superuser account' });
-    }
-    const player = PlayerDB.getByPlayerName(name);
-    if (!player) return res.status(404).json({ success: false, error: 'Player not found' });
-    if (player.is_superuser) {
-      return res.status(403).json({ success: false, error: 'Cannot modify a superuser account' });
-    }
-    const newStatus = player.status === 'suspended' ? 'active' : 'suspended';
-    const reason = newStatus === 'suspended'
-      ? ((req.body && req.body.reason) || 'Admin action')
-      : null;
-    PlayerDB.setStatus(player.kg_user_id, newStatus, reason, null);
-    console.log(`Admin toggle: ${name} → ${newStatus}`);
-    return res.json({ success: true, player_name: name, status: newStatus });
-  } catch (err) {
-    console.error('Toggle suspend error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to toggle suspend' });
-  }
-});
 // START SERVER
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🎮 Manifold Auth Server running on http://localhost:${PORT}`);
-  console.log(`📝 Endpoints:`);
-  console.log(`   POST /api/auth/register`);
-  console.log(`   POST /api/auth/login`);
-  console.log(`   GET  /api/auth/validate`);
-  console.log(`   POST /api/auth/forgot-password`);
-  console.log(`   POST /api/auth/reset-password`);
+  console.log(`Manifold Auth Server running on http://localhost:${PORT}`);
 });
 
 module.exports = app;

@@ -6,8 +6,7 @@
  *
  * What it does:
  *   1. Reads kg_token from localStorage
- *   2. If missing, tries Cloudflare Access bridge (access-session)
- *   3. If still no token, redirects to /login (unless body has data-kg-public="true")
+ *   2. If missing, redirects to /login (unless body has data-kg-public="true")
  *   4. Loads /api/players/me → if profileSetup is missing → /player/setup.html
  *   5. Injects player chip into any element with id="kg-player-slot" or .header-nav
  *   6. Fires onReady callbacks
@@ -149,8 +148,7 @@
       localStorage.removeItem('kg_userId');
       localStorage.removeItem('kg_displayName');
       sessionStorage.removeItem('kg_music_override');
-      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      window.location.href = isLocal ? '/login/' : 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
+      window.location.href = '/login/';
     },
   };
 
@@ -196,31 +194,11 @@
     // 1. Try localStorage token
     _token = localStorage.getItem('kg_token');
 
-    // 2. If no token, try Cloudflare Access bridge
-    if (!_token) {
-      try {
-        const br = await fetch(`${API}/auth/access-session`, { credentials: 'include' });
-        if (br.ok) {
-          const bd = await br.json();
-          if (bd.success && bd.token) {
-            _token = bd.token;
-            localStorage.setItem('kg_token', _token);
-            if (bd.username) localStorage.setItem('kg_username', bd.username);
-            if (bd.userId) localStorage.setItem('kg_userId', bd.userId);
-            if (bd.displayName) localStorage.setItem('kg_displayName', bd.displayName);
-          }
-        }
-      } catch { }
-    }
-
-    // 3. Still no token → redirect to login (unless public page)
+    // 2. Still no token → redirect to login (unless public page)
     if (!_token) {
       if (isPublicPage) return;
       const dest = location.pathname + location.search;
-      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      window.location.href = isLocal
-        ? `/login/?redirect=${encodeURIComponent(dest)}`
-        : `/cdn-cgi/access/login?redirect_url=${encodeURIComponent(dest)}`;
+      window.location.href = `/login/?redirect=${encodeURIComponent(dest)}`;
       return;
     }
 
@@ -243,7 +221,8 @@
 
     // 6. If profile not set up, redirect to setup (unless already there)
     if (_player && !_player.profileSetup && !location.pathname.startsWith('/player/setup')) {
-      window.location.href = '/player/setup.html';
+      const dest = location.pathname + location.search;
+      window.location.href = '/player/setup.html?redirect=' + encodeURIComponent(dest);
       return;
     }
 

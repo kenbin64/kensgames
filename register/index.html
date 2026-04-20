@@ -18,20 +18,37 @@
     .reg-wrap {
       flex: 1;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 40px 20px;
     }
 
     .reg-box {
       width: 100%;
-      max-width: 480px;
+      max-width: 520px;
+      max-height: min(90vh, 820px);
+      overflow-y: auto;
       background: rgba(4, 4, 20, .96);
       border: 2px solid var(--np);
       box-shadow: var(--gp), inset 0 0 40px rgba(255, 0, 255, .03);
       border-radius: 6px;
       padding: 44px 36px;
       animation: fadeUp .4s ease;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 0, 255, .4) transparent;
+    }
+
+    .reg-box::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .reg-box::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .reg-box::-webkit-scrollbar-thumb {
+      background: rgba(255, 0, 255, .35);
+      border-radius: 3px;
     }
 
     @keyframes fadeUp {
@@ -69,7 +86,7 @@
       font-size: 12px;
       color: var(--txm);
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       letter-spacing: 1px;
     }
 
@@ -77,7 +94,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
 
     .perk {
@@ -96,26 +113,89 @@
       margin-right: 5px;
     }
 
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .reg-footer {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 12px;
-      color: var(--txm);
-    }
-
-    .reg-footer a {
+    /* Avatar picker */
+    .av-section-label {
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 2px;
       color: var(--np);
-      text-decoration: none;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      margin-top: 4px;
     }
 
-    .reg-footer a:hover {
-      text-shadow: var(--gp);
+    .av-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .av-tab {
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 0, 255, .25);
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--txm);
+      background: transparent;
+      transition: all .15s;
+      font-family: var(--fa);
+    }
+
+    .av-tab:hover {
+      border-color: var(--np);
+      color: var(--text);
+    }
+
+    .av-tab.active {
+      border-color: var(--np);
+      color: var(--np);
+      background: rgba(255, 0, 255, .08);
+    }
+
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-bottom: 4px;
+    }
+
+    .avatar-opt {
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all .15s;
+      background: rgba(0, 0, 0, .2);
+    }
+
+    .avatar-opt:hover {
+      border-color: rgba(255, 0, 255, .4);
+      transform: scale(1.1);
+    }
+
+    .avatar-opt.selected {
+      border-color: var(--np);
+      box-shadow: var(--gp);
+      background: rgba(255, 0, 255, .08);
+      transform: scale(1.1);
+    }
+
+    .av-hint {
+      font-size: 11px;
+      color: var(--txm);
+      margin-bottom: 16px;
+    }
+
+    .av-hint.err {
+      color: #ff4d4d;
     }
 
     .submit-reg {
@@ -140,6 +220,58 @@
       transform: scale(1.03);
       box-shadow: var(--gp), 0 0 30px var(--np);
     }
+
+    .reg-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--txm);
+    }
+
+    .reg-footer a {
+      color: var(--np);
+      text-decoration: none;
+    }
+
+    .reg-footer a:hover {
+      text-shadow: var(--gp);
+    }
+
+    .tos-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 12px 0 16px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 0, 255, .2);
+      border-radius: 4px;
+      background: rgba(255, 0, 255, .03);
+    }
+
+    .tos-row input[type="checkbox"] {
+      margin-top: 2px;
+      flex-shrink: 0;
+      accent-color: var(--np);
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+
+    .tos-row label {
+      font-size: 12px;
+      color: var(--txm);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+
+    .tos-row a {
+      color: var(--np);
+      text-decoration: none;
+    }
+
+    .tos-row a:hover {
+      text-shadow: var(--gp);
+    }
   </style>
   <script src="/js/analytics.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -154,7 +286,7 @@
       <a href="/" class="arc-logo"><img src="/assets/masterImageFile/icon.svg" alt="KensGames"
           style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <div class="arc-nav-right">
-        <a href="/login" class="btn btn-c">SIGN IN</a>
+        <a href="/login/" class="btn btn-c">SIGN IN</a>
       </div>
     </div>
   </nav>
@@ -173,43 +305,90 @@
       </div>
 
       <form onsubmit="handleRegister(event)">
-        <div class="form-row">
-          <div class="arc-field">
-            <label>Username</label>
-            <input class="arc-input" type="text" id="r-user" placeholder="ArcadeHero99" required minlength="3"
-              maxlength="20">
-          </div>
-          <div class="arc-field">
-            <label>Display Name</label>
-            <input class="arc-input" type="text" id="r-display" placeholder="Hero" maxlength="30">
-          </div>
+        <div class="arc-field">
+          <label>Playername</label>
+          <input class="arc-input" type="text" id="r-user" placeholder="ArcadeHero99" required minlength="3"
+            maxlength="20" autocomplete="username">
+          <div style="font-size:11px;color:var(--txm);margin-top:3px;">3–20 chars · letters, numbers, underscore ·
+            visible to all players</div>
         </div>
         <div class="arc-field">
           <label>Email</label>
-          <input class="arc-input" type="email" id="r-email" placeholder="you@email.com" required>
+          <input class="arc-input" type="email" id="r-email" placeholder="you@email.com" required autocomplete="email">
         </div>
         <div class="arc-field">
           <label>Password</label>
-          <input class="arc-input" type="password" id="r-pass" placeholder="Min 8 characters" required minlength="8">
+          <input class="arc-input" type="password" id="r-pass" placeholder="Min 8 characters" required minlength="8"
+            autocomplete="new-password">
         </div>
         <div class="arc-field">
           <label>Confirm Password</label>
-          <input class="arc-input" type="password" id="r-pass2" placeholder="Repeat password" required minlength="8">
+          <input class="arc-input" type="password" id="r-pass2" placeholder="Repeat password" required minlength="8"
+            autocomplete="new-password">
         </div>
+
+        <div class="av-section-label">Choose Your Avatar</div>
+        <div class="av-tabs" id="av-tabs"></div>
+        <div class="avatar-grid" id="avatar-grid"></div>
+        <div class="av-hint" id="av-hint">Pick an avatar to represent you in every game</div>
+
         <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark"
-          style="margin-top:12px;margin-bottom:4px;"></div>
+          style="margin-top:8px;margin-bottom:4px;"></div>
+
+        <div class="tos-row">
+          <input type="checkbox" id="r-tos">
+          <label for="r-tos">I agree to the <a href="/tos/" target="_blank" rel="noopener">KensGames Terms of
+              Service</a>. By checking this box I confirm I am at least 13 years old and accept all terms and
+            conditions.</label>
+        </div>
+
         <button type="submit" class="submit-reg">&#9654; CREATE ACCOUNT</button>
         <div class="arc-msg" id="r-msg"></div>
       </form>
 
       <div class="reg-footer">
-        Already have an account? <a href="/login">Sign in</a>
+        Already have an account? <a href="/login/">Sign in</a>
       </div>
     </div>
   </div>
 
   <script>
-    if (localStorage.getItem('user_token')) window.location.href = '/lobby';
+    if (localStorage.getItem('kg_token')) window.location.href = '/';
+
+    const AVATAR_CATEGORIES = [
+      { id: 'people', label: '👥 People', avatars: [{ id: 'p_f_light', e: '👩🏻' }, { id: 'p_m_light', e: '👨🏻' }, { id: 'p_f_med', e: '👩🏽' }, { id: 'p_m_med', e: '👨🏽' }, { id: 'p_f_dark', e: '👩🏿' }, { id: 'p_m_dark', e: '👨🏿' }, { id: 'ninja', e: '🥷' }, { id: 'cowboy', e: '🤠' }, { id: 'p_mech_f', e: '👩‍🔧' }, { id: 'p_mech_m', e: '👨‍🔧' }, { id: 'p_art_f', e: '👩‍🎨' }, { id: 'p_art_m', e: '👨‍🎨' }, { id: 'nerd', e: '🤓' }, { id: 'p_bald', e: '🧑‍🦲' }, { id: 'p_beard', e: '🧔' }, { id: 'p_blonde_f', e: '👱‍♀️' }] },
+      { id: 'fantasy', label: '🦄 Fantasy', avatars: [{ id: 'wizard_f', e: '🧙‍♀️' }, { id: 'wizard_m', e: '🧙‍♂️' }, { id: 'elf_f', e: '🧝‍♀️' }, { id: 'elf_m', e: '🧝‍♂️' }, { id: 'vampire_m', e: '🧛‍♂️' }, { id: 'vampire_f', e: '🧛‍♀️' }, { id: 'hero_f', e: '🦸‍♀️' }, { id: 'hero_m', e: '🦸‍♂️' }, { id: 'villain_f', e: '🦹‍♀️' }, { id: 'villain_m', e: '🦹‍♂️' }, { id: 'dragon', e: '🐉' }, { id: 'unicorn', e: '🦄' }, { id: 'ghost', e: '👻' }, { id: 'skull', e: '💀' }, { id: 'crown', e: '👑' }, { id: 'crystal', e: '🔮' }] },
+      { id: 'science', label: '🔬 Science', avatars: [{ id: 'sci_f', e: '👩‍🔬' }, { id: 'sci_m', e: '👨‍🔬' }, { id: 'robot', e: '🤖' }, { id: 'alien', e: '👽' }, { id: 'alien_px', e: '👾' }, { id: 'dna', e: '🧬' }, { id: 'brain', e: '🧠' }, { id: 'atom', e: '⚛️' }, { id: 'flask', e: '⚗️' }, { id: 'cyborg', e: '🦾' }, { id: 'micro', e: '🔬' }, { id: 'satellite', e: '🛰️' }] },
+      { id: 'space', label: '🚀 Space', avatars: [{ id: 'rocket', e: '🚀' }, { id: 'ufo', e: '🛸' }, { id: 'astro_f', e: '👩‍🚀' }, { id: 'astro_m', e: '👨‍🚀' }, { id: 'planet', e: '🪐' }, { id: 'star', e: '⭐' }, { id: 'comet', e: '☄️' }, { id: 'moon', e: '🌙' }, { id: 'galaxy', e: '🌌' }, { id: 'telescope', e: '🔭' }, { id: 'blackhole', e: '🕳️' }] },
+      { id: 'animals', label: '🦁 Animals', avatars: [{ id: 'lion', e: '🦁' }, { id: 'tiger', e: '🐯' }, { id: 'bear', e: '🐻' }, { id: 'fox', e: '🦊' }, { id: 'wolf', e: '🐺' }, { id: 'cat', e: '😼' }, { id: 'eagle', e: '🦅' }, { id: 'owl', e: '🦉' }, { id: 'dolphin', e: '🐬' }, { id: 'shark', e: '🦈' }, { id: 'butterfly', e: '🦋' }, { id: 'penguin', e: '🐧' }, { id: 'panda', e: '🐼' }, { id: 'octopus', e: '🐙' }, { id: 'rabbit', e: '🐰' }, { id: 'snake', e: '🐍' }] },
+      { id: 'toys', label: '🎮 Toys', avatars: [{ id: 'toy_stick', e: '🕹️' }, { id: 'toy_dice', e: '🎲' }, { id: 'toy_chess', e: '♟️' }, { id: 'toy_puzzle', e: '🧩' }, { id: 'toy_darts', e: '🎯' }, { id: 'toy_magic', e: '🪄' }, { id: 'toy_teddy', e: '🧸' }, { id: 'toy_balloon', e: '🎈' }, { id: 'toy_blocks', e: '🧱' }, { id: 'toy_kite', e: '🪁' }, { id: 'toy_boom', e: '🪃' }, { id: 'toy_yoyo', e: '🪀' }] },
+      { id: 'hobbies', label: '🎨 Hobbies', avatars: [{ id: 'hb_guitar', e: '🎸' }, { id: 'hb_palette', e: '🎨' }, { id: 'hb_camera', e: '📷' }, { id: 'hb_book', e: '📚' }, { id: 'hb_chef', e: '👨‍🍳' }, { id: 'hb_music', e: '🎵' }, { id: 'hb_drum', e: '🥁' }, { id: 'hb_gamepad', e: '🎮' }, { id: 'hb_bike', e: '🚴' }, { id: 'hb_surf', e: '🏄' }, { id: 'hb_gym', e: '🏋️' }] },
+    ];
+
+    let selectedAvatar = null;
+    let activeCategory = AVATAR_CATEGORIES[0].id;
+
+    function buildAvatarGrid(catId) {
+      activeCategory = catId || AVATAR_CATEGORIES[0].id;
+      const cat = AVATAR_CATEGORIES.find(c => c.id === activeCategory) || AVATAR_CATEGORIES[0];
+      document.getElementById('av-tabs').innerHTML = AVATAR_CATEGORIES.map(c =>
+        `<button type="button" class="av-tab${c.id === activeCategory ? ' active' : ''}" onclick="buildAvatarGrid('${c.id}')">${c.label}</button>`
+      ).join('');
+      document.getElementById('avatar-grid').innerHTML = cat.avatars.map(a =>
+        `<div class="avatar-opt${selectedAvatar === a.id ? ' selected' : ''}" id="avr-${a.id}" onclick="selectAvatar('${a.id}')" title="${a.id}">${a.e}</div>`
+      ).join('');
+    }
+
+    function selectAvatar(id) {
+      document.querySelectorAll('.avatar-opt').forEach(el => el.classList.remove('selected'));
+      document.getElementById(`avr-${id}`)?.classList.add('selected');
+      selectedAvatar = id;
+      const hint = document.getElementById('av-hint');
+      hint.className = 'av-hint';
+      hint.textContent = 'Avatar selected \u2713';
+    }
+
+    buildAvatarGrid();
 
     async function handleRegister(e) {
       e.preventDefault();
@@ -218,29 +397,37 @@
       if (pass !== document.getElementById('r-pass2').value) {
         msg.textContent = 'Passwords do not match'; msg.className = 'arc-msg err'; return;
       }
-      const tsToken = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
-      if (!tsToken) {
-        msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return;
+      if (!selectedAvatar) {
+        const hint = document.getElementById('av-hint');
+        hint.className = 'av-hint err'; hint.textContent = 'Please choose an avatar'; return;
       }
+      if (!document.getElementById('r-tos').checked) {
+        msg.textContent = 'You must agree to the Terms of Service to continue'; msg.className = 'arc-msg err'; return;
+      }
+      const tsToken = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
+      if (!tsToken) { msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return; }
       msg.textContent = 'Creating account...'; msg.className = 'arc-msg';
       try {
+        const username = document.getElementById('r-user').value.trim();
         const res = await fetch('/api/auth/register', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username: document.getElementById('r-user').value,
-            displayName: document.getElementById('r-display').value || document.getElementById('r-user').value,
-            email: document.getElementById('r-email').value,
+            username,
+            displayName: username,
+            email: document.getElementById('r-email').value.trim(),
             password: pass,
-            turnstileToken: tsToken
+            avatar: selectedAvatar,
+            turnstileToken: tsToken,
+            tosAgreed: true
           })
         });
         const data = await res.json();
         if (res.ok) {
-          msg.textContent = 'Account created! Check your email to verify, then sign in.';
+          msg.textContent = 'Account created! Signing you in…';
           msg.className = 'arc-msg ok';
-          setTimeout(() => window.location.href = '/login', 2500);
+          setTimeout(() => window.location.href = '/login/', 1800);
         } else {
-          msg.textContent = data.message || 'Registration failed'; msg.className = 'arc-msg err';
+          msg.textContent = data.error || data.message || 'Registration failed'; msg.className = 'arc-msg err';
         }
       } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
     }

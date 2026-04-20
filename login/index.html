@@ -46,77 +46,9 @@
       }
     }
 
-    .cab-art {
-      text-align: center;
-      margin-bottom: 28px;
-      font-size: 64px;
-      line-height: 1;
-      filter: drop-shadow(0 0 12px #00FFFF);
-    }
-
-    .login-title {
-      font-family: var(--fa);
-      font-size: 22px;
-      font-weight: 900;
-      color: var(--nc);
-      text-shadow: var(--gc);
-      text-transform: uppercase;
-      letter-spacing: 3px;
-      text-align: center;
-      margin-bottom: 4px;
-    }
-
-    .login-sub {
-      font-size: 12px;
-      color: var(--txm);
-      text-align: center;
-      margin-bottom: 28px;
-      letter-spacing: 1px;
-    }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 20px 0;
-      color: var(--txm);
-      font-size: 11px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(0, 255, 255, .15);
-    }
-
-    .oauth-btn {
-      width: 100%;
-      padding: 11px;
-      margin-bottom: 8px;
-      font-family: var(--fa);
-      font-size: 10px;
-      letter-spacing: 2px;
-      background: transparent;
-      color: var(--txm);
-      border: 1px solid #334466;
-      border-radius: 3px;
-      cursor: pointer;
-      text-transform: uppercase;
-      transition: all .2s;
-    }
-
-    .oauth-btn:hover {
-      border-color: var(--nc);
-      color: var(--nc);
-    }
-
     .login-footer {
       text-align: center;
-      margin-top: 22px;
+      margin-top: 18px;
       font-size: 12px;
       color: var(--txm);
     }
@@ -124,35 +56,47 @@
     .login-footer a {
       color: var(--nc);
       text-decoration: none;
-      cursor: pointer;
     }
 
     .login-footer a:hover {
       text-shadow: var(--gc);
     }
 
-    .insert-coin {
-      font-family: var(--fa);
-      font-size: 10px;
-      letter-spacing: 4px;
-      color: var(--np);
-      text-shadow: var(--gp);
-      text-transform: uppercase;
-      text-align: center;
-      margin-bottom: 20px;
-      animation: blink 1.2s step-end infinite;
+    .forgot-link {
+      display: block;
+      text-align: right;
+      font-size: 11px;
+      color: var(--txm);
+      margin-top: 4px;
+      margin-bottom: 16px;
+      text-decoration: none;
     }
 
-    @keyframes blink {
+    .forgot-link:hover {
+      color: var(--nc);
+    }
 
-      0%,
-      100% {
-        opacity: 1
-      }
+    .submit-login {
+      width: 100%;
+      padding: 14px;
+      margin-top: 4px;
+      font-family: var(--fa);
+      font-size: 13px;
+      letter-spacing: 2px;
+      background: var(--nc);
+      color: var(--bg);
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: 900;
+      box-shadow: var(--gc);
+      transition: all .25s;
+    }
 
-      50% {
-        opacity: 0
-      }
+    .submit-login:hover {
+      transform: scale(1.03);
+      box-shadow: var(--gc), 0 0 30px var(--nc);
     }
   </style>
   <script src="/js/analytics.js"></script>
@@ -168,111 +112,50 @@
       <a href="/" class="arc-logo"><img src="/assets/masterImageFile/icon.svg" alt="KensGames"
           style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <div class="arc-nav-right">
-        <a href="/register" class="btn btn-p">JOIN FREE</a>
+        <a href="/register/" class="btn btn-p">JOIN FREE</a>
       </div>
     </div>
   </nav>
 
   <div class="login-wrap">
     <div class="login-box">
-      <div class="cab-art">&#127918;</div>
-      <div class="insert-coin">&#9655; INSERT COIN TO CONTINUE &#9655;</div>
-      <div class="login-title">Sign In</div>
-      <div class="login-sub">Enter your credentials, player</div>
+      <form onsubmit="handleLogin(event)">
+        <div class="arc-field">
+          <label>Playername</label>
+          <input class="arc-input" type="text" id="l-user" placeholder="YourPlayername" required
+            autocomplete="username">
+        </div>
+        <div class="arc-field">
+          <label>Password</label>
+          <input class="arc-input" type="password" id="l-pass" placeholder="••••••••" required
+            autocomplete="current-password">
+        </div>
+        <a href="/forgot-password/" class="forgot-link">Forgot password?</a>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj" data-theme="dark" style="margin-bottom:4px;">
+        </div>
+        <button type="submit" class="submit-login">&#9654; SIGN IN</button>
+        <div class="arc-msg" id="l-msg"></div>
+      </form>
 
-      <div id="cf-access-btn"></div>
-
-      <script>
-        (function () {
-          const TEAM_DOMAIN = "https://butterflyfx.cloudflareaccess.com";
-          const APP_AUD = "551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95";
-
-          function isLoggedIn() {
-            return document.cookie
-              .split(";")
-              .some((c) => c.trim().startsWith("CF_Authorization="));
-          }
-
-          const container = document.getElementById("cf-access-btn");
-          if (!container) return;
-
-          const btn = document.createElement("a");
-          btn.style.cssText = `
-            display: inline-block;
-            padding: 10px 24px;
-            background-color: #f6821f;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-            transition: background-color 0.2s;
-          `;
-          btn.onmouseover = () => (btn.style.backgroundColor = "#e5741a");
-          btn.onmouseout = () => (btn.style.backgroundColor = "#f6821f");
-
-          if (isLoggedIn()) {
-            btn.href = 'https://kensgames.com/cdn-cgi/access/logout?returnTo=https://kensgames.com/';
-            btn.textContent = "Log Out";
-          } else {
-            // After CF login, return to this login page so the bridge can exchange for kg_token,
-            // then the startup script above will redirect to the original ?redirect= destination.
-            const redirectParam = new URLSearchParams(location.search).get('redirect') || '/lobby/';
-            const returnUrl = window.location.origin + '/login/?redirect=' + encodeURIComponent(redirectParam);
-            btn.href = `${TEAM_DOMAIN}/cdn-cgi/access/login?${new URLSearchParams({
-              kid: APP_AUD,
-              redirect_url: returnUrl
-            })}`;
-            btn.textContent = "Log In with Cloudflare";
-          }
-
-          container.appendChild(btn);
-        })();
-      </script>
+      <div class="login-footer">
+        New player? <a href="/register/">Join free</a>
+      </div>
     </div>
   </div>
 
   <script>
     const API = '/api/auth';
-    // On load: try existing kg_token, then try CF Access bridge, then show login UI.
-    (async function () {
-      const redir = new URLSearchParams(location.search).get('redirect') || '/lobby/';
 
-      // 1. If we already have a valid kg_token, skip to destination
+    (async function () {
+      const redir = new URLSearchParams(location.search).get('redirect') || '/';
       const t = localStorage.getItem('kg_token');
       if (t) {
         try {
           const r = await fetch(`${API}/validate`, { headers: { Authorization: `Bearer ${t}` } });
-          if (r.ok) {
-            const d = await r.json();
-            if (d && d.valid) { window.location.replace(redir); return; }
-          }
+          if (r.ok) { const d = await r.json(); if (d && d.valid) { window.location.replace(redir); return; } }
           localStorage.removeItem('kg_token');
         } catch { }
       }
-
-      // 2. Try Cloudflare Access bridge — user may have just returned from CF login
-      try {
-        const r = await fetch('/api/auth/access-session', {
-          method: 'GET', credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d && d.success && d.token) {
-            localStorage.setItem('kg_token', d.token);
-            localStorage.setItem('user_token', d.token);
-            if (d.username) localStorage.setItem('kg_username', d.username);
-            if (d.displayName) localStorage.setItem('kg_display_name', d.displayName);
-            if (d.userId != null) localStorage.setItem('kg_user_id', String(d.userId));
-            window.location.replace(redir);
-            return;
-          }
-        }
-      } catch { }
-      // 3. No token found — login UI is already visible, nothing more to do
     })();
 
     async function handleLogin(e) {
@@ -281,12 +164,14 @@
       msg.textContent = 'Authenticating...'; msg.className = 'arc-msg';
       try {
         const tsToken = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
-        if (!tsToken) {
-          msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return;
-        }
+        if (!tsToken) { msg.textContent = 'Please complete the security check'; msg.className = 'arc-msg err'; return; }
         const res = await fetch(`${API}/login`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: document.getElementById('l-user').value, password: document.getElementById('l-pass').value, turnstileToken: tsToken })
+          body: JSON.stringify({
+            username: document.getElementById('l-user').value.trim(),
+            password: document.getElementById('l-pass').value,
+            turnstileToken: tsToken
+          })
         });
         const data = await res.json();
         if (res.ok) {
@@ -295,23 +180,18 @@
           localStorage.setItem('kg_username', data.username);
           localStorage.setItem('kg_display_name', data.displayName);
           if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar, name: data.displayName }));
-          msg.textContent = 'Welcome back!'; msg.className = 'arc-msg ok';
-          const redir = new URLSearchParams(location.search).get('redirect') || '/portal.html';
-          setTimeout(() => {
-            window.location.href = redir;
-          }, 700);
+          const redir = new URLSearchParams(location.search).get('redirect') || '/';
+          if (!data.profileSetup) {
+            msg.textContent = 'First time? Set up your profile…'; msg.className = 'arc-msg ok';
+            setTimeout(() => { window.location.href = '/player/setup.html?redirect=' + encodeURIComponent(redir); }, 700);
+          } else {
+            msg.textContent = 'Welcome back!'; msg.className = 'arc-msg ok';
+            setTimeout(() => { window.location.href = redir; }, 700);
+          }
         } else {
           msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'arc-msg err';
         }
       } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
-    }
-
-    function oauthLogin(p) {
-      // SSO via Cloudflare Access — redirect to a protected page which triggers
-      // the Access login prompt (Google, Discord, etc.) for the chosen provider.
-      // After Access authenticates, access_session_bridge.js mints a KensGames JWT.
-      var redir = new URLSearchParams(location.search).get('redirect') || '/lobby/';
-      window.location.href = '/cdn-cgi/access/login?redirect_url=' + encodeURIComponent(redir);
     }
   </script>
 </body>

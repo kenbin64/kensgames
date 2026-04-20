@@ -4,338 +4,346 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KensGames — Game Portal</title>
-  <meta http-equiv="refresh" content="0; url=/lobby/">
-  <script>
-    // Login is handled by Cloudflare Access.
-    window.location.replace('/lobby/');
-  </script>
+  <title>Reset Password — KensGames</title>
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
+    .wrap {
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 40px 20px;
     }
 
-    .container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    .box {
       width: 100%;
-      max-width: 450px;
-      padding: 40px;
-      animation: slideIn 0.3s ease;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .icon {
-      text-align: center;
-      font-size: 50px;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 30px;
-      line-height: 1.6;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      color: #333;
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    input[type="email"] {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
+      max-width: 420px;
+      background: rgba(4, 4, 20, .96);
+      border: 2px solid var(--nc);
+      box-shadow: var(--gc), inset 0 0 40px rgba(0, 255, 255, .04);
       border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.3s;
+      padding: 44px 36px;
+      animation: fadeUp .4s ease;
     }
 
-    input[type="email"]:focus {
-      outline: none;
-      border-color: #667eea;
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px) }
+      to   { opacity: 1; transform: translateY(0) }
     }
 
-    .feedback {
+    .box-title {
+      font-family: var(--fa);
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--nc);
+      text-shadow: var(--gc);
+      margin-bottom: 6px;
+    }
+
+    .box-sub {
       font-size: 12px;
-      margin-top: 4px;
-      display: none;
-    }
-
-    .feedback.show {
-      display: block;
-    }
-
-    .feedback.valid {
-      color: #3c3;
-    }
-
-    .feedback.invalid {
-      color: #c33;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 30px;
-    }
-
-    button {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-    }
-
-    .btn-secondary {
-      background: #f0f0f0;
-      color: #333;
-    }
-
-    .btn-secondary:hover {
-      background: #e0e0e0;
-    }
-
-    .error-message {
-      background: #fee;
-      color: #c33;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .error-message.show {
-      display: block;
-    }
-
-    .success-message {
-      background: #efe;
-      color: #3c3;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .success-message.show {
-      display: block;
-    }
-
-    .loading {
-      display: none;
-      text-align: center;
-      color: #666;
-      font-size: 14px;
-    }
-
-    .loading.show {
-      display: block;
-    }
-
-    .link {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 14px;
-      color: #666;
-    }
-
-    .link a {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .link a:hover {
-      text-decoration: underline;
-    }
-
-    .info-box {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 20px;
+      color: var(--txm);
+      margin-bottom: 28px;
       line-height: 1.5;
+    }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .pw-rules {
+      font-size: 11px;
+      color: var(--txm);
+      margin-top: 6px;
+      line-height: 1.7;
+    }
+
+    .pw-rules span {
+      display: block;
+      transition: color .2s;
+    }
+
+    .pw-rules span.ok  { color: var(--ng); }
+    .pw-rules span.bad { color: #ff4d4d; }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      font-family: var(--fa);
+      font-size: 13px;
+      letter-spacing: 2px;
+      background: var(--nc);
+      color: var(--bg);
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: 900;
+      box-shadow: var(--gc);
+      transition: all .25s;
+    }
+
+    .submit-btn:hover { transform: scale(1.03); box-shadow: var(--gc), 0 0 30px var(--nc); }
+    .submit-btn.pink  { background: var(--np); box-shadow: var(--gp); }
+    .submit-btn.pink:hover { box-shadow: var(--gp), 0 0 30px var(--np); }
+
+    .otp-input {
+      text-align: center;
+      font-size: 32px;
+      font-family: var(--fa);
+      letter-spacing: 12px;
+      color: var(--np);
+      font-weight: 900;
+    }
+
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--txm);
+      text-decoration: none;
+    }
+
+    .back-link:hover { color: var(--nc); }
+    .back-link span { cursor: pointer; color: var(--nc); }
+
+    .resend-row {
+      text-align: center;
+      font-size: 12px;
+      color: var(--txm);
+      margin-top: 14px;
+    }
+
+    .resend-row a {
+      color: var(--nc);
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .resend-row a:hover { text-shadow: var(--gc); }
+
+    .field-note {
+      font-size: 11px;
+      min-height: 14px;
+      margin-top: 3px;
     }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
 
 <body>
-  <div class="container">
-    <div class="icon">🔐</div>
-    <h1>Forgot Password?</h1>
-    <p class="subtitle">Enter your email address and we'll send you a link to reset your password.</p>
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
 
-    <div class="info-box">
-      Recovery link will expire in 15 minutes. Check your spam folder if you don't see the email.
+  <nav class="arc-nav">
+    <div class="arc-nav-inner">
+      <a href="/" class="arc-logo">
+        <img src="/assets/masterImageFile/icon.svg" alt="KensGames"
+          style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES
+      </a>
+      <div class="arc-nav-right">
+        <a href="/login/" class="btn">SIGN IN</a>
+      </div>
     </div>
+  </nav>
 
-    <div class="error-message" id="errorMessage"></div>
-    <div class="success-message" id="successMessage"></div>
+  <div class="wrap">
+    <div class="box">
 
-    <form id="recoveryForm">
-      <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="email" placeholder="your@email.com" required autocomplete="email" />
-        <div class="feedback" id="emailFeedback"></div>
+      <!-- STEP 1: Enter email -->
+      <div class="step active" id="step1">
+        <div class="box-title">&#128274; Reset Password</div>
+        <div class="box-sub">Enter your account email. We'll send a 6-digit code.</div>
+        <form onsubmit="sendCode(event)">
+          <div class="arc-field">
+            <label>Email Address</label>
+            <input class="arc-input" type="email" id="fp-email" placeholder="you@email.com"
+              required autocomplete="email">
+            <div class="field-note" id="fp-email-note"></div>
+          </div>
+          <button type="submit" class="submit-btn">&#9654; SEND CODE</button>
+          <div class="arc-msg" id="fp-msg1"></div>
+        </form>
+        <a href="/login/" class="back-link">&#8592; Back to Sign In</a>
       </div>
 
-      <div class="button-group">
-        <button type="submit" class="btn-primary" id="submitBtn">Send Recovery Link</button>
-        <button type="button" class="btn-secondary" onclick="window.location.href='/login'">
-          Back to Login
-        </button>
+      <!-- STEP 2: Enter code + new password -->
+      <div class="step" id="step2">
+        <div class="box-title">&#128273; Enter Code</div>
+        <div class="box-sub" id="step2-sub">Check your inbox for the 6-digit code.</div>
+        <form onsubmit="doReset(event)">
+          <div class="arc-field">
+            <label>6-Digit Code</label>
+            <input class="arc-input otp-input" type="text" id="fp-code" placeholder="000000"
+              required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+            <div class="field-note" id="fp-code-note"></div>
+          </div>
+          <div class="arc-field" style="margin-top:14px;">
+            <label>New Password</label>
+            <input class="arc-input" type="password" id="fp-pass" placeholder="New password"
+              required autocomplete="new-password" oninput="checkPW(this.value)">
+            <div class="pw-rules" id="pw-rules">
+              <span id="pr-len">&#9632; At least 8 characters</span>
+              <span id="pr-cap">&#9632; At least 1 uppercase letter (A–Z)</span>
+              <span id="pr-dig">&#9632; At least 1 digit (0–9)</span>
+              <span id="pr-spc">&#9632; At least 1 special char (!&nbsp;&nbsp;#&nbsp;&nbsp;$&nbsp;&nbsp;_)</span>
+            </div>
+          </div>
+          <div class="arc-field" style="margin-top:14px;">
+            <label>Confirm New Password</label>
+            <input class="arc-input" type="password" id="fp-pass2" placeholder="Repeat password"
+              required autocomplete="new-password" oninput="checkPWMatch()">
+            <div class="field-note" id="fp-pass2-note"></div>
+          </div>
+          <button type="submit" class="submit-btn pink" style="margin-top:18px;">&#9654; SET NEW PASSWORD</button>
+          <div class="arc-msg" id="fp-msg2"></div>
+        </form>
+        <div class="resend-row">
+          Didn't get a code? <a onclick="resendCode()">Resend</a>
+        </div>
+        <a class="back-link" onclick="goStep(1)" style="cursor:pointer;">&#8592; Change email</a>
       </div>
 
-      <div class="loading" id="loading">
-        <span>Sending recovery email...</span>
+      <!-- STEP 3: Success -->
+      <div class="step" id="step3">
+        <div style="text-align:center;padding:20px 0;">
+          <div style="font-size:52px;margin-bottom:16px;">&#9989;</div>
+          <div class="box-title" style="color:var(--ng);">Password Updated!</div>
+          <div class="box-sub" style="margin-top:10px;">Your password has been changed.<br>Redirecting to sign in…</div>
+        </div>
       </div>
-    </form>
 
-    <div class="link">
-      <a href="/login">← Back to login</a>
     </div>
   </div>
 
   <script>
-    const API_URL = '/api/auth';
+    const API = '/api/auth';
+    let _emailForReset = '';
 
-    // Email validation
-    document.getElementById('email').addEventListener('input', validateEmail);
-    function validateEmail() {
-      const email = document.getElementById('email').value.trim().toLowerCase();
-      const feedback = document.getElementById('emailFeedback');
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // ── Step navigation ────────────────────────────────────────────────────
+    function goStep(n) {
+      document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i + 1 === n));
+    }
 
-      if (email.length === 0) {
-        feedback.classList.remove('show');
+    // ── Password rules live check ──────────────────────────────────────────
+    function checkPW(val) {
+      const set = (id, ok) => {
+        const el = document.getElementById(id);
+        el.classList.toggle('ok', ok);
+        el.classList.toggle('bad', val.length > 0 && !ok);
+        el.textContent = (ok ? '✓' : '✗') + el.textContent.slice(1);
+      };
+      set('pr-len', val.length >= 8);
+      set('pr-cap', /[A-Z]/.test(val));
+      set('pr-dig', /[0-9]/.test(val));
+      set('pr-spc', /[!#$_]/.test(val));
+      checkPWMatch();
+    }
+
+    function checkPWMatch() {
+      const p1 = document.getElementById('fp-pass').value;
+      const p2 = document.getElementById('fp-pass2').value;
+      const note = document.getElementById('fp-pass2-note');
+      if (!p2) { note.textContent = ''; return; }
+      const ok = p1 === p2;
+      note.textContent = ok ? 'Passwords match ✓' : 'Passwords do not match';
+      note.style.color = ok ? 'var(--ng)' : '#ff4d4d';
+    }
+
+    function pwValid(val) {
+      return val.length >= 8 && /[A-Z]/.test(val) && /[0-9]/.test(val) && /[!#$_]/.test(val);
+    }
+
+    // ── Step 1: Send OTP code ──────────────────────────────────────────────
+    async function sendCode(e) {
+      e.preventDefault();
+      const email = document.getElementById('fp-email').value.trim().toLowerCase();
+      const msg = document.getElementById('fp-msg1');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        msg.textContent = 'Enter a valid email address'; msg.className = 'arc-msg err'; return;
+      }
+      msg.textContent = 'Sending code…'; msg.className = 'arc-msg';
+      try {
+        const res = await fetch(`${API}/send-reset-code`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          _emailForReset = email;
+          document.getElementById('step2-sub').textContent =
+            'A 6-digit code was sent to ' + email + '. It expires in 15 minutes.';
+          goStep(2);
+        } else {
+          msg.textContent = data.error || 'Could not send code. Try again.'; msg.className = 'arc-msg err';
+        }
+      } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
+    }
+
+    // ── Resend code ────────────────────────────────────────────────────────
+    async function resendCode() {
+      if (!_emailForReset) { goStep(1); return; }
+      const msg = document.getElementById('fp-msg2');
+      msg.textContent = 'Resending…'; msg.className = 'arc-msg';
+      try {
+        const res = await fetch(`${API}/send-reset-code`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: _emailForReset })
+        });
+        const data = await res.json();
+        msg.textContent = res.ok ? 'New code sent ✓' : (data.error || 'Error');
+        msg.className = 'arc-msg ' + (res.ok ? 'ok' : 'err');
+      } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
+    }
+
+    // ── Step 2: Verify code + reset password ───────────────────────────────
+    async function doReset(e) {
+      e.preventDefault();
+      const msg = document.getElementById('fp-msg2');
+      const code = document.getElementById('fp-code').value.trim();
+      const pass = document.getElementById('fp-pass').value;
+      const pass2 = document.getElementById('fp-pass2').value;
+
+      if (!/^[0-9]{6}$/.test(code)) {
+        document.getElementById('fp-code-note').textContent = 'Enter the 6-digit code from your email';
+        document.getElementById('fp-code-note').style.color = '#ff4d4d';
+        return;
+      }
+      if (!pwValid(pass)) {
+        msg.textContent = 'Password does not meet requirements above'; msg.className = 'arc-msg err'; return;
+      }
+      if (pass !== pass2) {
+        document.getElementById('fp-pass2-note').textContent = 'Passwords do not match';
+        document.getElementById('fp-pass2-note').style.color = '#ff4d4d';
         return;
       }
 
-      if (!emailRegex.test(email)) {
-        feedback.textContent = '❌ Invalid email format';
-        feedback.classList.add('show', 'invalid');
-        feedback.classList.remove('valid');
-      } else {
-        feedback.textContent = '✓ Email looks good';
-        feedback.classList.add('show', 'valid');
-        feedback.classList.remove('invalid');
-      }
-    }
-
-    // Form submission
-    document.getElementById('recoveryForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const email = document.getElementById('email').value.trim().toLowerCase();
-
-      // Clear messages
-      document.getElementById('errorMessage').classList.remove('show');
-      document.getElementById('successMessage').classList.remove('show');
-
-      // Show loading
-      document.getElementById('loading').classList.add('show');
-      document.getElementById('submitBtn').disabled = true;
-
+      msg.textContent = 'Verifying…'; msg.className = 'arc-msg';
       try {
-        const response = await fetch(`${API_URL}/forgot-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email })
+        const res = await fetch(`${API}/reset-with-code`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: _emailForReset, code, password: pass })
         });
-
-        const data = await response.json();
-
-        if (data.success) {
-          document.getElementById('successMessage').innerHTML = '<strong>✓ Recovery email sent!</strong><br>Check your inbox for a link to reset your password. Link expires in 15 minutes.';
-          document.getElementById('successMessage').classList.add('show');
-
-          // Clear form
-          document.getElementById('recoveryForm').reset();
-
-          // Redirect after delay
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 3000);
+        const data = await res.json();
+        if (res.ok && data.success) {
+          goStep(3);
+          setTimeout(() => { window.location.href = '/login/'; }, 2500);
         } else {
-          throw new Error(data.error || 'Failed to send recovery email');
+          msg.textContent = data.error || 'Reset failed'; msg.className = 'arc-msg err';
         }
-      } catch (error) {
-        console.error('Recovery error:', error);
-        document.getElementById('errorMessage').textContent = error.message;
-        document.getElementById('errorMessage').classList.add('show');
-      } finally {
-        document.getElementById('loading').classList.remove('show');
-        document.getElementById('submitBtn').disabled = false;
-      }
-    });
-
-    // Check if already logged in
-    window.addEventListener('load', () => {
-      if (localStorage.getItem('user_token')) {
-        window.location.href = '/lobby';
-      }
-    });
+      } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
+    }
   </script>
 </body>
 

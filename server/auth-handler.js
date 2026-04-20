@@ -115,22 +115,24 @@ class AuthHandler {
    * Validate password strength (optional, for new registrations)
    */
   validatePassword(password) {
-    if (!password) {
-      return { valid: true, warning: 'No password provided' };
+    if (!password || typeof password !== 'string') {
+      return { valid: false, error: 'Password is required' };
     }
-
-    if (typeof password !== 'string') {
-      return { valid: false, error: 'Password must be a string' };
+    if (password.length < 8) {
+      return { valid: false, error: 'Password must be at least 8 characters' };
     }
-
-    if (password.length < 6) {
-      return { valid: false, error: 'Password must be at least 6 characters' };
-    }
-
     if (password.length > 128) {
       return { valid: false, error: 'Password too long (max 128 chars)' };
     }
-
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one uppercase letter (A–Z)' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one digit (0–9)' };
+    }
+    if (!/[!#$_]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one special character (!  #  $  _)' };
+    }
     return { valid: true };
   }
 

@@ -416,30 +416,6 @@ function connectToLobby() {
             console.log('[Lobby] Connected');
 
             (async () => {
-                // SSO: if authenticated via Cloudflare Access, mint a real KensGames JWT.
-                try {
-                    const existing = (() => {
-                        try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
-                    })();
-                    if (!existing || String(existing).startsWith('guest-')) {
-                        const res = await fetch('/api/auth/access-session', {
-                            method: 'GET',
-                            credentials: 'include',
-                            headers: { 'Accept': 'application/json' },
-                        });
-                        if (res && res.ok) {
-                            const data = await res.json();
-                            if (data && data.success && data.token) {
-                                try {
-                                    localStorage.setItem('user_token', data.token);
-                                    if (data.username) localStorage.setItem('username', data.username);
-                                    if (data.displayName) localStorage.setItem('display_name', data.displayName);
-                                    if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
-                                } catch (e) { /* ignore */ }
-                            }
-                        }
-                    }
-                } catch (e) { /* ignore */ }
 
                 const token = (() => {
                     try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
