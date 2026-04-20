@@ -1319,11 +1319,17 @@
     <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
     <!-- Three.js -->
     <!-- Manifold Substrates (Dimensional Programming) -->
+    <script src="/js/substrates/game_session_substrate.js"></script>
+    <script src="/js/game_landing.js"></script>
     <!-- Game Logic -->
     <script>
       KG_LANDING.init('starfighter', '/starfighter/lobby.html');
       document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
-      if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
+      if (localStorage.getItem('kg_token')) {
+        var sb = document.getElementById('signin-btn');
+        sb.textContent = 'LOBBY';
+        sb.href = '/starfighter/lobby.html';
+      }
     </script>
     <script src="starfighter.bundle.js?v=a4da92ba33eb7312"></script>
 </body>
