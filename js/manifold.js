@@ -79,7 +79,7 @@ const Manifold = (() => {
   const diamond = (x, y, z) =>
     Math.cos(x) * Math.cos(y) * Math.cos(z) - Math.sin(x) * Math.sin(y) * Math.sin(z);
 
-  const blend = (x, y, z, t = 0.3) =>
+  const blend = (x, y, z, t = 0.5) =>  // t=0.5: equal-weight superposition, no arbitrary bias
     gyroid(x, y, z) * (1 - t) + diamond(x, y, z) * t;
 
   const diamondGrad = (x, y, z) => {
@@ -98,7 +98,15 @@ const Manifold = (() => {
   // These are NOT stored. They are computed every time you ask.
   // ══════════════════════════════════════════════════════════════════════════
 
-  const PI_10 = Math.PI / 10;
+  // Natural period of both the Schwartz Diamond and the gyroid: one full cycle = 2π
+  const SURFACE_PERIOD = 2 * Math.PI;
+
+  // Fold any real coordinate into [0, 2π) — the fundamental domain of the surface.
+  // Because cos/sin are 2π-periodic this is equivalent to evaluating the surface
+  // directly; it simply keeps inputs canonical and eliminates redundant oscillation.
+  function _toSurfaceDomain(c) {
+    return ((c % SURFACE_PERIOD) + SURFACE_PERIOD) % SURFACE_PERIOD;
+  }
 
   // CORE EQUATIONS
   // z = x · y²   — 2D→3D projection (quadratic multiplier: small y → big z)
@@ -108,29 +116,35 @@ const Manifold = (() => {
 
   function _surface(x, y) {
     const z = _z(x, y);
-    const sx = (x / 10) * Math.PI;
-    const sy = (y / 10) * Math.PI;
-    const sz = (z / 100) * Math.PI;
+    // Wrap into fundamental domain [0, 2π) — the natural unit cell of both surfaces.
+    // No arbitrary scaling factors; the period itself (2π) is the only normalisation.
+    const sx = _toSurfaceDomain(x);
+    const sy = _toSurfaceDomain(y);
+    const sz = _toSurfaceDomain(z);
     return {
       gyroid: gyroid(sx, sy, sz),
       diamond: diamond(sx, sy, sz),
       blend: blend(sx, sy, sz),
-      m: _m(x, y, z),  // manifold value at this point
+      m: _m(x, y, z),
     };
   }
 
   function _position3d(x, y) {
     const z = _z(x, y);
+    // Archimedean spiral: radius grows linearly with angle (x, y already in radians).
+    // Height normalised to one surface period so the y-axis is in units of 2π.
     return {
-      x: Math.cos(x * PI_10) * (x * 10),
-      y: z / 10,
-      z: Math.sin(y * PI_10) * (y * 10),
+      x: Math.cos(x) * x,
+      y: z / SURFACE_PERIOD,
+      z: Math.sin(y) * y,
     };
   }
 
   function _color(x, y) {
     const z = _z(x, y);
-    return `hsl(${Math.abs(_m(x, y, z) * 0.036) % 360}, 80%, 60%)`;
+    // Hue cycles exactly once per surface period of |m|.
+    // 360° / 2π maps one radian period to the full colour wheel — no magic constants.
+    return `hsl(${(Math.abs(_m(x, y, z)) % SURFACE_PERIOD) * (360 / SURFACE_PERIOD)}, 80%, 60%)`;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -312,9 +326,10 @@ const Manifold = (() => {
 
     _emit('place', rName, entity);
 
-    // 🍴 Grant fork — compute field value at entity position for Dijkstra priority
+    // 🍴 Grant fork — compute field value at entity position for Dijkstra priority.
+    // Coordinates are wrapped into the fundamental domain before surface evaluation.
     const z = _z(x, y);
-    const sx = x * Math.PI / 10, sy = y * Math.PI / 10, sz = z * Math.PI / 100;
+    const sx = _toSurfaceDomain(x), sy = _toSurfaceDomain(y), sz = _toSurfaceDomain(z);
     const fieldVal = diamond(sx, sy, sz);
     DiningPhilosophers.grant(id, fieldVal);
   }
