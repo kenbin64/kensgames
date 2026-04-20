@@ -29,11 +29,31 @@
 (function () {
   'use strict';
 
+  // Site neon palette — cycles slowly across the background manifold
+  const PALETTE = [
+    [0.00, 1.00, 1.00],  // #00FFFF  cyan
+    [0.60, 0.00, 1.00],  // #9900FF  purple
+    [0.00, 1.00, 0.25],  // #00FF41  green
+    [1.00, 0.91, 0.00],  // #FFE800  yellow
+    [1.00, 0.00, 1.00],  // #FF00FF  pink
+    [1.00, 0.40, 0.00],  // #FF6600  orange
+  ];
+
+  function lerpPalette(t, offset) {
+    const n = PALETTE.length;
+    const idx = ((t + offset) % n + n) % n;
+    const i0 = Math.floor(idx) % n;
+    const i1 = (i0 + 1) % n;
+    const f = idx - Math.floor(idx);
+    return PALETTE[i0].map((v, j) => v * (1 - f) + PALETTE[i1][j] * f);
+  }
+
+  // Legacy theme map (kept for setTheme() API compatibility)
   const THEMES = {
-    cyan: { a: [0.00, 1.00, 1.00], b: [0.75, 0.00, 1.00] },
-    purple: { a: [0.75, 0.00, 1.00], b: [0.00, 1.00, 1.00] },
-    green: { a: [0.22, 1.00, 0.08], b: [0.00, 1.00, 1.00] },
-    gold: { a: [1.00, 0.75, 0.00], b: [0.75, 0.00, 1.00] },
+    cyan: { offset: 0 },
+    purple: { offset: 1 },
+    green: { offset: 2 },
+    gold: { offset: 3 },
   };
 
   // ── Vertex shader — full-screen quad ────────────────────────────────────
@@ -57,6 +77,7 @@
     uniform  float u_scroll;
     uniform  vec3  u_col_a;    /* theme primary   */
     uniform  vec3  u_col_b;    /* theme secondary */
+    uniform  vec3  u_col_c;    /* theme accent    */
     uniform  float u_compile;  /* 0→1 boot anim   */
     uniform  float u_intensity;
 
@@ -219,11 +240,15 @@
       float dim_data  = dim_extract(hitP);
 
       /* ── Color Composition ───────────────────────────────────────────── */
-      /* Surface color: blend theme colors by dimensional data value        */
-      vec3 surfBase  = mix(u_col_a * 0.55, u_col_b * 0.4, zxy_pulse * 0.7 + dim_data * 0.3);
+      /* Surface color: blend all three palette colors by dimensional data   */
+      vec3 surfBase  = mix(
+        mix(u_col_a * 0.55, u_col_b * 0.45, zxy_pulse * 0.7),
+        u_col_c * 0.55,
+        dim_data * 0.55
+      );
       vec3 surfColor = surfBase * (0.22 + diffuse * 0.65)
-                     + u_col_a  * spec    * 0.9
-                     + u_col_b  * fresnel * 0.55;
+                     + mix(u_col_a, u_col_c, zxy_pulse) * spec    * 0.9
+                     + mix(u_col_b, u_col_c, dim_data)  * fresnel * 0.55;
 
       /* Subsurface scatter-like warmth in the tunnels */
       float sss = exp(-diffuse * 3.0) * 0.12;
@@ -232,19 +257,22 @@
       /* Atmospheric depth: surfaces further away fade */
       if (hit > 0.5) surfColor *= exp(-hitDist * 0.055);
 
-      /* Volumetric glow: emanates from the crystal network */
-      float glowPhase = sin(u_time * 0.18) * 0.5 + 0.5;
-      vec3  glowColor = mix(u_col_a, u_col_b, glowPhase) * glow * 2.8;
-      vec3  haloColor = u_col_a * halo * 0.6;
+      /* Volumetric glow: cycles through all three palette colors          */
+      float glowPhase  = sin(u_time * 0.18) * 0.5 + 0.5;
+      float glowPhase2 = sin(u_time * 0.11 + 2.1) * 0.5 + 0.5;
+      vec3  glowColor  = mix(mix(u_col_a, u_col_b, glowPhase), u_col_c, glowPhase2 * 0.6)
+                         * glow * 3.4;
+      vec3  haloColor  = mix(u_col_a, u_col_c, glowPhase2) * halo * 0.8;
 
       /* z=x·y data field overlay: faint saddle-surface contours in bg    */
       float grid  = data_grid(uv);
       float fwave = abs(sin(uv.x * uv.y * 8.0 - u_time * 1.2)) * 0.5 + 0.5;
-      vec3  gridC = u_col_a * grid * fwave * (1.0 - hit * 0.85);
+      vec3  gridC = mix(u_col_a, u_col_c, fwave) * grid * fwave * (1.0 - hit * 0.85);
 
       /* Screen-space dimensional pulse: z=x·y broadcast across the frame  */
-      float scrZXY = abs(sin(uv.x * uv.y * 14.0 - u_time * 0.35)) * 0.028;
-      vec3  scrPulse = u_col_b * scrZXY * (1.0 - hit * 0.9);
+      float scrZXY  = abs(sin(uv.x * uv.y * 14.0 - u_time * 0.35)) * 0.032;
+      float scrMix  = abs(sin(u_time * 0.13));
+      vec3  scrPulse = mix(u_col_b, u_col_c, scrMix) * scrZXY * (1.0 - hit * 0.9);
 
       /* Compose */
       vec3 color = surfColor * hit + glowColor + haloColor + gridC + scrPulse;
@@ -309,10 +337,10 @@
     const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
     if (!gl) { console.warn('[ManifoldReality] WebGL not available'); return; }
 
-    // Detect theme from <body data-mtheme="...">
+    // Detect theme from <body data-mtheme="..."> — sets the palette start offset
     let themeName = document.body.dataset.mtheme || 'cyan';
     if (!THEMES[themeName]) themeName = 'cyan';
-    let theme = THEMES[themeName];
+    let paletteOffset = THEMES[themeName].offset;
     let intensity = 1.0;
 
     // Resize
@@ -353,6 +381,7 @@
     const uScroll = gl.getUniformLocation(prog, 'u_scroll');
     const uColA = gl.getUniformLocation(prog, 'u_col_a');
     const uColB = gl.getUniformLocation(prog, 'u_col_b');
+    const uColC = gl.getUniformLocation(prog, 'u_col_c');
     const uCompile = gl.getUniformLocation(prog, 'u_compile');
     const uIntensity = gl.getUniformLocation(prog, 'u_intensity');
 
@@ -383,8 +412,12 @@
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform2f(uMouse, mouseX, mouseY);
       gl.uniform1f(uScroll, scrollY);
-      gl.uniform3fv(uColA, theme.a);
-      gl.uniform3fv(uColB, theme.b);
+      // Slowly cycle all three colors through the full site palette (period ~30s)
+      const CYCLE_PERIOD = 30.0;
+      const cycleT = (t / CYCLE_PERIOD) * PALETTE.length + paletteOffset;
+      gl.uniform3fv(uColA, lerpPalette(cycleT, 0));
+      gl.uniform3fv(uColB, lerpPalette(cycleT, 2));
+      gl.uniform3fv(uColC, lerpPalette(cycleT, 4));
       gl.uniform1f(uCompile, compileVal);
       gl.uniform1f(uIntensity, intensity);
 
@@ -396,7 +429,7 @@
     // ── Public API ───────────────────────────────────────────────────────
     window.ManifoldReality = {
       setTheme(name) {
-        if (THEMES[name]) { theme = THEMES[name]; themeName = name; }
+        if (THEMES[name]) { paletteOffset = THEMES[name].offset; themeName = name; }
       },
       setIntensity(v) { intensity = Math.max(0, Math.min(2, v)); },
       getTheme() { return themeName; },
