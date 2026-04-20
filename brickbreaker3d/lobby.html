@@ -2,19 +2,7 @@
 <html lang="en">
 
 <head>
-  <!-- Auth + profile gate: must be logged in AND have playername/avatar -->
-  <script>
-    (function () {
-      var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/brickbreaker3d/index.html'); return; }
-      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/brickbreaker3d/index.html'); return; }
-          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
-        }).catch(function () { });
-    })();
-  </script>
+  <!-- Cloudflare Access SSO -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BrickBreaker 3D Lobby &mdash; KensGames</title>
@@ -324,7 +312,33 @@
         <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
         <li><a href="/assemble/">Assemble</a></li>
       </ul>
-      <div class="arc-nav-right" id="nav-avatar"></div>
+      <div class="arc-nav-right">
+        <div id="cf-access-btn"></div>
+        <script>
+          (function () {
+            const TEAM_DOMAIN = "https://butterflyfx.cloudflareaccess.com";
+            const APP_AUD = "551237ed3f6b696243df00c79e764a22153d53e9c1087324b63cd84f4ca49f95";
+            const APP_DOMAIN = "https://kensgames.com";
+            function isLoggedIn() {
+              return document.cookie.split(";").some(function(c) { return c.trim().startsWith("CF_Authorization="); });
+            }
+            var container = document.getElementById("cf-access-btn");
+            if (!container) return;
+            var btn = document.createElement("a");
+            btn.style.cssText = "display:inline-block;padding:8px 18px;background-color:#f6821f;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:background-color 0.2s";
+            btn.onmouseover = function() { btn.style.backgroundColor = "#e5741a"; };
+            btn.onmouseout = function() { btn.style.backgroundColor = "#f6821f"; };
+            if (isLoggedIn()) {
+              btn.href = APP_DOMAIN + "/cdn-cgi/access/logout?redirect_url=" + encodeURIComponent(APP_DOMAIN);
+              btn.textContent = "Log Out";
+            } else {
+              btn.href = TEAM_DOMAIN + "/cdn-cgi/access/login?" + new URLSearchParams({ kid: APP_AUD, redirect_url: APP_DOMAIN + "/lobby" });
+              btn.textContent = "Log In";
+            }
+            container.appendChild(btn);
+          })();
+        </script>
+      </div>
     </div>
   </nav>
   <div class="lobby-wrap">
