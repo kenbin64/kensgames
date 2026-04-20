@@ -232,6 +232,7 @@
 
     /* ── Play button ────────────────────────────────────────────── */
     .play-btn {
+      display: block;
       width: 100%;
       padding: 0.6rem;
       font-family: 'Press Start 2P', monospace;
@@ -243,6 +244,9 @@
       color: var(--c1);
       border: 1px solid var(--c1);
       transition: all 0.2s;
+      text-decoration: none;
+      text-align: center;
+      box-sizing: border-box;
     }
 
     .play-btn:hover {
@@ -447,23 +451,7 @@
     </div>
   </main>
 
-  <!-- ── GAME LAUNCH MODAL ────────────────────────────────────────── -->
-  <div id="launch-modal"
-    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:none;align-items:center;justify-content:center;">
-    <div
-      style="background:var(--surface);border:1px solid var(--c1);border-radius:12px;padding:2rem;max-width:420px;width:90%">
-      <div class="modal-title" id="launch-game-name" style="color:var(--c1);margin-bottom:1.5rem;font-size:0.7rem;">
-      </div>
-      <div style="display:grid;gap:0.75rem;">
-        <button class="arcade-btn" onclick="launchMode('bot')">⚙️ SINGLE PLAYER vs BOTS</button>
-        <button class="arcade-btn" onclick="launchMode('invite_code')">🔗 INVITE WITH CODE</button>
-        <button class="arcade-btn" onclick="launchMode('invite_friends')">👥 INVITE FRIENDS</button>
-        <button class="arcade-btn" onclick="launchMode('public')">🌐 CREATE PUBLIC GAME</button>
-      </div>
-      <button class="arcade-btn" onclick="closeLaunch()"
-        style="width:100%;margin-top:1rem;color:var(--dim);border-color:var(--dim);">CANCEL</button>
-    </div>
-  </div>
+  <!-- launch modal removed — game mode selection handled inside each game -->
 
   <script src="/js/manifold_reality.js" defer></script>
   <script src="/js/manifold_panels.js" defer></script>
@@ -481,7 +469,6 @@
       { id: 'assemble', name: 'ASSEMBLE', icon: '🧩', path: '/assemble/', desc: 'Collaborative puzzle-building. Plan. Build. Solve.', players: '1–4', minPlay: 15 },
     ];
 
-    let currentLaunchGame = null;
     let myProfile = null;
 
     // ── Auth gate ───────────────────────────────────────────────────
@@ -499,7 +486,9 @@
         const pr = await fetch(`${API}/players/me`, { headers: { Authorization: `Bearer ${token}` } });
         if (pr.ok) {
           myProfile = await pr.json();
-          if (!myProfile.tosAgreed || !myProfile.profileSetup) {
+          // Soft-redirect to profile setup only if profile is completely missing
+          // (not on tosAgreed alone — that gate was blocking all users)
+          if (myProfile && !myProfile.profileSetup && myProfile.playername == null) {
             window.location.href = '/player/setup.html'; return;
           }
           renderProfile(myProfile);
@@ -525,7 +514,7 @@
     function renderGames() {
       const grid = document.getElementById('games-grid');
       grid.innerHTML = GAMES.map(g => `
-        <div class="game-card" onclick="openLaunch('${g.id}')">
+        <div class="game-card">
           <span class="game-icon">${g.icon}</span>
           <div class="game-name">${g.name}</div>
           <div class="game-desc">${g.desc}</div>
@@ -533,28 +522,9 @@
             <span>👥 <strong>${g.players}</strong> players</span>
             <span>⏱ <strong>~${g.minPlay}min</strong></span>
           </div>
-          <button class="play-btn">▶ PLAY</button>
+          <a class="play-btn" href="${g.path}">▶ PLAY</a>
         </div>
       `).join('');
-    }
-
-    function openLaunch(gameId) {
-      currentLaunchGame = GAMES.find(g => g.id === gameId);
-      if (!currentLaunchGame) return;
-      document.getElementById('launch-game-name').textContent = currentLaunchGame.name;
-      document.getElementById('launch-modal').style.display = 'flex';
-    }
-    function closeLaunch() {
-      document.getElementById('launch-modal').style.display = 'none';
-      currentLaunchGame = null;
-    }
-    function launchMode(mode) {
-      if (!currentLaunchGame) return;
-      const game = currentLaunchGame;   // capture before closeLaunch() nulls it
-      closeLaunch();
-      const url = new URL(game.path, window.location.origin);
-      url.searchParams.set('mode', mode);
-      window.location.href = url.toString();
     }
 
     async function loadNotifications() {
