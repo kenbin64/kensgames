@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KensGames Admin</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #111118;
+      --cyan: #00ffff;
+      --green: #00ff41;
+      --pink: #ff00ff;
+      --yellow: #ffe600;
+      --orange: #ff8c00;
+      --red: #ff3333;
+      --dim: #888;
+      --txm: #aaa;
+      --font: 'Courier New', monospace;
+      --gcyan: 0 0 12px rgba(0, 255, 255, .35);
+      --ggreen: 0 0 12px rgba(0, 255, 65, .35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: #e0e0e0;
+      font-family: var(--font);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .adm-header {
+      background: linear-gradient(135deg, #0d0d1a, #111130);
+      border-bottom: 2px solid var(--cyan);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .adm-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--cyan);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: var(--gcyan);
+    }
+
+    .adm-who {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--txm);
+    }
+
+    .adm-who .av {
+      font-size: 22px;
+    }
+
+    .adm-who .name {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
+    .adm-badge {
+      padding: 3px 10px;
+      border: 1px solid var(--yellow);
+      border-radius: 10px;
+      color: var(--yellow);
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    /* ── Stats bar ── */
+    .adm-stats {
+      display: flex;
+      gap: 16px;
+      padding: 20px 28px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid rgba(0, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 14px 22px;
+      min-width: 120px;
+      text-align: center;
+    }
+
+    .stat-card .val {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--cyan);
+      text-shadow: var(--gcyan);
+    }
+
+    .stat-card.warn .val {
+      color: var(--orange);
+      text-shadow: 0 0 12px rgba(255, 140, 0, .4);
+    }
+
+    .stat-card.danger .val {
+      color: var(--red);
+      text-shadow: 0 0 12px rgba(255, 51, 51, .4);
+    }
+
+    .stat-card .lbl {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* ── Search + toolbar ── */
+    .adm-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 28px 20px;
+      flex-wrap: wrap;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 420px;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      background: var(--card);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 6px;
+      color: #fff;
+      font-family: var(--font);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .search-wrap input:focus {
+      border-color: var(--cyan);
+    }
+
+    .search-wrap .icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    .adm-refresh {
+      padding: 10px 18px;
+      background: rgba(0, 255, 255, 0.08);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 6px;
+      color: var(--cyan);
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      transition: all .2s;
+    }
+
+    .adm-refresh:hover {
+      background: rgba(0, 255, 255, 0.18);
+    }
+
+    .result-count {
+      font-size: 12px;
+      color: var(--dim);
+    }
+
+    /* ── Table ── */
+    .adm-table-wrap {
+      padding: 0 28px 40px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+      color: var(--cyan);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background .15s;
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 255, 255, 0.04);
+    }
+
+    tbody td {
+      padding: 10px 12px;
+      vertical-align: middle;
+      color: var(--txm);
+      white-space: nowrap;
+    }
+
+    .td-av {
+      font-size: 22px;
+      text-align: center;
+      width: 42px;
+    }
+
+    .td-name {
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .td-name.superuser {
+      color: var(--yellow);
+    }
+
+    .badge-su {
+      display: inline-block;
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(255, 230, 0, 0.15);
+      border: 1px solid var(--yellow);
+      color: var(--yellow);
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+
+    .status-active {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: rgba(0, 255, 65, 0.1);
+      border: 1px solid rgba(0, 255, 65, 0.3);
+      color: var(--green);
+    }
+
+    .status-suspended {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: rgba(255, 140, 0, 0.1);
+      border: 1px solid rgba(255, 140, 0, 0.35);
+      color: var(--orange);
+    }
+
+    .btn-toggle {
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+      border: 1px solid;
+    }
+
+    .btn-toggle.suspend {
+      background: rgba(255, 140, 0, 0.08);
+      border-color: rgba(255, 140, 0, 0.35);
+      color: var(--orange);
+    }
+
+    .btn-toggle.suspend:hover {
+      background: rgba(255, 140, 0, 0.22);
+      border-color: var(--orange);
+    }
+
+    .btn-toggle.unsuspend {
+      background: rgba(0, 255, 65, 0.08);
+      border-color: rgba(0, 255, 65, 0.3);
+      color: var(--green);
+    }
+
+    .btn-toggle.unsuspend:hover {
+      background: rgba(0, 255, 65, 0.2);
+      border-color: var(--green);
+    }
+
+    .btn-toggle:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    /* ── Empty / loading ── */
+    .adm-msg {
+      text-align: center;
+      padding: 48px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      display: none;
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      border: 1px solid var(--cyan);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 999;
+      box-shadow: var(--gcyan);
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="adm-header">
+    <div class="adm-title">&#9652; KensGames Admin</div>
+    <div class="adm-who">
+      <span class="av" id="adm-av">&#x1F680;</span>
+      <span class="name" id="adm-name">kbingh</span>
+      <span class="adm-badge">SUPERUSER</span>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="adm-stats" id="adm-stats">
+    <div class="stat-card">
+      <div class="val" id="st-total">—</div>
+      <div class="lbl">Total Players</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="st-active">—</div>
+      <div class="lbl">Active</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="val" id="st-suspended">—</div>
+      <div class="lbl">Suspended</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="st-today">—</div>
+      <div class="lbl">Seen Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="st-setup">—</div>
+      <div class="lbl">Profiles Set Up</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="adm-toolbar">
+    <div class="search-wrap">
+      <span class="icon">&#128269;</span>
+      <input type="text" id="search-input" placeholder="Search player name…" autocomplete="off">
+    </div>
+    <button class="adm-refresh" onclick="load()">&#8635; Refresh</button>
+    <span class="result-count" id="result-count"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="adm-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Player Name</th>
+          <th>Status</th>
+          <th>Joined</th>
+          <th>Last Seen</th>
+          <th>Games</th>
+          <th>Wins</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="adm-tbody">
+        <tr>
+          <td colspan="8" class="adm-msg">Loading…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ── Avatar emoji map (must match player/setup.html) ──────────────────────
+    const AV = {
+      wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👾', ninja: '🥷',
+      astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺',
+      cat: '😼', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐',
+      diamond: '💎', crown: '👑', rocket: '🚀', ufo: '🛸', satellite: '🛰️',
+      comet: '☄️', planet: '🪐',
+      soccer: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
+      lion: '🦁', tiger: '🐯', bear: '🐻', panda: '🐼', owl: '🦉',
+      gamepad: '🎮', dice: '🎲', joystick: '🕹️', chess: '♟️',
+      wizard2: '🔮', alchemist: '⚗️', laser: '🔬', dna: '🧬',
+      unicorn: '🦄', griffin: '🦅', fairy: '🧚', demon: '👹',
+      cowboy: '🤠', pirate: '🏴‍☠️', samurai: '⚔️',
+      'p_f_med': '🎮', // default fallback
+    };
+
+    const token = localStorage.getItem('kg_token');
+    let _debounce;
+
+    // ── Auth guard — must be superuser ────────────────────────────────────────
+    async function init() {
+      if (!token) { return redirect(); }
+      try {
+        const r = await fetch('/api/players/me', { headers: { Authorization: 'Bearer ' + token } });
+        const d = await r.json();
+        if (!d.success || !d.isSuperuser) return redirect();
+        document.getElementById('adm-name').textContent = d.playername || d.username || 'Admin';
+        const avEmoji = AV[d.avatarId] || '🚀';
+        document.getElementById('adm-av').textContent = avEmoji;
+      } catch { return redirect(); }
+      load();
+    }
+
+    function redirect() {
+      window.location.replace('/login/?redirect=' + encodeURIComponent('/admin/'));
+    }
+
+    // ── Load players ──────────────────────────────────────────────────────────
+    async function load(q) {
+      q = q !== undefined ? q : document.getElementById('search-input').value.trim();
+      const url = '/api/admin/players?limit=100&q=' + encodeURIComponent(q);
+      try {
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (r.status === 401 || r.status === 403) return redirect();
+        const d = await r.json();
+        if (!d.success) { showToast('Error: ' + d.error); return; }
+        renderStats(d.stats);
+        renderTable(d.players);
+        document.getElementById('result-count').textContent =
+          d.players.length + ' player' + (d.players.length !== 1 ? 's' : '');
+      } catch (e) {
+        showToast('Network error');
+      }
+    }
+
+    // ── Render stats bar ─────────────────────────────────────────────────────
+    function renderStats(s) {
+      if (!s) return;
+      document.getElementById('st-total').textContent = s.total ?? '—';
+      document.getElementById('st-active').textContent = s.active ?? '—';
+      document.getElementById('st-suspended').textContent = s.suspended ?? '—';
+      document.getElementById('st-today').textContent = s.seen_today ?? '—';
+      document.getElementById('st-setup').textContent = s.setup_complete ?? '—';
+    }
+
+    // ── Render player table ──────────────────────────────────────────────────
+    function renderTable(players) {
+      const tbody = document.getElementById('adm-tbody');
+      if (!players || players.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="adm-msg">No players found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = players.map(p => {
+        const av = AV[p.avatar_id] || '🎮';
+        const name = esc(p.player_name || '—');
+        const isSU = p.is_superuser === 1;
+        const status = p.status || 'active';
+        const joined = p.created_at ? fmtDate(p.created_at) : '—';
+        const seen = p.last_seen ? fmtAgo(p.last_seen) : '—';
+        const games = p.total_games ?? 0;
+        const wins = p.total_wins ?? 0;
+        const canAct = !isSU;
+        const isSusp = status === 'suspended';
+        const btnCls = isSusp ? 'unsuspend' : 'suspend';
+        const btnLbl = isSusp ? '&#9654; Unsuspend' : '&#9632; Suspend';
+        return `<tr>
+          <td class="td-av">${av}</td>
+          <td class="td-name ${isSU ? 'superuser' : ''}">${name}${isSU ? '<span class="badge-su">SU</span>' : ''}</td>
+          <td><span class="status-${status}">${status.toUpperCase()}</span></td>
+          <td>${joined}</td>
+          <td>${seen}</td>
+          <td>${games}</td>
+          <td>${wins}</td>
+          <td>${canAct
+            ? `<button class="btn-toggle ${btnCls}" onclick="toggleSuspend('${name}', this)">${btnLbl}</button>`
+            : '<span style="color:var(--dim);font-size:11px">Protected</span>'
+          }</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Toggle suspend ───────────────────────────────────────────────────────
+    async function toggleSuspend(playerName, btn) {
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/admin/players/' + encodeURIComponent(playerName) + '/toggle-suspend', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ reason: 'Admin panel action' })
+        });
+        const d = await r.json();
+        if (d.success) {
+          showToast(playerName + ' → ' + d.status.toUpperCase());
+          load();
+        } else {
+          showToast('Error: ' + d.error);
+          btn.disabled = false;
+        }
+      } catch {
+        showToast('Network error');
+        btn.disabled = false;
+      }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function fmtDate(unix) {
+      return new Date(unix * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function fmtAgo(unix) {
+      const diff = Math.floor(Date.now() / 1000) - unix;
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(t._t);
+      t._t = setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    // ── Search debounce ───────────────────────────────────────────────────────
+    document.getElementById('search-input').addEventListener('input', () => {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(() => load(), 320);
+    });
+
+    init();
+  </script>
+</body>
+
+</html>

@@ -218,6 +218,83 @@
             background: rgba(0, 255, 255, 0.06);
         }
 
+        /* ── Top marquee ticker ── */
+        .marquee-bar {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            background: linear-gradient(90deg,
+                rgba(0,0,0,0.92) 0%,
+                rgba(10,0,30,0.96) 50%,
+                rgba(0,0,0,0.92) 100%);
+            border-bottom: 1px solid rgba(0,255,255,0.25);
+            overflow: hidden;
+            height: 36px;
+            display: flex;
+            align-items: center;
+        }
+
+        .marquee-bar::before,
+        .marquee-bar::after {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 80px;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .marquee-bar::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(4,4,12,1), transparent);
+        }
+
+        .marquee-bar::after {
+            right: 0;
+            background: linear-gradient(270deg, rgba(4,4,12,1), transparent);
+        }
+
+        .marquee-track {
+            display: flex;
+            white-space: nowrap;
+            animation: marquee-scroll 28s linear infinite;
+            will-change: transform;
+        }
+
+        .marquee-track:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes marquee-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .marquee-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 28px;
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .marquee-item.c { color: var(--neon-cyan);   text-shadow: 0 0 10px var(--neon-cyan);   }
+        .marquee-item.p { color: var(--neon-pink);   text-shadow: 0 0 10px var(--neon-pink);   }
+        .marquee-item.y { color: var(--neon-yellow); text-shadow: 0 0 10px var(--neon-yellow); }
+        .marquee-item.g { color: var(--neon-green);  text-shadow: 0 0 10px var(--neon-green);  }
+        .marquee-item.o { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
+        .marquee-item.v { color: var(--neon-purple); text-shadow: 0 0 10px var(--neon-purple); }
+
+        .marquee-sep {
+            color: rgba(255,255,255,0.2);
+            font-size: 14px;
+        }
+
         .nav-auth {
             display: flex;
             gap: 10px;
@@ -1627,6 +1704,62 @@
     <div id="tron-grid"></div>
     <div id="scanlines"></div>
     <div class="arcade-symbols" id="arcade-symbols"></div>
+
+    <!-- ── Colorful marquee platform banner ── -->
+    <div class="marquee-bar" role="marquee" aria-label="KensGames game platform ticker">
+        <div class="marquee-track" id="marquee-track">
+            <!-- first copy -->
+            <span class="marquee-item c">&#9646; KensGames</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item p">Free Arcade Games</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item y">&#9646; FastTrack</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item g">BrickBreaker 3D</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item o">&#9646; Alien Space Attack</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item v">4D TicTacToe</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item c">&#9646; Assemble</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item p">No Ads. No Installs.</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item y">&#9646; Play Free</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item g">60 FPS Locked</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item o">&#9646; Multiplayer Ready</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item v">Game Platform</span>
+            <span class="marquee-sep">&#9670;</span>
+            <!-- duplicate for seamless loop -->
+            <span class="marquee-item c">&#9646; KensGames</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item p">Free Arcade Games</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item y">&#9646; FastTrack</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item g">BrickBreaker 3D</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item o">&#9646; Alien Space Attack</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item v">4D TicTacToe</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item c">&#9646; Assemble</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item p">No Ads. No Installs.</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item y">&#9646; Play Free</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item g">60 FPS Locked</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item o">&#9646; Multiplayer Ready</span>
+            <span class="marquee-sep">&#9670;</span>
+            <span class="marquee-item v">Game Platform</span>
+            <span class="marquee-sep">&#9670;</span>
+        </div>
+    </div>
 
     <header>
         <nav>
