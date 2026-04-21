@@ -1,124 +1,50 @@
 {
-  "_schema": "2.0",
-  "_compiled": "2026-04-20T00:00:00.000Z",
+  "_schema": "1.0",
+  "_compiled": "2026-04-21T11:47:59.597736+00:00",
   "portal": "kensgames-portal",
-  "version": "1.5.0",
   "vps": {
     "host": "172.81.62.217",
-    "user": "butterfly",
-    "webroot": "/var/www/kensgames.com/public",
-    "logs": "/var/www/kensgames.com/logs",
-    "backups": "/var/www/backups",
-    "nginx_site": "/etc/nginx/sites-available/kensgames.com",
+    "user": "root",
+    "deploy_path": "/var/www/kensgames.com",
+    "server_path": "/opt/butterflyfx/dimensionsos/helix",
+    "ssh_key": "~/.ssh/id_ed25519_mcp",
     "nginx_reload": true
   },
-  "processes": [
-    {
-      "name": "kensgames-auth",
-      "entry": "server/index.js",
-      "port": 3000,
-      "runtime": "node",
-      "cwd": "/home/butterfly/apps/kensgames-portal/manifold"
-    },
-    {
-      "name": "kensgames-lobby",
-      "entry": "server/lobby-server.js",
-      "port": 8765,
-      "runtime": "node",
-      "protocol": "websocket",
-      "cwd": "/home/butterfly/apps/kensgames-portal/manifold"
-    }
-  ],
-  "deploy_script": "deploy.sh",
   "steps": [
     {
-      "step": "portal_root",
+      "step": "deploy_portal_pages",
       "files": [
         "index.html",
-        "portal.html",
-        "manifold.html",
-        "arcade.css",
-        "arcade.js",
         "lounge.html",
         "discover.html",
-        "showcase.html",
-        "admin.html",
-        "admin.js",
-        "gyroid.js",
-        "sitemap.xml",
-        "manifold.portal.json",
-        "substrates.json"
+        "arcade.css",
+        "showcase.html"
       ],
-      "destination": "/var/www/kensgames.com/public/",
-      "type": "copy"
+      "destination": "/var/www/kensgames.com",
+      "type": "rsync"
     },
     {
-      "step": "shared_assets",
-      "source_dirs": [
-        "js/",
-        "css/",
-        "lib/",
-        "assets/",
-        "shared/",
-        "dist/"
-      ],
-      "destination": "/var/www/kensgames.com/public/",
-      "type": "rsync",
-      "excludes": [
-        "node_modules/",
-        ".git/"
-      ]
+      "step": "deploy_shared_js",
+      "source": "js/",
+      "destination": "/var/www/kensgames.com/js/",
+      "type": "rsync"
     },
     {
-      "step": "auth_pages",
+      "step": "deploy_auth_pages",
       "source_dirs": [
         "login/",
         "register/",
         "forgot-password/",
         "reset-password/",
-        "verify-email/",
-        "invite/",
-        "invited/",
-        "tos/",
-        "player/",
-        "social/",
-        "lobby/",
-        "play/"
+        "verify-email/"
       ],
-      "destination": "/var/www/kensgames.com/public/",
+      "destination": "/var/www/kensgames.com",
       "type": "rsync"
     },
     {
-      "step": "gallery",
-      "source_dirs": [
-        "gallery/"
-      ],
-      "destination": "/var/www/kensgames.com/public/",
-      "type": "rsync"
-    },
-    {
-      "step": "admin_panel",
-      "source_dirs": [
-        "admin/"
-      ],
-      "destination": "/var/www/kensgames.com/public/",
-      "type": "rsync"
-    },
-    {
-      "step": "games",
-      "source_dirs": [
-        "fasttrack/",
-        "brickbreaker3d/",
-        "starfighter/",
-        "assemble/",
-        "4dtictactoe/",
-        "chomp/",
-        "dungeon/",
-        "geowars/",
-        "racer/",
-        "siege/"
-      ],
-      "destination": "/var/www/kensgames.com/public/",
+      "step": "deploy_game_fasttrack",
+      "source": "fasttrack/",
+      "destination": "/var/www/kensgames.com/public/fasttrack/",
       "type": "rsync",
       "excludes": [
         "*.test.js",
@@ -127,28 +53,78 @@
       ]
     },
     {
-      "step": "server",
-      "source_dirs": [
-        "server/"
-      ],
-      "destination": "/var/www/kensgames.com/public/server/",
+      "step": "deploy_game_brickbreaker3d",
+      "source": "brickbreaker3d/",
+      "destination": "/var/www/kensgames.com/public/brickbreaker3d/",
       "type": "rsync",
       "excludes": [
-        "node_modules/"
-      ],
-      "note": "Server runs from source; webroot copy kept in sync"
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_4dtictactoe",
+      "source": "4dtictactoe/",
+      "destination": "/var/www/kensgames.com/public/4dtictactoe/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_starfighter",
+      "source": "starfighter/",
+      "destination": "/var/www/kensgames.com/public/starfighter/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_game_assemble",
+      "source": "assemble/",
+      "destination": "/var/www/kensgames.com/public/assemble/",
+      "type": "rsync",
+      "excludes": [
+        "*.test.js",
+        "*.sh",
+        "manifold.game.json"
+      ]
+    },
+    {
+      "step": "deploy_server",
+      "source": "server/",
+      "destination": "/var/www/kensgames.com/server/",
+      "type": "rsync"
     },
     {
       "step": "post_deploy",
       "commands": [
-        "pm2 restart kensgames-auth --update-env",
-        "pm2 restart kensgames-lobby --update-env",
-        "nginx -t && nginx -s reload"
+        "pm2 restart kensgames-server || pm2 start /var/www/kensgames.com/server/index.js --name kensgames-server",
+        "nginx -t && systemctl reload nginx"
       ],
       "type": "shell"
+    },
+    {
+      "step": "deploy_registry",
+      "source": "dist/manifold.registry.json",
+      "destination": "/var/www/kensgames.com/js/manifold.registry.json",
+      "type": "rsync"
     }
   ],
-  "excludes_global": [
+  "server": {
+    "path": "server/",
+    "entry": "server/index.js",
+    "port": 3000,
+    "runtime": "node",
+    "process_name": "kensgames-server"
+  },
+  "excludes": [
     ".git/",
     ".github/",
     "engine/",
@@ -157,20 +133,7 @@
     "*.md",
     "*.pdf",
     "*.test.js",
-    ".gitignore",
-    "server/db.js.bak",
-    "tools/",
-    "helix.sh"
-  ],
-  "key_files": {
-    "auth_server": "server/index.js",
-    "lobby_server": "server/lobby-server.js",
-    "database": "server/kensgames.db",
-    "game_registry": "shared/game-registry.json",
-    "nginx_config": "docs/nginx-kensgames.conf",
-    "lobby_substrate": "js/kg_lobby.js",
-    "gate_substrate": "js/kg_gate.js",
-    "access_status": "js/access_status.js"
-  }
-}
+    "dist/",
+    ".gitignore"
+  ]
 }

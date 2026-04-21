@@ -1,6 +1,6 @@
 {
   "_schema": "1.0",
-  "_compiled": "2026-04-20T07:04:11.282229+00:00",
+  "_compiled": "2026-04-21T11:47:59.596869+00:00",
   "portal": "kensgames-portal",
   "domain": "kensgames.com",
   "dimensions": {
@@ -41,7 +41,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/fasttrack/",
+        "target": "/var/www/kensgames.com/public/fasttrack/",
         "type": "static_with_server"
       }
     },
@@ -71,7 +71,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/brickbreaker3d/",
+        "target": "/var/www/kensgames.com/public/brickbreaker3d/",
         "type": "static"
       }
     },
@@ -96,7 +96,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/4dtictactoe/",
+        "target": "/var/www/kensgames.com/public/4dtictactoe/",
         "type": "static"
       }
     },
@@ -133,7 +133,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/starfighter/",
+        "target": "/var/www/kensgames.com/public/starfighter/",
         "type": "static_with_server"
       }
     },
@@ -156,7 +156,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/assemble/",
+        "target": "/var/www/kensgames.com/public/assemble/",
         "type": "static"
       }
     }
