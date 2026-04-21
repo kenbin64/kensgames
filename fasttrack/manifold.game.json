@@ -11,8 +11,6 @@
   },
   "entry": "index.html",
   "lobby": "lobby.html",
-  "join": "join.html",
-  "play": "play.html",
   "substrates": {
     "auth": "auth_substrate.js",
     "board": "board_manifold.js",
@@ -41,7 +39,8 @@
   },
   "server": {
     "type": "node",
-    "lobby_port": 3001
+    "lobby_port": 8765,
+    "process": "kensgames-lobby"
   },
   "build": {
     "test_files": [
@@ -58,17 +57,13 @@
     ]
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/fasttrack/",
+    "target": "/var/www/kensgames.com/public/fasttrack/",
     "type": "static_with_server"
   },
   "manifold_compatibility": {
-    "bridge_included": false,
-    "state_exposed": false,
-    "postmessage_protocol": "partial",
-    "todo": [
-      "Include js/manifold_bridge.js in index.html and play.html",
-      "Emit window.__MANIFOLD__ from game_engine_manifold.js",
-      "Wire postMessage events to ManifoldBridge.emit()"
-    ]
-  }
+    "bridge_included": true,
+    "state_exposed": true,
+    "postmessage_protocol": "partial"
+  },
+  "game": "game.html"
 }

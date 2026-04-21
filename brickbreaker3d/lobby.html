@@ -1,640 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <!-- Auth + profile gate: must be logged in AND have playername/avatar -->
-  <script>
-    (function () {
-      var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/brickbreaker3d/lobby.html')); return; }
-      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/brickbreaker3d/lobby.html')); return; }
-          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
-        }).catch(function () { });
-    })();
-  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BrickBreaker 3D Lobby &mdash; KensGames</title>
+  <title>BrickBreaker 3D — Lobby | KensGames</title>
   <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    main {
-      position: relative;
-      z-index: 2;
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem;
-    }
-
-    h1.page-title {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.75rem;
-      color: var(--c2);
-      margin-bottom: 0.4rem;
-    }
-
-    .page-sub {
-      font-size: 0.8rem;
-      color: var(--dim);
-      margin-bottom: 2rem;
-    }
-
-    .lobby-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-
-    @media(max-width: 700px) {
-      .lobby-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .panel {
-      background: var(--surface);
-      border: 1px solid rgba(191, 0, 255, 0.18);
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-
-    .panel-title {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.45rem;
-      color: var(--c2);
-      letter-spacing: 3px;
-      margin-bottom: 1.25rem;
-    }
-
-    .field-row {
-      margin-bottom: 1rem;
-    }
-
-    .field-label {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.36rem;
-      color: var(--dim);
-      letter-spacing: 2px;
-      margin-bottom: 0.35rem;
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .radio-opt {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-    }
-
-    .radio-opt input {
-      accent-color: var(--c2);
-    }
-
-    .select-field {
-      width: 100%;
-      padding: 0.55rem 0.75rem;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 0.85rem;
-      outline: none;
-    }
-
-    .select-field:focus {
-      border-color: var(--c2);
-    }
-
-    .sess-list {
-      list-style: none;
-      padding: 0;
-    }
-
-    .sess-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.65rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      gap: 0.5rem;
-    }
-
-    .sess-info {
-      font-size: 0.78rem;
-      color: var(--dim);
-    }
-
-    .sess-creator {
-      font-size: 0.8rem;
-      color: var(--text);
-    }
-
-    .sess-empty {
-      font-size: 0.78rem;
-      color: var(--dim);
-      text-align: center;
-      padding: 1.5rem 0;
-    }
-
-    .lb-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.78rem;
-    }
-
-    .lb-table th {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.32rem;
-      color: var(--dim);
-      letter-spacing: 2px;
-      text-align: left;
-      padding: 0.4rem 0.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .lb-table td {
-      padding: 0.5rem 0.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text);
-    }
-
-    .lb-rank-1 td {
-      color: var(--c2);
-    }
-
-    .lb-me td {
-      background: rgba(191, 0, 255, 0.04);
-    }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 900;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-overlay.open {
-      display: flex;
-    }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--c2);
-      border-radius: 14px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 480px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
-    .modal-title {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.6rem;
-      color: var(--c2);
-      margin-bottom: 1rem;
-    }
-
-    .players-row {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-      min-height: 40px;
-    }
-
-    .player-chip {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.75rem;
-    }
-
-    .chip-ready {
-      color: var(--c3);
-    }
-
-    .chip-wait {
-      color: var(--dim);
-    }
-
-    .invite-link-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(191, 0, 255, 0.2);
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.5rem;
-      color: var(--c2);
-      letter-spacing: 4px;
-      word-break: break-all;
-      cursor: pointer;
-      margin-bottom: 0.5rem;
-    }
-
-    .copy-hint {
-      font-size: 0.68rem;
-      color: var(--dim);
-      margin-bottom: 1rem;
-    }
-
-    .bots-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .bots-label {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.36rem;
-      color: var(--dim);
-    }
-
-    .status-msg {
-      font-size: 0.75rem;
-      min-height: 1.2em;
-      margin-top: 0.5rem;
-    }
-
-    .status-msg.err {
-      color: #ff4d4d;
-    }
-
-    .status-msg.ok,
-    .status-msg.info {
-      color: var(--c2);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-
-    .stat-box {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
-      padding: 0.85rem;
-      text-align: center;
-    }
-
-    .stat-val {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 0.75rem;
-      color: var(--c2);
-      margin-bottom: 0.3rem;
-    }
-
-    .stat-lbl {
-      font-size: 0.65rem;
-      color: var(--dim);
-    }
+    .lobby-wrap{max-width:1100px;margin:0 auto;padding:40px 20px 80px;}
+    .launch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin:24px 0;}
+    .launch-card{background:rgba(4,4,20,.82);border:1px solid rgba(255,0,255,.22);border-radius:8px;padding:26px 22px;text-align:center;}
+    .launch-card h3{font-family:var(--fa);font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--np);margin-bottom:10px;}
+    .launch-card p{font-size:13px;color:var(--txm);margin-bottom:18px;line-height:1.5;}
+    .bot-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px;}
+    .bot-row button{background:none;border:1px solid #445;color:var(--txm);width:28px;height:28px;border-radius:3px;cursor:pointer;font-size:18px;line-height:1;transition:all .2s;}
+    .bot-row button:hover{border-color:var(--np);color:var(--np);}
+    #bot-count-val{font-family:var(--fa);font-size:24px;color:var(--np);min-width:28px;text-align:center;}
+    .range-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;font-size:13px;color:var(--txm);}
+    input[type=range]{width:80px;accent-color:var(--np);}
+    .join-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 24px;}
+    #join-code-input{background:rgba(255,255,255,.05);border:1px solid #445;border-radius:3px;padding:10px 16px;color:var(--txt);font-family:var(--fa);font-size:14px;letter-spacing:4px;width:180px;text-transform:uppercase;}
+    #join-code-input:focus{outline:none;border-color:var(--np);box-shadow:0 0 8px rgba(255,0,255,.25);}
+    #waiting-room{background:rgba(4,4,20,.9);border:1px solid rgba(255,0,255,.38);border-radius:8px;padding:28px;margin:24px 0;}
+    .share-block{background:rgba(255,0,255,.06);border:1px solid rgba(255,0,255,.2);border-radius:6px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+    .share-code-big{font-family:var(--fa);font-size:36px;letter-spacing:10px;color:var(--np);text-shadow:var(--gp);}
+    #player-list{list-style:none;margin:14px 0;display:flex;flex-direction:column;gap:8px;}
+    #player-list li{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:4px;font-size:13px;}
+    .ready-dot{width:8px;height:8px;border-radius:50%;background:#334;flex-shrink:0;}
+    .ready-dot.on{background:var(--ng);box-shadow:0 0 6px var(--ng);}
+    .player-name{flex:1;}
+    .host-badge{font-size:10px;background:rgba(255,0,255,.15);color:var(--np);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
+    .bot-badge{font-size:10px;background:rgba(0,255,255,.1);color:var(--nc);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
+    .wr-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
+    #sessions-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin:12px 0;}
+    #sessions-list li button{width:100%;text-align:left;background:rgba(4,4,20,.8);border:1px solid #334;border-radius:4px;padding:12px 16px;color:var(--txt);font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s;}
+    #sessions-list li button:hover{border-color:var(--np);}
+    .section-title{font-family:var(--fa);font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--txm);margin-bottom:14px;}
+    .divider{border:none;border-top:1px solid #1a1a2e;margin:30px 0;}
+    .kg-toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:4px;font-size:13px;z-index:500;animation:fadeIn .2s;max-width:320px;}
+    .kg-toast-error{background:rgba(200,0,40,.92);color:#fff;border:1px solid #f00;}
+    .kg-toast-info{background:rgba(0,20,30,.92);color:var(--nc);border:1px solid var(--nc);}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   </style>
 </head>
-
-<body>
+<body style="visibility:hidden">
   <div id="tron-grid"></div>
   <div id="scanlines"></div>
+
   <nav class="arc-nav">
     <div class="arc-nav-inner">
-      <a href="/" class="arc-logo"><img src="/assets/masterImageFile/icon.svg" alt="KensGames"
-          style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
+      <a href="/" class="arc-logo">KENS<span>GAMES</span></a>
       <ul class="arc-nav-links">
-        <li><a href="/">&#8592; Portal</a></li>
-        <li><a href="/fasttrack/">FastTrack</a></li>
-        <li><a href="/starfighter/">Alien Attack</a></li>
-        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
+        <li><a href="/fasttrack/">Fast Track</a></li>
+        <li><a href="/brickbreaker3d/">BrickBreaker</a></li>
+        <li><a href="/starfighter/">StarFighter</a></li>
         <li><a href="/assemble/">Assemble</a></li>
+        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
       </ul>
       <div class="arc-nav-right">
-        <div id="cf-access-btn">
-          <script>
-            (function () {
-              var t = localStorage.getItem('kg_token');
-              var btn = document.createElement('a');
-              btn.style.cssText = 'display:inline-block;padding:8px 18px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border-radius:6px;';
-              if (t) {
-                btn.textContent = 'Log Out';
-                btn.style.background = '#334466';
-                btn.style.color = '#fff';
-                btn.href = '#';
-                btn.onclick = function () {
-                  ['kg_token', 'user_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar'].forEach(function (k) { localStorage.removeItem(k); });
-                  window.location.href = '/login/';
-                  return false;
-                };
-              } else {
-                btn.textContent = 'Log In';
-                btn.style.background = '#0099ff';
-                btn.style.color = '#fff';
-                btn.href = '/login/?redirect=' + encodeURIComponent(window.location.pathname);
-              }
-              document.getElementById('cf-access-btn').appendChild(btn);
-            })();
-          </script>
-        </div>
+        <span id="player-bar" style="font-family:var(--fa);font-size:11px;color:var(--txm);letter-spacing:1px;"></span>
+        <a href="/portal.html" class="btn btn-ghost" style="font-size:10px;padding:6px 14px;">Portal</a>
+        <button class="btn btn-ghost" style="font-size:10px;padding:6px 14px;" onclick="signOut()">Sign Out</button>
       </div>
     </div>
   </nav>
-  <div class="lobby-wrap">
-    <div class="cabinet">
-      <div class="cab-top"></div>
-      <div class="cab-body">
-        <div class="cab-screen">&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;<br>&#9679;&#8594;</div>
-        <div class="cab-label">BrickBreaker 3D</div>
-        <div class="cab-buttons">
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-          <div class="cab-btn"></div>
-        </div>
-      </div>
+
+  <main class="lobby-wrap">
+    <div style="text-align:center;margin:40px 0 36px;">
+      <div class="arc-eyebrow">Arcade Game</div>
+      <h1 class="arc-h1" style="color:var(--np);text-shadow:var(--gp);">BrickBreaker 3D</h1>
+      <p class="arc-sub" style="margin-top:8px;">Smash bricks in 3D &mdash; solo or head-to-head</p>
     </div>
-    <div class="player-card">
-      <div class="arc-avatar" id="av-badge" style="font-size:26px;border-color:var(--accent);box-shadow:var(--gaccent)">
+
+    <p class="section-title">How do you want to play?</p>
+    <div class="launch-grid" id="launch-panel">
+      <div class="launch-card">
+        <h3>Play Solo</h3>
+        <p>Beat your high score against AI</p>
+        <div class="bot-row">
+          <button onclick="adjustBots(-1)">&#8722;</button>
+          <span id="bot-count-val">1</span>
+          <button onclick="adjustBots(1)">&#43;</button>
+        </div>
+        <p style="font-size:11px;color:var(--txm);margin-bottom:18px;">opponents (1&#8211;3)</p>
+        <button class="btn btn-p btn-full" onclick="launchSolo()">Play Solo</button>
       </div>
-      <div>
-        <div class="player-name" id="p-name">Player</div>
-        <div class="player-meta">3D Arcade &bull; Solo &amp; Head-to-Head</div>
+      <div class="launch-card">
+        <h3>Public Game</h3>
+        <p>Open lobby &mdash; anyone can join</p>
+        <div class="range-row">
+          <input type="range" id="max-pub" min="2" max="4" value="2"
+            oninput="document.getElementById('max-pub-val').textContent=this.value">
+          <span id="max-pub-val">2</span>&nbsp;players
+        </div>
+        <button class="btn btn-p btn-full" onclick="launchPublic()">Create Public Game</button>
+      </div>
+      <div class="launch-card">
+        <h3>Private Game</h3>
+        <p>Invite friends with a code</p>
+        <div class="range-row">
+          <input type="range" id="max-priv" min="2" max="4" value="2"
+            oninput="document.getElementById('max-priv-val').textContent=this.value">
+          <span id="max-priv-val">2</span>&nbsp;players
+        </div>
+        <button class="btn btn-p btn-full" onclick="launchPrivate()">Create Private Game</button>
+      </div>
+      <div class="launch-card">
+        <h3>Find a Match</h3>
+        <p>Auto-matched with other players in the queue</p>
+        <button class="btn btn-p btn-full" style="margin-top:54px;" onclick="launchMatchmake()">Find Match</button>
       </div>
     </div>
 
-    <header class="arcade-header">
-      <a href="/" style="text-decoration:none">
-        <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
-      </a>
-      <nav class="header-nav">
-        <a href="/brickbreaker3d/index.html" class="arcade-btn" style="font-size:0.4rem">&#8592; GAME INFO</a>
-        <a href="/portal.html" class="arcade-btn">PORTAL</a>
-      </nav>
-    </header>
+    <hr class="divider">
+    <p class="section-title">Join with a Code</p>
+    <div class="join-row" id="join-code-panel">
+      <input type="text" id="join-code-input" placeholder="A1B2C3" maxlength="6"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')joinWithCode()">
+      <button class="btn btn-p" onclick="joinWithCode()">Join Game</button>
+    </div>
 
-    <main>
-      <h1 class="page-title">&#x1F9F1; BRICKBREAKER 3D</h1>
-      <p class="page-sub">Smash bricks in three dimensions &#x2014; solo or challenge your crew.</p>
-      <div class="lobby-grid">
-        <div class="panel">
-          <div class="panel-title">START A SESSION</div>
-          <div class="field-row">
-            <div class="field-label">GAME MODE</div>
-            <div class="radio-group">
-              <label class="radio-opt"><input type="radio" name="mode" value="private" checked
-                  onchange="onModeChange()"> Private (invite
-                only)</label>
-              <label class="radio-opt"><input type="radio" name="mode" value="public" onchange="onModeChange()"> Public
-                (open)</label>
-              <label class="radio-opt"><input type="radio" name="mode" value="solo" onchange="onModeChange()"> Solo
-                run</label>
-            </div>
-          </div>
-          <div class="field-row" id="max-players-row">
-            <div class="field-label">MAX PLAYERS</div>
-            <select class="select-field" id="max-players-sel">
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4" selected>4</option>
-            </select>
-          </div>
-          <div class="field-row" id="solo-bots-row" style="display:none">
-            <div class="field-label">BOT OPPONENTS</div>
-            <select class="select-field" id="solo-bots-sel">
-              <option value="0">None (pure solo)</option>
-              <option value="1" selected>1 Bot</option>
-              <option value="2">2 Bots</option>
-              <option value="3">3 Bots</option>
-            </select>
-          </div>
-          <button class="arcade-btn"
-            style="width:100%;padding:0.75rem;margin-top:0.5rem;border-color:var(--c2);color:var(--c2)" id="create-btn"
-            onclick="createGame()">CREATE GAME</button>
-          <div class="status-msg" id="create-status"></div>
+    <div id="waiting-room" style="display:none">
+      <p class="section-title">Waiting Room</p>
+      <div class="share-block" id="share-block" style="display:none">
+        <div>
+          <div style="font-size:10px;color:var(--txm);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Game Code</div>
+          <div class="share-code-big" id="share-code-display"></div>
         </div>
-        <div class="panel">
-          <div class="panel-title">PUBLIC GAMES <span id="pub-count" style="color:var(--dim);font-size:0.35rem"></span>
-          </div>
-          <ul class="sess-list" id="pub-sess-list">
-            <li class="sess-empty">Loading open sessions&#x2026;</li>
-          </ul>
-          <button class="arcade-btn" style="font-size:0.4rem;padding:0.4rem 0.8rem;margin-top:0.75rem"
-            onclick="loadPublicSessions()">REFRESH</button>
-        </div>
-        <div class="panel">
-          <div class="panel-title">LEADERBOARD &#x2014; TOP 10</div>
-          <table class="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>PLAYER</th>
-                <th>BEST SCORE</th>
-                <th>MEDALS</th>
-              </tr>
-            </thead>
-            <tbody id="lb-body">
-              <tr>
-                <td colspan="4" style="text-align:center;color:var(--dim);padding:1rem">Loading&#x2026;</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="panel">
-          <div class="panel-title">MY STATS</div>
-          <div class="stats-grid">
-            <div class="stat-box">
-              <div class="stat-val" id="stat-wins">&#x2014;</div>
-              <div class="stat-lbl">SESSIONS</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val" id="stat-losses">&#x2014;</div>
-              <div class="stat-lbl">WINS</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val" id="stat-rank">&#x2014;</div>
-              <div class="stat-lbl">RANK</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val" id="stat-medals">&#x2014;</div>
-              <div class="stat-lbl">MEDALS</div>
-            </div>
-          </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-p" onclick="copyShareUrl()">Copy Invite Link</button>
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="copyCode()">Copy Code</button>
         </div>
       </div>
-    </main>
-
-    <div class="modal-overlay" id="modal-overlay">
-      <div class="modal">
-        <div class="modal-title">&#x1F9F1; WAITING FOR PLAYERS</div>
-        <div style="margin-bottom:0.75rem">
-          <div class="field-label"
-            style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.35rem">
-            INVITE CODE</div>
-          <div class="invite-link-box" id="invite-code-display" onclick="copyInviteLink()">------</div>
-          <div class="copy-hint" id="copy-hint">Click to copy invite link</div>
+      <ul id="player-list"></ul>
+      <div class="wr-actions">
+        <div id="host-controls" style="display:none">
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.addBot('easy')">+ Add Bot</button>
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.removeBot()">- Remove Bot</button>
+          <button class="btn btn-p" id="start-btn" onclick="lobby.startGame()" disabled>Start Game</button>
         </div>
-        <div class="field-label"
-          style="font-family:'Press Start 2P',monospace;font-size:0.36rem;color:var(--dim);letter-spacing:2px;margin-bottom:0.5rem">
-          PLAYERS</div>
-        <div class="players-row" id="modal-players"></div>
-        <div class="bots-row">
-          <span class="bots-label">BOT PLAYERS:</span>
-          <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem"
-            onclick="adjustBots(-1)">&#x2013;</button>
-          <span id="bot-count"
-            style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c2);min-width:1.5rem;text-align:center">0</span>
-          <button class="arcade-btn" style="padding:0.3rem 0.6rem;font-size:0.4rem" onclick="adjustBots(1)">+</button>
-          <span style="font-size:0.72rem;color:var(--dim)">(fill open slots)</span>
+        <div id="guest-controls" style="display:none">
+          <button class="btn btn-ghost" id="ready-btn" onclick="toggleReady()">Ready Up</button>
         </div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
-          <button class="arcade-btn" style="flex:1;padding:0.75rem;border-color:var(--c2);color:var(--c2)"
-            id="start-btn" onclick="startGame()">ENTER GAME</button>
-          <button class="arcade-btn"
-            style="padding:0.75rem 1rem;background:transparent;border-color:rgba(255,0,0,0.4);color:#ff4d4d;font-size:0.4rem"
-            onclick="cancelGame()">CANCEL</button>
-        </div>
-        <div class="status-msg" id="modal-status"></div>
+        <button class="btn btn-ghost" onclick="lobby.leave()">Leave Game</button>
       </div>
     </div>
-    <script src="/js/substrates/profile_gate.js"></script>
-    <script src="/js/substrates/game_session_substrate.js"></script>
-    <script src="/js/manifold_reality.js" defer></script>
-    <script src="/js/manifold_panels.js" defer></script>
-    <script>
-      'use strict';
-      const API = '/api';
-      const GAME = 'brickbreaker3d';
-      const token = localStorage.getItem('kg_token');
-      const AVATARS = { wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👽', ninja: '🥷', astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺', cat: '🐱', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐', diamond: '💎', crown: '👑' };
-      let currentSession = null, currentBots = 0, pollTimer = null;
-      function ah() { return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; }
-      function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-      function setStatus(id, msg, cls) { const el = document.getElementById(id); if (!el) return; el.className = `status-msg ${cls || ''}`; el.textContent = msg; }
-      async function createGame() {
-        const mode = document.querySelector('input[name="mode"]:checked').value;
-        const maxPlayers = parseInt(document.getElementById('max-players-sel').value);
-        document.getElementById('create-btn').disabled = true;
-        setStatus('create-status', 'Creating…', 'info');
-        if (mode === 'solo') {
-          const bots = parseInt(document.getElementById('solo-bots-sel').value);
-          const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode: 'solo', bots }) });
-          const d = await r.json();
-          if (d.success && d.gameUrl) { window.location.href = d.gameUrl; return; }
-          setStatus('create-status', d.error || 'Failed', 'err');
-          document.getElementById('create-btn').disabled = false; return;
-        }
-        const r = await fetch(`${API}/sessions/create`, { method: 'POST', headers: ah(), body: JSON.stringify({ gameId: GAME, mode, maxPlayers }) });
-        const d = await r.json();
-        if (!r.ok || !d.success) { setStatus('create-status', d.error || 'Failed', 'err'); document.getElementById('create-btn').disabled = false; return; }
-        setStatus('create-status', '', '');
-        document.getElementById('create-btn').disabled = false;
-        currentSession = d.session; currentBots = currentSession.bots || 0;
-        openModal(d.code, d.inviteUrl); startPolling(d.sessionId);
-      }
-      async function joinSession(sessionId) {
-        const sr = await fetch(`${API}/sessions/${sessionId}`, { headers: ah() });
-        const sd = await sr.json();
-        if (sd.success && sd.session.code) window.location.href = `/invite/?code=${sd.session.code}&game=${GAME}`;
-      }
-      async function loadPublicSessions() {
-        const r = await fetch(`${API}/sessions/game/${GAME}/public`, { headers: ah() });
-        const d = await r.json();
-        const list = document.getElementById('pub-sess-list');
-        const count = document.getElementById('pub-count');
-        if (!d.success || !d.sessions.length) { list.innerHTML = '<li class="sess-empty">No open sessions right now</li>'; count.textContent = ''; return; }
-        count.textContent = `(${d.sessions.length})`;
-        list.innerHTML = d.sessions.map(s => `<li class="sess-item"><div><div class="sess-creator">${escHtml(s.players?.[0]?.playername || 'Host')}'s session</div><div class="sess-info">${s.players}/${s.maxPlayers} players${s.bots ? ` + ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</div></div><button class="arcade-btn" style="font-size:0.38rem;padding:0.4rem 0.7rem;border-color:var(--c2);color:var(--c2)" onclick="joinSession('${escHtml(s.sessionId)}')">JOIN</button></li>`).join('');
-      }
-      async function loadLeaderboard() {
-        try {
-          const r = await fetch(`${API}/leaderboards/${GAME}?limit=10`, { headers: ah() });
-          const d = await r.json(); const tbody = document.getElementById('lb-body');
-          if (!d.success || !d.entries?.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:1rem">No data yet</td></tr>'; return; }
-          const myId = d.myUserId;
-          tbody.innerHTML = d.entries.map((e, i) => `<tr class="${i === 0 ? 'lb-rank-1' : ''} ${e.userId === myId ? 'lb-me' : ''}"><td>${i + 1}</td><td>${escHtml(e.playername)}</td><td>${e.score || 0}</td><td>${e.medals || 0}</td></tr>`).join('');
-        } catch { }
-      }
-      async function loadMyStats() {
-        try {
-          const r = await fetch(`${API}/leaderboards/${GAME}/me`, { headers: ah() });
-          const d = await r.json();
-          if (d.success) { document.getElementById('stat-wins').textContent = d.sessions ?? '0'; document.getElementById('stat-losses').textContent = d.wins ?? '0'; document.getElementById('stat-rank').textContent = d.rank ?? '—'; document.getElementById('stat-medals').textContent = d.medals ?? '0'; }
-        } catch { }
-      }
-      function openModal(code, inviteUrl) {
-        document.getElementById('invite-code-display').textContent = code || '------';
-        document.getElementById('invite-code-display').dataset.url = inviteUrl || '';
-        document.getElementById('modal-overlay').classList.add('open');
-        renderModalPlayers();
-      }
-      function renderModalPlayers() {
-        if (!currentSession) return;
-        const row = document.getElementById('modal-players');
-        row.innerHTML = currentSession.players.map(p => {
-          const e = AVATARS[p.avatarId] || '🎮'; const crown = p.isCreator ? ' 👑' : '';
-          return `<div class="player-chip">${e} ${escHtml(p.playername)}${crown} <span class="${p.ready ? 'chip-ready' : 'chip-wait'}">${p.ready ? '✔' : '…'}</span></div>`;
-        }).join('');
-        document.getElementById('bot-count').textContent = currentBots;
-      }
-      function copyInviteLink() {
-        const box = document.getElementById('invite-code-display');
-        const url = box.dataset.url || `${window.location.origin}/invite/?code=${box.textContent}&game=${GAME}`;
-        navigator.clipboard.writeText(url).then(() => { document.getElementById('copy-hint').textContent = 'Copied!'; setTimeout(() => { document.getElementById('copy-hint').textContent = 'Click to copy invite link'; }, 2000); });
-      }
-      async function adjustBots(delta) {
-        if (!currentSession) return;
-        const max = (currentSession.maxPlayers || 4) - 1;
-        const newBots = Math.max(0, Math.min(currentBots + delta, max));
-        const r = await fetch(`${API}/sessions/${currentSession.sessionId}/bots`, { method: 'POST', headers: ah(), body: JSON.stringify({ bots: newBots }) });
-        const d = await r.json(); if (d.success) { currentBots = d.bots; document.getElementById('bot-count').textContent = currentBots; }
-      }
-      async function startGame() {
-        if (!currentSession) return;
-        document.getElementById('start-btn').disabled = true; setStatus('modal-status', 'Starting…', 'info');
-        const r = await fetch(`${API}/sessions/${currentSession.sessionId}/start`, { method: 'POST', headers: ah() });
-        const d = await r.json();
-        if (d.success && d.gameUrl) { stopPolling(); window.location.href = d.gameUrl; return; }
-        setStatus('modal-status', d.error || 'Could not start', 'err'); document.getElementById('start-btn').disabled = false;
-      }
-      async function cancelGame() {
-        if (!currentSession) { closeModal(); return; }
-        await fetch(`${API}/sessions/${currentSession.sessionId}`, { method: 'DELETE', headers: ah() });
-        stopPolling(); closeModal();
-      }
-      function closeModal() { stopPolling(); document.getElementById('modal-overlay').classList.remove('open'); currentSession = null; }
-      function startPolling(sessionId) {
-        stopPolling();
-        pollTimer = setInterval(async () => {
-          try {
-            const r = await fetch(`${API}/sessions/${sessionId}`, { headers: ah() });
-            const d = await r.json(); if (!d.success) return;
-            currentSession = d.session; renderModalPlayers();
-            if (d.session.status === 'active' && d.session.gameUrl) { stopPolling(); window.location.href = d.session.gameUrl; }
-          } catch { }
-        }, 3000);
-      }
-      function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
-      function onModeChange() {
-        const mode = document.querySelector('input[name="mode"]:checked').value;
-        document.getElementById('solo-bots-row').style.display = mode === 'solo' ? 'block' : 'none';
-        document.getElementById('max-players-row').style.display = mode === 'solo' ? 'none' : 'block';
-      }
-      loadPublicSessions(); loadLeaderboard(); loadMyStats();
-    </script>
+
+    <hr class="divider">
+    <div id="sessions-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <p class="section-title" style="margin:0">Open Games</p>
+        <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.browseGames()">Refresh</button>
+      </div>
+      <ul id="sessions-list">
+        <li style="color:var(--txm);font-size:13px;padding:10px 0;">Connecting...</li>
+      </ul>
+    </div>
+  </main>
+
+  <script src="/js/kg_gate.js"></script>
+  <script src="/js/kg_lobby.js"></script>
+  <script>
+    'use strict';
+    var bots=1,shareUrl='',currentSession=null,isReady=false,lobby;
+
+    KGGate.protect({allowGuest:false,requireToS:true,requireProfile:true}).then(function(r){
+      if(!r.allowed)return;
+      document.body.style.visibility='';
+      document.getElementById('player-bar').textContent=(r.player&&(r.player.playername||r.player.username))||'';
+      initLobby();
+    });
+
+    function initLobby(){
+      lobby=KGLobby.init({
+        gameId:'brickbreaker3d',
+        gamePath:'/brickbreaker3d/game.html',
+        onConnected:function(){lobby.browseGames();},
+        onError:function(msg){showToast(msg||'Error','error');},
+        onSessionCreated:function(session,code,url){currentSession=session;shareUrl=url||(location.origin+'/brickbreaker3d/lobby.html?join='+code);if(code){document.getElementById('share-code-display').textContent=code;document.getElementById('share-block').style.display='';}showWaitingRoom(session);},
+        onSessionJoined:function(session){currentSession=session;showWaitingRoom(session);},
+        onSessionUpdate:function(session){currentSession=session;renderPlayers(session.players);updateStartBtn(session);},
+        onPlayerJoined:function(player,players,session){currentSession=session;renderPlayers(players);updateStartBtn(session);showToast(escHtml(player.playername||player.username)+' joined','info');},
+        onPlayerLeft:function(username,players,session){if(session){currentSession=session;updateStartBtn(session);}renderPlayers(players);showToast(escHtml(username)+' left','info');},
+        onGameStarted:function(session){window.location.href='/brickbreaker3d/game.html?session='+encodeURIComponent(session.session_id)+'&mode=multi';},
+        onSessionList:function(sessions){renderSessions(sessions);},
+        onMatchmakeResult:function(action,session){if(action==='joined'||action==='created'){currentSession=session;showWaitingRoom(session);}},
+        onLeftSession:function(){currentSession=null;hideWaitingRoom();lobby.browseGames();},
+      });
+    }
+
+    function adjustBots(d){bots=Math.max(1,Math.min(3,bots+d));document.getElementById('bot-count-val').textContent=bots;}
+    function launchSolo(){lobby.solo(bots);}
+    function launchPublic(){lobby.createPublic({maxPlayers:parseInt(document.getElementById('max-pub').value,10)||2});}
+    function launchPrivate(){lobby.createPrivate({maxPlayers:parseInt(document.getElementById('max-priv').value,10)||2});}
+    function launchMatchmake(){lobby.matchmake();}
+    function joinWithCode(){var code=document.getElementById('join-code-input').value.trim().toUpperCase();if(code.length>=4)lobby.joinByCode(code);else showToast('Enter a valid game code','error');}
+    function showWaitingRoom(session){
+      document.getElementById('launch-panel').style.display='none';document.getElementById('join-code-panel').style.display='none';document.getElementById('sessions-panel').style.display='none';document.getElementById('waiting-room').style.display='';
+      var isHost=lobby.user&&session.host_id===lobby.user.user_id;
+      document.getElementById('host-controls').style.display=isHost?'':'none';document.getElementById('guest-controls').style.display=isHost?'none':'';
+      renderPlayers(session.players||[]);updateStartBtn(session);
+    }
+    function hideWaitingRoom(){document.getElementById('waiting-room').style.display='none';document.getElementById('share-block').style.display='none';document.getElementById('launch-panel').style.display='';document.getElementById('join-code-panel').style.display='';document.getElementById('sessions-panel').style.display='';isReady=false;}
+    function renderPlayers(players){
+      document.getElementById('player-list').innerHTML=(players||[]).map(function(p){
+        var badge=p.is_host?'<span class="host-badge">HOST</span>':'';if(p.is_ai)badge='<span class="bot-badge">BOT</span>';
+        return '<li><span class="ready-dot'+(p.ready||p.is_host?' on':'')+'"></span><span class="player-name">'+escHtml(p.playername||p.username||'Player')+'</span>'+badge+'</li>';
+      }).join('');
+    }
+    function updateStartBtn(session){
+      var btn=document.getElementById('start-btn');if(!btn)return;
+      var humans=(session.players||[]).filter(function(p){return!p.is_ai;});
+      var ok=humans.every(function(p){return p.ready||p.is_host;});
+      btn.disabled=!ok||(session.players||[]).length<2;btn.style.opacity=btn.disabled?'0.5':'1';
+    }
+    function toggleReady(){isReady=!isReady;lobby.toggleReady();var btn=document.getElementById('ready-btn');btn.textContent=isReady?'Not Ready':'Ready Up';btn.className='btn '+(isReady?'btn-p':'btn-ghost');}
+    function copyShareUrl(){writeClip(shareUrl||location.href);showToast('Invite link copied!','info');}
+    function copyCode(){writeClip(document.getElementById('share-code-display').textContent);showToast('Code copied!','info');}
+    function writeClip(text){if(navigator.clipboard){navigator.clipboard.writeText(text).catch(function(){fbCopy(text);});}else{fbCopy(text);}}
+    function fbCopy(text){var t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(t);}
+    function renderSessions(sessions){
+      var list=document.getElementById('sessions-list');
+      if(!sessions||!sessions.length){list.innerHTML='<li style="color:var(--txm);font-size:13px;padding:12px 0;">No open games &mdash; create one above!</li>';return;}
+      list.innerHTML=sessions.map(function(s){return '<li><button onclick="lobby.joinSession(\''+s.session_id+'\')"><span>'+escHtml(s.host_username||'Unknown')+'\'s game</span><span style="color:var(--txm);font-size:11px;font-family:var(--fa);">'+(s.player_count||1)+' / '+(s.max_players||4)+'</span></button></li>';}).join('');
+    }
+    function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function showToast(msg,type){var t=document.createElement('div');t.className='kg-toast kg-toast-'+(type||'info');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);}
+    function signOut(){['kg_token','user_token','kg_username','kg_display_name','kg_user_id','kg_avatar','display_name','username'].forEach(function(k){localStorage.removeItem(k);});window.location.href='/login/';}
+    (function(){var c=new URLSearchParams(location.search).get('join');if(c)document.getElementById('join-code-input').value=c.toUpperCase().slice(0,6);}());
+  </script>
 </body>
-
 </html>

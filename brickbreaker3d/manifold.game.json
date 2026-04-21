@@ -46,7 +46,7 @@
     ]
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/brickbreaker3d/",
+    "target": "/var/www/kensgames.com/public/brickbreaker3d/",
     "type": "static"
   },
   "manifold_compatibility": {

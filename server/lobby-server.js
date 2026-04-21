@@ -170,13 +170,14 @@ function getWsByUserId(userId) {
 
 // ── Registered game types ──
 const GAME_REGISTRY = {
-  fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
-  // brickbreaker — canonical game_id used by brickbreaker3d/lobby.html
-  brickbreaker3d: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
-  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' }, // legacy alias
-  starfighter: { name: 'StarFighter', path: '/starfighter/index.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
+  // Standard entry point: every game uses game.html as canonical
+  fasttrack: { name: 'Fast Track', path: '/fasttrack/game.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
+  brickbreaker3d: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
+  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' }, // legacy alias
+  starfighter: { name: 'StarFighter', path: '/starfighter/game.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
   assemble: { name: 'Assemble', path: '/assemble/game.html', lobby: '/assemble/lobby.html', maxPlayers: 4, type: 'realtime' },
   '4dtictactoe': { name: '4D TicTacToe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby.html', maxPlayers: 2, type: 'turn' },
+  chomp: { name: 'Chomp! Wally', path: '/chomp/game.html', lobby: '/chomp/lobby.html', maxPlayers: 1, type: 'solo' },
   connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
   swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
   cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },

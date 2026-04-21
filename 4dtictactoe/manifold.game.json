@@ -33,7 +33,7 @@
     ]
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/4dtictactoe/",
+    "target": "/var/www/kensgames.com/public/4dtictactoe/",
     "type": "static"
   },
   "manifold_compatibility": {

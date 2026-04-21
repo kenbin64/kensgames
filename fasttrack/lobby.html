@@ -1,1312 +1,286 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Fast Track - Lobby</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/svg+xml" href="/assets/masterImageFile/icon.svg">
-  <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
-  <meta name="theme-color" content="#07040f">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fast Track — Lobby | KensGames</title>
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
-  <link rel="stylesheet" href="assets/css/lobby.css">
-  <link rel="stylesheet" href="assets/css/lobby-inline.css">
-  <script src="/js/analytics.js"></script>
-  <script>
-    (function () {
-      document.documentElement.style.visibility = 'hidden';
-      var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
-      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
-          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
-          document.documentElement.style.visibility = '';
-        }).catch(function () { document.documentElement.style.visibility = ''; });
-    })();
-  </script>
+  <link rel="stylesheet" href="/lib/arcade-theme.css">
+  <style>
+    .lobby-wrap{max-width:1100px;margin:0 auto;padding:40px 20px 80px;}
+    .launch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin:24px 0;}
+    .launch-card{background:rgba(4,4,20,.82);border:1px solid rgba(255,232,0,.22);border-radius:8px;padding:26px 22px;text-align:center;}
+    .launch-card h3{font-family:var(--fa);font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--ny);margin-bottom:10px;}
+    .launch-card p{font-size:13px;color:var(--txm);margin-bottom:18px;line-height:1.5;}
+    .bot-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px;}
+    .bot-row button{background:none;border:1px solid #445;color:var(--txm);width:28px;height:28px;border-radius:3px;cursor:pointer;font-size:18px;line-height:1;transition:all .2s;}
+    .bot-row button:hover{border-color:var(--ny);color:var(--ny);}
+    #bot-count-val{font-family:var(--fa);font-size:24px;color:var(--ny);min-width:28px;text-align:center;}
+    .range-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;font-size:13px;color:var(--txm);}
+    input[type=range]{width:80px;accent-color:var(--ny);}
+    .join-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 24px;}
+    #join-code-input{background:rgba(255,255,255,.05);border:1px solid #445;border-radius:3px;padding:10px 16px;color:var(--txt);font-family:var(--fa);font-size:14px;letter-spacing:4px;width:180px;text-transform:uppercase;}
+    #join-code-input:focus{outline:none;border-color:var(--ny);box-shadow:0 0 8px rgba(255,232,0,.25);}
+    #waiting-room{background:rgba(4,4,20,.9);border:1px solid rgba(255,232,0,.38);border-radius:8px;padding:28px;margin:24px 0;}
+    .share-block{background:rgba(255,232,0,.08);border:1px solid rgba(255,232,0,.2);border-radius:6px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+    .share-code-big{font-family:var(--fa);font-size:36px;letter-spacing:10px;color:var(--ny);text-shadow:var(--gy);}
+    #player-list{list-style:none;margin:14px 0;display:flex;flex-direction:column;gap:8px;}
+    #player-list li{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:4px;font-size:13px;}
+    .ready-dot{width:8px;height:8px;border-radius:50%;background:#334;flex-shrink:0;}
+    .ready-dot.on{background:var(--ng);box-shadow:0 0 6px var(--ng);}
+    .player-name{flex:1;}
+    .host-badge{font-size:10px;background:rgba(255,232,0,.15);color:var(--ny);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
+    .bot-badge{font-size:10px;background:rgba(0,255,255,.1);color:var(--nc);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
+    .wr-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
+    #sessions-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin:12px 0;}
+    #sessions-list li button{width:100%;text-align:left;background:rgba(4,4,20,.8);border:1px solid #334;border-radius:4px;padding:12px 16px;color:var(--txt);font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s;}
+    #sessions-list li button:hover{border-color:var(--ny);}
+    .section-title{font-family:var(--fa);font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--txm);margin-bottom:14px;}
+    .divider{border:none;border-top:1px solid #1a1a2e;margin:30px 0;}
+    .kg-toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:4px;font-size:13px;z-index:500;animation:fadeIn .2s;max-width:320px;}
+    .kg-toast-error{background:rgba(200,0,40,.92);color:#fff;border:1px solid #f00;}
+    .kg-toast-info{background:rgba(0,20,30,.92);color:var(--nc);border:1px solid var(--nc);}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    #speakeasy-canvas{position:fixed;inset:0;z-index:1;opacity:.3;pointer-events:none;}
+    #music-btn{position:fixed;bottom:20px;left:20px;z-index:100;background:rgba(4,4,20,.88);border:1px solid #334;border-radius:4px;padding:8px 14px;color:var(--txm);font-size:10px;font-family:var(--fa);cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;}
+    #music-btn:hover,#music-btn.on{border-color:var(--ny);color:var(--ny);}
+    .arc-nav,main{position:relative;z-index:10;}
+  </style>
 </head>
-
-<body>
-  <!-- Speakeasy 3D atmosphere canvas -->
+<body style="visibility:hidden">
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
   <canvas id="speakeasy-canvas"></canvas>
 
-  <!-- Music toggle -->
-  <button id="speakeasy-music-toggle" onclick="Speakeasy.toggleMusic()" title="Toggle ragtime music">
-    <span class="music-icon">🔇</span><span class="music-label">Music Off</span>
-  </button>
+  <nav class="arc-nav">
+    <div class="arc-nav-inner">
+      <a href="/" class="arc-logo">KENS<span>GAMES</span></a>
+      <ul class="arc-nav-links">
+        <li><a href="/fasttrack/">Fast Track</a></li>
+        <li><a href="/brickbreaker3d/">BrickBreaker</a></li>
+        <li><a href="/starfighter/">StarFighter</a></li>
+        <li><a href="/assemble/">Assemble</a></li>
+        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
+      </ul>
+      <div class="arc-nav-right">
+        <span id="player-bar" style="font-family:var(--fa);font-size:11px;color:var(--txm);letter-spacing:1px;"></span>
+        <a href="/portal.html" class="btn btn-ghost" style="font-size:10px;padding:6px 14px;">Portal</a>
+        <button class="btn btn-ghost" style="font-size:10px;padding:6px 14px;" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </nav>
 
-  <!-- Auth Screen (hidden: auth gate redirects before this shows) -->
-  <div id="auth-screen" class="auth-screen" style="display:none;">
-    <div class="auth-logo">
-      <img src="assets/images/icon-192.png" alt="Fast Track">
-      <h1>Fast Track</h1>
-      <p style="color: var(--text-secondary);">The Ultimate Board Game</p>
+  <main class="lobby-wrap">
+    <div style="text-align:center;margin:40px 0 36px;">
+      <div class="arc-eyebrow">Board Game</div>
+      <h1 class="arc-h1" style="color:var(--ny);text-shadow:var(--gy);">Fast Track</h1>
+      <p class="arc-sub" style="margin-top:8px;">Card &amp; peg racing — solo or multiplayer</p>
     </div>
 
-    <div class="auth-card card">
-      <a class="btn btn-primary private-game-btn" id="cf-login-btn" href="#"
-        style="display:block;text-align:center;text-decoration:none;margin-bottom:8px;">
-        🔑 Sign In
-      </a>
-      <a class="btn btn-primary private-game-btn" id="cf-create-private-btn" href="#"
-        style="display:block;text-align:center;text-decoration:none;margin-bottom:8px;">
-        🔒 Create Private Game
-      </a>
-      <script>
-        (function () {
-          var loginBtn = document.getElementById('cf-login-btn');
-          var privateBtn = document.getElementById('cf-create-private-btn');
-          if (loginBtn) {
-            loginBtn.href = '/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html');
-          }
-          if (privateBtn) {
-            privateBtn.href = '/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html?action=private');
-          }
-        })();
-      </script>
-      <div class="auth-divider"><span>or play without login</span></div>
-      <button class="btn btn-secondary private-game-btn" onclick="showPrivateGameJoin()">
-        🎟️ Join Private Game
-      </button>
-      <button class="btn btn-secondary private-game-btn" onclick="playOfflineWithAI()">
-        🤖 Play Offline vs Bots
-      </button>
+    <p class="section-title">How do you want to play?</p>
+    <div class="launch-grid" id="launch-panel">
+      <div class="launch-card">
+        <h3>Play Solo</h3>
+        <p>Race against AI bots</p>
+        <div class="bot-row">
+          <button onclick="adjustBots(-1)">&#8722;</button>
+          <span id="bot-count-val">2</span>
+          <button onclick="adjustBots(1)">&#43;</button>
+        </div>
+        <p style="font-size:11px;color:var(--txm);margin-bottom:18px;">opponents (1&#8211;5)</p>
+        <button class="btn btn-y btn-full" onclick="launchSolo()">Play Solo</button>
+      </div>
+      <div class="launch-card">
+        <h3>Public Game</h3>
+        <p>Open lobby &mdash; anyone can join</p>
+        <div class="range-row">
+          <input type="range" id="max-pub" min="2" max="6" value="4"
+            oninput="document.getElementById('max-pub-val').textContent=this.value">
+          <span id="max-pub-val">4</span>&nbsp;players
+        </div>
+        <button class="btn btn-y btn-full" onclick="launchPublic()">Create Public Game</button>
+      </div>
+      <div class="launch-card">
+        <h3>Private Game</h3>
+        <p>Invite friends with a code</p>
+        <div class="range-row">
+          <input type="range" id="max-priv" min="2" max="6" value="4"
+            oninput="document.getElementById('max-priv-val').textContent=this.value">
+          <span id="max-priv-val">4</span>&nbsp;players
+        </div>
+        <button class="btn btn-y btn-full" onclick="launchPrivate()">Create Private Game</button>
+      </div>
+      <div class="launch-card">
+        <h3>Find a Match</h3>
+        <p>Auto-matched with other players in the queue</p>
+        <button class="btn btn-y btn-full" style="margin-top:54px;" onclick="launchMatchmake()">Find Match</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Main App -->
-  <div id="main-app">
-    <!-- Header -->
-    <header class="header">
-      <div class="logo">
-        <a href="/"
-          style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:0.4rem;opacity:0.7;font-size:0.75rem;margin-right:0.75rem;"
-          title="Back to Portal">&#8592;</a>
-        <img src="assets/images/icon-72.png" class="logo-icon" alt="">
-        <span>Fast Track</span>
-      </div>
+    <hr class="divider">
+    <p class="section-title">Join with a Code</p>
+    <div class="join-row" id="join-code-panel">
+      <input type="text" id="join-code-input" placeholder="A1B2C3" maxlength="6"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')joinWithCode()">
+      <button class="btn btn-y" onclick="joinWithCode()">Join Game</button>
+    </div>
 
-      <div class="user-info" onclick="showProfileModal()">
-        <div class="user-details">
-          <div class="user-name" id="header-username">Player</div>
-          <div class="user-prestige">
-            <span class="prestige-badge prestige-bronze" id="header-prestige">BRONZE</span>
-            <span id="header-points">0 pts</span>
-          </div>
-        </div>
-        <div class="user-avatar" id="header-avatar">👤</div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <div class="quick-action" onclick="createPublicGame()">
-          <div class="quick-action-icon">🎯</div>
-          <div class="quick-action-title">Quick Match</div>
-          <div class="quick-action-desc">Create public game</div>
-        </div>
-        <div class="quick-action" onclick="showCreatePrivateGame()">
-          <div class="quick-action-icon">🔒</div>
-          <div class="quick-action-title">Private Game</div>
-          <div class="quick-action-desc">Invite friends</div>
-        </div>
-        <div class="quick-action" onclick="showJoinByCode()">
-          <div class="quick-action-icon">🎟️</div>
-          <div class="quick-action-title">Join by Code</div>
-          <div class="quick-action-desc">Enter game code</div>
-        </div>
-        <div class="quick-action" onclick="playOfflineWithAI()">
-          <div class="quick-action-icon">🤖</div>
-          <div class="quick-action-title">vs Bots</div>
-          <div class="quick-action-desc">Play offline</div>
-        </div>
-      </div>
-
-      <!-- Tabs -->
-      <div class="tabs">
-        <button class="tab active" data-tab="lounge" onclick="switchTab('lounge')">
-          <span class="tab-icon">🍸</span> Lounge
-        </button>
-        <button class="tab" data-tab="games" onclick="switchTab('games')">
-          <span class="tab-icon">🎮</span> Games
-        </button>
-        <button class="tab" data-tab="guilds" onclick="switchTab('guilds')">
-          <span class="tab-icon">⚔️</span> Guilds
-        </button>
-        <button class="tab" data-tab="players" onclick="switchTab('players')">
-          <span class="tab-icon">👥</span> Players
-        </button>
-        <button class="tab" data-tab="tutorial" onclick="switchTab('tutorial')">
-          <span class="tab-icon">📖</span> How to Play
-        </button>
-        <button class="tab" data-tab="strategy" onclick="switchTab('strategy')">
-          <span class="tab-icon">♟️</span> Strategy
-        </button>
-        <button class="tab" data-tab="history" onclick="switchTab('history')">
-          <span class="tab-icon">📜</span> History
-        </button>
-        <button class="tab" data-tab="terms" onclick="switchTab('terms')">
-          <span class="tab-icon">🛡️</span> Terms
-        </button>
-        <button class="tab" data-tab="chat" onclick="switchTab('chat')">
-          <span class="tab-icon">💬</span> Chat
-        </button>
-      </div>
-
-      <!-- Lounge Panel -->
-      <div class="panel active" id="panel-lounge">
-        <div class="card lounge-welcome">
-          <div class="card-header">
-            <h3 class="card-title">🍸 The Fast Track Lounge</h3>
-          </div>
-          <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
-            Pull up a stool. Fast Track is a race + tactics board game for 2–6 players. Use the outer track for
-            consistency, the inner Fast Track for tempo, and the Bullseye for safety.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">🎲 Ways to Play</h3>
-          </div>
-
-          <div class="play-modes" style="margin-bottom: 0;">
-            <div class="play-mode" onclick="createPublicGame()" role="button" tabindex="0">
-              <div class="mode-icon">🎯</div>
-              <div class="mode-title">Quick Match</div>
-              <div class="mode-desc">Create a public game. Fill seats with bots if you want.</div>
-            </div>
-
-            <div class="play-mode" onclick="showCreatePrivateGame()" role="button" tabindex="0">
-              <div class="mode-icon">🔒</div>
-              <div class="mode-title">Private Game</div>
-              <div class="mode-desc">Host a room, share the code, accept the group, then launch.</div>
-            </div>
-
-            <div class="play-mode" onclick="showJoinByCode()" role="button" tabindex="0">
-              <div class="mode-icon">🎟️</div>
-              <div class="mode-title">Join by Code</div>
-              <div class="mode-desc">Got a code? Ask the host to accept you, then click Ready.</div>
-            </div>
-
-            <div class="play-mode" onclick="playOfflineWithAI()" role="button" tabindex="0">
-              <div class="mode-icon">🤖</div>
-              <div class="mode-title">Offline vs Bots</div>
-              <div class="mode-desc">Solo practice. Learn lines and openings without waiting.</div>
-            </div>
-          </div>
-
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 1rem 0 0;">
-            Note: Signed-in players get full multiplayer features. Invite codes can be used by guests.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">📖 Rules at a Glance</h3>
-            <button class="btn btn-small btn-secondary" onclick="switchTab('tutorial')">Open Rules</button>
-          </div>
-          <ul class="lounge-bullets">
-            <li>Goal: move all 5 pegs into your Safe Zone.</li>
-            <li>Track: outer loop is steady; inner Fast Track is the shortcut.</li>
-            <li>Bullseye: safe position and a flexible exit with face cards.</li>
-            <li>Captures: landing on an opponent sends them home (Safe Zones are protected).</li>
-          </ul>
-        </div>
-
-        <div class="lounge-two">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">♟️ Strategy Corner</h3>
-              <button class="btn btn-small btn-secondary" onclick="switchTab('strategy')">Deep Dive</button>
-            </div>
-            <ul class="lounge-bullets">
-              <li>Tempo beats greed: take safe progress over risky leaps when ahead.</li>
-              <li>Threats matter: keep a peg “in range” to discourage passes.</li>
-              <li>Use the Fast Track to convert a good roll into a real swing.</li>
-              <li>Protect your entry: timing Safe Zone entry is everything.</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">📜 History & Lore</h3>
-              <button class="btn btn-small btn-secondary" onclick="switchTab('history')">Read</button>
-            </div>
-            <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
-              Fast Track is a classic race game with a ruthless middle: shortcuts, safe zones, and
-              tactical collisions. This portal version keeps the spirit but adds modern match flow.
-            </p>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">🛡️ Conduct & Terms</h3>
-            <button class="btn btn-small btn-secondary" onclick="switchTab('terms')">View</button>
-          </div>
-          <p style="color: var(--text-secondary); margin: 0; line-height: 1.7;">
-            Keep it friendly: no harassment, no cheating, no impersonation. The Portal Terms apply to all games.
-          </p>
-        </div>
-      </div>
-
-      <!-- Games Panel -->
-      <div class="panel" id="panel-games">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">🎮 Active Games</h3>
-            <button class="btn btn-small btn-secondary" onclick="refreshGames()">↻ Refresh</button>
-          </div>
-          <div class="session-list" id="session-list">
-            <div class="loading-spinner"></div>
-          </div>
-
-          <!-- Enhanced "No Games" panel with all play options -->
-          <div id="no-games-panel" style="display: none;">
-            <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
-              <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎲</div>
-              <p style="margin-bottom: 1rem;">No active games right now. Start playing with one of these
-                options:</p>
-            </div>
-
-            <div class="no-games-options"
-              style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0 1rem 1.5rem;">
-              <!-- Private Game Option -->
-              <div class="play-option" onclick="showCreatePrivateGame()"
-                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
-                <div style="font-size: 2.5rem;">🔒</div>
-                <div style="flex: 1;">
-                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">
-                    Private Game</div>
-                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Create a game with a
-                    shareable code. Invite friends via link!</div>
-                </div>
-                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
-              </div>
-
-              <!-- Quick Match Option -->
-              <div class="play-option" onclick="createPublicGame()"
-                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
-                <div style="font-size: 2.5rem;">🎯</div>
-                <div style="flex: 1;">
-                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Quick
-                    Match</div>
-                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Create a public game
-                    for anyone to join. Add bots if needed.</div>
-                </div>
-                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
-              </div>
-
-              <!-- Solo vs Bots Option -->
-              <div class="play-option" onclick="playOfflineWithAI()"
-                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
-                <div style="font-size: 2.5rem;">🤖</div>
-                <div style="flex: 1;">
-                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Solo
-                    vs Bots</div>
-                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Play offline against
-                    bot opponents. No waiting required!</div>
-                </div>
-                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
-              </div>
-
-              <!-- Join by Code Option -->
-              <div class="play-option" onclick="showJoinByCode()"
-                style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card)); border-radius: 12px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;">
-                <div style="font-size: 2.5rem;">🎟️</div>
-                <div style="flex: 1;">
-                  <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-primary);">Join
-                    by Code</div>
-                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Have a game code from
-                    a friend? Enter it here!</div>
-                </div>
-                <div style="font-size: 1.5rem; color: var(--accent);">→</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Guilds Panel -->
-      <div class="panel" id="panel-guilds">
-        <!-- Your Guild Section -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">⚔️ Your Guild</h3>
-            <button class="btn btn-small btn-primary" id="create-guild-btn" onclick="showCreateGuild()">+
-              Create Guild</button>
-          </div>
-          <div id="my-guild-info">
-            <p style="color: var(--text-secondary);">You're not in a guild yet.</p>
-          </div>
-
-          <!-- Guild Controls (shown when in a guild) -->
-          <div id="guild-controls" style="display: none;">
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
-              <button class="btn btn-small btn-primary" onclick="showCreateGuildGame()">🎮 Start Guild
-                Game</button>
-              <button class="btn btn-small btn-secondary" onclick="showGuildMembers()">👥 Members</button>
-              <button class="btn btn-small btn-secondary" id="guild-tournament-btn" onclick="showGuildTournaments()"
-                style="display: none;">🏆 Tournaments</button>
-            </div>
-
-            <!-- Guildmaster Controls -->
-            <div id="guildmaster-controls"
-              style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px;">
-              <div style="font-size: 0.9rem; color: #ffd700; margin-bottom: 0.75rem; font-weight: 600;">👑
-                Guildmaster Controls</div>
-              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                <button class="btn btn-small btn-secondary" onclick="showManageMembers()">⚙️ Manage
-                  Members</button>
-                <button class="btn btn-small btn-secondary" onclick="showCreateTournament()">🏆 Create
-                  Tournament</button>
-                <button class="btn btn-small" style="background: rgba(239,68,68,0.2); color: #ef4444;"
-                  onclick="showDisbandGuildConfirm()">☠️ Disband Guild</button>
-              </div>
-              <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
-                ⚠️ If you leave, the guild will be abolished
-              </p>
-            </div>
-
-            <!-- Leave Guild Button (non-guildmasters) -->
-            <div id="leave-guild-section" style="display: none; margin-top: 1rem;">
-              <button class="btn btn-small" style="background: rgba(239,68,68,0.2); color: #ef4444;"
-                onclick="showLeaveGuildConfirm()">🚪 Leave Guild</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Guild Members Online (shown when in a guild) -->
-        <div class="card" id="guild-members-online-card" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title">🟢 Guild Members Online</h3>
-            <span id="guild-online-count" style="color: var(--text-secondary); font-size: 0.9rem;">0
-              online</span>
-          </div>
-          <div id="guild-online-list" style="max-height: 200px; overflow-y: auto;">
-            <p style="color: var(--text-secondary); font-size: 0.9rem;">No members online</p>
-          </div>
-        </div>
-
-        <!-- Guild Games (shown when in a guild) -->
-        <div class="card" id="guild-games-card" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title">🎲 Active Guild Games</h3>
-          </div>
-          <div id="guild-games-list">
-            <p style="color: var(--text-secondary); font-size: 0.9rem;">No active guild games</p>
-          </div>
-        </div>
-
-        <!-- Guild Chat Section (shown when in a guild) -->
-        <div class="card" id="guild-chat-card" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title">💬 Guild Chat</h3>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-small btn-secondary" onclick="showChatSettings()" title="Chat Settings">⚙️</button>
-              <button class="btn btn-small btn-secondary" id="chat-opt-toggle" onclick="toggleChatOptOut()"
-                title="Opt out of chat">🔇</button>
-            </div>
-          </div>
-
-          <!-- Chat disabled notice -->
-          <div id="chat-disabled-notice"
-            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔇</div>
-            <p style="font-size: 0.85rem;">Chat is disabled by the Guildmaster</p>
-          </div>
-
-          <!-- Chat opted out notice -->
-          <div id="chat-opted-out-notice"
-            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔕</div>
-            <p style="font-size: 0.85rem;">You have opted out of chat</p>
-            <button class="btn btn-small btn-secondary" onclick="toggleChatOptOut()"
-              style="margin-top: 0.5rem;">Re-enable Chat</button>
-          </div>
-
-          <!-- Chat not approved notice -->
-          <div id="chat-not-approved-notice"
-            style="display: none; text-align: center; padding: 1rem; color: var(--text-secondary);">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏳</div>
-            <p style="font-size: 0.85rem;">Waiting for chat approval from Guildmaster</p>
-          </div>
-
-          <!-- Active chat area -->
-          <div id="guild-chat-area" style="display: none;">
-            <div id="guild-chat-messages"
-              style="height: 250px; overflow-y: auto; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 0.75rem;">
-              <p style="color: var(--text-secondary); font-size: 0.85rem; text-align: center;">No messages
-                yet</p>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-              <input type="text" class="input" id="guild-chat-input" placeholder="Type a message..." style="flex: 1;"
-                onkeypress="handleGuildChatKeypress(event)">
-              <button class="btn btn-primary" onclick="sendGuildChatMessage()">Send</button>
-            </div>
-          </div>
-
-          <!-- Guildmaster chat controls -->
-          <div id="guildmaster-chat-controls"
-            style="display: none; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
-            <div style="font-size: 0.85rem; color: #ffd700; margin-bottom: 0.5rem; font-weight: 600;">👑
-              Chat Controls</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-              <button class="btn btn-small btn-secondary" id="toggle-guild-chat-btn" onclick="toggleGuildChat()">
-                <span id="toggle-guild-chat-text">Disable Chat</span>
-              </button>
-              <button class="btn btn-small btn-secondary" onclick="showChatApprovals()">📋 Approvals <span
-                  id="pending-approvals-badge"
-                  style="display: none; background: #ef4444; color: #fff; padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; margin-left: 0.3rem;">0</span></button>
-              <button class="btn btn-small btn-secondary" onclick="showBlockedUsers()">🚫 Blocked</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Find Guilds Section -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">🔍 Find Guilds</h3>
-          </div>
-          <div class="input-group" style="margin-bottom: 0;">
-            <input type="text" class="input" id="guild-search" placeholder="Search guilds..." oninput="searchGuilds()">
-          </div>
-          <div id="guild-search-results" style="margin-top: 1rem;"></div>
-        </div>
-
-        <!-- Guild Rules Info -->
-        <div class="card" style="background: rgba(100,200,255,0.05); border: 1px solid rgba(100,200,255,0.2);">
-          <div class="card-header">
-            <h3 class="card-title" style="font-size: 0.95rem;">📜 Guild Rules</h3>
-          </div>
-          <ul
-            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.8;">
-            <li>🎮 <strong>Guild games:</strong> All human, guild members only (2-6 players)</li>
-            <li>🤖 <strong>No bots allowed</strong> in guild games or tournaments</li>
-            <li>👑 <strong>Guildmaster:</strong> Creator, cannot be changed</li>
-            <li>☠️ <strong>If guildmaster leaves:</strong> Guild abolished</li>
-            <li>🏆 <strong>Tournaments:</strong> Guildmaster-to-guildmaster only</li>
-          </ul>
-
-          <!-- Chat Rules -->
-          <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(100,200,255,0.15);">
-            <div style="font-size: 0.85rem; color: #64d8ff; margin-bottom: 0.5rem; font-weight: 500;">💬
-              Chat Rules</div>
-            <ul
-              style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.7;">
-              <li><strong>Guild chat only</strong> — except during tournaments</li>
-              <li><strong>Approval required</strong> — guildmaster approves chat access</li>
-              <li><strong>Guildmaster controls:</strong> Can disable chat, block users</li>
-              <li><strong>Anyone can block</strong> — blocks are silent</li>
-              <li><strong>Unblock cooldown:</strong> 24h before blocking again</li>
-              <li><strong>Blocked users:</strong> See no trace of your presence</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <!-- Players Panel -->
-      <div class="panel" id="panel-players">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">👥 Find Players</h3>
-          </div>
-          <div class="input-group">
-            <input type="text" class="input" id="player-search" placeholder="Search by username..."
-              oninput="searchPlayers()">
-          </div>
-          <div id="player-search-results"></div>
-        </div>
-      </div>
-
-      <!-- Tutorial Panel -->
-      <div class="panel" id="panel-tutorial">
-        <div class="card">
-          <div class="tutorial-step active" data-step="0">
-            <h2>Welcome to Fast Track!</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🎲</div>
-            <p>Fast Track is a strategic racing board game for 2-6 players. Race your pegs around the board
-              and into your safe zone to win!</p>
-          </div>
-
-          <div class="tutorial-step" data-step="1">
-            <h2>The Board</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🔵🔴🟢🟡🟣🟠</div>
-            <p>Each player has a color with 5 pegs. 4 start in the Holding Area, and 1 starts on the Diamond
-              (Home) hole. Get all 5 pegs to your Safe Zone to win!</p>
-          </div>
-
-          <div class="tutorial-step" data-step="2">
-            <h2>Moving Pegs</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🎯</div>
-            <p>Roll the dice and move your pegs clockwise around the outer track. Land exactly on the Safe
-              Zone Entry (2 spaces before your Safe Zone) to enter.</p>
-          </div>
-
-          <div class="tutorial-step" data-step="3">
-            <h2>The Fast Track</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🚀</div>
-            <p>The inner Fast Track is a shortcut! Enter through any colored pentagon (except your own) and
-              exit at your own color. Risky but rewarding!</p>
-          </div>
-
-          <div class="tutorial-step" data-step="4">
-            <h2>The Bullseye</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">⭕</div>
-            <p>Land on the center Bullseye for safety. Rolling J, Q, or K lets you exit to any Fast Track
-              pentagon. Strategic positioning!</p>
-          </div>
-
-          <div class="tutorial-step" data-step="5">
-            <h2>Sending Opponents Home</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">💥</div>
-            <p>Land on an opponent's peg to send them back to their Holding Area! But beware - they can do
-              the same to you. Pegs in Safe Zones cannot be attacked.</p>
-          </div>
-
-          <div class="tutorial-step" data-step="6">
-            <h2>Prestige Points</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🏆</div>
-            <p>Earn prestige by winning games, making strategic plays, and sending opponents home. Rise
-              through the ranks: Bronze → Silver → Gold → Diamond → Platinum!</p>
-          </div>
-
-          <div class="tutorial-step" data-step="7">
-            <h2>Ready to Play!</h2>
-            <div style="font-size: 4rem; margin: 1rem 0;">🎮</div>
-            <p>You're ready! Create a game, invite friends with a code, or join a public match. Good luck!
-            </p>
-            <button class="btn btn-primary" onclick="switchTab('games')" style="margin-top: 1rem;">Find a
-              Game</button>
-          </div>
-
-          <div class="tutorial-dots">
-            <span class="tutorial-dot active" onclick="goToTutorialStep(0)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(1)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(2)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(3)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(4)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(5)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(6)"></span>
-            <span class="tutorial-dot" onclick="goToTutorialStep(7)"></span>
-          </div>
-
-          <div class="tutorial-nav">
-            <button class="btn btn-secondary" onclick="prevTutorialStep()">← Previous</button>
-            <button class="btn btn-primary" onclick="nextTutorialStep()">Next →</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chat Panel -->
-      <div class="panel" id="panel-chat">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">💬 Lobby Chat</h3>
-          </div>
-          <div class="chat-container">
-            <div class="chat-messages" id="chat-messages"></div>
-            <div class="chat-input-row">
-              <input type="text" class="input" id="chat-input" placeholder="Type a message..."
-                onkeydown="handleChatKeydown(event)">
-              <button class="btn btn-primary" onclick="sendChat()">Send</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Strategy Panel -->
-      <div class="panel" id="panel-strategy">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">♟️ Strategy</h3>
-          </div>
-          <div class="lounge-columns">
-            <div class="lounge-col">
-              <h4 class="lounge-h">Openings</h4>
-              <ul class="lounge-bullets">
-                <li>Advance two pegs early: it creates more legal moves later.</li>
-                <li>Don’t sprint a single peg unless it’s protected or decisive.</li>
-                <li>Use the Bullseye when you need stability more than speed.</li>
-              </ul>
-            </div>
-            <div class="lounge-col">
-              <h4 class="lounge-h">Midgame</h4>
-              <ul class="lounge-bullets">
-                <li>Watch “capture lanes”: leave opponents awkward choices.</li>
-                <li>Shortcut with intent: Fast Track should change who’s leading.</li>
-                <li>Protect your Safe Zone entry timing; avoid getting bounced.</li>
-              </ul>
-            </div>
-            <div class="lounge-col">
-              <h4 class="lounge-h">Endgame</h4>
-              <ul class="lounge-bullets">
-                <li>Prioritize guaranteed scoring over flashy collisions.</li>
-                <li>When ahead, reduce variance: safer paths, fewer gambles.</li>
-                <li>When behind, increase variance: aggressive Fast Track plays.</li>
-              </ul>
-            </div>
-          </div>
-          <p style="color: var(--text-secondary); margin: 1rem 0 0;">
-            Want to learn hands-on? Start an Offline vs Bots match and practice entering Safe Zones under pressure.
-          </p>
-        </div>
-      </div>
-
-      <!-- History Panel -->
-      <div class="panel" id="panel-history">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">📜 Fast Track History</h3>
-          </div>
-          <p style="color: var(--text-secondary); line-height: 1.7; margin: 0;">
-            Fast Track belongs to the family of classic race board games where the “track” is only half the story.
-            The interesting part is the interaction: shortcuts, safety, and sending opponents home.
-          </p>
-          <div style="height: 1px; background: var(--border); opacity: 0.6; margin: 1rem 0;"></div>
-          <h4 class="lounge-h">Why it stays fun</h4>
-          <ul class="lounge-bullets">
-            <li>The Fast Track creates comebacks without feeling random.</li>
-            <li>Safe Zones reward timing and planning.</li>
-            <li>Collisions create tension and social moments.</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Terms Panel -->
-      <div class="panel" id="panel-terms">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">🛡️ Terms & Safety</h3>
-            <a class="btn btn-small btn-secondary" href="/#tos">Open Full Terms</a>
-          </div>
-          <p style="color: var(--text-secondary); line-height: 1.7; margin: 0;">
-            By playing, you agree to the Portal Terms of Service. Keep it clean and respectful.
-          </p>
-          <div style="height: 1px; background: var(--border); opacity: 0.6; margin: 1rem 0;"></div>
-          <ul class="lounge-bullets">
-            <li>No harassment, hate, or targeted abuse.</li>
-            <li>No cheating, automation, or exploiting bugs to ruin games.</li>
-            <li>No impersonation or doxxing.</li>
-            <li>Hosts control their rooms; follow the lobby flow (Ready → Accept → Launch).</li>
-          </ul>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <!-- Modals -->
-
-  <!-- Profile Modal -->
-  <div class="modal-overlay" id="profile-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">👤 Profile</h2>
-        <button class="modal-close" onclick="closeModal('profile-modal')">×</button>
-      </div>
-
-      <div style="text-align: center; margin-bottom: 1.5rem;">
-        <div style="font-size: 5rem;" id="profile-avatar-display">👤</div>
-        <h3 id="profile-username">Player</h3>
-        <div class="user-prestige" style="justify-content: center; margin-top: 0.5rem;">
-          <span class="prestige-badge prestige-bronze" id="profile-prestige">BRONZE</span>
-          <span id="profile-points">0 pts</span>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center; margin-bottom: 1.5rem;">
+    <div id="waiting-room" style="display:none">
+      <p class="section-title">Waiting Room</p>
+      <div class="share-block" id="share-block" style="display:none">
         <div>
-          <div style="font-size: 1.5rem; font-weight: bold;" id="profile-games">0</div>
-          <div style="color: var(--text-secondary); font-size: 0.85rem;">Games Played</div>
+          <div style="font-size:10px;color:var(--txm);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Game Code</div>
+          <div class="share-code-big" id="share-code-display"></div>
         </div>
-        <div>
-          <div style="font-size: 1.5rem; font-weight: bold;" id="profile-wins">0</div>
-          <div style="color: var(--text-secondary); font-size: 0.85rem;">Wins</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-y" onclick="copyShareUrl()">Copy Invite Link</button>
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="copyCode()">Copy Code</button>
         </div>
       </div>
-
-      <button class="btn btn-secondary" style="width: 100%; margin-bottom: 0.5rem;" onclick="showAvatarPicker()">
-        🎨 Change Avatar
-      </button>
-      <button class="btn btn-secondary" style="width: 100%;" onclick="logout()">
-        🚪 Logout
-      </button>
-    </div>
-  </div>
-
-  <!-- Avatar Picker Modal -->
-  <div class="modal-overlay" id="avatar-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">🎨 Choose Avatar</h2>
-        <button class="modal-close" onclick="closeModal('avatar-modal')">×</button>
-      </div>
-
-      <div class="avatar-categories" id="avatar-categories"></div>
-      <div class="avatar-grid" id="avatar-grid"></div>
-
-      <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveAvatar()">
-        Save Avatar
-      </button>
-    </div>
-  </div>
-
-  <!-- Join by Code Modal -->
-  <div class="modal-overlay" id="join-code-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">🎟️ Join Game</h2>
-        <button class="modal-close" onclick="closeModal('join-code-modal')">×</button>
-      </div>
-
-      <form onsubmit="joinByCode(event)">
-        <div class="input-group">
-          <label>Game Code</label>
-          <input type="text" class="input" id="join-code-input" placeholder="Enter 6-character code" maxlength="6"
-            style="text-align: center; font-size: 1.5rem; letter-spacing: 0.3rem; text-transform: uppercase;">
+      <ul id="player-list"></ul>
+      <div class="wr-actions">
+        <div id="host-controls" style="display:none">
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.addBot('easy')">+ Add Bot</button>
+          <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.removeBot()">- Remove Bot</button>
+          <button class="btn btn-y" id="start-btn" onclick="lobby.startGame()" disabled>Start Game</button>
         </div>
-
-        <div class="input-group" id="guest-name-group">
-          <label>Your Name</label>
-          <input type="text" class="input" id="guest-name-input" placeholder="Enter your name">
+        <div id="guest-controls" style="display:none">
+          <button class="btn btn-ghost" id="ready-btn" onclick="toggleReady()">Ready Up</button>
         </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Join Game</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Create Guild Modal -->
-  <div class="modal-overlay" id="create-guild-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">⚔️ Create Guild</h2>
-        <button class="modal-close" onclick="closeModal('create-guild-modal')">×</button>
-      </div>
-
-      <form onsubmit="createGuild(event)">
-        <div class="input-group">
-          <label>Guild Name</label>
-          <input type="text" class="input" id="guild-name" placeholder="e.g., Fast Track Masters" required
-            minlength="3">
-        </div>
-        <div class="input-group">
-          <label>Guild Tag (2-4 characters)</label>
-          <input type="text" class="input" id="guild-tag" placeholder="e.g., FTM" required minlength="2" maxlength="4"
-            style="text-transform: uppercase;">
-        </div>
-
-        <div
-          style="background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
-          <p style="font-size: 0.85rem; color: #ffd700; margin: 0;">
-            👑 You will become the <strong>Guildmaster</strong>.<br>
-            <span style="font-size: 0.75rem; color: var(--text-secondary);">This role cannot be transferred.
-              If you leave, the guild will be abolished.</span>
-          </p>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Guild</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Create Guild Game Modal -->
-  <div class="modal-overlay" id="create-guild-game-modal">
-    <div class="modal" style="max-width: 480px;">
-      <div class="modal-header">
-        <h2 class="modal-title">⚔️ Guild Game</h2>
-        <button class="modal-close" onclick="closeModal('create-guild-game-modal')">×</button>
-      </div>
-
-      <form onsubmit="createGuildGame(event)">
-        <div class="input-group">
-          <label>Number of Players</label>
-          <select class="input" id="guild-game-player-count">
-            <option value="2">2 Players</option>
-            <option value="3">3 Players</option>
-            <option value="4" selected>4 Players</option>
-            <option value="5">5 Players</option>
-            <option value="6">6 Players</option>
-          </select>
-        </div>
-
-        <div
-          style="background: rgba(100,200,255,0.1); border: 1px solid rgba(100,200,255,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
-          <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">📜 Guild Game
-            Rules</div>
-          <ul
-            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.6;">
-            <li>🚫 <strong>No bots allowed</strong></li>
-            <li>👥 Guild members only</li>
-            <li>✅ Any guild member can organize</li>
-            <li>🎯 No approval required from guildmaster</li>
-          </ul>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Guild Game</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Guild Members Modal -->
-  <div class="modal-overlay" id="guild-members-modal">
-    <div class="modal" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2 class="modal-title">👥 Guild Members</h2>
-        <button class="modal-close" onclick="closeModal('guild-members-modal')">×</button>
-      </div>
-
-      <div class="input-group">
-        <input type="text" class="input" id="guild-member-search" placeholder="Search members..."
-          oninput="filterGuildMembers()">
-      </div>
-
-      <div id="guild-members-list" style="max-height: 400px; overflow-y: auto;">
-        <p style="color: var(--text-secondary);">Loading members...</p>
+        <button class="btn btn-ghost" onclick="lobby.leave()">Leave Game</button>
       </div>
     </div>
-  </div>
 
-  <!-- Manage Members Modal (Guildmaster only) -->
-  <div class="modal-overlay" id="manage-members-modal">
-    <div class="modal" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2 class="modal-title">⚙️ Manage Members</h2>
-        <button class="modal-close" onclick="closeModal('manage-members-modal')">×</button>
+    <hr class="divider">
+    <div id="sessions-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <p class="section-title" style="margin:0">Open Games</p>
+        <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.browseGames()">Refresh</button>
       </div>
-
-      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
-        👑 As Guildmaster, you can remove any member from the guild.
-      </p>
-
-      <div id="manage-members-list" style="max-height: 400px; overflow-y: auto;">
-        <p style="color: var(--text-secondary);">Loading members...</p>
-      </div>
+      <ul id="sessions-list">
+        <li style="color:var(--txm);font-size:13px;padding:10px 0;">Connecting...</li>
+      </ul>
     </div>
-  </div>
+  </main>
 
-  <!-- Guild Tournaments Modal -->
-  <div class="modal-overlay" id="guild-tournaments-modal">
-    <div class="modal" style="max-width: 550px;">
-      <div class="modal-header">
-        <h2 class="modal-title">🏆 Guild Tournaments</h2>
-        <button class="modal-close" onclick="closeModal('guild-tournaments-modal')">×</button>
-      </div>
+  <button id="music-btn" onclick="toggleMusic()">MUSIC: OFF</button>
 
-      <div id="active-tournaments-section">
-        <h4 style="color: var(--text-primary); margin-bottom: 0.75rem;">Active Tournaments</h4>
-        <div id="active-tournaments-list" style="margin-bottom: 1.5rem;">
-          <p style="color: var(--text-secondary); font-size: 0.9rem;">No active tournaments</p>
-        </div>
-      </div>
-
-      <div id="pending-tournament-invites-section" style="display: none;">
-        <h4 style="color: #ffd700; margin-bottom: 0.75rem;">📥 Pending Invites</h4>
-        <div id="pending-tournament-invites-list" style="margin-bottom: 1.5rem;"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Create Tournament Modal (Guildmaster only) -->
-  <div class="modal-overlay" id="create-tournament-modal">
-    <div class="modal" style="max-width: 520px;">
-      <div class="modal-header">
-        <h2 class="modal-title">🏆 Create Guild Tournament</h2>
-        <button class="modal-close" onclick="closeModal('create-tournament-modal')">×</button>
-      </div>
-
-      <form onsubmit="createGuildTournament(event)">
-        <div class="input-group">
-          <label>Tournament Name</label>
-          <input type="text" class="input" id="tournament-name" placeholder="e.g., Championship 2026" required>
-        </div>
-
-        <div class="input-group">
-          <label>Invite Guilds</label>
-          <input type="text" class="input" id="tournament-guild-search" placeholder="Search guilds to invite..."
-            oninput="searchGuildsForTournament()">
-        </div>
-        <div id="tournament-guild-results" style="max-height: 150px; overflow-y: auto; margin-bottom: 1rem;">
-        </div>
-
-        <div id="invited-guilds-list" style="display: none; margin-bottom: 1rem;">
-          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Invited
-            Guilds:</div>
-          <div id="invited-guilds-tags"></div>
-        </div>
-
-        <div
-          style="background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
-          <div style="font-weight: 600; color: #ffd700; margin-bottom: 0.5rem;">📜 Tournament Rules</div>
-          <ul
-            style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.5;">
-            <li>All participating guildmasters must approve</li>
-            <li>Only guild members can participate</li>
-            <li>No bots allowed in any match</li>
-            <li>Orphaned guilds (no guildmaster) cannot participate</li>
-          </ul>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Send Invitations</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Disband Guild Confirmation Modal -->
-  <div class="modal-overlay" id="disband-guild-modal">
-    <div class="modal" style="max-width: 400px;">
-      <div class="modal-header">
-        <h2 class="modal-title">☠️ Disband Guild</h2>
-        <button class="modal-close" onclick="closeModal('disband-guild-modal')">×</button>
-      </div>
-
-      <div style="text-align: center;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
-        <p style="color: var(--text-primary); margin-bottom: 1rem;">
-          Are you sure you want to <strong>permanently disband</strong> your guild?
-        </p>
-        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
-          All members will be removed.<br>This action cannot be undone.
-        </p>
-
-        <div style="display: flex; gap: 1rem;">
-          <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('disband-guild-modal')">Cancel</button>
-          <button class="btn" style="flex: 1; background: #ef4444; color: #fff;" onclick="disbandGuild()">Disband
-            Guild</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Leave Guild Confirmation Modal -->
-  <div class="modal-overlay" id="leave-guild-modal">
-    <div class="modal" style="max-width: 400px;">
-      <div class="modal-header">
-        <h2 class="modal-title">🚪 Leave Guild</h2>
-        <button class="modal-close" onclick="closeModal('leave-guild-modal')">×</button>
-      </div>
-
-      <div style="text-align: center;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">👋</div>
-        <p style="color: var(--text-primary); margin-bottom: 1.5rem;">
-          Are you sure you want to leave <strong id="leave-guild-name">this guild</strong>?
-        </p>
-
-        <div style="display: flex; gap: 1rem;">
-          <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('leave-guild-modal')">Cancel</button>
-          <button class="btn" style="flex: 1; background: #ef4444; color: #fff;" onclick="leaveGuild()">Leave
-            Guild</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chat Settings Modal -->
-  <div class="modal-overlay" id="chat-settings-modal">
-    <div class="modal" style="max-width: 450px;">
-      <div class="modal-header">
-        <h2 class="modal-title">⚙️ Chat Settings</h2>
-        <button class="modal-close" onclick="closeModal('chat-settings-modal')">×</button>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <div
-          style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-          <div>
-            <div style="font-weight: 500; color: var(--text-primary);">Opt Out of Chat</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">Disable all chat messages</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="chat-opt-out-toggle" onchange="toggleChatOptOut()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <button class="btn btn-secondary" onclick="showBlockedUsers()" style="width: 100%;">
-          🚫 Manage Blocked Users
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chat Approvals Modal (Guildmaster only) -->
-  <div class="modal-overlay" id="chat-approvals-modal">
-    <div class="modal" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2 class="modal-title">📋 Chat Approval Requests</h2>
-        <button class="modal-close" onclick="closeModal('chat-approvals-modal')">×</button>
-      </div>
-
-      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
-        Members must be approved before they can participate in guild chat.
-      </p>
-
-      <div id="chat-approval-list" style="max-height: 400px; overflow-y: auto;">
-        <p style="color: var(--text-secondary); text-align: center;">No pending approvals</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Blocked Users Modal -->
-  <div class="modal-overlay" id="blocked-users-modal">
-    <div class="modal" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2 class="modal-title">🚫 Blocked Users</h2>
-        <button class="modal-close" onclick="closeModal('blocked-users-modal')">×</button>
-      </div>
-
-      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
-        Blocked users cannot see you or interact with you. Blocks are silent.<br>
-        <span style="color: #ffd700;">⚠️ After unblocking, you must wait 24 hours to block again.</span>
-      </p>
-
-      <div id="blocked-users-list" style="max-height: 400px; overflow-y: auto;">
-        <p style="color: var(--text-secondary); text-align: center;">No blocked users</p>
-      </div>
-
-      <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-        <div style="font-size: 0.9rem; color: var(--text-primary); margin-bottom: 0.75rem;">Block a User</div>
-        <div style="display: flex; gap: 0.5rem;">
-          <input type="text" class="input" id="block-user-search" placeholder="Search username to block..."
-            style="flex: 1;" oninput="searchUsersToBlock()">
-        </div>
-        <div id="block-user-results" style="margin-top: 0.5rem; max-height: 150px; overflow-y: auto;"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Waiting Room Modal (for public games / join-by-code) -->
-  <div class="modal-overlay" id="waiting-room-modal">
-    <div class="modal" style="max-width: 600px;">
-      <div class="modal-header">
-        <h2 class="modal-title">⏳ Waiting Room</h2>
-        <button class="modal-close" onclick="leaveWaitingRoom()">×</button>
-      </div>
-
-      <div class="waiting-room">
-        <p>Share this code with friends:</p>
-        <div class="waiting-code" id="waiting-room-code">ABC123</div>
-
-        <div class="share-url">
-          <input type="text" class="input" id="share-url" readonly>
-          <button class="btn btn-secondary" onclick="copyShareUrl()">📋 Copy</button>
-          <button class="btn btn-secondary" onclick="shareViaMessenger()">📤 Share</button>
-        </div>
-
-        <div class="waiting-players" id="waiting-players"></div>
-
-        <div id="game-setup-options"
-          style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 10px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-            <span style="font-size: 0.9rem; color: var(--text-secondary);">Add Bots:</span>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-small btn-secondary" onclick="addAIPlayer()" id="add-ai-btn">🤖 +1
-                Bot</button>
-              <button class="btn btn-small btn-secondary" onclick="removeAIPlayer()" id="remove-ai-btn"
-                style="display: none;">➖ Remove</button>
-            </div>
-          </div>
-          <div id="bot-count-info" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center;"></div>
-          <div id="bot-limit-warning"
-            style="display: none; font-size: 0.75rem; color: var(--warning); margin-top: 0.5rem; text-align: center;">
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
-          <button class="btn btn-secondary" onclick="toggleReady()" id="ready-btn">⬜ I’m Ready</button>
-          <button class="btn btn-secondary" onclick="acceptLobby()" id="accept-btn" style="display:none;">✅ Accept
-            Group</button>
-          <button class="btn btn-primary" onclick="startGame()" id="start-game-btn" disabled>🚀 Launch Game</button>
-        </div>
-
-        <p id="waiting-room-note" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 1rem;">
-          Players must click Ready. Host accepts, then launches.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Private Game Wizard Modal -->
-  <div class="modal-overlay" id="private-wizard-modal">
-    <div class="modal wizard-modal" style="max-width: 520px;">
-      <!-- Wizard Header -->
-      <div class="modal-header">
-        <h2 class="modal-title" id="wizard-title">🔒 Create Private Game</h2>
-        <button class="modal-close" onclick="closePrivateWizard()">×</button>
-      </div>
-
-      <!-- Step Indicator -->
-      <div class="wizard-steps">
-        <div class="wizard-step active" data-step="1"><span>1</span></div>
-        <div class="wizard-step-line"></div>
-        <div class="wizard-step" data-step="2"><span>2</span></div>
-        <div class="wizard-step-line"></div>
-        <div class="wizard-step" data-step="3"><span>3</span></div>
-        <div class="wizard-step-line"></div>
-        <div class="wizard-step" data-step="4"><span>4</span></div>
-      </div>
-
-      <!-- Step 1: Room Code & Share -->
-      <div class="wizard-panel active" id="wizard-step-1">
-        <div class="wizard-content">
-          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">Share this code
-            with friends:</p>
-          <div class="waiting-code" id="wizard-room-code">------</div>
-
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <input type="text" class="input" id="wizard-share-url" readonly style="flex: 1; font-size: 0.8rem;">
-            <button class="btn btn-secondary" onclick="copyShareUrl()" title="Copy link">📋 Copy</button>
-            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-1">Next →</button>
-          </div>
-
-          <div class="wizard-share-icons">
-            <button class="wizard-share-btn" onclick="shareViaMessenger()" title="Share">📤</button>
-            <button class="wizard-share-btn" onclick="shareToWhatsApp()" title="WhatsApp">💬</button>
-            <button class="wizard-share-btn" onclick="shareToTwitter()" title="Twitter / X">🐦</button>
-            <button class="wizard-share-btn" onclick="shareToEmail()" title="Email">✉️</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 2: Username & Avatar -->
-      <div class="wizard-panel" id="wizard-step-2">
-        <div class="wizard-content">
-          <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
-            <div class="wizard-avatar-preview" id="wizard-avatar-preview">😊</div>
-            <input type="text" class="input" id="wizard-username" placeholder="Choose your name..." style="flex: 1;"
-              oninput="wizardCheckUsername()" maxlength="20">
-            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-2" disabled>Next
-              →</button>
-          </div>
-
-          <div class="wizard-avatar-cats" id="wizard-avatar-cats"></div>
-          <div class="wizard-avatar-grid" id="wizard-avatar-grid"></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Game Settings -->
-      <div class="wizard-panel" id="wizard-step-3">
-        <div class="wizard-content">
-          <div class="wizard-settings">
-            <label class="wizard-toggle">
-              <span>🎵 Music</span>
-              <input type="checkbox" id="wiz-music" checked>
-            </label>
-            <label class="wizard-toggle">
-              <span>🤖 Allow AI Players</span>
-              <input type="checkbox" id="wiz-allow-ai" checked>
-            </label>
-            <label class="wizard-toggle">
-              <span>⏱️ Turn Timer</span>
-              <input type="checkbox" id="wiz-turn-timer">
-            </label>
-            <label class="wizard-toggle">
-              <span>🚪 Late Arrivals OK</span>
-              <input type="checkbox" id="wiz-late-arrivals" checked>
-            </label>
-            <div class="wizard-toggle" style="cursor: default;">
-              <span>👥 Max Players</span>
-              <select class="input" id="wiz-max-players"
-                style="width: 80px; padding: 0.3rem 0.5rem; font-size: 0.9rem;">
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4" selected>4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-              </select>
-            </div>
-          </div>
-          <div style="text-align: center; margin-top: 1rem;">
-            <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-3">Open Lobby →</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 4: Waiting Lobby -->
-      <div class="wizard-panel" id="wizard-step-4">
-        <div class="wizard-content">
-          <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-            <button class="btn btn-secondary" onclick="toggleReady()" id="wizard-ready-btn">⬜ I’m Ready</button>
-            <button class="btn btn-secondary" onclick="acceptLobby()" id="wizard-accept-btn">✅ Accept Group</button>
-            <button class="btn btn-primary btn-enter-game" onclick="startGame()" id="wizard-start-btn" disabled>🚀
-              Launch
-              Game</button>
-          </div>
-          <p id="wizard-start-note"
-            style="color: var(--text-secondary); font-size: 0.8rem; text-align: center; margin: 0.5rem 0;">
-            Add at least 1 bot or invite a friend to start
-          </p>
-
-          <div class="waiting-players" id="wizard-waiting-players"></div>
-
-          <div id="wizard-bot-controls"
-            style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.75rem;">
-            <button class="btn btn-small btn-secondary" onclick="addAIPlayer()" id="wizard-add-ai">🤖 + Add
-              Bot</button>
-            <button class="btn btn-small btn-secondary" onclick="removeAIPlayer()" id="wizard-remove-ai"
-              style="display: none;">➖ Remove Bot</button>
-          </div>
-          <div id="wizard-bot-info"
-            style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Create Public Game Modal -->
-  <div class="modal-overlay" id="create-public-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">🌐 Quick Match Settings</h2>
-        <button class="modal-close" onclick="closeModal('create-public-modal')">×</button>
-      </div>
-
-      <form onsubmit="createPublicGameWithSettings(event)">
-        <div class="input-group">
-          <label>Number of Players</label>
-          <select class="input" id="public-player-count">
-            <option value="3">3 Players</option>
-            <option value="4" selected>4 Players (Preferred)</option>
-          </select>
-        </div>
-
-        <div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
-          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Public Game
-            Rules</div>
-          <ul
-            style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; padding-left: 1.2rem; line-height: 1.6;">
-            <li>3-4 players only, no bots at start</li>
-            <li>Bots only replace players who leave/timeout</li>
-            <li>If game starts with 3, stays 3 (no 4th bot)</li>
-            <li>⏱️ Turn timer: 2 min + 1 min warning</li>
-          </ul>
-        </div>
-
-        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
-          🏅 Medallion points are awarded in public matches!
-        </p>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Find Match</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Toast Container -->
-  <div class="toast-container" id="toast-container"></div>
-
-  <!-- Scripts -->
+  <script src="/js/kg_gate.js"></script>
+  <script src="/js/kg_lobby.js"></script>
   <script src="lobby-speakeasy.js"></script>
-  <script src="avatars.js"></script>
-  <script src="lobby_client.js"></script>
-</body>
+  <script>
+    'use strict';
+    var bots=2,shareUrl='',currentSession=null,isReady=false,lobby;
 
+    KGGate.protect({allowGuest:false,requireToS:true,requireProfile:true}).then(function(r){
+      if(!r.allowed)return;
+      document.body.style.visibility='';
+      var name=(r.player&&(r.player.playername||r.player.username))||'';
+      document.getElementById('player-bar').textContent=name;
+      initLobby();
+    });
+
+    function initLobby(){
+      lobby=KGLobby.init({
+        gameId:'fasttrack',
+        gamePath:'/fasttrack/game.html',
+        onConnected:function(){lobby.browseGames();},
+        onError:function(msg){showToast(msg||'Error','error');},
+        onSessionCreated:function(session,code,url){
+          currentSession=session;
+          shareUrl=url||(location.origin+'/fasttrack/lobby.html?join='+code);
+          if(code){document.getElementById('share-code-display').textContent=code;document.getElementById('share-block').style.display='';}
+          showWaitingRoom(session);
+        },
+        onSessionJoined:function(session){currentSession=session;showWaitingRoom(session);},
+        onSessionUpdate:function(session){currentSession=session;renderPlayers(session.players);updateStartBtn(session);},
+        onPlayerJoined:function(player,players,session){currentSession=session;renderPlayers(players);updateStartBtn(session);showToast(escHtml(player.playername||player.username)+' joined','info');},
+        onPlayerLeft:function(username,players,session){if(session){currentSession=session;updateStartBtn(session);}renderPlayers(players);showToast(escHtml(username)+' left','info');},
+        onGameStarted:function(session){window.location.href='/fasttrack/game.html?session='+encodeURIComponent(session.session_id)+'&mode=multi';},
+        onSessionList:function(sessions){renderSessions(sessions);},
+        onMatchmakeResult:function(action,session){if(action==='joined'||action==='created'){currentSession=session;showWaitingRoom(session);}},
+        onLeftSession:function(){currentSession=null;hideWaitingRoom();lobby.browseGames();},
+      });
+    }
+
+    function adjustBots(d){bots=Math.max(1,Math.min(5,bots+d));document.getElementById('bot-count-val').textContent=bots;}
+    function launchSolo(){lobby.solo(bots);}
+    function launchPublic(){lobby.createPublic({maxPlayers:parseInt(document.getElementById('max-pub').value,10)||4});}
+    function launchPrivate(){lobby.createPrivate({maxPlayers:parseInt(document.getElementById('max-priv').value,10)||4});}
+    function launchMatchmake(){lobby.matchmake();}
+    function joinWithCode(){
+      var code=document.getElementById('join-code-input').value.trim().toUpperCase();
+      if(code.length>=4)lobby.joinByCode(code);else showToast('Enter a valid game code','error');
+    }
+
+    function showWaitingRoom(session){
+      document.getElementById('launch-panel').style.display='none';
+      document.getElementById('join-code-panel').style.display='none';
+      document.getElementById('sessions-panel').style.display='none';
+      document.getElementById('waiting-room').style.display='';
+      var isHost=lobby.user&&session.host_id===lobby.user.user_id;
+      document.getElementById('host-controls').style.display=isHost?'':'none';
+      document.getElementById('guest-controls').style.display=isHost?'none':'';
+      renderPlayers(session.players||[]);
+      updateStartBtn(session);
+    }
+    function hideWaitingRoom(){
+      document.getElementById('waiting-room').style.display='none';
+      document.getElementById('share-block').style.display='none';
+      document.getElementById('launch-panel').style.display='';
+      document.getElementById('join-code-panel').style.display='';
+      document.getElementById('sessions-panel').style.display='';
+      isReady=false;
+    }
+    function renderPlayers(players){
+      document.getElementById('player-list').innerHTML=(players||[]).map(function(p){
+        var badge=p.is_host?'<span class="host-badge">HOST</span>':'';
+        if(p.is_ai)badge='<span class="bot-badge">BOT</span>';
+        return '<li><span class="ready-dot'+(p.ready||p.is_host?' on':'')+'"></span>'
+          +'<span class="player-name">'+escHtml(p.playername||p.username||'Player')+'</span>'+badge+'</li>';
+      }).join('');
+    }
+    function updateStartBtn(session){
+      var btn=document.getElementById('start-btn');if(!btn)return;
+      var humans=(session.players||[]).filter(function(p){return!p.is_ai;});
+      var ok=humans.every(function(p){return p.ready||p.is_host;});
+      btn.disabled=!ok||(session.players||[]).length<2;
+      btn.style.opacity=btn.disabled?'0.5':'1';
+    }
+    function toggleReady(){
+      isReady=!isReady;lobby.toggleReady();
+      var btn=document.getElementById('ready-btn');
+      btn.textContent=isReady?'Not Ready':'Ready Up';
+      btn.className='btn '+(isReady?'btn-y':'btn-ghost');
+    }
+    function copyShareUrl(){var u=shareUrl||location.href;writeClip(u);showToast('Invite link copied!','info');}
+    function copyCode(){writeClip(document.getElementById('share-code-display').textContent);showToast('Code copied!','info');}
+    function writeClip(text){
+      if(navigator.clipboard){navigator.clipboard.writeText(text).catch(function(){fbCopy(text);});}else{fbCopy(text);}
+    }
+    function fbCopy(text){var t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(t);}
+    function renderSessions(sessions){
+      var list=document.getElementById('sessions-list');
+      if(!sessions||!sessions.length){list.innerHTML='<li style="color:var(--txm);font-size:13px;padding:12px 0;">No open games &mdash; create one above!</li>';return;}
+      list.innerHTML=sessions.map(function(s){
+        return '<li><button onclick="lobby.joinSession(\''+s.session_id+'\')"><span>'+escHtml(s.host_username||'Unknown')+'\'s game</span><span style="color:var(--txm);font-size:11px;font-family:var(--fa);">'+(s.player_count||1)+' / '+(s.max_players||4)+'</span></button></li>';
+      }).join('');
+    }
+    function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function showToast(msg,type){
+      var t=document.createElement('div');t.className='kg-toast kg-toast-'+(type||'info');t.textContent=msg;
+      document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);
+    }
+    function signOut(){['kg_token','user_token','kg_username','kg_display_name','kg_user_id','kg_avatar','display_name','username'].forEach(function(k){localStorage.removeItem(k);});window.location.href='/login/';}
+    var musicOn=false;
+    function toggleMusic(){
+      musicOn=!musicOn;var btn=document.getElementById('music-btn');
+      btn.textContent='MUSIC: '+(musicOn?'ON':'OFF');btn.className=musicOn?'on':'';
+      if(typeof Speakeasy!=='undefined'){musicOn?Speakeasy.start():Speakeasy.stop();}
+    }
+    (function(){var c=new URLSearchParams(location.search).get('join');if(c)document.getElementById('join-code-input').value=c.toUpperCase().slice(0,6);}());
+  </script>
+</body>
 </html>

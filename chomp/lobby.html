@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chomp! Wally — Lobby | KensGames</title>
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <link rel="stylesheet" href="/lib/arcade-theme.css">
+  <style>
+    .lobby-wrap{max-width:700px;margin:0 auto;padding:40px 20px 80px;text-align:center;}
+    .launch-card{background:rgba(4,4,20,.82);border:1px solid rgba(0,255,65,.22);border-radius:8px;padding:40px 32px;margin:24px 0;}
+    .launch-card h3{font-family:var(--fa);font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--ng);margin-bottom:12px;}
+    .launch-card p{font-size:13px;color:var(--txm);margin-bottom:24px;line-height:1.6;}
+    .diff-row{display:flex;justify-content:center;gap:10px;margin-bottom:24px;flex-wrap:wrap;}
+    .diff-btn{background:none;border:1px solid #445;border-radius:4px;padding:8px 20px;color:var(--txm);font-family:var(--fa);font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+    .diff-btn:hover,.diff-btn.active{border-color:var(--ng);color:var(--ng);}
+    .section-title{font-family:var(--fa);font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--txm);margin-bottom:14px;}
+    .kg-toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:4px;font-size:13px;z-index:500;animation:fadeIn .2s;}
+    .kg-toast-error{background:rgba(200,0,40,.92);color:#fff;border:1px solid #f00;}
+    .kg-toast-info{background:rgba(0,20,30,.92);color:var(--nc);border:1px solid var(--nc);}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  </style>
+</head>
+<body style="visibility:hidden">
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
+
+  <nav class="arc-nav">
+    <div class="arc-nav-inner">
+      <a href="/" class="arc-logo">KENS<span>GAMES</span></a>
+      <ul class="arc-nav-links">
+        <li><a href="/fasttrack/">Fast Track</a></li>
+        <li><a href="/brickbreaker3d/">BrickBreaker</a></li>
+        <li><a href="/starfighter/">StarFighter</a></li>
+        <li><a href="/assemble/">Assemble</a></li>
+        <li><a href="/chomp/">Chomp!</a></li>
+      </ul>
+      <div class="arc-nav-right">
+        <span id="player-bar" style="font-family:var(--fa);font-size:11px;color:var(--txm);letter-spacing:1px;"></span>
+        <a href="/portal.html" class="btn btn-ghost" style="font-size:10px;padding:6px 14px;">Portal</a>
+        <button class="btn btn-ghost" style="font-size:10px;padding:6px 14px;" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="lobby-wrap">
+    <div style="margin:40px 0 36px;">
+      <div class="arc-eyebrow">Adventure Game</div>
+      <h1 class="arc-h1" style="color:var(--ng);text-shadow:var(--gg);">Chomp!</h1>
+      <p class="arc-sub" style="margin-top:8px;">Wally the Cairns Crocodile &mdash; chomp your way through 8 biomes</p>
+    </div>
+
+    <p class="section-title">Choose Difficulty</p>
+    <div class="launch-card">
+      <h3>Play Solo</h3>
+      <p>Guide Wally through the Cairns estuary &mdash; mangroves, mudflats, tidal rivers and beyond</p>
+      <div class="diff-row">
+        <button class="diff-btn active" id="diff-easy" onclick="setDiff('easy')">Easy</button>
+        <button class="diff-btn" id="diff-normal" onclick="setDiff('normal')">Normal</button>
+        <button class="diff-btn" id="diff-hard" onclick="setDiff('hard')">Hard</button>
+      </div>
+      <button class="btn btn-g btn-full" onclick="launchSolo()" style="max-width:300px;margin:0 auto;display:block;">Play Now</button>
+    </div>
+  </main>
+
+  <script src="/js/kg_gate.js"></script>
+  <script src="/js/kg_lobby.js"></script>
+  <script>
+    'use strict';
+    var difficulty='easy',lobby;
+    KGGate.protect({allowGuest:false,requireToS:true,requireProfile:true}).then(function(r){
+      if(!r.allowed)return;
+      document.body.style.visibility='';
+      document.getElementById('player-bar').textContent=(r.player&&(r.player.playername||r.player.username))||'';
+      lobby=KGLobby.init({gameId:'chomp',gamePath:'/chomp/game.html',onError:function(msg){showToast(msg,'error');}});
+    });
+    function setDiff(d){
+      difficulty=d;
+      ['easy','normal','hard'].forEach(function(x){
+        document.getElementById('diff-'+x).className='diff-btn'+(x===d?' active':'');
+      });
+    }
+    function launchSolo(){
+      if(lobby){lobby.solo(0);}
+      else{window.location.href='/chomp/game.html?mode=solo&difficulty='+difficulty;}
+    }
+    function showToast(msg,type){var t=document.createElement('div');t.className='kg-toast kg-toast-'+(type||'info');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);}
+    function signOut(){['kg_token','user_token','kg_username','kg_display_name','kg_user_id','kg_avatar','display_name','username'].forEach(function(k){localStorage.removeItem(k);});window.location.href='/login/';}
+  </script>
+</body>
+</html>

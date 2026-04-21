@@ -63,7 +63,7 @@
     ]
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/starfighter/",
+    "target": "/var/www/kensgames.com/public/starfighter/",
     "type": "static_with_server"
   },
   "manifold_compatibility": {
