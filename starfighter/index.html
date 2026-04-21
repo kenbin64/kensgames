@@ -25,7 +25,6 @@
     })();
   </script>
   <!-- Auth enforcement: sign-in required (invite-code guests allowed) -->
-  <script src="/js/substrates/profile_gate.js"></script>
   <script>KG_GATE.require({ allowGuest: true });</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -827,8 +826,7 @@
       display: none !important
     }
   </style>
-  <script src="/js/manifold_bridge.js"></script>
-</head>
+  </head>
 
 <body data-mtheme="green">
   <div class="scanlines"></div>
@@ -1320,8 +1318,6 @@
     <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
     <!-- Three.js -->
     <!-- Manifold Substrates (Dimensional Programming) -->
-    <script src="/js/substrates/game_session_substrate.js"></script>
-    <script src="/js/game_landing.js"></script>
     <!-- Game Logic -->
     <script>
       KG_LANDING.init('starfighter', '/starfighter/lobby.html');
@@ -1332,7 +1328,7 @@
         sb.href = '/starfighter/lobby.html';
       }
     </script>
-    <script src="starfighter.bundle.js?v=a4da92ba33eb7312"></script>
+    <script src="starfighter.bundle.js?v=bcf330ae163f5a30"></script>
 </body>
 
 </html>
