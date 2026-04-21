@@ -784,18 +784,30 @@ function showCreatePrivateGame() {
 
 function updateWizardSteps() {
     const step = state.wizardStep;
+    const skipIdentity = wizardIsAuthenticated();
 
-    // Update step indicators
+    // Update step indicators; hide step 2 dot for authenticated users
     document.querySelectorAll('.wizard-step').forEach(el => {
         const s = parseInt(el.dataset.step);
-        el.classList.toggle('active', s === step);
-        el.classList.toggle('done', s < step);
+        if (s === 2 && skipIdentity) {
+            el.style.display = 'none';
+        } else {
+            el.style.display = '';
+            el.classList.toggle('active', s === step);
+            el.classList.toggle('done', s < step);
+        }
     });
 
     // Update lines between steps
     const lines = document.querySelectorAll('.wizard-step-line');
     lines.forEach((line, i) => {
-        line.classList.toggle('done', (i + 1) < step);
+        // Hide the line before step 2 (index 0) when identity step is skipped
+        if (i === 0 && skipIdentity) {
+            line.style.display = 'none';
+        } else {
+            line.style.display = '';
+            line.classList.toggle('done', (i + 1) < step);
+        }
     });
 
     // Show/hide panels
@@ -824,15 +836,24 @@ function updateWizardSteps() {
     }
 }
 
+function wizardIsAuthenticated() {
+    // Non-guests who reached the lobby have already completed profile setup
+    return !!(state.user && state.user.username && (state.user.profileSetup || !state.user.is_guest));
+}
+
 function wizardNext() {
     if (state.wizardStep >= 4) return;
     state.wizardStep++;
+    // Skip step 2 (identity) for users who are already logged in with a profile
+    if (state.wizardStep === 2 && wizardIsAuthenticated()) state.wizardStep++;
     updateWizardSteps();
 }
 
 function wizardBack() {
     if (state.wizardStep <= 1) return;
     state.wizardStep--;
+    // Skip step 2 on the way back too
+    if (state.wizardStep === 2 && wizardIsAuthenticated()) state.wizardStep--;
     updateWizardSteps();
 }
 

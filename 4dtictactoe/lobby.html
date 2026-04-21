@@ -6,11 +6,11 @@
   <script>
     (function () {
       var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/4DTicTacToe/index.html'); return; }
+      if (!t) { window.location.replace('/4dtictactoe/index.html'); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/4DTicTacToe/index.html'); return; }
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/4dtictactoe/index.html'); return; }
           if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
         }).catch(function () { });
     })();
@@ -313,7 +313,7 @@
       <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
     </a>
     <nav class="header-nav">
-      <a href="/4DTicTacToe/index.html" class="arcade-btn" style="font-size:0.4rem">← GAME INFO</a>
+      <a href="/4dtictactoe/index.html" class="arcade-btn" style="font-size:0.4rem">← GAME INFO</a>
       <a href="/portal.html" class="arcade-btn">PORTAL</a>
     </nav>
   </header>

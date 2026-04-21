@@ -7,11 +7,11 @@ console.log('  surface obj:     ', mj.includes('surface: { gyroid'));
 console.log('  distance uses _z:', mj.includes('_z(ax, ay)'));
 console.log('  write emits:     ', mj.includes("_emit('write'"));
 
-const ms = fs.readFileSync('js/manifold-core/manifold_surface.js', 'utf8');
+const ms = fs.readFileSync('js/manifold_core/manifold_surface.js', 'utf8');
 console.log('manifold_surface.js:');
 console.log('  calculateZ x*y:  ', ms.includes('return x * y;'));
 
-const sb = fs.readFileSync('js/manifold-core/substrate_base.js', 'utf8');
+const sb = fs.readFileSync('js/manifold_core/substrate_base.js', 'utf8');
 console.log('substrate_base.js:');
 console.log('  write-invalidated:', sb.includes("manifold.on('write'"));
 console.log('  no Date.now():    ', !sb.includes('Date.now'));

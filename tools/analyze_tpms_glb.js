@@ -3,7 +3,7 @@
   Analyze a GLB and test whether its mesh lies near the Schwarz (Schwarz) Diamond TPMS field.
 
   Usage:
-    node tools/analyze_tpms_glb.js /var/www/kensgames.com/4DTicTacToe/assets/models/connect4.glb
+    node tools/analyze_tpms_glb.js /var/www/kensgames.com/4dtictactoe/assets/models/connect4.glb
 
   Output:
     - Mesh/primitives/vertex counts

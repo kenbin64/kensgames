@@ -5,7 +5,13 @@
  * Shared browser substrate that every kensgames.com game includes.
  *
  * Axiom:  Manifold = Expression + Attributes + Substrate
- *         z = x·y  (universal access rule)
+ *         z = x · y²   (x, y are the primary 2D coordinates;
+ *                        z is their quadratic 3D projection — never stored, always derived)
+ *
+ * Schwartz Diamond field: F(x,y,z) = cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z)
+ *   Entities where |F| → 0 sit on the surface boundary and get highest fork priority.
+ *   Entities deep in a channel (|F| → 1) have lower priority.
+ *   This is the Dijkstra ordering used to prevent deadlock in multi-entity operations.
  *
  * What this does
  * ──────────────
@@ -21,8 +27,8 @@
  *     ManifoldBridge.init({
  *       id:      'fasttrack',
  *       version: '2.1.0',
- *       x:       playerCount,    // dimension x
- *       y:       playTimeMin,    // dimension y
+ *       x:       4,           // suits (primary axis)
+ *       y:       13,          // ranks (quadratic axis)  →  z = 4·169 = 676
  *       exposes: () => ({        // live state snapshot
  *         gameState, playerCount, roundTime, score
  *       })
@@ -63,8 +69,8 @@
      * @param {object} opts
      * @param {string}   opts.id        game identifier  (e.g. 'fasttrack')
      * @param {string}   opts.version   semver string
-     * @param {number}   opts.x         dimension x (player count)
-     * @param {number}   opts.y         dimension y (play time minutes)
+     * @param {number}   opts.x         primary coordinate (e.g. suits, rows, board dimension)
+     * @param {number}   opts.y         quadratic coordinate (e.g. ranks, cols) — dominates z
      * @param {Function} opts.exposes   () => object  — live state snapshot
      */
     init(opts = {}) {
@@ -76,18 +82,29 @@
       if (!opts.id) throw new Error('[ManifoldBridge] opts.id is required');
       if (!opts.exposes) throw new Error('[ManifoldBridge] opts.exposes must be a function');
 
+      // z = x · y²  — the quadratic 3D projection of the 2D coordinate (x, y).
+      // x and y are the primary inputs. z is always derived, never primary.
+      // Small changes in y produce quadratic change in z — y is the dominant axis.
       const x = opts.x ?? 1;
       const y = opts.y ?? 1;
-      const z = x * y;  // z = xy — universal access rule
+      const z = x * y * y;   // canonical: z = x·y²
 
-      _config = { id: opts.id, version: opts.version ?? '1.0.0', x, y, z };
+      // Schwartz Diamond field value at this coordinate (wrapped to [0, 2π)).
+      // |field| → 0: entity sits on the surface boundary → highest fork priority.
+      // |field| → 1: entity deep in a channel → lower priority.
+      const PERIOD = 2 * Math.PI;
+      const wrap = c => ((c % PERIOD) + PERIOD) % PERIOD;
+      const field = Math.cos(wrap(x)) * Math.cos(wrap(y)) * Math.cos(wrap(z))
+        - Math.sin(wrap(x)) * Math.sin(wrap(y)) * Math.sin(wrap(z));
+
+      _config = { id: opts.id, version: opts.version ?? '1.0.0', x, y, z, field };
 
       // Publish to window so portal/compiler can inspect it
       global.__MANIFOLD__ = {
         id: _config.id,
         version: _config.version,
         schema: '1.0',
-        dimension: { x, y, z },
+        dimension: { x, y, z, field },  // field: Schwartz Diamond value — drives fork priority
         get state() { return opts.exposes(); },
         emit: (...args) => ManifoldBridge.emit(...args),
         on: (...args) => ManifoldBridge.on(...args),
@@ -98,7 +115,7 @@
       _announce();
 
       console.log(
-        `%c🜂 ManifoldBridge%c ${_config.id} v${_config.version} · z=${z}`,
+        `%c🜂 ManifoldBridge%c ${_config.id} v${_config.version} · (${x}, ${y}) → z=${z} · field=${field.toFixed(4)}`,
         'color:#7af;font-weight:bold', 'color:#888'
       );
 
@@ -195,14 +212,23 @@
           _fire('resume', msg.payload);
           break;
 
-        case 'setDimension':
-          // Portal updating x or y (e.g. player joined)
+        case 'setDimension': {
+          // Portal updating x or y (e.g. player count changed, difficulty changed).
+          // z and field are derived — recompute both whenever x or y changes.
           if (msg.payload?.x !== undefined) global.__MANIFOLD__.dimension.x = msg.payload.x;
           if (msg.payload?.y !== undefined) global.__MANIFOLD__.dimension.y = msg.payload.y;
-          global.__MANIFOLD__.dimension.z =
-            global.__MANIFOLD__.dimension.x * global.__MANIFOLD__.dimension.y;
+          const dx = global.__MANIFOLD__.dimension.x;
+          const dy = global.__MANIFOLD__.dimension.y;
+          const dz = dx * dy * dy;  // z = x·y²
+          const PERIOD = 2 * Math.PI;
+          const wrap = c => ((c % PERIOD) + PERIOD) % PERIOD;
+          global.__MANIFOLD__.dimension.z = dz;
+          global.__MANIFOLD__.dimension.field =
+            Math.cos(wrap(dx)) * Math.cos(wrap(dy)) * Math.cos(wrap(dz))
+            - Math.sin(wrap(dx)) * Math.sin(wrap(dy)) * Math.sin(wrap(dz));
           _fire('dimensionChanged', global.__MANIFOLD__.dimension);
           break;
+        }
 
         default:
           // Forward unknown commands to registered listeners

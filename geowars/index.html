@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geometry Wars 2D &mdash; Coming Soon | KensGames</title>
+  <meta name="description"
+    content="Geometry Wars 2D — twin-stick chaos where the arena itself shifts and folds. Coming Q3 2026 to KensGames.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://kensgames.com/geowars/">
+  <meta property="og:title" content="Geometry Wars 2D — Coming Soon | KensGames">
+  <meta property="og:description"
+    content="Twin-stick chaos where the arena itself shifts and folds. Every wave changes the rules of the space you fight in.">
+  <meta property="og:url" content="https://kensgames.com/geowars/">
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <link rel="stylesheet" href="/lib/arcade-theme.css">
+  <script src="/js/analytics.js"></script>
+  <style>
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 20px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .hero {
+      padding: 28px;
+    }
+
+    .hero .kicker {
+      font-family: var(--fa);
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: var(--np);
+      text-shadow: var(--gp);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .hero h1 {
+      font-family: var(--fa);
+      font-size: clamp(28px, 4.4vw, 62px);
+      font-weight: 900;
+      color: var(--np);
+      text-shadow: var(--gp);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      line-height: 1.05;
+    }
+
+    .hero p {
+      margin-top: 14px;
+      color: var(--txm);
+      font-size: 14px;
+      line-height: 1.8;
+      max-width: 62ch;
+    }
+
+    .cta-row {
+      margin-top: 22px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .eta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--np);
+      border: 1px solid rgba(255, 0, 255, 0.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+    }
+
+    .notify-btn {
+      display: inline-block;
+      padding: 8px 20px;
+      font-family: var(--fa);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--ng);
+      background: transparent;
+      border: 1px solid var(--ng);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      outline: none;
+      text-transform: uppercase;
+    }
+
+    .notify-btn:hover:not([data-notified="true"]) {
+      background: rgba(34, 255, 20, 0.1);
+      box-shadow: 0 0 10px rgba(34, 255, 20, 0.3);
+    }
+
+    .notify-btn[data-notified="true"] {
+      color: var(--txm);
+      border-color: var(--txm);
+      cursor: default;
+    }
+
+    /* Shimmer behind the title area */
+    .hero-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,
+          rgba(255, 0, 255, 0.04) 0%,
+          rgba(0, 255, 255, 0.03) 50%,
+          rgba(255, 0, 255, 0.04) 100%);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .site-card {
+      padding: 22px;
+    }
+
+    .site-card h2 {
+      font-family: var(--fa);
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--nc);
+      text-shadow: var(--gc);
+    }
+
+    .site-card p {
+      margin-top: 10px;
+      color: var(--txm);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .site-links {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .feature-list {
+      margin-top: 14px;
+      list-style: none;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .feature-list li {
+      font-size: 13px;
+      color: var(--txm);
+      line-height: 1.6;
+      padding-left: 18px;
+      position: relative;
+    }
+
+    .feature-list li::before {
+      content: '&#9632;';
+      position: absolute;
+      left: 0;
+      color: var(--np);
+      font-size: 8px;
+      top: 4px;
+    }
+
+    @media (max-width: 980px) {
+      .wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
+
+  <nav class="arc-nav">
+    <div class="arc-nav-inner">
+      <a class="arc-logo" href="/"><img src="/assets/masterImageFile/icon.svg" alt="KensGames"
+          style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KENS<span>GAMES</span></a>
+      <ul class="arc-nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/#upcoming">Coming Soon</a></li>
+        <li><a href="/lobby/">Portal</a></li>
+      </ul>
+      <div class="arc-nav-right">
+        <a class="btn btn-ghost btn-lg" href="/">&#8592; Back</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section class="arc-card arc-card-p hero" style="position:relative;overflow:hidden">
+      <div class="hero-shimmer"></div>
+      <div class="kicker">&#9632; Q3 2026 &nbsp;/&nbsp; Twin-Stick / Arcade</div>
+      <h1>Geometry Wars 2D</h1>
+      <p>
+        Twin-stick chaos where the arena itself shifts and folds.
+        Every wave changes the rules of the space you fight in.
+        The geometry is the enemy.
+      </p>
+      <div class="cta-row">
+        <span class="eta-badge">&#9660;&nbsp; Q3 2026</span>
+        <button class="notify-btn" id="notify-btn" onclick="kgNotify()">Notify Me</button>
+      </div>
+    </section>
+
+    <aside class="stack">
+      <section class="arc-card site-card">
+        <h2>What to Expect</h2>
+        <ul class="feature-list">
+          <li>Dynamic arena geometry that morphs between waves</li>
+          <li>Twin-stick controls &mdash; mouse + WASD or gamepad</li>
+          <li>Built on the same Manifold substrate as every KensGames title</li>
+          <li>Online leaderboards at launch</li>
+        </ul>
+      </section>
+      <section class="arc-card arc-card-g site-card">
+        <h2>Other Games</h2>
+        <p>While you wait, try what&rsquo;s already live:</p>
+        <div class="site-links">
+          <a class="btn btn-c btn-full" href="/brickbreaker3d/">BrickBreaker 3D</a>
+          <a class="btn btn-ghost btn-full" href="/starfighter/">StarFighter</a>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    (function () {
+      var KEY = 'kg_notify_geowars';
+      var btn = document.getElementById('notify-btn');
+      if (localStorage.getItem(KEY) === '1') {
+        btn.textContent = 'Notified \u2713';
+        btn.setAttribute('data-notified', 'true');
+        btn.disabled = true;
+      }
+      window.kgNotify = function () {
+        if (btn.getAttribute('data-notified') === 'true') return;
+        try { localStorage.setItem(KEY, '1'); } catch (e) { }
+        btn.textContent = 'Notified \u2713';
+        btn.setAttribute('data-notified', 'true');
+        btn.disabled = true;
+      };
+    })();
+  </script>
+</body>
+
+</html>

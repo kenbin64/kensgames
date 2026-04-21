@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Setup — KensGames</title>
+  <link rel="icon" href="/assets/images/favicon.ico" type="image/x-icon">
+  <style>
+    :root {
+      --neon-cyan: #00FFFF;
+      --neon-green: #00FF41;
+      --neon-yellow: #FFE800;
+      --neon-pink: #FF00FF;
+      --bg-dark: #04040C;
+      --bg-card: rgba(4, 4, 20, 0.96);
+      --bg-panel: rgba(10, 10, 30, 0.92);
+      --text: #E0E0FF;
+      --text-muted: #8888AA;
+      --border: rgba(0, 255, 255, 0.15);
+      --accent: var(--neon-cyan);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      min-height: 100vh;
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    body {
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(0, 255, 255, 0.05) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 90%, rgba(0, 255, 65, 0.04) 0%, transparent 60%);
+    }
+
+    /* ── Header ── */
+    .pg-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 4, 20, 0.9);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .pg-back {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      border: 1px solid rgba(136, 136, 170, 0.3);
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .pg-back:hover {
+      color: var(--neon-cyan);
+      border-color: var(--neon-cyan);
+    }
+
+    .pg-title {
+      flex: 1;
+      font-size: 1.1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .pg-title span {
+      color: var(--accent);
+      text-shadow: 0 0 10px var(--accent);
+    }
+
+    .pg-mode-tag {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Layout ── */
+    .pg-body {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Phase sections ── */
+    .phase {
+      display: none;
+    }
+
+    .phase.active {
+      display: block;
+    }
+
+    /* ── Spinner ── */
+    .spinner-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 40vh;
+      gap: 1.2rem;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(0, 255, 255, 0.15);
+      border-top-color: var(--neon-cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner-label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Section headers ── */
+    .section-title {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Code display ── */
+    .code-block {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .code-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .code-display {
+      font-size: 2.8rem;
+      font-weight: bold;
+      letter-spacing: 0.35em;
+      color: var(--neon-green);
+      text-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+      background: rgba(0, 255, 65, 0.05);
+      border: 1px solid rgba(0, 255, 65, 0.25);
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      display: inline-block;
+      min-width: 240px;
+    }
+
+    /* ── URL row ── */
+    .url-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .url-row input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .url-row input:focus {
+      border-color: rgba(0, 255, 255, 0.4);
+    }
+
+    /* ── Share buttons ── */
+    .share-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 1.8rem;
+    }
+
+    .share-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 0.3rem;
+      color: var(--text);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      font-family: inherit;
+    }
+
+    .share-btn:hover {
+      background: rgba(0, 255, 255, 0.08);
+      border-color: rgba(0, 255, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .share-btn .icon {
+      font-size: 1.4rem;
+    }
+
+    /* ── Settings ── */
+    .settings-list {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 1.8rem;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-label {
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+
+    .setting-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.1rem;
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle input:checked+.toggle-track {
+      background: rgba(0, 255, 65, 0.55);
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked+.toggle-track::after {
+      transform: translateX(20px);
+    }
+
+    /* Select */
+    .setting-select {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .setting-select:focus {
+      border-color: rgba(0, 255, 255, 0.4);
+    }
+
+    /* ── Waiting room ── */
+    .player-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .player-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1rem 1rem;
+      width: 130px;
+      min-height: 160px;
+      position: relative;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      text-align: center;
+    }
+
+    .player-card.is-host {
+      border-color: rgba(0, 255, 255, 0.5);
+      box-shadow: 0 0 14px rgba(0, 255, 255, 0.15), inset 0 0 20px rgba(0, 255, 255, 0.04);
+    }
+
+    .player-card.is-bot {
+      border-color: rgba(255, 232, 0, 0.4);
+      box-shadow: 0 0 10px rgba(255, 232, 0, 0.1);
+    }
+
+    .player-card.is-ready {
+      border-color: rgba(0, 255, 65, 0.55);
+      box-shadow: 0 0 14px rgba(0, 255, 65, 0.18);
+    }
+
+    .player-card.is-me {
+      outline: 2px solid rgba(0, 255, 255, 0.25);
+      outline-offset: 2px;
+    }
+
+    .player-card.is-open {
+      border-style: dashed;
+      border-color: rgba(136, 136, 170, 0.2);
+      opacity: 0.5;
+    }
+
+    .card-crown {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .card-avatar {
+      font-size: 2.4rem;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-name {
+      font-size: 0.82rem;
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.3;
+      margin-bottom: 0.6rem;
+      min-height: 2.1em;
+    }
+
+    .card-you {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .card-status {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      border: 1px solid currentColor;
+      margin-top: auto;
+    }
+
+    .card-status.s-host {
+      color: var(--neon-cyan);
+    }
+
+    .card-status.s-bot {
+      color: var(--neon-yellow);
+    }
+
+    .card-status.s-ready {
+      color: var(--neon-green);
+    }
+
+    .card-status.s-waiting {
+      color: var(--text-muted);
+    }
+
+    .card-status.s-open {
+      color: rgba(136, 136, 170, 0.4);
+    }
+
+    .waiting-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .launch-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Auth required ── */
+    .auth-gate {
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+
+    .auth-gate h2 {
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    .auth-gate p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      border-radius: 6px;
+      padding: 0.65rem 1.2rem;
+      font-size: 0.85rem;
+      font-family: inherit;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: rgba(0, 255, 65, 0.12);
+      border-color: rgba(0, 255, 65, 0.5);
+      color: var(--neon-green);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: rgba(0, 255, 65, 0.2);
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(0, 255, 255, 0.08);
+      border-color: rgba(0, 255, 255, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(255, 0, 0, 0.07);
+      border-color: rgba(255, 0, 0, 0.3);
+      color: #ff6666;
+    }
+
+    .btn-launch {
+      background: rgba(0, 255, 65, 0.15);
+      border-color: rgba(0, 255, 65, 0.6);
+      color: var(--neon-green);
+      font-size: 0.95rem;
+      padding: 0.8rem 1.8rem;
+      letter-spacing: 0.1em;
+    }
+
+    .btn-launch:hover:not(:disabled) {
+      background: rgba(0, 255, 65, 0.25);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    }
+
+    .btn-full {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .btn-cyan {
+      background: rgba(0, 255, 255, 0.1);
+      border-color: rgba(0, 255, 255, 0.45);
+      color: var(--neon-cyan);
+    }
+
+    .btn-cyan:hover:not(:disabled) {
+      background: rgba(0, 255, 255, 0.18);
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(10, 10, 30, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 1.2rem;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #toast.success {
+      border-color: rgba(0, 255, 65, 0.5);
+      color: var(--neon-green);
+    }
+
+    #toast.error {
+      border-color: rgba(255, 50, 50, 0.5);
+      color: #ff8888;
+    }
+
+    #toast.info {
+      border-color: rgba(0, 255, 255, 0.4);
+      color: var(--neon-cyan);
+    }
+
+    /* ── Error ── */
+    .error-state {
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+
+    .error-state h2 {
+      color: #ff8888;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .error-state p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Code join input ── */
+    .join-form {
+      margin-bottom: 1.5rem;
+    }
+
+    .join-form input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      color: var(--text);
+      font-size: 1.5rem;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.3em;
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+      margin-bottom: 0.75rem;
+    }
+
+    .join-form input::placeholder {
+      color: var(--text-muted);
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+    }
+
+    .join-form input:focus {
+      border-color: rgba(0, 255, 255, 0.4);
+    }
+
+    /* \u2500\u2500 Multi-menu option cards \u2500\u2500 */
+    .multi-option-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 0.8rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    }
+
+    .multi-option-card:hover {
+      border-color: rgba(0, 255, 255, 0.4);
+      background: rgba(0, 255, 255, 0.05);
+      transform: translateY(-1px);
+    }
+
+    .multi-opt-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .multi-opt-title {
+      font-size: 0.95rem;
+      color: var(--neon-cyan);
+      margin-bottom: 0.2rem;
+    }
+
+    .multi-opt-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* \u2500\u2500 Browse cards \u2500\u2500 */
+    .browse-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s;
+    }
+
+    .browse-card:hover {
+      border-color: rgba(0, 255, 255, 0.3);
+    }
+
+    .browse-game-tag {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+
+    .browse-host {
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+
+    .browse-avatars {
+      font-size: 1.3rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.35rem;
+    }
+
+    .browse-spots {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.7rem;
+    }
+
+    .browse-btns {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* \u2500\u2500 Join request items (host view) \u2500\u2500 */
+    .join-request-item {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      background: rgba(255, 232, 0, 0.04);
+      border: 1px solid rgba(255, 232, 0, 0.25);
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .jreq-avatar {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .jreq-name {
+      flex: 1;
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 480px) {
+      .pg-body {
+        padding: 1.2rem 1rem 3rem;
+      }
+
+      .share-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .code-display {
+        font-size: 2rem;
+        letter-spacing: 0.25em;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="pg-header">
+    <a href="/" class="pg-back">← Games</a>
+    <div class="pg-title">Set Up — <span id="hdr-game-name">...</span></div>
+    <div class="pg-mode-tag" id="hdr-mode-tag"></div>
+  </header>
+
+  <main class="pg-body">
+
+    <!-- Phase: Loading / Connecting -->
+    <div class="phase active" id="phase-loading">
+      <div class="spinner-wrap">
+        <div class="spinner"></div>
+        <div class="spinner-label" id="loading-label">Connecting...</div>
+      </div>
+    </div>
+
+    <!-- Phase: Auth gate (not logged in, private/public mode) -->
+    <div class="phase" id="phase-auth">
+      <div class="auth-gate">
+        <h2>🔒 Sign In Required</h2>
+        <p>Create a free account to host multiplayer games.</p>
+        <a id="auth-login-link" class="btn btn-cyan btn-full" href="/login/">Sign In</a>
+        <a href="/register/" class="btn btn-secondary btn-full" style="margin-top:0.5rem;">Create Account</a>
+      </div>
+    </div>
+
+    <!-- Phase: Join by code (no code in URL yet) -->
+    <div class="phase" id="phase-join-input">
+      <p class="section-title">Enter Game Code</p>
+      <div class="join-form">
+        <input type="text" id="join-code-input" maxlength="6" placeholder="ABC123" autocomplete="off"
+          oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')submitJoinCode()">
+        <button class="btn btn-cyan btn-full" onclick="submitJoinCode()">→ Join Game</button>
+      </div>
+    </div>
+
+    <!-- Phase: Join Confirm (invitee arrives via code URL) -->
+    <div class="phase" id="phase-join-confirm">
+      <div style="text-align:center;padding:1.5rem 0 0.5rem;">
+        <div style="font-size:2.5rem;margin-bottom:0.5rem;">🎮</div>
+        <h2 style="font-size:1.1rem;letter-spacing:0.1em;color:var(--neon-cyan);text-shadow:0 0 10px var(--neon-cyan);">
+          YOU'RE INVITED</h2>
+      </div>
+      <div class="code-block" style="margin:1rem 0;">
+        <div class="code-label">Game Code</div>
+        <div class="code-display" id="join-confirm-code">------</div>
+      </div>
+      <p id="join-confirm-label"
+        style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Join the private game
+      </p>
+      <button class="btn btn-cyan btn-full" onclick="joinConfirmedCode()">→ Join Game</button>
+      <a href="/" class="btn btn-secondary btn-full" style="margin-top:0.5rem;display:block;text-align:center;">← Back
+        to Games</a>
+    </div>
+
+    <!-- Phase: Waiting Room (host + joiners) -->
+    <div class="phase" id="phase-waiting">
+
+      <!-- HOST ONLY: Incoming join requests panel -->
+      <div id="join-requests-panel" style="display:none;margin-bottom:1rem;">
+        <p class="section-title" style="color:var(--neon-yellow);border-color:rgba(255,232,0,0.3);">⚡ Join Requests</p>
+        <div id="join-requests-list"></div>
+      </div>
+
+      <!-- HOST ONLY: Invite panel with share code -->
+      <div id="host-share-panel" style="display:none;">
+        <p class="section-title">Invite Players</p>
+        <div class="code-block">
+          <div class="code-label">Room Code</div>
+          <div class="code-display" id="room-code">------</div>
+        </div>
+        <div class="url-row">
+          <input type="text" id="share-url-input" readonly placeholder="Generating link...">
+          <button class="btn btn-secondary" onclick="copyShareUrl()" id="btn-copy">📋 Copy</button>
+        </div>
+        <div class="share-grid">
+          <button class="share-btn" onclick="shareWhatsApp()">
+            <span class="icon">💬</span>WhatsApp
+          </button>
+          <button class="share-btn" onclick="shareTwitter()">
+            <span class="icon">🐦</span>X / Twitter
+          </button>
+          <button class="share-btn" onclick="shareEmail()">
+            <span class="icon">✉️</span>Email
+          </button>
+          <button class="share-btn" onclick="shareNative()">
+            <span class="icon">📤</span>Share
+          </button>
+        </div>
+      </div>
+
+      <p class="section-title" id="players-section-title">Players</p>
+      <div class="player-grid" id="player-slots"></div>
+
+      <!-- HOST ONLY: Game Settings (collapsible) -->
+      <div id="host-settings-panel" style="display:none;margin-top:0.75rem;">
+        <details>
+          <summary
+            style="cursor:pointer;color:var(--text-muted);font-size:0.82rem;letter-spacing:0.08em;padding:0.4rem 0;list-style:none;display:flex;align-items:center;gap:0.4rem;">
+            ⚙ Game Settings
+          </summary>
+          <div class="settings-list" style="margin-top:0.5rem;">
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Max Players</div>
+                <div class="setting-hint">How many players (including you)</div>
+              </div>
+              <select class="setting-select" id="s-max-players" onchange="updateSessionSettings()">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </div>
+            <div class="setting-row" id="row-bots">
+              <div>
+                <div class="setting-label">Allow AI Bots</div>
+                <div class="setting-hint">Fill empty seats with computer players</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="s-allow-bots" checked onchange="updateSessionSettings()">
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Turn Timer</div>
+                <div class="setting-hint">2 min per turn, 1 min warning</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="s-turn-timer" checked onchange="updateSessionSettings()">
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Late Arrivals OK</div>
+                <div class="setting-hint">Allow players to join mid-game</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="s-late-arrivals" checked onchange="updateSessionSettings()">
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="waiting-actions">
+        <button class="btn btn-secondary" onclick="addBot()" id="btn-add-bot" style="display:none;">🤖 Add Bot</button>
+        <button class="btn btn-danger" onclick="removeBot()" id="btn-remove-bot" style="display:none;">➖ Remove
+          Bot</button>
+        <button class="btn btn-secondary" onclick="toggleReady()" id="btn-ready">⬜ I'm Ready</button>
+      </div>
+      <p class="launch-note" id="launch-note" style="display:none;">Add at least 1 bot or invite a friend to start</p>
+      <button class="btn btn-launch btn-full" onclick="launchGame()" id="btn-launch" disabled style="display:none;">🚀
+        Launch Game</button>
+    </div>
+
+    <!-- Phase: Multi Menu (choose Browse vs Matchmaker) -->
+    <div class="phase" id="phase-multi-menu">
+      <div style="text-align:center;padding:1.5rem 0 1rem;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🎮</div>
+        <h2 style="font-size:1rem;letter-spacing:0.12em;color:var(--neon-cyan);text-shadow:0 0 10px var(--neon-cyan);">
+          MULTIPLAYER</h2>
+        <p style="color:var(--text-muted);font-size:0.82rem;margin-top:0.4rem;" id="multi-game-label">Join or find a
+          game</p>
+      </div>
+      <div class="multi-option-card" onclick="gotoMultiBrowse()">
+        <div class="multi-opt-icon">🔍</div>
+        <div>
+          <div class="multi-opt-title">Browse Open Games</div>
+          <div class="multi-opt-desc">See rooms other players have created and request to join</div>
+        </div>
+      </div>
+      <div class="multi-option-card" onclick="gotoMatchmake()">
+        <div class="multi-opt-icon">⚡</div>
+        <div>
+          <div class="multi-opt-title">Quick Match</div>
+          <div class="multi-opt-desc">Auto-match with other players waiting to play now</div>
+        </div>
+      </div>
+      <a href="/" class="btn btn-secondary btn-full" style="margin-top:1rem;display:block;text-align:center;">← Back to
+        Games</a>
+    </div>
+
+    <!-- Phase: Browse Open Games -->
+    <div class="phase" id="phase-browse">
+      <p class="section-title">Open Games</p>
+      <div id="browse-list"></div>
+      <button class="btn btn-secondary btn-full" onclick="loadBrowse()" style="margin-top:0.5rem;">↺ Refresh</button>
+      <a href="/" class="btn btn-secondary btn-full" style="margin-top:0.4rem;display:block;text-align:center;">←
+        Back</a>
+    </div>
+
+    <!-- Phase: Matchmaker -->
+    <div class="phase" id="phase-matchmake">
+      <p class="section-title">Quick Match</p>
+      <div style="text-align:center;margin:2rem 0 1rem;">
+        <div class="spinner" style="margin:0 auto 1rem;"></div>
+        <div style="color:var(--neon-cyan);font-size:0.88rem;letter-spacing:0.1em;">SEARCHING FOR PLAYERS...</div>
+      </div>
+      <div id="matchmake-roster" class="player-grid" style="margin-bottom:1.5rem;"></div>
+      <button class="btn btn-danger btn-full" onclick="cancelMatchmake()">✕ Cancel</button>
+    </div>
+
+    <!-- Phase: Error -->
+    <div class="phase" id="phase-error">
+      <div class="error-state">
+        <h2>⚠ Something went wrong</h2>
+        <p id="error-msg">Could not connect to the lobby server.</p>
+        <a href="/" class="btn btn-secondary">← Back to Games</a>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    // =============================================================================
+    // Game Registry — mirrors server GAME_REGISTRY with client-side additions
+    // =============================================================================
+    const GAME_REGISTRY = {
+      fasttrack: {
+        name: 'FastTrack',
+        color: '#00ff88',
+        soloUrl: '/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium',
+        gameUrl: '/fasttrack/3d.html',
+        minPlayers: 2, maxPlayers: 4,
+        defaultMaxPlayers: 4,
+        allowBots: true,
+        sessionStoragePrefix: 'ft',
+        launchParams: (session, me, myEmoji, wsUrl) => ({
+          session: session.session_id,
+          multiplayer: 'true',
+          wsUrl,
+          name: me?.username || '',
+          avatar: myEmoji,
+          players: String(session.players?.length || 2),
+        }),
+      },
+      brickbreaker3d: {
+        name: 'BrickBreaker 3D',
+        color: '#ff44ff',
+        soloUrl: '/brickbreaker3d/game.html?offline=true',
+        gameUrl: '/brickbreaker3d/game.html',
+        minPlayers: 2, maxPlayers: 4,
+        defaultMaxPlayers: 4,
+        allowBots: false,
+        launchParams: (session, me, myEmoji, wsUrl) => ({
+          session: session.session_id,
+          multiplayer: 'true',
+          wsUrl,
+          name: me?.username || '',
+        }),
+      },
+      starfighter: {
+        name: 'Alien Space Attack',
+        color: '#ffdd00',
+        soloUrl: '/starfighter/?offline=true',
+        gameUrl: '/starfighter/',
+        minPlayers: 1, maxPlayers: 4,
+        defaultMaxPlayers: 4,
+        allowBots: true,
+        launchParams: (session, me, myEmoji, wsUrl) => ({
+          session: session.session_id,
+          multiplayer: 'true',
+          wsUrl,
+          name: me?.username || '',
+          avatar: myEmoji,
+        }),
+      },
+      tictactoe: {
+        name: '4D TicTacToe',
+        color: '#44aaff',
+        soloUrl: '/4dtictactoe/game.html?offline=true',
+        gameUrl: '/4dtictactoe/game.html',
+        minPlayers: 2, maxPlayers: 4,
+        defaultMaxPlayers: 4,
+        allowBots: true,
+        launchParams: (session, me, myEmoji, wsUrl) => ({
+          session: session.session_id,
+          multiplayer: 'true',
+          wsUrl,
+          name: me?.username || '',
+        }),
+      },
+      assemble: {
+        name: 'Assemble',
+        color: '#ff8844',
+        soloUrl: '/assemble/game.html?offline=true',
+        gameUrl: '/assemble/game.html',
+        minPlayers: 2, maxPlayers: 6,
+        defaultMaxPlayers: 4,
+        allowBots: false,
+        launchParams: (session, me, myEmoji, wsUrl) => ({
+          session: session.session_id,
+          multiplayer: 'true',
+          wsUrl,
+          name: me?.username || '',
+        }),
+      },
+    };
+
+    const AVATAR_MAP = {
+      // Legacy IDs
+      person_smile: '😊', person_cool: '😎', animal_lion: '🦁', animal_fox: '🦊',
+      space_rocket: '🚀', fantasy_dragon: '🐲', scifi_robot: '🤖', sport_soccer: '⚽',
+      robot: '🤖', default: '👤',
+      // People
+      p_f_light: '👩🏻', p_m_light: '👨🏻', p_f_med: '👩🏽', p_m_med: '👨🏽',
+      p_f_dark: '👩🏿', p_m_dark: '👨🏿', p_f_tan: '👩🏾', p_m_tan: '👨🏾',
+      p_blonde_f: '👱‍♀️', p_blonde_m: '👱‍♂️', p_red_f: '👩‍🦰', p_red_m: '👨‍🦰',
+      p_curly_f: '👩‍🦱', p_curly_m: '👨‍🦱', p_silver_f: '👩‍🦳', p_silver_m: '👨‍🦳',
+      p_bald: '🧑‍🦲', p_beard: '🧔', ninja: '🥷', cowboy: '🤠',
+      p_mech_f: '👩‍🔧', p_mech_m: '👨‍🔧', p_art_f: '👩‍🎨', p_art_m: '👨‍🎨',
+      // Science
+      sci_f: '👩‍🔬', sci_m: '👨‍🔬', alien: '👽', alien_px: '👾',
+      dna: '🧬', micro: '🔬', brain: '🧠', atom: '⚛️', flask: '⚗️', nerd: '🤓', cyborg: '🦾',
+      // Fantasy
+      wizard_f: '🧙‍♀️', wizard_m: '🧙‍♂️', elf_f: '🧝‍♀️', elf_m: '🧝‍♂️',
+      vampire_m: '🧛‍♂️', vampire_f: '🧛‍♀️', mermaid: '🧜‍♀️', fairy: '🧚‍♀️',
+      hero_f: '🦸‍♀️', hero_m: '🦸‍♂️', villain_f: '🦹‍♀️', villain_m: '🦹‍♂️',
+      dragon: '🐉', unicorn: '🦄', ghost: '👻', skull: '💀', crown: '👑', crystal: '🔮',
+      // Sports
+      sp_soccer: '⚽', sp_bball: '🏀', sp_football: '🏈', sp_baseball: '⚾',
+      sp_tennis: '🎾', sp_hockey: '🏒', sp_race: '🏎️', sp_martial: '🥋',
+      sp_swim: '🏊', sp_climb: '🧗', sp_run_f: '🏃‍♀️', sp_run_m: '🏃‍♂️',
+      // Animals
+      lion: '🦁', tiger: '🐯', bear: '🐻', fox: '🦊', wolf: '🐺', cat: '😼',
+      eagle: '🦅', owl: '🦉', dolphin: '🐬', shark: '🦈', butterfly: '🦋', penguin: '🐧',
+      panda: '🐼', octopus: '🐙', rabbit: '🐰', snake: '🐍',
+      // Toys
+      toy_stick: '🕹️', toy_dice: '🎲', toy_chess: '♟️', toy_puzzle: '🧩',
+      toy_darts: '🎯', toy_yoyo: '🪀', toy_teddy: '🧸', toy_kite: '🪁',
+      toy_boom: '🪃', toy_balloon: '🎈', toy_magic: '🪄', toy_blocks: '🧱',
+      // Space
+      rocket: '🚀', ufo: '🛸', astro_f: '👩‍🚀', astro_m: '👨‍🚀',
+      planet: '🪐', star: '⭐', comet: '☄️', moon: '🌙',
+      galaxy: '🌌', satellite: '🛰️', telescope: '🔭', blackhole: '🕳️',
+      // Hobbies
+      hb_guitar: '🎸', hb_palette: '🎨', hb_camera: '📷', hb_book: '📚',
+      hb_gym: '🏋️', hb_chef: '👨‍🍳', hb_music: '🎵', hb_drum: '🥁',
+      hb_gamepad: '🎮', hb_bike: '🚴', hb_surf: '🏄', hb_dart: '🎯',
+    };
+    function avatarEmoji(id) { return AVATAR_MAP[id] || window.KG_AVATARS?.[id] || '👤'; }
+
+    // =============================================================================
+    // Parse URL Params
+    // =============================================================================
+    const params = new URLSearchParams(location.search);
+    const GAME_ID = params.get('game') || '';
+    const MODE = params.get('mode') || '';     // private | public | solo | join
+    const CODE_IN = params.get('code') || '';     // for joining by URL
+
+    const GAME_INFO = GAME_REGISTRY[GAME_ID] || null;
+
+    // =============================================================================
+    // WebSocket Config
+    // =============================================================================
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? `ws://${location.hostname}:8765`
+      : `${wsProtocol}//${location.host}/ws`;
+
+    const API = '/api';
+
+    // =============================================================================
+    // State
+    // =============================================================================
+    const state = {
+      socket: null,
+      connected: false,
+      user: null,
+      session: null,
+      shareCode: null,
+      shareUrl: null,
+      myReady: false,
+      reconnectAttempts: 0,
+      pendingJoinCode: null,
+    };
+
+    // =============================================================================
+    // Boot
+    // =============================================================================
+    document.addEventListener('DOMContentLoaded', boot);
+
+    async function boot() {
+      // Set header
+      if (GAME_INFO) {
+        document.getElementById('hdr-game-name').textContent = GAME_INFO.name;
+        document.getElementById('hdr-game-name').style.color = GAME_INFO.color;
+        document.querySelector('.pg-title span').style.textShadow = `0 0 10px ${GAME_INFO.color}`;
+        document.title = `${GAME_INFO.name} — Set Up Game`;
+        // Configure settings for this game
+        const maxSel = document.getElementById('s-max-players');
+        // Build options up to game's maxPlayers
+        maxSel.innerHTML = '';
+        for (let n = Math.max(2, GAME_INFO.minPlayers); n <= (GAME_INFO.maxPlayers || 4); n++) {
+          const o = document.createElement('option');
+          o.value = n;
+          o.textContent = n;
+          if (n === (GAME_INFO.defaultMaxPlayers || 4)) o.selected = true;
+          maxSel.appendChild(o);
+        }
+        // Hide bots toggle if game doesn't support bots
+        if (!GAME_INFO.allowBots) {
+          document.getElementById('row-bots').style.display = 'none';
+          document.getElementById('s-allow-bots').checked = false;
+        }
+      }
+
+      // Solo: skip setup page entirely, redirect immediately
+      if (MODE === 'solo') {
+        if (GAME_INFO?.soloUrl) {
+          window.location.replace(GAME_INFO.soloUrl);
+        } else {
+          showError('Solo mode not configured for this game.');
+        }
+        return;
+      }
+
+      // Set mode tag
+      const modeLabels = { private: '🔒 Private', public: '🌐 Quick Match' };
+      if (CODE_IN) {
+        document.getElementById('hdr-mode-tag').textContent = '🔗 Joining';
+      } else {
+        document.getElementById('hdr-mode-tag').textContent = modeLabels[MODE] || '🎮 Play';
+      }
+
+      // Update login redirect link
+      document.getElementById('auth-login-link').href =
+        `/login/?redirect=${encodeURIComponent(location.href)}`;
+
+      // Require auth for hosting (not for joining by code — guests can join)
+      const token = localStorage.getItem('kg_token');
+      if (!token && !CODE_IN) {
+        setLoadingLabel('Sign in to continue...');
+        showPhase('auth');
+        return;
+      }
+
+      // Connect to lobby
+      setLoadingLabel('Connecting to lobby...');
+      showPhase('loading');
+      connectLobby();
+    }
+
+    // =============================================================================
+    // WebSocket
+    // =============================================================================
+    function connectLobby() {
+      const sock = new WebSocket(WS_URL);
+      state.socket = sock;
+
+      sock.addEventListener('open', () => {
+        state.connected = true;
+        state.reconnectAttempts = 0;
+        authenticate();
+      });
+
+      sock.addEventListener('message', (evt) => {
+        let msg;
+        try { msg = JSON.parse(evt.data); } catch { return; }
+        dispatch(msg);
+      });
+
+      sock.addEventListener('close', () => {
+        state.connected = false;
+        if (state.reconnectAttempts < 5) {
+          state.reconnectAttempts++;
+          setTimeout(connectLobby, 2000 * state.reconnectAttempts);
+        } else {
+          showError('Lost connection to the lobby server.');
+        }
+      });
+
+      sock.addEventListener('error', () => {
+        showError('Could not reach the lobby server. Please try again.');
+      });
+    }
+
+    function send(msg) {
+      if (state.socket?.readyState === WebSocket.OPEN) {
+        state.socket.send(JSON.stringify(msg));
+      }
+    }
+
+    function authenticate() {
+      const token = localStorage.getItem('kg_token');
+      const username = localStorage.getItem('kg_username') || localStorage.getItem('username') || '';
+      const rawAv = localStorage.getItem('kg_avatar') || 'person_smile';
+      let avatarId = rawAv;
+      try {
+        const parsedAv = JSON.parse(rawAv);
+        avatarId = (parsedAv && (parsedAv.emoji || parsedAv.id)) || rawAv;
+      } catch (e) { /* raw string — use as-is */ }
+
+      if (token) {
+        send({ type: 'auth', token, username, avatar_id: avatarId });
+      } else if (CODE_IN) {
+        // Guest joining by code
+        send({
+          type: 'guest_login',
+          name: `Guest_${Math.random().toString(36).slice(2, 6)}`,
+          avatar_id: avatarId,
+        });
+      } else {
+        showPhase('auth');
+      }
+    }
+
+    // =============================================================================
+    // Message Dispatcher
+    // =============================================================================
+    function dispatch(msg) {
+      switch (msg.type) {
+        case 'connected': return;
+        case 'auth_success': return onAuthSuccess(msg);
+        case 'error': return onServerError(msg);
+        case 'session_created': return onSessionCreated(msg);
+        case 'session_update': return onSessionUpdate(msg);
+        case 'session_joined': return onSessionJoined(msg);
+        case 'player_joined': return onPlayerJoined(msg);
+        case 'player_left': return onPlayerLeft(msg);
+        case 'player_ready_changed': return onReadyChanged(msg);
+        case 'game_started': return onGameStarted(msg);
+        case 'left_session': return onLeftSession(msg);
+        case 'session_list': return onSessionList(msg);
+        case 'matchmake_result': return onMatchmakeResult(msg);
+        case 'join_requested': return onJoinRequested(msg);
+        case 'join_request': return onJoinRequest(msg);         // host receives
+        case 'join_request_accepted': return;                   // host ack (already in session)
+        case 'join_request_rejected': return onJoinRejected(msg); // requester notified
+        case 'lobby_update': return onLobbyUpdate(msg);
+      }
+    }
+
+    // =============================================================================
+    // Auth
+    // =============================================================================
+    function onAuthSuccess(msg) {
+      state.user = msg.user;
+      setLoadingLabel('Setting up game...');
+
+      if (CODE_IN) {
+        // Invitee: show a confirmation page rather than auto-joining
+        state.pendingJoinCode = CODE_IN;
+        document.getElementById('join-confirm-code').textContent = CODE_IN.toUpperCase();
+        const gameName = GAME_INFO?.name || 'a game';
+        document.getElementById('join-confirm-label').textContent = `Join the private ${gameName} room`;
+        showPhase('join-confirm');
+      } else if (MODE === 'host') {
+        createSession(true);
+      } else if (MODE === 'private') {
+        createSession(true);
+      } else if (MODE === 'public') {
+        createSession(false);
+      } else if (MODE === 'multi') {
+        showPhase('multi-menu');
+      } else if (MODE === 'browse') {
+        loadBrowse();
+      } else if (MODE === 'matchmake') {
+        startMatchmake();
+      } else {
+        // No mode — show join-by-code input
+        showPhase('join-input');
+      }
+    }
+
+    function onServerError(msg) {
+      const text = msg.message || 'An error occurred';
+      showToast(text, 'error');
+
+      // If join failed, let them try again via the confirm button
+      if (state.pendingJoinCode) {
+        showToast(text, 'error');
+        showPhase('join-confirm');
+        return;
+      }
+    }
+
+    // =============================================================================
+    // Session creation
+    // =============================================================================
+    function createSession(isPrivate) {
+      const maxPlayers = GAME_INFO?.defaultMaxPlayers || 4;
+      send({
+        type: 'create_session',
+        game_id: GAME_ID,
+        private: isPrivate,
+        max_players: maxPlayers,
+        settings: {
+          initial_bots: 0,
+          allow_bots: GAME_INFO?.allowBots !== false,
+          replace_with_bot: true,
+          turn_timer: true,
+          turn_timer_seconds: 120,
+          warning_seconds: 60,
+          late_arrivals: true,
+        }
+      });
+    }
+
+    function onSessionCreated(msg) {
+      state.session = msg.session;
+      const code = msg.share_code || msg.session.session_code;
+      const shareUrl = `${location.origin}/play/?code=${encodeURIComponent(code)}`;
+      state.shareCode = code;
+      state.shareUrl = shareUrl;
+
+      document.getElementById('room-code').textContent = code;
+      document.getElementById('share-url-input').value = shareUrl;
+
+      applySettingsToUI(msg.session);
+      renderWaitingRoom();
+      showPhase('waiting');
+      showToast('Game room created! Share the code to invite friends.', 'success');
+    }
+
+    function onSessionJoined(msg) {
+      state.session = msg.session;
+      // Sync user_id from session player data when it might be missing (e.g. guest flow)
+      if (state.user && !state.user.user_id) {
+        const me = (msg.session.players || []).find(p => p.username === state.user.username && !p.is_ai);
+        if (me) state.user.user_id = me.user_id;
+      }
+      applySettingsToUI(msg.session);
+      renderWaitingRoom();
+      showPhase('waiting');
+      const amHost = !!(state.user?.user_id && msg.session.host_id && msg.session.host_id === (state.user.user_id || state.user?.id));
+      showToast(amHost ? 'Game room created!' : 'Joined game!', 'success');
+    }
+
+    function onSessionUpdate(msg) {
+      state.session = msg.session;
+      if (document.getElementById('phase-waiting').classList.contains('active')) {
+        renderWaitingRoom();
+      }
+    }
+
+    function onPlayerJoined(msg) {
+      if (msg.session) state.session = msg.session;
+      if (msg.players) mergePlayersIn(msg.players);
+      if (document.getElementById('phase-waiting').classList.contains('active')) {
+        renderWaitingRoom();
+      }
+      if (msg.player?.username) showToast(`${msg.player.username} joined!`, 'success');
+    }
+
+    function onPlayerLeft(msg) {
+      if (msg.session) state.session = msg.session;
+      if (msg.players) mergePlayersIn(msg.players);
+      if (document.getElementById('phase-waiting').classList.contains('active')) {
+        renderWaitingRoom();
+      }
+      if (msg.username) showToast(`${msg.username} left`, 'info');
+    }
+
+    function onReadyChanged(msg) {
+      if (msg.session) state.session = msg.session;
+      if (document.getElementById('phase-waiting').classList.contains('active')) {
+        renderWaitingRoom();
+      }
+    }
+
+    function onLeftSession() {
+      state.session = null;
+      if (CODE_IN) {
+        showPhase('join-confirm');
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    function mergePlayersIn(players) {
+      if (!state.session) return;
+      state.session.players = players;
+    }
+
+    // =============================================================================
+    // Browse Open Games
+    // =============================================================================
+    function loadBrowse() {
+      showPhase('browse');
+      send({ type: 'list_sessions', game_id: GAME_ID || null });
+      document.getElementById('browse-list').innerHTML =
+        '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Loading open games...</div>';
+    }
+
+    function onSessionList(msg) {
+      const sessions = (msg.sessions || []).filter(s => s.status === 'waiting');
+      const el = document.getElementById('browse-list');
+      if (!sessions.length) {
+        el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">No open games right now — host your own!</div>';
+        return;
+      }
+      el.innerHTML = sessions.map(s => {
+        const gameInfo = GAME_REGISTRY[s.game_id] || {};
+        const spots = (s.max_players || 4) - (s.players?.length || 1);
+        const playerList = (s.players || []).filter(p => !p.is_ai).slice(0, 3)
+          .map(p => `<span title="${escapeHtml(p.username)}">${avatarEmoji(p.avatar_id)}</span>`).join('');
+        return `
+        <div class="browse-card" id="bcard-${s.session_id}">
+          <div class="browse-game-tag" style="color:${gameInfo.color || 'var(--neon-cyan)'};">${gameInfo.name || s.game_id}</div>
+          <div class="browse-host">Host: <strong>${escapeHtml(s.host_username || s.players?.[0]?.username || '?')}</strong></div>
+          <div class="browse-avatars">${playerList}</div>
+          <div class="browse-spots">${s.players?.length || 1}/${s.max_players || 4} players &bull; ${spots} spot${spots !== 1 ? 's' : ''} open</div>
+          <div class="browse-btns">
+            <button class="btn btn-cyan" onclick="requestJoin('${s.session_id}')" id="bjoin-${s.session_id}">
+              Request to Join
+            </button>
+          </div>
+          <div class="browse-status" id="bstatus-${s.session_id}" style="display:none;font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;"></div>
+        </div>`;
+      }).join('');
+    }
+
+    function onLobbyUpdate(msg) {
+      // Refresh browse list if it's currently active
+      if (document.getElementById('phase-browse')?.classList.contains('active')) {
+        send({ type: 'list_sessions', game_id: GAME_ID || null });
+      }
+    }
+
+    function requestJoin(sessionId) {
+      state.requestingSessionId = sessionId;
+      send({ type: 'request_join', session_id: sessionId });
+      const btn = document.getElementById(`bjoin-${sessionId}`);
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Waiting for host...'; }
+    }
+
+    function onJoinRequested(msg) {
+      // Player confirmation — waiting for host
+      const statusEl = document.getElementById(`bstatus-${msg.session_id}`);
+      if (statusEl) { statusEl.style.display = ''; statusEl.textContent = 'Request sent — waiting for host to accept...'; }
+    }
+
+    function onJoinRejected(msg) {
+      showToast('Host declined your request', 'error');
+      state.requestingSessionId = null;
+      const btn = document.getElementById(`bjoin-${msg.session_id}`);
+      if (btn) { btn.disabled = false; btn.textContent = 'Request to Join'; }
+      const statusEl = document.getElementById(`bstatus-${msg.session_id}`);
+      if (statusEl) { statusEl.textContent = 'Request declined.'; }
+    }
+
+    // Incoming join request — host sees this notification
+    function onJoinRequest(msg) {
+      const el = document.getElementById('join-requests-panel');
+      if (!el) return;
+      el.style.display = '';
+      const list = document.getElementById('join-requests-list');
+      // Don't add duplicates
+      if (document.getElementById(`jreq-${msg.player.user_id}`)) return;
+      const item = document.createElement('div');
+      item.className = 'join-request-item';
+      item.id = `jreq-${msg.player.user_id}`;
+      item.innerHTML = `
+        <div class="jreq-avatar">${avatarEmoji(msg.player.avatar_id)}</div>
+        <div class="jreq-name">${escapeHtml(msg.player.username)}</div>
+        <button class="btn btn-primary" style="padding:0.3rem 0.8rem;font-size:0.8rem;" onclick="acceptJoin('${msg.player.user_id}','${msg.player.username}')">✓ Accept</button>
+        <button class="btn btn-danger" style="padding:0.3rem 0.8rem;font-size:0.8rem;" onclick="rejectJoin('${msg.player.user_id}')">✗ Reject</button>
+      `;
+      list.appendChild(item);
+    }
+
+    function acceptJoin(userId) {
+      send({ type: 'accept_join_request', user_id: userId });
+      const el = document.getElementById(`jreq-${userId}`);
+      if (el) el.remove();
+      const list = document.getElementById('join-requests-list');
+      if (list && !list.children.length) document.getElementById('join-requests-panel').style.display = 'none';
+    }
+
+    function rejectJoin(userId) {
+      send({ type: 'reject_join_request', user_id: userId });
+      const el = document.getElementById(`jreq-${userId}`);
+      if (el) el.remove();
+      const list = document.getElementById('join-requests-list');
+      if (list && !list.children.length) document.getElementById('join-requests-panel').style.display = 'none';
+    }
+
+    // =============================================================================
+    // Matchmaker
+    // =============================================================================
+    function startMatchmake() {
+      showPhase('matchmake');
+      document.getElementById('matchmake-roster').innerHTML = '';
+      state.matchmaking = true;
+      send({ type: 'matchmake', game_id: GAME_ID });
+    }
+
+    function onMatchmakeResult(msg) {
+      state.matchmaking = false;
+      if (msg.action === 'created' || msg.action === 'joined') {
+        state.session = msg.session;
+        applySettingsToUI(msg.session);
+        renderWaitingRoom();
+        showPhase('waiting');
+        const isHost = msg.session.host_id === (state.user?.user_id || state.user?.id);
+        showToast(isHost ? 'Matchmaking room created — waiting for players!' : 'Matched! Room found.', 'success');
+      }
+    }
+
+    function cancelMatchmake() {
+      state.matchmaking = false;
+      window.location.href = '/';
+    }
+
+    // =============================================================================
+    // Game Started — redirect to the game board
+    // =============================================================================
+    function onGameStarted(msg) {
+      const session = msg.session;
+      const myUserId = state.user?.user_id || state.user?.id || '';
+      const me = session.players?.find(p => p.user_id === myUserId) || session.players?.[0];
+      const myEmoji = avatarEmoji(me?.avatar_id);
+      const gameId = session.game_id || GAME_ID;
+      const gameInfo = GAME_REGISTRY[gameId];
+
+      if (!gameInfo) {
+        showError(`Unknown game: ${gameId}`);
+        return;
+      }
+
+      // Store roster in sessionStorage (all games can read this)
+      const roster = (session.players || []).map(p => ({
+        user_id: p.user_id,
+        username: p.username,
+        avatar: avatarEmoji(p.avatar_id),
+        is_ai: !!(p.is_ai || p.is_bot),
+        is_host: !!p.is_host,
+      }));
+      try {
+        const prefix = gameInfo.sessionStoragePrefix || gameId;
+        sessionStorage.setItem(`${prefix}_session_players`, JSON.stringify(roster));
+        sessionStorage.setItem(`${prefix}_my_user_id`, myUserId);
+        // Also store with generic key so any game can find it
+        sessionStorage.setItem('kg_session_players', JSON.stringify(roster));
+        sessionStorage.setItem('kg_my_user_id', myUserId);
+        sessionStorage.setItem('kg_host_user_id', String(session.host_id || ''));
+
+        if (session.settings) {
+          const timer = !!session.settings.turn_timer;
+          sessionStorage.setItem(`${prefix}_turn_timer_enabled`, timer ? '1' : '0');
+          sessionStorage.setItem(`${prefix}_turn_timer_wait_seconds`, String(session.settings.turn_timer_seconds || 120));
+          sessionStorage.setItem(`${prefix}_turn_timer_warning_seconds`, String(session.settings.warning_seconds || 60));
+        }
+      } catch (_) { }
+
+      // Build redirect URL
+      const launchParamsFn = gameInfo.launchParams;
+      const extraParams = launchParamsFn ? launchParamsFn(session, me, myEmoji, WS_URL) : {};
+      const urlParams = new URLSearchParams(extraParams);
+      window.location.href = `${gameInfo.gameUrl}?${urlParams.toString()}`;
+    }
+
+    // =============================================================================
+    // Join Confirm (invitee clicks Join Game button)
+    // =============================================================================
+    function joinConfirmedCode() {
+      if (!state.pendingJoinCode) return;
+      setLoadingLabel('Joining game...');
+      showPhase('loading');
+      send({ type: 'join_by_code', code: state.pendingJoinCode.toUpperCase() });
+    }
+
+    // =============================================================================
+    // Settings live-update (host changes settings from waiting room)
+    // =============================================================================
+    function updateSessionSettings() {
+      if (!state.session) return;
+      const maxPlayers = parseInt(document.getElementById('s-max-players').value);
+      const allowBots = document.getElementById('s-allow-bots').checked;
+      const turnTimer = document.getElementById('s-turn-timer').checked;
+      const lateArrivals = document.getElementById('s-late-arrivals').checked;
+      send({
+        type: 'update_session_settings',
+        settings: {
+          allow_bots: allowBots,
+          turn_timer: turnTimer,
+          turn_timer_seconds: turnTimer ? 120 : 0,
+          warning_seconds: 60,
+          late_arrivals: lateArrivals,
+        },
+        max_players: maxPlayers,
+      });
+    }
+
+    function applySettingsToUI(session) {
+      if (!session?.settings) return;
+      const s = session.settings;
+      if (s.allow_bots !== undefined) document.getElementById('s-allow-bots').checked = !!s.allow_bots;
+      if (s.turn_timer !== undefined) document.getElementById('s-turn-timer').checked = !!s.turn_timer;
+      if (s.late_arrivals !== undefined) document.getElementById('s-late-arrivals').checked = !!s.late_arrivals;
+      if (session.max_players) {
+        const sel = document.getElementById('s-max-players');
+        if ([...sel.options].some(o => parseInt(o.value) === session.max_players)) {
+          sel.value = session.max_players;
+        }
+      }
+    }
+
+    // =============================================================================
+    // Waiting Room Render
+    // =============================================================================
+    function renderWaitingRoom() {
+      const session = state.session;
+      if (!session) return;
+
+      const myUserId = state.user?.user_id || state.user?.id || '';
+      const amHost = !!(myUserId && session.host_id && session.host_id === myUserId);
+      const players = session.players || [];
+      const maxPlayers = session.max_players || 4;
+      const container = document.getElementById('player-slots');
+
+      // Sort: host first, then humans, then bots
+      const sorted = [
+        ...players.filter(p => p.user_id === session.host_id),
+        ...players.filter(p => p.user_id !== session.host_id && !(p.is_ai || p.is_bot)),
+        ...players.filter(p => (p.is_ai || p.is_bot)),
+      ];
+
+      let html = '';
+
+      for (const p of sorted) {
+        const isMe = p.user_id === myUserId;
+        const isActualHost = p.user_id === session.host_id;
+        const isBot = !!(p.is_ai || p.is_bot);
+        const isReady = !!p.ready || isActualHost; // host is always ready
+
+        let cardClass = 'player-card';
+        if (isActualHost) cardClass += ' is-host';
+        else if (isBot) cardClass += ' is-bot';
+        else if (isReady) cardClass += ' is-ready';
+        if (isMe) cardClass += ' is-me';
+
+        let statusClass, statusText;
+        if (isActualHost) { statusClass = 's-host'; statusText = 'HOST'; }
+        else if (isBot) { statusClass = 's-bot'; statusText = 'BOT'; }
+        else if (isReady) { statusClass = 's-ready'; statusText = '✓ READY'; }
+        else { statusClass = 's-waiting'; statusText = 'WAITING'; }
+
+        const crown = isActualHost ? `<div class="card-crown">👑</div>` : '';
+        const youLabel = isMe ? `<span class="card-you">(you)</span>` : '';
+
+        html += `
+        <div class="${cardClass}">
+          ${crown}
+          <div class="card-avatar">${avatarEmoji(p.avatar_id)}</div>
+          <div class="card-name">${escapeHtml(p.username)}${youLabel}</div>
+          <div class="card-status ${statusClass}">${statusText}</div>
+        </div>`;
+      }
+
+      // Empty slots
+      for (let i = players.length; i < maxPlayers; i++) {
+        html += `
+        <div class="player-card is-open">
+          <div class="card-avatar" style="opacity:0.3">👤</div>
+          <div class="card-name" style="color:var(--text-muted)">Empty</div>
+          <div class="card-status s-open">OPEN</div>
+        </div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Section title with live count
+      const humanCount = players.filter(p => !(p.is_ai || p.is_bot)).length;
+      const botCount = players.filter(p => (p.is_ai || p.is_bot)).length;
+      const parts = [`${humanCount} player${humanCount !== 1 ? 's' : ''}`];
+      if (botCount > 0) parts.push(`${botCount} bot${botCount !== 1 ? 's' : ''}`);
+      document.getElementById('players-section-title').textContent = `Players — ${parts.join(', ')}`;
+
+      // Host-only panels
+      document.getElementById('host-share-panel').style.display = amHost ? '' : 'none';
+      document.getElementById('host-settings-panel').style.display = amHost ? '' : 'none';
+
+      // Bot controls — host only
+      const hasBots = players.some(p => p.is_ai || p.is_bot);
+      const isFull = players.length >= maxPlayers;
+      const allowBots = session.settings?.allow_bots !== false;
+      document.getElementById('btn-add-bot').style.display = (amHost && allowBots && !isFull) ? '' : 'none';
+      document.getElementById('btn-remove-bot').style.display = (amHost && hasBots) ? '' : 'none';
+
+      // Ready button — joiners only (host is implicitly ready)
+      const myPlayer = players.find(p => p.user_id === myUserId);
+      state.myReady = myPlayer?.ready || false;
+      const readyBtn = document.getElementById('btn-ready');
+      readyBtn.style.display = amHost ? 'none' : '';
+      if (!amHost) {
+        readyBtn.textContent = state.myReady ? '✅ Ready' : '⬜ I\'m Ready';
+        readyBtn.className = state.myReady
+          ? 'btn btn-primary'
+          : 'btn btn-secondary';
+      }
+
+      // Launch button — host only
+      // Enabled when: 2+ players total AND all non-host humans are ready
+      const launchBtn = document.getElementById('btn-launch');
+      launchBtn.style.display = amHost ? '' : 'none';
+      if (amHost) {
+        const humanPlayers = players.filter(p => !(p.is_ai || p.is_bot) && p.user_id !== session.host_id);
+        const allReady = humanPlayers.length === 0 || humanPlayers.every(p => p.ready);
+        const canLaunch = players.length >= 2 && allReady;
+        launchBtn.disabled = !canLaunch;
+        if (players.length < 2) {
+          document.getElementById('launch-note').textContent = 'Add a bot or wait for a player to join';
+          document.getElementById('launch-note').style.display = '';
+        } else if (!allReady) {
+          const notReady = humanPlayers.filter(p => !p.ready).length;
+          document.getElementById('launch-note').textContent = `Waiting for ${notReady} player${notReady !== 1 ? 's' : ''} to ready up...`;
+          document.getElementById('launch-note').style.display = '';
+        } else {
+          document.getElementById('launch-note').style.display = 'none';
+        }
+      } else {
+        document.getElementById('launch-note').textContent = 'Waiting for the host to launch...';
+        document.getElementById('launch-note').style.display = '';
+      }
+    }
+
+    function addBot() {
+      send({ type: 'add_bot', level: 'medium' });
+    }
+
+    function removeBot() {
+      send({ type: 'remove_bot' });
+    }
+
+    function toggleReady() {
+      state.myReady = !state.myReady;
+      send({ type: 'player_ready', ready: state.myReady });
+      document.getElementById('btn-ready').textContent = state.myReady ? '✅ Ready' : '⬜ I\'m Ready';
+    }
+
+    function launchGame() {
+      send({ type: 'start_game' });
+    }
+
+    // =============================================================================
+    // Join by code (manual entry phase)
+    // =============================================================================
+    function submitJoinCode() {
+      const code = document.getElementById('join-code-input').value.toUpperCase().trim();
+      if (code.length < 4) { showToast('Enter a valid game code', 'error'); return; }
+      state.pendingJoinCode = code;
+      send({ type: 'join_by_code', code });
+    }
+
+    // =============================================================================
+    // Share Functions
+    // =============================================================================
+    function copyShareUrl() {
+      const url = state.shareUrl || document.getElementById('share-url-input').value;
+      if (!url) return;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Link copied!', 'success');
+        document.getElementById('btn-copy').textContent = '✓ Copied';
+        setTimeout(() => { document.getElementById('btn-copy').textContent = '📋 Copy'; }, 2000);
+      }).catch(() => {
+        // Fallback
+        const el = document.getElementById('share-url-input');
+        el.select();
+        document.execCommand('copy');
+        showToast('Link copied!', 'success');
+      });
+    }
+
+    function shareWhatsApp() {
+      const url = state.shareUrl || '';
+      const code = state.shareCode || '';
+      const gameName = GAME_INFO?.name || 'a game';
+      window.open(`https://wa.me/?text=${encodeURIComponent(`Join my ${gameName} game! Code: ${code}\n${url}`)}`, '_blank');
+    }
+
+    function shareTwitter() {
+      const url = state.shareUrl || '';
+      const code = state.shareCode || '';
+      const gameName = GAME_INFO?.name || 'a game';
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Join my ${gameName} game! Code: ${code}`)}&url=${encodeURIComponent(url)}`, '_blank');
+    }
+
+    function shareEmail() {
+      const url = state.shareUrl || '';
+      const code = state.shareCode || '';
+      const gameName = GAME_INFO?.name || 'a game';
+      const subject = encodeURIComponent(`Join my ${gameName} game on KensGames!`);
+      const body = encodeURIComponent(`Hey! Come play ${gameName} with me.\n\nGame Code: ${code}\nJoin Link: ${url}\n\nSee you there!`);
+      window.open(`mailto:?subject=${subject}&body=${body}`);
+    }
+
+    function shareNative() {
+      const url = state.shareUrl || '';
+      const code = state.shareCode || '';
+      const gameName = GAME_INFO?.name || 'a game';
+      if (navigator.share) {
+        navigator.share({ title: `Join my ${gameName} game!`, text: `Code: ${code}`, url });
+      } else {
+        copyShareUrl();
+      }
+    }
+
+    // =============================================================================
+    // Phase Management
+    // =============================================================================
+    function showPhase(name) {
+      // Map name → element id
+      const idMap = {
+        loading: 'phase-loading',
+        auth: 'phase-auth',
+        'join-input': 'phase-join-input',
+        'join-confirm': 'phase-join-confirm',
+        'multi-menu': 'phase-multi-menu',
+        browse: 'phase-browse',
+        matchmake: 'phase-matchmake',
+        waiting: 'phase-waiting',
+        error: 'phase-error',
+      };
+      document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+      const el = document.getElementById(idMap[name] || `phase-${name}`);
+      if (el) el.classList.add('active');
+    }
+
+    function gotoPhase(name) { showPhase(name); }
+
+    function gotoMultiBrowse() {
+      showPhase('loading');
+      setLoadingLabel('Loading open games...');
+      // Re-authenticate if needed, then browse
+      if (state.connected) { loadBrowse(); }
+      else { connectLobby(); } // will call loadBrowse via onAuthSuccess with MODE=multi→browse
+    }
+
+    function gotoMatchmake() {
+      showPhase('loading');
+      setLoadingLabel('Starting matchmaker...');
+      if (state.connected) { startMatchmake(); }
+      else { connectLobby(); }
+    }
+
+    function setLoadingLabel(text) {
+      document.getElementById('loading-label').textContent = text;
+    }
+
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = msg;
+      showPhase('error');
+    }
+
+    // =============================================================================
+    // Toast
+    // =============================================================================
+    let toastTimer;
+    function showToast(msg, type = 'info') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = `show ${type}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+    }
+
+    // =============================================================================
+    // Utils
+    // =============================================================================
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+
+</html>

@@ -2,7 +2,19 @@
 <html lang="en">
 
 <head>
-  <!-- Cloudflare Access SSO -->
+  <!-- Auth + profile gate: must be logged in AND have playername/avatar -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('kg_token');
+      if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/brickbreaker3d/lobby.html')); return; }
+      fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/brickbreaker3d/lobby.html')); return; }
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
+        }).catch(function () { });
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BrickBreaker 3D Lobby &mdash; KensGames</title>
@@ -307,9 +319,9 @@
           style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <ul class="arc-nav-links">
         <li><a href="/">&#8592; Portal</a></li>
-        <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
-        <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
-        <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
+        <li><a href="/fasttrack/">FastTrack</a></li>
+        <li><a href="/starfighter/">Alien Attack</a></li>
+        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
         <li><a href="/assemble/">Assemble</a></li>
       </ul>
       <div class="arc-nav-right">

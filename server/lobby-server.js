@@ -171,12 +171,16 @@ function getWsByUserId(userId) {
 // ── Registered game types ──
 const GAME_REGISTRY = {
   fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
-  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
-  starfighter: { name: 'Starfighter', path: '/starfighter/index.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
+  // brickbreaker — canonical game_id used by brickbreaker3d/lobby.html
+  brickbreaker3d: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
+  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' }, // legacy alias
+  starfighter: { name: 'StarFighter', path: '/starfighter/index.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
+  assemble: { name: 'Assemble', path: '/assemble/game.html', lobby: '/assemble/lobby.html', maxPlayers: 4, type: 'realtime' },
+  '4dtictactoe': { name: '4D TicTacToe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby.html', maxPlayers: 2, type: 'turn' },
   connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
   swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
   cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: '4D TicTacToe', path: '/4DTicTacToe/index.html', lobby: '/4DTicTacToe/lobby.html', maxPlayers: 4, type: 'turn' },
+  tictactoe: { name: '4D TicTacToe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby.html', maxPlayers: 2, type: 'turn' }, // legacy alias
 };
 
 function resetLobbyAcceptance(session) {
@@ -275,6 +279,15 @@ handlers.ping = (ws) => {
   send(ws, { type: 'pong' });
 };
 
+// Portal home page — real-time online count. No auth required.
+handlers.get_portal_stats = (ws) => {
+  send(ws, {
+    type: 'portal_stats',
+    online: connections.size,
+    active_sessions: sessions.size
+  });
+};
+
 // Some join flows send this when the user hits Cancel on a join spinner.
 // We don't currently keep a pending-approval queue, so this is a no-op.
 handlers.cancel_join_request = () => { };
@@ -305,9 +318,10 @@ handlers.auth = async (ws, data) => {
     const user = {
       user_id: userId,
       id: userId,
-      username: username.slice(0, 20),
-      avatar_id: avatarId || 'person_smile',
+      username: (res.body.playername || username).slice(0, 20),
+      avatar_id: res.body.avatarId || avatarId || 'person_smile',
       is_guest: false,
+      profileSetup: res.body.profileSetup === true,
       prestige_level: 'bronze',
       prestige_points: 0,
       games_played: 0,
@@ -984,6 +998,89 @@ handlers.add_ai_player = (ws, data) => {
 
 // Aliases for unified clients
 handlers.add_ai = (ws, data) => handlers.add_ai_player(ws, { level: data && data.difficulty ? data.difficulty : (data && data.level ? data.level : 'medium') });
+handlers.add_bot = (ws, data) => handlers.add_ai_player(ws, { level: (data && data.level) || 'medium' });
+
+// ── Join Requests (host-gated open sessions) ──
+// Player requests to join; only the host sees it until accepted.
+handlers.request_join = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+
+  const sessionId = data.session_id;
+  const session = sessions.get(sessionId);
+  if (!session) { send(ws, { type: 'error', message: 'Game not found' }); return; }
+  if (session.status !== 'waiting') { send(ws, { type: 'error', message: 'Game already started' }); return; }
+  if (session.players.length >= session.max_players) { send(ws, { type: 'error', message: 'Game is full' }); return; }
+  if (session.players.some(p => p.user_id === conn.user_id)) { send(ws, { type: 'error', message: 'Already in this game' }); return; }
+
+  // Acknowledge requester
+  send(ws, { type: 'join_requested', session_id: sessionId });
+
+  // Notify host only
+  const hostWs = getWsByUserId(session.host_id);
+  if (hostWs) {
+    send(hostWs, {
+      type: 'join_request',
+      session_id: sessionId,
+      player: { user_id: conn.user_id, username: conn.user.username, avatar_id: conn.user.avatar_id }
+    });
+  }
+};
+
+handlers.accept_join_request = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.host_id !== conn.user_id) { send(ws, { type: 'error', message: 'Only the host can accept players' }); return; }
+
+  const targetUserId = data.user_id;
+  if (!targetUserId) return;
+  if (session.players.length >= session.max_players) { send(ws, { type: 'error', message: 'Game is full' }); return; }
+
+  // Find the requester's connection
+  let targetWs = null;
+  for (const [cws, cconn] of connections) {
+    if (cconn.user_id === targetUserId) { targetWs = cws; break; }
+  }
+  if (!targetWs) { send(ws, { type: 'error', message: 'Player is no longer connected' }); return; }
+
+  const targetConn = connections.get(targetWs);
+  const player = {
+    user_id: targetUserId,
+    username: targetConn.user.username,
+    avatar_id: targetConn.user.avatar_id,
+    is_host: false, is_ai: false,
+    slot: session.players.length,
+    ready: false
+  };
+  session.players.push(player);
+  resetLobbyAcceptance(session);
+
+  // Tell the accepted player they're in
+  send(targetWs, { type: 'session_joined', session: sanitizeSession(session) });
+  // Broadcast new roster to everyone in session
+  broadcastSessionUpdate(session, { action: 'player_joined' });
+  // Notify host of acceptance
+  send(ws, { type: 'join_request_accepted', user_id: targetUserId });
+};
+
+handlers.reject_join_request = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+
+  const session = findSessionByPlayer(conn.user_id);
+  if (!session || session.host_id !== conn.user_id) return;
+
+  const targetUserId = data.user_id;
+  for (const [cws, cconn] of connections) {
+    if (cconn.user_id === targetUserId) {
+      send(cws, { type: 'join_request_rejected', session_id: session.session_id });
+      break;
+    }
+  }
+  send(ws, { type: 'join_request_rejected_ack', user_id: targetUserId });
+};
 
 handlers.remove_ai_player = (ws, data) => {
   const conn = connections.get(ws);
@@ -1055,17 +1152,16 @@ handlers.start_game = (ws) => {
   }
 
   const allHumansReady = session.players
-    .filter(p => !p.is_ai)
+    .filter(p => !p.is_ai && p.user_id !== session.host_id)
     .every(p => !!p.ready);
   if (!allHumansReady) {
     send(ws, { type: 'error', message: 'All players must be ready' });
     return;
   }
 
-  if (!session.settings || session.settings.lobby_accepted !== true) {
-    send(ws, { type: 'error', message: 'Host must accept the group before launch' });
-    return;
-  }
+  // Auto-accept lobby when host explicitly launches
+  if (!session.settings) session.settings = {};
+  session.settings.lobby_accepted = true;
 
   session.status = 'playing';
 

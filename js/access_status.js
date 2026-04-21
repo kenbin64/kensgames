@@ -62,7 +62,7 @@ function showLoggedIn(identity) {
 
   container.innerHTML = `
     ${welcomeHtml}
-    <a href="#" onclick="(['kg_token','kg_username','kg_display_name','kg_user_id','kg_avatar','user_token','display_name','username'].forEach(k=>localStorage.removeItem(k)),window.location.href='/login/');return false;" class="${classes.logout}" style="text-decoration:none;display:inline-flex;align-items:center">LOG OUT</a>
+    <a href="#" onclick="(['kg_token','kg_username','kg_display_name','kg_user_id','kg_avatar','user_token','display_name','username'].forEach(k=>localStorage.removeItem(k)),window.location.href='/');return false;" class="${classes.logout}" style="text-decoration:none;display:inline-flex;align-items:center">LOG OUT</a>
   `;
 
   // Best-effort: unify Access login with the site's own JWT token.
@@ -80,7 +80,7 @@ function showLoggedOut() {
   // Do not link directly to the Cloudflare Access team-domain login URL.
   // Linking to a protected page is the most reliable way to trigger Access.
   container.innerHTML = `
-    <a href="/login/" class="${classes.login}" style="text-decoration:none;display:inline-flex;align-items:center">LOG IN</a>
+    <a href="/login/?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '/')}" class="${classes.login}" style="text-decoration:none;display:inline-flex;align-items:center">LOG IN</a>
   `;
 }
 

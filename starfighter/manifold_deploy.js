@@ -29,7 +29,7 @@ const X = [
   ['dimensional_substrate.js', SF], ['manifold_geometry_substrate.js', SF],
   ['lib/three/three.min.js', ROOT], ['lib/three/GLTFLoader.js', ROOT],
   ['audio.js', SF], ['music.js', SF], ['anpc.js', SF], ['progression.js', SF],
-  ['js/multiplayer-client.js', ROOT], ['multiplayer.js', SF],
+  ['js/multiplayer_client.js', ROOT], ['multiplayer.js', SF],
   ['announcer.js', SF], ['core.js', SF], ['input.js', SF], ['3d.js', SF],
 ];
 

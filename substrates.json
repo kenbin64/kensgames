@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-04-20",
+  "substrates": [
+    {
+      "name": "shared",
+      "moduleCount": 33,
+      "boundary": "closed",
+      "paths": [
+        "js/*.js",
+        "js/substrates/*.js"
+      ],
+      "description": "Cross-title shared infrastructure. Read-only from game substrates."
+    },
+    {
+      "name": "fasttrack",
+      "moduleCount": 98,
+      "boundary": "closed",
+      "paths": [
+        "fasttrack/*.js"
+      ],
+      "description": "FastTrack multiplayer board game substrate."
+    },
+    {
+      "name": "alienspaceattack",
+      "moduleCount": 34,
+      "boundary": "closed",
+      "paths": [
+        "starfighter/*.js"
+      ],
+      "description": "Alien Space Attack (Starfighter) substrate."
+    },
+    {
+      "name": "brickbreaker",
+      "moduleCount": 3,
+      "boundary": "closed",
+      "paths": [
+        "brickbreaker3d/*.js"
+      ],
+      "description": "BrickBreaker 3D substrate."
+    },
+    {
+      "name": "tictactoe",
+      "moduleCount": 1,
+      "boundary": "closed",
+      "paths": [
+        "4dtictactoe/*.js"
+      ],
+      "description": "4D TicTacToe substrate."
+    },
+    {
+      "name": "assemble",
+      "moduleCount": 2,
+      "boundary": "closed",
+      "paths": [
+        "assemble/*.js"
+      ],
+      "description": "Assemble puzzle game substrate."
+    }
+  ],
+  "totalModules": 171,
+  "legalCrossRefs": "game -> shared (read only)",
+  "illegalCrossRefs": [
+    "game -> game",
+    "shared -> game"
+  ],
+  "communicationProtocol": "Coordinate-Mediated Communication (CMC) only. No event buses. No direct cross-substrate calls."
+}

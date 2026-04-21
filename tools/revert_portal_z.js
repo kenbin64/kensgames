@@ -1,20 +1,20 @@
 const fs = require('fs');
 
 // manifold_surface.js: calculateZ — portal-level z = x*y (AGENTS.md law, not engine _z)
-let ms = fs.readFileSync('js/manifold-core/manifold_surface.js', 'utf8');
+let ms = fs.readFileSync('js/manifold_core/manifold_surface.js', 'utf8');
 const msOld = 'calculateZ(x, y) { return x * y * y; }';
 const msNew = 'calculateZ(x, y) { return x * y; }  // z = x\u00b7y \u2014 portal dimensional law (AGENTS.md)';
 if (!ms.includes(msOld)) { console.error('manifold_surface: old string not found'); process.exit(1); }
 ms = ms.replace(msOld, msNew);
-fs.writeFileSync('js/manifold-core/manifold_surface.js', ms, 'utf8');
+fs.writeFileSync('js/manifold_core/manifold_surface.js', ms, 'utf8');
 console.log('manifold_surface.js:', ms.includes('return x * y;') ? 'OK' : 'FAIL');
 
 // test_manifold_core.js: assert z(3,4)=12 (portal z=x*y)
-let tc = fs.readFileSync('js/manifold-core/test_manifold_core.js', 'utf8');
+let tc = fs.readFileSync('js/manifold_core/test_manifold_core.js', 'utf8');
 tc = tc.replace("assertEqual(z, 48, 'Z = x * y\u00b2 formula (3\xd716=48)')",
   "assertEqual(z, 12, 'Z = x\u00b7y portal dimensional law (3\xd74=12)')");
-fs.writeFileSync('js/manifold-core/test_manifold_core.js', tc, 'utf8');
-console.log('test_manifold_core.js:', fs.readFileSync('js/manifold-core/test_manifold_core.js', 'utf8').includes('assertEqual(z, 12') ? 'OK' : 'FAIL');
+fs.writeFileSync('js/manifold_core/test_manifold_core.js', tc, 'utf8');
+console.log('test_manifold_core.js:', fs.readFileSync('js/manifold_core/test_manifold_core.js', 'utf8').includes('assertEqual(z, 12') ? 'OK' : 'FAIL');
 
 // manifold_compiler.py: validate_dimension — portal z = x*y
 const mc = fs.readFileSync('engine/manifold_compiler.py', 'utf8');

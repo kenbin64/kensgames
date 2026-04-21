@@ -1,6 +1,6 @@
 /**
  * Test Runner - Loads all manifold core modules and runs tests
- * Run: cd /var/www/kensgames.com && node js/manifold-core/run_tests.js
+ * Run: cd /var/www/kensgames.com && node js/manifold_core/run_tests.js
  */
 
 const path = require('path');

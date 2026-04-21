@@ -151,10 +151,12 @@ router.post('/setup', requireAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Profile already set up' });
   }
 
-  const { playername, avatarId } = req.body;
+  // Username IS the playername — use body value or fall back to the user's username
+  const { avatarId } = req.body;
+  const playername = (req.body.playername || user.username || '').trim();
 
   if (!playername || !PLAYERNAME_RE.test(playername)) {
-    return res.status(400).json({ success: false, error: 'Playername must be 3-20 characters: letters, numbers, underscore only' });
+    return res.status(400).json({ success: false, error: 'Username must be 3-20 characters: letters, numbers, underscore only' });
   }
 
   // Check uniqueness — DB first, then in-memory

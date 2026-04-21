@@ -79,7 +79,7 @@
             <span class="nav-logo-text">FastTrack!</span>
         </a>
         <ul class="nav-links">
-            <li><a href="play.html">Play</a></li>
+            <li><a href="/play/?game=fasttrack&mode=solo">Play</a></li>
             <li><a href="docs.html">Guide</a></li>
             <li><a href="#rules">Rules</a></li>
             <li><a href="#cards">Cards</a></li>
@@ -91,7 +91,7 @@
         <div class="nav-cta">
             <div id="kg-player"></div>
             <div id="access-status" data-access-mode="compact"></div>
-            <a href="play.html" class="btn btn-primary">Play Now</a>
+            <a href="/play/?game=fasttrack&mode=solo" class="btn btn-primary">Play Now</a>
         </div>
     </nav>
 
@@ -109,17 +109,14 @@
             join guilds, compete in tournaments, and become a champion!
         </p>
         <div class="hero-buttons">
-            <a href="ai_setup.html" class="btn btn-primary btn-lg">
-                🤖 Play vs AI
+            <a href="/play/?game=fasttrack&mode=solo" class="btn btn-primary btn-lg">
+                🎮 SOLO
             </a>
-            <a href="lobby.html?action=private" class="btn btn-private btn-lg">
-                🔒 Private Game
+            <a href="/play/?game=fasttrack&mode=host" class="btn btn-private btn-lg">
+                📨 INVITE
             </a>
-            <a href="lobby.html?action=join" class="btn btn-join btn-lg">
-                🎟️ Join by Code
-            </a>
-            <a href="play.html" class="btn btn-accent btn-lg">
-                🎮 Multiplayer
+            <a href="/play/?game=fasttrack&mode=multi" class="btn btn-accent btn-lg">
+                👥 MULTI
             </a>
         </div>
         <div class="hero-stats">
@@ -1257,8 +1254,8 @@
             ManifoldBridge.init({
                 id: 'fasttrack',
                 version: '2.1.0',
-                x: 3,
-                y: 45,
+                x: 4,   // suits (primary axis)
+                y: 13,  // ranks (quadratic axis)  →  z = 4·169 = 676
                 exposes: () => {
                     const gs = window.gameState;
                     if (!gs) return { phase: 'idle', playerCount: 0 };

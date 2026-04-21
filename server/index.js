@@ -37,7 +37,7 @@ app.use(cors({
 // ═══════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER: Manifold Integration
 // ═══════════════════════════════════════════════════════════════════════════
-// TODO: Import manifold-core when server runs in Node environment
+// TODO: Import manifold_core when server runs in Node environment
 // For now using mock manifold - will be replaced with real manifold integration
 
 const { manifoldData } = require('./store'); // Shared in-memory store
@@ -499,6 +499,8 @@ app.post('/api/auth/login', async (req, res) => {
       const emailEnc = PiiCrypto.encrypt(userData.email || '');
       const dbPlayer = PlayerDB.ensurePlayer(userData.userId, userData.email, emailEnc);
       profileSetup = dbPlayer ? dbPlayer.profile_setup === 1 : false;
+      // Sync profileSetup into in-memory store so validate is consistent mid-session
+      if (profileSetup) writeUserToManifold(username, { profileSetup: true });
     } catch (dbErr) {
       console.error('DB ensurePlayer error:', dbErr.message);
     }
@@ -536,14 +538,25 @@ app.get('/api/auth/validate', (req, res) => {
       return res.status(401).json({ valid: false, error: decoded.error });
     }
 
-    // Look up user to return profile state — gates need this in one request
+    // Look up user to return profile state — SQLite is source of truth; fall back to in-memory
     let profileSetup = false, playername = null, avatarId = null;
-    for (const key in manifoldData) {
-      if (manifoldData[key].userId === decoded.userId) {
-        profileSetup = manifoldData[key].profileSetup || false;
-        playername = manifoldData[key].playername || null;
-        avatarId = manifoldData[key].avatarId || null;
-        break;
+    try {
+      const dbPlayer = PlayerDB.getByKgUserId(decoded.userId);
+      if (dbPlayer) {
+        profileSetup = dbPlayer.profile_setup === 1;
+        playername = dbPlayer.player_name || null;
+        avatarId = dbPlayer.avatar_id || null;
+      }
+    } catch { }
+    // Fill any gaps from in-memory store (e.g. display name for new registrations)
+    if (!profileSetup || !playername) {
+      for (const key in manifoldData) {
+        if (manifoldData[key].userId === decoded.userId) {
+          if (!profileSetup) profileSetup = manifoldData[key].profileSetup || false;
+          if (!playername) playername = manifoldData[key].playername || null;
+          if (!avatarId) avatarId = manifoldData[key].avatarId || null;
+          break;
+        }
       }
     }
 
@@ -832,6 +845,14 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: Date.now() });
+});
+
+// ─── Directive 2.6 — Privacy analytics ingest ────────────────────────────────
+// Accepts beacon payloads: { duration_ms, events: [{t,d,ts}] }
+// No IP logged, no user identity, no PII stored.
+app.post('/api/analytics', (req, res) => {
+  // Silently accept — aggregate persistence added in a future sprint
+  res.sendStatus(204);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1254,7 +1275,7 @@ const guildsRouter = require('./routes/guilds');
 const chatRouter = require('./routes/chat');
 const leaderboardRouter = require('./routes/leaderboards');
 const tournamentsRouter = require('./routes/tournaments');
-const gameSessionsRouter = require('./routes/game_sessions');
+const gameSessionsRouter = require('./routes/game-sessions');
 
 app.use('/api/players', playersRouter);
 app.use('/api/friends', friendsRouter);

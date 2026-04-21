@@ -108,5 +108,5 @@ const lines = [
   'if (typeof module !== '\''undefined'\'' && module.exports) module.exports = SubstrateBase;',
   'if (typeof window !== '\''undefined'\'') window.SubstrateBase = SubstrateBase;'
 ];
-fs.writeFileSync('c:/projects/manifold/js/manifold-core/substrate_base.js', lines.join('\n') + '\n', 'utf8');
-console.log('OK', fs.statSync('c:/projects/manifold/js/manifold-core/substrate_base.js').size, 'bytes');
+fs.writeFileSync('c:/projects/manifold/js/manifold_core/substrate_base.js', lines.join('\n') + '\n', 'utf8');
+console.log('OK', fs.statSync('c:/projects/manifold/js/manifold_core/substrate_base.js').size, 'bytes');

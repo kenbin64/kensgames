@@ -29,7 +29,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const GAMES = {
   fasttrack: { name: 'FastTrack', maxPlayers: 4, minPlayers: 2, lobbyPath: '/fasttrack/portal.html', gamePath: '/fasttrack/portal.html' },
   brickbreaker3d: { name: 'BrickBreaker 3D', maxPlayers: 4, minPlayers: 1, lobbyPath: '/brickbreaker3d/lobby.html', gamePath: '/brickbreaker3d/game.html' },
-  '4dtictactoe': { name: '4D Tic-Tac-Toe', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4DTicTacToe/lobby.html', gamePath: '/4DTicTacToe/game.html' },
+  '4dtictactoe': { name: '4D Tic-Tac-Toe', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dtictactoe/lobby.html', gamePath: '/4dtictactoe/game.html' },
   starfighter: { name: 'StarFighter', maxPlayers: 4, minPlayers: 1, lobbyPath: '/starfighter/lobby.html', gamePath: '/starfighter/index.html' },
   assemble: { name: 'Assemble', maxPlayers: 4, minPlayers: 1, lobbyPath: '/assemble/lobby.html', gamePath: '/assemble/game.html' },
 };

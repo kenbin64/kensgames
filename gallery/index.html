@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyFX Art Gallery — KensGames</title>
+  <meta name="description"
+    content="Original generative and digital fine art by Kenneth Bingham (ButterflyFX). Browse the collection and shop prints on Fine Art America.">
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <link rel="stylesheet" href="/arcade.css">
+  <link rel="canonical" href="https://kensgames.com/gallery/">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ButterflyFX Art Gallery — KensGames">
+  <meta property="og:description"
+    content="Original generative and digital fine art by Kenneth Bingham. Prints on canvas, metal, acrylic and more.">
+  <meta property="og:url" content="https://kensgames.com/gallery/">
+  <meta property="og:image" content="https://kensgames.com/assets/masterImageFile/logo_thumbnail.png">
+  <style>
+    :root {
+      --nc: #00FFFF;
+      --np: #FF00FF;
+      --ny: #FFE800;
+      --ng: #00FF41;
+      --bg: #04040C;
+      --bg-card: rgba(4, 4, 20, 0.94);
+      --text: #E0E0FF;
+      --dim: #8888AA;
+      --c1: #00FFFF;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Canvas background ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.18;
+    }
+
+    /* ── Nav ── */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(4, 4, 20, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(0, 255, 255, 0.12);
+    }
+
+    nav {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      width: 30px;
+      height: 30px;
+    }
+
+    .nav-logo span {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--nc);
+      letter-spacing: 2px;
+    }
+
+    .nav-links {
+      display: flex;
+      list-style: none;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .nav-links a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 0.8rem;
+      letter-spacing: .06em;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--nc);
+    }
+
+    .nav-auth {
+      margin-left: auto;
+    }
+
+    /* ── Page layout ── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 100px 24px 80px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── Hero ── */
+    .gallery-hero {
+      text-align: center;
+      padding: 48px 0 64px;
+    }
+
+    .gallery-eyebrow {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      color: var(--np);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      text-shadow: 0 0 12px var(--np);
+    }
+
+    .gallery-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1rem, 3vw, 1.8rem);
+      color: var(--nc);
+      text-shadow: 0 0 20px rgba(0, 255, 255, .6);
+      letter-spacing: 4px;
+      margin-bottom: 20px;
+    }
+
+    .gallery-sub {
+      font-size: 1.05rem;
+      color: var(--dim);
+      line-height: 1.8;
+      max-width: 640px;
+      margin: 0 auto 36px;
+    }
+
+    .btn-store {
+      display: inline-block;
+      padding: 14px 40px;
+      background: transparent;
+      border: 2px solid var(--nc);
+      color: var(--nc);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background .2s, color .2s, box-shadow .2s;
+      text-transform: uppercase;
+    }
+
+    .btn-store:hover {
+      background: var(--nc);
+      color: #000;
+      box-shadow: 0 0 24px rgba(0, 255, 255, .5);
+    }
+
+    .btn-secondary-link {
+      display: inline-block;
+      margin-left: 14px;
+      padding: 14px 28px;
+      background: transparent;
+      border: 2px solid var(--np);
+      color: var(--np);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background .2s, color .2s;
+    }
+
+    .btn-secondary-link:hover {
+      background: var(--np);
+      color: #000;
+    }
+
+    /* ── Section title ── */
+    .section-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      color: var(--nc);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .section-hr {
+      border: none;
+      border-top: 1px solid rgba(0, 255, 255, .15);
+      margin-bottom: 36px;
+      margin-top: 10px;
+    }
+
+    /* ── Collection categories ── */
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 28px;
+      margin-bottom: 72px;
+    }
+
+    .category-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 255, 255, .15);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color .3s, transform .3s;
+      cursor: pointer;
+    }
+
+    .category-card:hover {
+      border-color: var(--nc);
+      transform: translateY(-4px);
+    }
+
+    .category-thumb {
+      height: 200px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .category-thumb canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .category-symbol {
+      font-size: 56px;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 0 16px currentColor);
+    }
+
+    .category-body {
+      padding: 20px;
+    }
+
+    .category-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      color: var(--nc);
+      margin-bottom: 8px;
+    }
+
+    .category-desc {
+      font-size: 0.85rem;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .category-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      background: rgba(0, 255, 255, .08);
+      border: 1px solid rgba(0, 255, 255, .2);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--nc);
+    }
+
+    /* ── Featured section ── */
+    .featured-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 72px;
+    }
+
+    .art-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(153, 0, 255, .2);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color .3s, box-shadow .3s;
+    }
+
+    .art-card:hover {
+      border-color: var(--np);
+      box-shadow: 0 0 24px rgba(255, 0, 255, .15);
+    }
+
+    .art-preview {
+      height: 220px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .art-preview canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .art-info {
+      padding: 16px;
+    }
+
+    .art-title {
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .art-medium {
+      font-size: 0.78rem;
+      color: var(--dim);
+    }
+
+    /* ── Studio section ── */
+    .studio-section {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 0, 255, .2);
+      border-radius: 12px;
+      padding: 48px 40px;
+      text-align: center;
+      margin-bottom: 72px;
+    }
+
+    .studio-logo {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.7rem, 2vw, 1.1rem);
+      color: var(--np);
+      text-shadow: 0 0 16px var(--np);
+      letter-spacing: 4px;
+      margin-bottom: 16px;
+    }
+
+    .studio-desc {
+      font-size: 0.95rem;
+      color: var(--dim);
+      line-height: 1.9;
+      max-width: 640px;
+      margin: 0 auto 28px;
+    }
+
+    /* ── Media types row ── */
+    .media-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    .media-chip {
+      padding: 6px 16px;
+      background: rgba(255, 232, 0, .07);
+      border: 1px solid rgba(255, 232, 0, .25);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--ny);
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid rgba(0, 255, 255, .08);
+      color: var(--dim);
+      font-size: 0.8rem;
+      line-height: 1.8;
+      position: relative;
+      z-index: 2;
+    }
+
+    footer a {
+      color: var(--nc);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .nav-links {
+        display: none;
+      }
+
+      .btn-secondary-link {
+        margin-left: 0;
+        margin-top: 10px;
+        display: block;
+        text-align: center;
+      }
+
+      .gallery-hero .btn-store {
+        display: block;
+        margin-bottom: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+
+  <header>
+    <nav>
+      <a class="nav-logo" href="/" aria-label="KensGames Home">
+        <img src="/assets/masterImageFile/icon.svg" alt="KG" width="30" height="30" onerror="this.style.display='none'">
+        <span>KENSGAMES</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">Portal</a></li>
+        <li><a href="/gallery/" class="active">Gallery</a></li>
+        <li><a href="https://butterflyfx.us" target="_blank" rel="noopener">ButterflyFX</a></li>
+        <li><a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener">Art Store
+            &#8599;</a></li>
+      </ul>
+      <div class="nav-auth">
+        <div id="access-status"></div>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ── Hero ── -->
+    <section class="gallery-hero">
+      <div class="gallery-eyebrow">&#9670; Art by Kenneth Bingham &#9670;</div>
+      <h1 class="gallery-title">ButterflyFX<br>Art Gallery</h1>
+      <p class="gallery-sub">
+        The same manifold geometry that powers every game on this portal extends into original
+        generative and digital fine art. Algorithmic compositions, photorealistic digital paintings,
+        and prints on premium media.
+      </p>
+      <div>
+        <a class="btn-store" href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener">
+          Shop the Collection &#8599;
+        </a>
+        <a class="btn-secondary-link" href="https://butterflyfx.us" target="_blank" rel="noopener">
+          butterflyfx.us &#8599;
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Collections ── -->
+    <section style="margin-bottom:72px">
+      <div class="section-title">Collections</div>
+      <hr class="section-hr">
+      <div class="category-grid">
+        <a class="category-card" href="https://fineartamerica.com/profiles/kenneth-bingham/shop" target="_blank"
+          rel="noopener" style="text-decoration:none">
+          <div class="category-thumb" style="background:linear-gradient(135deg,#04040C,#1a0033)">
+            <canvas class="thumb-canvas" data-palette="cyan"></canvas>
+            <div class="category-symbol" style="color:var(--nc)">&#9670;</div>
+          </div>
+          <div class="category-body">
+            <div class="category-name">Generative</div>
+            <p class="category-desc">
+              Algorithmic compositions driven by manifold geometry. Every render is unique — no two outputs alike.
+            </p>
+            <span class="category-tag">Browse &#8599;</span>
+          </div>
+        </a>
+
+        <a class="category-card" href="https://fineartamerica.com/profiles/kenneth-bingham/shop" target="_blank"
+          rel="noopener" style="text-decoration:none">
+          <div class="category-thumb" style="background:linear-gradient(135deg,#0D0020,#1a0030)">
+            <canvas class="thumb-canvas" data-palette="purple"></canvas>
+            <div class="category-symbol" style="color:var(--np)">&#9651;</div>
+          </div>
+          <div class="category-body">
+            <div class="category-name" style="color:var(--np)">Digital Fine Art</div>
+            <p class="category-desc">
+              Photorealistic digital paintings — landscapes, abstracts, and dimensional forms available on canvas,
+              metal, and acrylic.
+            </p>
+            <span class="category-tag"
+              style="border-color:rgba(255,0,255,.3);color:var(--np);background:rgba(255,0,255,.06)">Browse
+              &#8599;</span>
+          </div>
+        </a>
+
+        <a class="category-card" href="https://fineartamerica.com/profiles/kenneth-bingham/shop" target="_blank"
+          rel="noopener" style="text-decoration:none">
+          <div class="category-thumb" style="background:linear-gradient(135deg,#0C0A00,#1a1400)">
+            <canvas class="thumb-canvas" data-palette="yellow"></canvas>
+            <div class="category-symbol" style="color:var(--ny)">&#9632;</div>
+          </div>
+          <div class="category-body">
+            <div class="category-name" style="color:var(--ny)">Prints &amp; Products</div>
+            <p class="category-desc">
+              Framed prints, phone cases, tote bags, throw pillows — the geometry travels with you wherever you go.
+            </p>
+            <span class="category-tag"
+              style="border-color:rgba(255,232,0,.3);color:var(--ny);background:rgba(255,232,0,.06)">Browse
+              &#8599;</span>
+          </div>
+        </a>
+
+        <a class="category-card" href="https://fineartamerica.com/profiles/kenneth-bingham/shop" target="_blank"
+          rel="noopener" style="text-decoration:none">
+          <div class="category-thumb" style="background:linear-gradient(135deg,#001a08,#001a20)">
+            <canvas class="thumb-canvas" data-palette="green"></canvas>
+            <div class="category-symbol" style="color:var(--ng)">&#9679;</div>
+          </div>
+          <div class="category-body">
+            <div class="category-name" style="color:var(--ng)">Game Art</div>
+            <p class="category-desc">
+              Art derived from the game engine itself — 3D board renders, particle systems, and manifold surface
+              captures.
+            </p>
+            <span class="category-tag"
+              style="border-color:rgba(0,255,65,.3);color:var(--ng);background:rgba(0,255,65,.06)">Browse &#8599;</span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Preview / Generated works ── -->
+    <section style="margin-bottom:72px">
+      <div class="section-title">Generated Works</div>
+      <hr class="section-hr">
+      <div class="featured-grid" id="generated-grid">
+        <!-- JS-generated preview cards -->
+      </div>
+      <div style="text-align:center">
+        <a class="btn-store" href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener">
+          View Full Collection on Fine Art America &#8599;
+        </a>
+      </div>
+    </section>
+
+    <!-- ── About the studio ── -->
+    <section class="studio-section">
+      <div class="studio-logo">BUTTERFLYFX STUDIO</div>
+      <p class="studio-desc">
+        ButterflyFX is the art &amp; technology studio behind KensGames. Every piece starts with the same
+        mathematical primitives that drive the game engine — manifold surfaces, gyroid structures, and
+        particle fields — then rendered and refined into fine art for physical media.
+      </p>
+      <div class="media-row">
+        <span class="media-chip">Canvas Print</span>
+        <span class="media-chip">Metal Print</span>
+        <span class="media-chip">Acrylic Print</span>
+        <span class="media-chip">Framed Print</span>
+        <span class="media-chip">Phone Case</span>
+        <span class="media-chip">Tote Bag</span>
+        <span class="media-chip">Throw Pillow</span>
+        <span class="media-chip">Digital Download</span>
+      </div>
+      <a class="btn-store" href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener">
+        Open the Store &#8599;
+      </a>
+      <a class="btn-secondary-link" href="https://butterflyfx.us" target="_blank" rel="noopener"
+        style="margin-top:12px">
+        Visit butterflyfx.us &#8599;
+      </a>
+    </section>
+
+  </main>
+
+  <footer>
+    <div>
+      <a href="/">KensGames Portal</a> &nbsp;&middot;&nbsp;
+      <a href="https://butterflyfx.us" target="_blank" rel="noopener">ButterflyFX Studio</a> &nbsp;&middot;&nbsp;
+      <a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener">Fine Art America
+        Store</a> &nbsp;&middot;&nbsp;
+      <a href="/tos/">Terms of Service</a>
+    </div>
+    <div style="margin-top:8px">&copy; Kenneth Bingham &bull; All artworks &amp; code reserved.</div>
+  </footer>
+
+  <script src="/js/access_status.js" defer></script>
+  <script>
+    (function () {
+      // ── Palette definitions ──────────────────────────────────────────────
+      const palettes = {
+        cyan: [[0, 255, 255], [0, 180, 200], [100, 220, 255]],
+        purple: [[180, 0, 255], [255, 0, 180], [100, 0, 200]],
+        yellow: [[255, 232, 0], [255, 140, 0], [200, 200, 0]],
+        green: [[0, 255, 65], [0, 200, 100], [100, 255, 150]],
+      };
+
+      // ── Animated thumbnail canvases ──────────────────────────────────────
+      function animateThumb(canvas, paletteName) {
+        const ctx = canvas.getContext('2d');
+        const cols = palettes[paletteName] || palettes.cyan;
+        const W = canvas.width = canvas.offsetWidth || 260;
+        const H = canvas.height = canvas.offsetHeight || 200;
+
+        const particles = Array.from({ length: 40 }, () => ({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          r: Math.random() * 2 + 0.5,
+          col: cols[Math.floor(Math.random() * cols.length)],
+        }));
+
+        let raf;
+        function draw() {
+          ctx.clearRect(0, 0, W, H);
+          particles.forEach(p => {
+            p.x = (p.x + p.vx + W) % W;
+            p.y = (p.y + p.vy + H) % H;
+            const [r, g, b] = p.col;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+            ctx.fill();
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `rgb(${r},${g},${b})`;
+          });
+          raf = requestAnimationFrame(draw);
+        }
+        draw();
+        return () => cancelAnimationFrame(raf);
+      }
+
+      // ── Animated art preview canvas ──────────────────────────────────────
+      function animateArtPreview(canvas, seed) {
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width = canvas.offsetWidth || 280;
+        const H = canvas.height = canvas.offsetHeight || 220;
+
+        // Seeded pseudo-random
+        let s = seed;
+        function rnd() { s = (s * 1664525 + 1013904223) & 0xFFFFFFFF; return (s >>> 0) / 0xFFFFFFFF; }
+
+        const hue = Math.floor(rnd() * 360);
+        const lines = Array.from({ length: 8 }, () => ({
+          x1: rnd() * W, y1: rnd() * H,
+          x2: rnd() * W, y2: rnd() * H,
+          vx1: (rnd() - 0.5) * 0.4, vy1: (rnd() - 0.5) * 0.4,
+          vx2: (rnd() - 0.5) * 0.4, vy2: (rnd() - 0.5) * 0.4,
+          h: (hue + Math.floor(rnd() * 60)) % 360,
+        }));
+
+        let raf;
+        function draw() {
+          ctx.fillStyle = `rgba(4,4,20,0.08)`;
+          ctx.fillRect(0, 0, W, H);
+          lines.forEach(l => {
+            l.x1 = (l.x1 + l.vx1 + W) % W;
+            l.y1 = (l.y1 + l.vy1 + H) % H;
+            l.x2 = (l.x2 + l.vx2 + W) % W;
+            l.y2 = (l.y2 + l.vy2 + H) % H;
+            ctx.beginPath();
+            ctx.moveTo(l.x1, l.y1);
+            ctx.lineTo(l.x2, l.y2);
+            ctx.strokeStyle = `hsla(${l.h},100%,60%,0.5)`;
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = `hsl(${l.h},100%,60%)`;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          });
+          raf = requestAnimationFrame(draw);
+        }
+        draw();
+        return () => cancelAnimationFrame(raf);
+      }
+
+      // ── Background ambient canvas ──────────────────────────────────────
+      function initBg() {
+        const canvas = document.getElementById('bg-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H;
+        function resize() {
+          W = canvas.width = window.innerWidth;
+          H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const dots = Array.from({ length: 60 }, () => ({
+          x: Math.random() * W, y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2,
+          h: Math.floor(Math.random() * 360), r: Math.random() + 0.5,
+        }));
+
+        function draw() {
+          ctx.clearRect(0, 0, W, H);
+          dots.forEach(d => {
+            d.x = (d.x + d.vx + W) % W;
+            d.y = (d.y + d.vy + H) % H;
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${d.h},100%,60%,0.7)`;
+            ctx.fill();
+          });
+          requestAnimationFrame(draw);
+        }
+        draw();
+      }
+
+      // ── Generated preview cards ───────────────────────────────────────
+      const artworks = [
+        { title: 'Manifold I', medium: 'Generative — Gyroid surface, neon render' },
+        { title: 'Dimensional Drift', medium: 'Digital painting — acrylic / canvas' },
+        { title: 'Tesseract Field', medium: 'Generative — 4D projection, particle trace' },
+        { title: 'Coral Lattice', medium: 'Digital painting — metal print' },
+        { title: 'Void Garden', medium: 'Generative — manifold particle bloom' },
+        { title: 'Signal Horizon', medium: 'Digital painting — framed print' },
+      ];
+
+      function buildGeneratedGrid() {
+        const grid = document.getElementById('generated-grid');
+        if (!grid) return;
+        artworks.forEach((art, i) => {
+          const card = document.createElement('div');
+          card.className = 'art-card';
+          card.innerHTML = `
+        <div class="art-preview">
+          <canvas class="art-canvas" data-seed="${i * 7919 + 1234}"></canvas>
+        </div>
+        <div class="art-info">
+          <div class="art-title">${art.title}</div>
+          <div class="art-medium">${art.medium}</div>
+        </div>
+      `;
+          grid.appendChild(card);
+        });
+      }
+
+      // ── Init ─────────────────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', function () {
+        initBg();
+
+        // Thumbnail canvases
+        document.querySelectorAll('.thumb-canvas').forEach(c => {
+          animateThumb(c, c.dataset.palette || 'cyan');
+        });
+
+        // Generated grid
+        buildGeneratedGrid();
+
+        // Art preview canvases (after grid is built)
+        setTimeout(() => {
+          document.querySelectorAll('.art-canvas').forEach(c => {
+            animateArtPreview(c, parseInt(c.dataset.seed, 10) || 42);
+          });
+        }, 50);
+      });
+    })();
+  </script>
+
+</body>
+
+</html>

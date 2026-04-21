@@ -1,8 +1,8 @@
 /**
- * kg-session.js — Shared KensGames session module
+ * kg_session.js — Shared KensGames session module
  *
  * Include on every authenticated portal/game page:
- *   <script src="/js/kg-session.js"></script>
+ *   <script src="/js/kg_session.js"></script>
  *
  * What it does:
  *   1. Reads kg_token from localStorage

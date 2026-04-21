@@ -10,7 +10,24 @@
 
     <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
+    <link rel="canonical" href="https://kensgames.com/">
     <link rel="stylesheet" href="/lib/fonts/fonts.css">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="KensGames">
+    <meta property="og:title" content="KensGames &mdash; Free Arcade Games | kensgames.com">
+    <meta property="og:description"
+        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D TicTacToe and Assemble. Free browser games, no installs, no ads. Powered by a geometry-driven engine built from scratch.">
+    <meta property="og:url" content="https://kensgames.com/">
+    <meta property="og:image" content="https://kensgames.com/assets/masterImageFile/logo_thumbnail.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="KensGames &mdash; Free Arcade Games | kensgames.com">
+    <meta name="twitter:description"
+        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D TicTacToe and Assemble. Free browser games, no installs, no ads.">
+    <meta name="twitter:image" content="https://kensgames.com/assets/masterImageFile/logo_thumbnail.png">
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
@@ -991,6 +1008,130 @@
         }
 
         /* ══════════════════════════════════════
+           SUBSTRATE SECTION
+           ══════════════════════════════════════ */
+        .substrate-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 255, 255, .1);
+            border-radius: 8px;
+            padding: 14px 20px;
+            flex-wrap: wrap;
+            transition: border-color .2s;
+        }
+
+        .substrate-row:hover {
+            border-color: rgba(0, 255, 255, .28);
+        }
+
+        .sub-game {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            color: var(--text);
+            min-width: 160px;
+        }
+
+        .sub-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sub-pill {
+            display: inline-block;
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            padding: 2px 9px;
+            border-radius: 20px;
+            border: 1.5px solid;
+        }
+
+        .sub-pill-cyan {
+            background: rgba(0, 255, 255, .1);
+            color: var(--neon-cyan);
+            border-color: rgba(0, 255, 255, .3);
+        }
+
+        .sub-pill-purple {
+            background: rgba(153, 0, 255, .1);
+            color: var(--neon-purple);
+            border-color: rgba(153, 0, 255, .3);
+        }
+
+        .sub-pill-pink {
+            background: rgba(255, 0, 255, .1);
+            color: #FF00FF;
+            border-color: rgba(255, 0, 255, .3);
+        }
+
+        .sub-pill-yellow {
+            background: rgba(255, 232, 0, .1);
+            color: var(--neon-yellow);
+            border-color: rgba(255, 232, 0, .3);
+        }
+
+        .sub-bytes {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            min-width: 60px;
+        }
+
+        .sub-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            flex: 1;
+        }
+
+        .sub-tag {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            background: rgba(136, 136, 170, .1);
+            color: var(--text-muted);
+            border: 1px solid rgba(136, 136, 170, .15);
+        }
+
+        .domain-chip {
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid;
+            letter-spacing: .03em;
+        }
+
+        .domain-cyan {
+            background: rgba(0, 255, 255, .06);
+            color: var(--neon-cyan);
+            border-color: rgba(0, 255, 255, .2);
+        }
+
+        .domain-purple {
+            background: rgba(153, 0, 255, .06);
+            color: var(--neon-purple);
+            border-color: rgba(153, 0, 255, .2);
+        }
+
+        .domain-green {
+            background: rgba(0, 255, 65, .06);
+            color: var(--neon-green);
+            border-color: rgba(0, 255, 65, .2);
+        }
+
+        .domain-yellow {
+            background: rgba(255, 232, 0, .06);
+            color: var(--neon-yellow);
+            border-color: rgba(255, 232, 0, .2);
+        }
+
+        /* ══════════════════════════════════════
            BENCHMARKS STRIP
            ══════════════════════════════════════ */
         .benchmarks {
@@ -1042,6 +1183,12 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 80px 40px;
+        }
+
+        /* Dark tinted backdrop so text stays readable over the bright gyroid canvas */
+        section.page-section {
+            max-width: 100%;
+            background: rgba(4, 4, 12, 0.82);
         }
 
         .section-header {
@@ -1347,12 +1494,45 @@
             border-radius: 6px;
             padding: 28px;
             transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
         }
 
         .upcoming-card:hover {
             border-color: var(--neon-pink);
             box-shadow: 0 0 16px rgba(255, 0, 255, 0.2);
             transform: translateY(-3px);
+        }
+
+        /* Protocol 3.8 — skeleton shimmer */
+        @keyframes skeleton-shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .upcoming-card[data-status="skeleton"]::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg,
+                    transparent 0%,
+                    rgba(255, 0, 255, 0.06) 40%,
+                    rgba(0, 255, 255, 0.08) 50%,
+                    rgba(255, 0, 255, 0.06) 60%,
+                    transparent 100%);
+            animation: skeleton-shimmer 2.4s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .upcoming-card[data-status="skeleton"]>* {
+            position: relative;
+            z-index: 1;
         }
 
         .upcoming-title {
@@ -1376,6 +1556,34 @@
             font-size: 10px;
             color: var(--neon-pink);
             letter-spacing: 1px;
+        }
+
+        /* Protocol 3.8 — Notify Me button */
+        .upcoming-notify-btn {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 5px 14px;
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--neon-green);
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+
+        .upcoming-notify-btn:hover:not([data-notified="true"]) {
+            background: rgba(34, 255, 20, 0.1);
+            box-shadow: 0 0 8px rgba(34, 255, 20, 0.3);
+        }
+
+        .upcoming-notify-btn[data-notified="true"] {
+            color: var(--text-muted);
+            border-color: var(--text-muted);
+            cursor: default;
         }
 
         /* ══════════════════════════════════════
@@ -1889,6 +2097,125 @@
                 font-size: 22px;
             }
         }
+
+        /* ── Directive 2.2 — Mobile Responsiveness ──────────────────────── */
+
+        /* Math notation & theorem blocks: horizontally scrollable on mobile */
+        .proof-scroll-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
+        }
+
+        /* Gradient fade on right edge to indicate scrollability */
+        .proof-scroll-wrap::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 32px;
+            background: linear-gradient(to right, transparent, rgba(4, 4, 20, 0.85));
+            pointer-events: none;
+        }
+
+        /* Inline code in theorems: wrap at operator boundaries */
+        .theorem-expr {
+            font-family: 'Courier New', monospace;
+            font-size: clamp(11px, 1.1vw, 14px);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            display: inline-block;
+        }
+
+        /* Theorem cards responsive font */
+        .manifold-proof-section {
+            font-size: clamp(12px, 1.1vw, 14px);
+        }
+
+        /* Touch targets: all interactive elements ≥ 44×44px (WCAG) */
+        .btn-play,
+        .btn-solo,
+        .btn-green,
+        .nav-link,
+        a.btn-play {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Module count table → card layout below 600px */
+        @media (max-width: 600px) {
+            .module-table {
+                display: none;
+            }
+
+            .module-cards {
+                display: flex !important;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .module-card {
+                background: rgba(0, 255, 255, 0.04);
+                border: 1px solid rgba(0, 255, 255, 0.12);
+                border-radius: 4px;
+                padding: 10px 14px;
+            }
+
+            .module-card .mc-title {
+                font-family: var(--font-arcade);
+                font-size: 11px;
+                color: var(--neon-cyan);
+                letter-spacing: .08em;
+                margin-bottom: 6px;
+            }
+
+            .module-card .mc-row {
+                display: flex;
+                justify-content: space-between;
+                font-size: 12px;
+                color: var(--text-muted);
+                padding: 2px 0;
+            }
+
+            .module-card .mc-val {
+                color: var(--text);
+            }
+        }
+
+        @media (max-width: 768px) {
+
+            /* Hero text scales down gracefully */
+            .hero-copy h1 {
+                font-size: clamp(2.2rem, 8vw, 4rem);
+            }
+
+            .hero-copy p {
+                font-size: clamp(13px, 1.4vw, 16px);
+            }
+
+            /* Proof/theorem sections: ensure no overflow */
+            .proof-scroll-wrap {
+                margin: 0 -4px;
+                padding: 0 4px;
+            }
+        }
+
+        @media (max-width: 414px) {
+            .hero-copy h1 {
+                font-size: clamp(1.8rem, 9vw, 2.8rem);
+            }
+        }
+
+        @media (max-width: 320px) {
+            .hero-copy h1 {
+                font-size: 1.6rem;
+            }
+
+            .hero-sub {
+                font-size: 11px;
+            }
+        }
     </style>
     <script src="/js/analytics.js"></script>
     <script src="/js/imgatlas.js?v=20260418" defer></script>
@@ -1965,13 +2292,19 @@
                 <li><a href="#games">Games</a></li>
                 <li><a href="#engine">The Engine</a></li>
                 <li><a href="#upcoming">Coming Soon</a></li>
+                <li><a href="/gallery/">Art Gallery</a></li>
+                <li><a href="#art-store">Art Store</a></li>
                 <li><a href="#about">About</a></li>
                 <li><a href="/manifold.html">Manifold</a></li>
+                <li><a href="#substrates">Under the Hood</a></li>
                 <li><a href="#tos">Terms</a></li>
             </ul>
             <div class="nav-auth">
                 <div id="kg-player" style="display:none"></div>
                 <div id="access-status"></div>
+                <div id="kg-online"
+                    style="font-size:11px;color:var(--neon-green);letter-spacing:.06em;opacity:0;transition:opacity .4s"
+                    aria-live="polite"></div>
             </div>
         </nav>
     </header>
@@ -2011,7 +2344,7 @@
                 <h1>MANI<span class="accent">FOLD</span></h1>
                 <div class="hero-sub"><span style="color:var(--neon-yellow);letter-spacing:.08em">A Primitive Shape as a
                         Programming Language</span></div>
-                <p>I developed a new paradigm built from a single primitive: the
+                <p>A new paradigm built from a single primitive: the
                     <strong style="color:var(--neon-cyan)">manifold</strong>, a geometric shape whose
                     curves and waveforms contain every program that can be derived from it.
                     The <strong style="color:var(--neon-purple)">gyroid</strong> rendered behind you is that primitive,
@@ -2035,6 +2368,14 @@
                 </div>
                 <div class="hero-note">Sign in to play free for a limited time &nbsp;&#9632;&nbsp; No credit card
                     required</div>
+                <!-- Directive 2.3 — Casual visitor fast-path -->
+                <div style="margin-top:18px">
+                    <a href="#games" id="skip-to-games"
+                        style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;text-decoration:none;opacity:.7;transition:opacity .2s"
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'"
+                        onclick="document.getElementById('games').scrollIntoView({behavior:'smooth'});return false;">&#8595;
+                        Skip to Games</a>
+                </div>
             </div>
 
             <div class="arcade-wall" aria-label="Arcade consoles">
@@ -2066,8 +2407,12 @@
                         <div style="display:flex;gap:4px;flex-wrap:wrap;">
                             <button class="go"
                                 style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
-                                onclick="location.href='/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium'">&#9654;
+                                onclick="goToGameSolo('/fasttrack/')">&#9654;
                                 SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="go kg-multi" onclick="goToGameHost('/fasttrack/')">📨 INVITE</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
                             <span class="kg-tip-wrap" style="flex:1;">
                                 <button class="go kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
                                     MULTI</button>
@@ -2105,7 +2450,12 @@
                         <div style="display:flex;gap:4px;flex-wrap:wrap;">
                             <button class="go"
                                 style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
-                                onclick="location.href='/brickbreaker3d/game.html?offline=true'">&#9654; SOLO</button>
+                                onclick="goToGameSolo('/brickbreaker3d/')">&#9654; SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="go kg-multi" onclick="goToGameHost('/brickbreaker3d/')">📨
+                                    INVITE</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
                             <span class="kg-tip-wrap" style="flex:1;">
                                 <button class="go kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
                                     MULTI</button>
@@ -2143,7 +2493,11 @@
                         <div style="display:flex;gap:4px;flex-wrap:wrap;">
                             <button class="go"
                                 style="font-size:9px;padding:6px 8px;color:var(--neon-yellow);border-color:var(--neon-yellow);"
-                                onclick="location.href='/starfighter/game.html?offline=true'">&#9654; SOLO</button>
+                                onclick="goToGameSolo('/starfighter/')">&#9654; SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="go kg-multi" onclick="goToGameHost('/starfighter/')">📨 INVITE</button>
+                                <span class="kg-tip">Sign in to unlock</span>
+                            </span>
                             <span class="kg-tip-wrap" style="flex:1;">
                                 <button class="go kg-multi" onclick="goToGame('/starfighter/')">&#9654;&#9654;
                                     MULTI</button>
@@ -2174,7 +2528,7 @@
         </div>
         <div class="games-grid">
 
-            <div class="game-card">
+            <div class="game-card" id="game-fasttrack">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
                     <picture>
                         <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
@@ -2197,19 +2551,22 @@
                             Features 5-Card Draw variant for high-stakes rounds. Skill always wins.</div>
                     </div>
                     <div class="game-btns">
-                        <button class="btn-solo"
-                            onclick="location.href='/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium'">&#9654;
-                            PLAY SOLO</button>
+                        <button class="btn-solo" onclick="goToGameSolo('/fasttrack/')">&#9654; PLAY SOLO</button>
+                        <span class="kg-tip-wrap">
+                            <button class="btn-green kg-multi" onclick="goToGameHost('/fasttrack/')">&#128232;
+                                INVITE</button>
+                            <span class="kg-tip" id="tip-card-fasttrack">Sign in to unlock multiplayer</span>
+                        </span>
                         <span class="kg-tip-wrap" style="flex:1;">
                             <button class="btn-green kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
-                                MULTIPLAYER</button>
-                            <span class="kg-tip" id="tip-card-fasttrack">Sign in to unlock multiplayer</span>
+                                MULTI</button>
+                            <span class="kg-tip">Sign in to unlock multiplayer</span>
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div class="game-card">
+            <div class="game-card" id="game-brickbreaker">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#0a0518);">
                     <picture>
                         <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
@@ -2240,18 +2597,22 @@
                             tracks every point. Solo or head-to-head: who clears the board fastest?</div>
                     </div>
                     <div class="game-btns">
-                        <button class="btn-solo"
-                            onclick="location.href='/brickbreaker3d/game.html?offline=true'">&#9654; PLAY SOLO</button>
+                        <button class="btn-solo" onclick="goToGameSolo('/brickbreaker3d/')">&#9654; PLAY SOLO</button>
+                        <span class="kg-tip-wrap">
+                            <button class="btn-green kg-multi" onclick="goToGameHost('/brickbreaker3d/')">&#128232;
+                                INVITE</button>
+                            <span class="kg-tip" id="tip-card-brickbreaker">Sign in to unlock multiplayer</span>
+                        </span>
                         <span class="kg-tip-wrap" style="flex:1;">
                             <button class="btn-green kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
-                                MULTIPLAYER</button>
-                            <span class="kg-tip" id="tip-card-brickbreaker">Sign in to unlock multiplayer</span>
+                                MULTI</button>
+                            <span class="kg-tip">Sign in to unlock multiplayer</span>
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div class="game-card">
+            <div class="game-card" id="game-starfighter">
                 <div class="game-image" style="background:linear-gradient(135deg,#0a1a2d,#020814);">
                     <picture>
                         <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
@@ -2275,12 +2636,16 @@
                     </div>
                     <div>
                         <div class="game-btns">
-                            <button class="btn-solo"
-                                onclick="location.href='/starfighter/game.html?offline=true'">&#9654; PLAY SOLO</button>
+                            <button class="btn-solo" onclick="goToGameSolo('/starfighter/')">&#9654; PLAY SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="btn-green kg-multi" onclick="goToGameHost('/starfighter/')">&#128232;
+                                    INVITE</button>
+                                <span class="kg-tip" id="tip-card-starfighter">Sign in to unlock multiplayer</span>
+                            </span>
                             <span class="kg-tip-wrap" style="flex:1;">
                                 <button class="btn-green kg-multi" onclick="goToGame('/starfighter/')">&#9654;&#9654;
-                                    MULTIPLAYER</button>
-                                <span class="kg-tip" id="tip-card-starfighter">Sign in to unlock multiplayer</span>
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock multiplayer</span>
                             </span>
                         </div>
                         <div class="game-download-link">
@@ -2293,7 +2658,7 @@
                 </div>
             </div>
 
-            <div class="game-card">
+            <div class="game-card" id="game-tictactoe">
                 <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
                     <picture>
                         <source srcset="/assets/masterImageFile/manifold.webp" type="image/webp">
@@ -2316,18 +2681,22 @@
                             solo against the AI, pass-and-play locally, or challenge a friend online.</div>
                     </div>
                     <div class="game-btns">
-                        <button class="btn-solo" onclick="location.href='/4DTicTacToe/game.html?offline=true'">&#9654;
-                            PLAY SOLO</button>
-                        <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/4DTicTacToe/')">&#9654;&#9654;
-                                MULTIPLAYER</button>
+                        <button class="btn-solo" onclick="goToGameSolo('/4dtictactoe/')">&#9654; PLAY SOLO</button>
+                        <span class="kg-tip-wrap">
+                            <button class="btn-green kg-multi" onclick="goToGameHost('/4dtictactoe/')">&#128232;
+                                INVITE</button>
                             <span class="kg-tip" id="tip-card-4d">Sign in to unlock multiplayer</span>
+                        </span>
+                        <span class="kg-tip-wrap" style="flex:1;">
+                            <button class="btn-green kg-multi" onclick="goToGame('/4dtictactoe/')">&#9654;&#9654;
+                                MULTI</button>
+                            <span class="kg-tip">Sign in to unlock multiplayer</span>
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div class="game-card">
+            <div class="game-card" id="game-assemble">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
                     <picture>
                         <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
@@ -2358,11 +2727,15 @@
                             sound, it runs. If not, watch it fail spectacularly.</div>
                     </div>
                     <div class="game-btns">
-                        <button class="btn-solo" onclick="location.href='/assemble/game.html?offline=true'">&#9654; PLAY
-                            SOLO</button>
+                        <button class="btn-solo" onclick="goToGameSolo('/assemble/')">&#9654; PLAY SOLO</button>
+                        <span class="kg-tip-wrap">
+                            <button class="btn-green kg-multi" onclick="goToGameHost('/assemble/')">&#128232;
+                                INVITE</button>
+                            <span class="kg-tip" id="tip-card-assemble-invite">Sign in to unlock multiplayer</span>
+                        </span>
                         <span class="kg-tip-wrap" style="flex:1;">
                             <button class="btn-green kg-multi" onclick="goToGame('/assemble/')">&#9654;&#9654;
-                                MULTIPLAYER</button>
+                                MULTI</button>
                             <span class="kg-tip" id="tip-card-assemble">Sign in to unlock multiplayer</span>
                         </span>
                     </div>
@@ -2421,30 +2794,109 @@
             <h2 class="section-title">Coming Soon</h2>
         </div>
         <div class="upcoming-grid">
-            <div class="upcoming-card">
-                <div class="upcoming-title">Geometry Wars 2D</div>
+            <div class="upcoming-card" id="upcoming-geowars" data-status="skeleton">
+                <a class="upcoming-title" href="/geowars/"
+                    style="color:inherit;text-decoration:none;display:block">Geometry Wars 2D</a>
                 <div class="upcoming-desc">Twin-stick chaos where the arena itself shifts and folds. Every wave changes
                     the rules of the space you fight in.</div>
                 <div class="upcoming-eta">&#9660; Q3 2026</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                    <button class="upcoming-notify-btn" data-game="geowars" onclick="kgNotify(this)">Notify Me</button>
+                    <a href="/geowars/"
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-decoration:none;opacity:0.7">Learn
+                        More &#8594;</a>
+                </div>
             </div>
-            <div class="upcoming-card">
-                <div class="upcoming-title">Manifold Racer</div>
+            <div class="upcoming-card" id="upcoming-racer" data-status="skeleton">
+                <a class="upcoming-title" href="/racer/"
+                    style="color:inherit;text-decoration:none;display:block">Manifold Racer</a>
                 <div class="upcoming-desc">Tracks that curve through impossible geometry. The fastest line isn&rsquo;t
                     always straight.</div>
                 <div class="upcoming-eta">&#9660; Q3 2026</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                    <button class="upcoming-notify-btn" data-game="racer" onclick="kgNotify(this)">Notify Me</button>
+                    <a href="/racer/"
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-decoration:none;opacity:0.7">Learn
+                        More &#8594;</a>
+                </div>
             </div>
-            <div class="upcoming-card">
-                <div class="upcoming-title">Grid Dungeon</div>
+            <div class="upcoming-card" id="upcoming-dungeon" data-status="skeleton">
+                <a class="upcoming-title" href="/dungeon/" style="color:inherit;text-decoration:none;display:block">Grid
+                    Dungeon</a>
                 <div class="upcoming-desc">Turn-based dungeon crawler with infinite procedural maps generated by the
                     same engine powering every KensGames title.</div>
                 <div class="upcoming-eta">&#9660; Q4 2026</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                    <button class="upcoming-notify-btn" data-game="dungeon" onclick="kgNotify(this)">Notify Me</button>
+                    <a href="/dungeon/"
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-decoration:none;opacity:0.7">Learn
+                        More &#8594;</a>
+                </div>
             </div>
-            <div class="upcoming-card">
-                <div class="upcoming-title">Surface Siege</div>
+            <div class="upcoming-card" id="upcoming-siege" data-status="skeleton">
+                <a class="upcoming-title" href="/siege/"
+                    style="color:inherit;text-decoration:none;display:block">Surface Siege</a>
                 <div class="upcoming-desc">Real-time strategy where territory expands and contracts across a living
                     mathematical landscape.</div>
                 <div class="upcoming-eta">&#9660; Q4 2026</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                    <button class="upcoming-notify-btn" data-game="siege" onclick="kgNotify(this)">Notify Me</button>
+                    <a href="/siege/"
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-decoration:none;opacity:0.7">Learn
+                        More &#8594;</a>
+                </div>
             </div>
+        </div>
+    </section>
+
+    <!-- Directive 2.5 — Art Store section -->
+    <section class="page-section" id="art-store">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; Digital &amp; Generative Art &#9632;</div>
+            <h2 class="section-title">Art Store</h2>
+        </div>
+        <div style="max-width:900px;margin:0 auto;text-align:center">
+            <p style="font-size:16px;color:var(--text-muted);line-height:1.9;margin-bottom:32px">
+                The same mathematical precision that drives every game here extends into generative and digital fine
+                art.
+                Original works printed on canvas, metal, acrylic, and more &mdash; each piece produced from the same
+                geometric primitives that power the engine.
+            </p>
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;margin-bottom:36px">
+                <div
+                    style="background:var(--bg-card);border:1px solid var(--neon-purple);border-radius:8px;padding:24px">
+                    <div style="font-size:28px;margin-bottom:12px">&#9670;</div>
+                    <div
+                        style="font-size:13px;color:var(--neon-cyan);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase">
+                        Generative</div>
+                    <div style="font-size:14px;color:var(--text-muted);line-height:1.7">Algorithmic compositions driven
+                        by manifold geometry. No two runs are alike.</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--neon-cyan);border-radius:8px;padding:24px">
+                    <div style="font-size:28px;margin-bottom:12px">&#9651;</div>
+                    <div
+                        style="font-size:13px;color:var(--neon-yellow);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase">
+                        Digital Fine Art</div>
+                    <div style="font-size:14px;color:var(--text-muted);line-height:1.7">Photorealistic digital paintings
+                        available on canvas, metal, and acrylic.</div>
+                </div>
+                <div
+                    style="background:var(--bg-card);border:1px solid var(--neon-yellow);border-radius:8px;padding:24px">
+                    <div style="font-size:28px;margin-bottom:12px">&#9632;</div>
+                    <div
+                        style="font-size:13px;color:var(--neon-pink);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase">
+                        Prints &amp; More</div>
+                    <div style="font-size:14px;color:var(--text-muted);line-height:1.7">Framed prints, phone cases, tote
+                        bags &mdash; the geometry travels with you.</div>
+                </div>
+            </div>
+            <a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener"
+                style="display:inline-block;padding:14px 36px;background:transparent;border:2px solid var(--neon-cyan);color:var(--neon-cyan);font-size:14px;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;border-radius:4px;transition:background .2s,color .2s"
+                onmouseover="this.style.background='var(--neon-cyan)';this.style.color='#000'"
+                onmouseout="this.style.background='transparent';this.style.color='var(--neon-cyan)'">
+                Browse the Collection &#8599;
+            </a>
         </div>
     </section>
 
@@ -2472,6 +2924,8 @@
                             <a onclick="switchTab('forgot')"
                                 style="font-size:11px;color:var(--text-muted);cursor:pointer;">Forgot password?</a>
                         </div>
+                        <div class="cf-turnstile" id="login-turnstile" data-sitekey="0x4AAAAAAC_uN7CPKfVyy0fj"
+                            data-theme="dark" style="margin-bottom:8px;"></div>
                         <button type="submit" class="form-submit">&#9654; SIGN IN</button>
                         <div class="form-msg" id="login-msg"></div>
                     </form>
@@ -2654,7 +3108,7 @@
                     <div style="font-size:10px;color:var(--neon-purple);font-weight:700;letter-spacing:.05em">Schwartz
                         Diamond
                     </div>
-                    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">entity priority ordering</div>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">fork priority ordering</div>
                 </div>
                 <div
                     style="background:var(--bg-card);border:1.5px solid rgba(0,255,65,.18);border-radius:8px;padding:20px 12px">
@@ -2665,6 +3119,808 @@
                     <div style="font-size:10px;color:var(--text-muted);margin-top:4px">derived coordinate</div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <!-- ── SUBSTRATES & MANIFOLDS ──────────────────────────── -->
+    <section class="page-section" id="substrates">
+        <div class="section-header">
+            <div class="section-eyebrow">&#9632; Under the Hood &#9632;</div>
+            <h2 class="section-title">Substrates &amp; Manifolds</h2>
+            <p style="color:var(--text-muted);font-size:13px;max-width:560px;margin:0 auto;line-height:1.8">
+                Every system in every game is a <strong style="color:var(--neon-cyan)">substrate</strong> &mdash; a
+                self-contained module that
+                publishes and reads coordinates on a shared geometric surface rather than
+                calling other code directly. No event buses. No callback chains.
+                Just positions on a manifold.
+            </p>
+        </div>
+
+        <!-- Headline stats -->
+        <div
+            style="max-width:900px;margin:0 auto 32px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center">
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(0,255,255,.15);border-radius:10px;padding:24px 12px">
+                <div style="font-family:var(--font-arcade);font-size:2rem;color:var(--neon-cyan);line-height:1">185
+                </div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:6px;letter-spacing:.06em">PRODUCTION
+                    MODULES</div>
+            </div>
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(153,0,255,.15);border-radius:10px;padding:24px 12px">
+                <div style="font-family:var(--font-arcade);font-size:2rem;color:var(--neon-purple);line-height:1">
+                    4.78<span style="font-size:1rem">MB</span></div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:6px;letter-spacing:.06em">PLATFORM LOGIC
+                </div>
+            </div>
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(0,255,65,.15);border-radius:10px;padding:24px 12px">
+                <div style="font-family:var(--font-arcade);font-size:2rem;color:var(--neon-green);line-height:1">
+                    368<span style="font-size:1rem">KB</span></div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:6px;letter-spacing:.06em">SHARED
+                    CROSS-TITLE</div>
+            </div>
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(255,232,0,.15);border-radius:10px;padding:24px 12px">
+                <div style="font-family:var(--font-arcade);font-size:2rem;color:var(--neon-yellow);line-height:1">0
+                </div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:6px;letter-spacing:.06em">EVENT BUSES
+                </div>
+            </div>
+        </div>
+
+        <!-- Without vs With comparison -->
+        <div
+            style="max-width:900px;margin:0 auto 56px;background:var(--bg-card);border:1.5px solid rgba(0,255,255,.1);border-radius:12px;padding:28px 32px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-cyan);margin-bottom:20px;text-align:center">
+                &#9632; THE COST OF DOING IT THE OLD WAY &#9632;</div>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center">
+                <!-- Without column -->
+                <div style="text-align:center;padding:16px">
+                    <div
+                        style="font-size:10px;color:var(--text-muted);letter-spacing:.1em;margin-bottom:10px;text-transform:uppercase">
+                        Duplicated Per Title</div>
+                    <div style="font-family:var(--font-arcade);font-size:2.4rem;color:#ff4466;line-height:1">~6.25<span
+                            style="font-size:1.1rem">MB</span></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">5 titles &times;
+                        full
+                        stack each<br>368KB shared layer &times;5<br>auth, lobby, AI, audio, social</div>
+                </div>
+                <!-- Arrow divider -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 24px">
+                    <div style="font-family:var(--font-arcade);font-size:2rem;color:var(--neon-green)">5&times;</div>
+                    <div style="font-size:9px;letter-spacing:.08em;color:var(--neon-green);text-transform:uppercase">
+                        leverage</div>
+                    <div style="width:1px;height:40px;background:rgba(0,255,255,.15)"></div>
+                    <div style="font-size:18px;color:var(--text-muted)">&#9660;</div>
+                </div>
+                <!-- With column -->
+                <div style="text-align:center;padding:16px">
+                    <div
+                        style="font-size:10px;color:var(--text-muted);letter-spacing:.1em;margin-bottom:10px;text-transform:uppercase">
+                        Via Manifold Sharing</div>
+                    <div style="font-family:var(--font-arcade);font-size:2.4rem;color:var(--neon-green);line-height:1">
+                        4.78<span style="font-size:1.1rem">MB</span></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">46 modules serve
+                        all 5 titles<br>1.47MB written once<br>nothing duplicated</div>
+                </div>
+            </div>
+            <div
+                style="border-top:1px solid rgba(0,255,255,.08);margin-top:20px;padding-top:16px;text-align:center;font-size:12px;color:var(--text-muted);line-height:1.7">
+                46 shared substrate modules serve all 5 titles. 5&times; leverage. <strong
+                    style="color:var(--text)">1.47MB of infrastructure written once</strong> instead of five times
+                &mdash; not compressed, not minified. Simply never duplicated.
+            </div>
+        </div>
+
+        <!-- Per-game breakdown -->
+        <div style="max-width:900px;margin:0 auto 48px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-purple);margin-bottom:20px;text-align:center">
+                &#9632; PER-TITLE DEPLOYMENT &#9632;</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+
+                <div class="substrate-row">
+                    <div class="sub-game">FastTrack</div>
+                    <div class="sub-count"><span class="sub-pill sub-pill-cyan">96</span> modules</div>
+                    <div class="sub-bytes">3.1 MB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">rules</span><span class="sub-tag">AI</span><span
+                            class="sub-tag">audio</span><span class="sub-tag">cards</span><span class="sub-tag">3D
+                            board</span><span class="sub-tag">lobby</span><span class="sub-tag">social</span><span
+                            class="sub-tag">commentary</span><span class="sub-tag">VR</span><span
+                            class="sub-tag">touch</span><span class="sub-tag">+86</span>
+                    </div>
+                </div>
+
+                <div class="substrate-row">
+                    <div class="sub-game">Alien Space Attack</div>
+                    <div class="sub-count"><span class="sub-pill sub-pill-purple">33</span> modules</div>
+                    <div class="sub-bytes">1.2 MB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">geometry</span><span class="sub-tag">audio</span><span class="sub-tag">AI
+                            entities</span><span class="sub-tag">kernel</span><span class="sub-tag">native</span><span
+                            class="sub-tag">spectrum</span><span class="sub-tag">ANPC</span><span class="sub-tag">hive
+                            mind</span>
+                    </div>
+                </div>
+
+                <div class="substrate-row">
+                    <div class="sub-game">BrickBreaker 3D</div>
+                    <div class="sub-count"><span class="sub-pill sub-pill-pink">7</span> modules</div>
+                    <div class="sub-bytes">125 KB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">manifold bridge</span><span class="sub-tag">3D renderer</span><span
+                            class="sub-tag">game engine</span>
+                    </div>
+                </div>
+
+                <div class="substrate-row">
+                    <div class="sub-game">4D TicTacToe</div>
+                    <div class="sub-count"><span class="sub-pill sub-pill-yellow">1</span> module</div>
+                    <div class="sub-bytes">2 KB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">board manifold substrate</span>
+                    </div>
+                </div>
+
+                <div class="substrate-row">
+                    <div class="sub-game">Assemble</div>
+                    <div class="sub-count"><span class="sub-pill"
+                            style="background:rgba(136,136,170,.15);color:var(--text-muted);border-color:rgba(136,136,170,.2)">2</span>
+                        modules
+                    </div>
+                    <div class="sub-bytes">68 KB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">assembler engine</span><span class="sub-tag">parts manifold</span>
+                    </div>
+                </div>
+
+                <div class="substrate-row">
+                    <div class="sub-game" style="color:var(--neon-cyan)">Shared /js/ Layer</div>
+                    <div class="sub-count"><span class="sub-pill sub-pill-cyan">46</span> modules</div>
+                    <div class="sub-bytes">368 KB</div>
+                    <div class="sub-tags">
+                        <span class="sub-tag">auth</span><span class="sub-tag">avatar</span><span
+                            class="sub-tag">lobby</span><span class="sub-tag">social</span><span
+                            class="sub-tag">analytics</span><span class="sub-tag">leaderboard</span><span
+                            class="sub-tag">profile</span><span class="sub-tag">friends</span><span
+                            class="sub-tag">guild</span><span class="sub-tag">&times;5 titles</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Domain cloud -->
+        <div style="max-width:820px;margin:0 auto 48px;text-align:center">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-purple);margin-bottom:20px">
+                &#9632; DOMAINS COVERED &#9632;</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+                <span class="domain-chip domain-cyan">Game Rules</span>
+                <span class="domain-chip domain-purple">Move Generation</span>
+                <span class="domain-chip domain-cyan">AI &amp; Decisions</span>
+                <span class="domain-chip domain-green">Audio Engine</span>
+                <span class="domain-chip domain-green">Music &amp; Ragtime</span>
+                <span class="domain-chip domain-yellow">3D Rendering</span>
+                <span class="domain-chip domain-yellow">Camera</span>
+                <span class="domain-chip domain-purple">VR Support</span>
+                <span class="domain-chip domain-cyan">Authentication</span>
+                <span class="domain-chip domain-cyan">Lobby &amp; Matchmaking</span>
+                <span class="domain-chip domain-green">Avatar System</span>
+                <span class="domain-chip domain-purple">Social Graph</span>
+                <span class="domain-chip domain-yellow">Commentary</span>
+                <span class="domain-chip domain-cyan">Crowd Simulation</span>
+                <span class="domain-chip domain-green">Analytics</span>
+                <span class="domain-chip domain-purple">SEO</span>
+                <span class="domain-chip domain-yellow">PWA</span>
+                <span class="domain-chip domain-cyan">Touch Input</span>
+                <span class="domain-chip domain-green">State Management</span>
+                <span class="domain-chip domain-purple">Validation</span>
+                <span class="domain-chip domain-yellow">Growth</span>
+                <span class="domain-chip domain-cyan">UI Interaction</span>
+                <span class="domain-chip domain-green">Observation</span>
+                <span class="domain-chip domain-purple">Spatial Geometry</span>
+            </div>
+        </div>
+
+        <!-- What is a substrate callout -->
+        <div
+            style="max-width:720px;margin:0 auto 24px;background:var(--bg-card);border:1.5px solid rgba(0,255,255,.12);border-left:3px solid var(--neon-cyan);border-radius:8px;padding:28px 32px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-cyan);margin-bottom:12px">
+                WHAT IS A SUBSTRATE?</div>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.9;margin-bottom:12px">
+                A substrate is a <strong style="color:var(--text)">lens</strong>. The manifold is a shared geometric
+                surface where all system state lives as coordinates &mdash; positions on a mathematical surface, not
+                variables in memory. A substrate points at a region of that surface and converts what it sees into
+                computer-usable code: a rendered image, a sound wave, a decision, a network packet.
+            </p>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.9;margin-bottom:12px">
+                The manifold doesn&rsquo;t know the substrate exists. The substrate doesn&rsquo;t know any other
+                substrate exists. There are no imports, no function calls, no event subscriptions between them. Each
+                lens independently reads the coordinates it cares about and produces its output. The coordination is in
+                the geometry &mdash; when a coordinate moves, every substrate whose lens covers that region responds on
+                its own next read cycle.
+            </p>
+            <p style="font-size:14px;color:var(--text-muted);line-height:1.9;margin-bottom:0">
+                When FastTrack&rsquo;s crowd system needs to react to the board state, it doesn&rsquo;t call the board.
+                It focuses its lens on the board&rsquo;s region of the surface and reads what&rsquo;s there. The board
+                never knew it was being watched.
+            </p>
+        </div>
+
+        <!-- Avatar as specimen -->
+        <div
+            style="max-width:720px;margin:0 auto 40px;background:rgba(255,0,255,.04);border:1.5px solid rgba(255,0,255,.18);border-left:3px solid #FF00FF;border-radius:8px;padding:24px 32px;display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+            <div style="font-size:3rem;line-height:1;flex-shrink:0" id="specimen-avatar">🚀</div>
+            <div style="flex:1;min-width:220px">
+                <div
+                    style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:#FF00FF;margin-bottom:10px">
+                    AVATARS: A PERFECT SPECIMEN</div>
+                <p style="font-size:13px;color:var(--text-muted);line-height:1.85;margin:0">
+                    The avatar shown here &mdash; yours, if you&rsquo;re signed in &mdash; is a substrate acting as a
+                    lens. It focuses on a single coordinate: <span
+                        style="font-family:'Courier New',monospace;color:var(--text)">player.identity.avatar</span>. It
+                    reads what&rsquo;s there and converts it &mdash; a coordinate value on the manifold &mdash; into
+                    computer-usable code: an emoji rendered on screen. That&rsquo;s the entire job of this substrate.
+                    Read the coordinate. Produce output.
+                    <br><br>
+                    The nav bar has its own avatar lens. The game lobby has one. The leaderboard has one. The crowd
+                    simulation has one. None of them call each other. None of them know the others exist. Each lens
+                    independently reads the same coordinate on the player manifold and converts it to whatever that
+                    system needs. When you change your avatar, the coordinate on the surface changes once. Every lens
+                    sees the new value on its next read. Zero function calls. Zero coupling.
+                    <br><br>
+                    That&rsquo;s the whole paradigm, visible in an emoji.
+                </p>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var el = document.getElementById('specimen-avatar');
+                if (!el) return;
+                try {
+                    var raw = localStorage.getItem('kg_avatar');
+                    if (!raw) return;
+                    var parsed = JSON.parse(raw);
+                    var id = (parsed && (parsed.emoji || parsed.id)) || raw;
+                    if (typeof MODAL_AV_CATS !== 'undefined') {
+                        for (var ci = 0; ci < MODAL_AV_CATS.length; ci++) {
+                            var avs = MODAL_AV_CATS[ci].avatars;
+                            for (var ai = 0; ai < avs.length; ai++) {
+                                if (avs[ai].id === id) { el.textContent = avs[ai].e; return; }
+                            }
+                        }
+                    }
+                    if (id.length > 2 && !/^[a-z0-9_]+$/.test(id)) el.textContent = id;
+                } catch (e) { }
+            })();
+        </script>
+
+        <!-- What the manifold can do -->
+        <div style="max-width:900px;margin:0 auto 56px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-cyan);margin-bottom:8px;text-align:center">
+                &#9632; THE SCOPE OF THE SURFACE &#9632;</div>
+            <p
+                style="text-align:center;font-size:13px;color:var(--text-muted);max-width:660px;margin:0 auto 32px;line-height:1.9">
+                We have not even scratched the surface. What follows is not speculation &mdash; it is the natural
+                consequence of what a manifold already is mathematically, waiting for the right substrates to read it.
+            </p>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(0,255,255,.12);border-top:3px solid var(--neon-cyan);border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-cyan);margin-bottom:10px">
+                        &#127752; SPECTRA</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        A substrate that points its lens at the right region of the surface sees a spectrum. Color is a
+                        spectrum &mdash; a substrate reading that region interprets the coordinate distribution as
+                        wavelengths and renders color. Sound is a spectrum &mdash; a substrate reading an oscillating
+                        coordinate region interprets it as a waveform and produces audio. Any physical spectrum &mdash;
+                        electromagnetic, thermal, acoustic, chemical &mdash; is a coordinate distribution on the
+                        surface. The right lens converts it to computer-usable code. The manifold doesn&rsquo;t change.
+                        The substrate decides what it means.
+                    </p>
+                </div>
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(0,255,65,.12);border-top:3px solid var(--neon-green);border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-green);margin-bottom:10px">
+                        &#8594; VECTORS &amp; MOTION</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        A manifold has curvature. From curvature you read direction. From direction you derive vectors.
+                        From vectors over time you get velocity. From changing velocity you get acceleration. A
+                        substrate reading the rate of coordinate change on the surface is reading motion &mdash; not
+                        simulating it, reading it. Speed, heading, trajectory, momentum: all native outputs of a lens
+                        focused on how the surface is curving in a given region. Physics is not computed on top of the
+                        manifold. It emerges from it.
+                    </p>
+                </div>
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(255,232,0,.12);border-top:3px solid var(--neon-yellow);border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-yellow);margin-bottom:10px">
+                        &#9651; TRIGONOMETRY</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        A curved surface contains right triangles. Wherever two vectors on the manifold meet, the
+                        geometry between them defines an angle, a hypotenuse, two legs. A substrate reading that
+                        relationship is doing trigonometry &mdash; not calling a math library, not computing sin and cos
+                        as abstract operations. The triangle is in the surface. The substrate reads the shape and
+                        produces the angle. All of classical trigonometry is a substrate that knows how to look at the
+                        right part of a curve.
+                    </p>
+                </div>
+
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(153,0,255,.12);border-top:3px solid var(--neon-purple);border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-purple);margin-bottom:10px">
+                        &#9135;&#9135; FLATTENING TO (x, y)</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        A manifold can be flattened. Project the surface onto a plane and you have a coordinate pair
+                        &mdash; (x, y) &mdash; a chord across the curve. That flattening is not a loss of information;
+                        it is a choice of representation. A substrate that reads coordinates in flat projection gives
+                        you a 2D map. A substrate that reads the same coordinates in full curvature gives you 3D space.
+                        A substrate reading in four dimensions gives you time. The manifold holds all representations
+                        simultaneously. The substrate chooses which slice to show.
+                    </p>
+                </div>
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(255,0,255,.12);border-top:3px solid #FF00FF;border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:#FF00FF;margin-bottom:10px">
+                        &#402;(x) POLYNOMIALS &amp; CALCULUS</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        Any polynomial is a curve. Any curve can live on a manifold. A substrate reading the shape of
+                        that curve is evaluating the polynomial &mdash; not computing it term by term, but reading the
+                        surface directly. Derivatives are slopes: a substrate reading the rate of surface change at a
+                        point is taking a derivative. Integrals are areas under curves: a substrate reading accumulated
+                        coordinate volume is integrating. Every operation in calculus is a geometric operation on the
+                        surface. The manifold is the math.
+                    </p>
+                </div>
+
+                <div
+                    style="background:var(--bg-card);border:1.5px solid rgba(0,255,255,.12);border-top:3px solid var(--neon-cyan);border-radius:8px;padding:20px 18px">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-cyan);margin-bottom:10px">
+                        &#9648; RENDERING</div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.8;margin:0">
+                        A rendering substrate is a lens that reads spatial coordinates, color spectra, light vectors,
+                        and surface normals from the manifold simultaneously and converts the combined reading into
+                        pixels. There is no separate scene graph, no render pipeline to wire up, no message passing
+                        between the geometry system and the shader. The renderer sees the whole picture on the surface
+                        at once and projects it. Every frame is a single coordinated read. The surface is the scene.
+                    </p>
+                </div>
+
+            </div>
+
+            <div
+                style="background:rgba(0,255,255,.04);border:1px solid rgba(0,255,255,.14);border-radius:8px;padding:20px 28px;text-align:center">
+                <div
+                    style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-cyan);margin-bottom:12px">
+                    &#9632; WE HAVE NOT SCRATCHED THE SURFACE &#9632;</div>
+                <p style="font-size:13px;color:var(--text-muted);line-height:1.9;max-width:740px;margin:0 auto">
+                    Color. Sound. Motion. Geometry. Calculus. Rendering. Machine learning. Signal processing. Natural
+                    language. Any domain where information can be expressed as a position on a surface &mdash; which is
+                    all of them &mdash; is a domain where a substrate can be a lens. The five games on this portal use a
+                    small handful of those lenses. The manifold underneath them is capable of every single one. The
+                    paradigm is not a game engine. It is a universal computation substrate that we happened to build
+                    games on first.
+                </p>
+            </div>
+        </div>
+
+        <!-- Mathematical Proof -->
+        <div
+            style="max-width:860px;margin:0 auto 56px;background:var(--bg-card);border:1.5px solid rgba(255,232,0,.14);border-radius:12px;padding:36px 40px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-yellow);margin-bottom:6px;text-align:center">
+                &#9632; FORMAL PROOF &#9632;</div>
+            <div
+                style="font-size:10px;color:var(--text-muted);text-align:center;margin-bottom:32px;letter-spacing:.04em">
+                Coordination Complexity: Conventional Architecture vs. Manifold Substrate Architecture</div>
+
+            <!-- Definitions -->
+            <div style="margin-bottom:28px">
+                <div
+                    style="font-size:11px;color:var(--neon-yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid rgba(255,232,0,.12);padding-bottom:8px">
+                    I. Definitions</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.7"><span
+                            style="font-family:'Courier New',monospace;color:var(--text)">S = {s₁, s₂, &hellip;,
+                            sₙ}</span> &mdash; a finite set of N independent system components (services, substrates,
+                        agents).</div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.7"><span
+                            style="font-family:'Courier New',monospace;color:var(--text)">C(sᵢ, sⱼ)</span> &mdash; the
+                        coordination interface required for component <em>i</em> to exchange state with component
+                        <em>j</em>. In conventional architecture this is a directed coupling: an API contract, event
+                        subscription, message schema, and error-handling path.
+                    </div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.7"><span
+                            style="font-family:'Courier New',monospace;color:var(--text)">M</span> &mdash; a smooth
+                        differentiable manifold serving as the shared state surface. Each component maps its state to a
+                        coordinate <span style="font-family:'Courier New',monospace;color:var(--text)">pᵢ &isin;
+                            M</span>.</div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.7"><span
+                            style="font-family:'Courier New',monospace;color:var(--text)">𝒩(pᵢ, r)</span> &mdash; the
+                        open neighborhood of radius <em>r</em> around <em>pᵢ</em> on M. A component reads only from its
+                        neighborhood; it has no reference to other components directly.</div>
+                </div>
+            </div>
+
+            <!-- Theorem 1 -->
+            <div style="margin-bottom:28px">
+                <div
+                    style="font-size:11px;color:var(--neon-yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid rgba(255,232,0,.12);padding-bottom:8px">
+                    II. Theorem 1 &mdash; Coupling Complexity</div>
+                <div
+                    style="background:rgba(255,232,0,.04);border:1px solid rgba(255,232,0,.1);border-radius:6px;padding:16px 20px;margin-bottom:14px">
+                    <div style="font-size:13px;color:var(--text);line-height:1.8;font-style:italic">In a conventional
+                        architecture with N components where each component may need to coordinate with any other, the
+                        number of required coordination interfaces is bounded below by O(N²). In a manifold substrate
+                        architecture, the number of required coordination interfaces is O(N).</div>
+                </div>
+                <div
+                    style="font-size:12px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px;text-transform:uppercase">
+                    Proof:</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.8"><strong
+                            style="color:var(--text)">Conventional case.</strong> For N components, the complete
+                        directed coordination graph has N(N&minus;1) edges. Even in a sparse graph where each component
+                        coordinates with only k others on average, the total interface count is <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">Nk/2</span> undirected
+                        couplings. Each coupling <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">C(sᵢ,sⱼ)</span> carries a
+                        fixed implementation cost &delta; (schema definition, versioning, error handling, retry logic).
+                        Total coordination code: <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">K_conv = &delta; &sdot;
+                            N(N&minus;1) / 2 = &Theta;(N²)</span> in the fully connected case.</div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.8"><strong
+                            style="color:var(--text)">Manifold case.</strong> Each component sᵢ implements exactly two
+                        operations: <span style="font-family:'Courier New',monospace;color:var(--text)">write(pᵢ,
+                            state)</span> and <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">read(𝒩(pᵢ, r))</span>. The
+                        component has no reference to any other component identifier. Let &gamma; be the fixed cost of
+                        implementing these two operations per substrate. Total coordination code: <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">K_mfld = &gamma; &sdot; N =
+                            &Theta;(N)</span>.</div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.8"><strong
+                            style="color:var(--text)">Reduction ratio.</strong> <span
+                            style="font-family:'Courier New',monospace;color:var(--text)">K_conv / K_mfld = [&delta;
+                            &sdot; N(N&minus;1)/2] / [&gamma; &sdot; N] = &delta;(N&minus;1) / 2&gamma;</span>. For
+                        fixed cost ratio &delta;/&gamma;, this grows linearly with N. At N = 185 (this portal) with
+                        &delta; &asymp; &gamma;: reduction factor &asymp; 92&times;. The measured saving on this portal
+                        is 1.47MB &mdash; 80% of the shared infrastructure layer written once instead of five copies
+                        (23% of the total hypothetical code mass). The theoretical factor grows linearly with N.
+                        <br><span style="color:var(--neon-purple)">Schwartz Diamond tightening:</span> the O(N²) worst
+                        case assumes any substrate can interact with any other. On the actual surface, substrates
+                        communicate only within a geometric neighborhood &mdash; and the Schwartz Diamond surface
+                        assigns
+                        each entity a field value F(x,y,z) = cos(x)cos(y)cos(z) &minus; sin(x)sin(y)sin(z). Entities
+                        with |F| &rarr; 0 (near the surface boundary) hold higher fork priority under Dijkstra ordering,
+                        structurally preventing deadlock without any coordination protocol. The effective connectivity
+                        is a subgraph of the theoretical O(N²), bounded by surface geometry.
+                        &nbsp;&nbsp;<span style="color:var(--neon-yellow)">&#9632;</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Theorem 2 -->
+            <div style="margin-bottom:28px">
+                <div
+                    style="font-size:11px;color:var(--neon-yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid rgba(255,232,0,.12);padding-bottom:8px">
+                    III. Theorem 2 &mdash; Runtime Coordination Cost</div>
+                <div
+                    style="background:rgba(255,232,0,.04);border:1px solid rgba(255,232,0,.1);border-radius:6px;padding:16px 20px;margin-bottom:14px">
+                    <div style="font-size:13px;color:var(--text);line-height:1.8;font-style:italic">The per-tick runtime
+                        coordination cost in a conventional brokered architecture is O(N &sdot; k &sdot; m) where m is
+                        mean message size. In a manifold architecture it is O(N &sdot; d) where d is the dimension of
+                        the coordinate space, independent of N.</div>
+                </div>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8"><strong
+                        style="color:var(--text)">Conventional case.</strong> Each tick, N components emit messages to k
+                    recipients each through a broker. The broker routes N&sdot;k messages, each of size m bytes. Total
+                    data moved: <span style="font-family:'Courier New',monospace;color:var(--text)">T_conv = N &sdot; k
+                        &sdot; m</span>. Additionally, the broker itself consumes CPU proportional to its routing table
+                    size O(N&sdot;k) per message. Energy scales super-linearly as the system grows.</div>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8;margin-top:10px"><strong
+                        style="color:var(--text)">Manifold case.</strong> Each tick, N substrates each write a
+                    d-dimensional coordinate vector. Total data written: <span
+                        style="font-family:'Courier New',monospace;color:var(--text)">T_mfld = N &sdot; d</span>.
+                    Reading is a local neighborhood query on M &mdash; O(1) in a spatially indexed surface regardless of
+                    N. No broker. No routing table. As N grows, each substrate&rsquo;s read cost stays constant because
+                    it reads its neighborhood, not the entire surface. <span
+                        style="color:var(--neon-yellow)">&#9632;</span></div>
+            </div>
+
+            <!-- Corollary -->
+            <div style="margin-bottom:28px">
+                <div
+                    style="font-size:11px;color:var(--neon-yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid rgba(255,232,0,.12);padding-bottom:8px">
+                    IV. Corollary &mdash; Energy &amp; Infrastructure</div>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8">Since energy consumption E &prop; T
+                    (data moved &sdot; routing operations), and T_conv/T_mfld = O(k &sdot; m / d), the energy reduction
+                    is proportional to the ratio of mean message overhead to coordinate dimensionality. For typical
+                    microservice environments where k &asymp; 8 and m &asymp; 4KB and d &asymp; 16 floats (64 bytes):
+                    <span style="font-family:'Courier New',monospace;color:var(--text)">T_conv / T_mfld &asymp; 8 &sdot;
+                        4096 / 64 = 512</span>. Even accounting for surface indexing overhead and non-uniform access
+                    patterns, the lower bound on reduction in orchestration overhead remains in the range of
+                    20&ndash;40%
+                    of orchestration cost &mdash; not total datacenter power. Since orchestration is estimated at
+                    20&ndash;30% of total power, the realistic total-power benefit is in the range of 4&ndash;12%,
+                    though the upper bound grows as AI workloads increase the share of coordination overhead.
+                </div>
+            </div>
+
+            <!-- Hallucination theorem -->
+            <div>
+                <div
+                    style="font-size:11px;color:var(--neon-yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid rgba(255,232,0,.12);padding-bottom:8px">
+                    V. Theorem 3 &mdash; Grounded Inference (AI Hallucination Bound)</div>
+                <div
+                    style="background:rgba(255,232,0,.04);border:1px solid rgba(255,232,0,.1);border-radius:6px;padding:16px 20px;margin-bottom:14px">
+                    <div style="font-size:13px;color:var(--text);line-height:1.8;font-style:italic">Let an inference
+                        system produce claim Q. In a conventional statistical model, the confidence P(Q) is unbounded
+                        from above regardless of whether Q has a grounding in the training data. In a manifold-grounded
+                        system, P(Q) is bounded by the local coordinate density &rho;(p_Q) at the claim&rsquo;s position
+                        on M.</div>
+                </div>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8"><strong
+                        style="color:var(--text)">Conventional case.</strong> A language model assigns P(Q) =
+                    softmax(logit(Q | context)). There is no constraint that ties P(Q) to the density of supporting
+                    evidence in the training corpus at the specific locality of Q. High P(Q) can be produced by
+                    statistical patterns that generalize incorrectly &mdash; hallucination.</div>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8;margin-top:10px"><strong
+                        style="color:var(--text)">Manifold case.</strong> Each known fact f is embedded as a coordinate
+                    p_f &isin; M. The local density at p_Q is defined as <span
+                        style="font-family:'Courier New',monospace;color:var(--text)">&rho;(p_Q) = |{p_f : d(p_f, p_Q)
+                        &lt; r}| / Vol(𝒩(p_Q, r))</span>. The system constrains output confidence: <span
+                        style="font-family:'Courier New',monospace;color:var(--text)">P(Q) &le; &rho;(p_Q) /
+                        &rho;_max</span>. When p_Q falls in a sparse region &mdash; few supporting facts nearby &mdash;
+                    &rho; &rarr; 0 and P(Q) &rarr; 0. The system is geometrically forced to express low confidence.
+                    Hallucination is suppressed not by instruction tuning but by the structure of the space. <span
+                        style="color:var(--neon-yellow)">&#9632;</span></div>
+                <div
+                    style="margin-top:14px;font-size:12px;color:var(--text-muted);font-style:italic;line-height:1.7;border-top:1px solid rgba(255,232,0,.08);padding-top:12px">
+                    Note: proofs I&ndash;III are rigorous under standard complexity assumptions. Theorem 3 is a formal
+                    framework; the specific embedding function mapping facts to M coordinates is an open engineering
+                    problem, not a solved one. The mathematical structure holds &mdash; the implementation is the
+                    research.</div>
+            </div>
+        </div>
+
+        <!-- Beyond Games -->
+        <div style="max-width:960px;margin:0 auto 48px">
+            <div
+                style="font-family:var(--font-arcade);font-size:9px;letter-spacing:3px;color:var(--neon-purple);margin-bottom:16px;text-align:center">
+                &#9632; BEYOND GAMES &#9632;</div>
+            <p
+                style="text-align:center;font-size:13px;color:var(--text-muted);max-width:660px;margin:0 auto 36px;line-height:1.9">
+                The same pattern that eliminated 80% of shared infrastructure duplication &mdash; 1.47MB written once
+                for all five titles rather than copied into each &mdash; applies to any system where independent
+                components need to coordinate. The bigger the system, the more the savings grow. What follows are
+                estimated projections based on current industry overhead figures &mdash; not benchmarks, but
+                directionally honest.
+            </p>
+
+            <!-- DATA FARMS -->
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(0,255,255,.12);border-left:4px solid var(--neon-cyan);border-radius:10px;padding:28px 32px;margin-bottom:20px">
+                <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+                    <div style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-cyan)">
+                        &#127970; DATA FARMS &amp; DATA CENTERS</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:#ff4466;background:rgba(255,68,102,.08);border:1px solid rgba(255,68,102,.2);border-radius:4px;padding:3px 10px">~30%
+                            orchestration overhead today</span>
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:var(--neon-green);background:rgba(0,255,65,.08);border:1px solid rgba(0,255,65,.2);border-radius:4px;padding:3px 10px">estimated
+                            20&ndash;28% infrastructure reduction</span>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            What it replaces</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            Kubernetes clusters, service meshes (Istio, Linkerd), message brokers (Kafka, RabbitMQ), API
+                            gateways, service registries, health-check polling loops, sidecar proxies, and the ops teams
+                            required to manage all of it. In a hyperscale facility these systems collectively occupy
+                            20&ndash;30% of total compute capacity &mdash; CPUs and RAM running 24/7 just to let the
+                            actual services find each other.
+                        </p>
+                    </div>
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            What the manifold does instead</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            Every service is a substrate. It writes its state as coordinates on a shared surface and
+                            reads neighboring coordinates. There is no broker, no registry, no polling loop. Services
+                            that don&rsquo;t interact don&rsquo;t share coordinates &mdash; the isolation is structural.
+                            A cluster running manifold-native workloads needs fewer nodes, smaller network fabrics, and
+                            less cooling because the coordination overhead simply doesn&rsquo;t exist. The surface is
+                            the infrastructure.
+                        </p>
+                    </div>
+                </div>
+                <div
+                    style="margin-top:16px;padding:12px 16px;background:rgba(0,255,255,.04);border-radius:6px;font-size:12px;color:var(--text-muted);line-height:1.7">
+                    <strong style="color:var(--neon-cyan)">What it derives:</strong> relationship graphs between
+                    services without a service mesh, dependency maps without a registry, load patterns without a metrics
+                    pipeline, fault boundaries without chaos engineering &mdash; all readable directly from the geometry
+                    of where coordinates cluster and diverge on the surface.
+                </div>
+            </div>
+
+            <!-- POWER GRID -->
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(0,255,65,.12);border-left:4px solid var(--neon-green);border-radius:10px;padding:28px 32px;margin-bottom:20px">
+                <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-green)">
+                        &#9889; ENERGY GRID &amp; INFRASTRUCTURE</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:#ff4466;background:rgba(255,68,102,.08);border:1px solid rgba(255,68,102,.2);border-radius:4px;padding:3px 10px">global
+                            data centers: ~250 TWh/yr</span>
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:var(--neon-green);background:rgba(0,255,65,.08);border:1px solid rgba(0,255,65,.2);border-radius:4px;padding:3px 10px">est.
+                            50&ndash;75 TWh/yr orchestration overhead (est. upper bound)</span>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            The current cost</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            Global data centers consume roughly 250 terawatt-hours per year and that figure is climbing
+                            as AI workloads grow. An estimated 20&ndash;30% of that energy goes to orchestration
+                            infrastructure &mdash; not computation, not storage, not networking the actual data. Just
+                            the machinery that lets services discover and talk to each other. That&rsquo;s 50&ndash;75
+                            TWh per year powering middleware &mdash; the upper-bound theoretical target for elimination.
+                            For reference, 75 TWh is roughly the annual output of eight large nuclear reactors.
+                        </p>
+                    </div>
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            What changes</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            On a power grid itself, each generation source, storage unit, and load writes its state as a
+                            coordinate. Grid balance becomes a read operation, not a dispatch command. No SCADA central
+                            controller to lose. No telemetry pipeline to overload during a fault. Fault isolation is
+                            geometric &mdash; a failed node simply stops writing; its neighborhood detects absence
+                            through coordinate drift rather than a missed heartbeat. The grid responds in microseconds,
+                            not the seconds a dispatcher round-trip takes.
+                        </p>
+                    </div>
+                </div>
+                <div
+                    style="margin-top:16px;padding:12px 16px;background:rgba(0,255,65,.04);border-radius:6px;font-size:12px;color:var(--text-muted);line-height:1.7">
+                    <strong style="color:var(--neon-green)">What it derives:</strong> real-time load topology without a
+                    telemetry bus, cascade failure prediction from coordinate divergence patterns, optimal storage
+                    dispatch from surface curvature, grid-wide demand forecasting from aggregate coordinate motion
+                    &mdash; emerging from the geometry, not computed by a separate analytics layer.
+                </div>
+            </div>
+
+            <!-- AI -->
+            <div
+                style="background:var(--bg-card);border:1.5px solid rgba(153,0,255,.12);border-left:4px solid var(--neon-purple);border-radius:10px;padding:28px 32px;margin-bottom:20px">
+                <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+                    <div
+                        style="font-family:var(--font-arcade);font-size:9px;letter-spacing:2px;color:var(--neon-purple)">
+                        &#129504; MANIFOLD-DRIVEN AI</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:#ff4466;background:rgba(255,68,102,.08);border:1px solid rgba(255,68,102,.2);border-radius:4px;padding:3px 10px">hallucinations:
+                            no geometric ground truth</span>
+                        <span
+                            style="font-family:var(--font-arcade);font-size:11px;color:var(--neon-purple);background:rgba(153,0,255,.08);border:1px solid rgba(153,0,255,.2);border-radius:4px;padding:3px 10px">manifold:
+                            every fact has a coordinate</span>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            Why current AI hallucinates</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            Large language models generate tokens by predicting what comes next in a statistical
+                            distribution. There is no internal representation that says &ldquo;this fact occupies this
+                            location and relates to those neighbors.&rdquo; Relationships are implied by proximity in a
+                            high-dimensional weight space &mdash; a space that has no geometric ground truth. When the
+                            model ventures outside its training distribution it has no surface to anchor against, so it
+                            confabulates. The probability distribution says something plausible; the geometry says
+                            nothing, because there is no geometry.
+                        </p>
+                    </div>
+                    <div>
+                        <div
+                            style="font-size:11px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">
+                            What a manifold substrate gives AI</div>
+                        <p style="font-size:13px;color:var(--text-muted);line-height:1.8;margin:0">
+                            When each AI subsystem &mdash; perception, memory, reasoning, planning &mdash; is a
+                            substrate writing to and reading from a shared manifold, every assertion has a coordinate.
+                            Contradictions produce geometric tension on the surface; the system can measure them.
+                            Confidence is not a softmax score, it&rsquo;s the density and coherence of coordinates in a
+                            neighborhood. When the model doesn&rsquo;t know something, the relevant region of the
+                            surface is sparse or incoherent &mdash; detectable before the answer is produced.
+                            Hallucination becomes a geometry problem with a geometry solution.
+                        </p>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">
+                    <div
+                        style="padding:14px 16px;background:rgba(153,0,255,.06);border:1px solid rgba(153,0,255,.15);border-radius:6px">
+                        <div
+                            style="font-size:10px;color:var(--neon-purple);letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase">
+                            Enhanced Learning</div>
+                        <p style="font-size:12px;color:var(--text-muted);line-height:1.7;margin:0">New knowledge is a
+                            new coordinate, not a weight update across billions of parameters. The model learns by
+                            extending the surface, not by retraining. Learning becomes incremental, targeted, and
+                            reversible.</p>
+                    </div>
+                    <div
+                        style="padding:14px 16px;background:rgba(153,0,255,.06);border:1px solid rgba(153,0,255,.15);border-radius:6px">
+                        <div
+                            style="font-size:10px;color:var(--neon-purple);letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase">
+                            Better Decisions</div>
+                        <p style="font-size:12px;color:var(--text-muted);line-height:1.7;margin:0">Decisions are
+                            evaluated by tracing paths on the surface. Each option maps to a trajectory; each trajectory
+                            has measurable cost. The AI doesn&rsquo;t guess the best answer &mdash; it navigates to it.
+                            The reasoning is auditable because the path is visible.</p>
+                    </div>
+                    <div
+                        style="padding:14px 16px;background:rgba(153,0,255,.06);border:1px solid rgba(153,0,255,.15);border-radius:6px">
+                        <div
+                            style="font-size:10px;color:var(--neon-purple);letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase">
+                            What It Derives</div>
+                        <p style="font-size:12px;color:var(--text-muted);line-height:1.7;margin:0">Concept relationships
+                            without a knowledge graph, semantic distance without embeddings, causal chains without rule
+                            engines, anomaly detection without labeled data &mdash; all readable from surface topology.
+                            The manifold IS the knowledge representation.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Closing statement -->
+            <div
+                style="padding:20px 28px;background:rgba(0,255,65,.04);border:1px solid rgba(0,255,65,.12);border-radius:8px;text-align:center;font-size:13px;color:var(--text-muted);line-height:1.8">
+                These five games are a working demonstration that the model holds. A game portal is a trivial system
+                compared to a data center or a power grid. The point is that the <strong style="color:var(--text)">same
+                    primitive</strong> &mdash; a shared geometric surface with substrate readers and writers &mdash;
+                applies at any scale, in any domain. <strong style="color:var(--neon-green)">The savings grow the
+                    bigger the system gets &mdash; linearly in code complexity, quadratically in coordination
+                    overhead.</strong>
+            </div>
+        </div>
+
+        <div style="text-align:center">
+            <a href="/manifold.html"
+                style="display:inline-flex;align-items:center;gap:10px;font-family:var(--font-arcade);font-size:10px;letter-spacing:2px;padding:14px 28px;border:1.5px solid var(--neon-purple);border-radius:4px;color:var(--neon-purple);text-decoration:none;box-shadow:0 0 16px rgba(153,0,255,0.18);transition:background .2s"
+                onmouseover="this.style.background='rgba(153,0,255,0.1)'"
+                onmouseout="this.style.background='transparent'">
+                &#9670; EXPLORE THE MANIFOLD ARCHITECTURE
+            </a>
         </div>
     </section>
 
@@ -2766,7 +4022,7 @@
                     <li><a href="/fasttrack/">FastTrack</a></li>
                     <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
                     <li><a href="/starfighter/">Alien Space Attack</a></li>
-                    <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
+                    <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
                     <li><a href="/assemble/">Assemble</a></li>
                 </ul>
             </div>
@@ -2935,13 +4191,16 @@
         async function handleLogin(e) {
             e.preventDefault();
             const msg = document.getElementById('login-msg');
+            const tsToken = document.querySelector('#panel-login [name="cf-turnstile-response"]')?.value || '';
+            if (!tsToken) { msg.textContent = 'Please complete the security check'; msg.className = 'form-msg err'; return; }
             msg.textContent = 'Authenticating...'; msg.className = 'form-msg';
             try {
                 const res = await fetch('/api/auth/login', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         username: document.getElementById('login-user').value.trim(),
-                        password: document.getElementById('login-pass').value
+                        password: document.getElementById('login-pass').value,
+                        turnstileToken: tsToken
                     })
                 });
                 const data = await res.json();
@@ -3055,10 +4314,26 @@
         function playAsGuest() {
             openModal('auth-modal');
         }
+        const PATH_TO_GAME = window.PATH_TO_GAME = {
+            '/fasttrack/': 'fasttrack',
+            '/brickbreaker3d/': 'brickbreaker3d',
+            '/starfighter/': 'starfighter',
+            '/4dtictactoe/': 'tictactoe',
+            '/assemble/': 'assemble',
+        };
         function goToGame(path) {
             if (!localStorage.getItem('kg_token')) { openModal('auth-modal'); return; }
-            // path like '/fasttrack/' → lobby is '/fasttrack/lobby'
-            window.location.href = path.replace(/\/$/, '') + '/lobby';
+            const gameId = PATH_TO_GAME[path] || path.replace(/\//g, '');
+            window.location.href = `/play/?game=${gameId}&mode=multi`;
+        }
+        function goToGameHost(path) {
+            if (!localStorage.getItem('kg_token')) { openModal('auth-modal'); return; }
+            const gameId = PATH_TO_GAME[path] || path.replace(/\//g, '');
+            window.location.href = `/play/?game=${gameId}&mode=host`;
+        }
+        function goToGameSolo(path) {
+            const gameId = PATH_TO_GAME[path] || path.replace(/\//g, '');
+            window.location.href = `/play/?game=${gameId}&mode=solo`;
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
         const urlParam = new URLSearchParams(location.search).get('modal');
@@ -3097,12 +4372,35 @@
                 window.location.href = '/login/';
             }
             window.kgLogout = kgLogout;
+            function getNavAvatarEmoji() {
+                try {
+                    var raw = localStorage.getItem('kg_avatar');
+                    if (!raw) return '👤';
+                    // Stored as JSON: {emoji: "id-or-emoji"}
+                    var parsed = JSON.parse(raw);
+                    var val = (parsed && (parsed.emoji || parsed.id)) || raw;
+                    // If val is already a multi-char emoji (not an ASCII id), use it directly
+                    if (val && val.length > 2 && !/^[a-z0-9_]+$/.test(val)) return val;
+                    // Otherwise look up in MODAL_AV_CATS
+                    if (typeof MODAL_AV_CATS !== 'undefined') {
+                        for (var ci = 0; ci < MODAL_AV_CATS.length; ci++) {
+                            var avs = MODAL_AV_CATS[ci].avatars;
+                            for (var ai = 0; ai < avs.length; ai++) {
+                                if (avs[ai].id === val) return avs[ai].e;
+                            }
+                        }
+                    }
+                    return val || '👤';
+                } catch (e) { return '👤'; }
+            }
             function applyNav(user) {
                 var statusEl = document.getElementById('access-status');
                 var playerEl = document.getElementById('kg-player');
                 document.body.classList.toggle('kg-auth', !!user);
                 if (user) {
-                    if (playerEl) playerEl.style.display = '';
+                    var name = localStorage.getItem('kg_username') || localStorage.getItem('display_name') || '';
+                    var avEmoji = getNavAvatarEmoji();
+                    if (playerEl) { playerEl.style.display = ''; playerEl.textContent = name ? avEmoji + ' ' + name : avEmoji; }
                     if (statusEl) statusEl.innerHTML = '<button class="btn-ghost" onclick="kgLogout()">LOG OUT</button>';
                 } else {
                     if (playerEl) playerEl.style.display = 'none';
@@ -3119,7 +4417,17 @@
             function patchGoToGame() {
                 window.goToGame = function (path) {
                     if (!localStorage.getItem('kg_token')) { if (typeof openModal === 'function') openModal('auth-modal'); return; }
-                    window.location.href = path.replace(/\/$/, '') + '/lobby';
+                    const gameId = (window.PATH_TO_GAME && window.PATH_TO_GAME[path]) || path.replace(/\//g, '');
+                    window.location.href = `/play/?game=${gameId}&mode=multi`;
+                };
+                window.goToGameHost = function (path) {
+                    if (!localStorage.getItem('kg_token')) { if (typeof openModal === 'function') openModal('auth-modal'); return; }
+                    const gameId = (window.PATH_TO_GAME && window.PATH_TO_GAME[path]) || path.replace(/\//g, '');
+                    window.location.href = `/play/?game=${gameId}&mode=host`;
+                };
+                window.goToGameSolo = function (path) {
+                    const gameId = (window.PATH_TO_GAME && window.PATH_TO_GAME[path]) || path.replace(/\//g, '');
+                    window.location.href = `/play/?game=${gameId}&mode=solo`;
                 };
             }
             async function initKGNav() {
@@ -3147,6 +4455,164 @@
             };
             if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initKGNav); }
             else { initKGNav(); }
+        })();
+    </script>
+
+    <!-- Directive 2.1 — Deep-Link URL Routing -->
+    <script src="/js/lens_registry.js"></script>
+    <script src="/js/router.js" defer></script>
+
+    <!-- Directive 2.3 — Floating PLAY NOW button -->
+    <script>
+        (function () {
+            'use strict';
+            // Create button
+            var btn = document.createElement('a');
+            btn.id = 'kg-play-now';
+            btn.href = '#games';
+            btn.textContent = 'PLAY NOW \u25B6';
+            btn.setAttribute('aria-label', 'Skip to games');
+            btn.style.cssText = [
+                'position:fixed', 'bottom:28px', 'right:28px', 'z-index:8000',
+                'display:none', 'align-items:center', 'justify-content:center',
+                'padding:12px 22px', 'min-height:44px',
+                'background:rgba(4,4,20,0.92)',
+                'border:1.5px solid #00FFFF',
+                'color:#00FFFF',
+                'font-family:Orbitron,monospace', 'font-size:12px', 'font-weight:700',
+                'letter-spacing:.1em', 'text-decoration:none',
+                'border-radius:24px',
+                'box-shadow:0 0 12px rgba(0,255,255,0.3)',
+                'cursor:pointer',
+                'transition:box-shadow .2s, opacity .3s',
+                'opacity:0'
+            ].join(';');
+
+            // Pulse animation via CSS class
+            var style = document.createElement('style');
+            style.textContent = [
+                '@keyframes kg-pulse{0%,100%{box-shadow:0 0 10px rgba(0,255,255,.3)}',
+                '50%{box-shadow:0 0 22px rgba(0,255,255,.7)}}',
+                '#kg-play-now:not(:hover){animation:kg-pulse 2.4s ease-in-out infinite}',
+                '#kg-play-now:hover{box-shadow:0 0 28px rgba(0,255,255,.9);opacity:1!important}'
+            ].join('');
+            document.head.appendChild(style);
+            document.body.appendChild(btn);
+
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var target = document.getElementById('games');
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+
+            // Show after 3 seconds
+            var showTimer = setTimeout(function () {
+                btn.style.display = 'inline-flex';
+                setTimeout(function () { btn.style.opacity = '1'; }, 20);
+            }, 3000);
+
+            // Hide once user scrolls past the games section
+            var gamesSection = null;
+            function getGamesSection() {
+                if (!gamesSection) gamesSection = document.getElementById('games');
+                return gamesSection;
+            }
+
+            function onScroll() {
+                var gs = getGamesSection();
+                if (!gs) return;
+                var rect = gs.getBoundingClientRect();
+                if (rect.bottom < 0) {
+                    // scrolled past games section — hide
+                    btn.style.opacity = '0';
+                    setTimeout(function () { btn.style.display = 'none'; }, 300);
+                    window.removeEventListener('scroll', onScroll);
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+        })();
+    </script>
+
+    <!-- Directive 2.4 — Live player counter via WebSocket -->
+    <script>
+        (function () {
+            var el = document.getElementById('kg-online');
+            if (!el) return;
+            var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+            var ws;
+            var retryDelay = 4000;
+            var maxRetries = 3;
+            var retries = 0;
+
+            function connect() {
+                try {
+                    ws = new WebSocket(proto + location.host + '/ws');
+                } catch (e) { return; }
+
+                ws.onopen = function () {
+                    retries = 0;
+                    ws.send(JSON.stringify({ type: 'get_portal_stats' }));
+                };
+
+                ws.onmessage = function (ev) {
+                    try {
+                        var msg = JSON.parse(ev.data);
+                        if (msg.type === 'portal_stats') {
+                            var n = msg.online || 0;
+                            if (n === 0) {
+                                el.textContent = 'Be the first to play today.';
+                            } else if (n === 1) {
+                                el.textContent = '1 player online';
+                            } else {
+                                el.textContent = n + ' players online';
+                            }
+                            el.style.opacity = '1';
+                            ws.close();
+                        }
+                    } catch (e) { /* ignore malformed */ }
+                };
+
+                ws.onerror = ws.onclose = function () {
+                    if (retries < maxRetries) {
+                        retries++;
+                        setTimeout(connect, retryDelay);
+                    }
+                };
+            }
+
+            // Delay slightly so page renders first
+            setTimeout(connect, 1500);
+        })();
+    </script>
+
+    <!-- Protocol 3.8 — Notify Me interest capture (localStorage, no server call) -->
+    <script>
+        (function () {
+            var KEY_PREFIX = 'kg_notify_';
+
+            // Restore button state from localStorage on page load
+            document.querySelectorAll('.upcoming-notify-btn').forEach(function (btn) {
+                var game = btn.getAttribute('data-game');
+                if (game && localStorage.getItem(KEY_PREFIX + game) === '1') {
+                    btn.textContent = 'Notified \u2713';
+                    btn.setAttribute('data-notified', 'true');
+                    btn.disabled = true;
+                }
+            });
+
+            // Global handler called by inline onclick
+            window.kgNotify = function (btn) {
+                var game = btn.getAttribute('data-game');
+                if (!game || btn.getAttribute('data-notified') === 'true') return;
+                try {
+                    localStorage.setItem(KEY_PREFIX + game, '1');
+                } catch (e) {
+                    // Storage unavailable — still show confirmation visually
+                }
+                btn.textContent = 'Notified \u2713';
+                btn.setAttribute('data-notified', 'true');
+                btn.disabled = true;
+            };
         })();
     </script>
 </body>

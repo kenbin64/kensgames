@@ -173,10 +173,103 @@
           href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a>.</p>
 
     </div>
+    <!-- ── ToS Acceptance Gate (shown when ?accept=1 or user is logged in without ToS) ── -->
+    <div id="tos-accept-section"
+      style="display:none;margin-top:3rem;padding:2rem;background:var(--bg-card);border:1px solid var(--c1);border-radius:10px;text-align:center">
+      <div
+        style="font-family:'Press Start 2P',monospace;font-size:0.65rem;color:var(--c1);letter-spacing:2px;margin-bottom:1.2rem">
+        AGREE TO CONTINUE</div>
+      <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.8;margin-bottom:1.5rem">
+        You must agree to these Terms of Service before accessing games on KensGames.
+      </p>
+      <label
+        style="display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;color:var(--text);font-size:0.85rem;margin-bottom:1.5rem">
+        <input type="checkbox" id="tos-check" style="width:18px;height:18px;accent-color:var(--c1);cursor:pointer">
+        I have read and agree to the KensGames Terms of Service
+      </label>
+      <button id="tos-accept-btn" disabled
+        style="padding:13px 36px;background:transparent;border:2px solid var(--c1);color:var(--c1);font-family:'Press Start 2P',monospace;font-size:0.65rem;letter-spacing:2px;cursor:pointer;border-radius:4px;transition:all .2s;opacity:0.5"
+        onclick="acceptTos()">
+        ACCEPT &amp; CONTINUE
+      </button>
+      <div id="tos-accept-msg" style="margin-top:1rem;font-size:0.85rem;color:var(--c1)"></div>
+    </div>
+
+    <!-- ── Already-agreed confirmation (for logged-in users who already accepted) ── -->
+    <div id="tos-already-section"
+      style="display:none;margin-top:3rem;padding:1.5rem;background:var(--bg-card);border:1px solid var(--ng, #0f0);border-radius:10px;text-align:center">
+      <div style="color:var(--ng, #0f0);font-size:1.2rem;margin-bottom:.6rem">&#10003;</div>
+      <div style="color:var(--text);font-size:0.9rem">You have already agreed to these Terms of Service.</div>
+      <a href="/"
+        style="display:inline-block;margin-top:1rem;color:var(--c1);font-size:0.8rem;text-decoration:none">&larr; Back
+        to Portal</a>
+    </div>
+
   </main>
 
   <script src="/js/manifold_reality.js" defer></script>
   <script src="/js/manifold_panels.js" defer></script>
+  <script>
+    (function () {
+      const TOKEN_KEYS = ['kg_token', 'user_token'];
+      function getToken() {
+        for (const k of TOKEN_KEYS) { const t = localStorage.getItem(k); if (t) return t; }
+        return null;
+      }
+      function isGuest(t) { return !t || t.startsWith('guest-'); }
+
+      const params = new URLSearchParams(location.search);
+      const nextUrl = params.get('next') || params.get('redirect') || '/';
+      const forceAccept = params.get('accept') === '1';
+
+      const token = getToken();
+      const loggedIn = token && !isGuest(token);
+
+      if (loggedIn || forceAccept) {
+        // Check if already agreed
+        fetch('/api/players/me', { headers: { Authorization: 'Bearer ' + token } })
+          .then(r => r.ok ? r.json() : null)
+          .then(p => {
+            if (p && p.tosAgreed) {
+              document.getElementById('tos-already-section').style.display = 'block';
+            } else {
+              document.getElementById('tos-accept-section').style.display = 'block';
+            }
+          })
+          .catch(() => {
+            if (forceAccept) document.getElementById('tos-accept-section').style.display = 'block';
+          });
+      }
+
+      const checkbox = document.getElementById('tos-check');
+      const btn = document.getElementById('tos-accept-btn');
+      checkbox.addEventListener('change', function () {
+        btn.disabled = !this.checked;
+        btn.style.opacity = this.checked ? '1' : '0.5';
+      });
+
+      window.acceptTos = async function () {
+        const msgEl = document.getElementById('tos-accept-msg');
+        btn.disabled = true;
+        msgEl.textContent = 'Saving…';
+        try {
+          const t = getToken();
+          const r = await fetch('/api/players/tos/agree', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tosType: 'general', version: '1.0' }),
+          });
+          const data = await r.json();
+          if (!r.ok) { msgEl.textContent = data.error || 'Failed — please try again.'; btn.disabled = false; return; }
+          msgEl.textContent = '✓ Agreed! Redirecting…';
+          setTimeout(() => { window.location.href = nextUrl; }, 800);
+        } catch {
+          msgEl.textContent = 'Network error. Please try again.';
+          btn.disabled = false;
+        }
+      };
+    })();
+  </script>
 </body>
 
 </html>

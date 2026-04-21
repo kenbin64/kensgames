@@ -61,9 +61,9 @@
     {
       "id": "4dtictactoe",
       "name": "4D Tic-Tac-Toe",
-      "path": "4DTicTacToe/",
-      "manifold": "4DTicTacToe/manifold.game.json",
-      "entry": "4DTicTacToe/index.html",
+      "path": "4dtictactoe/",
+      "manifold": "4dtictactoe/manifold.game.json",
+      "entry": "4dtictactoe/index.html",
       "server": "static",
       "status": "production"
     },

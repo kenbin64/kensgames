@@ -51,7 +51,7 @@
     "_note": "Wally's swim speed, chomp arc, and tail-sweep radius all scale by golden ratio φ ≈ 1.618 per upgrade tier"
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/Chomp!WallyTheCairnsCrocodileAdventure/",
+    "target": "/var/www/kensgames.com/chomp/",
     "type": "static"
   }
 }

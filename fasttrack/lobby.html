@@ -17,14 +17,16 @@
   <script src="/js/analytics.js"></script>
   <script>
     (function () {
+      document.documentElement.style.visibility = 'hidden';
       var t = localStorage.getItem('kg_token');
       if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
-          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); }
-        }).catch(function () { });
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent('/fasttrack/lobby.html')); return; }
+          document.documentElement.style.visibility = '';
+        }).catch(function () { document.documentElement.style.visibility = ''; });
     })();
   </script>
 </head>

@@ -1061,8 +1061,8 @@ window.addEventListener('load', () => {
         ManifoldBridge.init({
             id: 'brickbreaker3d',
             version: '1.0.0',
-            x: 2,
-            y: 22,
+            x: 5,   // grid rows (primary axis)
+            y: 6,   // grid cols (quadratic axis)  →  z = 5·36 = 180
             exposes: () => ({
                 gameActive,
                 gamePaused,

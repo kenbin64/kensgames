@@ -455,7 +455,7 @@
       <li><a href="/">Portal</a></li>
       <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
       <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
-      <li><a href="/4DTicTacToe/">Connect 4D</a></li>
+      <li><a href="/4dtictactoe/">Connect 4D</a></li>
     </ul>
   </nav>
 
@@ -1130,8 +1130,8 @@
       ManifoldBridge.init({
         id: 'assemble',
         version: '1.0.0',
-        x: 2,
-        y: 20,
+        x: 2,  // piece axes (primary)
+        y: 3,  // spatial dimensions (quadratic)  →  z = 2·9 = 18
         exposes: () => {
           const eng = window.__assembleEngine;
           if (!eng) return { running: false, partCount: 0 };

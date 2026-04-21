@@ -5,14 +5,16 @@
   <!-- Auth + profile gate: must be logged in AND have playername/avatar -->
   <script>
     (function () {
+      document.documentElement.style.visibility = 'hidden';
       var t = localStorage.getItem('kg_token');
       if (!t) { window.location.replace('/login/?redirect=' + encodeURIComponent('/starfighter/lobby.html')); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/login/?redirect=' + encodeURIComponent('/starfighter/lobby.html')); return; }
-          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
-        }).catch(function () { });
+          if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); return; }
+          document.documentElement.style.visibility = '';
+        }).catch(function () { document.documentElement.style.visibility = ''; });
     })();
   </script>
   <meta charset="UTF-8">
@@ -321,7 +323,7 @@
         <li><a href="/">&#8592; Portal</a></li>
         <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
         <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
-        <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
+        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
         <li><a href="/assemble/">Assemble</a></li>
       </ul>
       <div class="arc-nav-right" id="nav-avatar"></div>

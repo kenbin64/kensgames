@@ -18,7 +18,7 @@
       "id": "tictactoe",
       "name": "4D TicTacToe",
       "portalTitle": "4D TicTacToe",
-      "playPath": "/4DTicTacToe/index.html",
+      "playPath": "/4dtictactoe/index.html",
       "lobbyPath": "/lobby/game.html?game=tictactoe",
       "maxPlayers": 4,
       "type": "turn",

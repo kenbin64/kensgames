@@ -60,7 +60,7 @@
     const clean = stripQueryAndHash(pngUrl || '');
     if (!clean.startsWith('/')) return null;
     if (!clean.toLowerCase().endsWith('.png')) return null;
-    // Preserve full relative path (including subfolders like /4DTicTacToe/...)
+    // Preserve full relative path (including subfolders like /4dtictactoe/...)
     return `/tools/output/manifold${clean}.imgatlas.json`;
   }
 

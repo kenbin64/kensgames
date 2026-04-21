@@ -79,7 +79,7 @@
       "id": "4dtictactoe",
       "name": "4D Tic-Tac-Toe",
       "version": "1.0.0",
-      "path": "4DTicTacToe/",
+      "path": "4dtictactoe/",
       "entry": "index.html",
       "lobby": null,
       "status": "production",
@@ -96,7 +96,7 @@
       ],
       "bridge": "window.__MANIFOLD__",
       "deploy": {
-        "target": "/var/www/kensgames.com/4DTicTacToe/",
+        "target": "/var/www/kensgames.com/4dtictactoe/",
         "type": "static"
       }
     },

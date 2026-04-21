@@ -295,7 +295,7 @@
     }
   </style>
   <script src="/js/analytics.js" defer></script>
-  <script src="/js/kg-session.js"></script>
+  <script src="/js/kg_session.js"></script>
 </head>
 
 <body data-mtheme="cyan">
@@ -309,7 +309,6 @@
     <div class="steps">
       <div class="step-dot active" id="dot-0"></div>
       <div class="step-dot" id="dot-1"></div>
-      <div class="step-dot" id="dot-2"></div>
     </div>
 
     <!-- ── Step 0: TOS ────────────────────────────────────────────── -->
@@ -353,29 +352,15 @@
       </div>
     </div>
 
-    <!-- ── Step 1: Playername ─────────────────────────────────────── -->
+    <!-- ── Step 1: Avatar ─────────────────────────────────────────── -->
     <div class="step-panel" id="step-1">
-      <div class="field-label">CHOOSE YOUR PLAYERNAME</div>
-      <input class="field-input" type="text" id="playername-input" placeholder="e.g. NeonKnight_42" maxlength="20"
-        autocomplete="off" oninput="onPlayernameInput()">
-      <div class="field-hint">3–20 characters · letters, numbers, underscore only · visible to all players</div>
-      <div class="field-error" id="pn-error"></div>
-
-      <div class="btn-row">
-        <button class="btn-next btn-back" onclick="gotoStep(0)">← BACK</button>
-        <button class="btn-next" id="btn-pn-next" disabled onclick="gotoStep(2)">NEXT →</button>
-      </div>
-    </div>
-
-    <!-- ── Step 2: Avatar ─────────────────────────────────────────── -->
-    <div class="step-panel" id="step-2">
       <div class="field-label">CHOOSE YOUR AVATAR</div>
       <div class="av-tabs" id="av-tabs"></div>
       <div class="avatar-grid" id="avatar-grid"></div>
       <div class="field-error" id="av-error"></div>
 
       <div class="btn-row">
-        <button class="btn-next btn-back" onclick="gotoStep(1)">← BACK</button>
+        <button class="btn-next btn-back" onclick="gotoStep(0)">← BACK</button>
         <button class="btn-next" id="btn-av-next" disabled onclick="submitSetup()">ENTER THE PORTAL →</button>
       </div>
     </div>
@@ -477,6 +462,7 @@
     let currentStep = 0;
     let selectedAvatar = null;
     let activeCategory = AVATAR_CATEGORIES[0].id;
+    let currentUsername = null; // populated from /api/players/me
 
     // ── Auth gate ────────────────────────────────────────────────────
     async function init() {
@@ -498,6 +484,8 @@
             window.location.href = dest;
             return;
           }
+          // Capture username for use as playername
+          currentUsername = p.username || null;
         }
       } catch { }
 
@@ -537,18 +525,6 @@
       document.getElementById(`dot-${n}`).classList.remove('done');
     }
 
-    function onPlayernameInput() {
-      const val = document.getElementById('playername-input').value;
-      const valid = /^[A-Za-z0-9_]{3,20}$/.test(val);
-      const errEl = document.getElementById('pn-error');
-      if (!valid && val.length > 0) {
-        errEl.textContent = val.length < 3 ? 'Too short (min 3)' : 'Letters, numbers, underscore only';
-      } else {
-        errEl.textContent = '';
-      }
-      document.getElementById('btn-pn-next').disabled = !valid;
-    }
-
     function selectAvatar(id) {
       document.querySelectorAll('.avatar-opt').forEach(el => el.classList.remove('selected'));
       document.getElementById(`av-${id}`)?.classList.add('selected');
@@ -558,10 +534,15 @@
 
     async function submitSetup() {
       const token = localStorage.getItem('kg_token');
-      const playername = document.getElementById('playername-input').value.trim();
+      // Username IS the playername — no separate entry needed
+      const playername = currentUsername || localStorage.getItem('kg_username') || localStorage.getItem('username');
       const statusEl = document.getElementById('setup-status');
 
-      if (!token || !playername || !selectedAvatar) return;
+      if (!token || !playername || !selectedAvatar) {
+        statusEl.className = 'setup-status err';
+        statusEl.textContent = !playername ? 'Could not determine username — please log in again.' : 'Please select an avatar.';
+        return;
+      }
 
       statusEl.className = 'setup-status';
       statusEl.textContent = 'Saving…';
