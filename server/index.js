@@ -1276,6 +1276,7 @@ const chatRouter = require('./routes/chat');
 const leaderboardRouter = require('./routes/leaderboards');
 const tournamentsRouter = require('./routes/tournaments');
 const gameSessionsRouter = require('./routes/game-sessions');
+const assetsManifestRouter = require('./routes/assets-manifest');
 
 app.use('/api/players', playersRouter);
 app.use('/api/friends', friendsRouter);
@@ -1284,6 +1285,7 @@ app.use('/api/chat', chatRouter);
 app.use('/api/leaderboards', leaderboardRouter);
 app.use('/api/tournaments', tournamentsRouter);
 app.use('/api/sessions', gameSessionsRouter);
+app.use('/api/assets', assetsManifestRouter);
 
 // START SERVER
 // ═══════════════════════════════════════════════════════════════════════════

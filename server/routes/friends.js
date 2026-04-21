@@ -22,8 +22,11 @@
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const AuthHandler = require('../auth-handler');
 const { manifoldData, friendsData, notifQueue } = require('../store');
+const TetracubeClient = require('../tetracube-client');
+const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && TetracubeClient.isStrict();
 
 const authHandler = new AuthHandler();
 
@@ -65,6 +68,29 @@ function addNotification(targetUserId, notif) {
   notifQueue[targetUserId].push({ ...notif, id: `notif-${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: Date.now(), read: false });
 }
 
+function mirrorFriendRecord(userId, record, eventName, actorId) {
+  return TetracubeClient.dualWriteFriendsRecord(userId, record, {
+    event: eventName,
+    actor: actorId || 'system',
+  }).catch((err) => {
+    console.warn('[friends] tetracube dual-write failed:', err.message);
+    return { ok: false, skipped: false, error: String(err.message || err), ts: Date.now() };
+  });
+}
+
+function strictModuleUnavailable(res) {
+  return res.status(503).json({
+    success: false,
+    error: 'Tetracube authoritative mode unavailable for friends writes',
+    detail: 'friends module is not fully cut over to remote-authoritative transactions',
+    strict: true,
+  });
+}
+
+function digest(v) {
+  return crypto.createHash('sha256').update(JSON.stringify(v || {})).digest('hex');
+}
+
 // ── GET /api/friends ─────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
   const rec = getFriendRecord(req.userId);
@@ -97,8 +123,46 @@ router.get('/requests', requireAuth, (req, res) => {
   return res.json({ success: true, requests: incoming });
 });
 
+router.get('/parity', requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const rec = getFriendRecord(req.userId);
+  const key = `friends:${userId}`;
+  const shadow = TetracubeClient.getShadowByKey(key);
+  const writeStatus = TetracubeClient.getWriteStatus(key);
+
+  let remote = null;
+  let remoteError = null;
+  if (TetracubeClient.isEnabled()) {
+    try {
+      remote = await TetracubeClient.fetchRemoteRecord('friends', userId, 'snapshot');
+    } catch (e) {
+      remoteError = String(e.message || e);
+    }
+  }
+
+  const memoryHash = digest(rec);
+  const shadowHash = shadow && shadow.value ? digest(shadow.value) : null;
+  const remoteValue = remote && (remote.value || remote.record) ? (remote.value || remote.record) : null;
+  const remoteHash = remoteValue ? digest(remoteValue) : null;
+
+  return res.json({
+    success: true,
+    userId,
+    writeStatus,
+    remoteError,
+    parity: {
+      memoryHash,
+      shadowHash,
+      remoteHash,
+      memoryVsShadow: memoryHash && shadowHash ? memoryHash === shadowHash : null,
+      shadowVsRemote: shadowHash && remoteHash ? shadowHash === remoteHash : null,
+    },
+  });
+});
+
 // ── POST /api/friends/request ────────────────────────────────────────────────
 router.post('/request', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const { toUserId, note } = req.body;
   if (!toUserId) return res.status(400).json({ success: false, error: 'toUserId required' });
   if (toUserId === req.userId) return res.status(400).json({ success: false, error: 'Cannot add yourself' });
@@ -130,12 +194,15 @@ router.post('/request', requireAuth, (req, res) => {
 
   myRec.sent.push({ toUserId, note: safeNote, sentAt: Date.now() });
   theirRec.requests.push({ fromUserId: req.userId, note: safeNote, sentAt: Date.now() });
+  mirrorFriendRecord(req.userId, myRec, 'friends:request-sent', String(req.userId));
+  mirrorFriendRecord(toUserId, theirRec, 'friends:request-received', String(req.userId));
 
   return res.json({ success: true, message: 'Friend request sent' });
 });
 
 // ── POST /api/friends/respond ────────────────────────────────────────────────
 router.post('/respond', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const { fromUserId, accept } = req.body;
   if (!fromUserId) return res.status(400).json({ success: false, error: 'fromUserId required' });
 
@@ -154,14 +221,19 @@ router.post('/respond', requireAuth, (req, res) => {
     const now = Date.now();
     myRec.friends.push({ userId: fromUserId, addedAt: now });
     theirRec.friends.push({ userId: req.userId, addedAt: now });
+    mirrorFriendRecord(req.userId, myRec, 'friends:request-accepted', String(req.userId));
+    mirrorFriendRecord(fromUserId, theirRec, 'friends:request-accepted', String(req.userId));
     return res.json({ success: true, message: 'Friend request accepted' });
   } else {
+    mirrorFriendRecord(req.userId, myRec, 'friends:request-declined', String(req.userId));
+    mirrorFriendRecord(fromUserId, theirRec, 'friends:request-declined', String(req.userId));
     return res.json({ success: true, message: 'Friend request declined' });
   }
 });
 
 // ── DELETE /api/friends/:userId ──────────────────────────────────────────────
 router.delete('/:userId', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const targetId = parseInt(req.params.userId, 10);
   if (isNaN(targetId)) return res.status(400).json({ success: false, error: 'Invalid user ID' });
 
@@ -170,12 +242,15 @@ router.delete('/:userId', requireAuth, (req, res) => {
 
   myRec.friends = myRec.friends.filter(f => f.userId !== targetId);
   theirRec.friends = theirRec.friends.filter(f => f.userId !== req.userId);
+  mirrorFriendRecord(req.userId, myRec, 'friends:removed', String(req.userId));
+  mirrorFriendRecord(targetId, theirRec, 'friends:removed', String(req.userId));
 
   return res.json({ success: true, message: 'Friend removed' });
 });
 
 // ── POST /api/friends/block ──────────────────────────────────────────────────
 router.post('/block', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const { targetUserId } = req.body;
   if (!targetUserId) return res.status(400).json({ success: false, error: 'targetUserId required' });
 
@@ -199,17 +274,21 @@ router.post('/block', requireAuth, (req, res) => {
   myRec.friends = myRec.friends.filter(f => f.userId !== targetUserId);
   const theirRec = getFriendRecord(targetUserId);
   theirRec.friends = theirRec.friends.filter(f => f.userId !== req.userId);
+  mirrorFriendRecord(req.userId, myRec, 'friends:blocked', String(req.userId));
+  mirrorFriendRecord(targetUserId, theirRec, 'friends:blocked-by-other', String(req.userId));
 
   return res.json({ success: true, message: 'User blocked' });
 });
 
 // ── POST /api/friends/unblock ────────────────────────────────────────────────
 router.post('/unblock', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const { targetUserId } = req.body;
   if (!targetUserId) return res.status(400).json({ success: false, error: 'targetUserId required' });
 
   const myRec = getFriendRecord(req.userId);
   myRec.blocked = myRec.blocked.filter(b => b.userId !== targetUserId);
+  mirrorFriendRecord(req.userId, myRec, 'friends:unblocked', String(req.userId));
 
   return res.json({ success: true, message: 'User unblocked' });
 });

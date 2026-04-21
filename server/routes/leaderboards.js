@@ -14,11 +14,22 @@ const express = require('express');
 const router = express.Router();
 const AuthHandler = require('../auth-handler');
 const { manifoldData, leaderboardData } = require('../store');
+const TetracubeClient = require('../tetracube-client');
+const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && TetracubeClient.isStrict();
 
 const authHandler = new AuthHandler();
 
 const VALID_GAMES = ['fasttrack', 'brickbreaker3d', '4dtictactoe', 'starfighter', 'assemble', 'global'];
 const MAX_ENTRIES = 100;
+
+function strictModuleUnavailable(res) {
+  return res.status(503).json({
+    success: false,
+    error: 'Tetracube authoritative mode unavailable for leaderboard writes',
+    detail: 'leaderboards module is not fully cut over to remote-authoritative transactions',
+    strict: true,
+  });
+}
 
 function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -90,6 +101,7 @@ router.get('/:gameId/me', requireAuth, (req, res) => {
 // ── POST /api/leaderboards/:gameId ────────────────────────────────────────────
 // Called by game servers to record scores
 router.post('/:gameId', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const gameId = req.params.gameId.toLowerCase();
   if (!VALID_GAMES.includes(gameId) || gameId === 'global') {
     return res.status(400).json({ success: false, error: 'Invalid gameId' });
@@ -134,6 +146,13 @@ router.post('/:gameId', requireAuth, (req, res) => {
   if (!user.stats.scores[gameId] || score > user.stats.scores[gameId]) {
     user.stats.scores[gameId] = score;
   }
+
+  TetracubeClient.dualWriteLeaderboard(gameId, board, {
+    event: 'leaderboard:score-recorded',
+    actor: String(req.userId),
+  }).catch((err) => {
+    console.warn('[leaderboards] tetracube dual-write failed:', err.message);
+  });
 
   return res.json({ success: true, recorded: true });
 });

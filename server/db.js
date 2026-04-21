@@ -24,6 +24,48 @@ const crypto = require('crypto');
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'kensgames.db');
 let _db = null;
 
+const DIMENSION_MAX_LEVEL = 7;
+const DIMENSION_FIB = [0, 1, 1, 2, 3, 5, 8, 13];
+
+function fibAt(level) {
+  const idx = Math.max(0, Math.min(DIMENSION_MAX_LEVEL, Number(level) || 0));
+  return DIMENSION_FIB[idx] || 0;
+}
+
+function buildDimensionalState(level, length, width, height) {
+  const l = Math.max(0, Math.min(DIMENSION_MAX_LEVEL, Number(level) || 0));
+  const x = Math.max(0, Number.isFinite(Number(length)) ? Number(length) : fibAt(l));
+  const y = Math.max(0, Number.isFinite(Number(width)) ? Number(width) : fibAt(Math.max(l - 1, 0)) || (l > 0 ? 1 : 0));
+  const zAxis = Math.max(0, Number.isFinite(Number(height)) ? Number(height) : fibAt(Math.max(l - 2, 0)) || (l > 1 ? 1 : 0));
+
+  const plane = x * y;     // D2: plane = x * y
+  const volume = plane * zAxis; // D3: volume = x * y * z
+  const mass = volume;     // D4+: atomic object count carried upward
+
+  const thetaDeg = l * 90;
+  const thetaRad = (thetaDeg * Math.PI) / 180;
+  const radius = fibAt(l);
+  const hx = radius * Math.cos(thetaRad);
+  const hy = radius * Math.sin(thetaRad);
+  const hz = hx * hy;      // Schwartz-style coupling: z = x * y in helix projection
+
+  return {
+    level: l,
+    fib_scale: radius,
+    x,
+    y,
+    z_axis: zAxis,
+    plane,
+    volume,
+    mass,
+    theta_deg: thetaDeg,
+    helix_x: hx,
+    helix_y: hy,
+    helix_z: hz,
+    updated_at: Math.floor(Date.now() / 1000),
+  };
+}
+
 // ─── PII encryption (AES-256-GCM) ────────────────────────────────────────────
 // ENCRYPTION_KEY must be exactly 64 hex chars (= 32 bytes) in .env
 const _PII_KEY = (() => {
@@ -242,11 +284,49 @@ function _initSchema(d) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_one_superuser
       ON admins(is_superuser) WHERE is_superuser=1 AND active=1;
     CREATE INDEX IF NOT EXISTS idx_admins_player ON admins(player_id);
+
+    -- ── Canonical dimensional model (void -> 7 levels) ───────────────────
+    CREATE TABLE IF NOT EXISTS dimension_levels (
+      level       INTEGER PRIMARY KEY,
+      label       TEXT    NOT NULL,
+      fib_scale   INTEGER NOT NULL,
+      turn_deg    INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dimensional_nodes (
+      owner_type  TEXT    NOT NULL,
+      owner_ref   TEXT    NOT NULL,
+      level       INTEGER NOT NULL,
+      fib_scale   INTEGER NOT NULL,
+      x           REAL    NOT NULL,
+      y           REAL    NOT NULL,
+      z_axis      REAL    NOT NULL,
+      plane       REAL    NOT NULL,
+      volume      REAL    NOT NULL,
+      mass        REAL    NOT NULL,
+      theta_deg   INTEGER NOT NULL,
+      helix_x     REAL    NOT NULL,
+      helix_y     REAL    NOT NULL,
+      helix_z     REAL    NOT NULL,
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (owner_type, owner_ref)
+    );
+    CREATE INDEX IF NOT EXISTS idx_dimensional_nodes_level ON dimensional_nodes(level);
   `);
 
   // ── Safe schema migrations ─────────────────────────────────────────────
   // Add email_enc column if upgrading from an older schema
   try { d.exec('ALTER TABLE players ADD COLUMN email_enc TEXT'); } catch { }
+
+  // Seed the canonical 0..7 dimensional ladder once.
+  const insertLevel = d.prepare(`
+    INSERT OR IGNORE INTO dimension_levels (level, label, fib_scale, turn_deg)
+    VALUES (?, ?, ?, ?)
+  `);
+  const labels = ['void', 'length', 'width', 'plane', 'volume', 'mass', 'dimension6', 'dimension7'];
+  for (let i = 0; i <= DIMENSION_MAX_LEVEL; i += 1) {
+    insertLevel.run(i, labels[i], fibAt(i), i * 90);
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -286,12 +366,68 @@ const PlayerDB = {
       } else {
         d.prepare('UPDATE players SET last_seen=unixepoch() WHERE id=?').run(existing.id);
       }
+      PlayerDB.upsertDimensionalNode('player', String(kgUserId), { level: 0 });
       return d.prepare('SELECT * FROM players WHERE id=?').get(existing.id);
     }
     const info = d.prepare(
       'INSERT INTO players (kg_user_id, email_hash, email_enc) VALUES (?,?,?)'
     ).run(kgUserId, hash, enc);
+    PlayerDB.upsertDimensionalNode('player', String(kgUserId), { level: 0 });
     return d.prepare('SELECT * FROM players WHERE id = ?').get(info.lastInsertRowid);
+  },
+
+  upsertDimensionalNode(ownerType, ownerRef, { level = 0, x, y, z } = {}) {
+    const state = buildDimensionalState(level, x, y, z);
+    db().prepare(`
+      INSERT INTO dimensional_nodes (
+        owner_type, owner_ref, level, fib_scale,
+        x, y, z_axis, plane, volume, mass,
+        theta_deg, helix_x, helix_y, helix_z, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(owner_type, owner_ref) DO UPDATE SET
+        level=excluded.level,
+        fib_scale=excluded.fib_scale,
+        x=excluded.x,
+        y=excluded.y,
+        z_axis=excluded.z_axis,
+        plane=excluded.plane,
+        volume=excluded.volume,
+        mass=excluded.mass,
+        theta_deg=excluded.theta_deg,
+        helix_x=excluded.helix_x,
+        helix_y=excluded.helix_y,
+        helix_z=excluded.helix_z,
+        updated_at=excluded.updated_at
+    `).run(
+      String(ownerType),
+      String(ownerRef),
+      state.level,
+      state.fib_scale,
+      state.x,
+      state.y,
+      state.z_axis,
+      state.plane,
+      state.volume,
+      state.mass,
+      state.theta_deg,
+      state.helix_x,
+      state.helix_y,
+      state.helix_z,
+      state.updated_at,
+    );
+    return state;
+  },
+
+  getDimensionalNode(ownerType, ownerRef) {
+    return db().prepare(
+      'SELECT * FROM dimensional_nodes WHERE owner_type=? AND owner_ref=?'
+    ).get(String(ownerType), String(ownerRef));
+  },
+
+  listDimensionLevels() {
+    return db().prepare(
+      'SELECT level, label, fib_scale, turn_deg FROM dimension_levels ORDER BY level ASC'
+    ).all();
   },
 
   getByKgUserId(kgUserId) {

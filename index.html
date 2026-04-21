@@ -2298,6 +2298,9 @@
                 <li><a href="/manifold.html">Manifold</a></li>
                 <li><a href="#substrates">Under the Hood</a></li>
                 <li><a href="#tos">Terms</a></li>
+                <li><a href="https://tetracubedb.com" target="_blank" rel="noopener"
+                        style="color:var(--neon-purple);text-shadow:0 0 6px rgba(153,0,255,.35);">TetracubeDB
+                        &#8599;</a></li>
             </ul>
             <div class="nav-auth">
                 <div id="kg-player" style="display:none"></div>
@@ -4042,6 +4045,9 @@
                     <li><a href="/manifold.html">Manifold</a></li>
                     <li><a href="#tos">Terms of Service</a></li>
                     <li><a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Blog</a></li>
+                    <li><a href="https://tetracubedb.com" target="_blank" rel="noopener"
+                            style="color:var(--neon-purple);text-shadow:0 0 6px rgba(153,0,255,.4);">TetracubeDB
+                            &#8599;</a></li>
                 </ul>
             </div>
         </div>
@@ -4455,6 +4461,662 @@
             };
             if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initKGNav); }
             else { initKGNav(); }
+        })();
+    </script>
+
+    <script>
+        // Public manifold tour with Australian-accent voice guidance
+        (function () {
+            const synth = window.speechSynthesis;
+            const TOUR_COPY_PREF_KEY = 'kg_tour_copy_mode';
+            const fallbackSteps = [
+                {
+                    id: 'hero',
+                    title: 'Welcome to the Platform Tour',
+                    sectionId: 'hero',
+                    text: 'Welcome in. This tour introduces KensGames as a living platform where geometry shapes how experiences are organized and rendered.',
+                    longText: 'At the center is TetracubeDB, used as the platform state substrate. Instead of treating everything as isolated rows, the system tracks identities, relationships, and evolving state in a shared dimensional model.'
+                },
+                {
+                    id: 'games',
+                    title: 'One Surface, Many Games',
+                    sectionId: 'games',
+                    text: 'Different games can share one coherent state fabric, so features feel connected instead of siloed.',
+                    longText: 'The platform favors canonical object reuse and references across modules, which helps reduce duplication while keeping lineage clear as state moves between gameplay, social, and rendering layers.'
+                },
+                {
+                    id: 'engine',
+                    title: 'Seed to Scene',
+                    sectionId: 'engine',
+                    text: 'Rather than repeating full payloads everywhere, the system can resolve rich state from compact seeds and shared rules.',
+                    longText: 'In practical terms, KensGames stores records plus the structural rules that turn seeds into coherent, renderable state over time.'
+                },
+                {
+                    id: 'substrates',
+                    title: 'How Modules Coordinate',
+                    sectionId: 'substrates',
+                    text: 'Subsystems stay aligned through shared references and projection contracts, so coordination stays intentional and predictable.',
+                    longText: 'The runtime is designed to minimize ad-hoc join-heavy access paths by resolving references and dimensional projections through explicit substrate contracts.'
+                },
+                {
+                    id: 'manifold',
+                    title: 'Shape-Driven Computing',
+                    sectionId: 'manifold',
+                    text: 'The direction is shape-driven computing, where dimensions are the medium and the processor remains the source of truth.',
+                    longText: 'Low-redundancy and normalization outcomes come from the platform contracts and identity rules used by KensGames. They describe this architecture, not a universal guarantee for every system.'
+                }
+            ];
+
+            const state = {
+                steps: fallbackSteps,
+                index: 0,
+                active: false,
+                paused: false,
+                muted: false,
+                showLongCopy: false,
+                currentUtterance: null,
+                selectedVoiceURI: '',
+                lastSpokenAt: 0,
+                endedNaturally: false
+            };
+
+            const ui = {};
+
+            function byId(id) {
+                return document.getElementById(id);
+            }
+
+            function normalizeStep(item, idx) {
+                const id = String(item.id || item.key || ('step-' + idx));
+                const title = String(item.title || item.name || ('Tour Step ' + (idx + 1)));
+                const text = String(item.text || item.narration || item.voice || item.description || '').trim();
+                const longText = String(item.longText || item.expanded || '').trim();
+                const sectionId = String(item.sectionId || item.anchor || '').replace(/^#/, '');
+                if (!text) return null;
+                return { id, title, text, longText, sectionId };
+            }
+
+            async function loadTourSteps() {
+                try {
+                    const res = await fetch('/api/assets/manifest/portal', { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const candidates =
+                        (data && data.tour && data.tour.steps) ||
+                        (data && data.narration && data.narration.steps) ||
+                        (data && data.manifoldTour && data.manifoldTour.steps) ||
+                        (data && data.steps) ||
+                        null;
+                    if (!Array.isArray(candidates) || !candidates.length) return;
+                    const normalized = candidates.map(normalizeStep).filter(Boolean);
+                    if (normalized.length) state.steps = normalized;
+                } catch (_) {
+                    // Fallback to in-page steps when manifest is unavailable
+                }
+            }
+
+            function ensureTourStyle() {
+                const style = document.createElement('style');
+                style.textContent = `
+                    #kg-tour-panel {
+                        position: fixed;
+                        right: 16px;
+                        bottom: 88px;
+                        width: min(380px, calc(100vw - 24px));
+                        background: linear-gradient(145deg, rgba(6, 10, 28, 0.96), rgba(10, 6, 18, 0.96));
+                        border: 1px solid rgba(0, 255, 255, 0.35);
+                        border-radius: 10px;
+                        box-shadow: 0 0 22px rgba(0, 255, 255, 0.18), 0 0 42px rgba(255, 0, 255, 0.12);
+                        z-index: 8200;
+                        padding: 14px;
+                        transform: translateY(18px);
+                        opacity: 0;
+                        pointer-events: none;
+                        transition: transform 260ms ease, opacity 260ms ease;
+                    }
+                    #kg-tour-panel.open {
+                        transform: translateY(0);
+                        opacity: 1;
+                        pointer-events: auto;
+                    }
+                    .kg-tour-kicker {
+                        font-family: var(--font-arcade);
+                        font-size: 9px;
+                        letter-spacing: 1.6px;
+                        color: var(--neon-yellow);
+                        text-transform: uppercase;
+                    }
+                    .kg-tour-title {
+                        margin-top: 6px;
+                        font-family: var(--font-arcade);
+                        font-size: 12px;
+                        color: var(--neon-cyan);
+                        letter-spacing: 1px;
+                    }
+                    .kg-tour-text {
+                        margin-top: 8px;
+                        font-size: 13px;
+                        line-height: 1.6;
+                        color: var(--text-muted);
+                        min-height: 52px;
+                    }
+                    .kg-tour-badge {
+                        margin-top: 8px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        font-family: var(--font-arcade);
+                        font-size: 9px;
+                        letter-spacing: 1px;
+                        color: var(--neon-green);
+                        border: 1px solid rgba(0, 255, 65, 0.35);
+                        background: rgba(0, 255, 65, 0.08);
+                        padding: 4px 8px;
+                        border-radius: 20px;
+                        text-transform: uppercase;
+                    }
+                    .kg-tour-stage {
+                        margin-top: 10px;
+                        position: relative;
+                        height: 124px;
+                        border-radius: 8px;
+                        border: 1px solid rgba(0, 255, 255, 0.2);
+                        background:
+                            radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.12), transparent 45%),
+                            radial-gradient(circle at 80% 78%, rgba(153, 0, 255, 0.14), transparent 48%),
+                            linear-gradient(145deg, rgba(4, 8, 22, 0.95), rgba(9, 6, 18, 0.95));
+                        overflow: hidden;
+                    }
+                    .kg-tour-stage::before {
+                        content: '';
+                        position: absolute;
+                        inset: 0;
+                        background:
+                            repeating-linear-gradient(90deg, rgba(0, 255, 255, 0.06) 0 1px, transparent 1px 34px),
+                            repeating-linear-gradient(0deg, rgba(0, 255, 255, 0.04) 0 1px, transparent 1px 34px);
+                        opacity: 0.35;
+                        pointer-events: none;
+                    }
+                    .kg-scene-label {
+                        position: absolute;
+                        left: 10px;
+                        top: 8px;
+                        z-index: 2;
+                        font-family: var(--font-arcade);
+                        font-size: 9px;
+                        letter-spacing: 1px;
+                        color: rgba(224, 224, 255, 0.86);
+                        text-transform: uppercase;
+                    }
+                    .kg-seed,
+                    .kg-orbit,
+                    .kg-flow,
+                    .kg-node {
+                        position: absolute;
+                        border-radius: 50%;
+                        pointer-events: none;
+                    }
+                    .kg-seed {
+                        width: 14px;
+                        height: 14px;
+                        left: 20%;
+                        top: 54%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(255, 232, 0, 0.9);
+                        box-shadow: 0 0 8px rgba(255, 232, 0, 0.45);
+                        animation: kg-seed-drift 8s ease-in-out infinite;
+                    }
+                    .kg-orbit {
+                        width: 88px;
+                        height: 88px;
+                        left: 20%;
+                        top: 54%;
+                        transform: translate(-50%, -50%);
+                        border: 1px solid rgba(255, 232, 0, 0.3);
+                        border-radius: 50%;
+                        animation: kg-orbit-turn 11s linear infinite;
+                    }
+                    .kg-flow {
+                        height: 2px;
+                        left: 30%;
+                        right: 12%;
+                        top: 56%;
+                        background: linear-gradient(90deg, rgba(0, 255, 255, 0.45), rgba(153, 0, 255, 0.28));
+                        border-radius: 2px;
+                        transform-origin: left center;
+                        animation: kg-flow-breathe 6s ease-in-out infinite;
+                    }
+                    .kg-node {
+                        width: 12px;
+                        height: 12px;
+                        background: rgba(0, 255, 255, 0.85);
+                        box-shadow: 0 0 8px rgba(0, 255, 255, 0.35);
+                        animation: kg-node-float 7s ease-in-out infinite;
+                    }
+                    .kg-node.n1 { left: 42%; top: 34%; }
+                    .kg-node.n2 { left: 58%; top: 68%; animation-delay: -1.8s; }
+                    .kg-node.n3 { left: 76%; top: 42%; animation-delay: -3.2s; }
+                    #kg-tour-stage.phase-seed .kg-scene-label::after { content: ' - Foundations'; }
+                    #kg-tour-stage.phase-reference .kg-scene-label::after { content: ' - Shared Fabric'; }
+                    #kg-tour-stage.phase-delta .kg-scene-label::after { content: ' - Evolving State'; }
+                    #kg-tour-stage.phase-runtime .kg-scene-label::after { content: ' - Guided Coordination'; }
+                    #kg-tour-stage.phase-authority .kg-scene-label::after { content: ' - Platform Direction'; }
+                    #kg-tour-stage.phase-seed .kg-flow {
+                        right: 46%;
+                        background: linear-gradient(90deg, rgba(255, 232, 0, 0.42), rgba(0, 255, 255, 0.25));
+                    }
+                    #kg-tour-stage.phase-reference .kg-node {
+                        background: rgba(0, 255, 255, 0.9);
+                    }
+                    #kg-tour-stage.phase-delta .kg-flow {
+                        animation-duration: 3.8s;
+                    }
+                    #kg-tour-stage.phase-runtime .kg-node {
+                        box-shadow: 0 0 9px rgba(153, 0, 255, 0.42);
+                        background: rgba(153, 0, 255, 0.9);
+                    }
+                    #kg-tour-stage.phase-authority .kg-orbit {
+                        border-color: rgba(0, 255, 65, 0.42);
+                    }
+                    .kg-tour-progress {
+                        margin-top: 8px;
+                        font-size: 11px;
+                        color: var(--text-muted);
+                    }
+                    .kg-tour-row {
+                        margin-top: 10px;
+                        display: flex;
+                        gap: 8px;
+                        flex-wrap: wrap;
+                        align-items: center;
+                    }
+                    .kg-tour-btn {
+                        border: 1px solid rgba(0, 255, 255, 0.28);
+                        background: rgba(0, 255, 255, 0.08);
+                        color: var(--neon-cyan);
+                        border-radius: 4px;
+                        padding: 7px 10px;
+                        font-family: var(--font-arcade);
+                        font-size: 10px;
+                        letter-spacing: 1px;
+                        cursor: pointer;
+                    }
+                    .kg-tour-btn:hover {
+                        box-shadow: 0 0 12px rgba(0, 255, 255, 0.28);
+                    }
+                    .kg-tour-btn.warn {
+                        color: var(--neon-yellow);
+                        border-color: rgba(255, 232, 0, 0.35);
+                        background: rgba(255, 232, 0, 0.08);
+                    }
+                    .kg-tour-voice {
+                        flex: 1;
+                        min-width: 170px;
+                        padding: 7px 8px;
+                        border-radius: 4px;
+                        border: 1px solid rgba(255, 0, 255, 0.34);
+                        background: rgba(255, 0, 255, 0.07);
+                        color: var(--text);
+                        font-size: 12px;
+                    }
+                    .kg-tour-pulse {
+                        animation: kg-tour-pulse 1200ms ease;
+                    }
+                    @keyframes kg-tour-pulse {
+                        0% { box-shadow: 0 0 18px rgba(0, 255, 255, 0.16), 0 0 36px rgba(255, 0, 255, 0.1); }
+                        50% { box-shadow: 0 0 22px rgba(0, 255, 255, 0.22), 0 0 42px rgba(255, 0, 255, 0.14); }
+                        100% { box-shadow: 0 0 18px rgba(0, 255, 255, 0.16), 0 0 36px rgba(255, 0, 255, 0.1); }
+                    }
+                    @keyframes kg-seed-drift {
+                        0%, 100% { transform: translate(-50%, -50%) scale(1); }
+                        50% { transform: translate(-50%, -50%) scale(1.08); }
+                    }
+                    @keyframes kg-orbit-turn {
+                        from { transform: translate(-50%, -50%) rotate(0deg); }
+                        to { transform: translate(-50%, -50%) rotate(360deg); }
+                    }
+                    @keyframes kg-flow-breathe {
+                        0%, 100% { transform: scaleX(0.88); opacity: 0.58; }
+                        50% { transform: scaleX(1); opacity: 0.86; }
+                    }
+                    @keyframes kg-node-float {
+                        0%, 100% { transform: translateY(0px); }
+                        50% { transform: translateY(-5px); }
+                    }
+                    .kg-tour-active {
+                        outline: 2px solid rgba(0, 255, 255, 0.35);
+                        outline-offset: 3px;
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        .kg-seed,
+                        .kg-orbit,
+                        .kg-flow,
+                        .kg-node,
+                        .kg-tour-pulse {
+                            animation: none !important;
+                        }
+                    }
+                    @media (max-width: 640px) {
+                        #kg-tour-panel {
+                            right: 8px;
+                            left: 8px;
+                            width: auto;
+                            bottom: 76px;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            function createPanel() {
+                const panel = document.createElement('aside');
+                panel.id = 'kg-tour-panel';
+                panel.innerHTML = [
+                    '<div class="kg-tour-kicker">Manifold Guided Tour</div>',
+                    '<div class="kg-tour-title" id="kg-tour-title">Australian Guide Ready</div>',
+                    '<div class="kg-tour-text" id="kg-tour-text">Tap start for a narrated walkthrough of the platform architecture.</div>',
+                    '<div class="kg-tour-badge">Guided Visual Tour</div>',
+                    '<div id="kg-tour-stage" class="kg-tour-stage phase-seed" aria-hidden="true">',
+                    '  <div class="kg-scene-label">Tour Visual</div>',
+                    '  <div class="kg-orbit"></div>',
+                    '  <div class="kg-seed"></div>',
+                    '  <div class="kg-flow"></div>',
+                    '  <div class="kg-node n1"></div>',
+                    '  <div class="kg-node n2"></div>',
+                    '  <div class="kg-node n3"></div>',
+                    '</div>',
+                    '<div class="kg-tour-progress" id="kg-tour-progress">Step 0 of 0</div>',
+                    '<div class="kg-tour-row">',
+                    '  <button class="kg-tour-btn" id="kg-tour-start" type="button">Start</button>',
+                    '  <button class="kg-tour-btn" id="kg-tour-pause" type="button">Pause</button>',
+                    '  <button class="kg-tour-btn" id="kg-tour-resume" type="button">Resume</button>',
+                    '  <button class="kg-tour-btn" id="kg-tour-more" type="button">More Info</button>',
+                    '  <button class="kg-tour-btn" id="kg-tour-replay" type="button">Replay</button>',
+                    '  <button class="kg-tour-btn warn" id="kg-tour-mute" type="button">Mute</button>',
+                    '</div>',
+                    '<div class="kg-tour-row">',
+                    '  <select id="kg-tour-voice" class="kg-tour-voice" aria-label="Tour voice"></select>',
+                    '</div>'
+                ].join('');
+                document.body.appendChild(panel);
+
+                ui.panel = panel;
+                ui.title = byId('kg-tour-title');
+                ui.text = byId('kg-tour-text');
+                ui.progress = byId('kg-tour-progress');
+                ui.start = byId('kg-tour-start');
+                ui.pause = byId('kg-tour-pause');
+                ui.resume = byId('kg-tour-resume');
+                ui.more = byId('kg-tour-more');
+                ui.replay = byId('kg-tour-replay');
+                ui.mute = byId('kg-tour-mute');
+                ui.voice = byId('kg-tour-voice');
+                ui.stage = byId('kg-tour-stage');
+            }
+
+            function activeNarrationText(step) {
+                if (!step) return '';
+                if (state.showLongCopy && step.longText) return step.longText;
+                return step.text;
+            }
+
+            function loadCopyPreference() {
+                try {
+                    const pref = localStorage.getItem(TOUR_COPY_PREF_KEY);
+                    state.showLongCopy = pref === 'long';
+                } catch (_) {
+                    state.showLongCopy = false;
+                }
+            }
+
+            function saveCopyPreference() {
+                try {
+                    localStorage.setItem(TOUR_COPY_PREF_KEY, state.showLongCopy ? 'long' : 'short');
+                } catch (_) {
+                    // Ignore storage failures and continue with in-memory state.
+                }
+            }
+
+            function scenePhaseForStep(step) {
+                const key = String(step.id || step.sectionId || '').toLowerCase();
+                if (key.includes('hero')) return 'phase-seed';
+                if (key.includes('games')) return 'phase-reference';
+                if (key.includes('engine')) return 'phase-delta';
+                if (key.includes('substrate')) return 'phase-runtime';
+                if (key.includes('manifold')) return 'phase-authority';
+                return 'phase-reference';
+            }
+
+            function createHeroTourButton() {
+                const cta = document.querySelector('.hero-cta');
+                if (!cta) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-solo';
+                btn.style.borderColor = 'var(--neon-cyan)';
+                btn.style.color = 'var(--neon-cyan)';
+                btn.style.minWidth = '220px';
+                btn.textContent = 'Guided Tour (AU)';
+                btn.addEventListener('click', function () {
+                    ui.panel.classList.add('open');
+                    startTour();
+                });
+                cta.appendChild(btn);
+            }
+
+            function getPreferredVoice(voices) {
+                const natural = voices.filter(v => /natural|enhanced|premium|neural/i.test(v.name));
+                const byLang = (lang) => voices.filter(v => (v.lang || '').toLowerCase().startsWith(lang));
+                const byLangNatural = (lang) => natural.filter(v => (v.lang || '').toLowerCase().startsWith(lang));
+                return (
+                    byLangNatural('en-au')[0] || byLang('en-au')[0] ||
+                    byLangNatural('en-gb')[0] || byLang('en-gb')[0] ||
+                    byLangNatural('en-us')[0] || byLang('en-us')[0] ||
+                    voices[0] || null
+                );
+            }
+
+            function voiceLabel(v) {
+                return (v.lang || 'unknown') + ' - ' + (v.name || 'voice');
+            }
+
+            function syncVoiceOptions() {
+                if (!ui.voice || !synth) return;
+                const voices = synth.getVoices() || [];
+                ui.voice.innerHTML = '';
+                if (!voices.length) {
+                    const opt = document.createElement('option');
+                    opt.textContent = 'System default voice';
+                    opt.value = '';
+                    ui.voice.appendChild(opt);
+                    return;
+                }
+                const preferred = getPreferredVoice(voices);
+                voices
+                    .filter(v => /^en/i.test(v.lang || ''))
+                    .forEach(function (v) {
+                        const opt = document.createElement('option');
+                        opt.value = v.voiceURI;
+                        opt.textContent = voiceLabel(v);
+                        ui.voice.appendChild(opt);
+                    });
+                if (!ui.voice.options.length) {
+                    voices.forEach(function (v) {
+                        const opt = document.createElement('option');
+                        opt.value = v.voiceURI;
+                        opt.textContent = voiceLabel(v);
+                        ui.voice.appendChild(opt);
+                    });
+                }
+                if (state.selectedVoiceURI && Array.from(ui.voice.options).some(o => o.value === state.selectedVoiceURI)) {
+                    ui.voice.value = state.selectedVoiceURI;
+                } else if (preferred) {
+                    state.selectedVoiceURI = preferred.voiceURI;
+                    ui.voice.value = preferred.voiceURI;
+                }
+            }
+
+            function selectedVoice() {
+                if (!synth) return null;
+                const voices = synth.getVoices() || [];
+                return voices.find(v => v.voiceURI === state.selectedVoiceURI) || getPreferredVoice(voices);
+            }
+
+            function clearStepHighlight() {
+                document.querySelectorAll('.kg-tour-active').forEach(function (el) {
+                    el.classList.remove('kg-tour-active');
+                });
+            }
+
+            function markActiveStep(step) {
+                clearStepHighlight();
+                const id = step.sectionId || (step.id === 'hero' ? 'hero' : '');
+                if (!id) return;
+                const section = document.getElementById(id);
+                if (!section) return;
+                section.classList.add('kg-tour-active');
+                section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            function renderStep() {
+                const step = state.steps[state.index];
+                if (!step) return;
+                ui.title.textContent = step.title;
+                ui.text.textContent = activeNarrationText(step);
+                ui.progress.textContent = 'Step ' + (state.index + 1) + ' of ' + state.steps.length;
+                if (ui.more) ui.more.textContent = state.showLongCopy ? 'Short Copy' : 'More Info';
+                if (ui.stage) {
+                    ui.stage.className = 'kg-tour-stage ' + scenePhaseForStep(step);
+                }
+                ui.panel.classList.remove('kg-tour-pulse');
+                void ui.panel.offsetWidth;
+                ui.panel.classList.add('kg-tour-pulse');
+                markActiveStep(step);
+            }
+
+            function speakStep() {
+                const step = state.steps[state.index];
+                if (!step || !synth || state.muted) return;
+                synth.cancel();
+                const utterance = new SpeechSynthesisUtterance(activeNarrationText(step));
+                const v = selectedVoice();
+                if (v) utterance.voice = v;
+                utterance.lang = (utterance.voice && utterance.voice.lang) || 'en-AU';
+                utterance.rate = 0.95;
+                utterance.pitch = 1.0;
+                utterance.volume = 1;
+
+                utterance.onstart = function () {
+                    state.lastSpokenAt = Date.now();
+                    state.endedNaturally = false;
+                };
+                utterance.onend = function () {
+                    state.currentUtterance = null;
+                    if (!state.active || state.paused) return;
+                    state.endedNaturally = true;
+                    if (state.index < state.steps.length - 1) {
+                        state.index += 1;
+                        state.showLongCopy = false;
+                        renderStep();
+                        speakStep();
+                    }
+                };
+                utterance.onerror = function () {
+                    state.currentUtterance = null;
+                };
+                state.currentUtterance = utterance;
+                synth.speak(utterance);
+            }
+
+            function startTour() {
+                state.active = true;
+                state.paused = false;
+                if (!ui.panel.classList.contains('open')) ui.panel.classList.add('open');
+                renderStep();
+                speakStep();
+            }
+
+            function pauseTour() {
+                state.paused = true;
+                if (synth && synth.speaking) synth.pause();
+            }
+
+            function resumeTour() {
+                if (!state.active) {
+                    startTour();
+                    return;
+                }
+                state.paused = false;
+                if (synth && synth.paused) {
+                    synth.resume();
+                    return;
+                }
+                if (!synth || !synth.speaking) speakStep();
+            }
+
+            function replayTour() {
+                state.index = 0;
+                state.paused = false;
+                state.showLongCopy = false;
+                if (synth) synth.cancel();
+                renderStep();
+                if (!state.muted) speakStep();
+            }
+
+            function toggleMute() {
+                state.muted = !state.muted;
+                ui.mute.textContent = state.muted ? 'Unmute' : 'Mute';
+                if (state.muted && synth) {
+                    synth.cancel();
+                } else if (!state.paused) {
+                    speakStep();
+                }
+            }
+
+            function bindEvents() {
+                ui.start.addEventListener('click', startTour);
+                ui.pause.addEventListener('click', pauseTour);
+                ui.resume.addEventListener('click', resumeTour);
+                ui.more.addEventListener('click', function () {
+                    state.showLongCopy = !state.showLongCopy;
+                    saveCopyPreference();
+                    renderStep();
+                    if (state.active && !state.paused && !state.muted) speakStep();
+                });
+                ui.replay.addEventListener('click', replayTour);
+                ui.mute.addEventListener('click', toggleMute);
+                ui.voice.addEventListener('change', function () {
+                    state.selectedVoiceURI = ui.voice.value;
+                    if (state.active && !state.paused && !state.muted) speakStep();
+                });
+
+                // Keep panel discoverable without forcing autoplay audio
+                setTimeout(function () {
+                    if (!state.active) ui.panel.classList.add('open');
+                }, 1300);
+            }
+
+            async function init() {
+                ensureTourStyle();
+                createPanel();
+                createHeroTourButton();
+                loadCopyPreference();
+                await loadTourSteps();
+                if (state.steps[0] && !state.steps[0].sectionId) state.steps[0].sectionId = 'hero';
+                if (state.steps.length > 1 && !state.steps[1].sectionId) state.steps[1].sectionId = 'games';
+                renderStep();
+                bindEvents();
+                syncVoiceOptions();
+                if (typeof synth !== 'undefined' && synth && typeof synth.onvoiceschanged !== 'undefined') {
+                    synth.onvoiceschanged = syncVoiceOptions;
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init, { once: true });
+            } else {
+                init();
+            }
         })();
     </script>
 

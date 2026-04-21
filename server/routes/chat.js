@@ -19,11 +19,22 @@ const express = require('express');
 const router = express.Router();
 const AuthHandler = require('../auth-handler');
 const { manifoldData, guildsData } = require('../store');
+const TetracubeClient = require('../tetracube-client');
+const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && TetracubeClient.isStrict();
 
 const authHandler = new AuthHandler();
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_DISPLAY_LIMIT = 50;
 const MSG_MAX_LEN = 500;
+
+function strictModuleUnavailable(res) {
+  return res.status(503).json({
+    success: false,
+    error: 'Tetracube authoritative mode unavailable for chat writes',
+    detail: 'chat module is not fully cut over to remote-authoritative transactions',
+    strict: true,
+  });
+}
 
 function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -68,6 +79,7 @@ router.get('/:guildId/history', requireAuth, requireGuildMember, (req, res) => {
 
 // ── POST /api/chat/:guildId/send ──────────────────────────────────────────────
 router.post('/:guildId/send', requireAuth, requireGuildMember, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   if (isMemberSuspended(req.member)) {
     return res.status(403).json({ success: false, error: 'Suspended members cannot chat' });
   }
@@ -94,6 +106,13 @@ router.post('/:guildId/send', requireAuth, requireGuildMember, (req, res) => {
   if (req.guild.chat.length > CHAT_HISTORY_LIMIT) {
     req.guild.chat.splice(0, req.guild.chat.length - CHAT_HISTORY_LIMIT);
   }
+
+  TetracubeClient.dualWriteChatMessage(req.guild.guildId, msg, {
+    event: 'chat:message',
+    actor: String(req.userId),
+  }).catch((err) => {
+    console.warn('[chat] tetracube dual-write failed:', err.message);
+  });
 
   return res.json({ success: true, message: msg });
 });

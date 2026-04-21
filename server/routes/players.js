@@ -16,9 +16,12 @@
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const AuthHandler = require('../auth-handler');
 const { manifoldData } = require('../store');
 const { PlayerDB } = require('../db');
+const TetracubeClient = require('../tetracube-client');
+const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && TetracubeClient.isStrict();
 
 const authHandler = new AuthHandler();
 
@@ -56,6 +59,42 @@ function sanitizePublicProfile(u) {
 }
 
 const PLAYERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+
+function strictModuleUnavailable(res) {
+  return res.status(503).json({
+    success: false,
+    error: 'Tetracube authoritative mode unavailable for player writes',
+    detail: 'players module is not fully cut over to remote-authoritative transactions',
+    strict: true,
+  });
+}
+
+function mirrorPlayerState(userId, user, eventName, extra) {
+  TetracubeClient.dualWritePlayerState(userId, {
+    userId,
+    username: user && user.username,
+    playername: user && user.playername,
+    avatarId: user && user.avatarId,
+    profileSetup: !!(user && user.profileSetup),
+    tosAgreed: !!(user && user.tosAgreed),
+    guildTosAgreed: !!(user && user.guildTosAgreed),
+    adminTosAgreed: !!(user && user.adminTosAgreed),
+    guildId: user && user.guildId,
+    guildRole: user && user.guildRole,
+    stats: (user && user.stats) || {},
+    extra: extra || null,
+    updatedAt: Date.now(),
+  }, {
+    event: eventName,
+    actor: String(userId),
+  }).catch((err) => {
+    console.warn('[players] tetracube dual-write failed:', err.message);
+  });
+}
+
+function digest(v) {
+  return crypto.createHash('sha256').update(JSON.stringify(v || {})).digest('hex');
+}
 
 // ── GET /api/players/check-playername?name= ─────────────────────────────────
 // Unauthenticated check — returns { available: bool }
@@ -105,8 +144,61 @@ router.get('/me', requireAuth, (req, res) => {
   });
 });
 
+router.get('/parity', requireAuth, async (req, res) => {
+  const user = getUserById(req.userId);
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+  const key = `players:${req.userId}`;
+  const shadow = TetracubeClient.getShadowByKey(key);
+  const writeStatus = TetracubeClient.getWriteStatus(key);
+
+  let remote = null;
+  let remoteError = null;
+  if (TetracubeClient.isEnabled()) {
+    try {
+      remote = await TetracubeClient.fetchRemoteRecord('players', req.userId, 'snapshot');
+    } catch (e) {
+      remoteError = String(e.message || e);
+    }
+  }
+
+  const memoryProjected = {
+    userId: user.userId,
+    username: user.username,
+    playername: user.playername || null,
+    avatarId: user.avatarId || null,
+    profileSetup: !!user.profileSetup,
+    tosAgreed: !!user.tosAgreed,
+    guildTosAgreed: !!user.guildTosAgreed,
+    adminTosAgreed: !!user.adminTosAgreed,
+    guildId: user.guildId || null,
+    guildRole: user.guildRole || null,
+    stats: user.stats || {},
+  };
+
+  const memoryHash = digest(memoryProjected);
+  const shadowHash = shadow && shadow.value ? digest(shadow.value) : null;
+  const remoteValue = remote && (remote.value || remote.record) ? (remote.value || remote.record) : null;
+  const remoteHash = remoteValue ? digest(remoteValue) : null;
+
+  return res.json({
+    success: true,
+    userId: req.userId,
+    writeStatus,
+    remoteError,
+    parity: {
+      memoryHash,
+      shadowHash,
+      remoteHash,
+      memoryVsShadow: memoryHash && shadowHash ? memoryHash === shadowHash : null,
+      shadowVsRemote: shadowHash && remoteHash ? shadowHash === remoteHash : null,
+    },
+  });
+});
+
 // ── POST /api/players/tos/agree ─────────────────────────────────────────────
 router.post('/tos/agree', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
@@ -129,6 +221,7 @@ router.post('/tos/agree', requireAuth, (req, res) => {
   if (tosType === 'general') {
     try { PlayerDB.agreeTOS(req.userId, version || '1.0'); } catch { }
   }
+  mirrorPlayerState(req.userId, user, 'players:tos-agree', { tosType, version: version || '1.0' });
 
   return res.json({ success: true, message: `${tosType} TOS recorded` });
 });
@@ -136,6 +229,7 @@ router.post('/tos/agree', requireAuth, (req, res) => {
 // ── POST /api/players/setup ─────────────────────────────────────────────────
 // First-login: playername + avatar (requires tosAgreed). Playername is PERMANENT.
 router.post('/setup', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
@@ -181,6 +275,7 @@ router.post('/setup', requireAuth, (req, res) => {
 
   // Persist to SQLite (playername is locked forever)
   try { PlayerDB.setupProfile(req.userId, playername.trim(), avatarId); } catch { }
+  mirrorPlayerState(req.userId, user, 'players:setup-profile');
 
   return res.json({
     success: true,
@@ -193,6 +288,7 @@ router.post('/setup', requireAuth, (req, res) => {
 // ── POST /api/players/profile ───────────────────────────────────────────────
 // Update avatar only — playername is PERMANENT and cannot be changed.
 router.post('/profile', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const user = getUserById(req.userId);
   if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
@@ -213,6 +309,7 @@ router.post('/profile', requireAuth, (req, res) => {
   }
 
   user.lastModified = Date.now();
+  mirrorPlayerState(req.userId, user, 'players:update-profile');
 
   return res.json({ success: true, playername: user.playername, avatarId: user.avatarId });
 });
@@ -275,6 +372,7 @@ router.get('/preferences', requireAuth, (req, res) => {
 // ── POST /api/players/preferences ────────────────────────────────────────────
 // Body: { key: string, value: string } or { prefs: { key: value, ... } }
 router.post('/preferences', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
 
@@ -290,6 +388,8 @@ router.post('/preferences', requireAuth, (req, res) => {
     PlayerDB.setPref(dbPlayer.id, k, v);
     changed[k] = v;
   }
+  const user = getUserById(req.userId);
+  mirrorPlayerState(req.userId, user, 'players:preferences-update', { changed });
   return res.json({ success: true, changed });
 });
 
@@ -312,6 +412,7 @@ router.get('/favorites', requireAuth, (req, res) => {
 // ── POST /api/players/favorites/toggle ───────────────────────────────────────
 // Body: { gameId: string }  — toggles favorite on/off, returns new state
 router.post('/favorites/toggle', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
   const { gameId } = req.body;
@@ -319,6 +420,8 @@ router.post('/favorites/toggle', requireAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'gameId required' });
   }
   const added = PlayerDB.toggleFavorite(dbPlayer.id, gameId.slice(0, 64));
+  const user = getUserById(req.userId);
+  mirrorPlayerState(req.userId, user, 'players:favorites-toggle', { gameId: gameId.slice(0, 64), favorited: added });
   return res.json({ success: true, gameId, favorited: added });
 });
 
@@ -333,6 +436,7 @@ router.get('/friends', requireAuth, (req, res) => {
 // ── POST /api/players/friends/add ─────────────────────────────────────────────
 // Body: { playerName: string }  — adds mutual friendship
 router.post('/friends/add', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
 
@@ -346,12 +450,15 @@ router.post('/friends/add', requireAuth, (req, res) => {
     return res.status(403).json({ success: false, error: 'Cannot add this player' });
   }
   PlayerDB.addFriend(dbPlayer.id, target.id);
+  const user = getUserById(req.userId);
+  mirrorPlayerState(req.userId, user, 'players:friends-add', { target: target.player_name });
   return res.json({ success: true, message: `${target.player_name} added as friend` });
 });
 
 // ── POST /api/players/friends/remove ──────────────────────────────────────────
 // Body: { playerName: string }
 router.post('/friends/remove', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
 
@@ -361,12 +468,15 @@ router.post('/friends/remove', requireAuth, (req, res) => {
   const target = PlayerDB.getByPlayerName(playerName);
   if (!target) return res.status(404).json({ success: false, error: 'Player not found' });
   PlayerDB.removeFriend(dbPlayer.id, target.id);
+  const user = getUserById(req.userId);
+  mirrorPlayerState(req.userId, user, 'players:friends-remove', { target: target.player_name });
   return res.json({ success: true });
 });
 
 // ── POST /api/players/blocks/add ──────────────────────────────────────────────
 // Body: { playerName: string } — also removes mutual friendship
 router.post('/blocks/add', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
 
@@ -378,12 +488,15 @@ router.post('/blocks/add', requireAuth, (req, res) => {
   if (target.id === dbPlayer.id) return res.status(400).json({ success: false, error: 'Cannot block yourself' });
 
   PlayerDB.addBlock(dbPlayer.id, target.id);
+  const user = getUserById(req.userId);
+  mirrorPlayerState(req.userId, user, 'players:block-add', { target: target.player_name });
   return res.json({ success: true, message: `${target.player_name} blocked` });
 });
 
 // ── POST /api/players/blocks/remove ───────────────────────────────────────────
 // Body: { playerName: string } — 24h cooldown enforced
 router.post('/blocks/remove', requireAuth, (req, res) => {
+  if (TETRACUBE_STRICT) return strictModuleUnavailable(res);
   const dbPlayer = PlayerDB.getByKgUserId(req.userId);
   if (!dbPlayer) return res.status(404).json({ success: false, error: 'Player not found' });
 
@@ -395,6 +508,8 @@ router.post('/blocks/remove', requireAuth, (req, res) => {
 
   try {
     PlayerDB.removeBlock(dbPlayer.id, target.id);
+    const user = getUserById(req.userId);
+    mirrorPlayerState(req.userId, user, 'players:block-remove', { target: target.player_name });
     return res.json({ success: true });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
