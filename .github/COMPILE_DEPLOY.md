@@ -36,6 +36,8 @@ The entry point for VPS post-deploy is `AGENTS.md` (Helix reads it automatically
 | Universal access | `z = x * y` — every game must satisfy this |
 | Recursion scope | Between dimensions only, never within |
 | Bridge protocol | Every deployed game must expose `window.__MANIFOLD__` |
+| Single substrate | All systems (logic, UI, audio, AI) read from `Manifold.sample()` |
+| Derived fields | `f1 = x·y` (density), `f2 = x·y²` (intensity), `G` (Schwarz Diamond field) |
 
 **If `z ≠ x*y` for any game, stop. Do not proceed.**
 
@@ -49,6 +51,7 @@ The entry point for VPS post-deploy is `AGENTS.md` (Helix reads it automatically
 | `manifold.portal.json` | Root portal config — source of truth for all games |
 | `*/manifold.game.json` | Per-game manifold descriptor (one per game directory) |
 | `js/manifold_bridge.js` | Shared browser bridge — included by every game |
+| `js/manifold_sample.js` | Unified `Manifold.sample(ctx)` API — load **before** bridge; all substrates read from this |
 | `js/kg-session.js` | Shared auth/session module — included by every authenticated page |
 | `dist/manifold.registry.json` | Compiler output — portal reads this at runtime |
 | `dist/deploy.manifest.json` | Compiler output — Helix AI reads this on VPS |
@@ -157,6 +160,7 @@ All games must show `tag=True` (or `tag=OK`).
 ```bash
 # Check any JS files you modified
 node --check arcade.js
+node --check js/manifold_sample.js
 node --check js/manifold_bridge.js
 node --check js/kg-session.js
 node --check brickbreaker3d/game.js
@@ -257,6 +261,7 @@ py -3.12 engine/manifold_compiler.py --validate-only
 | `dist/` missing | Create it: `mkdir dist` then recompile |
 | `node --check` fails | Fix syntax before committing |
 | Bridge tag missing from a game | Add `<script src="/js/manifold_bridge.js"></script>` to the game's HTML |
+| `manifold_sample.js` not loaded before bridge | Move `<script src="/js/manifold_sample.js"></script>` above `manifold_bridge.js` |
 | `kg-session.js` missing from authenticated page | Add `<script src="/js/kg-session.js"></script>` to `<head>` |
 | `portal.html` shows double player chip | Ensure `<body data-kg-no-init="true">` is set on portal.html |
 | `better-sqlite3` build fails on VPS | Ensure Node.js version matches; try `npm rebuild better-sqlite3` |
@@ -328,5 +333,83 @@ To add a new game:
 
 ---
 
+## 12. Manifold.sample() — Unified Substrate API
+
+`js/manifold_sample.js` is the single entry point all systems use instead of separate config trees.
+
+### Load order (in every game HTML)
+
+```html
+<script src="/js/manifold_sample.js"></script>   <!-- must be first -->
+<script src="/js/manifold_bridge.js"></script>
+```
+
+### Wire once at game init
+
+```javascript
+// Subscribe all substrates to the shared sample stream
+Manifold.subscribe(function(s) {
+  // Logic — spawn rates, difficulty, feature flags
+  spawnSystem.setRate(s.logic.spawnRate);
+  aiTree.setDifficulty(s.logic.difficulty);
+
+  // UI/UX — layout, animation speed, color theme
+  uiLayer.setDensity(s.ui.layoutDensity);
+  animator.setSpeed(s.ui.animSpeed);
+  theme.apply(s.ui.colorScheme);
+
+  // Audio — music mode, SFX density, volume
+  musicMixer.setMode(s.audio.musicMode);
+  sfxLayer.setDensity(s.audio.sfxDensity);
+
+  // AI routing — pick model size, set temperature, cache hint
+  aiRouter.configure(s.ai);
+});
+```
+
+### Drive from game loop or context change
+
+```javascript
+// Each frame (or each turn, screen transition, major action):
+Manifold.update({
+  x: turnNumber / maxTurns,   // progression 0..1
+  y: boardTension,            // intensity 0..1
+});
+```
+
+### Gyroid lattice — tune without touching substrate code
+
+Add a node to the lattice to create a new behavioral region:
+
+```javascript
+// "Boss fight" zone — fires at peak x=0.8, y=0.9
+Manifold.lattice.push({
+  x: 0.8, y: 0.9,
+  region: 'boss', intensity: 0.95, theme: 'danger',
+  aiMode: 'aggressive', spawnRate: 0.95, musicMode: 'climax'
+});
+```
+
+### ManifoldSample fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x`, `y` | float 0..1 | Input coordinates (progression, intensity) |
+| `z` | float | Derived: `x·y²` |
+| `f1` | float | `x·y` — interaction density |
+| `f2` | float | `x·y²` — non-linear intensity |
+| `G` | float [−1,1] | Schwarz Diamond field value |
+| `surfaceProximity` | float 0..1 | `1 − |G|` — 1 = on surface (high priority) |
+| `region` | string | Nearest lattice region name |
+| `intensity` | float 0..1 | IDW-blended intensity |
+| `theme` | string | Color/mood theme |
+| `aiMode` | string | AI routing mode |
+| `logic` | object | `{ spawnRate, difficulty, featureFlags, forkPriority }` |
+| `ui` | object | `{ layoutDensity, animSpeed, colorScheme, glowIntensity }` |
+| `audio` | object | `{ musicMode, sfxDensity, notifyStyle, masterVolume }` |
+| `ai` | object | `{ modelSize, temperature, cacheHint, maxTokens, promptStyle }` |
+
+---
+
 *Axiom: z = xy · Everything is a point in a higher dimension and a whole in a lower.*
-*Directive version: 2.0 · kensgames.com · Updated April 2026*
+*Directive version: 2.1 · kensgames.com · Updated April 2026*

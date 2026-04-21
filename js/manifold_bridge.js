@@ -9,6 +9,13 @@
  *                        z is their quadratic 3D projection — never stored, always derived)
  *
  * Schwartz Diamond field: F(x,y,z) = cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z)
+ *
+ * Integration with Manifold.sample (js/manifold_sample.js)
+ * ─────────────────────────────────────────────────────────
+ * Load manifold_sample.js BEFORE this file.  When present, every
+ * setDimension command also fires Manifold.update() so all subscribers
+ * (audio, UI, AI) receive a fresh ManifoldSample automatically.
+ * ManifoldBridge.sample() is a convenience shortcut for the same thing.
  *   Entities where |F| → 0 sit on the surface boundary and get highest fork priority.
  *   Entities deep in a channel (|F| → 1) have lower priority.
  *   This is the Dijkstra ordering used to prevent deadlock in multi-entity operations.
@@ -166,6 +173,33 @@
       return global.__MANIFOLD__?.dimension ?? null;
     },
 
+    /**
+     * Compute a ManifoldSample from the current game dimensions.
+     * Delegates to Manifold.sample() if manifold_sample.js is loaded;
+     * otherwise returns a minimal struct with just x, y, z, f1, f2, G.
+     *
+     * @param {object} [overrides]  merged into the ctx before sampling
+     * @returns {ManifoldSample|object}
+     */
+    sample(overrides) {
+      const dim = global.__MANIFOLD__?.dimension;
+      if (!dim) return null;
+      // Normalize integer game dimensions (e.g. x=4, y=13) to 0..1
+      // by dividing by their product (z = x·y in the integer dimension axiom).
+      const maxXY = Math.max(1, dim.x * dim.y);
+      const nx = Math.min(1, dim.x / Math.max(1, dim.x));
+      const ny = Math.min(1, dim.y / Math.max(1, maxXY / dim.x));
+      const ctx = Object.assign({ x: nx, y: ny }, overrides);
+      if (global.Manifold && global.Manifold.sample) {
+        return global.Manifold.sample(ctx);
+      }
+      // Fallback: minimal sample without the full lattice
+      const f1 = nx * ny;
+      const f2 = nx * ny * ny;
+      const G = dim.field;
+      return { x: nx, y: ny, z: f2, f1, f2, G, surfaceProximity: 1 - Math.abs(G) };
+    },
+
     /** True after init() has been called */
     get ready() { return _ready; },
   };
@@ -227,6 +261,11 @@
             Math.cos(wrap(dx)) * Math.cos(wrap(dy)) * Math.cos(wrap(dz))
             - Math.sin(wrap(dx)) * Math.sin(wrap(dy)) * Math.sin(wrap(dz));
           _fire('dimensionChanged', global.__MANIFOLD__.dimension);
+          // Propagate to Manifold.update() so all substrate subscribers
+          // (audio, UI, AI) receive a fresh ManifoldSample automatically.
+          if (global.Manifold && global.Manifold.update) {
+            global.Manifold.update(ManifoldBridge.sample());
+          }
           break;
         }
 
