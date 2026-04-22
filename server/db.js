@@ -146,6 +146,28 @@ function _initSchema(d) {
     CREATE INDEX IF NOT EXISTS idx_players_status ON players(status);
     CREATE INDEX IF NOT EXISTS idx_players_uid    ON players(kg_user_id);
 
+    -- ── Auth users (persistent login identity) ───────────────────────────
+    CREATE TABLE IF NOT EXISTS auth_users (
+      kg_user_id                INTEGER PRIMARY KEY,
+      username                  TEXT    UNIQUE NOT NULL COLLATE NOCASE,
+      email                     TEXT    UNIQUE NOT NULL COLLATE NOCASE,
+      password_hash             TEXT,
+      display_name              TEXT,
+      avatar                    TEXT    NOT NULL DEFAULT '🎮',
+      auth_method               INTEGER NOT NULL DEFAULT 1,
+      status                    TEXT    NOT NULL DEFAULT 'active',
+      email_verified            INTEGER NOT NULL DEFAULT 1,
+      verification_code_hash    TEXT,
+      verification_code_expiry  INTEGER,
+      sessions_json             TEXT    NOT NULL DEFAULT '[]',
+      last_password_change_at   INTEGER,
+      created_at                INTEGER NOT NULL DEFAULT (unixepoch()),
+      last_login_at             INTEGER,
+      FOREIGN KEY (kg_user_id) REFERENCES players(kg_user_id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_users_username ON auth_users(username COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_auth_users_email    ON auth_users(email COLLATE NOCASE);
+
     -- ── Guilds ────────────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS guilds (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -312,6 +334,56 @@ function _initSchema(d) {
       PRIMARY KEY (owner_type, owner_ref)
     );
     CREATE INDEX IF NOT EXISTS idx_dimensional_nodes_level ON dimensional_nodes(level);
+
+    -- ── Beta Codes (promotional codes for beta testers) ────────────────────
+    CREATE TABLE IF NOT EXISTS beta_codes (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      code            TEXT    UNIQUE NOT NULL COLLATE NOCASE,
+      code_type       TEXT    NOT NULL DEFAULT 'beta',
+      created_by      INTEGER NOT NULL REFERENCES players(id),
+      claimed_by      INTEGER REFERENCES players(id),
+      status          TEXT    NOT NULL DEFAULT 'active',
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      claimed_at      INTEGER,
+      expires_at      INTEGER,
+      benefits        TEXT    NOT NULL DEFAULT 'free_play_lifetime'
+    );
+    CREATE INDEX IF NOT EXISTS idx_beta_codes_code ON beta_codes(code);
+    CREATE INDEX IF NOT EXISTS idx_beta_codes_claimed_by ON beta_codes(claimed_by);
+
+    -- ── Bug Reports (submitted by beta testers) ────────────────────────────
+    CREATE TABLE IF NOT EXISTS bug_reports (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      reporter_id     INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      game_id         TEXT,
+      title           TEXT    NOT NULL,
+      description     TEXT    NOT NULL,
+      priority        TEXT    NOT NULL DEFAULT 'medium',
+      status          TEXT    NOT NULL DEFAULT 'open',
+      steps_to_repro  TEXT,
+      screenshot_url  TEXT,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      resolved_at     INTEGER,
+      resolved_by     INTEGER REFERENCES players(id),
+      resolution_note TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_bug_reports_reporter ON bug_reports(reporter_id);
+    CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);
+    CREATE INDEX IF NOT EXISTS idx_bug_reports_priority ON bug_reports(priority);
+    CREATE INDEX IF NOT EXISTS idx_bug_reports_created ON bug_reports(created_at DESC);
+
+    -- ── User Reviews (5-star reviews, superuser-only visibility) ──────────
+    CREATE TABLE IF NOT EXISTS user_reviews (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      reviewer_id     INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      rating          INTEGER NOT NULL,
+      comment         TEXT,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    CREATE INDEX IF NOT EXISTS idx_reviews_reviewer ON user_reviews(reviewer_id);
+    CREATE INDEX IF NOT EXISTS idx_reviews_rating ON user_reviews(rating);
   `);
 
   // ── Safe schema migrations ─────────────────────────────────────────────
@@ -837,4 +909,436 @@ const AdminDB = {
   },
 };
 
-module.exports = { db, PlayerDB, AdminDB, PiiCrypto, hashEmail, xpToLevel, MEDALLION_LEVELS, MEDALLION_MIN_XP };
+const AuthDB = {
+  _nextKgUserId() {
+    const row = db().prepare('SELECT COALESCE(MAX(kg_user_id), 0) + 1 AS next_id FROM players').get();
+    return row && row.next_id ? row.next_id : 1;
+  },
+
+  _mergeRow(row) {
+    if (!row) return null;
+    let sessions = [];
+    try { sessions = JSON.parse(row.sessions_json || '[]'); } catch { sessions = []; }
+    return {
+      userId: row.kg_user_id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      displayName: row.display_name || row.username,
+      avatar: row.avatar || '🎮',
+      authMethod: row.auth_method || 1,
+      status: row.status || 'active',
+      emailVerified: row.email_verified === 1,
+      verificationCodeHash: row.verification_code_hash || null,
+      verificationCodeExpiry: row.verification_code_expiry || null,
+      sessions,
+      lastPasswordChangeAt: row.last_password_change_at || null,
+      createdAt: row.created_at ? row.created_at * 1000 : Date.now(),
+      lastLoginAt: row.last_login_at ? row.last_login_at * 1000 : null,
+      profileSetup: row.profile_setup === 1,
+      playername: row.player_name || null,
+      avatarId: row.avatar_id || null,
+      isAdmin: row.is_admin === 1,
+      isSuperuser: row.is_superuser === 1,
+      adminLevel: row.is_superuser === 1 ? 3 : 0,
+    };
+  },
+
+  _selectBy(whereClause, value) {
+    const row = db().prepare(`
+      SELECT a.*, p.player_name, p.avatar_id, p.profile_setup, p.is_admin, p.is_superuser
+      FROM auth_users a
+      JOIN players p ON p.kg_user_id = a.kg_user_id
+      WHERE ${whereClause}
+      LIMIT 1
+    `).get(value);
+    return AuthDB._mergeRow(row);
+  },
+
+  listUsers() {
+    const rows = db().prepare(`
+      SELECT a.*, p.player_name, p.avatar_id, p.profile_setup, p.is_admin, p.is_superuser
+      FROM auth_users a
+      JOIN players p ON p.kg_user_id = a.kg_user_id
+      ORDER BY a.kg_user_id ASC
+    `).all();
+    return rows.map(AuthDB._mergeRow);
+  },
+
+  getByUsername(username) {
+    return AuthDB._selectBy('a.username = ? COLLATE NOCASE', username);
+  },
+
+  getByEmail(email) {
+    return AuthDB._selectBy('a.email = ? COLLATE NOCASE', String(email || '').toLowerCase());
+  },
+
+  getByKgUserId(kgUserId) {
+    return AuthDB._selectBy('a.kg_user_id = ?', kgUserId);
+  },
+
+  createUser({
+    username,
+    email,
+    passwordHash,
+    displayName,
+    avatar,
+    authMethod,
+    status,
+    emailVerified,
+    verificationCodeHash,
+    verificationCodeExpiry,
+    isAdmin,
+    isSuperuser,
+    sessions,
+  }) {
+    const d = db();
+    const uname = String(username || '').trim();
+    const em = String(email || '').trim().toLowerCase();
+    if (!uname || !em) throw new Error('username and email required');
+
+    const tx = d.transaction(() => {
+      const kgUserId = AuthDB._nextKgUserId();
+      const emailEnc = PiiCrypto.encrypt(em);
+      d.prepare(
+        `INSERT INTO players (kg_user_id, email_hash, email_enc, status, is_admin, is_superuser)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(
+        kgUserId,
+        hashEmail(em),
+        emailEnc,
+        status || 'active',
+        isAdmin ? 1 : 0,
+        isSuperuser ? 1 : 0,
+      );
+
+      d.prepare(
+        `INSERT INTO auth_users (
+          kg_user_id, username, email, password_hash, display_name, avatar,
+          auth_method, status, email_verified, verification_code_hash,
+          verification_code_expiry, sessions_json, created_at, last_login_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?)`
+      ).run(
+        kgUserId,
+        uname,
+        em,
+        passwordHash || null,
+        displayName || uname,
+        avatar || '🎮',
+        Number(authMethod) || 1,
+        status || 'active',
+        emailVerified === false ? 0 : 1,
+        verificationCodeHash || null,
+        verificationCodeExpiry || null,
+        JSON.stringify(Array.isArray(sessions) ? sessions : []),
+        null,
+      );
+
+      return kgUserId;
+    });
+
+    const id = tx();
+    return AuthDB.getByKgUserId(id);
+  },
+
+  updateByUsername(username, patch) {
+    const current = AuthDB.getByUsername(username);
+    if (!current) return null;
+    return AuthDB.updateByKgUserId(current.userId, patch);
+  },
+
+  updateByKgUserId(kgUserId, patch) {
+    const current = AuthDB.getByKgUserId(kgUserId);
+    if (!current) return null;
+    const next = { ...current, ...(patch || {}) };
+
+    db().prepare(
+      `UPDATE auth_users SET
+        username=?,
+        email=?,
+        password_hash=?,
+        display_name=?,
+        avatar=?,
+        auth_method=?,
+        status=?,
+        email_verified=?,
+        verification_code_hash=?,
+        verification_code_expiry=?,
+        sessions_json=?,
+        last_password_change_at=?,
+        last_login_at=?
+      WHERE kg_user_id=?`
+    ).run(
+      next.username,
+      String(next.email || '').toLowerCase(),
+      next.passwordHash || null,
+      next.displayName || next.username,
+      next.avatar || '🎮',
+      Number(next.authMethod) || 1,
+      next.status || 'active',
+      next.emailVerified === false ? 0 : 1,
+      next.verificationCodeHash || null,
+      next.verificationCodeExpiry || null,
+      JSON.stringify(Array.isArray(next.sessions) ? next.sessions : []),
+      next.lastPasswordChangeAt ? Math.floor(Number(next.lastPasswordChangeAt) / 1000) : null,
+      next.lastLoginAt ? Math.floor(Number(next.lastLoginAt) / 1000) : null,
+      kgUserId,
+    );
+
+    db().prepare(
+      'UPDATE players SET email_hash=?, email_enc=?, status=?, is_admin=?, is_superuser=? WHERE kg_user_id=?'
+    ).run(
+      hashEmail(next.email || ''),
+      PiiCrypto.encrypt(next.email || ''),
+      next.status || 'active',
+      next.isAdmin ? 1 : 0,
+      next.isSuperuser ? 1 : 0,
+      kgUserId,
+    );
+
+    return AuthDB.getByKgUserId(kgUserId);
+  },
+
+  // ── Admin role management ──────────────────────────────────────────────
+
+  isSuperuser(kgUserId) {
+    const d = db();
+    const row = d.prepare('SELECT is_superuser FROM admins WHERE player_id = (SELECT id FROM players WHERE kg_user_id = ?) AND active = 1').get(kgUserId);
+    return row ? row.is_superuser === 1 : false;
+  },
+
+  isAdmin(kgUserId) {
+    const d = db();
+    const row = d.prepare('SELECT is_superuser FROM admins WHERE player_id = (SELECT id FROM players WHERE kg_user_id = ?) AND active = 1').get(kgUserId);
+    return row ? true : false;
+  },
+
+  elevateToSuperuser(targetKgUserId, elevatedByKgUserId) {
+    const d = db();
+    // Check that elevator is already superuser
+    if (!AuthDB.isSuperuser(elevatedByKgUserId)) {
+      throw new Error('Only superuser can elevate to superuser');
+    }
+    // Get player IDs
+    const targetPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(targetKgUserId);
+    const elevatedByPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(elevatedByKgUserId);
+    if (!targetPlayer || !elevatedByPlayer) throw new Error('Player not found');
+
+    // Deactivate any existing superuser
+    d.prepare('UPDATE admins SET active = 0, revoked_at = unixepoch(), revoked_by = ? WHERE is_superuser = 1 AND active = 1').run(elevatedByPlayer.id);
+
+    // Insert or update new superuser
+    const existing = d.prepare('SELECT id FROM admins WHERE player_id = ?').get(targetPlayer.id);
+    if (existing) {
+      d.prepare('UPDATE admins SET is_superuser = 1, active = 1, granted_by = ?, granted_at = unixepoch() WHERE player_id = ?').run(elevatedByPlayer.id, targetPlayer.id);
+    } else {
+      d.prepare('INSERT INTO admins (player_id, is_superuser, granted_by, granted_at, active) VALUES (?, 1, ?, unixepoch(), 1)').run(targetPlayer.id, elevatedByPlayer.id);
+    }
+    return AuthDB.getByKgUserId(targetKgUserId);
+  },
+
+  createAdmin(targetKgUserId, createdByKgUserId, reason) {
+    const d = db();
+    // Check that creator is superuser
+    if (!AuthDB.isSuperuser(createdByKgUserId)) {
+      throw new Error('Only superuser can create admins');
+    }
+    const targetPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(targetKgUserId);
+    const createdByPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(createdByKgUserId);
+    if (!targetPlayer || !createdByPlayer) throw new Error('Player not found');
+
+    // Insert admin record (not superuser)
+    const existing = d.prepare('SELECT id FROM admins WHERE player_id = ?').get(targetPlayer.id);
+    if (existing) throw new Error('User is already an admin');
+
+    d.prepare('INSERT INTO admins (player_id, is_superuser, granted_by, granted_at, active, notes_enc) VALUES (?, 0, ?, unixepoch(), 1, ?)').run(targetPlayer.id, createdByPlayer.id, reason || '');
+    return AuthDB.getByKgUserId(targetKgUserId);
+  },
+
+  revokeAdmin(targetKgUserId, revokedByKgUserId, reason) {
+    const d = db();
+    // Check that revoker is superuser
+    if (!AuthDB.isSuperuser(revokedByKgUserId)) {
+      throw new Error('Only superuser can revoke admins');
+    }
+    // Superuser cannot be revoked
+    if (AuthDB.isSuperuser(targetKgUserId)) {
+      throw new Error('Cannot revoke superuser status this way');
+    }
+
+    const targetPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(targetKgUserId);
+    const revokedByPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(revokedByKgUserId);
+    if (!targetPlayer || !revokedByPlayer) throw new Error('Player not found');
+
+    d.prepare('UPDATE admins SET active = 0, revoked_at = unixepoch(), revoked_by = ?, notes_enc = ? WHERE player_id = ?').run(revokedByPlayer.id, reason || '', targetPlayer.id);
+    return AuthDB.getByKgUserId(targetKgUserId);
+  },
+
+  // ── Beta code management ───────────────────────────────────────────────
+
+  generateBetaCodes(count, generatedByKgUserId, expiresInDays) {
+    const d = db();
+    const adminPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(generatedByKgUserId);
+    if (!adminPlayer) throw new Error('Admin not found');
+
+    const codes = [];
+    const expiresAt = expiresInDays ? Math.floor(Date.now() / 1000) + (expiresInDays * 86400) : null;
+
+    const stmt = d.prepare(`
+      INSERT INTO beta_codes (code, code_type, created_by, status, expires_at, benefits)
+      VALUES (?, 'beta', ?, 'active', ?, 'free_play_lifetime')
+    `);
+
+    const tx = d.transaction(() => {
+      for (let i = 0; i < count; i++) {
+        // Generate unique code: BETA-XXXXX-XXXXX format
+        const code = 'BETA-' + Math.random().toString(36).substr(2, 5).toUpperCase() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+        stmt.run(code, adminPlayer.id, expiresAt);
+        codes.push(code);
+      }
+    });
+
+    tx();
+    return codes;
+  },
+
+  claimBetaCode(code, claimerKgUserId) {
+    const d = db();
+    const betaRow = d.prepare('SELECT id, claimed_by FROM beta_codes WHERE code = ? COLLATE NOCASE').get(code);
+    if (!betaRow) throw new Error('Invalid beta code');
+    if (betaRow.claimed_by) throw new Error('Code already claimed');
+
+    const claimerPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(claimerKgUserId);
+    if (!claimerPlayer) throw new Error('Claimer not found');
+
+    d.prepare('UPDATE beta_codes SET claimed_by = ?, claimed_at = unixepoch(), status = \'claimed\' WHERE id = ?').run(claimerPlayer.id, betaRow.id);
+    return betaRow;
+  },
+
+  getBetaCodesStatus(generatedByKgUserId) {
+    const d = db();
+    const adminPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(generatedByKgUserId);
+    if (!adminPlayer) throw new Error('Admin not found');
+
+    return d.prepare(`
+      SELECT
+        code, status, claimed_by, created_at, claimed_at, expires_at,
+        (SELECT player_name FROM players WHERE id = claimed_by) as claimed_by_name
+      FROM beta_codes
+      WHERE created_by = ?
+      ORDER BY created_at DESC
+    `).all(adminPlayer.id);
+  },
+
+  // ── Bug reporting ──────────────────────────────────────────────────────
+
+  submitBugReport(reporterKgUserId, gameId, title, description, priority, stepsToRepro) {
+    const d = db();
+    const reporter = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(reporterKgUserId);
+    if (!reporter) throw new Error('Reporter not found');
+
+    const validPriorities = ['minor', 'moderate', 'major', 'critical', 'show_stopper'];
+    const pri = validPriorities.includes(priority) ? priority : 'moderate';
+
+    d.prepare(`
+      INSERT INTO bug_reports (reporter_id, game_id, title, description, priority, steps_to_repro, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'open')
+    `).run(reporter.id, gameId || null, title, description, pri, stepsToRepro || null);
+
+    return d.prepare('SELECT * FROM bug_reports WHERE id = last_insert_rowid()').get();
+  },
+
+  getBugReports(filterBy = 'all', superuserKgUserId) {
+    const d = db();
+    // Verify caller is superuser
+    if (!AuthDB.isSuperuser(superuserKgUserId)) {
+      throw new Error('Only superuser can view bug reports');
+    }
+
+    let query = `
+      SELECT
+        b.*,
+        (SELECT player_name FROM players WHERE id = b.reporter_id) as reporter_name,
+        (SELECT player_name FROM players WHERE id = b.resolved_by) as resolved_by_name
+      FROM bug_reports b
+    `;
+
+    if (filterBy === 'open') {
+      query += ' WHERE b.status = \'open\'';
+    } else if (filterBy === 'critical') {
+      query += ' WHERE b.priority IN (\'critical\', \'show_stopper\')';
+    }
+
+    query += ' ORDER BY b.created_at DESC LIMIT 100';
+
+    return d.prepare(query).all();
+  },
+
+  updateBugReportStatus(bugReportId, newStatus, resolvedByKgUserId, resolutionNote) {
+    const d = db();
+    const resolvedByPlayer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(resolvedByKgUserId);
+
+    d.prepare(`
+      UPDATE bug_reports
+      SET status = ?, resolved_by = ?, resolved_at = unixepoch(), resolution_note = ?, updated_at = unixepoch()
+      WHERE id = ?
+    `).run(newStatus, resolvedByPlayer?.id || null, resolutionNote || null, bugReportId);
+
+    return d.prepare('SELECT * FROM bug_reports WHERE id = ?').get(bugReportId);
+  },
+
+  // ── User reviews ───────────────────────────────────────────────────────
+
+  submitReview(reviewerKgUserId, rating, comment) {
+    const d = db();
+    const reviewer = d.prepare('SELECT id FROM players WHERE kg_user_id = ?').get(reviewerKgUserId);
+    if (!reviewer) throw new Error('Reviewer not found');
+
+    const validRating = Math.min(5, Math.max(1, parseInt(rating) || 3));
+
+    d.prepare(`
+      INSERT INTO user_reviews (reviewer_id, rating, comment)
+      VALUES (?, ?, ?)
+    `).run(reviewer.id, validRating, comment || null);
+
+    return d.prepare('SELECT * FROM user_reviews WHERE id = last_insert_rowid()').get();
+  },
+
+  getReviews(superuserKgUserId) {
+    const d = db();
+    // Verify caller is superuser
+    if (!AuthDB.isSuperuser(superuserKgUserId)) {
+      throw new Error('Only superuser can view reviews');
+    }
+
+    return d.prepare(`
+      SELECT
+        r.*,
+        (SELECT player_name FROM players WHERE id = r.reviewer_id) as reviewer_name,
+        (SELECT avatar FROM players WHERE id = r.reviewer_id) as reviewer_avatar
+      FROM user_reviews r
+      ORDER BY r.created_at DESC
+    `).all();
+  },
+
+  getReviewStats(superuserKgUserId) {
+    const d = db();
+    if (!AuthDB.isSuperuser(superuserKgUserId)) {
+      throw new Error('Only superuser can view review stats');
+    }
+
+    return d.prepare(`
+      SELECT
+        COUNT(*) as total_reviews,
+        AVG(rating) as average_rating,
+        COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star_count,
+        COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star_count,
+        COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star_count,
+        COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star_count,
+        COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star_count
+      FROM user_reviews
+    `).get();
+  },
+};
+
+module.exports = { db, PlayerDB, AdminDB, AuthDB, PiiCrypto, hashEmail, xpToLevel, MEDALLION_LEVELS, MEDALLION_MIN_XP };

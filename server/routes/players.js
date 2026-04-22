@@ -245,9 +245,16 @@ router.post('/setup', requireAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Profile already set up' });
   }
 
-  // Username IS the playername — use body value or fall back to the user's username
+  // Username is the canonical player identity and is immutable after account creation.
   const { avatarId } = req.body;
-  const playername = (req.body.playername || user.username || '').trim();
+  const requestedPlayername = (req.body.playername || '').trim();
+  const canonicalPlayername = (user.username || '').trim();
+
+  if (requestedPlayername && requestedPlayername.toLowerCase() !== canonicalPlayername.toLowerCase()) {
+    return res.status(400).json({ success: false, error: 'Playername is fixed to your account username' });
+  }
+
+  const playername = canonicalPlayername;
 
   if (!playername || !PLAYERNAME_RE.test(playername)) {
     return res.status(400).json({ success: false, error: 'Username must be 3-20 characters: letters, numbers, underscore only' });

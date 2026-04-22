@@ -171,17 +171,17 @@ function getWsByUserId(userId) {
 // ── Registered game types ──
 const GAME_REGISTRY = {
   // Standard entry point: every game uses game.html as canonical
-  fasttrack: { name: 'Fast Track', path: '/fasttrack/game.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
-  brickbreaker3d: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
-  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' }, // legacy alias
-  starfighter: { name: 'StarFighter', path: '/starfighter/game.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
-  assemble: { name: 'Assemble', path: '/assemble/game.html', lobby: '/assemble/lobby.html', maxPlayers: 4, type: 'realtime' },
-  '4dtictactoe': { name: '4D TicTacToe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby.html', maxPlayers: 2, type: 'turn' },
-  chomp: { name: 'Chomp! Wally', path: '/chomp/game.html', lobby: '/chomp/lobby.html', maxPlayers: 1, type: 'solo' },
+  fasttrack: { name: 'Fast Track', path: '/fasttrack/game.html', lobby: '/fasttrack/lobby/', maxPlayers: 6, type: 'turn' },
+  brickbreaker3d: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby/', maxPlayers: 4, type: 'realtime' },
+  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby/', maxPlayers: 4, type: 'realtime' }, // legacy alias
+  starfighter: { name: 'Starfighter', path: '/starfighter/game.html', lobby: '/starfighter/lobby/', maxPlayers: 6, type: 'realtime' },
+  assemble: { name: 'Assemble', path: '/assemble/game.html', lobby: '/assemble/lobby/', maxPlayers: 4, type: 'realtime' },
+  '4dtictactoe': { name: '4D Tic-Tac-Toe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby/', maxPlayers: 2, type: 'turn' },
+  chomp: { name: 'Chomp! Wally', path: '/chomp/game.html', lobby: '/chomp/lobby/', maxPlayers: 1, type: 'solo' },
   connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
   swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
   cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: '4D TicTacToe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby.html', maxPlayers: 2, type: 'turn' }, // legacy alias
+  tictactoe: { name: '4D Tic-Tac-Toe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby/', maxPlayers: 2, type: 'turn' }, // legacy alias
 };
 
 function resetLobbyAcceptance(session) {
@@ -302,17 +302,23 @@ handlers.auth = async (ws, data) => {
   const username = (data && (data.username || data.guest_name)) ? String(data.username || data.guest_name) : 'Guest';
   const avatarId = (data && data.avatar_id) ? String(data.avatar_id) : (data && data.avatarId) ? String(data.avatarId) : null;
 
-  // Guest path
+  // Multiplayer flows require a signed-in account identity.
   if (!token || token.startsWith('guest-')) {
-    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
+    send(ws, { type: 'error', message: 'Sign in required for multiplayer and lobby actions' });
+    return;
   }
 
   // Signed-in path (validate token)
   try {
     const res = await authApiValidateToken(token);
     if (res.status !== 200 || !res.body || !res.body.valid) {
-      // Fallback to guest if token invalid (keeps invite links usable)
-      return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile' });
+      send(ws, { type: 'error', message: 'Session expired. Please sign in again.' });
+      return;
+    }
+
+    if (res.body.profileSetup !== true) {
+      send(ws, { type: 'error', message: 'Complete profile setup before joining multiplayer' });
+      return;
     }
 
     const userId = `user_${res.body.userId}`;
@@ -335,8 +341,8 @@ handlers.auth = async (ws, data) => {
     postAuthSendSessionState(ws, userId);
   } catch (e) {
     console.error('[Lobby] Auth validate error:', e.message);
-    // Non-fatal: allow guest so invites still work
-    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
+    send(ws, { type: 'error', message: 'Authentication unavailable. Please try again.' });
+    return;
   }
 };
 
@@ -418,57 +424,10 @@ handlers.login = async (ws, data) => {
 };
 
 handlers.register = async (ws, data) => {
-  const { username, password } = data;
-  if (!username || !password) {
-    send(ws, { type: 'error', message: 'Username and password required' });
-    return;
-  }
-  if (username.length < 3) {
-    send(ws, { type: 'error', message: 'Username must be at least 3 characters' });
-    return;
-  }
-  if (password.length < 4) {
-    send(ws, { type: 'error', message: 'Password must be at least 4 characters' });
-    return;
-  }
-
-  try {
-    const res = await authApiRequest('/api/auth/register', {
-      username,
-      password,
-      email: data.email || null
-    });
-    if (res.body.success) {
-      const userId = `user_${res.body.userId}`;
-      const user = {
-        user_id: userId,
-        id: userId,
-        username: res.body.username || username,
-        avatar_id: 'person_smile',
-        is_guest: false,
-        prestige_level: 'bronze',
-        prestige_points: 0,
-        games_played: 0,
-        games_won: 0,
-        guild_id: null,
-        auth_token: res.body.token
-      };
-      users.set(username, user);
-      connections.set(ws, { user_id: userId, user });
-      send(ws, {
-        type: 'auth_success',
-        action: 'register',
-        user: { ...user, auth_token: undefined },
-        user_id: user.user_id,
-        username: user.username
-      });
-    } else {
-      send(ws, { type: 'error', message: res.body.error || 'Registration failed' });
-    }
-  } catch (e) {
-    console.error('[Lobby] Auth API register error:', e.message);
-    send(ws, { type: 'error', message: 'Registration service unavailable. Try again.' });
-  }
+  send(ws, {
+    type: 'error',
+    message: 'Use /register for account creation (email, password confirmation, TOS).'
+  });
 };
 
 handlers.logout = (ws) => {
@@ -509,9 +468,9 @@ handlers.create_session = (ws, data) => {
     return;
   }
 
-  // Guests may create PRIVATE invite-code sessions, but not public listings.
-  if (conn.user.is_guest && !(data && data.private)) {
-    send(ws, { type: 'error', message: 'Sign in to create public games' });
+  // Multiplayer sessions are persistent and require signed-in accounts.
+  if (conn.user.is_guest) {
+    send(ws, { type: 'error', message: 'Sign in to create multiplayer sessions' });
     return;
   }
 
@@ -730,9 +689,9 @@ handlers.join_session = (ws, data) => {
     return handlers.join_by_code(ws, { code: data.code });
   }
 
-  // Spec: joining via browsing/match sessions requires sign-in (invite codes are the exception)
-  if (conn.user.is_guest && !(data && data.allow_guest)) {
-    send(ws, { type: 'error', message: 'Sign in to join games (invite codes are the exception)' });
+  // Joining multiplayer requires a signed-in identity.
+  if (conn.user.is_guest) {
+    send(ws, { type: 'error', message: 'Sign in to join multiplayer sessions' });
     return;
   }
 
@@ -822,7 +781,7 @@ handlers.join_by_code = (ws, data) => {
   }
 
   // Delegate to join_session
-  handlers.join_session(ws, { session_id: sessionId, allow_guest: true });
+  handlers.join_session(ws, { session_id: sessionId });
 };
 
 handlers.leave_session = (ws) => {
@@ -858,23 +817,26 @@ handlers.update_player_info = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
 
+  // Playername is immutable after registration/profile setup.
   if (data.username) {
-    conn.user.username = data.username.slice(0, 20);
+    send(ws, { type: 'error', message: 'Playername cannot be changed after account setup' });
   }
+
+  const session = findSessionByPlayer(conn.user_id);
+  if (session && session.status === 'playing' && data.avatar_id) {
+    send(ws, { type: 'error', message: 'Cannot change avatar during active gameplay' });
+    return;
+  }
+
   if (data.avatar_id) {
     conn.user.avatar_id = data.avatar_id;
   }
 
   // Update in session too
-  const session = findSessionByPlayer(conn.user_id);
   if (session) {
     const player = session.players.find(p => p.user_id === conn.user_id);
     if (player) {
-      if (data.username) player.username = conn.user.username;
       if (data.avatar_id) player.avatar_id = conn.user.avatar_id;
-    }
-    if (session.host_id === conn.user_id && data.username) {
-      session.host_username = conn.user.username;
     }
   }
 };

@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 
 class AuthHandler {
   constructor(sessionSecret = process.env.SESSION_SECRET || 'change-me-in-production') {
-    this.sessionSecret = sessionSecret;
+    this.sessionSecret = process.env.JWT_SECRET || sessionSecret;
     this.jwtExpiry = process.env.JWT_EXPIRY || '24h';
     this.bcryptRounds = 12;
   }

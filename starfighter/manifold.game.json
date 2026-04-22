@@ -1,6 +1,6 @@
 {
   "manifold": "starfighter",
-  "name": "StarFighter",
+  "name": "Starfighter",
   "version": "1.0.0",
   "status": "production",
   "dimension": {
@@ -9,7 +9,8 @@
     "z": 60,
     "_note": "z = x*y = 2 players avg * 30 min avg = 60"
   },
-  "entry": "index.html",
+  "entry": "game.html",
+  "lobby": "lobby/",
   "substrates": {
     "core": "core.js",
     "input": "input.js",
@@ -71,7 +72,7 @@
     "state_exposed": false,
     "postmessage_protocol": false,
     "todo": [
-      "Include js/manifold_bridge.js in index.html",
+      "Include js/manifold_bridge.js in game.html",
       "Emit window.__MANIFOLD__ from core.js with missionState",
       "Wire postMessage events to ManifoldBridge.emit()",
       "Expose ANPC emotion substrate through bridge"

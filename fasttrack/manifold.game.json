@@ -9,8 +9,8 @@
     "z": 135,
     "_note": "z = x*y = 3 players avg * 45 min avg = 135"
   },
-  "entry": "index.html",
-  "lobby": "lobby.html",
+  "entry": "game.html",
+  "lobby": "lobby/",
   "substrates": {
     "auth": "auth_substrate.js",
     "board": "board_manifold.js",

@@ -409,6 +409,7 @@
       msg.textContent = 'Creating account...'; msg.className = 'arc-msg';
       try {
         const username = document.getElementById('r-user').value.trim();
+        const confirmPassword = document.getElementById('r-pass2').value;
         const res = await fetch('/api/auth/register', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -416,6 +417,7 @@
             displayName: username,
             email: document.getElementById('r-email').value.trim(),
             password: pass,
+            confirmPassword,
             avatar: selectedAvatar,
             turnstileToken: tsToken,
             tosAgreed: true

@@ -9,8 +9,9 @@
     "z": 8,
     "_note": "z = x*y = 1 player * 8 levels = 8; game is a 3D volume manifold (Cairns estuary)"
   },
-  "entry": "index.html",
+  "entry": "game.html",
   "game": "game.html",
+  "lobby": "lobby/",
   "substrates": {
     "player": "inline:WallySubstrate",
     "world": "inline:EstuaryWorldSubstrate",

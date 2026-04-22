@@ -9,7 +9,8 @@
     "z": 40,
     "_note": "z = x*y = 2 players avg * 20 min avg = 40"
   },
-  "entry": "index.html",
+  "entry": "game.html",
+  "lobby": "lobby/",
   "substrates": {
     "assembler": "assembler.js",
     "parts": "parts.js"
@@ -39,7 +40,7 @@
     "state_exposed": false,
     "postmessage_protocol": false,
     "todo": [
-      "Include js/manifold_bridge.js in index.html",
+      "Include js/manifold_bridge.js in game.html",
       "Emit window.__MANIFOLD__ with assemblyState from assembler.js",
       "Wire postMessage events to ManifoldBridge.emit()"
     ]

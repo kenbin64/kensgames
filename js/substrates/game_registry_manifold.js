@@ -23,7 +23,7 @@ const GameRegistryManifold = (() => {
       genre: ['board', 'strategy', 'multiplayer'],
       author: 'Ken\'s Games Team',
       version: '2.1.0',
-      entryPoint: '/fasttrack/lobby.html',
+      entryPoint: '/fasttrack/lobby/',
       icon: '/fasttrack/assets/images/ftLogo.png',
       thumbnail: '/fasttrack/assets/images/billiard_theme.png',
 
@@ -67,7 +67,7 @@ const GameRegistryManifold = (() => {
       genre: ['board', 'card', 'multiplayer'],
       author: 'Ken\'s Games Team',
       version: '1.0.0',
-      entryPoint: '/fasttrack/lobby.html?mode=5card',
+      entryPoint: '/fasttrack/lobby/?mode=5card',
       icon: '/fasttrack/assets/images/ftLogo.png',
       thumbnail: '/fasttrack/assets/images/cosmic_theme.png',
 

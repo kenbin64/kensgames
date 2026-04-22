@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames Community — Discord</title>
+  <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --neon-cyan: #00FFFF;
+      --neon-pink: #FF00FF;
+      --neon-yellow: #FFE800;
+      --neon-purple: #9900FF;
+      --neon-green: #00FF41;
+      --bg-dark: #04040C;
+      --bg-card: rgba(4, 4, 20, 0.94);
+      --text: #E0E0FF;
+      --text-muted: #8888AA;
+      --glow-cyan: 0 0 8px #00FFFF, 0 0 24px #00FFFF, 0 0 48px #00FFFF;
+      --discord-blue: #5865F2;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Tron grid overlay */
+    #tron-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* CRT scanlines */
+    #scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg,
+          rgba(0, 0, 0, 0.15),
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px);
+      animation: flicker 0.15s infinite;
+    }
+
+    @keyframes flicker {
+
+      0%,
+      19%,
+      21%,
+      23%,
+      25%,
+      54%,
+      56%,
+      100% {
+        opacity: 0.97;
+      }
+
+      20%,
+      24%,
+      55% {
+        opacity: 1;
+      }
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 60px;
+      padding: 40px 20px;
+    }
+
+    header h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      margin-bottom: 15px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink), var(--neon-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+      filter: drop-shadow(0 0 10px rgba(255, 0, 255, 0.3));
+    }
+
+    header p {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 20px;
+    }
+
+    .nav-back {
+      display: inline-block;
+      margin-bottom: 20px;
+      padding: 10px 20px;
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      text-decoration: none;
+      border-radius: 4px;
+      transition: all 0.3s;
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-back:hover {
+      background: rgba(0, 255, 255, 0.1);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .content-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      margin-bottom: 60px;
+    }
+
+    .discord-section {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 8px;
+      padding: 40px 30px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1);
+      transition: all 0.3s;
+    }
+
+    .discord-section:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.2), var(--glow-cyan);
+    }
+
+    .discord-section h2 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+      color: var(--neon-cyan);
+      letter-spacing: 0.1em;
+    }
+
+    .discord-section p {
+      margin-bottom: 15px;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    .feature-list {
+      list-style: none;
+      margin: 30px 0;
+    }
+
+    .feature-list li {
+      padding: 12px 0;
+      padding-left: 30px;
+      position: relative;
+      color: var(--text);
+    }
+
+    .feature-list li:before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--neon-green);
+      font-size: 1.2em;
+    }
+
+    .btn-discord {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, var(--discord-blue), #4752C4);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-decoration: none;
+      margin-top: 20px;
+    }
+
+    .btn-discord:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(88, 101, 242, 0.4);
+    }
+
+    .btn-discord:active {
+      transform: translateY(0);
+    }
+
+    .discord-icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    .widget-container {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 8px;
+      padding: 30px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1);
+      min-height: 600px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .widget-placeholder {
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .widget-placeholder h3 {
+      color: var(--neon-cyan);
+      margin-bottom: 15px;
+      font-size: 1.3rem;
+      letter-spacing: 0.1em;
+    }
+
+    .widget-placeholder p {
+      margin-bottom: 20px;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 1024px) {
+      .content-wrapper {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+      }
+    }
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 2rem;
+      }
+
+      .btn-discord {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .discord-section,
+      .widget-container {
+        padding: 20px;
+      }
+    }
+
+    /* Auth gate message */
+    .auth-gate {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      text-align: center;
+    }
+
+    .auth-gate.hidden {
+      display: none;
+    }
+
+    .auth-gate-content {
+      max-width: 400px;
+    }
+
+    .auth-gate-content h2 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: var(--neon-pink);
+    }
+
+    .auth-gate-content p {
+      margin-bottom: 30px;
+      color: var(--text-muted);
+    }
+
+    .auth-gate-btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: var(--neon-cyan);
+      color: var(--bg-dark);
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 700;
+      transition: all 0.3s;
+    }
+
+    .auth-gate-btn:hover {
+      box-shadow: var(--glow-cyan);
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="tron-grid"></div>
+  <div id="scanlines"></div>
+
+  <!-- AUTH GATE -->
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-gate-content">
+      <h2>⚠️ Access Required</h2>
+      <p>You must be logged in to access the community chat.</p>
+      <a href="/" class="auth-gate-btn">← Return to Home</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header>
+      <a href="/" class="nav-back">← Back to Home</a>
+      <h1>🎮 COMMUNITY</h1>
+      <p>Join the KensGames Discord — Connect with players, get updates, report bugs, and share feedback</p>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content-wrapper">
+      <!-- LEFT: Info & Join Button -->
+      <div>
+        <div class="discord-section">
+          <h2>💬 Join Our Discord</h2>
+          <p>
+            Connect with the KensGames community! Share tips, discuss strategies, report bugs,
+            and stay updated on the latest features and releases.
+          </p>
+
+          <ul class="feature-list">
+            <li>Chat with other gamers in real-time</li>
+            <li>Get instant game updates and patch notes</li>
+            <li>Report bugs directly to the dev team</li>
+            <li>Participate in community events</li>
+            <li>Share gameplay screenshots and videos</li>
+            <li>Join discussions about game strategy</li>
+          </ul>
+
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 30px;">
+            Our Discord is home to hundreds of KensGames players. Whether you're a casual player
+            or a competitive speedrunner, you'll find your people here.
+          </p>
+
+          <a href="https://discord.gg/your-server-code" target="_blank" rel="noopener" class="btn-discord">
+            <svg class="discord-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.607 1.25a18.27 18.27 0 0 0-5.487 0c-.163-.39-.399-.875-.607-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.042-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.294.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.295a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.699.769 1.364 1.226 1.994a.078.078 0 0 0 .084.027 19.963 19.963 0 0 0 6.002-3.03.077.077 0 0 0 .032-.056c.5-4.65-.838-8.686-3.554-12.265a.06.06 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-.965-2.157-2.156 0-1.193.96-2.157 2.157-2.157 1.201 0 2.169.973 2.157 2.157 0 1.19-.956 2.156-2.157 2.156zm7.975 0c-1.183 0-2.157-.965-2.157-2.156 0-1.193.96-2.157 2.157-2.157 1.201 0 2.169.973 2.157 2.157 0 1.19-.956 2.156-2.157 2.156z" />
+            </svg>
+            Join Discord Server
+          </a>
+        </div>
+      </div>
+
+      <!-- RIGHT: Discord Widget -->
+      <div>
+        <div class="widget-container">
+          <div class="widget-placeholder">
+            <h3>🎫 Discord Server Widget</h3>
+            <p>
+              Live member list and server info will appear here.<br>
+              <br>
+              Click "Join Discord Server" to connect!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check authentication
+    function checkAuth() {
+      const token = localStorage.getItem('kg_token') || localStorage.getItem('user_token');
+      if (!token) {
+        document.getElementById('auth-gate').classList.remove('hidden');
+        document.querySelector('.container').style.display = 'none';
+        return false;
+      }
+      document.getElementById('auth-gate').classList.add('hidden');
+      document.querySelector('.container').style.display = 'block';
+      return true;
+    }
+
+    // Update Discord link with actual server invite
+    function updateDiscordLink() {
+      // Replace with your actual Discord invite URL
+      const discordInvite = 'https://discord.gg/your-invite-code'; // UPDATE THIS
+      const discordBtns = document.querySelectorAll('.btn-discord');
+      discordBtns.forEach(btn => {
+        btn.href = discordInvite;
+      });
+    }
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+      checkAuth();
+      updateDiscordLink();
+    });
+
+    // Also check when returning to page (tab switch)
+    window.addEventListener('focus', () => {
+      checkAuth();
+    });
+  </script>
+</body>
+
+</html>

@@ -3,7 +3,7 @@
 
 <head>
   <script>
-    (function () { var t = localStorage.getItem('kg_token'); if (t) { fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (r.ok) window.location.replace('/assemble/lobby.html'); }).catch(function () { }); } })();
+    (function () { var t = localStorage.getItem('kg_token'); if (t) { fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (r.ok) window.location.replace('/assemble/lobby/'); }).catch(function () { }); } })();
   </script>
   <!-- Auth enforcement: sign-in required (invite-code guests allowed) -->
   <script src="/js/substrates/profile_gate.js"></script>
@@ -1681,7 +1681,7 @@
   </script>
   <script src="/js/manifold_bridge.js"></script>
   <script>
-    KG_LANDING.init('assemble', '/assemble/lobby.html');
+    KG_LANDING.init('assemble', '/assemble/lobby/');
     document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
     if (localStorage.getItem('kg_token')) document.getElementById('signin-btn').textContent = 'LOBBY';
   </script>

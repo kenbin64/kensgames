@@ -9,8 +9,8 @@
     "z": 44,
     "_note": "z = x*y = 2 players avg * 22 min avg = 44"
   },
-  "entry": "index.html",
-  "lobby": "lobby.html",
+  "entry": "game.html",
+  "lobby": "lobby/",
   "substrates": {
     "physics": "shared:PhysicsSubstrate",
     "graphics": "shared:GraphicsSubstrate",
@@ -54,7 +54,7 @@
     "state_exposed": false,
     "postmessage_protocol": false,
     "todo": [
-      "Include js/manifold_bridge.js in index.html",
+      "Include js/manifold_bridge.js in game.html",
       "Emit window.__MANIFOLD__ with level/score/lives from game.js",
       "Wire postMessage events to ManifoldBridge.emit()"
     ]

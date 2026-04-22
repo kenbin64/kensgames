@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    header p {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 5px;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .header-right button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .header-right button:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .stat-card h3 {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-card .number {
+      font-size: 36px;
+      font-weight: 700;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section h2 {
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #333;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .section-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.3s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab:hover {
+      color: #667eea;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    .table th {
+      background: #f5f5f5;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #eee;
+    }
+
+    .table td {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .table tr:hover {
+      background: #f9f9f9;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-open {
+      background: #ffc107;
+      color: #333;
+    }
+
+    .badge-critical {
+      background: #dc3545;
+      color: white;
+    }
+
+    .badge-investigating {
+      background: #17a2b8;
+      color: white;
+    }
+
+    .badge-resolved {
+      background: #28a745;
+      color: white;
+    }
+
+    .priority-minor {
+      color: #17a2b8;
+      font-weight: 600;
+    }
+
+    .priority-moderate {
+      color: #ffc107;
+      font-weight: 600;
+    }
+
+    .priority-critical {
+      color: #dc3545;
+      font-weight: 600;
+    }
+
+    .priority-show_stopper {
+      color: #dc3545;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    .btn-small {
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+
+    .alert {
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .alert-warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .modal-close:hover {
+      color: #333;
+    }
+
+    .codes-list {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .code-item {
+      padding: 10px;
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .code-item .code {
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .code-item .status {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      background: #eee;
+      color: #666;
+    }
+
+    .review-item {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      border-left: 4px solid #667eea;
+    }
+
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 10px;
+    }
+
+    .review-user {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .review-rating {
+      color: #ffc107;
+      font-size: 14px;
+    }
+
+    .review-comment {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-active {
+      background: #28a745;
+    }
+
+    .status-inactive {
+      background: #dc3545;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        border-radius: 0;
+      }
+
+      header {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .header-right {
+        margin-top: 15px;
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .table {
+        font-size: 12px;
+      }
+
+      .table th,
+      .table td {
+        padding: 10px 5px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🎮 Admin Dashboard</h1>
+        <p id="superuser-label">Superuser Control Panel</p>
+      </div>
+      <div class="header-right">
+        <button onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div id="alert" class="alert"></div>
+
+      <!-- DASHBOARD STATS -->
+      <div class="dashboard-grid" id="stats-container">
+        <div class="stat-card">
+          <h3>Open Bug Reports</h3>
+          <div class="number" id="open-bugs">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Critical Issues</h3>
+          <div class="number" id="critical-bugs">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Average Rating</h3>
+          <div class="number" id="avg-rating">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Beta Codes Claimed</h3>
+          <div class="number" id="beta-claimed">0</div>
+        </div>
+      </div>
+
+      <!-- BUG REPORTS SECTION -->
+      <div class="section">
+        <h2>🐛 Bug Reports</h2>
+        <div class="section-tabs">
+          <button class="tab active" onclick="switchBugTab('open')">Open</button>
+          <button class="tab" onclick="switchBugTab('critical')">Critical</button>
+          <button class="tab" onclick="switchBugTab('all')">All</button>
+        </div>
+        <div id="bugs-container" class="loading">
+          <div class="spinner"></div>
+          Loading bug reports...
+        </div>
+      </div>
+
+      <!-- BETA CODES SECTION -->
+      <div class="section">
+        <h2>🎫 Beta Codes & Promotions</h2>
+        <button class="btn btn-primary" onclick="openGenerateCodesModal()">Generate New Codes</button>
+        <div id="codes-container" style="margin-top: 20px;">
+          <!-- Beta codes list will be populated here -->
+        </div>
+      </div>
+
+      <!-- USER REVIEWS SECTION -->
+      <div class="section">
+        <h2>⭐ User Reviews & Feedback</h2>
+        <div id="reviews-container" class="loading">
+          <div class="spinner"></div>
+          Loading reviews...
+        </div>
+      </div>
+
+      <!-- ADMIN MANAGEMENT SECTION -->
+      <div class="section">
+        <h2>👥 Admin Management</h2>
+        <button class="btn btn-primary" onclick="openCreateAdminModal()">Create Admin</button>
+        <button class="btn btn-secondary" onclick="openRevokeAdminModal()">Revoke Admin</button>
+        <p style="margin-top: 20px; color: #666; font-size: 14px;">
+          ⚠️ Only you (the superuser) can create or revoke admin privileges.
+          Admins can moderate users but cannot manage other admins.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="generateCodesModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Generate Beta Codes</h2>
+        <button class="modal-close" onclick="closeModal('generateCodesModal')">×</button>
+      </div>
+      <form onsubmit="generateBetaCodes(event)">
+        <div class="form-group">
+          <label>Number of Codes</label>
+          <input type="number" id="codeCount" min="1" max="100" value="10" required>
+        </div>
+        <div class="form-group">
+          <label>Expiration (days from now, optional)</label>
+          <input type="number" id="expiresInDays" min="1" placeholder="Leave blank for no expiration">
+        </div>
+        <button type="submit" class="btn btn-primary">Generate Codes</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="createAdminModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create Admin</h2>
+        <button class="modal-close" onclick="closeModal('createAdminModal')">×</button>
+      </div>
+      <form onsubmit="createAdmin(event)">
+        <div class="form-group">
+          <label>Target Username</label>
+          <input type="text" id="adminUsername" placeholder="Enter username" required>
+        </div>
+        <div class="form-group">
+          <label>Reason / Notes</label>
+          <textarea id="adminReason" placeholder="Why are you making this person an admin?" rows="4"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Admin</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="revokeAdminModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Revoke Admin</h2>
+        <button class="modal-close" onclick="closeModal('revokeAdminModal')">×</button>
+      </div>
+      <form onsubmit="revokeAdmin(event)">
+        <div class="form-group">
+          <label>Target Username</label>
+          <input type="text" id="revokeUsername" placeholder="Enter username" required>
+        </div>
+        <div class="form-group">
+          <label>Reason</label>
+          <textarea id="revokeReason" placeholder="Why are you revoking admin privileges?" rows="4"></textarea>
+        </div>
+        <button type="submit" class="btn btn-danger">Revoke Admin</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Get token from localStorage
+    function getToken() {
+      return localStorage.getItem('kg_token');
+    }
+
+    // Show alert message
+    function showAlert(message, type = 'success') {
+      const alert = document.getElementById('alert');
+      alert.textContent = message;
+      alert.className = `alert show alert-${type}`;
+      setTimeout(() => alert.classList.remove('show'), 4000);
+    }
+
+    // Check auth and load dashboard
+    async function initDashboard() {
+      const token = getToken();
+      if (!token) {
+        window.location.href = '/';
+        return;
+      }
+
+      try {
+        // Load dashboard stats
+        const dashResponse = await fetch('/api/admin/dashboard', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!dashResponse.ok) {
+          if (dashResponse.status === 403) {
+            showAlert('You do not have admin access', 'error');
+            setTimeout(() => window.location.href = '/', 2000);
+            return;
+          }
+          throw new Error('Failed to load dashboard');
+        }
+        const dash = await dashResponse.json();
+        if (dash.success) {
+          document.getElementById('open-bugs').textContent = dash.dashboard.open_bugs;
+          document.getElementById('critical-bugs').textContent = dash.dashboard.critical_bugs;
+          document.getElementById('avg-rating').textContent = (dash.dashboard.average_rating || 0).toFixed(1);
+          document.getElementById('beta-claimed').textContent = dash.dashboard.beta_codes_claimed;
+        }
+
+        // Load initial data
+        loadBugReports('open');
+        loadReviews();
+        loadBetaCodes();
+      } catch (err) {
+        console.error('Init error:', err);
+        showAlert('Failed to load dashboard: ' + err.message, 'error');
+      }
+    }
+
+    // Load bug reports
+    async function loadBugReports(filter = 'open') {
+      const token = getToken();
+      try {
+        const response = await fetch(`/api/admin/bug-reports?filter=${filter}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        let html = '';
+        if (data.reports && data.reports.length > 0) {
+          html = `<table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Game</th>
+                <th>Title</th>
+                <th>Reporter</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+          data.reports.forEach(report => {
+            const priorityClass = `priority-${report.priority}`;
+            const statusBadge = `badge badge-${report.status}`;
+            html += `
+              <tr>
+                <td>#${report.id}</td>
+                <td>${report.game_id || 'N/A'}</td>
+                <td title="${report.description}">${report.title.substring(0, 30)}</td>
+                <td>${report.reporter_name}</td>
+                <td><span class="${priorityClass}">${report.priority.toUpperCase()}</span></td>
+                <td><span class="${statusBadge}">${report.status}</span></td>
+                <td><button class="btn btn-small btn-secondary" onclick="viewBugReport(${report.id})">Details</button></td>
+              </tr>
+            `;
+          });
+          html += `</tbody></table>`;
+        } else {
+          html = '<p style="text-align: center; padding: 40px; color: #999;">No bug reports found</p>';
+        }
+        document.getElementById('bugs-container').innerHTML = html;
+      } catch (err) {
+        document.getElementById('bugs-container').innerHTML = `<p style="color: red;">Error loading bug reports: ${err.message}</p>`;
+      }
+    }
+
+    // Load user reviews
+    async function loadReviews() {
+      const token = getToken();
+      try {
+        const response = await fetch('/api/admin/reviews', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        let html = '';
+        if (data.reviews && data.reviews.length > 0) {
+          data.reviews.forEach(review => {
+            const stars = '⭐'.repeat(review.rating);
+            html += `
+              <div class="review-item">
+                <div class="review-header">
+                  <span class="review-user">${review.reviewer_name}</span>
+                  <span class="review-rating">${stars} (${review.rating}/5)</span>
+                </div>
+                ${review.comment ? `<div class="review-comment">"${review.comment}"</div>` : ''}
+              </div>
+            `;
+          });
+        } else {
+          html = '<p style="text-align: center; padding: 40px; color: #999;">No reviews yet</p>';
+        }
+        document.getElementById('reviews-container').innerHTML = html;
+      } catch (err) {
+        document.getElementById('reviews-container').innerHTML = `<p style="color: red;">Error loading reviews: ${err.message}</p>`;
+      }
+    }
+
+    // Load beta codes
+    async function loadBetaCodes() {
+      const token = getToken();
+      try {
+        const response = await fetch('/api/admin/beta-codes-status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        let html = `<p style="margin-bottom: 20px;">
+          <strong>Total Codes:</strong> ${data.total} |
+          <strong>Claimed:</strong> ${data.claimed} |
+          <strong>Active:</strong> ${data.active}
+        </p>`;
+
+        if (data.codes && data.codes.length > 0) {
+          html += '<div class="codes-list">';
+          data.codes.forEach(code => {
+            html += `
+              <div class="code-item">
+                <span class="code">${code.code}</span>
+                <span class="status">${code.status.toUpperCase()}${code.claimed_by_name ? ' - ' + code.claimed_by_name : ''}</span>
+              </div>
+            `;
+          });
+          html += '</div>';
+        }
+        document.getElementById('codes-container').innerHTML = html;
+      } catch (err) {
+        document.getElementById('codes-container').innerHTML = `<p style="color: red;">Error loading codes: ${err.message}</p>`;
+      }
+    }
+
+    // Tab switching
+    function switchBugTab(filter) {
+      document.querySelectorAll('#bugs-container').forEach(el => el.classList.remove('active'));
+      event.target.classList.add('active');
+      loadBugReports(filter);
+    }
+
+    // Generate beta codes
+    async function generateBetaCodes(event) {
+      event.preventDefault();
+      const token = getToken();
+      const count = document.getElementById('codeCount').value;
+      const expiresInDays = document.getElementById('expiresInDays').value;
+
+      try {
+        const response = await fetch('/api/admin/generate-beta-codes', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            count: parseInt(count),
+            expiresInDays: expiresInDays ? parseInt(expiresInDays) : null
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert(`Generated ${count} beta codes!`);
+          closeModal('generateCodesModal');
+          loadBetaCodes();
+        } else {
+          showAlert(data.error || 'Failed to generate codes', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Create admin
+    async function createAdmin(event) {
+      event.preventDefault();
+      const token = getToken();
+      const username = document.getElementById('adminUsername').value;
+      const reason = document.getElementById('adminReason').value;
+
+      try {
+        const response = await fetch('/api/admin/create-admin', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            targetUsername: username,
+            reason: reason
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert(data.message);
+          closeModal('createAdminModal');
+          document.getElementById('adminUsername').value = '';
+          document.getElementById('adminReason').value = '';
+        } else {
+          showAlert(data.error || 'Failed to create admin', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Revoke admin
+    async function revokeAdmin(event) {
+      event.preventDefault();
+      const token = getToken();
+      const username = document.getElementById('revokeUsername').value;
+      const reason = document.getElementById('revokeReason').value;
+
+      try {
+        const response = await fetch('/api/admin/revoke-admin', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            targetUsername: username,
+            reason: reason
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert(data.message);
+          closeModal('revokeAdminModal');
+          document.getElementById('revokeUsername').value = '';
+          document.getElementById('revokeReason').value = '';
+        } else {
+          showAlert(data.error || 'Failed to revoke admin', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Modal functions
+    function openGenerateCodesModal() {
+      document.getElementById('generateCodesModal').classList.add('show');
+    }
+
+    function openCreateAdminModal() {
+      document.getElementById('createAdminModal').classList.add('show');
+    }
+
+    function openRevokeAdminModal() {
+      document.getElementById('revokeAdminModal').classList.add('show');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('show');
+    }
+
+    // Logout
+    function logout() {
+      localStorage.removeItem('kg_token');
+      localStorage.removeItem('user_token');
+      window.location.href = '/';
+    }
+
+    // Initialize on load
+    window.addEventListener('load', initDashboard);
+  </script>
+</body>
+
+</html>

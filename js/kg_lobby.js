@@ -76,7 +76,15 @@
   // ── localStorage helpers ─────────────────────────────────────────────────
   function getToken() {
     try {
-      return localStorage.getItem('kg_token') || localStorage.getItem('user_token') || null;
+      var token = localStorage.getItem('kg_token') || null;
+      if (token) return token;
+      var legacy = localStorage.getItem('user_token') || null;
+      if (legacy) {
+        localStorage.setItem('kg_token', legacy);
+        localStorage.removeItem('user_token');
+        return legacy;
+      }
+      return null;
     } catch (e) { return null; }
   }
 

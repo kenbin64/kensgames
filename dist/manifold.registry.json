@@ -1,6 +1,6 @@
 {
   "_schema": "1.0",
-  "_compiled": "2026-04-21T11:47:59.596869+00:00",
+  "_compiled": "2026-04-22T10:51:48.582311+00:00",
   "portal": "kensgames-portal",
   "domain": "kensgames.com",
   "dimensions": {
@@ -15,8 +15,8 @@
       "name": "FastTrack",
       "version": "2.1.0",
       "path": "fasttrack/",
-      "entry": "index.html",
-      "lobby": "lobby.html",
+      "entry": "game.html",
+      "lobby": "lobby/",
       "status": "production",
       "dimension": {
         "x": 3,
@@ -50,8 +50,8 @@
       "name": "BrickBreaker 3D",
       "version": "1.0.0",
       "path": "brickbreaker3d/",
-      "entry": "index.html",
-      "lobby": "lobby.html",
+      "entry": "game.html",
+      "lobby": "lobby/",
       "status": "production",
       "dimension": {
         "x": 2,
@@ -80,8 +80,8 @@
       "name": "4D Tic-Tac-Toe",
       "version": "1.0.0",
       "path": "4dtictactoe/",
-      "entry": "index.html",
-      "lobby": null,
+      "entry": "game.html",
+      "lobby": "lobby/",
       "status": "production",
       "dimension": {
         "x": 2,
@@ -102,11 +102,11 @@
     },
     {
       "id": "starfighter",
-      "name": "StarFighter",
+      "name": "Starfighter",
       "version": "1.0.0",
       "path": "starfighter/",
-      "entry": "index.html",
-      "lobby": null,
+      "entry": "game.html",
+      "lobby": "lobby/",
       "status": "production",
       "dimension": {
         "x": 2,
@@ -142,8 +142,8 @@
       "name": "Assemble",
       "version": "1.0.0",
       "path": "assemble/",
-      "entry": "index.html",
-      "lobby": null,
+      "entry": "game.html",
+      "lobby": "lobby/",
       "status": "production",
       "dimension": {
         "x": 2,

@@ -43,7 +43,7 @@ const DimensionalPlatform = (function () {
   function _Dfull(px, py, pz) {
     const x = px * _TWO_PI, y = py * _TWO_PI, z = pz * _TWO_PI;
     return Math.cos(x) * Math.cos(y) * Math.cos(z)
-         - Math.sin(x) * Math.sin(y) * Math.sin(z);
+      - Math.sin(x) * Math.sin(y) * Math.sin(z);
   }
 
   function _G(p) {
@@ -72,7 +72,7 @@ const DimensionalPlatform = (function () {
   // Level 6 VOLUME → m=xyz; complete manifested entity
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const DIM = { VOID:0, POINT:1, LENGTH:2, WIDTH:3, DEPTH:4, FOLD:5, VOLUME:6 };
+  const DIM = { VOID: 0, POINT: 1, LENGTH: 2, WIDTH: 3, DEPTH: 4, FOLD: 5, VOLUME: 6 };
 
   function _chain(label, z0, role) {
     if (z0 === undefined) {
@@ -82,21 +82,21 @@ const DimensionalPlatform = (function () {
       };
     }
 
-    const D    = _D(z0);
-    const g    = _G(z0);
-    const bw   = _bandwidth(z0);
-    const ch   = D >= 0 ? 'A' : 'B';
-    const xH   = bw * (1 + Math.abs(z0));
-    const yH   = xH * 0.6;
-    const zH   = (2.0 + Math.abs(z0) * 2.0);
+    const D = _D(z0);
+    const g = _G(z0);
+    const bw = _bandwidth(z0);
+    const ch = D >= 0 ? 'A' : 'B';
+    const xH = bw * (1 + Math.abs(z0));
+    const yH = xH * 0.6;
+    const zH = (2.0 + Math.abs(z0) * 2.0);
     const fold = z0 * D;
-    const m    = z0 * D * g;
+    const m = z0 * D * g;
 
     return {
       dim: DIM.VOLUME,
       label,
       role: role || label,
-      z:    z0,
+      z: z0,
       D,
       g,
       bw,
@@ -106,7 +106,7 @@ const DimensionalPlatform = (function () {
       m,
       // LOD resolution: higher gradient → finer mesh
       resolution(lod) {
-        return Math.max(3, Math.round(([12,7,4][lod]||8) + g * 0.5));
+        return Math.max(3, Math.round(([12, 7, 4][lod] || 8) + g * 0.5));
       },
       // Sample the full diamond field at any point in this volume
       sample(px, py, pz) { return _Dfull(px, py, pz); },
@@ -159,8 +159,8 @@ const DimensionalPlatform = (function () {
       if (!rec) return null;
       const prev = rec.z;
       const next = prev + dz;
-      const vol  = _chain(label, next, rec.volume.role);
-      rec.z      = next;
+      const vol = _chain(label, next, rec.volume.role);
+      rec.z = next;
       rec.volume = vol;
       for (const fn of rec.listeners) fn({ label, dz, prev, next, volume: vol });
       return vol;
@@ -220,9 +220,9 @@ const DimensionalPlatform = (function () {
   // ═══════════════════════════════════════════════════════════════════════════
 
   const _budget = new Map();   // label → { lod, active, el, observer }
-  let   _tabFocused = typeof document !== 'undefined' ? !document.hidden : true;
-  let   _lastFrameMs = 0;
-  let   _frameBudgetMs = 16;
+  let _tabFocused = typeof document !== 'undefined' ? !document.hidden : true;
+  let _lastFrameMs = 0;
+  let _frameBudgetMs = 16;
 
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
@@ -256,7 +256,7 @@ const DimensionalPlatform = (function () {
 
       const obs = new IntersectionObserver(([entry]) => {
         rec.inViewport = entry.isIntersecting;
-        rec.lod    = entry.isIntersecting ? (_tabFocused ? 0 : 1) : 2;
+        rec.lod = entry.isIntersecting ? (_tabFocused ? 0 : 1) : 2;
         rec.active = entry.isIntersecting && _tabFocused;
         // Push delta to registered entity if exists
         if (_registry.has(label)) {
@@ -307,22 +307,22 @@ const DimensionalPlatform = (function () {
 
   const APPS = [
     // Games
-    { label:'starfighter',     z: 0.35, role:'game-3d',       path:'/starfighter/'         },
-    { label:'fasttrack',       z: 0.28, role:'game-board',    path:'/fasttrack/lobby.html' },
-    { label:'brickbreaker3d',  z: 0.18, role:'game-3d',       path:'/brickbreaker3d/'      },
-    { label:'4d-tictactoe',    z: 0.12, role:'game-puzzle',   path:'/4dtictactoe/'         },
-    { label:'assemble',        z: 0.08, role:'game-puzzle',   path:'/assemble/'            },
+    { label: 'starfighter', z: 0.35, role: 'game-3d', path: '/starfighter/' },
+    { label: 'fasttrack', z: 0.28, role: 'game-board', path: '/fasttrack/lobby/' },
+    { label: 'brickbreaker3d', z: 0.18, role: 'game-3d', path: '/brickbreaker3d/' },
+    { label: '4d-tictactoe', z: 0.12, role: 'game-puzzle', path: '/4dtictactoe/' },
+    { label: 'assemble', z: 0.08, role: 'game-puzzle', path: '/assemble/' },
     // Platform
-    { label:'portal',          z: 0.60, role:'portal',        path:'/index.html'           },
-    { label:'discover',        z: 0.55, role:'portal',        path:'/discover.html'        },
-    { label:'showcase',        z: 0.50, role:'portal',        path:'/showcase.html'        },
-    { label:'lounge',          z: 0.45, role:'portal',        path:'/lounge.html'          },
+    { label: 'portal', z: 0.60, role: 'portal', path: '/index.html' },
+    { label: 'discover', z: 0.55, role: 'portal', path: '/discover.html' },
+    { label: 'showcase', z: 0.50, role: 'portal', path: '/showcase.html' },
+    { label: 'lounge', z: 0.45, role: 'portal', path: '/lounge.html' },
     // Engine substrates
-    { label:'auth',            z: 0.05, role:'engine',        path:'/login/'               },
-    { label:'lobby',           z: 0.10, role:'engine',        path:'/lobby/'               },
-    { label:'multiplayer',     z: 0.20, role:'engine',        path:null                    },
-    { label:'audio-engine',    z: 0.15, role:'engine',        path:null                    },
-    { label:'admin',           z: 0.80, role:'admin',         path:'/admin.html'           },
+    { label: 'auth', z: 0.05, role: 'engine', path: '/login/' },
+    { label: 'lobby', z: 0.10, role: 'engine', path: '/lobby/' },
+    { label: 'multiplayer', z: 0.20, role: 'engine', path: null },
+    { label: 'audio-engine', z: 0.15, role: 'engine', path: null },
+    { label: 'admin', z: 0.80, role: 'admin', path: '/admin.html' },
   ];
 
   // Register all apps on the delta relay at startup

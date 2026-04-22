@@ -402,6 +402,30 @@
             box-shadow: var(--glow-pink);
         }
 
+        .btn-discord {
+            padding: 8px 16px;
+            font-size: 11px;
+            background: #5865F2;
+            color: #fff;
+            font-weight: 900;
+            box-shadow: 0 0 12px rgba(88, 101, 242, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-discord:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 24px rgba(88, 101, 242, 0.6);
+        }
+
+        .btn-discord-icon {
+            width: 12px;
+            height: 12px;
+        }
+
         .btn-ghost {
             padding: 8px 18px;
             font-size: 11px;
@@ -2305,6 +2329,14 @@
             <div class="nav-auth">
                 <div id="kg-player" style="display:none"></div>
                 <div id="access-status"></div>
+                <a href="/community.html" id="btn-community" class="btn-discord" style="display:none;"
+                    title="Join our community">
+                    <svg class="btn-discord-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.607 1.25a18.27 18.27 0 0 0-5.487 0c-.163-.39-.399-.875-.607-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.042-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.294.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.295a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.699.769 1.364 1.226 1.994a.078.078 0 0 0 .084.027 19.963 19.963 0 0 0 6.002-3.03.077.077 0 0 0 .032-.056c.5-4.65-.838-8.686-3.554-12.265a.06.06 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-.965-2.157-2.156 0-1.193.96-2.157 2.157-2.157 1.201 0 2.169.973 2.157 2.157 0 1.19-.956 2.156-2.157 2.156zm7.975 0c-1.183 0-2.157-.965-2.157-2.156 0-1.193.96-2.157 2.157-2.157 1.201 0 2.169.973 2.157 2.157 0 1.19-.956 2.156-2.157 2.156z" />
+                    </svg>
+                    COMMUNITY
+                </a>
                 <div id="kg-online"
                     style="font-size:11px;color:var(--neon-green);letter-spacing:.06em;opacity:0;transition:opacity .4s"
                     aria-live="polite"></div>
@@ -4212,7 +4244,6 @@
                 const data = await res.json();
                 if (res.ok) {
                     localStorage.setItem('kg_token', data.token);
-                    localStorage.setItem('user_token', data.token);
                     localStorage.setItem('kg_user_id', String(data.userId || ''));
                     localStorage.setItem('kg_username', data.username || '');
                     localStorage.setItem('kg_display_name', data.displayName || '');
@@ -4375,7 +4406,7 @@
             }
             function kgLogout() {
                 ['kg_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar', 'display_name', 'username', 'user_token'].forEach(function (k) { localStorage.removeItem(k); });
-                window.location.href = '/login/';
+                window.location.href = '/';
             }
             window.kgLogout = kgLogout;
             function getNavAvatarEmoji() {
@@ -4402,15 +4433,18 @@
             function applyNav(user) {
                 var statusEl = document.getElementById('access-status');
                 var playerEl = document.getElementById('kg-player');
+                var communityBtn = document.getElementById('btn-community');
                 document.body.classList.toggle('kg-auth', !!user);
                 if (user) {
                     var name = localStorage.getItem('kg_username') || localStorage.getItem('display_name') || '';
                     var avEmoji = getNavAvatarEmoji();
                     if (playerEl) { playerEl.style.display = ''; playerEl.textContent = name ? avEmoji + ' ' + name : avEmoji; }
                     if (statusEl) statusEl.innerHTML = '<button class="btn-ghost" onclick="kgLogout()">LOG OUT</button>';
+                    if (communityBtn) communityBtn.style.display = 'flex';
                 } else {
                     if (playerEl) playerEl.style.display = 'none';
                     if (statusEl) statusEl.innerHTML = '<button class="btn-login" onclick="openModal(\'auth-modal\')">LOG IN</button>';
+                    if (communityBtn) communityBtn.style.display = 'none';
                 }
             }
             function applyPlayState(user) {

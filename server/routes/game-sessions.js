@@ -30,11 +30,11 @@ const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && Tetra
 
 // Game manifest — max players, lobby path, game launch path
 const GAMES = {
-  fasttrack: { name: 'FastTrack', maxPlayers: 4, minPlayers: 2, lobbyPath: '/fasttrack/portal.html', gamePath: '/fasttrack/portal.html' },
-  brickbreaker3d: { name: 'BrickBreaker 3D', maxPlayers: 4, minPlayers: 1, lobbyPath: '/brickbreaker3d/lobby.html', gamePath: '/brickbreaker3d/game.html' },
-  '4dtictactoe': { name: '4D Tic-Tac-Toe', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dtictactoe/lobby.html', gamePath: '/4dtictactoe/game.html' },
-  starfighter: { name: 'StarFighter', maxPlayers: 4, minPlayers: 1, lobbyPath: '/starfighter/lobby.html', gamePath: '/starfighter/index.html' },
-  assemble: { name: 'Assemble', maxPlayers: 4, minPlayers: 1, lobbyPath: '/assemble/lobby.html', gamePath: '/assemble/game.html' },
+  fasttrack: { name: 'FastTrack', maxPlayers: 4, minPlayers: 2, lobbyPath: '/fasttrack/lobby/', gamePath: '/fasttrack/game.html' },
+  brickbreaker3d: { name: 'BrickBreaker 3D', maxPlayers: 4, minPlayers: 1, lobbyPath: '/brickbreaker3d/lobby/', gamePath: '/brickbreaker3d/game.html' },
+  '4dtictactoe': { name: '4D Tic-Tac-Toe', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dtictactoe/lobby/', gamePath: '/4dtictactoe/game.html' },
+  starfighter: { name: 'Starfighter', maxPlayers: 4, minPlayers: 1, lobbyPath: '/starfighter/lobby/', gamePath: '/starfighter/game.html' },
+  assemble: { name: 'Assemble', maxPlayers: 4, minPlayers: 1, lobbyPath: '/assemble/lobby/', gamePath: '/assemble/game.html' },
 };
 
 // Session TTL: 2 hours if never started, auto-purge on access
@@ -458,13 +458,12 @@ router.get('/:sessionId', requireAuthOrGuest, async (req, res) => {
 
 /**
  * POST /api/sessions/join
- * Body: { code, playername?, avatarId? }
- * - If auth token present: join as auth user
- * - If no auth (guest): playername + avatarId required; returns a short-lived guest JWT
+ * Body: { code }
+ * Multiplayer persistence is authoritative and requires signed-in identity.
  */
 router.post('/join', async (req, res) => {
   purgeStaleSessions();
-  const { code, playername, avatarId = 'robot' } = req.body;
+  const { code } = req.body;
 
   if (!code) return res.status(400).json({ success: false, error: 'Invite code required' });
 
@@ -474,42 +473,24 @@ router.post('/join', async (req, res) => {
   if (session.players.length >= session.maxPlayers) return res.status(409).json({ success: false, error: 'Game is full' });
 
   const userId = resolveUserId(req);
-  let slot;
-  let guestToken = null;
-
-  if (userId) {
-    // Auth user joining
-    if (session.players.find(p => p.userId === userId)) {
-      return res.status(409).json({ success: false, error: 'Already in this session' });
-    }
-    const user = findUser(userId);
-    slot = {
-      userId, type: 'auth', isCreator: false, ready: false, online: true,
-      playername: user?.playername || user?.username || 'Player',
-      avatarId: user?.avatarId || 'robot',
-    };
-  } else {
-    // Guest joining
-    if (!playername || !/^[A-Za-z0-9_ ]{2,20}$/.test(playername)) {
-      return res.status(400).json({ success: false, error: 'Playername must be 2–20 alphanumeric characters' });
-    }
-    const taken = session.players.find(p => p.playername?.toLowerCase() === playername.toLowerCase());
-    if (taken) return res.status(409).json({ success: false, error: 'That name is already taken in this session' });
-
-    const guestId = generateId('guest');
-    slot = {
-      guestId, type: 'guest', isCreator: false, ready: false, online: true,
-      playername: playername.trim(),
-      avatarId: avatarId || 'robot',
-    };
-
-    // Issue a short-lived guest JWT (4 hours)
-    guestToken = jwt.sign(
-      { type: 'guest', guestId, playername: slot.playername, avatarId: slot.avatarId, sessionId: session.sessionId },
-      JWT_SECRET,
-      { expiresIn: '4h' }
-    );
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Sign in to join multiplayer sessions' });
   }
+
+  if (session.players.find(p => p.userId === userId)) {
+    return res.status(409).json({ success: false, error: 'Already in this session' });
+  }
+
+  const user = findUser(userId);
+  if (!user || !user.profileSetup) {
+    return res.status(403).json({ success: false, error: 'Complete profile setup before joining multiplayer' });
+  }
+
+  const slot = {
+    userId, type: 'auth', isCreator: false, ready: false, online: true,
+    playername: user.playername || user.username || 'Player',
+    avatarId: user.avatarId || 'robot',
+  };
 
   session.players.push(slot);
   syncSessionDimension(session, 3);
@@ -525,9 +506,9 @@ router.post('/join', async (req, res) => {
   }
   return res.json({
     success: true,
-    guestToken,
+    guestToken: null,
     sessionId: session.sessionId,
-    session: publicSession(session, callerId, !userId),
+    session: publicSession(session, callerId, false),
   });
 });
 

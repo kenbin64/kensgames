@@ -10,7 +10,7 @@
         if (!isPlay) {
           // Only send to lobby if already authenticated; otherwise stay on landing page.
           if (localStorage.getItem('kg_token')) {
-            window.location.replace('/starfighter/lobby.html');
+            window.location.replace('/starfighter/lobby/');
             return;
           }
         }
@@ -826,7 +826,7 @@
       display: none !important
     }
   </style>
-  </head>
+</head>
 
 <body data-mtheme="green">
   <div class="scanlines"></div>
@@ -837,7 +837,7 @@
       <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
     </a>
     <nav class="header-nav">
-      <a href="/starfighter/lobby.html" class="arcade-btn" style="color:#39ff14;border-color:#39ff14">&#8592; LOBBY</a>
+      <a href="/starfighter/lobby/" class="arcade-btn" style="color:#39ff14;border-color:#39ff14">&#8592; LOBBY</a>
       <a href="/login/index.html" class="arcade-btn" id="signin-btn">SIGN IN</a>
     </nav>
   </header>
@@ -1320,12 +1320,12 @@
     <!-- Manifold Substrates (Dimensional Programming) -->
     <!-- Game Logic -->
     <script>
-      KG_LANDING.init('starfighter', '/starfighter/lobby.html');
+      KG_LANDING.init('starfighter', '/starfighter/lobby/');
       document.getElementById('invite-code-input').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, ''); });
       if (localStorage.getItem('kg_token')) {
         var sb = document.getElementById('signin-btn');
         sb.textContent = 'LOBBY';
-        sb.href = '/starfighter/lobby.html';
+        sb.href = '/starfighter/lobby/';
       }
     </script>
     <script src="starfighter.bundle.js?v=bcf330ae163f5a30"></script>

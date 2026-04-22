@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beta Tester Hub — KensGames</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: white;
+      border-radius: 12px 12px 0 0;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 15px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .content {
+      background: white;
+      padding: 30px;
+      margin-top: -1px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s;
+    }
+
+    .tab-btn.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .star-rating {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .star {
+      font-size: 40px;
+      cursor: pointer;
+      opacity: 0.3;
+      transition: all 0.2s;
+    }
+
+    .star:hover,
+    .star.selected {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    .alert {
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .alert-info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .info-box {
+      background: #f0f7ff;
+      border-left: 4px solid #667eea;
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .info-box strong {
+      color: #667eea;
+    }
+
+    .form-section {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+
+    .form-section h3 {
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .priority-levels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .priority-btn {
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.3s;
+      text-align: center;
+    }
+
+    .priority-btn:hover {
+      border-color: #667eea;
+    }
+
+    .priority-btn.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .priority-minor {
+      border-color: #17a2b8;
+    }
+
+    .priority-minor.selected {
+      background: #17a2b8;
+    }
+
+    .priority-moderate {
+      border-color: #ffc107;
+      color: #000;
+    }
+
+    .priority-moderate.selected {
+      background: #ffc107;
+      color: white;
+    }
+
+    .priority-critical {
+      border-color: #dc3545;
+    }
+
+    .priority-critical.selected {
+      background: #dc3545;
+    }
+
+    .priority-show_stopper {
+      border-color: #dc3545;
+    }
+
+    .priority-show_stopper.selected {
+      background: #dc3545;
+    }
+
+    .char-count {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 40px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .code-claim-box {
+      background: #fff3cd;
+      border: 2px dashed #ffc107;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .code-claim-box h3 {
+      margin-bottom: 15px;
+      color: #856404;
+    }
+
+    .code-input {
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+
+    .benefits-list {
+      list-style: none;
+      margin: 20px 0;
+      padding-left: 0;
+    }
+
+    .benefits-list li {
+      padding: 10px 0;
+      padding-left: 30px;
+      position: relative;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .benefits-list li:before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #28a745;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    footer {
+      background: white;
+      border-radius: 0 0 12px 12px;
+      padding: 20px 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      color: #666;
+      font-size: 13px;
+      margin-top: -1px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+
+    @media (max-width: 768px) {
+
+      header,
+      .content,
+      footer {
+        border-radius: 0;
+      }
+
+      body {
+        padding: 0;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .priority-levels {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>🎫 Beta Tester Hub</h1>
+      <p>Help us improve KensGames! Report bugs, submit feedback, and earn lifetime free play.</p>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="goHome()">Back to Home</button>
+        <button class="btn btn-secondary" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div id="alert" class="alert"></div>
+
+      <!-- CODE CLAIM SECTION -->
+      <div id="codeClaimSection" class="code-claim-box">
+        <h3>🎫 Don't Have a Beta Code?</h3>
+        <p style="margin-bottom: 15px;">Enter your promotional code to unlock beta tester benefits:</p>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <input type="text" id="betaCodeInput" class="code-input" placeholder="BETA-XXXXX-XXXXX" style="flex: 1;">
+          <button class="btn btn-primary" onclick="claimBetaCode()">Claim Code</button>
+        </div>
+        <ul class="benefits-list">
+          <li>Free play for life (even if KensGames becomes paid)</li>
+          <li>First access to new features</li>
+          <li>Direct influence on game development</li>
+          <li>Exclusive beta tester badge</li>
+        </ul>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('bug-report')">🐛 Report a Bug</button>
+        <button class="tab-btn" onclick="switchTab('feedback')">⭐ Leave Feedback</button>
+      </div>
+
+      <!-- TAB: BUG REPORT -->
+      <div id="bug-report" class="tab-content active">
+        <div class="info-box">
+          <strong>Thank you for beta testing!</strong> Found a bug? Tell us about it here. Include as much detail as
+          possible so we can fix it quickly.
+        </div>
+
+        <form onsubmit="submitBugReport(event)">
+          <div class="form-section">
+            <h3>Bug Details</h3>
+
+            <div class="form-group">
+              <label>Game (optional)</label>
+              <input type="text" id="bugGame" placeholder="e.g., Brick Breaker 3D, 4D Tic Tac Toe">
+            </div>
+
+            <div class="form-group">
+              <label>Bug Title *</label>
+              <input type="text" id="bugTitle" placeholder="Brief description of the bug" required maxlength="100">
+              <div class="char-count"><span id="titleCount">0</span>/100</div>
+            </div>
+
+            <div class="form-group">
+              <label>Description *</label>
+              <textarea id="bugDescription"
+                placeholder="What happened? What did you expect to happen? Any error messages?" required
+                maxlength="1000" rows="5"></textarea>
+              <div class="char-count"><span id="descCount">0</span>/1000</div>
+            </div>
+
+            <div class="form-group">
+              <label>Steps to Reproduce</label>
+              <textarea id="bugSteps" placeholder="1. Click on...\n2. Then...\n3. Bug occurs when..." maxlength="500"
+                rows="4"></textarea>
+              <div class="char-count"><span id="stepsCount">0</span>/500</div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Severity Level</h3>
+            <p style="margin-bottom: 15px; font-size: 14px; color: #666;">How serious is this bug?</p>
+            <div class="priority-levels">
+              <button type="button" class="priority-btn priority-minor" onclick="selectPriority('minor', event)">
+                🟢 Minor
+              </button>
+              <button type="button" class="priority-btn priority-moderate" onclick="selectPriority('moderate', event)">
+                🟡 Moderate
+              </button>
+              <button type="button" class="priority-btn priority-critical" onclick="selectPriority('critical', event)">
+                🔴 Critical
+              </button>
+              <button type="button" class="priority-btn priority-show_stopper"
+                onclick="selectPriority('show_stopper', event)">
+                ⛔ Show Stopper
+              </button>
+            </div>
+            <input type="hidden" id="bugPriority" value="moderate">
+          </div>
+
+          <button type="submit" class="submit-btn">Submit Bug Report</button>
+        </form>
+      </div>
+
+      <!-- TAB: FEEDBACK -->
+      <div id="feedback" class="tab-content">
+        <div class="info-box">
+          <strong>Your feedback matters!</strong> Rate your experience with KensGames. Your reviews help us understand
+          what's working and what needs improvement.
+        </div>
+
+        <form onsubmit="submitReview(event)">
+          <div class="form-section">
+            <h3>Rate Your Experience</h3>
+
+            <div class="form-group">
+              <label>Your Rating *</label>
+              <div class="star-rating" id="starRating">
+                <span class="star" onclick="setRating(1)">★</span>
+                <span class="star" onclick="setRating(2)">★</span>
+                <span class="star" onclick="setRating(3)">★</span>
+                <span class="star" onclick="setRating(4)">★</span>
+                <span class="star" onclick="setRating(5)">★</span>
+              </div>
+              <input type="hidden" id="reviewRating" value="0" required>
+              <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                <span id="ratingText">Select a rating</span>
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label>Your Feedback (optional)</label>
+              <textarea id="reviewComment" placeholder="What did you love? What can we improve? Any suggestions?"
+                maxlength="500" rows="5"></textarea>
+              <div class="char-count"><span id="commentCount">0</span>/500</div>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn">Submit Review</button>
+        </form>
+      </div>
+    </div>
+
+    <footer>
+      <p>Your feedback and bug reports help make KensGames better for everyone. Thank you for being a beta tester! 🙌
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    let selectedRating = 0;
+    let selectedPriority = 'moderate';
+
+    // Get token from localStorage
+    function getToken() {
+      return localStorage.getItem('kg_token');
+    }
+
+    // Show alert
+    function showAlert(message, type = 'success') {
+      const alert = document.getElementById('alert');
+      alert.textContent = message;
+      alert.className = `alert show alert-${type}`;
+      setTimeout(() => alert.classList.remove('show'), 4000);
+    }
+
+    // Character counter
+    document.getElementById('bugTitle').addEventListener('input', (e) => {
+      document.getElementById('titleCount').textContent = e.target.value.length;
+    });
+    document.getElementById('bugDescription').addEventListener('input', (e) => {
+      document.getElementById('descCount').textContent = e.target.value.length;
+    });
+    document.getElementById('bugSteps').addEventListener('input', (e) => {
+      document.getElementById('stepsCount').textContent = e.target.value.length;
+    });
+    document.getElementById('reviewComment').addEventListener('input', (e) => {
+      document.getElementById('commentCount').textContent = e.target.value.length;
+    });
+
+    // Tab switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // Star rating
+    function setRating(rating) {
+      selectedRating = rating;
+      document.getElementById('reviewRating').value = rating;
+
+      const stars = document.querySelectorAll('#starRating .star');
+      stars.forEach((star, index) => {
+        if (index < rating) {
+          star.classList.add('selected');
+        } else {
+          star.classList.remove('selected');
+        }
+      });
+
+      const ratingTexts = ['', 'Needs Work', 'Poor', 'Good', 'Very Good', 'Excellent'];
+      document.getElementById('ratingText').textContent = `${rating}/5 - ${ratingTexts[rating]}`;
+    }
+
+    // Priority selection
+    function selectPriority(priority, event) {
+      event.preventDefault();
+      selectedPriority = priority;
+      document.getElementById('bugPriority').value = priority;
+
+      document.querySelectorAll('.priority-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      event.target.classList.add('selected');
+    }
+
+    // Claim beta code
+    async function claimBetaCode() {
+      const code = document.getElementById('betaCodeInput').value.trim();
+      if (!code) {
+        showAlert('Please enter a code', 'error');
+        return;
+      }
+
+      const token = getToken();
+      if (!token) {
+        showAlert('Please log in first', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/betatester/claim-code', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ code })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert('🎉 ' + data.message);
+          document.getElementById('betaCodeInput').value = '';
+          // Hide code section after successful claim
+          setTimeout(() => {
+            document.getElementById('codeClaimSection').style.display = 'none';
+          }, 2000);
+        } else {
+          showAlert(data.error || 'Failed to claim code', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Submit bug report
+    async function submitBugReport(event) {
+      event.preventDefault();
+      const token = getToken();
+      if (!token) {
+        showAlert('Please log in first', 'error');
+        return;
+      }
+
+      const gameId = document.getElementById('bugGame').value || null;
+      const title = document.getElementById('bugTitle').value;
+      const description = document.getElementById('bugDescription').value;
+      const priority = document.getElementById('bugPriority').value;
+      const stepsToRepro = document.getElementById('bugSteps').value || null;
+
+      try {
+        const response = await fetch('/api/betatester/report-bug', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            gameId, title, description, priority, stepsToRepro
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert('✅ ' + data.message + ' (Report #' + data.report_id + ')');
+          // Reset form
+          event.target.reset();
+          document.getElementById('bugPriority').value = 'moderate';
+          document.getElementById('titleCount').textContent = '0';
+          document.getElementById('descCount').textContent = '0';
+          document.getElementById('stepsCount').textContent = '0';
+          document.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('selected'));
+        } else {
+          showAlert(data.error || 'Failed to submit report', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Submit review
+    async function submitReview(event) {
+      event.preventDefault();
+      const token = getToken();
+      if (!token) {
+        showAlert('Please log in first', 'error');
+        return;
+      }
+
+      if (!selectedRating || selectedRating === 0) {
+        showAlert('Please select a rating', 'error');
+        return;
+      }
+
+      const rating = selectedRating;
+      const comment = document.getElementById('reviewComment').value || null;
+
+      try {
+        const response = await fetch('/api/betatester/submit-review', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ rating, comment })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showAlert('❤️ ' + data.message);
+          // Reset form
+          event.target.reset();
+          selectedRating = 0;
+          document.getElementById('reviewRating').value = '0';
+          document.getElementById('ratingText').textContent = 'Select a rating';
+          document.querySelectorAll('#starRating .star').forEach(star => {
+            star.classList.remove('selected');
+          });
+          document.getElementById('commentCount').textContent = '0';
+        } else {
+          showAlert(data.error || 'Failed to submit review', 'error');
+        }
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Navigation
+    function goHome() {
+      window.location.href = '/';
+    }
+
+    function logout() {
+      localStorage.removeItem('kg_token');
+      localStorage.removeItem('user_token');
+      window.location.href = '/';
+    }
+
+    // Check auth on load
+    window.addEventListener('load', () => {
+      const token = getToken();
+      if (!token) {
+        showAlert('Please log in to access beta testing features', 'info');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 3000);
+      }
+    });
+  </script>
+</body>
+
+</html>

@@ -5,7 +5,22 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEY = 'user_token';
+  const TOKEN_KEY = 'kg_token';
+  const LEGACY_TOKEN_KEY = 'user_token';
+
+  function getToken() {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) return token;
+      const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+      if (legacy) {
+        localStorage.setItem(TOKEN_KEY, legacy);
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+        return legacy;
+      }
+    } catch { }
+    return null;
+  }
 
   function isGuestToken(token) {
     if (!token) return true;
@@ -18,7 +33,7 @@
 
   function ensureTokenFromAccess() {
     // CF Access bridge removed. Returns existing localStorage token or null.
-    try { return Promise.resolve(localStorage.getItem(TOKEN_KEY) || null); } catch { return Promise.resolve(null); }
+    return Promise.resolve(getToken());
   }
 
   function redirectToAccessLogin() {
@@ -39,14 +54,14 @@
 
     try {
       if (allowIf && allowIf()) {
-        return { allowed: true, token: localStorage.getItem(TOKEN_KEY) || null };
+        return { allowed: true, token: getToken() };
       }
     } catch (e) {
       // ignore allowIf errors; proceed with normal gating
     }
 
     let token = null;
-    try { token = localStorage.getItem(TOKEN_KEY) || null; } catch (e) { token = null; }
+    token = getToken();
 
     if (!hasSignedInToken(token)) token = await ensureTokenFromAccess();
 

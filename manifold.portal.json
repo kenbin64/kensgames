@@ -45,7 +45,8 @@
       "name": "FastTrack",
       "path": "fasttrack/",
       "manifold": "fasttrack/manifold.game.json",
-      "entry": "fasttrack/index.html",
+      "entry": "fasttrack/game.html",
+      "lobby": "fasttrack/lobby/",
       "server": "node",
       "status": "production"
     },
@@ -54,7 +55,8 @@
       "name": "BrickBreaker 3D",
       "path": "brickbreaker3d/",
       "manifold": "brickbreaker3d/manifold.game.json",
-      "entry": "brickbreaker3d/index.html",
+      "entry": "brickbreaker3d/game.html",
+      "lobby": "brickbreaker3d/lobby/",
       "server": "static",
       "status": "production"
     },
@@ -63,16 +65,18 @@
       "name": "4D Tic-Tac-Toe",
       "path": "4dtictactoe/",
       "manifold": "4dtictactoe/manifold.game.json",
-      "entry": "4dtictactoe/index.html",
+      "entry": "4dtictactoe/game.html",
+      "lobby": "4dtictactoe/lobby/",
       "server": "static",
       "status": "production"
     },
     {
       "id": "starfighter",
-      "name": "StarFighter",
+      "name": "Starfighter",
       "path": "starfighter/",
       "manifold": "starfighter/manifold.game.json",
-      "entry": "starfighter/index.html",
+      "entry": "starfighter/game.html",
+      "lobby": "starfighter/lobby/",
       "server": "node",
       "status": "production"
     },
@@ -81,7 +85,8 @@
       "name": "Assemble",
       "path": "assemble/",
       "manifold": "assemble/manifold.game.json",
-      "entry": "assemble/index.html",
+      "entry": "assemble/game.html",
+      "lobby": "assemble/lobby/",
       "server": "static",
       "status": "production"
     }

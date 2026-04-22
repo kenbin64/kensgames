@@ -24,15 +24,20 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEYS = ['kg_token', 'user_token'];
+  const TOKEN_KEY = 'kg_token';
+  const LEGACY_TOKEN_KEY = 'user_token';
   const GUEST_PREFIX = 'guest-';
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function getToken() {
-    for (const k of TOKEN_KEYS) {
-      const t = localStorage.getItem(k);
-      if (t) return t;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) return token;
+    const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+    if (legacy) {
+      localStorage.setItem(TOKEN_KEY, legacy);
+      localStorage.removeItem(LEGACY_TOKEN_KEY);
+      return legacy;
     }
     return null;
   }
@@ -42,7 +47,8 @@
   }
 
   function clearTokens() {
-    TOKEN_KEYS.forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
     ['kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar',
       'display_name', 'username'].forEach(k => localStorage.removeItem(k));
   }

@@ -55,7 +55,17 @@ class KGMultiplayer {
   async connect(auth) {
     if (this.ws && this.ws.readyState <= 1) return;
     this.username = (auth && auth.username) || localStorage.getItem('username') || 'Guest';
-    let token = (auth && auth.token) || localStorage.getItem('user_token') || null;
+    let token = (auth && auth.token) || localStorage.getItem('kg_token') || null;
+    if (!token) {
+      const legacy = localStorage.getItem('user_token');
+      if (legacy) {
+        token = legacy;
+        try {
+          localStorage.setItem('kg_token', legacy);
+          localStorage.removeItem('user_token');
+        } catch { /* ignore */ }
+      }
+    }
 
     const isGuestToken = (t) => !t || String(t).startsWith('guest-');
 
@@ -65,7 +75,7 @@ class KGMultiplayer {
     // (JWT tokens for signed-in users are preserved as-is.)
     if (!token) {
       token = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      try { localStorage.setItem('user_token', token); } catch { /* ignore */ }
+      try { localStorage.setItem('kg_token', token); } catch { /* ignore */ }
     }
 
     // Best-effort avatar_id (shared AvatarPicker stores under kg_avatar)
