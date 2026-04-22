@@ -2395,7 +2395,7 @@
                 </p>
                 <div class="hero-cta">
                     <span class="kg-tip-wrap">
-                        <a class="btn-play" href="/fasttrack/3d.html?offline=true&amp;ai_players=1&amp;ai_level=medium"
+                        <a class="btn-play" href="/play/?game=fasttrack&amp;mode=solo"
                             style="text-decoration:none;display:inline-flex;align-items:center">&#9654; QUICK PLAY vs
                             BOTS</a>
                         <span class="kg-tip kg-tip-free">&#9733; No login required for solo play</span>
@@ -4360,11 +4360,11 @@
             '/assemble/': 'assemble',
         };
         const SOLO_ROUTES = window.SOLO_ROUTES = {
-            '/fasttrack/': '/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium',
-            '/brickbreaker3d/': '/brickbreaker3d/game.html?offline=true',
-            '/starfighter/': '/starfighter/game.html?offline=true',
-            '/4dtictactoe/': '/4dtictactoe/game.html?offline=true',
-            '/assemble/': '/assemble/game.html?offline=true',
+            '/fasttrack/': '/play/?game=fasttrack&mode=solo',
+            '/brickbreaker3d/': '/play/?game=brickbreaker3d&mode=solo',
+            '/starfighter/': '/play/?game=starfighter&mode=solo',
+            '/4dtictactoe/': '/play/?game=tictactoe&mode=solo',
+            '/assemble/': '/play/?game=assemble&mode=solo',
         };
         function goToGame(path) {
             if (!localStorage.getItem('kg_token')) { openModal('auth-modal'); return; }

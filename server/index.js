@@ -386,6 +386,7 @@ app.get('/api/auth/check-username', (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password, confirmPassword, avatar, turnstileToken, tosAgreed } = req.body;
+    const avatarId = typeof avatar === 'string' ? avatar.trim() : '';
 
     // Verify Turnstile challenge
     const tsOk = await verifyTurnstile(turnstileToken, req.ip);
@@ -396,6 +397,10 @@ app.post('/api/auth/register', async (req, res) => {
     // TOS must be accepted
     if (!tosAgreed) {
       return res.status(400).json({ success: false, error: 'You must agree to the Terms of Service to register.' });
+    }
+
+    if (!avatarId) {
+      return res.status(400).json({ success: false, error: 'Avatar selection required' });
     }
 
     // Validate username
@@ -450,7 +455,7 @@ app.post('/api/auth/register', async (req, res) => {
       email: email ? email.toLowerCase() : null,
       passwordHash,
       displayName: username,
-      avatar: avatar || '🎮',
+      avatar: avatarId,
       authMethod: 1,
       status: 'active',
       emailVerified: true,
@@ -466,7 +471,7 @@ app.post('/api/auth/register', async (req, res) => {
       email: email ? email.toLowerCase() : null,
       passwordHash: passwordHash,
       displayName: username,
-      avatar: avatar || '🎮',
+      avatar: avatarId,
       status: 'active',
       emailVerified: true,
       verificationCodeHash: verificationCodeHash,
@@ -485,10 +490,22 @@ app.post('/api/auth/register', async (req, res) => {
     try {
       const emailEnc = PiiCrypto.encrypt(email ? email.toLowerCase() : '');
       const dbPlayer = PlayerDB.ensurePlayer(userData.userId, email ? email.toLowerCase() : null, emailEnc);
-      if (dbPlayer) PlayerDB.agreeTOS(userData.userId, '1.0');
+      if (dbPlayer) {
+        PlayerDB.agreeTOS(userData.userId, '1.0');
+        PlayerDB.setupProfile(userData.userId, username, avatarId);
+      }
     } catch (dbErr) {
       console.error('DB register error:', dbErr.message);
     }
+
+    // Keep in-memory auth/profile state aligned with SQLite to avoid duplicate setup prompts.
+    writeUserToManifold(username, {
+      avatar: avatarId,
+      avatarId,
+      playername: username,
+      profileSetup: true,
+      tosAgreed: true,
+    });
 
     // Send verification email (non-blocking — don't await)
     if (email) {
@@ -592,6 +609,21 @@ app.post('/api/auth/login', async (req, res) => {
       const emailEnc = PiiCrypto.encrypt(userData.email || '');
       const dbPlayer = PlayerDB.ensurePlayer(userData.userId, userData.email, emailEnc);
       profileSetup = dbPlayer ? dbPlayer.profile_setup === 1 : false;
+      if (!profileSetup) {
+        const inferredAvatarId = (typeof userData.avatar === 'string' && /^[A-Za-z0-9_]{2,40}$/.test(userData.avatar))
+          ? userData.avatar
+          : null;
+        if (inferredAvatarId) {
+          PlayerDB.setupProfile(userData.userId, username, inferredAvatarId);
+          profileSetup = true;
+          writeUserToManifold(username, {
+            avatarId: inferredAvatarId,
+            playername: username,
+            profileSetup: true,
+            tosAgreed: true,
+          });
+        }
+      }
       // Sync profileSetup into in-memory store so validate is consistent mid-session
       if (profileSetup) writeUserToManifold(username, { profileSetup: true });
     } catch (dbErr) {

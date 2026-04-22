@@ -137,14 +137,14 @@
 
   <div id="menu">
     <h1>BRICKBREAKER 3D</h1>
-    <button class="mode-btn" onclick="startGame('easy')">EASY — SOLO</button>
-    <button class="mode-btn" onclick="startGame('hard')">HARD — SOLO</button>
-    <button class="mode-btn" onclick="startGame('multi2')">2 PLAYER</button>
-    <button class="mode-btn" onclick="startGame('multi3')">3 PLAYER</button>
-    <button class="mode-btn" onclick="startGame('multi4')">4 PLAYER</button>
+    <button class="mode-btn" data-start-mode="easy">EASY — SOLO</button>
+    <button class="mode-btn" data-start-mode="hard">HARD — SOLO</button>
+    <button class="mode-btn" data-start-mode="multi2">2 PLAYER</button>
+    <button class="mode-btn" data-start-mode="multi3">3 PLAYER</button>
+    <button class="mode-btn" data-start-mode="multi4">4 PLAYER</button>
     <div id="session-actions" style="display:none;text-align:center;margin-top:0.5rem">
       <div id="session-info" style="font-size:0.65rem;color:#8a7a68;margin-bottom:0.5rem"></div>
-      <button class="mode-btn" id="session-start-btn" onclick="startFromSession()">START SESSION GAME</button>
+      <button class="mode-btn" id="session-start-btn">START SESSION GAME</button>
     </div>
     <a href="/brickbreaker3d/lobby/" class="lobby-link">&#x2190; BACK TO LOBBY</a>
   </div>
@@ -187,6 +187,24 @@
       else if (totalPlayers >= 2) mode = 'multi2';
       startGame(mode);
     }
+
+    // Bind menu buttons via JS (works under strict CSP where inline onclick is blocked).
+    function bindMenuButtons() {
+      document.querySelectorAll('[data-start-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mode = btn.getAttribute('data-start-mode');
+          if (typeof window.startGame === 'function') {
+            window.startGame(mode);
+          }
+        });
+      });
+      const sessionStartBtn = document.getElementById('session-start-btn');
+      if (sessionStartBtn) {
+        sessionStartBtn.addEventListener('click', () => startFromSession());
+      }
+    }
+
+    bindMenuButtons();
 
     // Auto-launch when arriving from the lobby (session URL)
     if (sessionId) {
