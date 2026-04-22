@@ -685,6 +685,11 @@ const SF3D = (function () {
         }
 
         const availableTypes = SFManifoldGeometry.getAvailableTypes();
+        if (!availableTypes || availableTypes.length === 0) {
+            console.warn('[ManifoldGeometry] No manifold types available, falling back to legacy GLB system');
+            _preloadGLBModels_LEGACY();
+            return;
+        }
         _totalModelsToLoad = availableTypes.length * 3; // 3 LOD levels per type
         _modelsLoaded = 0;
 
