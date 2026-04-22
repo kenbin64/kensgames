@@ -138,7 +138,7 @@ All 5 game HTML entry points must include `manifold_bridge.js`:
 
 ```bash
 # Windows PowerShell
-@("4DTicTacToe","brickbreaker3d","starfighter","fasttrack","assemble") | ForEach-Object {
+@("4dconnect","brickbreaker3d","starfighter","fasttrack","assemble") | ForEach-Object {
   $f = "$_\index.html"
   $c = Get-Content $f -Raw
   $tag = $c -match "manifold_bridge\.js"
@@ -147,7 +147,7 @@ All 5 game HTML entry points must include `manifold_bridge.js`:
 }
 
 # Linux / macOS
-for game in 4DTicTacToe brickbreaker3d starfighter fasttrack assemble; do
+for game in 4dconnect brickbreaker3d starfighter fasttrack assemble; do
   tag=$(grep -l "manifold_bridge.js" $game/index.html 2>/dev/null && echo "OK" || echo "MISSING")
   echo "$game  tag=$tag"
 done
@@ -186,7 +186,7 @@ is **not** a public landing page. Verify it is included where needed:
 
 - `portal.html` must have `data-kg-no-init="true"` on `<body>` (portal manages its own auth flow; kg-session.js only provides `window.KG_AVATARS`).
 - `player/setup.html` and `player/index.html` rely on kg-session.js for auth gating.
-- Game HTML files (`fasttrack/`, `4DTicTacToe/`, etc.) may include kg-session.js for the player chip and `KGSession.musicEnabled` / `KGSession.soundEnabled` controls.
+- Game HTML files (`fasttrack/`, `4dconnect/`, etc.) may include kg-session.js for the player chip and `KGSession.musicEnabled` / `KGSession.soundEnabled` controls.
 
 ### Step 6 — Commit and Push
 
@@ -278,7 +278,7 @@ py -3.12 engine/manifold_compiler.py --validate-only
 |---------|-----------|------------|
 | `fasttrack` | x=3 y=45 z=135 | `/fasttrack/portal.html` |
 | `brickbreaker3d` | x=2 y=22 z=44 | `/brickbreaker3d/lobby.html` |
-| `4dtictactoe` | x=2 y=12 z=24 | `/4DTicTacToe/lobby.html` |
+| `4dconnect` | x=2 y=12 z=24 | `/4dconnect/lobby.html` |
 | `starfighter` | x=2 y=30 z=60 | `/starfighter/lobby.html` |
 | `assemble` | x=2 y=20 z=40 | `/assemble/lobby.html` |
 

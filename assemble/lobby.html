@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,42 +9,289 @@
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
   <style>
-    .lobby-wrap{max-width:1100px;margin:0 auto;padding:40px 20px 80px;}
-    .launch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin:24px 0;}
-    .launch-card{background:rgba(4,4,20,.82);border:1px solid rgba(0,255,255,.22);border-radius:8px;padding:26px 22px;text-align:center;}
-    .launch-card h3{font-family:var(--fa);font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--nc);margin-bottom:10px;}
-    .launch-card p{font-size:13px;color:var(--txm);margin-bottom:18px;line-height:1.5;}
-    .bot-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:14px;}
-    .bot-row button{background:none;border:1px solid #445;color:var(--txm);width:28px;height:28px;border-radius:3px;cursor:pointer;font-size:18px;line-height:1;transition:all .2s;}
-    .bot-row button:hover{border-color:var(--nc);color:var(--nc);}
-    #bot-count-val{font-family:var(--fa);font-size:24px;color:var(--nc);min-width:28px;text-align:center;}
-    .range-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;font-size:13px;color:var(--txm);}
-    input[type=range]{width:80px;accent-color:var(--nc);}
-    .join-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 24px;}
-    #join-code-input{background:rgba(255,255,255,.05);border:1px solid #445;border-radius:3px;padding:10px 16px;color:var(--txt);font-family:var(--fa);font-size:14px;letter-spacing:4px;width:180px;text-transform:uppercase;}
-    #join-code-input:focus{outline:none;border-color:var(--nc);}
-    #waiting-room{background:rgba(4,4,20,.9);border:1px solid rgba(0,255,255,.38);border-radius:8px;padding:28px;margin:24px 0;}
-    .share-block{background:rgba(0,255,255,.06);border:1px solid rgba(0,255,255,.2);border-radius:6px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-    .share-code-big{font-family:var(--fa);font-size:36px;letter-spacing:10px;color:var(--nc);}
-    #player-list{list-style:none;margin:14px 0;display:flex;flex-direction:column;gap:8px;}
-    #player-list li{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:4px;font-size:13px;}
-    .ready-dot{width:8px;height:8px;border-radius:50%;background:#334;flex-shrink:0;}
-    .ready-dot.on{background:var(--ng);box-shadow:0 0 6px var(--ng);}
-    .player-name{flex:1;}
-    .host-badge{font-size:10px;background:rgba(0,255,255,.15);color:var(--nc);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
-    .bot-badge{font-size:10px;background:rgba(0,255,255,.1);color:var(--nc);padding:2px 8px;border-radius:2px;font-family:var(--fa);letter-spacing:1px;}
-    .wr-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
-    #sessions-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin:12px 0;}
-    #sessions-list li button{width:100%;text-align:left;background:rgba(4,4,20,.8);border:1px solid #334;border-radius:4px;padding:12px 16px;color:var(--txt);font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s;}
-    #sessions-list li button:hover{border-color:var(--nc);}
-    .section-title{font-family:var(--fa);font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--txm);margin-bottom:14px;}
-    .divider{border:none;border-top:1px solid #1a1a2e;margin:30px 0;}
-    .kg-toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:4px;font-size:13px;z-index:500;animation:fadeIn .2s;max-width:320px;}
-    .kg-toast-error{background:rgba(200,0,40,.92);color:#fff;border:1px solid #f00;}
-    .kg-toast-info{background:rgba(0,20,30,.92);color:var(--nc);border:1px solid var(--nc);}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .lobby-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    .launch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .launch-card {
+      background: rgba(4, 4, 20, .82);
+      border: 1px solid rgba(0, 255, 255, .22);
+      border-radius: 8px;
+      padding: 26px 22px;
+      text-align: center;
+    }
+
+    .launch-card h3 {
+      font-family: var(--fa);
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--nc);
+      margin-bottom: 10px;
+    }
+
+    .launch-card p {
+      font-size: 13px;
+      color: var(--txm);
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+
+    .bot-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .bot-row button {
+      background: none;
+      border: 1px solid #445;
+      color: var(--txm);
+      width: 28px;
+      height: 28px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      transition: all .2s;
+    }
+
+    .bot-row button:hover {
+      border-color: var(--nc);
+      color: var(--nc);
+    }
+
+    #bot-count-val {
+      font-family: var(--fa);
+      font-size: 24px;
+      color: var(--nc);
+      min-width: 28px;
+      text-align: center;
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--txm);
+    }
+
+    input[type=range] {
+      width: 80px;
+      accent-color: var(--nc);
+    }
+
+    .join-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 4px 0 24px;
+    }
+
+    #join-code-input {
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid #445;
+      border-radius: 3px;
+      padding: 10px 16px;
+      color: var(--txt);
+      font-family: var(--fa);
+      font-size: 14px;
+      letter-spacing: 4px;
+      width: 180px;
+      text-transform: uppercase;
+    }
+
+    #join-code-input:focus {
+      outline: none;
+      border-color: var(--nc);
+    }
+
+    #waiting-room {
+      background: rgba(4, 4, 20, .9);
+      border: 1px solid rgba(0, 255, 255, .38);
+      border-radius: 8px;
+      padding: 28px;
+      margin: 24px 0;
+    }
+
+    .share-block {
+      background: rgba(0, 255, 255, .06);
+      border: 1px solid rgba(0, 255, 255, .2);
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .share-code-big {
+      font-family: var(--fa);
+      font-size: 36px;
+      letter-spacing: 10px;
+      color: var(--nc);
+    }
+
+    #player-list {
+      list-style: none;
+      margin: 14px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #player-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, .04);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .ready-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #334;
+      flex-shrink: 0;
+    }
+
+    .ready-dot.on {
+      background: var(--ng);
+      box-shadow: 0 0 6px var(--ng);
+    }
+
+    .player-name {
+      flex: 1;
+    }
+
+    .host-badge {
+      font-size: 10px;
+      background: rgba(0, 255, 255, .15);
+      color: var(--nc);
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-family: var(--fa);
+      letter-spacing: 1px;
+    }
+
+    .bot-badge {
+      font-size: 10px;
+      background: rgba(0, 255, 255, .1);
+      color: var(--nc);
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-family: var(--fa);
+      letter-spacing: 1px;
+    }
+
+    .wr-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    #sessions-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    #sessions-list li button {
+      width: 100%;
+      text-align: left;
+      background: rgba(4, 4, 20, .8);
+      border: 1px solid #334;
+      border-radius: 4px;
+      padding: 12px 16px;
+      color: var(--txt);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color .2s;
+    }
+
+    #sessions-list li button:hover {
+      border-color: var(--nc);
+    }
+
+    .section-title {
+      font-family: var(--fa);
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--txm);
+      margin-bottom: 14px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #1a1a2e;
+      margin: 30px 0;
+    }
+
+    .kg-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 500;
+      animation: fadeIn .2s;
+      max-width: 320px;
+    }
+
+    .kg-toast-error {
+      background: rgba(200, 0, 40, .92);
+      color: #fff;
+      border: 1px solid #f00;
+    }
+
+    .kg-toast-info {
+      background: rgba(0, 20, 30, .92);
+      color: var(--nc);
+      border: 1px solid var(--nc);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
   </style>
 </head>
+
 <body style="visibility:hidden">
   <div id="tron-grid"></div>
   <div id="scanlines"></div>
@@ -55,7 +303,7 @@
         <li><a href="/brickbreaker3d/">BrickBreaker</a></li>
         <li><a href="/starfighter/">StarFighter</a></li>
         <li><a href="/assemble/">Assemble</a></li>
-        <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
+        <li><a href="/4dconnect/">4D Connect</a></li>
       </ul>
       <div class="arc-nav-right">
         <span id="player-bar" style="font-family:var(--fa);font-size:11px;color:var(--txm);letter-spacing:1px;"></span>
@@ -112,8 +360,7 @@
     <hr class="divider">
     <p class="section-title">Join with a Code</p>
     <div class="join-row" id="join-code-panel">
-      <input type="text" id="join-code-input" placeholder="A1B2C3" maxlength="6"
-        autocomplete="off" spellcheck="false"
+      <input type="text" id="join-code-input" placeholder="A1B2C3" maxlength="6" autocomplete="off" spellcheck="false"
         onkeydown="if(event.key==='Enter')joinWithCode()">
       <button class="btn btn-nc" onclick="joinWithCode()">Join Game</button>
     </div>
@@ -121,7 +368,8 @@
       <p class="section-title">Waiting Room</p>
       <div class="share-block" id="share-block" style="display:none">
         <div>
-          <div style="font-size:10px;color:var(--txm);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Game Code</div>
+          <div style="font-size:10px;color:var(--txm);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">
+            Game Code</div>
           <div class="share-code-big" id="share-code-display"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -157,69 +405,70 @@
   <script src="/js/kg_lobby.js"></script>
   <script>
     'use strict';
-    var bots=1,shareUrl='',currentSession=null,isReady=false,lobby;
-    KGGate.protect({allowGuest:false,requireToS:true,requireProfile:true}).then(function(r){
-      if(!r.allowed)return;
-      document.body.style.visibility='';
-      document.getElementById('player-bar').textContent=(r.player&&(r.player.playername||r.player.username))||'';
+    var bots = 1, shareUrl = '', currentSession = null, isReady = false, lobby;
+    KGGate.protect({ allowGuest: false, requireToS: true, requireProfile: true }).then(function (r) {
+      if (!r.allowed) return;
+      document.body.style.visibility = '';
+      document.getElementById('player-bar').textContent = (r.player && (r.player.playername || r.player.username)) || '';
       initLobby();
     });
-    function initLobby(){
-      lobby=KGLobby.init({
-        gameId:'assemble',
-        gamePath:'/assemble/game.html',
-        onConnected:function(){lobby.browseGames();},
-        onError:function(msg){showToast(msg||'Error','error');},
-        onSessionCreated:function(session,code,url){currentSession=session;shareUrl=url||(location.origin+'/assemble/game.html/../lobby.html?join='+code);if(code){document.getElementById('share-code-display').textContent=code;document.getElementById('share-block').style.display='';}showWaitingRoom(session);},
-        onSessionJoined:function(session){currentSession=session;showWaitingRoom(session);},
-        onSessionUpdate:function(session){currentSession=session;renderPlayers(session.players);updateStartBtn(session);},
-        onPlayerJoined:function(player,players,session){currentSession=session;renderPlayers(players);updateStartBtn(session);showToast(escHtml(player.playername||player.username)+' joined','info');},
-        onPlayerLeft:function(username,players,session){if(session){currentSession=session;updateStartBtn(session);}renderPlayers(players);showToast(escHtml(username)+' left','info');},
-        onGameStarted:function(session){window.location.href='/assemble/game.html?session='+encodeURIComponent(session.session_id)+'&mode=multi';},
-        onSessionList:function(sessions){renderSessions(sessions);},
-        onMatchmakeResult:function(action,session){if(action==='joined'||action==='created'){currentSession=session;showWaitingRoom(session);}},
-        onLeftSession:function(){currentSession=null;hideWaitingRoom();lobby.browseGames();},
+    function initLobby() {
+      lobby = KGLobby.init({
+        gameId: 'assemble',
+        gamePath: '/assemble/game.html',
+        onConnected: function () { lobby.browseGames(); },
+        onError: function (msg) { showToast(msg || 'Error', 'error'); },
+        onSessionCreated: function (session, code, url) { currentSession = session; shareUrl = url || (location.origin + '/assemble/game.html/../lobby.html?join=' + code); if (code) { document.getElementById('share-code-display').textContent = code; document.getElementById('share-block').style.display = ''; } showWaitingRoom(session); },
+        onSessionJoined: function (session) { currentSession = session; showWaitingRoom(session); },
+        onSessionUpdate: function (session) { currentSession = session; renderPlayers(session.players); updateStartBtn(session); },
+        onPlayerJoined: function (player, players, session) { currentSession = session; renderPlayers(players); updateStartBtn(session); showToast(escHtml(player.playername || player.username) + ' joined', 'info'); },
+        onPlayerLeft: function (username, players, session) { if (session) { currentSession = session; updateStartBtn(session); } renderPlayers(players); showToast(escHtml(username) + ' left', 'info'); },
+        onGameStarted: function (session) { window.location.href = '/assemble/game.html?session=' + encodeURIComponent(session.session_id) + '&mode=multi'; },
+        onSessionList: function (sessions) { renderSessions(sessions); },
+        onMatchmakeResult: function (action, session) { if (action === 'joined' || action === 'created') { currentSession = session; showWaitingRoom(session); } },
+        onLeftSession: function () { currentSession = null; hideWaitingRoom(); lobby.browseGames(); },
       });
     }
-    function adjustBots(d){bots=Math.max(1,Math.min(3,bots+d));document.getElementById('bot-count-val').textContent=bots;}
-    function launchSolo(){lobby.solo(bots);}
-    function launchPublic(){lobby.createPublic({maxPlayers:parseInt(document.getElementById('max-pub').value,10)||4});}
-    function launchPrivate(){lobby.createPrivate({maxPlayers:parseInt(document.getElementById('max-priv').value,10)||4});}
-    function launchMatchmake(){lobby.matchmake();}
-    function joinWithCode(){var code=document.getElementById('join-code-input').value.trim().toUpperCase();if(code.length>=4)lobby.joinByCode(code);else showToast('Enter a valid game code','error');}
-    function showWaitingRoom(session){
-      document.getElementById('launch-panel').style.display='none';document.getElementById('join-code-panel').style.display='none';document.getElementById('sessions-panel').style.display='none';document.getElementById('waiting-room').style.display='';
-      var isHost=lobby.user&&session.host_id===lobby.user.user_id;
-      document.getElementById('host-controls').style.display=isHost?'':'none';document.getElementById('guest-controls').style.display=isHost?'none':'';
-      renderPlayers(session.players||[]);updateStartBtn(session);
+    function adjustBots(d) { bots = Math.max(1, Math.min(3, bots + d)); document.getElementById('bot-count-val').textContent = bots; }
+    function launchSolo() { lobby.solo(bots); }
+    function launchPublic() { lobby.createPublic({ maxPlayers: parseInt(document.getElementById('max-pub').value, 10) || 4 }); }
+    function launchPrivate() { lobby.createPrivate({ maxPlayers: parseInt(document.getElementById('max-priv').value, 10) || 4 }); }
+    function launchMatchmake() { lobby.matchmake(); }
+    function joinWithCode() { var code = document.getElementById('join-code-input').value.trim().toUpperCase(); if (code.length >= 4) lobby.joinByCode(code); else showToast('Enter a valid game code', 'error'); }
+    function showWaitingRoom(session) {
+      document.getElementById('launch-panel').style.display = 'none'; document.getElementById('join-code-panel').style.display = 'none'; document.getElementById('sessions-panel').style.display = 'none'; document.getElementById('waiting-room').style.display = '';
+      var isHost = lobby.user && session.host_id === lobby.user.user_id;
+      document.getElementById('host-controls').style.display = isHost ? '' : 'none'; document.getElementById('guest-controls').style.display = isHost ? 'none' : '';
+      renderPlayers(session.players || []); updateStartBtn(session);
     }
-    function hideWaitingRoom(){document.getElementById('waiting-room').style.display='none';document.getElementById('share-block').style.display='none';document.getElementById('launch-panel').style.display='';document.getElementById('join-code-panel').style.display='';document.getElementById('sessions-panel').style.display='';isReady=false;}
-    function renderPlayers(players){
-      document.getElementById('player-list').innerHTML=(players||[]).map(function(p){
-        var badge=p.is_host?'<span class="host-badge">HOST</span>':'';if(p.is_ai)badge='<span class="bot-badge">BOT</span>';
-        return '<li><span class="ready-dot'+(p.ready||p.is_host?' on':'')+'"></span><span class="player-name">'+escHtml(p.playername||p.username||'Player')+'</span>'+badge+'</li>';
+    function hideWaitingRoom() { document.getElementById('waiting-room').style.display = 'none'; document.getElementById('share-block').style.display = 'none'; document.getElementById('launch-panel').style.display = ''; document.getElementById('join-code-panel').style.display = ''; document.getElementById('sessions-panel').style.display = ''; isReady = false; }
+    function renderPlayers(players) {
+      document.getElementById('player-list').innerHTML = (players || []).map(function (p) {
+        var badge = p.is_host ? '<span class="host-badge">HOST</span>' : ''; if (p.is_ai) badge = '<span class="bot-badge">BOT</span>';
+        return '<li><span class="ready-dot' + (p.ready || p.is_host ? ' on' : '') + '"></span><span class="player-name">' + escHtml(p.playername || p.username || 'Player') + '</span>' + badge + '</li>';
       }).join('');
     }
-    function updateStartBtn(session){
-      var btn=document.getElementById('start-btn');if(!btn)return;
-      var humans=(session.players||[]).filter(function(p){return!p.is_ai;});
-      var ok=humans.every(function(p){return p.ready||p.is_host;});
-      btn.disabled=!ok||(session.players||[]).length<2;btn.style.opacity=btn.disabled?'0.5':'1';
+    function updateStartBtn(session) {
+      var btn = document.getElementById('start-btn'); if (!btn) return;
+      var humans = (session.players || []).filter(function (p) { return !p.is_ai; });
+      var ok = humans.every(function (p) { return p.ready || p.is_host; });
+      btn.disabled = !ok || (session.players || []).length < 2; btn.style.opacity = btn.disabled ? '0.5' : '1';
     }
-    function toggleReady(){isReady=!isReady;lobby.toggleReady();var btn=document.getElementById('ready-btn');btn.textContent=isReady?'Not Ready':'Ready Up';btn.className='btn '+(isReady?'btn-nc':'btn-ghost');}
-    function copyShareUrl(){writeClip(shareUrl||location.href);showToast('Invite link copied!','info');}
-    function copyCode(){writeClip(document.getElementById('share-code-display').textContent);showToast('Code copied!','info');}
-    function writeClip(text){if(navigator.clipboard){navigator.clipboard.writeText(text).catch(function(){fbCopy(text);});}else{fbCopy(text);}}
-    function fbCopy(text){var t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(t);}
-    function renderSessions(sessions){
-      var list=document.getElementById('sessions-list');
-      if(!sessions||!sessions.length){list.innerHTML='<li style="color:var(--txm);font-size:13px;padding:12px 0;">No open games &mdash; create one above!</li>';return;}
-      list.innerHTML=sessions.map(function(s){return '<li><button onclick="lobby.joinSession(\''+s.session_id+'\')"><span>'+escHtml(s.host_username||'Unknown')+'\'s game</span><span style="color:var(--txm);font-size:11px;font-family:var(--fa);">'+(s.player_count||1)+' / '+(s.max_players||4)+'</span></button></li>';}).join('');
+    function toggleReady() { isReady = !isReady; lobby.toggleReady(); var btn = document.getElementById('ready-btn'); btn.textContent = isReady ? 'Not Ready' : 'Ready Up'; btn.className = 'btn ' + (isReady ? 'btn-nc' : 'btn-ghost'); }
+    function copyShareUrl() { writeClip(shareUrl || location.href); showToast('Invite link copied!', 'info'); }
+    function copyCode() { writeClip(document.getElementById('share-code-display').textContent); showToast('Code copied!', 'info'); }
+    function writeClip(text) { if (navigator.clipboard) { navigator.clipboard.writeText(text).catch(function () { fbCopy(text); }); } else { fbCopy(text); } }
+    function fbCopy(text) { var t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) { } document.body.removeChild(t); }
+    function renderSessions(sessions) {
+      var list = document.getElementById('sessions-list');
+      if (!sessions || !sessions.length) { list.innerHTML = '<li style="color:var(--txm);font-size:13px;padding:12px 0;">No open games &mdash; create one above!</li>'; return; }
+      list.innerHTML = sessions.map(function (s) { return '<li><button onclick="lobby.joinSession(\'' + s.session_id + '\')"><span>' + escHtml(s.host_username || 'Unknown') + '\'s game</span><span style="color:var(--txm);font-size:11px;font-family:var(--fa);">' + (s.player_count || 1) + ' / ' + (s.max_players || 4) + '</span></button></li>'; }).join('');
     }
-    function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-    function showToast(msg,type){var t=document.createElement('div');t.className='kg-toast kg-toast-'+(type||'info');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4000);}
-    function signOut(){['kg_token','user_token','kg_username','kg_display_name','kg_user_id','kg_avatar','display_name','username'].forEach(function(k){localStorage.removeItem(k);});window.location.href='/login/';}
-    (function(){var c=new URLSearchParams(location.search).get('join');if(c)document.getElementById('join-code-input').value=c.toUpperCase().slice(0,6);}());
+    function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function showToast(msg, type) { var t = document.createElement('div'); t.className = 'kg-toast kg-toast-' + (type || 'info'); t.textContent = msg; document.body.appendChild(t); setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 4000); }
+    function signOut() { ['kg_token', 'user_token', 'kg_username', 'kg_display_name', 'kg_user_id', 'kg_avatar', 'display_name', 'username'].forEach(function (k) { localStorage.removeItem(k); }); window.location.href = '/login/'; }
+    (function () { var c = new URLSearchParams(location.search).get('join'); if (c) document.getElementById('join-code-input').value = c.toUpperCase().slice(0, 6); }());
   </script>
 </body>
+
 </html>

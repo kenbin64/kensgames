@@ -163,7 +163,7 @@ jobs:
             --exclude='dist/' \
             --exclude='fasttrack/' \
             --exclude='brickbreaker3d/' \
-            --exclude='4DTicTacToe/' \
+            --exclude='4dconnect/' \
             --exclude='starfighter/' \
             --exclude='assemble/' \
             --exclude='server/' \
@@ -193,14 +193,15 @@ jobs:
             brickbreaker3d/ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/brickbreaker3d/
 
-      - name: Deploy game — 4DTicTacToe
-        if: inputs.game == '' || inputs.game == '4dtictactoe'
+      - name: Deploy game — 4dconnect
+        if: inputs.game == '' || inputs.game == '4dconnect' || inputs.game ==
+          '4dtictactoe'
         run: |
           rsync -avz --delete \
             --exclude='manifold.game.json' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
-            4DTicTacToe/ \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/4DTicTacToe/
+            4dconnect/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/4dconnect/
 
       - name: Deploy game — starfighter
         if: inputs.game == '' || inputs.game == 'starfighter'

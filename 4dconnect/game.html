@@ -719,7 +719,7 @@
   <nav class="nav">
     <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
     <ul class="nav-links">
-      <li><a href="/4dtictactoe/lobby/" style="color:var(--cyan);font-weight:700">&#8592; LOBBY</a></li>
+      <li><a href="/4dconnect/lobby/" style="color:var(--cyan);font-weight:700">&#8592; LOBBY</a></li>
       <li><a href="/">Portal</a></li>
       <li><a href="/starfighter/lobby/">Alien Attack</a></li>
       <li><a href="/fasttrack/lobby/">FastTrack</a></li>
@@ -799,7 +799,9 @@
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/GLTFLoader.js"></script>
   <script src="/js/manifold_bridge.js"></script>
-  <script src="/4dtictactoe/board_manifold_substrate.js"></script>
+  <script src="/js/kg_lobby.js"></script>
+  <script src="/js/game_manager_client.js"></script>
+  <script src="/4dconnect/board_manifold_substrate.js"></script>
   <script>
     'use strict';
     const TRNG = { _b: new Uint32Array(16), _i: 16, _r() { crypto.getRandomValues(this._b); this._i = 0; }, f() { if (this._i >= 16) this._r(); return this._b[this._i++] / 0xFFFFFFFF; }, i(a, b) { return Math.floor(this.f() * (b - a + 1)) + a; }, pick(a) { return a[this.i(0, a.length - 1)]; }, shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = this.i(0, i);[r[i], r[j]] = [r[j], r[i]]; } return r; } };
@@ -862,9 +864,9 @@
     const saturn = makeSaturn();
     let jupiter = null;
     const GLTF = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
-    if (GLTF) { GLTF.load('/4dtictactoe/assets/model/jupiter.glb', gltf => { jupiter = gltf.scene; jupiter.scale.setScalar(7); jupiter.position.set(-75, -18, -80); jupiter.traverse(c => { if (c.isMesh) { c.material.roughness = 0.6; c.material.metalness = 0.05; } }); scene.add(jupiter); }, null, () => { }); }
+    if (GLTF) { GLTF.load('/4dconnect/assets/model/jupiter.glb', gltf => { jupiter = gltf.scene; jupiter.scale.setScalar(7); jupiter.position.set(-75, -18, -80); jupiter.traverse(c => { if (c.isMesh) { c.material.roughness = 0.6; c.material.metalness = 0.05; } }); scene.add(jupiter); }, null, () => { }); }
     let glbOverlay = null;
-    if (GLTF) { GLTF.load('/4dtictactoe/assets/model/connect4.glb', gltf => { glbOverlay = gltf.scene; const box = new THREE.Box3().setFromObject(glbOverlay); const size = box.getSize(new THREE.Vector3()).length(); const sc = 12 / Math.max(size, 0.001); glbOverlay.scale.setScalar(sc); const center = box.getCenter(new THREE.Vector3()); glbOverlay.position.sub(center.multiplyScalar(sc)); glbOverlay.position.y -= 0.5; glbOverlay.traverse(c => { if (c.isMesh) c.material = new THREE.MeshPhysicalMaterial({ color: 0x1a2255, emissive: 0x08083a, metalness: 0.85, roughness: 0.08, transparent: true, opacity: 0.38, envMap, envMapIntensity: 1.8, side: THREE.DoubleSide, depthWrite: false }); }); glbOverlay.renderOrder = -1; scene.add(glbOverlay); setPreloadProgress(70); }, null, () => setPreloadProgress(70)); }
+    if (GLTF) { GLTF.load('/4dconnect/assets/model/connect4.glb', gltf => { glbOverlay = gltf.scene; const box = new THREE.Box3().setFromObject(glbOverlay); const size = box.getSize(new THREE.Vector3()).length(); const sc = 12 / Math.max(size, 0.001); glbOverlay.scale.setScalar(sc); const center = box.getCenter(new THREE.Vector3()); glbOverlay.position.sub(center.multiplyScalar(sc)); glbOverlay.position.y -= 0.5; glbOverlay.traverse(c => { if (c.isMesh) c.material = new THREE.MeshPhysicalMaterial({ color: 0x3355cc, emissive: 0x223366, emissiveIntensity: 0.7, metalness: 0.35, roughness: 0.22, transparent: true, opacity: 0.55, envMap, envMapIntensity: 1.2, side: THREE.DoubleSide, depthWrite: false }); }); glbOverlay.renderOrder = -1; scene.add(glbOverlay); setPreloadProgress(70); }, null, () => setPreloadProgress(70)); }
     const CELL = 2.8, BALL_R = 0.40;
     const latticeGroup = new THREE.Group(); scene.add(latticeGroup);
     function nodePos(gx, gy, gz) { return new THREE.Vector3((gx - 1.5) * CELL, (gy - 1.5) * CELL * 0.92 + 0.5, (gz - 1.5) * CELL); }
@@ -882,17 +884,17 @@
     const atmoMat = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x4400bb) } }, vertexShader: `varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`, fragmentShader: `uniform vec3 uColor;uniform float uTime;varying vec3 vN;void main(){float rim=1.0-abs(dot(vN,vec3(0.0,0.0,1.0)));float pulse=0.85+0.15*sin(uTime*1.4);float a=pow(rim,2.8)*0.35*pulse;gl_FragColor=vec4(uColor,a);}`, transparent: true, side: THREE.BackSide, depthWrite: false });
     scene.add(new THREE.Mesh(atmoGeo, atmoMat));
     const BCOLS = { [P1]: { base: 0x1144ee, emissive: 0x0a1a66, glow: 0x2266ff }, [P2]: { base: 0xcc1100, emissive: 0x550800, glow: 0xff2200 } };
-    const BGEO = new THREE.SphereGeometry(BALL_R, 28, 28), HGEO = new THREE.SphereGeometry(BALL_R * 2.2, 14, 14), RGEO = new THREE.TorusGeometry(BALL_R * 1.55, 0.025, 8, 32), WGEO = new THREE.SphereGeometry(BALL_R * 2.4, 18, 18);
-    function makeBallMat(p, ei = 0.7) { const c = BCOLS[p]; return new THREE.MeshPhysicalMaterial({ color: c.base, emissive: c.emissive, emissiveIntensity: ei, metalness: 1.0, roughness: 0.04, envMap, envMapIntensity: 2.5 }); }
-    function makeHaloMat(p, op = 0.18) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: op, side: THREE.BackSide, depthWrite: false }); }
+    const BGEO = new THREE.SphereGeometry(BALL_R, 28, 28), HGEO = new THREE.SphereGeometry(BALL_R * 1.25, 14, 14), RGEO = new THREE.TorusGeometry(BALL_R * 1.55, 0.025, 8, 32), WGEO = new THREE.SphereGeometry(BALL_R * 2.4, 18, 18);
+    function makeBallMat(p, ei = 1.2) { const c = BCOLS[p]; return new THREE.MeshPhysicalMaterial({ color: c.base, emissive: c.base, emissiveIntensity: ei, metalness: 0.35, roughness: 0.18, envMap, envMapIntensity: 1.6 }); }
+    function makeHaloMat(p, op = 0.10) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: op, side: THREE.BackSide, depthWrite: false }); }
     const placedBalls = [];
-    function addPlacedBall(gx, gy, gz, p) { const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 0.6)); const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.14)); const ring = new THREE.Mesh(RGEO, new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: 0.45 })); const pos = nodePos(gx, gy, gz);[mesh, halo, ring].forEach(o => { o.position.copy(pos); scene.add(o); }); ring.rotation.x = Math.PI / 2; placedBalls.push({ mesh, halo, ring, gx, gy, gz, p }); }
+    function addPlacedBall(gx, gy, gz, p) { const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 1.0)); const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.08)); const ring = new THREE.Mesh(RGEO, new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: 0.45 })); const pos = nodePos(gx, gy, gz);[mesh, halo, ring].forEach(o => { o.position.copy(pos); scene.add(o); }); ring.rotation.x = Math.PI / 2; placedBalls.push({ mesh, halo, ring, gx, gy, gz, p }); }
     const winGlows = [];
     function showWinGlows(cells) { cells.forEach(([gx, gy, gz]) => { const m = new THREE.Mesh(WGEO, new THREE.MeshBasicMaterial({ color: 0xffee00, transparent: true, opacity: 0.42, side: THREE.BackSide, depthWrite: false })); m.position.copy(nodePos(gx, gy, gz)); scene.add(m); winGlows.push(m); }); }
     function clearWinGlows() { winGlows.forEach(m => scene.remove(m)); winGlows.length = 0; }
     const GRAV = -28, RESTIT = 0.42, DAMP = 0.72, SETTLE_V = 0.18;
     let physBall = null;
-    function spawnPhysBall(gx, gz, p) { if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } const gy = lowestFree(gx, gz); if (gy < 0) return false; const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 0.9)); const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.25)); const startY = nodePos(gx, G + 0.5, gz).y, tx = nodePos(gx, 0, gz).x, tz = nodePos(gx, 0, gz).z; mesh.position.set(tx, startY, tz); halo.position.copy(mesh.position); scene.add(mesh); scene.add(halo); physBall = { mesh, halo, py: startY, vy: -1, tx, tz, gy, gx, gz, p, settled: false }; return true; }
+    function spawnPhysBall(gx, gz, p) { if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } const gy = lowestFree(gx, gz); if (gy < 0) return false; const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 1.4)); const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.14)); const startY = nodePos(gx, G + 0.5, gz).y, tx = nodePos(gx, 0, gz).x, tz = nodePos(gx, 0, gz).z; mesh.position.set(tx, startY, tz); halo.position.copy(mesh.position); scene.add(mesh); scene.add(halo); physBall = { mesh, halo, py: startY, vy: -1, tx, tz, gy, gx, gz, p, settled: false }; return true; }
     const MAX_PARTS = 160, partPos = new Float32Array(MAX_PARTS * 3), partGeo = new THREE.BufferGeometry();
     partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
     const partMat = new THREE.PointsMaterial({ size: 0.2, color: 0xffffff, transparent: true, opacity: 0.88, depthWrite: false, sizeAttenuation: true });
@@ -926,8 +928,9 @@
     function refreshColBtns() { const isP2 = currentPlayer === P2; document.querySelectorAll('.drop-btn').forEach(btn => { const gx = +btn.dataset.gx, gz = +btn.dataset.gz; btn.disabled = isDropping || isGameOver || colFull(gx, gz); btn.className = 'drop-btn' + (isP2 ? ' p2b' : ''); }); }
     function startTurnTimer() { if (!currentScenario.timer) return; clearTurnTimer(); timerLeft = currentScenario.timer; const el = document.getElementById('turn-timer'); el.style.color = 'var(--cyan)'; el.textContent = timerLeft + 's'; turnTimer = setInterval(() => { timerLeft--; el.textContent = timerLeft + 's'; if (timerLeft <= 3) el.style.color = '#ff4444'; if (timerLeft <= 0) { clearTurnTimer(); const avail = []; for (let gz = 0; gz < G; gz++)for (let gx = 0; gx < G; gx++)if (!colFull(gx, gz)) avail.push([gx, gz]); if (avail.length) { const [gx, gz] = TRNG.pick(avail); dropBall(gx, gz); } } }, 1000); }
     function clearTurnTimer() { if (turnTimer) { clearInterval(turnTimer); turnTimer = null; } document.getElementById('turn-timer').textContent = ''; document.getElementById('turn-timer').style.color = 'var(--cyan)'; }
-    function dropBall(gx, gz) { if (isDropping || isGameOver || colFull(gx, gz)) return; clearTurnTimer(); isDropping = true; refreshColBtns(); spawnPhysBall(gx, gz, currentPlayer); if (camFollow) { const tp = nodePos(gx, G, gz); camPosT.set(tp.x * 0.5 + 6, nodePos(gx, G, gz).y + 6, tp.z * 0.5 + 12); camLookT.set(tp.x, 3, tp.z); } }
-    function physStep(dt) { if (!physBall || physBall.settled) return; physBall.vy += GRAV * dt; physBall.py += physBall.vy * dt; const floorY = nodePos(physBall.gx, physBall.gy, physBall.gz).y; if (physBall.py <= floorY + BALL_R) { if (Math.abs(physBall.vy) < SETTLE_V) { physBall.py = floorY; physBall.vy = 0; physBall.settled = true; onBallSettled(); return; } physBall.py = floorY + BALL_R; physBall.vy = -physBall.vy * RESTIT * DAMP; } boardGlow.intensity = Math.max(0, 2 - physBall.py * 0.2); physBall.mesh.position.set(physBall.tx, physBall.py, physBall.tz); physBall.halo.position.set(physBall.tx, physBall.py, physBall.tz); if (camFollow) { camLookT.y += (physBall.py - camLookT.y) * 0.1; camPosT.y += (physBall.py + 7 - camPosT.y) * 0.06; } }
+    function _dropBallPhys(gx, gz) { if (isDropping || isGameOver || colFull(gx, gz)) return; clearTurnTimer(); isDropping = true; refreshColBtns(); spawnPhysBall(gx, gz, currentPlayer); if (camFollow) { const tp = nodePos(gx, G, gz); camPosT.set(tp.x * 0.5 + 6, nodePos(gx, G, gz).y + 6, tp.z * 0.5 + 12); camLookT.set(tp.x, 3, tp.z); } }
+    function dropBall(gx, gz) { if (window.NET && window.NET.active) { window.NET.onLocalClick(gx, gz); return; } _dropBallPhys(gx, gz); }
+    function physStep(dt) { if (!physBall || physBall.settled) return; physBall.vy += GRAV * dt; physBall.py += physBall.vy * dt; const floorY = nodePos(physBall.gx, physBall.gy, physBall.gz).y; if (physBall.py <= floorY + BALL_R) { if (Math.abs(physBall.vy) < SETTLE_V) { physBall.py = floorY; physBall.vy = 0; physBall.settled = true; onBallSettled(); return; } physBall.py = floorY + BALL_R; physBall.vy = -physBall.vy * RESTIT * DAMP; } boardGlow.intensity = Math.max(0, 2 - physBall.py * 0.2); const baseY = nodePos(physBall.gx, 0, physBall.gz).y, cellH = CELL * 0.92, t = (physBall.py - baseY) / cellH, wf = t - Math.floor(t), amp = CELL * 0.30, parX = ((physBall.gx + physBall.gz) & 1) ? 1 : -1, parZ = ((physBall.gx * 2 + physBall.gz) & 1) ? 1 : -1, ox = Math.sin(wf * Math.PI * 2) * amp * parX, oz = Math.sin(wf * Math.PI * 4) * amp * parZ; physBall.mesh.position.set(physBall.tx + ox, physBall.py, physBall.tz + oz); physBall.halo.position.set(physBall.tx + ox, physBall.py, physBall.tz + oz); if (camFollow) { camLookT.y += (physBall.py - camLookT.y) * 0.1; camPosT.y += (physBall.py + 7 - camPosT.y) * 0.06; } }
     function describeWin(cells, sc) { if (sc.special === 'cube') return 'PERFECT CUBE COMPLETED!'; if (!cells || cells.length < 2) return ''; const [x0, y0, z0] = cells[0], [x1, y1, z1] = cells[1]; const axes = []; if (x1 !== x0) axes.push('X'); if (y1 !== y0) axes.push('Y'); if (z1 !== z0) axes.push('Z'); return `${sc.winLen} IN A ROW \u2014 ${axes.length === 1 ? axes[0] + ' AXIS' : axes.join('/') + ' DIAGONAL'}`; }
     function onBallSettled() { const { gx, gy, gz, p } = physBall; scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; boardGlow.intensity = 0; scell(gx, gy, gz, p); addPlacedBall(gx, gy, gz, p); moveCounts[p - 1]++; logMove(p, gx, gz, gy); emitParticles(nodePos(gx, gy, gz), 28, BCOLS[p].glow); boardGlow.color.setHex(BCOLS[p].glow); boardGlow.intensity = 4; setTimeout(() => { boardGlow.intensity = 0; }, 350); const winCells = checkWin(p); if (winCells) { isGameOver = true; scores[p - 1]++; streaks[p - 1]++; streaks[(p === P1 ? P2 : P1) - 1] = 0; document.getElementById(`score-p${p}`).textContent = scores[p - 1]; showWinGlows(winCells); emitParticles(nodePos(gx, gy, gz), 60, 0xffee00); const winDesc = describeWin(winCells, currentScenario); const n = p === P1 ? document.getElementById('name-p1').textContent : document.getElementById('name-p2').textContent; const hex = '#' + BCOLS[p].glow.toString(16).padStart(6, '0'); setTimeout(() => showResult(`${n} WINS`, winDesc, `P1: ${scores[0]}  |  P2: ${scores[1]}`, hex), 700); if (camFollow) { const cx = winCells.reduce((a, [x]) => a + x / winCells.length, 0), cy = winCells.reduce((a, [, y]) => a + y / winCells.length, 0), cz = winCells.reduce((a, [, , z]) => a + z / winCells.length, 0); const wp = nodePos(cx, cy, cz); camLookT.set(wp.x, wp.y, wp.z); camPosT.set(wp.x + 8, wp.y + 8, wp.z + 14); } isDropping = false; refreshColBtns(); return; } if (boardFull()) { isGameOver = true; if (currentScenario.special === 'territory') { const p1L = countAllLines(P1), p2L = countAllLines(P2); const winner = p1L > p2L ? P1 : p2L > p1L ? P2 : 0; const color = winner === P1 ? '#2255ff' : winner === P2 ? '#ff2200' : '#ffee00'; const wn = winner === 0 ? 'DRAW' : (winner === P1 ? document.getElementById('name-p1').textContent : document.getElementById('name-p2').textContent) + ' WINS'; if (winner) { scores[winner - 1]++; streaks[winner - 1]++; streaks[(winner === P1 ? P2 : P1) - 1] = 0; document.getElementById(`score-p${winner}`).textContent = scores[winner - 1]; } setTimeout(() => showResult(wn, `Lines: P1=${p1L}  P2=${p2L}`, 'TERRITORY WAR COMPLETE', color), 700); } else { setTimeout(() => showResult('DRAW', 'The lattice is full', `P1: ${scores[0]}  P2: ${scores[1]}`, '#ffee00'), 500); } isDropping = false; refreshColBtns(); return; } currentPlayer = currentPlayer === P1 ? P2 : P1; updateHUD(); buildColUI(); if (camFollow) setTimeout(() => { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); }, 600); if (vsMode === 'ai' && currentPlayer === P2) { setTimeout(() => { if (!isGameOver && !isDropping) { const col = aiPickColumn(); if (col) dropBall(col[0], col[1]); } }, 500 + TRNG.f() * 400); } else { startTurnTimer(); } }
     function buildScenarioSelect() { const grid = document.getElementById('ss-grid'); grid.innerHTML = ''; SCENARIOS.forEach((sc, i) => { const card = document.createElement('div'); card.className = 'ss-card' + (i === 0 ? ' sel' : ''); card.innerHTML = `<div class="ss-icon">${sc.icon}</div><div class="ss-name">${sc.name}</div><div class="ss-desc">${sc.desc}</div>`; card.onclick = () => { document.querySelectorAll('.ss-card').forEach(c => c.classList.remove('sel')); card.classList.add('sel'); selectedScenario = sc; }; grid.appendChild(card); }); }
@@ -950,7 +953,71 @@
     camPosT.copy(CAM_PRESETS.A.pos);
     setTimeout(() => { setPreloadProgress(100); document.getElementById('pre-msg').textContent = 'READY'; setTimeout(finishPreload, 400); }, GLTF ? 1800 : 400);
     requestAnimationFrame(animate);
-    if (typeof ManifoldBridge !== 'undefined') ManifoldBridge.init({ id: '4dtictactoe', version: '2.0.0', x: 4, y: 4, exposes: () => ({ currentPlayer, scores: [...scores], isGameOver, filled: board.filter(v => v).length, scenario: currentScenario.id }) });
+    if (typeof ManifoldBridge !== 'undefined') ManifoldBridge.init({ id: '4dconnect', version: '2.0.0', x: 4, y: 4, exposes: () => ({ currentPlayer, scores: [...scores], isGameOver, filled: board.filter(v => v).length, scenario: currentScenario.id }) });
+
+    // ── Multiplayer adapter (manifold-backed via apply_action) ────────────
+    (function initNet() {
+      const q = new URLSearchParams(location.search);
+      if (q.get('mode') !== 'multi' || !q.get('session')) return;
+      if (typeof KGLobby === 'undefined' || typeof KGGameManager === 'undefined') {
+        console.warn('[4dconnect mp] KGLobby / KGGameManager missing — multi disabled');
+        return;
+      }
+      const sid = q.get('session');
+      let myUserId = '', sessionPlayers = [];
+      try { myUserId = sessionStorage.getItem('kg_my_user_id') || ''; } catch (e) { }
+      try { sessionPlayers = JSON.parse(sessionStorage.getItem('kg_session_players') || '[]'); } catch (e) { }
+      const humans = sessionPlayers.filter(p => !p.is_ai);
+      const slotByUser = new Map();
+      humans.slice(0, 2).forEach((p, i) => slotByUser.set(p.user_id, i === 0 ? P1 : P2));
+      const NET = window.NET = {
+        active: true, sessionId: sid, myUserId, slotByUser,
+        mySlot: slotByUser.get(myUserId) || null,
+        serverTurn: P1, lobby: null, gm: null,
+      };
+
+      // Pick local scenario matching the server's chosen scenarioId.
+      const scFromUrl = q.get('scenario') || '';
+      const localId = scFromUrl.replace(/^4dconnect\./, '');
+      const chosen = SCENARIOS.find(s => s.id === localId);
+      if (chosen) { selectedScenario = chosen; currentScenario = chosen; document.getElementById('scenario-tag').textContent = chosen.name; document.querySelectorAll('.panel-mode').forEach(e => e.textContent = chosen.name); }
+      vsMode = 'pvp';
+      const ss = document.getElementById('scenario-select'); if (ss) ss.classList.remove('show');
+      buildColUI();
+
+      NET.onLocalClick = function (gx, gz) {
+        if (isGameOver || isDropping) return;
+        if (NET.mySlot && NET.serverTurn !== NET.mySlot) return;
+        if (colFull(gx, gz)) return;
+        NET.gm.applyAction({ action: 'drop', atom: 'own', cell: [gx, null, gz] });
+      };
+
+      function onActionApplied(msg) {
+        const act = msg.action || {};
+        if (act.type !== 'drop') return;
+        const cell = act.cell; const pid = msg.player_id || act.playerId;
+        if (!cell || cell.length < 3 || !pid) return;
+        const slot = slotByUser.get(pid); if (!slot) return;
+        currentPlayer = slot;
+        NET.serverTurn = slot === P1 ? P2 : P1;
+        _dropBallPhys(cell[0], cell[2]);
+      }
+
+      function onGameWon(win) { isGameOver = true; /* result overlay shown by onBallSettled */ }
+
+      NET.lobby = KGLobby.init({
+        gameId: '4dconnect', gamePath: '/4dconnect/game.html',
+        onError: (m) => console.warn('[4dconnect mp]', m),
+      });
+      NET.gm = KGGameManager.init({
+        gameId: '4dconnect', sessionId: sid,
+        send: (m) => NET.lobby.sendRaw(m),
+        on: (t, fn) => NET.lobby.onMessage(t, fn),
+        onActionApplied: onActionApplied,
+        onGameWon: onGameWon,
+        onError: (m) => console.warn('[4dconnect gm]', m),
+      });
+    })();
   </script>
 </body>
 

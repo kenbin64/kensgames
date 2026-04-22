@@ -19,7 +19,7 @@ const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && Tetra
 
 const authHandler = new AuthHandler();
 
-const VALID_GAMES = ['fasttrack', 'brickbreaker3d', '4dtictactoe', 'starfighter', 'assemble', 'global'];
+const VALID_GAMES = ['fasttrack', 'brickbreaker3d', '4dconnect', 'starfighter', 'assemble', 'global', '4dtictactoe'];
 const MAX_ENTRIES = 100;
 
 function strictModuleUnavailable(res) {

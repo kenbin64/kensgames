@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarFighter — Lobby | KensGames</title>
+  <title>4D Connect — Lobby | KensGames</title>
   <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
@@ -24,7 +24,7 @@
 
     .launch-card {
       background: rgba(4, 4, 20, .82);
-      border: 1px solid rgba(0, 255, 65, .22);
+      border: 1px solid rgba(153, 0, 255, .22);
       border-radius: 8px;
       padding: 26px 22px;
       text-align: center;
@@ -35,7 +35,7 @@
       font-size: 12px;
       letter-spacing: 3px;
       text-transform: uppercase;
-      color: var(--ng);
+      color: var(--np);
       margin-bottom: 10px;
     }
 
@@ -68,14 +68,14 @@
     }
 
     .bot-row button:hover {
-      border-color: var(--ng);
-      color: var(--ng);
+      border-color: var(--np);
+      color: var(--np);
     }
 
     #bot-count-val {
       font-family: var(--fa);
       font-size: 24px;
-      color: var(--ng);
+      color: var(--np);
       min-width: 28px;
       text-align: center;
     }
@@ -92,7 +92,7 @@
 
     input[type=range] {
       width: 80px;
-      accent-color: var(--ng);
+      accent-color: var(--np);
     }
 
     .join-row {
@@ -118,20 +118,20 @@
 
     #join-code-input:focus {
       outline: none;
-      border-color: var(--ng);
+      border-color: var(--np);
     }
 
     #waiting-room {
       background: rgba(4, 4, 20, .9);
-      border: 1px solid rgba(0, 255, 65, .38);
+      border: 1px solid rgba(153, 0, 255, .38);
       border-radius: 8px;
       padding: 28px;
       margin: 24px 0;
     }
 
     .share-block {
-      background: rgba(0, 255, 65, .06);
-      border: 1px solid rgba(0, 255, 65, .2);
+      background: rgba(153, 0, 255, .06);
+      border: 1px solid rgba(153, 0, 255, .2);
       border-radius: 6px;
       padding: 16px 20px;
       margin-bottom: 20px;
@@ -146,7 +146,7 @@
       font-family: var(--fa);
       font-size: 36px;
       letter-spacing: 10px;
-      color: var(--ng);
+      color: var(--np);
     }
 
     #player-list {
@@ -186,8 +186,8 @@
 
     .host-badge {
       font-size: 10px;
-      background: rgba(0, 255, 65, .15);
-      color: var(--ng);
+      background: rgba(153, 0, 255, .15);
+      color: var(--np);
       padding: 2px 8px;
       border-radius: 2px;
       font-family: var(--fa);
@@ -236,7 +236,53 @@
     }
 
     #sessions-list li button:hover {
-      border-color: var(--ng);
+      border-color: var(--np);
+    }
+
+    #scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin: 14px 0 28px;
+    }
+
+    .scenario-card {
+      background: rgba(4, 4, 20, .78);
+      border: 1px solid #334;
+      border-radius: 6px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      text-align: left;
+    }
+
+    .scenario-card:hover {
+      border-color: rgba(153, 0, 255, .5);
+    }
+
+    .scenario-card.selected {
+      border-color: var(--np);
+      background: rgba(153, 0, 255, .12);
+    }
+
+    .scenario-card .sc-icon {
+      font-size: 22px;
+      margin-right: 8px;
+    }
+
+    .scenario-card .sc-name {
+      font-family: var(--fa);
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--np);
+      text-transform: uppercase;
+    }
+
+    .scenario-card .sc-desc {
+      font-size: 12px;
+      color: var(--txm);
+      margin-top: 6px;
+      line-height: 1.4;
     }
 
     .section-title {
@@ -314,9 +360,13 @@
   </nav>
   <main class="lobby-wrap">
     <div style="text-align:center;margin:40px 0 36px;">
-      <div class="arc-eyebrow">Space Shooter</div>
-      <h1 class="arc-h1" style="color:var(--ng);">StarFighter</h1>
-      <p class="arc-sub" style="margin-top:8px;">Defend the galaxy &mdash; solo or squad up</p>
+      <div class="arc-eyebrow">Strategy Game</div>
+      <h1 class="arc-h1" style="color:var(--np);">4D Connect</h1>
+      <p class="arc-sub" style="margin-top:8px;">Classic strategy across four dimensions</p>
+    </div>
+    <p class="section-title">Pick a Scenario</p>
+    <div id="scenario-grid">
+      <div style="color:var(--txm);font-size:13px;padding:10px 0;grid-column:1/-1;">Loading scenarios&hellip;</div>
     </div>
     <p class="section-title">How do you want to play?</p>
     <div class="launch-grid" id="launch-panel">
@@ -325,36 +375,36 @@
         <p>Play against AI bots</p>
         <div class="bot-row">
           <button onclick="adjustBots(-1)">&#8722;</button>
-          <span id="bot-count-val">2</span>
+          <span id="bot-count-val">1</span>
           <button onclick="adjustBots(1)">&#43;</button>
         </div>
-        <p style="font-size:11px;color:var(--txm);margin-bottom:18px;">opponents (1&#8211;5)</p>
-        <button class="btn btn-ng btn-full" onclick="launchSolo()">Play Solo</button>
+        <p style="font-size:11px;color:var(--txm);margin-bottom:18px;">opponents (1&#8211;1)</p>
+        <button class="btn btn-p btn-full" onclick="launchSolo()">Play Solo</button>
       </div>
       <div class="launch-card">
         <h3>Public Game</h3>
         <p>Open lobby &mdash; anyone can join</p>
         <div class="range-row">
-          <input type="range" id="max-pub" min="2" max="6" value="6"
+          <input type="range" id="max-pub" min="2" max="2" value="2"
             oninput="document.getElementById('max-pub-val').textContent=this.value">
-          <span id="max-pub-val">6</span>&nbsp;players
+          <span id="max-pub-val">2</span>&nbsp;players
         </div>
-        <button class="btn btn-ng btn-full" onclick="launchPublic()">Create Public Game</button>
+        <button class="btn btn-p btn-full" onclick="launchPublic()">Create Public Game</button>
       </div>
       <div class="launch-card">
         <h3>Private Game</h3>
         <p>Invite friends with a code</p>
         <div class="range-row">
-          <input type="range" id="max-priv" min="2" max="6" value="6"
+          <input type="range" id="max-priv" min="2" max="2" value="2"
             oninput="document.getElementById('max-priv-val').textContent=this.value">
-          <span id="max-priv-val">6</span>&nbsp;players
+          <span id="max-priv-val">2</span>&nbsp;players
         </div>
-        <button class="btn btn-ng btn-full" onclick="launchPrivate()">Create Private Game</button>
+        <button class="btn btn-p btn-full" onclick="launchPrivate()">Create Private Game</button>
       </div>
       <div class="launch-card">
         <h3>Find a Match</h3>
         <p>Auto-matched with other players</p>
-        <button class="btn btn-ng btn-full" style="margin-top:54px;" onclick="launchMatchmake()">Find Match</button>
+        <button class="btn btn-p btn-full" style="margin-top:54px;" onclick="launchMatchmake()">Find Match</button>
       </div>
     </div>
     <hr class="divider">
@@ -362,7 +412,7 @@
     <div class="join-row" id="join-code-panel">
       <input type="text" id="join-code-input" placeholder="A1B2C3" maxlength="6" autocomplete="off" spellcheck="false"
         onkeydown="if(event.key==='Enter')joinWithCode()">
-      <button class="btn btn-ng" onclick="joinWithCode()">Join Game</button>
+      <button class="btn btn-p" onclick="joinWithCode()">Join Game</button>
     </div>
     <div id="waiting-room" style="display:none">
       <p class="section-title">Waiting Room</p>
@@ -373,7 +423,7 @@
           <div class="share-code-big" id="share-code-display"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
-          <button class="btn btn-ng" onclick="copyShareUrl()">Copy Invite Link</button>
+          <button class="btn btn-p" onclick="copyShareUrl()">Copy Invite Link</button>
           <button class="btn btn-ghost" style="font-size:10px;" onclick="copyCode()">Copy Code</button>
         </div>
       </div>
@@ -382,7 +432,7 @@
         <div id="host-controls" style="display:none">
           <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.addBot('easy')">+ Add Bot</button>
           <button class="btn btn-ghost" style="font-size:10px;" onclick="lobby.removeBot()">- Remove Bot</button>
-          <button class="btn btn-ng" id="start-btn" onclick="lobby.startGame()" disabled>Start Game</button>
+          <button class="btn btn-p" id="start-btn" onclick="lobby.startGame()" disabled>Start Game</button>
         </div>
         <div id="guest-controls" style="display:none">
           <button class="btn btn-ghost" id="ready-btn" onclick="toggleReady()">Ready Up</button>
@@ -403,9 +453,11 @@
   </main>
   <script src="/js/kg_gate.js"></script>
   <script src="/js/kg_lobby.js"></script>
+  <script src="/js/game_manager_client.js"></script>
   <script>
     'use strict';
-    var bots = 2, shareUrl = '', currentSession = null, isReady = false, lobby;
+    var bots = 1, shareUrl = '', currentSession = null, isReady = false, lobby, gm;
+    var selectedScenarioId = null, scenarios = [];
     KGGate.protect({ allowGuest: false, requireToS: true, requireProfile: true }).then(function (r) {
       if (!r.allowed) return;
       document.body.style.visibility = '';
@@ -414,25 +466,53 @@
     });
     function initLobby() {
       lobby = KGLobby.init({
-        gameId: 'starfighter',
-        gamePath: '/starfighter/game.html',
+        gameId: '4dconnect',
+        gamePath: '/4dconnect/game.html',
         onConnected: function () { lobby.browseGames(); },
         onError: function (msg) { showToast(msg || 'Error', 'error'); },
-        onSessionCreated: function (session, code, url) { currentSession = session; shareUrl = url || (location.origin + '/starfighter/game.html/../lobby.html?join=' + code); if (code) { document.getElementById('share-code-display').textContent = code; document.getElementById('share-block').style.display = ''; } showWaitingRoom(session); },
+        onSessionCreated: function (session, code, url) { currentSession = session; shareUrl = url || (location.origin + '/4dconnect/game.html/../lobby.html?join=' + code); if (code) { document.getElementById('share-code-display').textContent = code; document.getElementById('share-block').style.display = ''; } showWaitingRoom(session); },
         onSessionJoined: function (session) { currentSession = session; showWaitingRoom(session); },
         onSessionUpdate: function (session) { currentSession = session; renderPlayers(session.players); updateStartBtn(session); },
         onPlayerJoined: function (player, players, session) { currentSession = session; renderPlayers(players); updateStartBtn(session); showToast(escHtml(player.playername || player.username) + ' joined', 'info'); },
         onPlayerLeft: function (username, players, session) { if (session) { currentSession = session; updateStartBtn(session); } renderPlayers(players); showToast(escHtml(username) + ' left', 'info'); },
-        onGameStarted: function (session) { window.location.href = '/starfighter/game.html?session=' + encodeURIComponent(session.session_id) + '&mode=multi'; },
+        onGameStarted: function (session) {
+          var sid = session.settings && session.settings.scenario_id;
+          var qp = 'session=' + encodeURIComponent(session.session_id) + '&mode=multi';
+          if (sid) qp += '&scenario=' + encodeURIComponent(sid);
+          window.location.href = '/4dconnect/game.html?' + qp;
+        },
         onSessionList: function (sessions) { renderSessions(sessions); },
         onMatchmakeResult: function (action, session) { if (action === 'joined' || action === 'created') { currentSession = session; showWaitingRoom(session); } },
         onLeftSession: function () { currentSession = null; hideWaitingRoom(); lobby.browseGames(); },
       });
+      gm = KGGameManager.init({
+        gameId: '4dconnect',
+        send: function (m) { lobby.sendRaw(m); },
+        on: function (type, fn) { lobby.onMessage(type, fn); },
+        onScenarios: function (list) { scenarios = list || []; renderScenarios(); },
+        onError: function (msg) { showToast(msg || 'Error', 'error'); },
+      });
+      lobby.afterAuth(function () { gm.listScenarios(); });
     }
-    function adjustBots(d) { bots = Math.max(1, Math.min(5, bots + d)); document.getElementById('bot-count-val').textContent = bots; }
+    function renderScenarios() {
+      var grid = document.getElementById('scenario-grid');
+      if (!scenarios.length) { grid.innerHTML = '<div style="color:var(--txm);font-size:13px;padding:10px 0;grid-column:1/-1;">No scenarios available.</div>'; return; }
+      if (!selectedScenarioId) selectedScenarioId = scenarios[0].id;
+      grid.innerHTML = scenarios.map(function (s) {
+        var sel = s.id === selectedScenarioId ? ' selected' : '';
+        return '<div class="scenario-card' + sel + '" data-sid="' + escHtml(s.id) + '" onclick="selectScenario(\'' + escHtml(s.id) + '\')">'
+          + '<span class="sc-icon">' + escHtml(s.icon || '\u25c6') + '</span>'
+          + '<span class="sc-name">' + escHtml(s.name || s.id) + '</span>'
+          + '<div class="sc-desc">' + escHtml(s.desc || '') + '</div>'
+          + '</div>';
+      }).join('');
+    }
+    function selectScenario(id) { selectedScenarioId = id; renderScenarios(); }
+    function scenarioSettings() { return selectedScenarioId ? { scenario_id: selectedScenarioId } : {}; }
+    function adjustBots(d) { bots = Math.max(1, Math.min(1, bots + d)); document.getElementById('bot-count-val').textContent = bots; }
     function launchSolo() { lobby.solo(bots); }
-    function launchPublic() { lobby.createPublic({ maxPlayers: parseInt(document.getElementById('max-pub').value, 10) || 6 }); }
-    function launchPrivate() { lobby.createPrivate({ maxPlayers: parseInt(document.getElementById('max-priv').value, 10) || 6 }); }
+    function launchPublic() { lobby.createPublic({ maxPlayers: parseInt(document.getElementById('max-pub').value, 10) || 2, settings: scenarioSettings() }); }
+    function launchPrivate() { lobby.createPrivate({ maxPlayers: parseInt(document.getElementById('max-priv').value, 10) || 2, settings: scenarioSettings() }); }
     function launchMatchmake() { lobby.matchmake(); }
     function joinWithCode() { var code = document.getElementById('join-code-input').value.trim().toUpperCase(); if (code.length >= 4) lobby.joinByCode(code); else showToast('Enter a valid game code', 'error'); }
     function showWaitingRoom(session) {
@@ -454,7 +534,7 @@
       var ok = humans.every(function (p) { return p.ready || p.is_host; });
       btn.disabled = !ok || (session.players || []).length < 2; btn.style.opacity = btn.disabled ? '0.5' : '1';
     }
-    function toggleReady() { isReady = !isReady; lobby.toggleReady(); var btn = document.getElementById('ready-btn'); btn.textContent = isReady ? 'Not Ready' : 'Ready Up'; btn.className = 'btn ' + (isReady ? 'btn-ng' : 'btn-ghost'); }
+    function toggleReady() { isReady = !isReady; lobby.toggleReady(); var btn = document.getElementById('ready-btn'); btn.textContent = isReady ? 'Not Ready' : 'Ready Up'; btn.className = 'btn ' + (isReady ? 'btn-p' : 'btn-ghost'); }
     function copyShareUrl() { writeClip(shareUrl || location.href); showToast('Invite link copied!', 'info'); }
     function copyCode() { writeClip(document.getElementById('share-code-display').textContent); showToast('Code copied!', 'info'); }
     function writeClip(text) { if (navigator.clipboard) { navigator.clipboard.writeText(text).catch(function () { fbCopy(text); }); } else { fbCopy(text); } }

@@ -165,22 +165,23 @@
   <script src="/brickbreaker3d/game.js"></script>
   <script>
     'use strict';
-    // Read session params from URL (set by game_sessions.js when game starts)
+    // Read launch params from URL (set by /play wizard or session invite)
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session');
     const sessionBots = parseInt(params.get('bots') || '0');
     const isGuest = params.get('guest') === 'true';
+    const offlineFlag = params.get('offline') === 'true';
+    const explicitMode = params.get('mode') || '';
+    const VALID_MODES = ['easy', 'hard', 'multi2', 'multi3', 'multi4'];
 
     if (sessionId) {
-      // Show session start option in menu
       document.getElementById('session-actions').style.display = 'block';
       const botsLabel = sessionBots > 0 ? ` + ${sessionBots} bot${sessionBots > 1 ? 's' : ''}` : '';
       document.getElementById('session-info').textContent = `Session: ${sessionId.slice(-8)}${botsLabel}`;
     }
 
     function startFromSession() {
-      // Determine mode based on bots / player count from session
-      const totalPlayers = 1 + sessionBots; // at minimum 1 human + bots
+      const totalPlayers = 1 + sessionBots;
       let mode = 'easy';
       if (totalPlayers >= 4) mode = 'multi4';
       else if (totalPlayers >= 3) mode = 'multi3';
@@ -188,7 +189,6 @@
       startGame(mode);
     }
 
-    // Bind menu buttons via JS (works under strict CSP where inline onclick is blocked).
     function bindMenuButtons() {
       document.querySelectorAll('[data-start-mode]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -206,12 +206,17 @@
 
     bindMenuButtons();
 
-    // Auto-launch when arriving from the lobby (session URL)
+    // Auto-launch priorities: explicit mode > session > offline flag (defaults to easy)
+    const autoMode = VALID_MODES.includes(explicitMode) ? explicitMode
+      : (offlineFlag && !sessionId ? 'easy' : null);
+
     if (sessionId) {
       window.addEventListener('load', function () {
-        // initScene() + animate() are also on 'load' in game.js (registered first)
-        // so by the time this runs the scene is ready
         startFromSession();
+      });
+    } else if (autoMode) {
+      window.addEventListener('load', function () {
+        if (typeof window.startGame === 'function') window.startGame(autoMode);
       });
     }
   </script>

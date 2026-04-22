@@ -32,7 +32,8 @@ const TETRACUBE_STRICT = typeof TetracubeClient.isStrict === 'function' && Tetra
 const GAMES = {
   fasttrack: { name: 'FastTrack', maxPlayers: 4, minPlayers: 2, lobbyPath: '/fasttrack/lobby/', gamePath: '/fasttrack/game.html' },
   brickbreaker3d: { name: 'BrickBreaker 3D', maxPlayers: 4, minPlayers: 1, lobbyPath: '/brickbreaker3d/lobby/', gamePath: '/brickbreaker3d/game.html' },
-  '4dtictactoe': { name: '4D Tic-Tac-Toe', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dtictactoe/lobby/', gamePath: '/4dtictactoe/game.html' },
+  '4dconnect': { name: '4D Connect', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dconnect/lobby/', gamePath: '/4dconnect/game.html' },
+  '4dtictactoe': { name: '4D Connect', maxPlayers: 2, minPlayers: 2, lobbyPath: '/4dconnect/lobby/', gamePath: '/4dconnect/game.html' }, // legacy alias
   starfighter: { name: 'Starfighter', maxPlayers: 4, minPlayers: 1, lobbyPath: '/starfighter/lobby/', gamePath: '/starfighter/game.html' },
   assemble: { name: 'Assemble', maxPlayers: 4, minPlayers: 1, lobbyPath: '/assemble/lobby/', gamePath: '/assemble/game.html' },
 };

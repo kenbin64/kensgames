@@ -40,13 +40,13 @@
       "description": "BrickBreaker 3D substrate."
     },
     {
-      "name": "tictactoe",
+      "name": "4dconnect",
       "moduleCount": 1,
       "boundary": "closed",
       "paths": [
-        "4dtictactoe/*.js"
+        "4dconnect/*.js"
       ],
-      "description": "4D TicTacToe substrate."
+      "description": "4D Connect substrate."
     },
     {
       "name": "assemble",

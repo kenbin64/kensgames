@@ -12,7 +12,7 @@ const GAMES = {
     fasttrack: { title: 'FastTrack', url: '/fasttrack/lobby/', multiplayer: true },
     brickbreaker3d: { title: 'BrickBreaker 3D', url: '/brickbreaker3d/lobby/', multiplayer: true },
     starfighter: { title: 'Starfighter', url: '/starfighter/lobby/', multiplayer: false },
-    '4dtictactoe': { title: '4D Tic-Tac-Toe', url: '/4dtictactoe/lobby/', multiplayer: true },
+    '4dconnect': { title: '4D Connect', url: '/4dconnect/lobby/', multiplayer: true },
     assemble: { title: 'Assemble', url: '/assemble/lobby/', multiplayer: false },
 };
 

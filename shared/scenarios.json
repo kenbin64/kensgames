@@ -1,0 +1,145 @@
+{
+  "_schema": "1.0",
+  "_doc": "Scenario catalog — points (0D atoms) combined into 1D combos, composed into 2D scenario planes bound to 3D game instances. Authoritative copy lives at tetracube://scenarios; this file seeds it on server boot.",
+  "_patterns": {
+    "seq": "ordered run of identical atoms along a direction (N-in-a-row).",
+    "set": "unordered collection of atoms matching a shape (e.g. 2x2x2 cube).",
+    "count": "accumulate N of any atom in the allowed list.",
+    "score": "accumulate numeric score from atom weights."
+  },
+  "_winRules": {
+    "first_combo": "first player to satisfy any combo wins.",
+    "most_score": "when board/time ends, highest cumulative combo score wins.",
+    "reach_score": "first to reach target score (multi or solo).",
+    "survive": "last player with lives > 0 wins."
+  },
+  "scenarios": [
+    {
+      "id": "4dconnect.classic",
+      "gameId": "4dconnect",
+      "name": "CLASSIC",
+      "icon": "●",
+      "desc": "4 in a row — any direction. 76 possible winning lines.",
+      "winRule": "first_combo",
+      "combos": [
+        { "id": "line4", "pattern": "seq", "atom": "own", "len": 4, "dirs": "all", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": null }
+    },
+    {
+      "id": "4dconnect.blitz",
+      "gameId": "4dconnect",
+      "name": "BLITZ 3",
+      "icon": "⚡",
+      "desc": "First to 3 in a row wins. Fast games, sneaky angles.",
+      "winRule": "first_combo",
+      "combos": [
+        { "id": "line3", "pattern": "seq", "atom": "own", "len": 3, "dirs": "all", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": null }
+    },
+    {
+      "id": "4dconnect.diagonal",
+      "gameId": "4dconnect",
+      "name": "DIAGONAL",
+      "icon": "✦",
+      "desc": "Only diagonal lines score. Pure spatial mastery.",
+      "winRule": "first_combo",
+      "combos": [
+        { "id": "diag4", "pattern": "seq", "atom": "own", "len": 4, "dirs": "diag", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": null }
+    },
+    {
+      "id": "4dconnect.cube",
+      "gameId": "4dconnect",
+      "name": "CUBE QUEST",
+      "icon": "⬛",
+      "desc": "First to fill a 2x2x2 cube of your pieces wins.",
+      "winRule": "first_combo",
+      "combos": [
+        { "id": "cube222", "pattern": "set", "atom": "own", "shape": "cube222", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": null }
+    },
+    {
+      "id": "4dconnect.territory",
+      "gameId": "4dconnect",
+      "name": "TERRITORY",
+      "icon": "○",
+      "desc": "Fill the board — most winning combos wins.",
+      "winRule": "most_score",
+      "combos": [
+        { "id": "line4", "pattern": "seq", "atom": "own", "len": 4, "dirs": "all", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": null, "fillBeforeWin": true }
+    },
+    {
+      "id": "4dconnect.speed",
+      "gameId": "4dconnect",
+      "name": "SPEED DROP",
+      "icon": "⏳",
+      "desc": "10 seconds per turn. Miss it — forfeit the drop!",
+      "winRule": "first_combo",
+      "combos": [
+        { "id": "line4", "pattern": "seq", "atom": "own", "len": 4, "dirs": "all", "score": 1 }
+      ],
+      "constraints": { "maxPlayers": 2, "timer": 10 }
+    },
+    {
+      "id": "chomp.esplanade-lagoon",
+      "gameId": "chomp",
+      "name": "Esplanade Lagoon",
+      "desc": "Home territory. Lazy tourists. Plenty of fish.",
+      "winRule": "reach_score",
+      "combos": [
+        { "id": "eat-fish", "pattern": "count", "atoms": ["barramundi", "mullet", "tilapia"], "count": 20, "score": "weighted" }
+      ],
+      "constraints": { "maxPlayers": 1, "targetScore": 500, "level": 1 }
+    },
+    {
+      "id": "chomp.mangrove-maze",
+      "gameId": "chomp",
+      "name": "Mangrove Maze",
+      "desc": "Tight channels. High roots. Ambush paradise.",
+      "winRule": "reach_score",
+      "combos": [
+        { "id": "eat-mangrove", "pattern": "count", "atoms": ["mud_crab", "catfish", "rat"], "count": 25, "score": "weighted" }
+      ],
+      "constraints": { "maxPlayers": 1, "targetScore": 800, "level": 2 }
+    },
+    {
+      "id": "chomp.mudflat-midnight",
+      "gameId": "chomp",
+      "name": "Mudflat Midnight",
+      "desc": "Night hunt on the mudflats. Stealth is key.",
+      "winRule": "reach_score",
+      "combos": [
+        { "id": "eat-mudflat", "pattern": "count", "atoms": ["ibis", "magpie_goose", "mud_skipper"], "count": 18, "score": "weighted" }
+      ],
+      "constraints": { "maxPlayers": 1, "targetScore": 1100, "level": 3 }
+    },
+    {
+      "id": "chomp.tidal-river-rush",
+      "gameId": "chomp",
+      "name": "Tidal River Rush",
+      "desc": "River in flood. Ride the current and strike fast.",
+      "winRule": "reach_score",
+      "combos": [
+        { "id": "eat-river", "pattern": "count", "atoms": ["barramundi", "water_buffalo_calf", "turtle"], "count": 22, "score": "weighted" }
+      ],
+      "constraints": { "maxPlayers": 1, "targetScore": 1500, "level": 4 }
+    },
+    {
+      "id": "chomp.reef-shallows",
+      "gameId": "chomp",
+      "name": "Reef Shallows",
+      "desc": "Saltie territory. Coral maze. Beware the shark.",
+      "winRule": "reach_score",
+      "combos": [
+        { "id": "eat-reef", "pattern": "count", "atoms": ["reef_fish", "dugong_calf", "seabird"], "count": 30, "score": "weighted" }
+      ],
+      "constraints": { "maxPlayers": 1, "targetScore": 2000, "level": 5 }
+    }
+  ]
+}

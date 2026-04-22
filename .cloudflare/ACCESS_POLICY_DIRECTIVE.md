@@ -35,7 +35,7 @@ substrate — Cloudflare simply proxies those pages without any Access policy.
 | `/fasttrack/index.html` | ✅ Public | Everyone (landing/splash) | — |
 | `/brickbreaker3d/index.html` | ✅ Public | Everyone (landing/splash) | — |
 | `/starfighter/index.html` | ✅ Public | Everyone (landing/splash) | — |
-| `/4DTicTacToe/index.html` | ✅ Public | Everyone (landing/splash) | — |
+| `/4dconnect/index.html` | ✅ Public | Everyone (landing/splash) | — |
 | `/assemble/index.html` | ✅ Public | Everyone (landing/splash) | — |
 | `/fasttrack/assets/*` | ✅ Public | Everyone | — |
 | `/starfighter/assets/*` | ✅ Public | Everyone | — |
@@ -46,8 +46,8 @@ substrate — Cloudflare simply proxies those pages without any Access policy.
 | `/brickbreaker3d/lobby.html` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |
 | `/brickbreaker3d/game.html` | 🔒 Login or guest | `kg_token` OR `kg_guest_token` (invite) | profile_gate.js |
 | `/starfighter/lobby.html` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |
-| `/4DTicTacToe/lobby.html` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |
-| `/4DTicTacToe/game.html` | 🔒 Login or guest | `kg_token` OR `kg_guest_token` (invite) | profile_gate.js |
+| `/4dconnect/lobby.html` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |
+| `/4dconnect/game.html` | 🔒 Login or guest | `kg_token` OR `kg_guest_token` (invite) | profile_gate.js |
 | `/assemble/lobby.html` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |
 | `/assemble/game.html` | 🔒 Login or guest | `kg_token` OR `kg_guest_token` (invite) | profile_gate.js |
 | `/player/*` | 🔒 Login required | Must have `kg_token` + profileSetup | profile_gate.js |

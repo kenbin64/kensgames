@@ -433,7 +433,7 @@
     }
 
     .card-status.s-waiting {
-      color: var(--text-muted);
+      color: #ff5252;
     }
 
     .card-status.s-open {
@@ -818,7 +818,23 @@
       <p id="join-confirm-label"
         style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">Join the private game
       </p>
+      <!-- Guest identity picker (shown only if not signed in) -->
+      <div id="guest-setup-panel" style="display:none;margin-bottom:0.8rem;">
+        <div
+          style="display:flex;gap:0.6rem;align-items:center;background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;padding:0.7rem 0.9rem;margin-bottom:0.5rem;">
+          <button type="button" onclick="pickGuestAvatar()" id="guest-av-preview" title="Pick avatar"
+            style="font-size:2rem;line-height:1;background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.25);border-radius:8px;width:56px;height:56px;cursor:pointer;flex-shrink:0;font-family:inherit;color:inherit;">😊</button>
+          <input type="text" id="guest-name-input" maxlength="20" placeholder="Pick a name (optional)"
+            style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:0.55rem 0.7rem;color:var(--text);font-family:inherit;font-size:0.9rem;outline:none;">
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;">
+          Already a member?
+          <a id="guest-login-link" href="/login/" style="color:var(--neon-cyan);text-decoration:none;">Sign in</a>
+        </div>
+      </div>
       <button class="btn btn-cyan btn-full" onclick="joinConfirmedCode()">→ Join Game</button>
+      <button class="btn btn-secondary btn-full" onclick="quickJoin()" id="btn-quick-join"
+        style="margin-top:0.5rem;display:none;">⚡ Quick Join (auto name & avatar)</button>
       <a href="/" class="btn btn-secondary btn-full" style="margin-top:0.5rem;display:block;text-align:center;">← Back
         to Games</a>
     </div>
@@ -988,6 +1004,7 @@
 
   <div id="toast"></div>
 
+  <script src="/js/substrates/avatar_picker.js"></script>
   <script>
     // =============================================================================
     // Game Registry — mirrors server GAME_REGISTRY with client-side additions
@@ -1042,20 +1059,27 @@
           avatar: myEmoji,
         }),
       },
-      tictactoe: {
-        name: '4D TicTacToe',
-        color: '#44aaff',
-        soloUrl: '/4dtictactoe/game.html?offline=true',
-        gameUrl: '/4dtictactoe/game.html',
-        minPlayers: 2, maxPlayers: 4,
-        defaultMaxPlayers: 4,
+      '4dconnect': {
+        name: '4D Connect',
+        color: '#00ffcc',
+        soloUrl: '/4dconnect/game.html?offline=true',
+        gameUrl: '/4dconnect/game.html',
+        minPlayers: 2, maxPlayers: 2,
+        defaultMaxPlayers: 2,
         allowBots: true,
-        launchParams: (session, me, myEmoji, wsUrl) => ({
-          session: session.session_id,
-          multiplayer: 'true',
-          wsUrl,
-          name: me?.username || '',
-        }),
+        launchParams: (session, me, myEmoji, wsUrl) => {
+          const p = {
+            session: session.session_id,
+            mode: 'multi',
+            multiplayer: 'true',
+            wsUrl,
+            name: me?.username || '',
+            avatar: myEmoji,
+          };
+          const sid = session.settings && session.settings.scenario_id;
+          if (sid) p.scenario = sid;
+          return p;
+        },
       },
       assemble: {
         name: 'Assemble',
@@ -1122,7 +1146,11 @@
     // =============================================================================
     const params = new URLSearchParams(location.search);
     const GAME_ID = params.get('game') || '';
-    const MODE = params.get('mode') || '';     // private | public | solo | join
+    // Unified action vocabulary: solo | invite | join | create | queue
+    // Legacy: private | public | matchmake | host | multi | browse (still accepted)
+    const MODE_ALIASES = { invite: 'private', create: 'public', queue: 'matchmake', join: '' };
+    const RAW_MODE = params.get('mode') || '';
+    const MODE = Object.prototype.hasOwnProperty.call(MODE_ALIASES, RAW_MODE) ? MODE_ALIASES[RAW_MODE] : RAW_MODE;
     const CODE_IN = params.get('code') || '';     // for joining by URL
 
     const GAME_INFO = GAME_REGISTRY[GAME_ID] || null;
@@ -1271,12 +1299,9 @@
       if (token) {
         send({ type: 'auth', token, username, avatar_id: avatarId });
       } else if (CODE_IN) {
-        // Guest joining by code
-        send({
-          type: 'guest_login',
-          name: `Guest_${Math.random().toString(36).slice(2, 6)}`,
-          avatar_id: avatarId,
-        });
+        // Guest arriving via invite link — show confirm panel with name/avatar picker;
+        // defer guest_login until user picks or hits Quick Join.
+        showGuestConfirmUI();
       } else {
         showPhase('auth');
       }
@@ -1316,11 +1341,19 @@
       setLoadingLabel('Setting up game...');
 
       if (CODE_IN) {
-        // Invitee: show a confirmation page rather than auto-joining
+        // Guest auto-join flow: guest_login just succeeded after picking identity —
+        // go straight to joining by code, skipping the confirm screen a second time.
+        if (state.guestAutoJoin) {
+          state.guestAutoJoin = false;
+          state.pendingJoinCode = CODE_IN;
+          send({ type: 'join_by_code', code: CODE_IN.toUpperCase() });
+          return;
+        }
+        // Member (token) arriving via invite link — show confirm page.
         state.pendingJoinCode = CODE_IN;
         document.getElementById('join-confirm-code').textContent = CODE_IN.toUpperCase();
         const gameName = GAME_INFO?.name || 'a game';
-        document.getElementById('join-confirm-label').textContent = `Join the private ${gameName} room`;
+        document.getElementById('join-confirm-label').textContent = `Join the ${gameName} room`;
         showPhase('join-confirm');
       } else if (MODE === 'host') {
         createSession(true);
@@ -1631,11 +1664,81 @@
     // =============================================================================
     // Join Confirm (invitee clicks Join Game button)
     // =============================================================================
-    function joinConfirmedCode() {
-      if (!state.pendingJoinCode) return;
+    function showGuestConfirmUI() {
+      // Render the invite confirm panel with the guest picker visible, deferring
+      // guest_login until the user picks an identity (or hits Quick Join).
+      state.pendingJoinCode = CODE_IN;
+      document.getElementById('join-confirm-code').textContent = (CODE_IN || '').toUpperCase();
+      const gameName = GAME_INFO?.name || 'a game';
+      document.getElementById('join-confirm-label').textContent = `Join the ${gameName} room`;
+      document.getElementById('guest-setup-panel').style.display = '';
+      document.getElementById('btn-quick-join').style.display = '';
+      const signIn = document.getElementById('guest-login-link');
+      if (signIn) signIn.href = `/login/?redirect=${encodeURIComponent(location.href)}`;
+      // Seed name/avatar from any stored values
+      const savedName = localStorage.getItem('kg_username') || '';
+      const nameEl = document.getElementById('guest-name-input');
+      if (nameEl) nameEl.value = savedName;
+      const savedAvId = localStorage.getItem('kg_avatar_id') || '';
+      if (savedAvId) {
+        state.guestAvatarId = savedAvId;
+        document.getElementById('guest-av-preview').textContent = avatarEmoji(savedAvId);
+      } else if (typeof AvatarPicker !== 'undefined' && AvatarPicker.has()) {
+        const av = AvatarPicker.get();
+        if (av) {
+          state.guestAvatarId = av.id || 'person_smile';
+          document.getElementById('guest-av-preview').textContent = av.emoji || '😊';
+        }
+      }
+      showPhase('join-confirm');
+    }
+
+    function pickGuestAvatar() {
+      if (typeof AvatarPicker === 'undefined') {
+        showToast('Avatar picker unavailable', 'error');
+        return;
+      }
+      AvatarPicker.show((av) => {
+        if (!av) return;
+        state.guestAvatarId = av.id;
+        document.getElementById('guest-av-preview').textContent = av.emoji || '😊';
+      });
+    }
+
+    function _guestDispatchJoin(username, avatarId) {
+      state.guestAutoJoin = true;
+      state.pendingJoinCode = CODE_IN || state.pendingJoinCode;
+      try {
+        if (username) localStorage.setItem('kg_username', username);
+        if (avatarId) localStorage.setItem('kg_avatar_id', avatarId);
+      } catch (_) { }
       setLoadingLabel('Joining game...');
       showPhase('loading');
-      send({ type: 'join_by_code', code: state.pendingJoinCode.toUpperCase() });
+      send({ type: 'guest_login', name: username, avatar_id: avatarId });
+    }
+
+    function quickJoin() {
+      if (!state.pendingJoinCode && !CODE_IN) return;
+      const username = `Guest_${Math.random().toString(36).slice(2, 6)}`;
+      const avatarId = state.guestAvatarId || 'person_smile';
+      _guestDispatchJoin(username, avatarId);
+    }
+
+    function joinConfirmedCode() {
+      if (!state.pendingJoinCode) return;
+      // Member flow — already authenticated via token
+      if (state.user) {
+        setLoadingLabel('Joining game...');
+        showPhase('loading');
+        send({ type: 'join_by_code', code: state.pendingJoinCode.toUpperCase() });
+        return;
+      }
+      // Guest flow — capture chosen name/avatar, auth as guest, then auth_success joins
+      const nameEl = document.getElementById('guest-name-input');
+      const typed = (nameEl?.value || '').trim();
+      const username = typed || `Guest_${Math.random().toString(36).slice(2, 6)}`;
+      const avatarId = state.guestAvatarId || 'person_smile';
+      _guestDispatchJoin(username, avatarId);
     }
 
     // =============================================================================

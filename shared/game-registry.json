@@ -15,11 +15,11 @@
       "supportsBots": true
     },
     {
-      "id": "tictactoe",
-      "name": "4D TicTacToe",
-      "portalTitle": "4D TicTacToe",
-      "playPath": "/4dtictactoe/index.html",
-      "lobbyPath": "/lobby/game.html?game=tictactoe",
+      "id": "4dconnect",
+      "name": "4D Connect",
+      "portalTitle": "4D Connect",
+      "playPath": "/4dconnect/index.html",
+      "lobbyPath": "/lobby/game.html?game=4dconnect",
       "maxPlayers": 4,
       "type": "turn",
       "supportsUnifiedLobby": true,

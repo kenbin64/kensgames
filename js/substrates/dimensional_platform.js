@@ -20,8 +20,8 @@
  *      Entities off-viewport → frozen or LOD=2. On-viewport → LOD=0.
  *      Idle callback for background sim. High-priority for focused app.
  *
- * Applies to: portal, starfighter, fasttrack, brickbreaker3d, 4dtictactoe,
- *             assemble, admin, auth, lobby, multiplayer, audio, UI — everything.
+ * Applies to: portal, starfighter, fasttrack, brickbreaker3d, 4dconnect,
+ *             assemble, chomp, admin, auth, lobby, multiplayer, audio, UI — everything.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -310,7 +310,7 @@ const DimensionalPlatform = (function () {
     { label: 'starfighter', z: 0.35, role: 'game-3d', path: '/starfighter/' },
     { label: 'fasttrack', z: 0.28, role: 'game-board', path: '/fasttrack/lobby/' },
     { label: 'brickbreaker3d', z: 0.18, role: 'game-3d', path: '/brickbreaker3d/' },
-    { label: '4d-tictactoe', z: 0.12, role: 'game-puzzle', path: '/4dtictactoe/' },
+    { label: '4dconnect', z: 0.12, role: 'game-puzzle', path: '/4dconnect/' },
     { label: 'assemble', z: 0.08, role: 'game-puzzle', path: '/assemble/' },
     // Platform
     { label: 'portal', z: 0.60, role: 'portal', path: '/index.html' },

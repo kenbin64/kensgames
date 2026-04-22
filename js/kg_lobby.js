@@ -150,6 +150,17 @@
       if (cb[name]) cb[name].apply(null, args);
     }
 
+    // Extension hooks: arbitrary message-type subscribers for features layered
+    // on top of the lobby (e.g. game manager scenarios / actions).
+    var msgSubs = {};
+    function fireMsg(msg) {
+      var subs = msgSubs[msg.type];
+      if (!subs) return;
+      for (var i = 0; i < subs.length; i++) {
+        try { subs[i](msg); } catch (e) { /* swallow */ }
+      }
+    }
+
     // ── send ─────────────────────────────────────────────────────────────
     function send(data) {
       if (ws && ws.readyState === 1 /* OPEN */) {
@@ -298,6 +309,8 @@
 
         // silently ignore unhandled types
       }
+      // Always notify raw subscribers too, after built-in dispatch.
+      fireMsg(msg);
     }
 
     // ── default game_started handler ─────────────────────────────────────
@@ -442,6 +455,20 @@
     /** Update a callback after init. */
     self.on = function (name, fn) {
       if (name in cb) cb[name] = fn;
+    };
+
+    /** Send an arbitrary message over the lobby WS. */
+    self.sendRaw = function (data) { return send(data); };
+
+    /** Subscribe to a raw message type. Returns an unsubscribe fn. */
+    self.onMessage = function (type, fn) {
+      if (!msgSubs[type]) msgSubs[type] = [];
+      msgSubs[type].push(fn);
+      return function () {
+        var arr = msgSubs[type] || [];
+        var i = arr.indexOf(fn);
+        if (i >= 0) arr.splice(i, 1);
+      };
     };
 
     /** Queue an action to run immediately after auth_success. */

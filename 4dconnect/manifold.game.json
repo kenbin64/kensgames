@@ -1,6 +1,6 @@
 {
-  "manifold": "4dtictactoe",
-  "name": "4D Tic-Tac-Toe",
+  "manifold": "4dconnect",
+  "name": "4D Connect",
   "version": "1.0.0",
   "status": "production",
   "dimension": {
@@ -37,7 +37,7 @@
     ]
   },
   "deploy": {
-    "target": "/var/www/kensgames.com/public/4dtictactoe/",
+    "target": "/var/www/kensgames.com/public/4dconnect/",
     "type": "static"
   },
   "manifold_compatibility": {

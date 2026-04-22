@@ -37,7 +37,7 @@ starfighter/index.src.html
 # Chomp — work in progress, not deployed
 Chomp!WallyTheCairnsCrocodileAdventure/
 starfighter/nginx_starfighter.conf
-4DTicTacToe/assets/models/*.glb
+4dconnect/assets/model/*.glb
 
 # Electron/desktop build outputs and wrappers — not needed in GitHub
 starfighter/downloads/

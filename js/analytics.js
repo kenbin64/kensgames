@@ -57,7 +57,7 @@
         var gameId = node.getAttribute('data-game-id') || '';
         if (!gameId && href) {
           // Extract game name from URL path segment
-          var m = href.match(/\/(fasttrack|brickbreaker|starfighter|4dtictactoe|assemble)/i);
+          var m = href.match(/\/(fasttrack|brickbreaker|starfighter|4dconnect|4dtictactoe|assemble|chomp)/i);
           gameId = m ? m[1].toLowerCase() : 'unknown';
         }
         record('game_launch', { game: gameId });

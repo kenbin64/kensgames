@@ -35,7 +35,7 @@
 │   └── kensgames.db           ← SQLite file — VPS only, never committed
 │
 ├── fasttrack/            ← FastTrack multiplayer game
-├── 4DTicTacToe/          ← 4D Tic-Tac-Toe
+├── 4dconnect/            ← 4D Connect
 ├── brickbreaker3d/       ← BrickBreaker 3D
 ├── starfighter/          ← StarFighter
 ├── assemble/             ← Assemble
@@ -261,7 +261,7 @@ GitHub Actions: .github/workflows/deploy.yml
 
 To deploy a single game without touching the rest of the portal:
 1. GitHub → Actions → "Manifold Compiler — Deploy to kensgames.com"
-2. Run workflow → `game: fasttrack` (or `brickbreaker3d`, `4dtictactoe`, `starfighter`, `assemble`)
+2. Run workflow → `game: fasttrack` (or `brickbreaker3d`, `4dconnect`, `starfighter`, `assemble`)
 
 To validate locally without pushing:
 ```bash

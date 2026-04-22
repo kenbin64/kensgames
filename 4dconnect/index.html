@@ -3,7 +3,7 @@
 
 <head>
   <script>
-    (function () { var t = localStorage.getItem('kg_token'); if (t) { fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (r.ok) window.location.replace('/4dtictactoe/lobby/'); }).catch(function () { }); } })();
+    (function () { var t = localStorage.getItem('kg_token'); if (t) { fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (r.ok) window.location.replace('/4dconnect/lobby/'); }).catch(function () { }); } })();
   </script>
   <!-- Auth enforcement: sign-in required (invite-code guests allowed) -->
   <script src="/js/substrates/profile_gate.js"></script>
@@ -618,7 +618,7 @@
   </div>
 
   <script src="/js/manifold_bridge.js"></script>
-  <script src="/4dtictactoe/board_manifold_substrate.js"></script>
+  <script src="/4dconnect/board_manifold_substrate.js"></script>
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/GLTFLoader.js"></script>
   <script type="module">
@@ -1113,7 +1113,7 @@
       statusMsgEl.textContent = 'Loading boardâ€¦';
       const loader = new THREE.GLTFLoader();
       loader.load(
-        '/4dtictactoe/assets/models/connect4.glb',
+        '/4dconnect/assets/models/connect4.glb',
         (gltf) => {
           const root = gltf.scene;
 
@@ -1619,7 +1619,7 @@
     function loadJupiter() {
       const loader = new THREE.GLTFLoader();
       loader.load(
-        '/4dtictactoe/assets/models/jupiter.glb',
+        '/4dconnect/assets/models/jupiter.glb',
         (gltf) => {
           const root = gltf.scene;
           root.traverse((obj) => {
@@ -2225,7 +2225,7 @@
     // â”€â”€ MANIFOLD BRIDGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (typeof ManifoldBridge !== 'undefined') {
       ManifoldBridge.init({
-        id: '4dtictactoe',
+        id: '4dconnect',
         version: '1.0.0',
         x: 4,   // board dimension (primary axis)
         y: 4,   // board dimension (quadratic axis)  →  z = 4·16 = 64

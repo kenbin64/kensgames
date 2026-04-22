@@ -6,18 +6,18 @@
   <script>
     (function () {
       var t = localStorage.getItem('kg_token');
-      if (!t) { window.location.replace('/4dtictactoe/index.html'); return; }
+      if (!t) { window.location.replace('/4dconnect/index.html'); return; }
       fetch('/api/auth/validate', { headers: { Authorization: 'Bearer ' + t } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/4dtictactoe/index.html'); return; }
+          if (!d || !d.valid) { localStorage.removeItem('kg_token'); window.location.replace('/4dconnect/index.html'); return; }
           if (!d.profileSetup) { window.location.replace('/player/setup.html?redirect=' + encodeURIComponent(window.location.pathname)); }
         }).catch(function () { });
     })();
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>4D Tic-Tac-Toe — Lobby | KensGames</title>
+  <title>4D Connect — Lobby | KensGames</title>
   <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/arcade.css">
   <link rel="stylesheet" href="/css/manifold_3d.css">
@@ -313,13 +313,13 @@
       <div class="logo glitch" data-text="KEN'S ARCADE">KEN'S ARCADE</div>
     </a>
     <nav class="header-nav">
-      <a href="/4dtictactoe/index.html" class="arcade-btn" style="font-size:0.4rem">← GAME INFO</a>
+      <a href="/4dconnect/index.html" class="arcade-btn" style="font-size:0.4rem">← GAME INFO</a>
       <a href="/portal.html" class="arcade-btn">PORTAL</a>
     </nav>
   </header>
 
   <main>
-    <h1 class="page-title">⊞ 4D TIC-TAC-TOE</h1>
+    <h1 class="page-title">⊞ 4D CONNECT</h1>
     <p class="page-sub">Connect 4 across the hypercube. 2 players — sign in to compete.</p>
 
     <div class="lobby-grid">
@@ -445,7 +445,7 @@
     'use strict';
 
     const API = '/api';
-    const GAME = '4dtictactoe';
+    const GAME = '4dconnect';
     const token = localStorage.getItem('kg_token');
     const AVATARS = { wizard: '🧙', knight: '🛡️', robot: '🤖', alien: '👽', ninja: '🥷', astronaut: '👨‍🚀', dragon: '🐉', phoenix: '🦅', fox: '🦊', wolf: '🐺', cat: '🐱', ghost: '👻', skull: '💀', fire: '🔥', lightning: '⚡', star: '⭐', diamond: '💎', crown: '👑' };
 

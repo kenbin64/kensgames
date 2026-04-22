@@ -26,10 +26,21 @@ const crypto = require('crypto');
 const http = require('http');
 
 const AuthHandler = require('./auth-handler');
+let GameManager = null;
+try { GameManager = require('./game_manager'); }
+catch (e) { console.warn('[Lobby] game_manager unavailable:', e.message); }
 
 const PORT = 8765;
 
 const authHandler = new AuthHandler();
+
+if (GameManager && GameManager.seedScenarios) {
+  GameManager.seedScenarios().catch(e => console.warn('[Lobby] scenario seed failed:', e.message));
+  try {
+    const fdc = require('./game_adapters/4dconnect_adapter');
+    GameManager.registerGameAdapter(fdc.gameId, fdc);
+  } catch (e) { console.warn('[Lobby] 4dconnect adapter skipped:', e.message); }
+}
 
 function stableGuestIdFromToken(token) {
   if (!token || typeof token !== 'string') return null;
@@ -176,12 +187,13 @@ const GAME_REGISTRY = {
   brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/game.html', lobby: '/brickbreaker3d/lobby/', maxPlayers: 4, type: 'realtime' }, // legacy alias
   starfighter: { name: 'Starfighter', path: '/starfighter/game.html', lobby: '/starfighter/lobby/', maxPlayers: 6, type: 'realtime' },
   assemble: { name: 'Assemble', path: '/assemble/game.html', lobby: '/assemble/lobby/', maxPlayers: 4, type: 'realtime' },
-  '4dtictactoe': { name: '4D Tic-Tac-Toe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby/', maxPlayers: 2, type: 'turn' },
+  '4dconnect': { name: '4D Connect', path: '/4dconnect/game.html', lobby: '/4dconnect/lobby/', maxPlayers: 2, type: 'turn' },
   chomp: { name: 'Chomp! Wally', path: '/chomp/game.html', lobby: '/chomp/lobby/', maxPlayers: 1, type: 'solo' },
   connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
   swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
   cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: '4D Tic-Tac-Toe', path: '/4dtictactoe/game.html', lobby: '/4dtictactoe/lobby/', maxPlayers: 2, type: 'turn' }, // legacy alias
+  '4dtictactoe': { name: '4D Connect', path: '/4dconnect/game.html', lobby: '/4dconnect/lobby/', maxPlayers: 2, type: 'turn' }, // legacy alias
+  tictactoe: { name: '4D Connect', path: '/4dconnect/game.html', lobby: '/4dconnect/lobby/', maxPlayers: 2, type: 'turn' }, // legacy alias
 };
 
 function resetLobbyAcceptance(session) {
@@ -1096,7 +1108,7 @@ handlers.remove_ai_player = (ws, data) => {
 
 handlers.remove_ai = (ws, data) => handlers.remove_ai_player(ws, { player_id: (data && data.player_id) || null });
 
-handlers.start_game = (ws) => {
+handlers.start_game = async (ws) => {
   const conn = connections.get(ws);
   if (!conn) return;
 
@@ -1128,15 +1140,19 @@ handlers.start_game = (ws) => {
 
   session.status = 'playing';
 
-  const payload = {
-    type: 'game_started',
-    session: sanitizeSession(session)
-  };
+  // If a scenario was chosen in the lobby, mirror the session into the
+  // manifold so apply_action has an authoritative cell to read/write.
+  if (GameManager && GameManager.seedSession && session.settings && session.settings.scenario_id) {
+    try { await GameManager.seedSession(session); }
+    catch (e) { console.warn('[Lobby] seedSession failed:', e.message); }
+  }
 
-  // Notify all players including host
+  const sanitized = sanitizeSession(session);
+
+  // Notify each player individually so they can learn their own user_id.
   for (const [clientWs, clientConn] of connections) {
     if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      send(clientWs, payload);
+      send(clientWs, { type: 'game_started', session: sanitized, my_user_id: clientConn.user_id });
     }
   }
 
@@ -1402,6 +1418,63 @@ handlers.toggle_ready = (ws) => {
     });
 
     broadcastSessionUpdate(session, { action: 'ready_changed' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Game Manager handlers (manifold-backed scenario / action flow)
+// ═══════════════════════════════════════════════════════════════════════════
+
+handlers.list_scenarios = async (ws, data) => {
+  if (!GameManager) return send(ws, { type: 'scenarios_list', scenarios: [] });
+  const gameId = (data && data.game_id) || null;
+  const list = await GameManager.listScenarios(gameId);
+  send(ws, { type: 'scenarios_list', game_id: gameId, scenarios: list });
+};
+
+handlers.create_game = async (ws, data) => {
+  if (!GameManager) return send(ws, { type: 'error', message: 'Game manager unavailable' });
+  const conn = connections.get(ws);
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  try {
+    const session = await GameManager.createGame({
+      gameId: data.game_id,
+      scenarioId: data.scenario_id,
+      hostId: conn.user_id,
+      opts: { settings: data.settings || {}, maxPlayers: data.max_players },
+    });
+    send(ws, { type: 'game_created', session });
+  } catch (err) {
+    send(ws, { type: 'error', message: err.message });
+  }
+};
+
+handlers.apply_action = async (ws, data) => {
+  if (!GameManager) return send(ws, { type: 'error', message: 'Game manager unavailable' });
+  const conn = connections.get(ws);
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  try {
+    const result = await GameManager.applyAction(data.session_id, {
+      playerId: conn.user_id,
+      type: data.action,
+      atom: data.atom,
+      cell: data.cell,
+      score: data.score,
+      payload: data.payload,
+    });
+    const msg = {
+      type: 'action_applied', session_id: data.session_id,
+      player_id: conn.user_id, username: conn.user && conn.user.username,
+      ...result,
+    };
+    // Broadcast to everyone in the room (including sender).
+    if (sessions.has(data.session_id)) broadcast(data.session_id, msg);
+    else send(ws, msg);
+    if (result.win) {
+      broadcast(data.session_id, { type: 'game_won', session_id: data.session_id, win: result.win });
+    }
+  } catch (err) {
+    send(ws, { type: 'error', message: err.message });
   }
 };
 

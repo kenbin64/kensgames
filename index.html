@@ -2698,14 +2698,14 @@
                     <picture>
                         <source srcset="/assets/masterImageFile/manifold.webp" type="image/webp">
                         <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/manifold.png"
-                            src="/assets/masterImageFile/manifold.png" alt="4D TicTacToe" loading="lazy"
-                            decoding="async" fetchpriority="low">
+                            src="/assets/masterImageFile/manifold.png" alt="4D Connect" loading="lazy" decoding="async"
+                            fetchpriority="low">
                     </picture>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
                 <div class="game-info">
                     <div>
-                        <div class="game-title">4D TicTacToe</div>
+                        <div class="game-title">4D Connect</div>
                         <div class="game-meta">
                             <span class="game-tag">1&ndash;4 Players</span>
                             <span class="game-tag">Strategy</span>
@@ -2716,14 +2716,14 @@
                             solo against the AI, pass-and-play locally, or challenge a friend online.</div>
                     </div>
                     <div class="game-btns">
-                        <button class="btn-solo" onclick="goToGameSolo('/4dtictactoe/')">&#9654; PLAY SOLO</button>
+                        <button class="btn-solo" onclick="goToGameSolo('/4dconnect/')">&#9654; PLAY SOLO</button>
                         <span class="kg-tip-wrap">
-                            <button class="btn-green kg-multi" onclick="goToGameHost('/4dtictactoe/')">&#128232;
+                            <button class="btn-green kg-multi" onclick="goToGameHost('/4dconnect/')">&#128232;
                                 INVITE</button>
                             <span class="kg-tip" id="tip-card-4d">Sign in to unlock multiplayer</span>
                         </span>
                         <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/4dtictactoe/')">&#9654;&#9654;
+                            <button class="btn-green kg-multi" onclick="goToGame('/4dconnect/')">&#9654;&#9654;
                                 MULTI</button>
                             <span class="kg-tip">Sign in to unlock multiplayer</span>
                         </span>
@@ -4058,7 +4058,7 @@
                     <li><a href="/fasttrack/">FastTrack</a></li>
                     <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
                     <li><a href="/starfighter/">Alien Space Attack</a></li>
-                    <li><a href="/4dtictactoe/">4D TicTacToe</a></li>
+                    <li><a href="/4dconnect/">4D Connect</a></li>
                     <li><a href="/assemble/">Assemble</a></li>
                 </ul>
             </div>
@@ -4356,14 +4356,14 @@
             '/fasttrack/': 'fasttrack',
             '/brickbreaker3d/': 'brickbreaker3d',
             '/starfighter/': 'starfighter',
-            '/4dtictactoe/': 'tictactoe',
+            '/4dconnect/': '4dconnect',
             '/assemble/': 'assemble',
         };
         const SOLO_ROUTES = window.SOLO_ROUTES = {
             '/fasttrack/': '/play/?game=fasttrack&mode=solo',
             '/brickbreaker3d/': '/play/?game=brickbreaker3d&mode=solo',
             '/starfighter/': '/play/?game=starfighter&mode=solo',
-            '/4dtictactoe/': '/play/?game=tictactoe&mode=solo',
+            '/4dconnect/': '/play/?game=4dconnect&mode=solo',
             '/assemble/': '/play/?game=assemble&mode=solo',
         };
         function goToGame(path) {

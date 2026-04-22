@@ -61,12 +61,12 @@
       "status": "production"
     },
     {
-      "id": "4dtictactoe",
-      "name": "4D Tic-Tac-Toe",
-      "path": "4dtictactoe/",
-      "manifold": "4dtictactoe/manifold.game.json",
-      "entry": "4dtictactoe/game.html",
-      "lobby": "4dtictactoe/lobby/",
+      "id": "4dconnect",
+      "name": "4D Connect",
+      "path": "4dconnect/",
+      "manifold": "4dconnect/manifold.game.json",
+      "entry": "4dconnect/game.html",
+      "lobby": "4dconnect/lobby/",
       "server": "static",
       "status": "production"
     },

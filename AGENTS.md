@@ -161,7 +161,7 @@ If `deploy.manifest.json` contains a game where `z ≠ x * y`, **halt and alert*
 │   └── ...
 ├── fasttrack/                  ← FastTrack game
 ├── brickbreaker3d/             ← BrickBreaker 3D
-├── 4DTicTacToe/                ← 4D Tic-Tac-Toe
+├── 4dconnect/                  ← 4D Connect
 ├── starfighter/                ← StarFighter
 ├── assemble/                   ← Assemble
 ├── server/                     ← Node.js auth + lobby server
