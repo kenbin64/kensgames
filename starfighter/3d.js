@@ -70,9 +70,10 @@ const SF3D = (function () {
             { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 2700 },
         ],
         predator: [
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb', distance: 380 },
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb', distance: 820 },
+            // aliased to AlienEnemyFighter_lod* — byte-identical meshes; separate LOD distances preserved for longer draw range
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 380 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 820 },
         ],
         baseship: [
             { path: 'assets/models/optimized/HumanSpaceBattleShip_lod0.glb', distance: 0 },

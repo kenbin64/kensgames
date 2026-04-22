@@ -85,8 +85,8 @@ const MANIFOLD_PARAMS = {
   'HumanSpaceBattleShip.glb': [0.80, 0.65, 0.85, 3],  // m=0.44
 
   // Enemy fighters: seen constantly in combat
+  // Predator drone aliases AlienEnemyFighter (byte-identical) — single entry regenerates shared LODs
   'AlienEnemyFighter.glb': [0.88, 0.85, 0.80, 3],  // m=0.60
-  'AlienEnemyPreditorDrone.glb': [0.88, 0.85, 0.80, 3],  // m=0.60
   'Interceptor_Needle.glb': [0.85, 0.82, 0.78, 3],  // m=0.54
 
   // Bombers / sentinels: mid-range threats
