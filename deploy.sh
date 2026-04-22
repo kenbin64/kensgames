@@ -40,6 +40,24 @@ AVAIL=$(df "$WEB" 2>/dev/null | awk 'NR==2{print $4}')
 echo -e "${Y}KensGames Portal — Deployment  ${TIMESTAMP}${NC}"
 echo "────────────────────────────────────────────────"
 
+# ── Logging policy install (daily archive/rotation) ───────────────────────
+LOGROTATE_SRC="$SRC/ops/logging/kensgames-manifold.logrotate"
+LOGROTATE_DST="/etc/logrotate.d/kensgames-manifold"
+if [[ -f "$LOGROTATE_SRC" ]]; then
+  mkdir -p /var/www/kensgames.com/logs
+  mkdir -p /home/butterfly/.pm2/logs
+  cp -f "$LOGROTATE_SRC" "$LOGROTATE_DST"
+  chmod 644 "$LOGROTATE_DST"
+  chown root:root "$LOGROTATE_DST"
+  touch /var/www/kensgames.com/logs/app.log /var/www/kensgames.com/logs/error.log
+  chown -R butterfly:www-data /var/www/kensgames.com/logs
+  chmod 775 /var/www/kensgames.com/logs
+  chmod 664 /var/www/kensgames.com/logs/*.log || true
+  echo -e "${G}  ✓ Logging policy installed: $LOGROTATE_DST${NC}"
+else
+  echo -e "${Y}  ! Logging policy source missing: $LOGROTATE_SRC${NC}"
+fi
+
 # ── [1] Backup ───────────────────────────────────────────────────────────────
 if $DO_BACKUP && [[ -d "$WEB" ]]; then
   echo -e "${Y}[1/5] Backing up...${NC}"

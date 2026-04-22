@@ -1,0 +1,40 @@
+# KensGames Manifold logging policy
+# Daily archive with compression and retention for app and PM2 logs.
+
+/var/www/kensgames.com/logs/*.log {
+    su butterfly www-data
+    daily
+    rotate 30
+    missingok
+    notifempty
+    compress
+    delaycompress
+    dateext
+    dateformat -%Y%m%d
+    copytruncate
+    create 0640 butterfly www-data
+}
+
+/home/butterfly/.pm2/logs/kensgames-*.log {
+    daily
+    rotate 30
+    missingok
+    notifempty
+    compress
+    delaycompress
+    dateext
+    dateformat -%Y%m%d
+    copytruncate
+    su butterfly butterfly
+    create 0640 butterfly butterfly
+}
+
+/var/www/backups/kensgames_*.tar.gz {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    dateext
+    dateformat -%Y%m%d
+    nocompress
+}
