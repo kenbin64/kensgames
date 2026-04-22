@@ -79,12 +79,26 @@ Create ONE Cloudflare Access Self-Hosted Application:
 
 ## 3. CACHE RULES
 
-| Pattern | Cache Level | Edge TTL |
-|---------|-------------|----------|
-| `kensgames.com/api/*` | Bypass | — |
-| `kensgames.com/*.html` | Standard | 4 hours |
-| `kensgames.com/js/*` | Aggressive | 7 days |
-| `kensgames.com/css/*` | Aggressive | 7 days |
+| Pattern | Cache Level | Edge TTL | Browser TTL |
+|---------|-------------|----------|-------------|
+| `kensgames.com/api/*` | Bypass | — | — |
+| `kensgames.com/*.html` | Standard | 4 hours | — |
+| `kensgames.com/js/*` | Aggressive | 7 days | — |
+| `kensgames.com/css/*` | Aggressive | 7 days | — |
+| `kensgames.com/**/*.glb` | Aggressive | 30 days | 7 days |
+| `kensgames.com/**/*.mp4` | Aggressive | 30 days | 7 days |
+| `kensgames.com/**/*.png` | Aggressive | 30 days | 7 days |
+| `kensgames.com/**/*.webp` | Aggressive | 30 days | 7 days |
+| `kensgames.com/**/*.jpg` | Aggressive | 30 days | 7 days |
+| `kensgames.com/**/*.svg` | Aggressive | 30 days | 7 days |
+
+**Binary cache-busting contract:** filenames are treated as content identity. To
+replace a binary master, either rename the file or append a `?v=<hash>` query
+string at the reference site. Do not edit a binary in place under the same name.
+
+**Rationale:** masters stay in the kensgames repo (Option A — cache-only). The
+CDN absorbs bandwidth; the repo absorbs storage. Origin CPU never touches the
+binary after first cache fill.
 
 ---
 
@@ -100,4 +114,4 @@ Create ONE Cloudflare Access Self-Hosted Application:
 
 ---
 
-*kensgames.com — Last updated: 2026-04-18*
+*kensgames.com — Last updated: 2026-04-22*
