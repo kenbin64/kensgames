@@ -2314,13 +2314,13 @@
             </a>
             <ul class="nav-links">
                 <li><a href="#games">Games</a></li>
-                <li><a href="#engine">The Engine</a></li>
-                <li><a href="#upcoming">Coming Soon</a></li>
-                <li><a href="/gallery/">Art Gallery</a></li>
-                <li><a href="#art-store">Art Store</a></li>
+                <li><a href="#engine">Engine</a></li>
+                <li><a href="#upcoming">Upcoming</a></li>
+                <li><a href="/gallery/">Gallery</a></li>
+                <li><a href="#art-store">Store</a></li>
                 <li><a href="#about">About</a></li>
                 <li><a href="/manifold.html">Manifold</a></li>
-                <li><a href="#substrates">Under the Hood</a></li>
+                <li><a href="#substrates">Substrates</a></li>
                 <li><a href="#tos">Terms</a></li>
                 <li><a href="https://tetracubedb.com" target="_blank" rel="noopener"
                         style="color:var(--neon-purple);text-shadow:0 0 6px rgba(153,0,255,.35);">TetracubeDB
@@ -2785,20 +2785,21 @@
             <div class="engine-text">
                 <h2>&#9881; The Engine</h2>
                 <p>Built from scratch. No commercial framework underneath. The five games on this portal don&rsquo;t
-                    just share a server &mdash; they share something deeper. A common geometric foundation
-                    that makes the whole thing behave differently from anything built the conventional way.</p>
+                    just share a server &mdash; they share a common geometric foundation.
+                    That gives the portal a consistent feel while letting us ship updates faster.</p>
                 <p>The background is rendering live. The coordinates on the game cards are real. The
-                    golden ratio is in the spacing. The three surface equations are load-bearing.
-                    Pull on any thread and you find the same shape.</p>
+                    spacing follows the same design rules used in gameplay. The surface model informs
+                    layout, audio, and game behavior in one system.</p>
                 <ul class="engine-features">
                     <li><strong>Pure WebGL2</strong> &mdash; no engine dependency. GPU shaders written by hand.</li>
-                    <li><strong>Zero audio files</strong> &mdash; all sound is procedurally synthesized from the Web
-                        Audio API.</li>
-                    <li><strong>One coordinate system</strong> &mdash; every game event has a position in the same
+                    <li><strong>Procedural audio-first</strong> &mdash; most game audio is synthesized in real time via
+                        the Web Audio API.</li>
+                    <li><strong>Shared coordinate model</strong> &mdash; core gameplay events map to one consistent
                         space.</li>
-                    <li><strong>Real-time leaderboards</strong> &mdash; scores, presence, and state live across all
-                        games simultaneously.</li>
-                    <li><strong>Browser-native</strong> &mdash; no installs. Works on any device with a GPU.</li>
+                    <li><strong>Live multiplayer data</strong> &mdash; scores, presence, and session state update in
+                        real time.</li>
+                    <li><strong>Browser-native</strong> &mdash; no installs. Designed for modern browsers on
+                        GPU-capable devices.</li>
                 </ul>
             </div>
             <div class="engine-visual">
@@ -4358,6 +4359,13 @@
             '/4dtictactoe/': 'tictactoe',
             '/assemble/': 'assemble',
         };
+        const SOLO_ROUTES = window.SOLO_ROUTES = {
+            '/fasttrack/': '/fasttrack/3d.html?offline=true&ai_players=1&ai_level=medium',
+            '/brickbreaker3d/': '/brickbreaker3d/game.html?offline=true',
+            '/starfighter/': '/starfighter/game.html?offline=true',
+            '/4dtictactoe/': '/4dtictactoe/game.html?offline=true',
+            '/assemble/': '/assemble/game.html?offline=true',
+        };
         function goToGame(path) {
             if (!localStorage.getItem('kg_token')) { openModal('auth-modal'); return; }
             const gameId = PATH_TO_GAME[path] || path.replace(/\//g, '');
@@ -4369,6 +4377,11 @@
             window.location.href = `/play/?game=${gameId}&mode=host`;
         }
         function goToGameSolo(path) {
+            const soloUrl = SOLO_ROUTES[path];
+            if (soloUrl) {
+                window.location.href = soloUrl;
+                return;
+            }
             const gameId = PATH_TO_GAME[path] || path.replace(/\//g, '');
             window.location.href = `/play/?game=${gameId}&mode=solo`;
         }
@@ -4466,6 +4479,11 @@
                     window.location.href = `/play/?game=${gameId}&mode=host`;
                 };
                 window.goToGameSolo = function (path) {
+                    const soloUrl = (window.SOLO_ROUTES && window.SOLO_ROUTES[path]) || null;
+                    if (soloUrl) {
+                        window.location.href = soloUrl;
+                        return;
+                    }
                     const gameId = (window.PATH_TO_GAME && window.PATH_TO_GAME[path]) || path.replace(/\//g, '');
                     window.location.href = `/play/?game=${gameId}&mode=solo`;
                 };

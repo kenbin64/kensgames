@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manifold — The Geometry Behind the Games | kensgames.com</title>
-    <meta name="description" content="Manifold is a dimensional programming paradigm. The governing equation is z = x·y. Three surfaces. One coordinate system. Five games built on top.">
+    <meta name="description"
+        content="Manifold is a dimensional programming paradigm. The governing equation is z = x·y. Three surfaces. One coordinate system. Five games built on top.">
     <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
     <link rel="stylesheet" href="/lib/fonts/fonts.css">
@@ -17,7 +19,7 @@
             --neon-purple: #9900FF;
             --neon-green: #00FF41;
             --bg-dark: #04040C;
-            --bg-card: rgba(4,4,20,0.94);
+            --bg-card: rgba(4, 4, 20, 0.94);
             --text: #E0E0FF;
             --text-muted: #8888AA;
             --glow-cyan: 0 0 8px #00FFFF, 0 0 24px #00FFFF, 0 0 48px #00FFFF;
@@ -25,153 +27,552 @@
             --glow-yellow: 0 0 8px #FFE800, 0 0 24px #FFE800;
             --font-arcade: 'Orbitron', monospace;
         }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        html, body { width:100%; overflow-x:hidden; }
-        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-dark); color:var(--text); line-height:1.6; }
 
-        #gyroid-bg { position:fixed; inset:0; z-index:0; width:100%; height:100%; pointer-events:none; opacity:.18; }
-        body > *:not(#gyroid-bg) { position:relative; z-index:1; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        #gyroid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: .18;
+        }
+
+        body>*:not(#gyroid-bg) {
+            position: relative;
+            z-index: 1;
+        }
 
         /* ── Nav ── */
         nav {
-            position:sticky; top:0; z-index:100;
-            background:rgba(4,4,12,0.92); backdrop-filter:blur(10px);
-            border-bottom:1px solid rgba(0,255,255,0.1);
-            padding:0 40px;
-            display:flex; align-items:center; justify-content:space-between; gap:20px;
-            height:56px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(4, 4, 12, 0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            height: 56px;
         }
-        .nav-logo { font-family:var(--font-arcade); font-size:13px; letter-spacing:3px; color:var(--neon-cyan); text-decoration:none; white-space:nowrap; }
-        .nav-logo span { color:var(--neon-pink); }
-        .nav-links { display:flex; gap:28px; list-style:none; }
-        .nav-links a { font-family:var(--font-arcade); font-size:10px; letter-spacing:2px; color:var(--text-muted); text-decoration:none; text-transform:uppercase; transition:color .2s; }
-        .nav-links a:hover, .nav-links a.active { color:var(--neon-cyan); }
-        .nav-cta { font-family:var(--font-arcade); font-size:10px; letter-spacing:2px; padding:8px 18px; background:transparent; color:var(--neon-green); border:1px solid rgba(0,255,65,.45); border-radius:4px; cursor:pointer; text-decoration:none; transition:background .2s; white-space:nowrap; }
-        .nav-cta:hover { background:rgba(0,255,65,.12); }
+
+        .nav-logo {
+            font-family: var(--font-arcade);
+            font-size: 13px;
+            letter-spacing: 3px;
+            color: var(--neon-cyan);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .nav-logo span {
+            color: var(--neon-pink);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 28px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: color .2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--neon-cyan);
+        }
+
+        .nav-cta {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 2px;
+            padding: 8px 18px;
+            background: transparent;
+            color: var(--neon-green);
+            border: 1px solid rgba(0, 255, 65, .45);
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .2s;
+            white-space: nowrap;
+        }
+
+        .nav-cta:hover {
+            background: rgba(0, 255, 65, .12);
+        }
 
         /* ── Hero ── */
         .m-hero {
-            min-height:90vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-            padding:80px 40px 60px; text-align:center; gap:40px;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 40px 60px;
+            text-align: center;
+            gap: 40px;
         }
-        .m-hero-eyebrow { font-family:var(--font-arcade); font-size:10px; letter-spacing:4px; color:var(--neon-purple); text-transform:uppercase; margin-bottom:8px; }
-        .m-hero h1 { font-family:var(--font-arcade); font-size:clamp(42px,8vw,80px); letter-spacing:.1em; color:var(--text); line-height:1.1; }
-        .m-hero h1 span.eq { color:var(--neon-yellow); text-shadow:var(--glow-yellow); display:block; font-size:.55em; margin-top:12px; letter-spacing:.18em; }
-        .m-hero-sub { font-size:17px; color:var(--text-muted); max-width:620px; line-height:1.9; }
-        .m-hero-sub code { color:var(--neon-yellow); background:rgba(255,232,0,.1); padding:2px 7px; border-radius:3px; }
+
+        .m-hero-eyebrow {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 4px;
+            color: var(--neon-purple);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .m-hero h1 {
+            font-family: var(--font-arcade);
+            font-size: clamp(42px, 8vw, 80px);
+            letter-spacing: .1em;
+            color: var(--text);
+            line-height: 1.1;
+        }
+
+        .m-hero h1 span.eq {
+            color: var(--neon-yellow);
+            text-shadow: var(--glow-yellow);
+            display: block;
+            font-size: .55em;
+            margin-top: 12px;
+            letter-spacing: .18em;
+        }
+
+        .m-hero-sub {
+            font-size: 17px;
+            color: var(--text-muted);
+            max-width: 620px;
+            line-height: 1.9;
+        }
+
+        .m-hero-sub code {
+            color: var(--neon-yellow);
+            background: rgba(255, 232, 0, .1);
+            padding: 2px 7px;
+            border-radius: 3px;
+        }
 
         /* ── Surface canvas ── */
         .surface-wrap {
-            width:min(680px,90vw); position:relative; display:flex; flex-direction:column; align-items:center; gap:14px;
+            width: min(680px, 90vw);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
         }
+
         #manifold-surface {
-            width:100%; height:420px; border-radius:12px; border:1.5px solid rgba(0,255,255,.18);
-            box-shadow:0 0 60px rgba(0,255,255,.07),inset 0 0 30px rgba(153,0,255,.06);
-            cursor:grab; display:block; background:transparent;
+            width: 100%;
+            height: 420px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(0, 255, 255, .18);
+            box-shadow: 0 0 60px rgba(0, 255, 255, .07), inset 0 0 30px rgba(153, 0, 255, .06);
+            cursor: grab;
+            display: block;
+            background: transparent;
         }
-        #manifold-surface:active { cursor:grabbing; }
-        .surface-eq { font-size:22px; color:var(--neon-yellow); font-weight:800; letter-spacing:.12em; text-shadow:var(--glow-yellow); }
-        .surface-hint { font-size:11px; color:var(--text-muted); letter-spacing:.05em; }
+
+        #manifold-surface:active {
+            cursor: grabbing;
+        }
+
+        .surface-eq {
+            font-size: 22px;
+            color: var(--neon-yellow);
+            font-weight: 800;
+            letter-spacing: .12em;
+            text-shadow: var(--glow-yellow);
+        }
+
+        .surface-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: .05em;
+        }
 
         /* ── Dim strip ── */
-        .dim-strip { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
-        .dim-node { font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px; border:1.5px solid rgba(0,255,255,.2); color:var(--text-muted); letter-spacing:.05em; }
-        .dim-node.dim-active { border-color:var(--neon-cyan); color:var(--neon-cyan); box-shadow:0 0 10px rgba(0,255,255,.25); }
-        .dim-node.dim-hi { border-color:var(--neon-purple); color:var(--neon-purple); box-shadow:0 0 10px rgba(153,0,255,.25); }
-        .dim-arrow { font-size:12px; color:rgba(136,136,170,.4); }
+        .dim-strip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 4px;
+        }
+
+        .dim-node {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            border: 1.5px solid rgba(0, 255, 255, .2);
+            color: var(--text-muted);
+            letter-spacing: .05em;
+        }
+
+        .dim-node.dim-active {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, .25);
+        }
+
+        .dim-node.dim-hi {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: 0 0 10px rgba(153, 0, 255, .25);
+        }
+
+        .dim-arrow {
+            font-size: 12px;
+            color: rgba(136, 136, 170, .4);
+        }
 
         /* ── Sections ── */
-        .m-section { max-width:960px; margin:0 auto; padding:80px 40px; }
-        .m-section-header { text-align:center; margin-bottom:48px; }
-        .m-eyebrow { font-family:var(--font-arcade); font-size:10px; letter-spacing:3px; color:var(--neon-purple); text-transform:uppercase; margin-bottom:10px; }
-        .m-h2 { font-family:var(--font-arcade); font-size:clamp(20px,3vw,28px); letter-spacing:.08em; color:var(--text); }
-        .m-lead { font-size:17px; color:var(--neon-cyan); line-height:1.9; font-weight:600; margin-bottom:18px; }
-        .m-body { font-size:15px; color:var(--text-muted); line-height:1.9; margin-bottom:18px; }
-        code.inline { color:var(--neon-yellow); background:rgba(255,232,0,.1); padding:2px 6px; border-radius:3px; }
+        .m-section {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 80px 40px;
+        }
+
+        .m-section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .m-eyebrow {
+            font-family: var(--font-arcade);
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--neon-purple);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .m-h2 {
+            font-family: var(--font-arcade);
+            font-size: clamp(20px, 3vw, 28px);
+            letter-spacing: .08em;
+            color: var(--text);
+        }
+
+        .m-lead {
+            font-size: 17px;
+            color: var(--neon-cyan);
+            line-height: 1.9;
+            font-weight: 600;
+            margin-bottom: 18px;
+        }
+
+        .m-body {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.9;
+            margin-bottom: 18px;
+        }
+
+        code.inline {
+            color: var(--neon-yellow);
+            background: rgba(255, 232, 0, .1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
 
         /* ── Theory card ── */
         .theory-card {
-            background:var(--bg-card); border:2px solid var(--neon-purple); border-radius:10px;
-            padding:40px; box-shadow:inset 0 0 30px rgba(153,0,255,.1),var(--glow-pink);
-            margin-bottom:36px;
+            background: var(--bg-card);
+            border: 2px solid var(--neon-purple);
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: inset 0 0 30px rgba(153, 0, 255, .1), var(--glow-pink);
+            margin-bottom: 36px;
         }
 
         /* ── Surface cards ── */
-        .surface-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:32px; }
-        .surface-card {
-            background:var(--bg-card); border-radius:10px; padding:28px; text-align:center;
-            display:flex; flex-direction:column; gap:10px;
+        .surface-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
         }
-        .surface-icon { font-size:38px; }
-        .surface-name { font-size:13px; font-weight:700; letter-spacing:.06em; }
-        .surface-formula { font-family:'Courier New',monospace; font-size:11px; color:var(--text-muted); line-height:1.7; }
-        .surface-desc { font-size:12px; color:var(--text-muted); line-height:1.6; }
+
+        .surface-card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 28px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .surface-icon {
+            font-size: 38px;
+        }
+
+        .surface-name {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .06em;
+        }
+
+        .surface-formula {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        .surface-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
 
         /* ── Principles ── */
-        .principles { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-        .principle-card {
-            background:var(--bg-card); border:1px solid rgba(0,255,255,.12); border-radius:8px;
-            padding:24px; display:flex; flex-direction:column; gap:8px;
+        .principles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
         }
-        .principle-num { font-family:var(--font-arcade); font-size:9px; letter-spacing:2px; color:var(--neon-purple); }
-        .principle-title { font-size:15px; font-weight:700; color:var(--text); }
-        .principle-body { font-size:13px; color:var(--text-muted); line-height:1.7; }
+
+        .principle-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 255, 255, .12);
+            border-radius: 8px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .principle-num {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: var(--neon-purple);
+        }
+
+        .principle-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .principle-body {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
 
         /* ── Game map ── */
-        .game-map { display:flex; flex-direction:column; gap:12px; }
-        .game-row {
-            background:var(--bg-card); border:1px solid rgba(0,255,255,.1); border-radius:8px;
-            padding:18px 24px; display:flex; align-items:center; gap:20px;
-            transition:border-color .2s;
+        .game-map {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
-        .game-row:hover { border-color:rgba(0,255,255,.3); }
-        .game-row-name { font-family:var(--font-arcade); font-size:12px; letter-spacing:2px; color:var(--text); min-width:180px; }
-        .game-row-coord { font-family:'Courier New',monospace; font-size:13px; color:var(--neon-yellow); min-width:160px; }
-        .game-row-desc { font-size:13px; color:var(--text-muted); line-height:1.6; flex:1; }
-        .game-row-link { font-family:var(--font-arcade); font-size:9px; letter-spacing:2px; color:var(--neon-green); text-decoration:none; white-space:nowrap; padding:6px 14px; border:1px solid rgba(0,255,65,.35); border-radius:4px; transition:background .2s; }
-        .game-row-link:hover { background:rgba(0,255,65,.1); }
+
+        .game-row {
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 255, 255, .1);
+            border-radius: 8px;
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: border-color .2s;
+        }
+
+        .game-row:hover {
+            border-color: rgba(0, 255, 255, .3);
+        }
+
+        .game-row-name {
+            font-family: var(--font-arcade);
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: var(--text);
+            min-width: 180px;
+        }
+
+        .game-row-coord {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--neon-yellow);
+            min-width: 160px;
+        }
+
+        .game-row-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            flex: 1;
+        }
+
+        .game-row-link {
+            font-family: var(--font-arcade);
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: var(--neon-green);
+            text-decoration: none;
+            white-space: nowrap;
+            padding: 6px 14px;
+            border: 1px solid rgba(0, 255, 65, .35);
+            border-radius: 4px;
+            transition: background .2s;
+        }
+
+        .game-row-link:hover {
+            background: rgba(0, 255, 65, .1);
+        }
 
         /* ── CTA strip ── */
         .m-cta-strip {
-            text-align:center; padding:80px 40px;
-            border-top:1px solid rgba(0,255,255,.08);
+            text-align: center;
+            padding: 80px 40px;
+            border-top: 1px solid rgba(0, 255, 255, .08);
         }
-        .m-cta-strip p { font-size:16px; color:var(--text-muted); margin-bottom:28px; max-width:540px; margin-left:auto; margin-right:auto; }
+
+        .m-cta-strip p {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-bottom: 28px;
+            max-width: 540px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         .btn-play {
-            display:inline-flex; align-items:center; gap:8px;
-            font-family:var(--font-arcade); font-size:11px; letter-spacing:2px;
-            padding:14px 28px; border-radius:4px; text-decoration:none; cursor:pointer; border:none;
-            background:var(--neon-cyan); color:var(--bg-dark); font-weight:700;
-            box-shadow:var(--glow-cyan); transition:opacity .2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            letter-spacing: 2px;
+            padding: 14px 28px;
+            border-radius: 4px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            font-weight: 700;
+            box-shadow: var(--glow-cyan);
+            transition: opacity .2s;
         }
-        .btn-play:hover { opacity:.88; }
+
+        .btn-play:hover {
+            opacity: .88;
+        }
+
         .btn-ghost {
-            background:transparent; color:var(--neon-purple); border:2px solid var(--neon-purple);
-            box-shadow:var(--glow-pink);
+            background: transparent;
+            color: var(--neon-purple);
+            border: 2px solid var(--neon-purple);
+            box-shadow: var(--glow-pink);
         }
 
         /* ── Footer ── */
-        footer { border-top:1px solid rgba(0,255,255,.1); padding:40px; }
-        .footer-bottom { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; max-width:960px; margin:0 auto; }
-        .footer-copy { font-size:12px; color:var(--text-muted); }
-        .footer-copy span { color:var(--neon-cyan); }
+        footer {
+            border-top: 1px solid rgba(0, 255, 255, .1);
+            padding: 40px;
+        }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .footer-copy {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .footer-copy span {
+            color: var(--neon-cyan);
+        }
 
         /* ── Responsive ── */
         @media (max-width:768px) {
-            nav { padding:0 20px; }
-            .nav-links { display:none; }
-            .m-hero { padding:60px 24px 40px; }
-            .m-section { padding:60px 24px; }
-            .surface-grid { grid-template-columns:1fr; }
-            .principles { grid-template-columns:1fr; }
-            #manifold-surface { height:280px; }
-            .game-row { flex-wrap:wrap; }
-            .game-row-name { min-width:unset; }
-            .game-row-coord { min-width:unset; }
+            nav {
+                padding: 0 20px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .m-hero {
+                padding: 60px 24px 40px;
+            }
+
+            .m-section {
+                padding: 60px 24px;
+            }
+
+            .surface-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .principles {
+                grid-template-columns: 1fr;
+            }
+
+            #manifold-surface {
+                height: 280px;
+            }
+
+            .game-row {
+                flex-wrap: wrap;
+            }
+
+            .game-row-name {
+                min-width: unset;
+            }
+
+            .game-row-coord {
+                min-width: unset;
+            }
         }
     </style>
     <script src="/js/analytics.js"></script>
 </head>
+
 <body>
     <canvas id="gyroid-bg"></canvas>
 
@@ -179,11 +580,11 @@
         <a class="nav-logo" href="/">KEN<span>S</span>GAMES</a>
         <ul class="nav-links">
             <li><a href="/#games">Games</a></li>
-            <li><a href="/#engine">The Engine</a></li>
+            <li><a href="/#engine">Engine</a></li>
             <li><a href="/manifold.html" class="active">Manifold</a></li>
             <li><a href="/#about">About</a></li>
         </ul>
-        <a class="nav-cta" href="/fasttrack/">PLAY FREE &#9654;</a>
+        <a class="nav-cta" href="/fasttrack/">PLAY &#9654;</a>
     </nav>
 
     <!-- ── Hero ── -->
@@ -194,13 +595,14 @@
         </div>
         <p class="m-hero-sub">
             A different way of building software. Not layers, not microservices &mdash; a continuous mathematical
-            surface where every element of a system has a coordinate.
+            surface where key parts of a system share coordinates.
             The governing equation is&nbsp;<code>z&nbsp;=&nbsp;x&nbsp;&middot;&nbsp;y</code>.
         </p>
         <div class="surface-wrap">
             <canvas id="manifold-surface" aria-label="Interactive saddle surface z = x·y. Drag to rotate."></canvas>
             <div class="surface-eq">z&nbsp;=&nbsp;x&nbsp;&middot;&nbsp;y</div>
-            <div class="surface-hint">drag to rotate &nbsp;&#9632;&nbsp; hyperbolic paraboloid &nbsp;&#9632;&nbsp; the core primitive</div>
+            <div class="surface-hint">drag to rotate &nbsp;&#9632;&nbsp; hyperbolic paraboloid &nbsp;&#9632;&nbsp; the
+                core primitive</div>
             <div class="dim-strip">
                 <div class="dim-node">0D</div>
                 <div class="dim-arrow">&#8594;</div>
@@ -230,7 +632,7 @@
             </p>
             <p class="m-body">
                 The governing equation is <code class="inline">z = x &middot; y</code> &mdash;
-                the hyperbolic paraboloid. Every point on that surface is a real thing in the system:
+                the hyperbolic paraboloid. Points on that surface can represent real things in the system:
                 a player, a score, a session, a UI element. What those points represent, and how they relate
                 to each other, is the design.
             </p>
@@ -241,7 +643,7 @@
             </p>
             <p class="m-body" style="margin-bottom:0">
                 The three surfaces below aren&rsquo;t decoration. They do something.
-                The math isn&rsquo;t the theme &mdash; it&rsquo;s the material.
+                The math isn&rsquo;t there to impress &mdash; it helps keep behavior consistent and understandable.
             </p>
         </div>
 
@@ -250,30 +652,35 @@
                 <div class="surface-icon" style="color:var(--neon-cyan)">&#8734;</div>
                 <div class="surface-name" style="color:var(--neon-cyan)">Gyroid Surface</div>
                 <div class="surface-formula">sin(x)cos(y) + sin(y)cos(z)<br>+ sin(z)cos(x) = 0</div>
-                <div class="surface-desc">Infinite. Non-self-intersecting. Minimal. The surface rendering behind every page on this site in real time.</div>
+                <div class="surface-desc">A smooth repeating structure used as the live visual backdrop across the site.
+                </div>
             </div>
             <div class="surface-card" style="border:2px solid rgba(191,0,255,.2)">
                 <div class="surface-icon" style="color:var(--neon-purple)">&#9670;</div>
                 <div class="surface-name" style="color:var(--neon-purple)">Schwartz D-Surface</div>
                 <div class="surface-formula">cos(x)cos(y)cos(z)<br>&minus; sin(x)sin(y)sin(z) = 0</div>
-                <div class="surface-desc">The diamond. Branching factor 4. Drives the structural skeleton &mdash; grid columns, data flow, the shape of the layout.</div>
+                <div class="surface-desc">The structural reference for layout relationships and substrate organization.
+                </div>
             </div>
             <div class="surface-card" style="border:2px solid rgba(0,255,65,.2)">
                 <div class="surface-icon" style="color:var(--neon-green)">&#8960;</div>
                 <div class="surface-name" style="color:var(--neon-green)">Saddle Surface</div>
                 <div class="surface-formula">z = x &middot; y</div>
-                <div class="surface-desc">The primitive. The governing equation. Drag the surface at the top of this page &mdash; that&rsquo;s it. Everything else is built on this.</div>
+                <div class="surface-desc">Core relation model used to map game state and interactions in a consistent
+                    way.</div>
             </div>
         </div>
 
         <p style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.8">
-            &phi;&nbsp;=&nbsp;1.618 &nbsp;&#9632;&nbsp; Fibonacci weights &nbsp;&#9632;&nbsp; Golden ratio spacing &nbsp;&#9632;&nbsp; Procedural audio<br>
-            Pull on any thread and you find the same shape.
+            &phi;&nbsp;=&nbsp;1.618 &nbsp;&#9632;&nbsp; Fibonacci weights &nbsp;&#9632;&nbsp; Golden ratio spacing
+            &nbsp;&#9632;&nbsp; Procedural audio<br>
+            Multiple systems share the same design language, so behavior stays coherent across games.
         </p>
     </div>
 
     <!-- ── Principles ── -->
-    <div class="m-section" style="background:rgba(0,255,255,.015);border-top:1px solid rgba(0,255,255,.07);border-bottom:1px solid rgba(0,255,255,.07)">
+    <div class="m-section"
+        style="background:rgba(0,255,255,.015);border-top:1px solid rgba(0,255,255,.07);border-bottom:1px solid rgba(0,255,255,.07)">
         <div class="m-section-header">
             <div class="m-eyebrow">&#9632; Design Axioms &#9632;</div>
             <h2 class="m-h2">How It Works in Practice</h2>
@@ -281,23 +688,30 @@
         <div class="principles">
             <div class="principle-card">
                 <div class="principle-num">AXIOM 01</div>
-                <div class="principle-title">Everything is a coordinate</div>
-                <div class="principle-body">Players, game events, scores, sessions, UI states &mdash; every entity has a position in the manifold space. There&rsquo;s no separate concept of &ldquo;data&rdquo; vs &ldquo;location&rdquo;. They&rsquo;re the same thing.</div>
+                <div class="principle-title">Core systems use coordinates</div>
+                <div class="principle-body">Players, game events, scores, sessions, and UI states can all be mapped in
+                    the same manifold space, so data relationships are easier to reason about.</div>
             </div>
             <div class="principle-card">
                 <div class="principle-num">AXIOM 02</div>
                 <div class="principle-title">The surface is the architecture</div>
-                <div class="principle-body">Instead of designing a class hierarchy or a service graph, you place things on a surface. The shape of the surface determines how things relate. Change the surface, change the system.</div>
+                <div class="principle-body">Instead of designing a class hierarchy or a service graph, you place things
+                    on a surface. The shape of the surface determines how things relate. Change the surface, change the
+                    system.</div>
             </div>
             <div class="principle-card">
                 <div class="principle-num">AXIOM 03</div>
                 <div class="principle-title">Substrates, not modules</div>
-                <div class="principle-body">Reusable functionality lives in substrates &mdash; dimensional slices of the manifold. Audio, physics, networking, AI each occupy their own substrate. They share one coordinate system, so they compose without plumbing.</div>
+                <div class="principle-body">Reusable functionality lives in substrates &mdash; dimensional slices of the
+                    manifold. Audio, physics, networking, AI each occupy their own substrate. They share one coordinate
+                    system, so they compose without plumbing.</div>
             </div>
             <div class="principle-card">
                 <div class="principle-num">AXIOM 04</div>
                 <div class="principle-title">The rendering is the proof</div>
-                <div class="principle-body">The gyroid you see in the background, the saddle surface above, the golden ratio in the spacing &mdash; the architecture is visible. If you understand what you&rsquo;re looking at, you can read the system from the screen.</div>
+                <div class="principle-body">The gyroid you see in the background, the saddle surface above, the golden
+                    ratio in the spacing &mdash; the architecture is visible. If you understand what you&rsquo;re
+                    looking at, you can read the system from the screen.</div>
             </div>
         </div>
     </div>
@@ -317,31 +731,36 @@
             <div class="game-row">
                 <div class="game-row-name">FastTrack</div>
                 <div class="game-row-coord">z = 3 &times; 45 = 135</div>
-                <div class="game-row-desc">Board strategy. Multiplayer. 2&ndash;4 players on the same coordinate plane, racing across a dynamic surface.</div>
+                <div class="game-row-desc">Board strategy. Multiplayer. 2&ndash;4 players on the same coordinate plane,
+                    racing across a dynamic surface.</div>
                 <a class="game-row-link" href="/fasttrack/">PLAY &#9654;</a>
             </div>
             <div class="game-row">
                 <div class="game-row-name">BrickBreaker 3D</div>
                 <div class="game-row-coord">z = 2 &times; 22 = 44</div>
-                <div class="game-row-desc">Classic reimagined in 3D. The ball&rsquo;s trajectory is a curve on the manifold surface, not a line.</div>
+                <div class="game-row-desc">Classic reimagined in 3D. The ball&rsquo;s trajectory is a curve on the
+                    manifold surface, not a line.</div>
                 <a class="game-row-link" href="/brickbreaker3d/">PLAY &#9654;</a>
             </div>
             <div class="game-row">
                 <div class="game-row-name">Alien Space Attack</div>
                 <div class="game-row-coord">z = 2 &times; 30 = 60</div>
-                <div class="game-row-desc">First-person 3D space combat. Wave logic and AI decision trees derived from saddle surface topology.</div>
+                <div class="game-row-desc">First-person 3D space combat. Wave logic and AI decision trees derived from
+                    saddle surface topology.</div>
                 <a class="game-row-link" href="/starfighter/">PLAY &#9654;</a>
             </div>
             <div class="game-row">
                 <div class="game-row-name">4D TicTacToe</div>
                 <div class="game-row-coord">z = 2 &times; 12 = 24</div>
-                <div class="game-row-desc">3&times;3&times;3&times;3 hypercube. The only game here that lives above 3D on the dimensional axis.</div>
+                <div class="game-row-desc">3&times;3&times;3&times;3 hypercube. The only game here that lives above 3D
+                    on the dimensional axis.</div>
                 <a class="game-row-link" href="/4dtictactoe/">PLAY &#9654;</a>
             </div>
             <div class="game-row">
                 <div class="game-row-name">Assemble</div>
                 <div class="game-row-coord">z = 2 &times; 20 = 40</div>
-                <div class="game-row-desc">Physics builder. Mechanical contraptions where structural integrity is validated against manifold constraints.</div>
+                <div class="game-row-desc">Physics builder. Mechanical contraptions where structural integrity is
+                    validated against manifold constraints.</div>
                 <a class="game-row-link" href="/assemble/">PLAY &#9654;</a>
             </div>
         </div>
@@ -358,7 +777,8 @@
 
     <footer>
         <div class="footer-bottom">
-            <div class="footer-copy"><span>KensGames</span> &copy; 2026 Kenneth Bingham &mdash; All rights reserved</div>
+            <div class="footer-copy"><span>KensGames</span> &copy; 2026 Kenneth Bingham &mdash; All rights reserved
+            </div>
             <div class="footer-copy">No ads &nbsp;&#9632;&nbsp; No tracking &nbsp;&#9632;&nbsp; No pay-to-win</div>
         </div>
     </footer>
@@ -367,4 +787,5 @@
     <script src="/js/manifold.js?v=7"></script>
     <script src="/js/manifold_reality.js" defer></script>
 </body>
+
 </html>
