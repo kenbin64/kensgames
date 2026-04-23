@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KensGames &mdash; Free Arcade Games | kensgames.com</title>
     <meta name="description"
-        content="KensGames &mdash; Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D TicTacToe and Assemble. Free browser games, no installs, no ads. Powered by a geometry-driven engine built from scratch.">
+        content="KensGames &mdash; Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D Connect and Assemble. Free browser games, no installs, no ads. Powered by a geometry-driven engine built from scratch.">
 
     <link rel="icon" href="/assets/masterImageFile/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/assets/masterImageFile/logo_thumbnail.png">
@@ -18,7 +18,7 @@
     <meta property="og:site_name" content="KensGames">
     <meta property="og:title" content="KensGames &mdash; Free Arcade Games | kensgames.com">
     <meta property="og:description"
-        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D TicTacToe and Assemble. Free browser games, no installs, no ads. Powered by a geometry-driven engine built from scratch.">
+        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D Connect and Assemble. Free browser games, no installs, no ads. Powered by a geometry-driven engine built from scratch.">
     <meta property="og:url" content="https://kensgames.com/">
     <meta property="og:image" content="https://kensgames.com/assets/masterImageFile/logo_thumbnail.png">
 
@@ -26,7 +26,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="KensGames &mdash; Free Arcade Games | kensgames.com">
     <meta name="twitter:description"
-        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D TicTacToe and Assemble. Free browser games, no installs, no ads.">
+        content="Play FastTrack, BrickBreaker 3D, Alien Space Attack, 4D Connect and Assemble. Free browser games, no installs, no ads.">
     <meta name="twitter:image" content="https://kensgames.com/assets/masterImageFile/logo_thumbnail.png">
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
@@ -1242,8 +1242,20 @@
            GAME CARDS
            ══════════════════════════════════════ */
         .games-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .featured-stack {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+
+        .secondary-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 30px;
         }
 
@@ -1282,6 +1294,12 @@
             border-color: var(--neon-cyan);
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.25), inset 0 0 20px rgba(0, 255, 255, 0.05);
             transform: translateY(-6px);
+        }
+
+        @media (max-width: 980px) {
+            .secondary-row {
+                grid-template-columns: 1fr;
+            }
         }
 
         @keyframes slideIn {
@@ -2097,7 +2115,8 @@
                 padding: 50px 20px;
             }
 
-            .games-grid {
+            .featured-stack,
+            .secondary-row {
                 grid-template-columns: 1fr;
             }
 
@@ -2265,7 +2284,7 @@
             <span class="marquee-sep">&#9670;</span>
             <span class="marquee-item o">&#9646; Alien Space Attack</span>
             <span class="marquee-sep">&#9670;</span>
-            <span class="marquee-item v">4D TicTacToe</span>
+            <span class="marquee-item v">4D Connect</span>
             <span class="marquee-sep">&#9670;</span>
             <span class="marquee-item c">&#9646; Assemble</span>
             <span class="marquee-sep">&#9670;</span>
@@ -2290,7 +2309,7 @@
             <span class="marquee-sep">&#9670;</span>
             <span class="marquee-item o">&#9646; Alien Space Attack</span>
             <span class="marquee-sep">&#9670;</span>
-            <span class="marquee-item v">4D TicTacToe</span>
+            <span class="marquee-item v">4D Connect</span>
             <span class="marquee-sep">&#9670;</span>
             <span class="marquee-item c">&#9646; Assemble</span>
             <span class="marquee-sep">&#9670;</span>
@@ -2563,216 +2582,230 @@
         </div>
         <div class="games-grid">
 
-            <div class="game-card" id="game-fasttrack">
-                <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
-                    <picture>
-                        <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/fasttrack_lobby.png"
-                            src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy"
-                            decoding="async" fetchpriority="low">
-                    </picture>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
-                </div>
-                <div class="game-info">
-                    <div>
-                        <div class="game-title">FastTrack</div>
-                        <div class="game-meta">
-                            <span class="game-tag">2&ndash;4 Players</span>
-                            <span class="game-tag">Strategy</span>
-                            <span class="game-tag">Board Game</span>
-                        </div>
-                        <div class="game-description">A lightning-fast multiplayer board game where strategy meets
-                            speed. Race your pieces across a dynamic board, block opponents, and play your hand right.
-                            Features 5-Card Draw variant for high-stakes rounds. Skill always wins.</div>
-                    </div>
-                    <div class="game-btns">
-                        <button class="btn-solo" onclick="goToGameSolo('/fasttrack/')">&#9654; PLAY SOLO</button>
-                        <span class="kg-tip-wrap">
-                            <button class="btn-green kg-multi" onclick="goToGameHost('/fasttrack/')">&#128232;
-                                INVITE</button>
-                            <span class="kg-tip" id="tip-card-fasttrack">Sign in to unlock multiplayer</span>
-                        </span>
-                        <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
-                                MULTI</button>
-                            <span class="kg-tip">Sign in to unlock multiplayer</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="game-card" id="game-brickbreaker">
-                <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#0a0518);">
-                    <picture>
-                        <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_landing.png"
-                            src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
-                            loading="lazy" decoding="async" fetchpriority="low">
-                    </picture>
-                    <div class="thumb-strip" aria-hidden="true">
+            <div class="featured-stack">
+                <div class="game-card" id="game-fasttrack">
+                    <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
                         <picture>
-                            <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_lobby.png"
-                                src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby"
-                                loading="lazy" decoding="async" fetchpriority="low">
+                            <source srcset="/assets/masterImageFile/fasttrack_lobby.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/fasttrack_lobby.png"
+                                src="/assets/masterImageFile/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy"
+                                decoding="async" fetchpriority="low">
                         </picture>
+                        <span class="game-badge badge-live">&#9679; LIVE</span>
                     </div>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
-                </div>
-                <div class="game-info">
-                    <div>
-                        <div class="game-title">BrickBreaker 3D</div>
-                        <div class="game-meta">
-                            <span class="game-tag">Solo</span>
-                            <span class="game-tag">Multiplayer</span>
-                            <span class="game-tag">Arcade</span>
+                    <div class="game-info">
+                        <div>
+                            <div class="game-title">FastTrack</div>
+                            <div class="game-meta">
+                                <span class="game-tag">2&ndash;4 Players</span>
+                                <span class="game-tag">Strategy</span>
+                                <span class="game-tag">Board Game</span>
+                            </div>
+                            <div class="game-description">A lightning-fast multiplayer board game where strategy meets
+                                speed. Race your pieces across a dynamic board, block opponents, and play your hand
+                                right.
+                                Features 5-Card Draw variant for high-stakes rounds. Skill always wins.</div>
                         </div>
-                        <div class="game-description">The classic reimagined in full 3D. Walls of bricks stretch into
-                            depth &mdash; your ball curves through space. Power-ups warp physics. Global leaderboard
-                            tracks every point. Solo or head-to-head: who clears the board fastest?</div>
-                    </div>
-                    <div class="game-btns">
-                        <button class="btn-solo" onclick="goToGameSolo('/brickbreaker3d/')">&#9654; PLAY SOLO</button>
-                        <span class="kg-tip-wrap">
-                            <button class="btn-green kg-multi" onclick="goToGameHost('/brickbreaker3d/')">&#128232;
-                                INVITE</button>
-                            <span class="kg-tip" id="tip-card-brickbreaker">Sign in to unlock multiplayer</span>
-                        </span>
-                        <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
-                                MULTI</button>
-                            <span class="kg-tip">Sign in to unlock multiplayer</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="game-card" id="game-starfighter">
-                <div class="game-image" style="background:linear-gradient(135deg,#0a1a2d,#020814);">
-                    <picture>
-                        <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/starfighter_landing.png"
-                            src="/assets/masterImageFile/starfighter_landing.png" alt="Alien Space Attack"
-                            loading="lazy" decoding="async" fetchpriority="low">
-                    </picture>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
-                </div>
-                <div class="game-info">
-                    <div>
-                        <div class="game-title">Alien Space Attack</div>
-                        <div class="game-meta">
-                            <span class="game-tag">First Person</span>
-                            <span class="game-tag">Space Combat</span>
-                            <span class="game-tag">3D</span>
-                        </div>
-                        <div class="game-description">Strap in. First-person deep-space combat rendered in real-time 3D.
-                            Waves of alien formations advance with tactical intelligence. Dodge, strafe, and blast your
-                            way to the top of the galactic kill board.</div>
-                    </div>
-                    <div>
                         <div class="game-btns">
-                            <button class="btn-solo" onclick="goToGameSolo('/starfighter/')">&#9654; PLAY SOLO</button>
+                            <button class="btn-solo" onclick="goToGameSolo('/fasttrack/')">&#9654; PLAY SOLO</button>
                             <span class="kg-tip-wrap">
-                                <button class="btn-green kg-multi" onclick="goToGameHost('/starfighter/')">&#128232;
+                                <button class="btn-green kg-multi" onclick="goToGameHost('/fasttrack/')">&#128232;
                                     INVITE</button>
-                                <span class="kg-tip" id="tip-card-starfighter">Sign in to unlock multiplayer</span>
+                                <span class="kg-tip" id="tip-card-fasttrack">Sign in to unlock multiplayer</span>
                             </span>
                             <span class="kg-tip-wrap" style="flex:1;">
-                                <button class="btn-green kg-multi" onclick="goToGame('/starfighter/')">&#9654;&#9654;
+                                <button class="btn-green kg-multi" onclick="goToGame('/fasttrack/')">&#9654;&#9654;
                                     MULTI</button>
                                 <span class="kg-tip">Sign in to unlock multiplayer</span>
                             </span>
                         </div>
-                        <div class="game-download-link">
-                            or download for
-                            <a href="/starfighter/downloads/Starfighter-Setup.exe">Windows</a> |
-                            <a href="/starfighter/downloads/Starfighter.dmg">Mac</a> |
-                            <a href="/starfighter/downloads/Starfighter.AppImage">Linux</a>
-                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" id="game-tictactoe">
-                <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
-                    <picture>
-                        <source srcset="/assets/masterImageFile/manifold.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/manifold.png"
-                            src="/assets/masterImageFile/manifold.png" alt="4D Connect" loading="lazy" decoding="async"
-                            fetchpriority="low">
-                    </picture>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
-                </div>
-                <div class="game-info">
-                    <div>
-                        <div class="game-title">4D Connect</div>
-                        <div class="game-meta">
-                            <span class="game-tag">1&ndash;4 Players</span>
-                            <span class="game-tag">Strategy</span>
-                            <span class="game-tag">Hypercube</span>
-                        </div>
-                        <div class="game-description">TicTacToe in three and four dimensions. A
-                            3&times;3&times;3&times;3 hypercube with 76 winning lines your brain can't visualize. Play
-                            solo against the AI, pass-and-play locally, or challenge a friend online.</div>
-                    </div>
-                    <div class="game-btns">
-                        <button class="btn-solo" onclick="goToGameSolo('/4dconnect/')">&#9654; PLAY SOLO</button>
-                        <span class="kg-tip-wrap">
-                            <button class="btn-green kg-multi" onclick="goToGameHost('/4dconnect/')">&#128232;
-                                INVITE</button>
-                            <span class="kg-tip" id="tip-card-4d">Sign in to unlock multiplayer</span>
-                        </span>
-                        <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/4dconnect/')">&#9654;&#9654;
-                                MULTI</button>
-                            <span class="kg-tip">Sign in to unlock multiplayer</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="game-card" id="game-assemble">
-                <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
-                    <picture>
-                        <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_landing.png"
-                            src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
-                            decoding="async" fetchpriority="low">
-                    </picture>
-                    <div class="thumb-strip" aria-hidden="true">
+                <div class="game-card" id="game-starfighter">
+                    <div class="game-image" style="background:linear-gradient(135deg,#0a1a2d,#020814);">
                         <picture>
-                            <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_lobby.png"
-                                src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble lobby" loading="lazy"
+                            <source srcset="/assets/masterImageFile/starfighter_landing.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/starfighter_landing.png"
+                                src="/assets/masterImageFile/starfighter_landing.png" alt="Spacefighter" loading="lazy"
                                 decoding="async" fetchpriority="low">
                         </picture>
+                        <span class="game-badge badge-live">&#9679; LIVE</span>
                     </div>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
-                </div>
-                <div class="game-info">
-                    <div>
-                        <div class="game-title">Assemble</div>
-                        <div class="game-meta">
-                            <span class="game-tag">1 Player</span>
-                            <span class="game-tag">Physics</span>
-                            <span class="game-tag">Builder</span>
+                    <div class="game-info">
+                        <div>
+                            <div class="game-title">Spacefighter</div>
+                            <div class="game-meta">
+                                <span class="game-tag">First Person</span>
+                                <span class="game-tag">Space Combat</span>
+                                <span class="game-tag">3D</span>
+                            </div>
+                            <div class="game-description">Strap in. First-person deep-space combat rendered in real-time
+                                3D.
+                                Waves of alien formations advance with tactical intelligence. Dodge, strafe, and blast
+                                your
+                                way to the top of the galactic kill board.</div>
                         </div>
-                        <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical and
-                            electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally
-                            sound, it runs. If not, watch it fail spectacularly.</div>
+                        <div>
+                            <div class="game-btns">
+                                <button class="btn-solo" onclick="goToGameSolo('/starfighter/')">&#9654; PLAY
+                                    SOLO</button>
+                                <span class="kg-tip-wrap">
+                                    <button class="btn-green kg-multi" onclick="goToGameHost('/starfighter/')">&#128232;
+                                        INVITE</button>
+                                    <span class="kg-tip" id="tip-card-starfighter">Sign in to unlock multiplayer</span>
+                                </span>
+                                <span class="kg-tip-wrap" style="flex:1;">
+                                    <button class="btn-green kg-multi"
+                                        onclick="goToGame('/starfighter/')">&#9654;&#9654;
+                                        MULTI</button>
+                                    <span class="kg-tip">Sign in to unlock multiplayer</span>
+                                </span>
+                            </div>
+                            <div class="game-download-link">
+                                or download for
+                                <a href="/starfighter/downloads/Starfighter-Setup.exe">Windows</a> |
+                                <a href="/starfighter/downloads/Starfighter.dmg">Mac</a> |
+                                <a href="/starfighter/downloads/Starfighter.AppImage">Linux</a>
+                            </div>
+                        </div>
                     </div>
-                    <div class="game-btns">
-                        <button class="btn-solo" onclick="goToGameSolo('/assemble/')">&#9654; PLAY SOLO</button>
-                        <span class="kg-tip-wrap">
-                            <button class="btn-green kg-multi" onclick="goToGameHost('/assemble/')">&#128232;
-                                INVITE</button>
-                            <span class="kg-tip" id="tip-card-assemble-invite">Sign in to unlock multiplayer</span>
-                        </span>
-                        <span class="kg-tip-wrap" style="flex:1;">
-                            <button class="btn-green kg-multi" onclick="goToGame('/assemble/')">&#9654;&#9654;
-                                MULTI</button>
-                            <span class="kg-tip" id="tip-card-assemble">Sign in to unlock multiplayer</span>
-                        </span>
+                </div>
+            </div>
+
+            <div class="secondary-row">
+                <div class="game-card" id="game-brickbreaker">
+                    <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#0a0518);">
+                        <picture>
+                            <source srcset="/assets/masterImageFile/brickbreaker3D_landing.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_landing.png"
+                                src="/assets/masterImageFile/brickbreaker3D_landing.png" alt="BrickBreaker 3D"
+                                loading="lazy" decoding="async" fetchpriority="low">
+                        </picture>
+                        <div class="thumb-strip" aria-hidden="true">
+                            <picture>
+                                <source srcset="/assets/masterImageFile/brickbreaker3D_lobby.webp" type="image/webp">
+                                <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/brickbreaker3D_lobby.png"
+                                    src="/assets/masterImageFile/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby"
+                                    loading="lazy" decoding="async" fetchpriority="low">
+                            </picture>
+                        </div>
+                        <span class="game-badge badge-live">&#9679; LIVE</span>
+                    </div>
+                    <div class="game-info">
+                        <div>
+                            <div class="game-title">BrickBreaker 3D</div>
+                            <div class="game-meta">
+                                <span class="game-tag">Solo</span>
+                                <span class="game-tag">Multiplayer</span>
+                                <span class="game-tag">Arcade</span>
+                            </div>
+                            <div class="game-description">The classic reimagined in full 3D. Walls of bricks stretch
+                                into
+                                depth &mdash; your ball curves through space. Power-ups warp physics. Global leaderboard
+                                tracks every point. Solo or head-to-head: who clears the board fastest?</div>
+                        </div>
+                        <div class="game-btns">
+                            <button class="btn-solo" onclick="goToGameSolo('/brickbreaker3d/')">&#9654; PLAY
+                                SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="btn-green kg-multi" onclick="goToGameHost('/brickbreaker3d/')">&#128232;
+                                    INVITE</button>
+                                <span class="kg-tip" id="tip-card-brickbreaker">Sign in to unlock multiplayer</span>
+                            </span>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="btn-green kg-multi" onclick="goToGame('/brickbreaker3d/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock multiplayer</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="game-card" id="game-4dconnect">
+                    <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
+                        <picture>
+                            <source srcset="/assets/masterImageFile/manifold.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/manifold.png"
+                                src="/assets/masterImageFile/manifold.png" alt="4D Connect" loading="lazy"
+                                decoding="async" fetchpriority="low">
+                        </picture>
+                        <span class="game-badge badge-live">&#9679; LIVE</span>
+                    </div>
+                    <div class="game-info">
+                        <div>
+                            <div class="game-title">4D Connect</div>
+                            <div class="game-meta">
+                                <span class="game-tag">1&ndash;4 Players</span>
+                                <span class="game-tag">Strategy</span>
+                                <span class="game-tag">Hypercube</span>
+                            </div>
+                            <div class="game-description">Connect four in three and four dimensions. A
+                                3&times;3&times;3&times;3 hypercube with 76 winning lines your brain can't visualize.
+                                Play
+                                solo against the AI, pass-and-play locally, or challenge a friend online.</div>
+                        </div>
+                        <div class="game-btns">
+                            <button class="btn-solo" onclick="goToGameSolo('/4dconnect/')">&#9654; PLAY SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="btn-green kg-multi" onclick="goToGameHost('/4dconnect/')">&#128232;
+                                    INVITE</button>
+                                <span class="kg-tip" id="tip-card-4d">Sign in to unlock multiplayer</span>
+                            </span>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="btn-green kg-multi" onclick="goToGame('/4dconnect/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip">Sign in to unlock multiplayer</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="game-card" id="game-assemble">
+                    <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
+                        <picture>
+                            <source srcset="/assets/masterImageFile/assembler_landing.webp" type="image/webp">
+                            <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_landing.png"
+                                src="/assets/masterImageFile/assembler_landing.png" alt="Assemble" loading="lazy"
+                                decoding="async" fetchpriority="low">
+                        </picture>
+                        <div class="thumb-strip" aria-hidden="true">
+                            <picture>
+                                <source srcset="/assets/masterImageFile/assembler_lobby.webp" type="image/webp">
+                                <img data-imgatlas="auto" data-pngsrc="/assets/masterImageFile/assembler_lobby.png"
+                                    src="/assets/masterImageFile/assembler_lobby.png" alt="Assemble lobby"
+                                    loading="lazy" decoding="async" fetchpriority="low">
+                            </picture>
+                        </div>
+                        <span class="game-badge badge-live">&#9679; LIVE</span>
+                    </div>
+                    <div class="game-info">
+                        <div>
+                            <div class="game-title">Assemble</div>
+                            <div class="game-meta">
+                                <span class="game-tag">1 Player</span>
+                                <span class="game-tag">Physics</span>
+                                <span class="game-tag">Builder</span>
+                            </div>
+                            <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical
+                                and
+                                electrical parts. Connect gears, motors, pistons, circuits. If your design is
+                                structurally
+                                sound, it runs. If not, watch it fail spectacularly.</div>
+                        </div>
+                        <div class="game-btns">
+                            <button class="btn-solo" onclick="goToGameSolo('/assemble/')">&#9654; PLAY SOLO</button>
+                            <span class="kg-tip-wrap">
+                                <button class="btn-green kg-multi" onclick="goToGameHost('/assemble/')">&#128232;
+                                    INVITE</button>
+                                <span class="kg-tip" id="tip-card-assemble-invite">Sign in to unlock multiplayer</span>
+                            </span>
+                            <span class="kg-tip-wrap" style="flex:1;">
+                                <button class="btn-green kg-multi" onclick="goToGame('/assemble/')">&#9654;&#9654;
+                                    MULTI</button>
+                                <span class="kg-tip" id="tip-card-assemble">Sign in to unlock multiplayer</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3293,7 +3326,7 @@
                 </div>
 
                 <div class="substrate-row">
-                    <div class="sub-game">4D TicTacToe</div>
+                    <div class="sub-game">4D Connect</div>
                     <div class="sub-count"><span class="sub-pill sub-pill-yellow">1</span> module</div>
                     <div class="sub-bytes">2 KB</div>
                     <div class="sub-tags">

@@ -1,7 +1,7 @@
 {
   "manifold": "4dconnect",
   "name": "4D Connect",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "status": "production",
   "dimension": {
     "x": 2,
@@ -12,12 +12,85 @@
   "entry": "game.html",
   "lobby": "lobby/",
   "substrates": {
-    "board": "inline:4DBoard",
-    "moves": "inline:MovementRules",
-    "win": "inline:WinCondition",
-    "render": "inline:CanvasRenderer"
+    "plane": "manifold.js:BoardManifold",
+    "height": "manifold.js:Turns",
+    "render": "game.js:CanvasRenderer",
+    "_note": "plane = 3D board lattice; height = 4D turn deltas. game.js is thin: input -> substrate.apply() -> lens -> render."
   },
-  "_note": "Single-file gameplay page — all substrates are inline in game.html. Manifold refactor will extract them.",
+  "attributes": {
+    "grid": 4,
+    "players": [
+      {
+        "id": 1,
+        "name": "PLAYER 1",
+        "color": "#2266ff",
+        "glow": "0x2266ff"
+      },
+      {
+        "id": 2,
+        "name": "PLAYER 2",
+        "color": "#ff2200",
+        "glow": "0xff2200"
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "classic",
+        "name": "CLASSIC",
+        "icon": "&#9679;",
+        "winLen": 4,
+        "modes": "all",
+        "special": null,
+        "desc": "4 in a row — any direction.\n76 possible winning lines."
+      },
+      {
+        "id": "blitz",
+        "name": "BLITZ 3",
+        "icon": "&#9889;",
+        "winLen": 3,
+        "modes": "all",
+        "special": null,
+        "desc": "First to 3 in a row wins.\nFast games, sneaky angles."
+      },
+      {
+        "id": "diagonal",
+        "name": "DIAGONAL",
+        "icon": "&#10020;",
+        "winLen": 4,
+        "modes": "diag",
+        "special": null,
+        "desc": "Only diagonal lines score.\nPure spatial mastery."
+      },
+      {
+        "id": "cube",
+        "name": "CUBE QUEST",
+        "icon": "&#11035;",
+        "winLen": 4,
+        "modes": "all",
+        "special": "cube",
+        "desc": "First to fill a 2x2x2\ncube of your pieces wins."
+      },
+      {
+        "id": "territory",
+        "name": "TERRITORY",
+        "icon": "&#9675;",
+        "winLen": 4,
+        "modes": "all",
+        "special": "territory",
+        "desc": "Fill the board — most\nwinning combos wins."
+      },
+      {
+        "id": "speed",
+        "name": "SPEED DROP",
+        "icon": "&#9203;",
+        "winLen": 4,
+        "modes": "all",
+        "special": null,
+        "timer": 10,
+        "desc": "10 seconds per turn.\nMiss it — forfeit the drop!"
+      }
+    ]
+  },
   "manifold_bridge": {
     "entry_var": "window.__MANIFOLD__",
     "schema_version": "1.0",
@@ -25,15 +98,21 @@
       "boardState",
       "currentPlayer",
       "winner",
-      "dimension"
+      "dimension",
+      "turns"
     ]
   },
   "build": {
     "assets": [
       "game.html",
+      "game.js",
+      "manifold.js",
+      "manifold.game.json",
+      "style.css",
       "index.html",
       "lobby.html",
-      "lobby/**"
+      "lobby/**",
+      "assets/**"
     ]
   },
   "deploy": {
@@ -41,14 +120,19 @@
     "type": "static"
   },
   "manifold_compatibility": {
-    "bridge_included": false,
-    "state_exposed": false,
-    "postmessage_protocol": false,
+    "bridge_included": true,
+    "state_exposed": true,
+    "postmessage_protocol": true,
+    "substrate_refactor": {
+      "plane_substrate": "done -- BoardManifold owns 3D cell lattice + lenses (findLine, checkCube, countAllLines, countThreats, checkWin, columnFull, lowestFree, place, reset, snapshot, restore, boardFull, filled, dirLabel, openColumns)",
+      "height_substrate": "done -- Turns owns 4D turn deltas with O(1) indexes (counts, scores, streaks, logs) via database-index pattern",
+      "rules_moved": "done -- game.js no longer duplicates board/dir/win logic; calls BM.* and TS.*",
+      "scenarios_as_attribute": "done -- SCENARIOS array lives in manifold.game.json:attributes.scenarios, loaded via fetch at bootstrap",
+      "thin_shell_html": "done -- game.html is 103 lines, scaffold + script tags only",
+      "procedural_geometry": "done -- connect4.glb (27.4 MB) replaced by Schwartz-P minimal surface from m=x*y*z; jupiter.glb (3.5 MB) replaced by banded SphereGeometry; GLTFLoader removed from runtime"
+    },
     "todo": [
-      "Extract inline JS into separate substrate files",
-      "Include js/manifold_bridge.js in game.html",
-      "Emit window.__MANIFOLD__ with boardState and currentPlayer",
-      "Wire postMessage events to ManifoldBridge.emit()"
+      "Consolidate CSS: deduplicate per-game arcade theme against shared palette/fonts when available"
     ]
   }
 }

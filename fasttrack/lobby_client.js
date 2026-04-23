@@ -59,9 +59,6 @@ function isGuestToken(token) {
 function ensureUserTokenFromAccess() {
     // CF Access bridge removed — returns existing localStorage token.
     return Promise.resolve(getSiteAuthToken());
-} catch (e) {
-    return existing;
-}
 }
 
 function getSiteUsernameFallback() {
@@ -128,6 +125,14 @@ function connectToLobby() {
             state.reconnectAttempts = 0;
             showToast('Connected to lobby', 'success');
 
+            // Start keep-alive ping (clear any prior handle from a previous connection)
+            if (state.pingInterval) clearInterval(state.pingInterval);
+            state.pingInterval = setInterval(() => {
+                if (state.connected) {
+                    send({ type: 'ping' });
+                }
+            }, 30000);
+
             // Reuse existing site login across all games (SSO: Access → JWT)
             ensureUserTokenFromAccess().finally(() => autoAuthenticateToLobby());
         };
@@ -136,6 +141,12 @@ function connectToLobby() {
             console.log('[Lobby] Disconnected from server');
             state.connected = false;
             state._authSent = false;
+
+            // Stop keep-alive ping; onopen will restart it on reconnect
+            if (state.pingInterval) {
+                clearInterval(state.pingInterval);
+                state.pingInterval = null;
+            }
 
             if (state.reconnectAttempts < LOBBY_CONFIG.maxReconnectAttempts) {
                 state.reconnectAttempts++;
@@ -2711,15 +2722,19 @@ function init() {
         chatState.optedOut = true;
     }
 
-    // Connect to lobby
+    // Connect to lobby (ping interval is started/stopped by socket onopen/onclose)
     connectToLobby();
 
-    // Ping every 30 seconds to keep connection alive
-    setInterval(() => {
-        if (state.connected) {
-            send({ type: 'ping' });
+    // Tear down ping interval and socket on page unload to avoid stale handles
+    window.addEventListener('beforeunload', () => {
+        if (state.pingInterval) {
+            clearInterval(state.pingInterval);
+            state.pingInterval = null;
         }
-    }, 30000);
+        if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+            try { state.socket.close(); } catch (_) { /* ignore */ }
+        }
+    });
 }
 
 // Start

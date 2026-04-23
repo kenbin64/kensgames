@@ -170,9 +170,13 @@
     const sessionId = params.get('session');
     const sessionBots = parseInt(params.get('bots') || '0');
     const isGuest = params.get('guest') === 'true';
-    const offlineFlag = params.get('offline') === 'true';
-    const explicitMode = params.get('mode') || '';
-    const VALID_MODES = ['easy', 'hard', 'multi2', 'multi3', 'multi4'];
+    const offlineMode = params.get('offline') === 'true';
+    const autoStart = params.get('autostart') === '1' || params.get('launch') === '1';
+
+    // Force bare solo URLs through the unified /play flow so difficulty/bots are set.
+    if (offlineMode && !sessionId && !autoStart) {
+      window.location.replace('/play/?game=brickbreaker3d&mode=solo');
+    }
 
     if (sessionId) {
       document.getElementById('session-actions').style.display = 'block';
@@ -183,6 +187,17 @@
     function startFromSession() {
       const totalPlayers = 1 + sessionBots;
       let mode = 'easy';
+      if (totalPlayers >= 4) mode = 'multi4';
+      else if (totalPlayers >= 3) mode = 'multi3';
+      else if (totalPlayers >= 2) mode = 'multi2';
+      startGame(mode);
+    }
+
+    function startOfflineAuto() {
+      const difficulty = (params.get('difficulty') || 'easy').toLowerCase();
+      const bots = Math.max(0, parseInt(params.get('bots') || '0', 10) || 0);
+      let mode = (difficulty === 'hard') ? 'hard' : 'easy';
+      const totalPlayers = 1 + bots;
       if (totalPlayers >= 4) mode = 'multi4';
       else if (totalPlayers >= 3) mode = 'multi3';
       else if (totalPlayers >= 2) mode = 'multi2';
@@ -206,17 +221,14 @@
 
     bindMenuButtons();
 
-    // Auto-launch priorities: explicit mode > session > offline flag (defaults to easy)
-    const autoMode = VALID_MODES.includes(explicitMode) ? explicitMode
-      : (offlineFlag && !sessionId ? 'easy' : null);
-
+    // Auto-launch: multiplayer session > unified solo flow.
     if (sessionId) {
       window.addEventListener('load', function () {
         startFromSession();
       });
-    } else if (autoMode) {
+    } else if (offlineMode && autoStart) {
       window.addEventListener('load', function () {
-        if (typeof window.startGame === 'function') window.startGame(autoMode);
+        startOfflineAuto();
       });
     }
   </script>

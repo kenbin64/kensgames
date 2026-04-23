@@ -794,6 +794,59 @@
       </div>
     </div>
 
+    <!-- Phase: Solo Setup (unified flow for all solo-capable games) -->
+    <div class="phase" id="phase-solo-setup">
+      <p class="section-title">Solo Setup</p>
+      <div class="settings-list">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Difficulty</div>
+            <div class="setting-hint">Applies where supported</div>
+          </div>
+          <select class="setting-select" id="solo-difficulty">
+            <option value="easy" selected>Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="setting-row" id="solo-row-bots">
+          <div>
+            <div class="setting-label">AI Bots</div>
+            <div class="setting-hint">How many bots to add</div>
+          </div>
+          <select class="setting-select" id="solo-bots">
+            <option value="0" selected>0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </div>
+        <div class="setting-row" id="solo-row-music">
+          <div>
+            <div class="setting-label">Music</div>
+            <div class="setting-hint">Start with music on/off</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="solo-music" checked>
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+        <div class="setting-row" id="solo-row-sound">
+          <div>
+            <div class="setting-label">Sound FX</div>
+            <div class="setting-hint">Start with effects on/off</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="solo-sfx" checked>
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+      <button class="btn btn-launch btn-full" onclick="launchSoloConfigured()">🚀 Launch Solo Game</button>
+      <a href="/" class="btn btn-secondary btn-full" style="margin-top:0.5rem;display:block;text-align:center;">← Back
+        to Games</a>
+    </div>
+
     <!-- Phase: Join by code (no code in URL yet) -->
     <div class="phase" id="phase-join-input">
       <p class="section-title">Enter Game Code</p>
@@ -1018,6 +1071,8 @@
         minPlayers: 2, maxPlayers: 4,
         defaultMaxPlayers: 4,
         allowBots: true,
+        supportsSoloSetup: true,
+        supportsAudioPrefs: true,
         sessionStoragePrefix: 'ft',
         launchParams: (session, me, myEmoji, wsUrl) => ({
           session: session.session_id,
@@ -1036,6 +1091,8 @@
         minPlayers: 2, maxPlayers: 4,
         defaultMaxPlayers: 4,
         allowBots: false,
+        supportsSoloSetup: true,
+        supportsAudioPrefs: false,
         launchParams: (session, me, myEmoji, wsUrl) => ({
           session: session.session_id,
           multiplayer: 'true',
@@ -1051,6 +1108,8 @@
         minPlayers: 1, maxPlayers: 4,
         defaultMaxPlayers: 4,
         allowBots: true,
+        supportsSoloSetup: true,
+        supportsAudioPrefs: true,
         launchParams: (session, me, myEmoji, wsUrl) => ({
           session: session.session_id,
           multiplayer: 'true',
@@ -1067,6 +1126,8 @@
         minPlayers: 2, maxPlayers: 2,
         defaultMaxPlayers: 2,
         allowBots: true,
+        supportsSoloSetup: true,
+        supportsAudioPrefs: true,
         launchParams: (session, me, myEmoji, wsUrl) => {
           const p = {
             session: session.session_id,
@@ -1089,6 +1150,8 @@
         minPlayers: 2, maxPlayers: 6,
         defaultMaxPlayers: 4,
         allowBots: false,
+        supportsSoloSetup: false,
+        supportsAudioPrefs: false,
         launchParams: (session, me, myEmoji, wsUrl) => ({
           session: session.session_id,
           multiplayer: 'true',
@@ -1210,13 +1273,18 @@
         }
       }
 
-      // Solo: skip setup page entirely, redirect immediately
+      // Solo: unified setup flow for all games except explicit bypass games
       if (MODE === 'solo') {
-        if (GAME_INFO?.soloUrl) {
-          window.location.replace(GAME_INFO.soloUrl);
-        } else {
+        if (!GAME_INFO?.soloUrl) {
           showError('Solo mode not configured for this game.');
+          return;
         }
+        if (GAME_INFO.supportsSoloSetup === false) {
+          window.location.replace(GAME_INFO.soloUrl);
+          return;
+        }
+        initSoloSetup();
+        showPhase('solo-setup');
         return;
       }
 
@@ -1985,6 +2053,7 @@
       const idMap = {
         loading: 'phase-loading',
         auth: 'phase-auth',
+        'solo-setup': 'phase-solo-setup',
         'join-input': 'phase-join-input',
         'join-confirm': 'phase-join-confirm',
         'multi-menu': 'phase-multi-menu',
@@ -2022,6 +2091,74 @@
     function showError(msg) {
       document.getElementById('error-msg').textContent = msg;
       showPhase('error');
+    }
+
+    // =============================================================================
+    // Unified Solo Setup + Launch
+    // =============================================================================
+    function initSoloSetup() {
+      const botsRow = document.getElementById('solo-row-bots');
+      const botsSel = document.getElementById('solo-bots');
+      const botsHint = botsRow.querySelector('.setting-hint');
+      const supportsBots = GAME_INFO?.allowBots === true;
+
+      if (supportsBots) {
+        const maxBots = Math.max(0, Math.min(3, (GAME_INFO.maxPlayers || 4) - 1));
+        botsSel.innerHTML = '';
+        for (let n = 0; n <= maxBots; n++) {
+          const opt = document.createElement('option');
+          opt.value = String(n);
+          opt.textContent = String(n);
+          if (n === 1) opt.selected = true;
+          botsSel.appendChild(opt);
+        }
+        botsSel.disabled = false;
+        botsHint.textContent = 'How many bots to add';
+      } else {
+        botsSel.innerHTML = '<option value="0" selected>0</option>';
+        botsSel.disabled = true;
+        botsHint.textContent = 'Not available for this game';
+      }
+    }
+
+    function applyGlobalAudioPrefs(musicOn, sfxOn) {
+      try {
+        localStorage.setItem('kg_pref_music', musicOn ? '1' : '0');
+        localStorage.setItem('kg_pref_sfx', sfxOn ? '1' : '0');
+      } catch (_) { }
+    }
+
+    function launchSoloConfigured() {
+      if (!GAME_INFO?.soloUrl) {
+        showError('Solo mode not configured for this game.');
+        return;
+      }
+
+      const difficulty = document.getElementById('solo-difficulty').value || 'easy';
+      const bots = parseInt(document.getElementById('solo-bots').value || '0', 10) || 0;
+      const musicOn = document.getElementById('solo-music').checked;
+      const sfxOn = document.getElementById('solo-sfx').checked;
+      applyGlobalAudioPrefs(musicOn, sfxOn);
+
+      const url = new URL(GAME_INFO.soloUrl, location.origin);
+      url.searchParams.set('launch', '1');
+      url.searchParams.set('difficulty', difficulty);
+      url.searchParams.set('bots', String(Math.max(0, bots)));
+      url.searchParams.set('music', musicOn ? '1' : '0');
+      url.searchParams.set('sfx', sfxOn ? '1' : '0');
+
+      if (GAME_ID === 'fasttrack') {
+        url.searchParams.set('offline', 'true');
+        url.searchParams.set('ai_players', String(Math.max(0, bots)));
+        url.searchParams.set('ai_level', difficulty === 'hard' ? 'hard' : (difficulty === 'easy' ? 'easy' : 'medium'));
+      }
+
+      if (GAME_ID === 'brickbreaker3d') {
+        url.searchParams.set('offline', 'true');
+        url.searchParams.set('autostart', '1');
+      }
+
+      window.location.href = url.pathname + url.search;
     }
 
     // =============================================================================
