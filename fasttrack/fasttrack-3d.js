@@ -1398,6 +1398,52 @@ function createBilliardRoom() {
   floor.receiveShadow = true;
   scene.add(floor);
 
+  // ── PERSIAN RUG — hexagonal, sits on the floor directly under the table ──
+  // Same vertex angles AND outer radius as the hex billiard table's cushion
+  // rail (createHexBilliardTable) so the rug footprint matches the table
+  // footprint exactly — corners line up dead-on when viewed from above.
+  {
+    const rugShape = new THREE.Shape();
+    const RUG_RADIUS = BOARD_RADIUS + RAIL_WIDTH + 25; // == table rail outer R
+    for (let i = 0; i < 6; i++) {
+      const angle = (i * Math.PI / 3) - Math.PI / 6;
+      const x = Math.cos(angle) * RUG_RADIUS;
+      const y = Math.sin(angle) * RUG_RADIUS;
+      if (i === 0) rugShape.moveTo(x, y); else rugShape.lineTo(x, y);
+    }
+    rugShape.closePath();
+
+    const rugGeo = new THREE.ShapeGeometry(rugShape);
+    // Re-map UVs so the persianrug.png fills the hex bounding box exactly
+    // (default ShapeGeometry UVs use raw vertex coords, which would tile).
+    const pos = rugGeo.attributes.position;
+    const minX = -RUG_RADIUS * Math.cos(Math.PI / 6); // -0.866 R
+    const maxX = RUG_RADIUS * Math.cos(Math.PI / 6);  // +0.866 R
+    const minY = -RUG_RADIUS;
+    const maxY = RUG_RADIUS;
+    const uvs = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      uvs[i * 2] = (pos.getX(i) - minX) / (maxX - minX);
+      uvs[i * 2 + 1] = (pos.getY(i) - minY) / (maxY - minY);
+    }
+    rugGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    rugGeo.rotateX(-Math.PI / 2); // lay flat on the floor
+
+    const rugTex = new THREE.TextureLoader().load('assets/images/persianrug.png');
+    rugTex.colorSpace = THREE.SRGBColorSpace;
+    rugTex.anisotropy = (renderer && renderer.capabilities) ? renderer.capabilities.getMaxAnisotropy() : 1;
+    const rugMat = new THREE.MeshStandardMaterial({
+      map: rugTex,
+      roughness: 0.92,
+      metalness: 0.0,
+      color: 0xffffff
+    });
+    const rug = new THREE.Mesh(rugGeo, rugMat);
+    rug.position.y = floor.position.y + 0.05; // just above floor to avoid z-fight
+    rug.receiveShadow = true;
+    scene.add(rug);
+  }
+
   // ── CEILING — black void with procedural starfield ──
   // Stars in cyan, green, purple, yellow, white — 80s wizard night sky.
   const ceilGeo = new THREE.PlaneGeometry(ROOM_WIDTH, ROOM_DEPTH);
