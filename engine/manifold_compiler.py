@@ -313,7 +313,11 @@ def compile_portal(
             all_errors.append(f"[{gcfg['id']}] manifold.game.json not found: {manifold_path}")
             continue
         spec = load_json(manifold_path)
-        spec['_portal_path'] = gcfg.get('path', spec.get('manifold', gcfg['id']) + '/')
+        if 'path' in gcfg:
+            spec['_portal_path'] = gcfg['path']
+        else:
+            m = spec.get('manifold')
+            spec['_portal_path'] = (m if isinstance(m, str) else gcfg['id']) + '/'
         game_specs.append(spec)
 
         errors, warnings = validate_game(gcfg, spec)
