@@ -2870,6 +2870,49 @@ function createHexBilliardTable() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// PERSIAN RUG — sits on the floor directly under the hex table
+// Hex footprint matches the table's outer rail; corners align 1:1.
+// ════════════════════════════════════════════════════════════════
+function createPersianRug() {
+  const rugRadius = BOARD_RADIUS + RAIL_WIDTH + 25; // matches table outer rail corners
+
+  const rugShape = new THREE.Shape();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI / 3) - Math.PI / 6;
+    const x = Math.cos(angle) * rugRadius;
+    const y = Math.sin(angle) * rugRadius;
+    if (i === 0) rugShape.moveTo(x, y); else rugShape.lineTo(x, y);
+  }
+  rugShape.closePath();
+
+  const rugGeo = new THREE.ShapeGeometry(rugShape);
+  rugGeo.rotateX(-Math.PI / 2);
+
+  // Remap UVs so the rug image fits the hex bbox exactly (no tiling).
+  const uv = rugGeo.attributes.uv;
+  const minX = -rugRadius, maxX = rugRadius;
+  const minY = -rugRadius, maxY = rugRadius;
+  for (let i = 0; i < uv.count; i++) {
+    const u = (uv.getX(i) - minX) / (maxX - minX);
+    const v = (uv.getY(i) - minY) / (maxY - minY);
+    uv.setXY(i, u, v);
+  }
+  uv.needsUpdate = true;
+
+  const rugTex = new THREE.TextureLoader().load('assets/images/persianrug.png');
+  rugTex.colorSpace = THREE.SRGBColorSpace;
+  rugTex.anisotropy = 8;
+
+  const rugMat = new THREE.MeshStandardMaterial({
+    map: rugTex, roughness: 0.85, metalness: 0.0, envMapIntensity: 0.3
+  });
+  const rug = new THREE.Mesh(rugGeo, rugMat);
+  rug.position.y = 0.1; // just above the floor at y = -1
+  rug.receiveShadow = true;
+  scene.add(rug);
+}
+
+// ════════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ════════════════════════════════════════════════════════════════
 async function init3D() {
@@ -2941,6 +2984,9 @@ async function init3D() {
   pegGroup = new THREE.Group();
   pegGroup.name = 'pegGroup';
   scene.add(pegGroup);
+
+  // Persian rug under the table (corners aligned to table corners)
+  createPersianRug();
 
   // Create hexagonal billiard table
   createHexBilliardTable();
