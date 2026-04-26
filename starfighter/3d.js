@@ -3309,6 +3309,8 @@ const SF3D = (function () {
     const _PICKUP_COLORS = {
         hull: 0x22ff88,  // green  — hull fragments
         shield: 0x2288ff,  // blue   — shield cell
+        fuel: 0xffaa22,  // amber  — fuel pack
+        missile: 0xff4422,  // red    — torpedo pack
         ammo: 0xff8822,  // orange — ammo cache
         intel: 0xffff44,  // yellow — intel data
         crew: 0xff44cc,  // pink   — crew pod

@@ -3660,12 +3660,20 @@ const Starfighter = (function () {
             `<span class="lives-pip ${i < lives ? 'active' : 'lost'}">&#9733;</span>`
         ).join('');
 
+        // Medical Bay framing: ship lost, body printed from career template.
+        // Sortie inventory (packets, torpedoes) is gone; career upgrades persist.
+        // Training mode keeps the gentler "MISSION FAILED" wording.
+        const headline = state._trainingMode ? 'MISSION FAILED' : 'MEDICAL BAY';
+        const subline = state._trainingMode
+            ? `You have <strong>${lives}</strong> turn${lives !== 1 ? 's' : ''} remaining`
+            : `Reconstructing pilot &middot; <strong>${lives}</strong> spare bod${lives !== 1 ? 'ies' : 'y'} on file`;
+        const cdLabel = state._trainingMode ? 'RETURNING TO BASE' : 'NEW HULL READY';
         overlay.innerHTML = `
             <div class="respawn-reason-text">${reason}</div>
-            <div class="respawn-headline">MISSION FAILED</div>
+            <div class="respawn-headline">${headline}</div>
             <div class="lives-meter-row">${pips}</div>
-            <div class="respawn-turns-text">You have <strong>${lives}</strong> turn${lives !== 1 ? 's' : ''} remaining</div>
-            <div class="respawn-turns-text" style="font-size:0.85em;color:#446688;margin-top:8px;letter-spacing:2px">RETURNING TO BASE IN <span id="respawn-cd">5</span>s</div>
+            <div class="respawn-turns-text">${subline}</div>
+            <div class="respawn-turns-text" style="font-size:0.85em;color:#446688;margin-top:8px;letter-spacing:2px">${cdLabel} IN <span id="respawn-cd">5</span>s</div>
         `;
         overlay.classList.add('active');
 
@@ -6970,6 +6978,18 @@ const Starfighter = (function () {
     }
 
     // ── Fire primary — dispatches based on selected weapon ──
+    // Scuttle: voluntary self-destruct to bail out of a lost sortie. Routes
+    // through the normal death path so packets are lost, career upgrades are
+    // preserved, and Medical Bay reconstruction handles the rest. Only valid
+    // in active combat \u2014 not during launch / landing / training overlays.
+    function scuttleShip() {
+        if (!state.player) return;
+        if (state.respawning || state.eliminated) return;
+        if (state.phase !== 'combat') return;
+        if (window.SF3D) SF3D.spawnImpactEffect(state.player.position.clone(), 0xff5522);
+        _onPlayerDestroyed('SHIP SCUTTLED');
+    }
+
     function firePrimary() {
         const p = state.player;
         if (!p) return;
@@ -7101,19 +7121,34 @@ const Starfighter = (function () {
             }
             b.markedForDeletion = true;
         } else {
-            // Physical crash - skip if player during launch
+            // Physical crash — kinetic damage scaled by mass × |Δv|². Skip if
+            // player is still in the launch tube (avoids self-killing on the
+            // bay walls during the cutscene exit).
             if (!(state.phase === 'launching' && (a.type === 'player' || b.type === 'player'))) {
-                a.takeDamage(50);
-                b.takeDamage(50);
+                const dmgA = _kineticImpactDamage(a, b);
+                const dmgB = _kineticImpactDamage(b, a);
+                if (dmgA > 0) a.takeDamage(dmgA);
+                if (dmgB > 0) b.takeDamage(dmgB);
 
-                if (window.SF3D) {
+                if (window.SF3D && (dmgA > 0 || dmgB > 0)) {
                     SF3D.spawnImpactEffect(a.position.clone().add(b.position).multiplyScalar(0.5), 0xff0088);
                 }
 
-                // Bounce
-                const n = a.position.clone().sub(b.position).normalize();
-                a.velocity.add(n.clone().multiplyScalar(50));
-                b.velocity.sub(n.clone().multiplyScalar(50));
+                // Bounce magnitude tracks closing speed so a soft kiss nudges
+                // and a head-on shoves hard. Lighter body kicked more (impulse
+                // shared inversely to mass) — keeps capital ships steady.
+                const n = a.position.clone().sub(b.position);
+                const nlen = n.length() || 1;
+                n.multiplyScalar(1 / nlen);
+                const dvx = (a.velocity?.x || 0) - (b.velocity?.x || 0);
+                const dvy = (a.velocity?.y || 0) - (b.velocity?.y || 0);
+                const dvz = (a.velocity?.z || 0) - (b.velocity?.z || 0);
+                const closing = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
+                const kick = Math.max(20, Math.min(300, closing * 0.6));
+                const mA = _kineticMass(a), mB = _kineticMass(b);
+                const totalM = mA + mB;
+                a.velocity.add(n.clone().multiplyScalar(kick * (mB / totalM)));
+                b.velocity.sub(n.clone().multiplyScalar(kick * (mA / totalM)));
             }
         }
     }
@@ -8103,6 +8138,7 @@ const Starfighter = (function () {
         togglePause,
         pause: () => _setPaused(true),
         resume: () => _setPaused(false),
+        scuttleShip,
         exitGame,
         openTutorial,
         _skipTraining: _skipTraining

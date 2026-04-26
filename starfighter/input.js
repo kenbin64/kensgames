@@ -25,6 +25,12 @@ const SFInput = (function () {
     // Touch action button tracking
     const touchBtns = {};               // id → held state
 
+    // Scuttle hold: 3-second Backspace press to self-destruct out of a sortie.
+    // Tracked here (not in core.js) so the on-screen progress bar updates per
+    // frame without round-tripping through the game module.
+    const SCUTTLE_HOLD_SECS = 3.0;
+    let scuttleHeld = 0;
+
     function init(p) {
         player = p;
 
@@ -49,6 +55,10 @@ const SFInput = (function () {
             keys[e.code] = true;
             // Resume audio on first user gesture
             if (window.SFAudio) SFAudio.resume();
+
+            // Backspace would otherwise navigate the browser back when no
+            // input is focused; we use it as the scuttle hold key, so swallow.
+            if (e.code === 'Backspace') e.preventDefault();
 
             // Tab — exit pointer lock and focus first visible UI button
             if (e.code === 'Tab') {
@@ -402,6 +412,29 @@ const SFInput = (function () {
             }
         } else {
             this.gPressed = false;
+        }
+
+        // Scuttle ship (Backspace hold, 3s) — voluntary sortie exit
+        const scuttleEligible = window.Starfighter && Starfighter.getPhase &&
+            Starfighter.getPhase() === 'combat';
+        if (keys['Backspace'] && scuttleEligible) {
+            scuttleHeld += dt;
+            const ind = document.getElementById('scuttle-indicator');
+            const fill = document.getElementById('scuttle-bar-fill');
+            if (ind && !ind.classList.contains('active')) ind.classList.add('active');
+            if (fill) fill.style.width = Math.min(100, (scuttleHeld / SCUTTLE_HOLD_SECS) * 100) + '%';
+            if (scuttleHeld >= SCUTTLE_HOLD_SECS) {
+                scuttleHeld = 0;
+                if (fill) fill.style.width = '0%';
+                if (ind) ind.classList.remove('active');
+                if (Starfighter.scuttleShip) Starfighter.scuttleShip();
+            }
+        } else if (scuttleHeld > 0) {
+            scuttleHeld = 0;
+            const ind = document.getElementById('scuttle-indicator');
+            const fill = document.getElementById('scuttle-bar-fill');
+            if (fill) fill.style.width = '0%';
+            if (ind) ind.classList.remove('active');
         }
 
         // Gamepad API — GDD §12.4

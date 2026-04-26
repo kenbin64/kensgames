@@ -15,6 +15,11 @@ const REFLECTION_UPDATE_EVERY = 8; // update cubemap every N frames
 
 // Game objects
 let balls = [], paddles = [], bricks = [], players = [];
+// Transient wall-impact rings (created on every wall/ceiling bounce so the
+// player sees where contact happened on the otherwise glassy surfaces).
+let wallImpacts = [];
+const IMPACT_LIFETIME = 0.42;     // seconds before the ring is removed
+const IMPACT_GROW = 3.4;          // final radius multiplier over lifetime
 
 const BRICK_COLORS = { red: 0xcc2222, orange: 0xcc7700, yellow: 0xbbbb00, green: 0x22aa22 };
 const PLAYER_COLORS = [0x00ccff, 0xff3366, 0x39ff14, 0xffaa00]; // cyan, pink, green, orange
@@ -25,17 +30,18 @@ const PADDLE_RADIUS = 4.5;
 const PADDLE_THICKNESS = 0.85;
 const PADDLE_BEVEL = 0.94; // top radius ratio to create a subtle bevel
 
-// Ball speeds
-const SPEED_EASY = 0.25;
-const SPEED_HARD = 0.4;
-const SPEED_MULTI = 0.3;
+// Ball speeds (PHI-scaled — golden-ratio kick over the previous baseline so
+// rallies feel snappier without breaking paddle reaction time).
+const SPEED_EASY = 0.25 * PHI;   // ≈ 0.405
+const SPEED_HARD = 0.4 * PHI;    // ≈ 0.647
+const SPEED_MULTI = 0.3 * PHI;   // ≈ 0.485
 
 // Ball dynamics (pseudo-physics)
 // NOTE: Units are per-frame; tuned to keep the existing “feel” while adding arch + chaos.
 const GRAVITY = 0.00075;              // downward acceleration (adds an arc)
 const FREE_FLIGHT_DRAG = 0.99935;     // slow energy bleed (walls/ceiling restore)
-const MIN_BALL_SPEED = 0.22;          // never let a ball become too weak to reach bricks
-const MAX_BALL_SPEED = 0.85;
+const MIN_BALL_SPEED = 0.22 * PHI;    // ≈ 0.356 — scaled with base speeds so clamps don't pinch
+const MAX_BALL_SPEED = 0.85 * PHI;    // ≈ 1.375 — scaled with base speeds so clamps don't pinch
 const WALL_BOOST = 1.035;
 const CEILING_BOOST = 1.06;
 const WALL_BOOST_ADD = 0.004;
@@ -226,6 +232,61 @@ function applyReflectionsToMaterial(mat, intensity = 1.0) {
     mat.needsUpdate = true;
 }
 
+// ── Wall-impact ring ──
+// Drops a thin reflective ring flush against the wall at the impact point,
+// scales it outward and fades it. The ring carries the env-map so each
+// bounce literally shows the reflective surface flaring at the contact.
+function spawnWallImpact(pos, axis, sign, color) {
+    if (!scene) return;
+    const ringGeo = new THREE.RingGeometry(0.6, 1.0, 32);
+    const ringMat = new THREE.MeshPhysicalMaterial({
+        color: color || 0xffffff,
+        emissive: color || 0xffffff,
+        emissiveIntensity: 0.9,
+        metalness: 0.9,
+        roughness: 0.05,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+    });
+    applyReflectionsToMaterial(ringMat, 1.6);
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    // Park the ring on the wall, biased a hair inward so it doesn't z-fight.
+    const bias = 0.05;
+    ring.position.copy(pos);
+    if (axis === 'x') {
+        ring.position.x = sign > 0 ? -WALL_INNER + bias : WALL_INNER - bias;
+        ring.rotation.y = Math.PI / 2;
+    } else if (axis === 'z') {
+        ring.position.z = sign > 0 ? -WALL_INNER + bias : WALL_INNER - bias;
+    } else {
+        ring.position.y = HALF_H - bias;
+        ring.rotation.x = Math.PI / 2;
+    }
+    scene.add(ring);
+    wallImpacts.push({ mesh: ring, mat: ringMat, age: 0 });
+}
+
+function updateWallImpacts(dt) {
+    for (let i = wallImpacts.length - 1; i >= 0; i--) {
+        const w = wallImpacts[i];
+        w.age += dt;
+        const t = w.age / IMPACT_LIFETIME;
+        if (t >= 1) {
+            scene.remove(w.mesh);
+            w.mesh.geometry.dispose();
+            w.mat.dispose();
+            wallImpacts.splice(i, 1);
+            continue;
+        }
+        const s = 1 + (IMPACT_GROW - 1) * t;
+        w.mesh.scale.set(s, s, s);
+        w.mat.opacity = 0.95 * (1 - t);
+        w.mat.emissiveIntensity = 0.9 * (1 - t);
+    }
+}
+
 // Build/rebuild arena for given player count
 function buildArena(numPlayers) {
     // Remove old arena objects
@@ -233,6 +294,9 @@ function buildArena(numPlayers) {
     arenaObjects = [];
     bricks.forEach(b => scene.remove(b));
     bricks = [];
+    // Drop any in-flight wall-impact rings — WALL_INNER may shift with player count
+    wallImpacts.forEach(w => { scene.remove(w.mesh); w.mesh.geometry.dispose(); w.mat.dispose(); });
+    wallImpacts = [];
 
     setArenaSize(numPlayers);
 
@@ -381,11 +445,11 @@ function createBricks() {
                     transparent: true,
                     opacity: 0.7,
                     roughness: 0.05,
-                    metalness: 0.15,
+                    metalness: 0.35,             // bumped — visibly mirror-y bricks
                     clearcoat: 1.0,
                     clearcoatRoughness: 0.05
                 });
-                applyReflectionsToMaterial(mat, 1.15);
+                applyReflectionsToMaterial(mat, 1.35);
                 const brick = new THREE.Mesh(geo, mat);
                 brick.castShadow = true;
                 brick.receiveShadow = true;
@@ -453,8 +517,10 @@ function setupPlayers() {
         p.castShadow = true;
         p.receiveShadow = true;
 
-        // Keep the paddle slightly above the floor so it throws a clear shadow.
-        p.position.set(startPositions[i][0], -HALF_H + (PADDLE_THICKNESS * 0.5) + 0.22, startPositions[i][1]);
+        // Lift the paddle a clean 1/PHI off the floor — wide enough that the
+        // directional light throws a definite shadow puddle directly under it,
+        // which doubles as the player's spatial-orientation cue on the floor.
+        p.position.set(startPositions[i][0], -HALF_H + (PADDLE_THICKNESS * 0.5) + (1 / PHI), startPositions[i][1]);
         p.playerId = i;
         p.paddleRadius = basePaddleRadius;
         p.baseRadius = basePaddleRadius;
@@ -798,6 +864,12 @@ function animate() {
         return;
     }
 
+    // Frame dt (cap to 1/30 s so a hitch doesn't snap-fade every impact ring at once)
+    const _now = performance.now();
+    const _dt = Math.min(0.033, ((_now - (animate._lastT || _now)) / 1000) || 0.016);
+    animate._lastT = _now;
+    updateWallImpacts(_dt);
+
     const isMulti = gameMode.startsWith('multi');
 
     if (isMulti) updateAIPaddles();
@@ -855,6 +927,11 @@ function animate() {
 
         b.position.add(b.velocity);
 
+        // Tint impact rings with the last-touching player's color so each
+        // bounce visibly belongs to whoever last hit the ball.
+        const owner = paddles[b.lastTouchedBy];
+        const impactColor = owner ? owner.material.color.getHex() : 0xffffff;
+
         // Side wall bounces — reflect + impart spin from tangential velocity
         let wallHit = false;
         let ceilingHit = false;
@@ -863,24 +940,28 @@ function animate() {
             // Wall normal is (-1,0,0), tangential is Y and Z
             b.spin.y += b.velocity.z * SPIN_TRANSFER;
             b.spin.z -= b.velocity.y * SPIN_TRANSFER;
+            spawnWallImpact(b.position, 'x', -1, impactColor);
             wallHit = true;
         }
         if (b.position.x < -WALL_INNER) {
             b.position.x = -WALL_INNER; b.velocity.x *= -1;
             b.spin.y -= b.velocity.z * SPIN_TRANSFER;
             b.spin.z += b.velocity.y * SPIN_TRANSFER;
+            spawnWallImpact(b.position, 'x', 1, impactColor);
             wallHit = true;
         }
         if (b.position.z > WALL_INNER) {
             b.position.z = WALL_INNER; b.velocity.z *= -1;
             b.spin.y -= b.velocity.x * SPIN_TRANSFER;
             b.spin.x += b.velocity.y * SPIN_TRANSFER;
+            spawnWallImpact(b.position, 'z', -1, impactColor);
             wallHit = true;
         }
         if (b.position.z < -WALL_INNER) {
             b.position.z = -WALL_INNER; b.velocity.z *= -1;
             b.spin.y += b.velocity.x * SPIN_TRANSFER;
             b.spin.x -= b.velocity.y * SPIN_TRANSFER;
+            spawnWallImpact(b.position, 'z', 1, impactColor);
             wallHit = true;
         }
 
@@ -891,6 +972,7 @@ function animate() {
             // Ceiling normal is (0,-1,0), tangential is X and Z
             b.spin.x += b.velocity.z * SPIN_TRANSFER;
             b.spin.z -= b.velocity.x * SPIN_TRANSFER;
+            spawnWallImpact(b.position, 'y', -1, impactColor);
             ceilingHit = true;
 
             // Ceiling restores energy so balls keep reaching bricks
