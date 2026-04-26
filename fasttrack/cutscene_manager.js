@@ -62,21 +62,21 @@ const CutsceneManager = {
     },
 
     // Check if this is first time seeing this cutscene
-    isFirstTime: function(type, playerId) {
+    isFirstTime: function (type, playerId) {
         playerId = playerId || null;
         const key = playerId !== null ? `${type}:${playerId}` : type;
         return !this.seenCutscenes.has(key);
     },
 
     // Get count of times this cutscene has been seen
-    getSeenCount: function(type, playerId) {
+    getSeenCount: function (type, playerId) {
         playerId = playerId || null;
         const key = playerId !== null ? `${type}:${playerId}` : type;
         return this.seenCutscenes.get(key) || 0;
     },
 
     // Mark cutscene as seen
-    markSeen: function(type, playerId) {
+    markSeen: function (type, playerId) {
         playerId = playerId || null;
         const key = playerId !== null ? `${type}:${playerId}` : type;
         const count = this.seenCutscenes.get(key) || 0;
@@ -84,7 +84,7 @@ const CutsceneManager = {
     },
 
     // Should we skip this cutscene entirely?
-    shouldSkip: function(type, playerId) {
+    shouldSkip: function (type, playerId) {
         playerId = playerId || null;
         const skipAfter = this.config.skipAfterCount[type];
         if (skipAfter === 0) return false;
@@ -92,17 +92,17 @@ const CutsceneManager = {
     },
 
     // Get duration based on first-time vs subsequent
-    getDuration: function(type, playerId) {
+    getDuration: function (type, playerId) {
         playerId = playerId || null;
         if (this.isFirstTime(type, playerId)) {
             return this.config.cutsceneDuration[type];
         }
         return this.config.cutsceneDuration[type + 'Short'] ||
-               Math.floor(this.config.cutsceneDuration[type] * 0.4);
+            Math.floor(this.config.cutsceneDuration[type] * 0.4);
     },
 
     // Reset seen cutscenes (for new game)
-    reset: function() {
+    reset: function () {
         this.seenCutscenes.clear();
         this.queue = [];
         this.isPlaying = false;
@@ -111,7 +111,7 @@ const CutsceneManager = {
     },
 
     // Initialize with scene references
-    init: function(scene, camera, renderer, boardGroup) {
+    init: function (scene, camera, renderer, boardGroup) {
         this.scene = scene;
         this.camera = camera;
         this.renderer = renderer;
@@ -120,7 +120,7 @@ const CutsceneManager = {
     },
 
     // Save current camera state before cutscene
-    saveCameraState: function() {
+    saveCameraState: function () {
         if (!this.camera) return;
         this.savedCameraState = {
             position: this.camera.position.clone(),
@@ -131,12 +131,12 @@ const CutsceneManager = {
     },
 
     // Restore camera state after cutscene (smooth transition)
-    restoreCameraState: function(callback) {
+    restoreCameraState: function (callback) {
         if (!this.savedCameraState || !this.camera) {
             if (callback) callback();
             return;
         }
-        
+
         const start = {
             x: this.camera.position.x,
             y: this.camera.position.y,
@@ -147,20 +147,20 @@ const CutsceneManager = {
             y: this.savedCameraState.position.y,
             z: this.savedCameraState.position.z
         };
-        
+
         const duration = this.config.transitionDuration;
         const startTime = performance.now();
-        
+
         const animate = () => {
             const elapsed = performance.now() - startTime;
             const t = Math.min(elapsed / duration, 1);
             const eased = this.easeOutCubic(t);
-            
+
             this.camera.position.x = start.x + (end.x - start.x) * eased;
             this.camera.position.y = start.y + (end.y - start.y) * eased;
             this.camera.position.z = start.z + (end.z - start.z) * eased;
             this.camera.lookAt(0, 0, 0);
-            
+
             if (t < 1) {
                 requestAnimationFrame(animate);
             } else {
@@ -168,17 +168,17 @@ const CutsceneManager = {
                 if (callback) callback();
             }
         };
-        
+
         requestAnimationFrame(animate);
     },
-    
+
     // Easing function for smooth transitions
-    easeOutCubic: function(t) {
+    easeOutCubic: function (t) {
         return 1 - Math.pow(1 - t, 3);
     },
 
     // Queue a cutscene to play (checks skip rules first)
-    queueCutscene: function(type, data) {
+    queueCutscene: function (type, data) {
         const playerId = data.playerId || null;
 
         // Check if we should skip this cutscene entirely
@@ -195,24 +195,24 @@ const CutsceneManager = {
             this.playNext();
         }
     },
-    
+
     // Play the next cutscene in queue
-    playNext: function() {
+    playNext: function () {
         if (this.queue.length === 0) {
             this.isPlaying = false;
             window._cutSceneActive = false;
             return;
         }
-        
+
         this.isPlaying = true;
         window._cutSceneActive = true;
         this.currentCutscene = this.queue.shift();
-        
+
         // Save camera state for manual mode restoration
         if (window.currentCameraView && window.currentCameraView.includes('fixed')) {
             this.saveCameraState();
         }
-        
+
         // Play the appropriate cutscene
         switch (this.currentCutscene.type) {
             case 'intro':
@@ -241,9 +241,9 @@ const CutsceneManager = {
                 this.finishCutscene();
         }
     },
-    
+
     // Finish current cutscene and play next
-    finishCutscene: function() {
+    finishCutscene: function () {
         // Restore camera if we were in manual mode
         if (this.savedCameraState) {
             this.restoreCameraState(() => {
@@ -261,7 +261,7 @@ const CutsceneManager = {
     // ============================================================
 
     // Determine first player (random for new game, last winner for replay)
-    getFirstPlayer: function(players, isReplay = false) {
+    getFirstPlayer: function (players, isReplay = false) {
         if (isReplay && this.lastWinner !== null) {
             // Winner of last game goes first
             const winnerIdx = players.findIndex(p => p.id === this.lastWinner || p.name === this.lastWinner);
@@ -277,23 +277,23 @@ const CutsceneManager = {
     },
 
     // Set the last winner (call when game ends)
-    setLastWinner: function(playerIdOrName) {
+    setLastWinner: function (playerIdOrName) {
         this.lastWinner = playerIdOrName;
         // Also persist to localStorage for page refreshes
         try {
             localStorage.setItem('fasttrack_lastWinner', playerIdOrName);
-        } catch (e) {}
+        } catch (e) { }
     },
 
     // Load last winner from localStorage
-    loadLastWinner: function() {
+    loadLastWinner: function () {
         try {
             this.lastWinner = localStorage.getItem('fasttrack_lastWinner');
-        } catch (e) {}
+        } catch (e) { }
     },
 
     // Play game intro cutscene
-    playGameIntroCutscene: function(data) {
+    playGameIntroCutscene: function (data) {
         const { players, firstPlayerIndex, onComplete } = data;
         const firstPlayer = players[firstPlayerIndex];
         const tagline = this.taglines[Math.floor(Math.random() * this.taglines.length)];
@@ -308,7 +308,7 @@ const CutsceneManager = {
     },
 
     // Show full-screen game intro overlay
-    showGameIntroOverlay: function(tagline, firstPlayer, callback) {
+    showGameIntroOverlay: function (tagline, firstPlayer, callback) {
         const overlay = document.createElement('div');
         overlay.id = 'game-intro-overlay';
         overlay.style.cssText = `
@@ -389,7 +389,7 @@ const CutsceneManager = {
     // ============================================================
 
     // FASTTRACK! entry celebration
-    playFastTrackCutscene: function(data) {
+    playFastTrackCutscene: function (data) {
         const { peg, hole, playerColor, playerName, playerId } = data;
         const isFirst = this.isFirstTime('fasttrack', playerId);
         const duration = this.getDuration('fasttrack', playerId);
@@ -416,7 +416,7 @@ const CutsceneManager = {
     },
 
     // Bullseye entry/exit celebration
-    playBullseyeCutscene: function(data) {
+    playBullseyeCutscene: function (data) {
         const { peg, isEntry, playerColor, playerId } = data;
 
         if (this.shouldSkip('bullseye', playerId)) {
@@ -445,7 +445,7 @@ const CutsceneManager = {
     },
 
     // Cut opponent - always show but shorter on repeat
-    playCutCutscene: function(data) {
+    playCutCutscene: function (data) {
         const { victorPeg, victimPeg, victorPlayer, victimPlayer } = data;
         const isFirst = this.isFirstTime('cut');
         const duration = this.getDuration('cut');
@@ -472,7 +472,7 @@ const CutsceneManager = {
     },
 
     // Safe zone entry - ONLY first time per player
-    playSafeZoneCutscene: function(data) {
+    playSafeZoneCutscene: function (data) {
         const { peg, playerColor, playerId } = data;
 
         if (this.shouldSkip('safeZone', playerId)) {
@@ -494,7 +494,7 @@ const CutsceneManager = {
     },
 
     // Golden crown on winning hole
-    playCrownCutscene: function(data) {
+    playCrownCutscene: function (data) {
         const { holePosition, playerColor } = data;
         console.log('🎬 Playing Crown cutscene');
 
@@ -505,19 +505,29 @@ const CutsceneManager = {
     },
 
     // Win celebration (delegates to VictoryCeremony if available)
-    playWinCutscene: function(data) {
+    playWinCutscene: function (data) {
         const { winner, homePosition, playerColor } = data;
         console.log('🎬 Playing Win cutscene for', winner.name);
+
+        const showReplay = () => {
+            if (window.showReplayPrompt) {
+                window.showReplayPrompt(winner && winner.name);
+            }
+        };
 
         if (window.VictoryCeremony) {
             VictoryCeremony.start(winner, homePosition, playerColor, () => {
                 this.finishCutscene();
+                showReplay();
             });
         } else {
             // Fallback
             this.showCelebrationGraphic('🏆 WINNER! 🏆', playerColor, () => {
                 this.spawnFloatingEmojis(['🏆', '👑', '🎉', '🎊', '✨'], 20);
-                setTimeout(() => this.finishCutscene(), this.config.cutsceneDuration.win);
+                setTimeout(() => {
+                    this.finishCutscene();
+                    showReplay();
+                }, this.config.cutsceneDuration.win);
             });
         }
     },
@@ -527,7 +537,7 @@ const CutsceneManager = {
     // ============================================================
 
     // Show large celebration text
-    showCelebrationGraphic: function(text, color, callback) {
+    showCelebrationGraphic: function (text, color, callback) {
         const overlay = document.createElement('div');
         overlay.className = 'cutscene-celebration-graphic';
         overlay.innerHTML = text;
@@ -555,7 +565,7 @@ const CutsceneManager = {
     },
 
     // Show peg reaction bubble
-    showPegReaction: function(peg, text) {
+    showPegReaction: function (peg, text) {
         if (!text || !peg) return;
 
         // Create floating text bubble above peg
@@ -585,7 +595,7 @@ const CutsceneManager = {
     },
 
     // Spawn floating emojis like balloons
-    spawnFloatingEmojis: function(emojis, count) {
+    spawnFloatingEmojis: function (emojis, count) {
         for (let i = 0; i < count; i++) {
             setTimeout(() => {
                 const emoji = document.createElement('div');
@@ -606,7 +616,7 @@ const CutsceneManager = {
     },
 
     // Spawn 3D golden crown above winning hole
-    spawnCrownAboveHole: function(position, color) {
+    spawnCrownAboveHole: function (position, color) {
         // This would create a 3D crown mesh - simplified for now
         console.log('👑 Spawning crown at', position);
         this.showCelebrationGraphic('👑', color, null);

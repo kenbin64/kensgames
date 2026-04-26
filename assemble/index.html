@@ -337,6 +337,32 @@
       width: 80px;
     }
 
+    .grid-control input[type="number"] {
+      width: 56px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 2px 4px;
+      font-size: 10px;
+      border-radius: 3px;
+    }
+
+    .grid-control .unit-btn {
+      padding: 2px 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-size: 10px;
+      cursor: pointer;
+      border-radius: 3px;
+      min-width: 28px;
+    }
+
+    .grid-control .unit-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
     /* ── ROTATION SPHERE ────────────────────────────────────── */
     .rotation-sphere {
       position: fixed;
@@ -527,8 +553,29 @@
             <input type="number" class="prop-input" id="prop-z" step="0.5">
           </div>
           <div class="prop-row">
-            <span class="prop-label">Rotation Y</span>
-            <input type="number" class="prop-input" id="prop-ry" step="15" min="-180" max="180">
+            <span class="prop-label">Rotation X (°)</span>
+            <input type="number" class="prop-input" id="prop-rx" step="15">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Rotation Y (°)</span>
+            <input type="number" class="prop-input" id="prop-ry" step="15">
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Rotation Z (°)</span>
+            <input type="number" class="prop-input" id="prop-rz" step="15">
+          </div>
+          <div class="prop-row" style="gap:4px;">
+            <span class="prop-label">Quick Rotate</span>
+            <div style="display:flex;gap:3px;">
+              <button class="ctrl-btn" type="button" title="Rotate Y +90°" onclick="rotateSelected('y',  90)"
+                style="padding:2px 6px;font-size:10px;">↻Y</button>
+              <button class="ctrl-btn" type="button" title="Rotate X +90°" onclick="rotateSelected('x',  90)"
+                style="padding:2px 6px;font-size:10px;">↻X</button>
+              <button class="ctrl-btn" type="button" title="Rotate Z +90°" onclick="rotateSelected('z',  90)"
+                style="padding:2px 6px;font-size:10px;">↻Z</button>
+              <button class="ctrl-btn" type="button" title="Reset rotation" onclick="rotateSelected('reset')"
+                style="padding:2px 6px;font-size:10px;">⟲</button>
+            </div>
           </div>
           <div class="prop-row">
             <span class="prop-label">Label</span>
@@ -571,11 +618,34 @@
       <div class="controls-bar">
         <button class="ctrl-btn active" id="btn-snap" onclick="toggleSnap()">📍 SNAP: ON</button>
         <button class="ctrl-btn active" id="btn-autoconnect" onclick="toggleAutoConnect()">🧲 AUTO-CONNECT: ON</button>
+        <div class="grid-control" title="Bond applied to new connections">
+          <label>Bond:</label>
+          <select id="bond-select" class="prop-input" style="width:auto;padding:2px 6px;font-size:10px"
+            onchange="setCurrentBond(this.value)">
+            <option value="none">· None</option>
+            <option value="glue">🩹 Glue</option>
+            <option value="tape">📼 Tape</option>
+            <option value="weld">🔥 Weld</option>
+            <option value="ziptie">🔗 Zip-Tie</option>
+            <option value="paint">🎨 Paint</option>
+            <option value="solder">⚡ Solder</option>
+          </select>
+        </div>
         <div class="grid-control">
           <label>Grid:</label>
-          <input type="range" id="grid-slider" min="0.1" max="2" step="0.1" value="0.5"
-            oninput="updateGridSize(this.value)">
-          <span id="grid-val">0.5</span>
+          <input type="range" id="grid-slider" min="0.05" max="2" step="0.05" value="0.5"
+            oninput="onGridSliderInput(this.value)">
+          <input type="number" id="grid-num" min="0.01" step="0.05" value="0.50"
+            oninput="onGridNumericInput(this.value)">
+          <button type="button" class="unit-btn" id="btn-grid-unit" onclick="toggleGridUnit()"
+            title="Toggle inches / metric">m</button>
+          <span id="grid-val">0.50 m</span>
+        </div>
+        <div class="grid-control" title="Scene brightness">
+          <label>💡 Light:</label>
+          <input type="range" id="light-slider" min="0.1" max="3" step="0.05" value="1"
+            oninput="onLightSliderInput(this.value)">
+          <span id="light-val">100%</span>
         </div>
         <div class="ctrl-separator"></div>
         <button class="ctrl-btn" id="btn-run" onclick="toggleSim()">▶ RUN</button>
@@ -630,7 +700,7 @@
     'use strict';
 
     import { PARTS, PART_MAP, CATEGORIES } from './parts.js?v=8';
-    import { AssembleEngine, AssembleRenderer, FAIL } from './assembler.js?v=8';
+    import { AssembleEngine, AssembleRenderer, FAIL, BOND, BOND_DEFS } from './assembler.js?v=8';
 
     // ═══════════════════════════════════════════════════════════════
     // GLOBAL STATE
@@ -645,6 +715,7 @@
     let snapEnabled = true;
     let autoConnectEnabled = true;
     let gridSize = 0.5;
+    let currentBond = BOND.NONE;
     let draggedNode = null;   // node being dragged
     let dragOffset = new THREE.Vector3();
     let isDragging = false;
@@ -773,6 +844,7 @@
         btn.dataset.partId = p.id;
         btn.innerHTML = `<div class="icon">${p.icon}</div><div class="lbl">${p.label}</div>`;
         btn.onclick = () => selectTool(p.id);
+        attachPaletteDrag(btn, p);
         // Tooltip
         btn.addEventListener('mouseenter', e => showTooltip(e, p.label, `Category: ${p.category} | Mass: ${p.mass}kg`));
         btn.addEventListener('mouseleave', hideTooltip);
@@ -797,9 +869,31 @@
       btn.dataset.partId = p.id;
       btn.innerHTML = `<div class="icon">${p.icon || '⬆️'}</div><div class="lbl">${p.label || p.id}</div>`;
       btn.onclick = () => selectTool(p.id);
+      attachPaletteDrag(btn, p);
       btn.addEventListener('mouseenter', e => showTooltip(e, p.label || p.id, `Category: ${p.category || 'Imported'} | Mass: ${p.mass || 1}kg`));
       btn.addEventListener('mouseleave', hideTooltip);
       grid.appendChild(btn);
+    }
+
+    // HTML5 drag from palette → canvas. We set partId via dataTransfer
+    // so the canvas drop handler can place the part at the cursor.
+    function attachPaletteDrag(btn, partDef) {
+      btn.draggable = true;
+      btn.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('application/x-assemble-part', partDef.id);
+        e.dataTransfer.setData('text/plain', partDef.id);
+        selectedTool = partDef.id;
+        placementMode = true;
+      });
+      btn.addEventListener('dragend', () => {
+        renderer.hideGhost();
+        ghostVisible = false;
+        // If the part wasn't dropped on the canvas, the drop handler never ran;
+        // clear placement state so a stray mousemove doesn't keep redrawing the ghost.
+        placementMode = false;
+        selectedTool = null;
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -868,12 +962,115 @@
       }
     };
 
+    window.setCurrentBond = function (bondKey) {
+      if (!BOND_DEFS[bondKey]) return;
+      currentBond = bondKey;
+      try { localStorage.setItem('assemble.currentBond', bondKey); } catch (e) { }
+      const sel = document.getElementById('bond-select');
+      if (sel && sel.value !== bondKey) sel.value = bondKey;
+    };
+
+    // Restore last-used bond
+    try {
+      const savedBond = localStorage.getItem('assemble.currentBond');
+      if (savedBond && BOND_DEFS[savedBond]) {
+        currentBond = savedBond;
+        const sel = document.getElementById('bond-select');
+        if (sel) sel.value = savedBond;
+      }
+    } catch (e) { }
+
+    // Grid units: internal gridSize is always in scene units (meters).
+    // The UI can display either metric (m) or imperial (in).
+    let gridUnit = 'm';
+    const M_TO_IN = 39.37007874;
+    const IN_TO_M = 0.0254;
+
+    function _formatGridLabel() {
+      if (gridUnit === 'in') {
+        const inches = gridSize * M_TO_IN;
+        return inches.toFixed(2) + ' in (' + gridSize.toFixed(3) + ' m)';
+      }
+      return gridSize.toFixed(2) + ' m (' + (gridSize * M_TO_IN).toFixed(2) + ' in)';
+    }
+
+    function _refreshGridUI() {
+      const slider = document.getElementById('grid-slider');
+      const num = document.getElementById('grid-num');
+      if (gridUnit === 'in') {
+        slider.min = 0.25; slider.max = 24; slider.step = 0.125;
+        num.min = 0.125; num.step = 0.125;
+        const inches = Math.max(0.25, Math.min(24, gridSize * M_TO_IN));
+        slider.value = inches;
+        num.value = inches.toFixed(3);
+      } else {
+        slider.min = 0.025; slider.max = 2; slider.step = 0.025;
+        num.min = 0.005; num.step = 0.025;
+        slider.value = gridSize;
+        num.value = gridSize.toFixed(3);
+      }
+      const label = document.getElementById('grid-val');
+      if (label) label.textContent = _formatGridLabel();
+      const btn = document.getElementById('btn-grid-unit');
+      if (btn) btn.textContent = gridUnit;
+    }
+
     window.updateGridSize = function (val) {
       gridSize = parseFloat(val);
-      document.getElementById('grid-val').textContent = val;
-      // Update renderer grid
+      const label = document.getElementById('grid-val');
+      if (label) label.textContent = _formatGridLabel();
       renderer.updateGrid(gridSize);
     };
+
+    window.onGridSliderInput = function (val) {
+      const v = parseFloat(val);
+      if (!Number.isFinite(v) || v <= 0) return;
+      const meters = (gridUnit === 'in') ? v * IN_TO_M : v;
+      updateGridSize(meters);
+      const num = document.getElementById('grid-num');
+      if (num) num.value = v.toFixed(3);
+    };
+
+    window.onGridNumericInput = function (val) {
+      const v = parseFloat(val);
+      if (!Number.isFinite(v) || v <= 0) return;
+      const meters = (gridUnit === 'in') ? v * IN_TO_M : v;
+      updateGridSize(meters);
+      const slider = document.getElementById('grid-slider');
+      if (slider) slider.value = v;
+    };
+
+    window.toggleGridUnit = function () {
+      gridUnit = (gridUnit === 'm') ? 'in' : 'm';
+      try { localStorage.setItem('assemble.gridUnit', gridUnit); } catch (e) { }
+      _refreshGridUI();
+    };
+
+    // Restore saved unit preference and apply
+    try {
+      const saved = localStorage.getItem('assemble.gridUnit');
+      if (saved === 'in' || saved === 'm') gridUnit = saved;
+    } catch (e) { }
+    _refreshGridUI();
+
+    // ── Scene brightness slider ──────────────────────────────────
+    window.onLightSliderInput = function (val) {
+      const v = parseFloat(val);
+      if (!Number.isFinite(v) || v < 0) return;
+      renderer.setLightLevel(v);
+      const label = document.getElementById('light-val');
+      if (label) label.textContent = Math.round(v * 100) + '%';
+      try { localStorage.setItem('assemble.lightLevel', String(v)); } catch (e) { }
+    };
+
+    try {
+      const savedLight = parseFloat(localStorage.getItem('assemble.lightLevel'));
+      if (Number.isFinite(savedLight) && savedLight > 0) {
+        const slider = document.getElementById('light-slider');
+        if (slider) slider.value = savedLight;
+        window.onLightSliderInput(savedLight);
+      }
+    } catch (e) { }
 
     function snapPosition(pos) {
       if (!snapEnabled) return pos;
@@ -947,6 +1144,44 @@
       mouseMoved = false;
     });
 
+    // ── HTML5 drop target for palette drags ──────────────────────
+    canvas.addEventListener('dragover', e => {
+      if (!e.dataTransfer || !e.dataTransfer.types.includes('application/x-assemble-part')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      if (selectedTool) {
+        const pt = raycastToGround(e);
+        if (pt) {
+          const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+          renderer.showGhost(selectedTool, snapped, null);
+          ghostVisible = true;
+        }
+      }
+    });
+
+    canvas.addEventListener('drop', e => {
+      if (!e.dataTransfer) return;
+      const partId = e.dataTransfer.getData('application/x-assemble-part') || e.dataTransfer.getData('text/plain');
+      if (!partId) return;
+      e.preventDefault();
+      const pt = raycastToGround(e);
+      if (!pt) return;
+      const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
+      const node = engine.addNode(partId, snapped, { x: 0, y: 0, z: 0 });
+      placementMode = false;
+      selectedTool = null;
+      renderer.hideGhost();
+      ghostVisible = false;
+      if (autoConnectEnabled) tryAutoConnect(node.id);
+      updateStats();
+    });
+
+    canvas.addEventListener('dragleave', e => {
+      if (e.relatedTarget && canvas.contains(e.relatedTarget)) return;
+      renderer.hideGhost();
+      ghostVisible = false;
+    });
+
     // Safety: if mouseup happens outside the canvas, don't get stuck "holding" a part
     window.addEventListener('mouseup', e => {
       if (e.button === 0 && isDragging) stopDragging();
@@ -956,6 +1191,56 @@
 
     window.addEventListener('blur', () => {
       if (isDragging) stopDragging();
+    });
+
+    // Rotate the currently-selected (or currently-dragged) node.
+    // axis ∈ {'x','y','z','reset'}; degrees defaults to +90.
+    window.rotateSelected = function (axis, degrees) {
+      const id = selectedNode || draggedNode;
+      if (!id) return;
+      const node = engine.nodes.get(id);
+      if (!node) return;
+      if (axis === 'reset') {
+        node.rotation.x = 0;
+        node.rotation.y = 0;
+        node.rotation.z = 0;
+      } else if (axis === 'x' || axis === 'y' || axis === 'z') {
+        const delta = ((Number(degrees) || 90) * Math.PI) / 180;
+        node.rotation[axis] = (node.rotation[axis] || 0) + delta;
+      }
+      renderer.updateMeshTransform(node);
+      if (selectedNode === id) updatePropertiesPanel();
+    };
+
+    window.addEventListener('keydown', e => {
+      // Don't intercept keys when typing in inputs/selects/textareas.
+      const t = e.target;
+      const tag = t && t.tagName;
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable);
+
+      if (e.key === 'Escape') {
+        if (isDragging) stopDragging();
+        if (placementMode) {
+          placementMode = false;
+          selectedTool = null;
+          renderer.hideGhost();
+          ghostVisible = false;
+          document.querySelectorAll('.part-btn').forEach(b => b.style.background = 'rgba(88,166,255,0.05)');
+        }
+        return;
+      }
+
+      if (inField) return;
+
+      // Rotation hotkeys: R = Y axis, T = X axis, F = Z axis.
+      // Shift = negative direction. Ctrl/Meta deferred to browser.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const step = 15;
+      const sign = e.shiftKey ? -1 : 1;
+      const k = e.key.toLowerCase();
+      if (k === 'r') { e.preventDefault(); window.rotateSelected('y', sign * step); }
+      else if (k === 't') { e.preventDefault(); window.rotateSelected('x', sign * step); }
+      else if (k === 'f') { e.preventDefault(); window.rotateSelected('z', sign * step); }
     });
 
     canvas.addEventListener('contextmenu', e => {
@@ -970,7 +1255,7 @@
       if (engine.running) return;
 
       if (placementMode && selectedTool) {
-        // Place new part
+        // Place new part and release — click-and-drag afterward to move it
         const pt = raycastToGround(e);
         if (pt) {
           const snapped = snapPosition({ x: pt.x, y: 0.5, z: pt.z });
@@ -978,8 +1263,8 @@
           placementMode = false;
           selectedTool = null;
           renderer.hideGhost();
-          // Immediately pick up the newly placed part
-          startDragging(node.id, e);
+          ghostVisible = false;
+          if (autoConnectEnabled) tryAutoConnect(node.id);
           updateStats();
         }
       } else {
@@ -1039,7 +1324,18 @@
           bestPortIdx = i;
         }
       }
-      if (!best || bestPortIdx < 0) return;
+      if (!best || bestPortIdx < 0) {
+        // Port snap missed — fall back to AABB adjacency so the part
+        // at least clicks flush against the nearest neighbour face.
+        const adj = engine.findAdjacencyTarget(node, 0.4);
+        if (adj) {
+          node.position.x = adj.snapPos.x;
+          node.position.y = adj.snapPos.y;
+          node.position.z = adj.snapPos.z;
+          renderer.updateMeshTransform(node);
+        }
+        return;
+      }
 
       // Align the dragged port to the target port by translation.
       const a = engine.getWorldPortPos(nodeId, bestPortIdx);
@@ -1054,7 +1350,7 @@
       node.position.z += dz;
       renderer.updateMeshTransform(node);
 
-      engine.connect(nodeId, bestPortIdx, best.node.id, best.portIdx);
+      engine.connect(nodeId, bestPortIdx, best.node.id, best.portIdx, currentBond);
     }
 
     function raycastToGround(e) {
@@ -1187,7 +1483,9 @@
       document.getElementById('prop-x').value = node.position.x.toFixed(2);
       document.getElementById('prop-y').value = node.position.y.toFixed(2);
       document.getElementById('prop-z').value = node.position.z.toFixed(2);
+      document.getElementById('prop-rx').value = (node.rotation.x * 180 / Math.PI).toFixed(0);
       document.getElementById('prop-ry').value = (node.rotation.y * 180 / Math.PI).toFixed(0);
+      document.getElementById('prop-rz').value = (node.rotation.z * 180 / Math.PI).toFixed(0);
       document.getElementById('prop-label').value = node.label || '';
 
       const extra = document.getElementById('prop-extra');
@@ -1282,7 +1580,7 @@
     }
 
     // Property inputs update node
-    ['prop-x', 'prop-y', 'prop-z', 'prop-ry', 'prop-label'].forEach(id => {
+    ['prop-x', 'prop-y', 'prop-z', 'prop-rx', 'prop-ry', 'prop-rz', 'prop-label'].forEach(id => {
       const inp = document.getElementById(id);
       inp.addEventListener('input', () => {
         if (!selectedNode) return;
@@ -1291,7 +1589,9 @@
         if (id === 'prop-x') node.position.x = parseFloat(inp.value) || 0;
         if (id === 'prop-y') node.position.y = parseFloat(inp.value) || 0;
         if (id === 'prop-z') node.position.z = parseFloat(inp.value) || 0;
+        if (id === 'prop-rx') node.rotation.x = (parseFloat(inp.value) || 0) * Math.PI / 180;
         if (id === 'prop-ry') node.rotation.y = (parseFloat(inp.value) || 0) * Math.PI / 180;
+        if (id === 'prop-rz') node.rotation.z = (parseFloat(inp.value) || 0) * Math.PI / 180;
         if (id === 'prop-label') node.label = inp.value;
         renderer.updateMeshTransform(node);
       });
@@ -1387,15 +1687,22 @@
         // Check if it works or fails
         setTimeout(() => {
           const stats = engine.stats();
-          if (stats.structurallySound && (stats.activePowered > 0 || stats.spinning > 0)) {
+          if (stats.success) {
             const motion = stats.spinning > 0 ? ` Motion: ${stats.spinning} rotating part(s).` : '';
-            showModal('RUNNING', `Active: ${stats.activePowered} part(s) powered (total ${stats.powered}).${motion} Mass ${stats.totalMass} kg.`, 'good');
+            showModal('SUCCESS!', `All ${stats.loadsTotal} load(s) running off ${stats.sourcesPowered}/${stats.sourcesTotal} source(s).${motion} Mass ${stats.totalMass} kg.`, 'good');
           } else if (!stats.structurallySound) {
-            showModal('FAILURE!', `Structural failure detected. Check for overload, fractures, or electrical shorts.`, 'bad');
-          } else if (stats.sourcesPowered === 0 && stats.total > 0) {
-            showModal('NO POWER', `No power sources detected. Add a battery, engine, or boiler and connect it to something.`, 'warn');
-          } else if (stats.activePowered === 0 && stats.total > 0) {
-            showModal('IDLE', `Power is present but nothing is running. Add required parts (e.g., motor rotor / fan blades) and connect them.`, 'warn');
+            const modes = stats.failureModes.join(', ');
+            showModal('FAILURE!', `Failure mode(s): ${modes}. ${stats.failed} part(s) failed. Check bonds, terminals, and source inputs.`, 'bad');
+          } else if (stats.leaks > 0) {
+            showModal('LEAK', `${stats.leaks} unsealed pipe joint(s). Use Glue, Weld, or Paint on pipe connections to seal them.`, 'warn');
+          } else if (stats.sourcesTotal === 0 && stats.total > 0) {
+            showModal('NO POWER', `No power sources detected. Add a battery, outlet, water main, or engine and connect it to something.`, 'warn');
+          } else if (stats.sourcesPowered === 0 && stats.sourcesTotal > 0) {
+            showModal('STARVED', `Source(s) present but not running. Pumps need wire power; engines need fuel/shaft input.`, 'warn');
+          } else if (stats.loadsTotal === 0) {
+            showModal('NO LOAD', `Sources are powered but nothing consumes the output. Add a motor, bulb, or other load.`, 'warn');
+          } else if (stats.loadsRunning < stats.loadsTotal) {
+            showModal('PARTIAL', `${stats.loadsRunning}/${stats.loadsTotal} load(s) running. Some loads are not connected to a live source.`, 'warn');
           }
         }, 500);
       }
@@ -1462,12 +1769,21 @@
       document.getElementById('stat-mass').textContent = s.totalMass + ' kg';
       const statEl = document.getElementById('stat-status');
       if (engine.running) {
-        if (s.structurallySound) {
-          statEl.textContent = (s.activePowered > 0 || s.spinning > 0) ? 'Running' : 'Idle';
-          statEl.className = 'stat-val good';
-        } else {
+        if (!s.structurallySound) {
           statEl.textContent = 'FAILED';
           statEl.className = 'stat-val bad';
+        } else if (s.leaks > 0) {
+          statEl.textContent = `Leak (${s.leaks})`;
+          statEl.className = 'stat-val bad';
+        } else if (s.success) {
+          statEl.textContent = 'Success';
+          statEl.className = 'stat-val good';
+        } else if (s.activePowered > 0 || s.spinning > 0) {
+          statEl.textContent = 'Running';
+          statEl.className = 'stat-val good';
+        } else {
+          statEl.textContent = 'Idle';
+          statEl.className = 'stat-val';
         }
       } else {
         statEl.textContent = 'Ready';

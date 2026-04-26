@@ -640,7 +640,7 @@
         await wait(500);
 
         const themes = [
-            { name: 'colosseum', label: 'COLOSSEUM', color: '#CD853F', angle: 0 },
+            { name: 'colosseum', label: 'COLOSSEUM', color: '#A0522D', angle: 0 },
             { name: 'spaceace', label: 'SPACE ACE', color: '#00CCFF', angle: Math.PI * 0.5 },
             { name: 'undersea', label: 'DEEP SEA', color: '#00CED1', angle: Math.PI },
             { name: 'fibonacci', label: 'FIBONACCI', color: '#FFD700', angle: Math.PI * 1.5 },

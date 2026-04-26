@@ -31,11 +31,12 @@ const state = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONSTANTS
+// CONSTANTS — single source of truth: fasttrack.rules.json
+// Verified by test_card7_splits.js Scenario 10 (rules-sync); drift fails CI.
 // ═══════════════════════════════════════════════════════════════════════════
-const PEGS_PER_PLAYER = 5;
-const SAFE_ZONE_SIZE = 4;
-const PLAYER_COLORS = ['#FFC000', '#0050B5', '#CC0000', '#4B0082', '#FF6600', '#006400'];
+const PEGS_PER_PLAYER = 5;   // rules.json :: setup.pegs_per_player
+const SAFE_ZONE_SIZE = 4;   // rules.json :: geometry.safe_zone.holes_per_player
+const PLAYER_COLORS = ['#FFC000', '#0050B5', '#CC0000', '#4B0082', '#A0522D', '#006400'];
 const PLAYER_NAMES = ['Yellow', 'Blue', 'Red', 'Purple', 'Orange', 'Green'];
 
 // Techy bot names — shuffled and assigned at game init
@@ -240,24 +241,27 @@ const RANK_GLYPHS = {
   '8': '8', '9': '9', '10': '10', J: 'J', Q: 'Q', K: 'K', JOKER: '🃏'
 };
 
-// Build the card matrix into the substrate
+// Build the card matrix into the substrate.
+// Single source of truth: fasttrack.rules.json :: cards.{rank}.
+// Each row is z-tagged with its rule coordinate (z = x*y, x=2 = card category).
+// test_card7_splits.js Scenario 10 verifies row-by-row equivalence.
 function buildCardMatrix() {
   const matrix = [
-    // id    rank    moves  dir          release  replay  exitBullseye  isWild  noFastTrack
-    ['A', 'A', 1, 'clockwise', true, true, false, false, false],
-    ['2', '2', 2, 'clockwise', false, false, false, false, false],
-    ['3', '3', 3, 'clockwise', false, false, false, false, false],
-    ['4', '4', 4, 'backward', false, false, false, false, true],
-    ['5', '5', 5, 'clockwise', false, false, false, false, false],
-    ['6', '6', 6, 'clockwise', true, true, false, false, false],
-    ['7', '7', 7, 'clockwise', false, false, false, true, false],
-    ['8', '8', 8, 'clockwise', false, false, false, false, false],
-    ['9', '9', 9, 'clockwise', false, false, false, false, false],
-    ['10', '10', 10, 'clockwise', false, false, false, false, false],
-    ['J', 'J', 1, 'clockwise', false, true, true, false, false],
-    ['Q', 'Q', 1, 'clockwise', false, true, true, false, false],
-    ['K', 'K', 1, 'clockwise', false, true, true, false, false],
-    ['JOKER', '🃏', 1, 'clockwise', true, true, false, false, false],
+    // id    rank    moves  dir          release  replay  exitBullseye  isWild  noFastTrack   z
+    ['A', 'A', 1, 'clockwise', true, true, false, false, false],   // z=2
+    ['2', '2', 2, 'clockwise', false, false, false, false, false],   // z=4
+    ['3', '3', 3, 'clockwise', false, false, false, false, false],   // z=6
+    ['4', '4', 4, 'backward', false, false, false, false, true],    // z=8  (FT_LOSS_ON_4 z=48; CARD_4_BACKWARD z=36)
+    ['5', '5', 5, 'clockwise', false, false, false, false, false],   // z=10
+    ['6', '6', 6, 'clockwise', true, true, false, false, false],   // z=12 (CARD_6_DUAL z=34)
+    ['7', '7', 7, 'clockwise', false, false, false, true, false],   // z=14 (CARD_7_SPLIT z=38; CARD_7_FT_HANDOFF z=42)
+    ['8', '8', 8, 'clockwise', false, false, false, false, false],   // z=16
+    ['9', '9', 9, 'clockwise', false, false, false, false, false],   // z=18
+    ['10', '10', 10, 'clockwise', false, false, false, false, false],   // z=20
+    ['J', 'J', 1, 'clockwise', false, true, true, false, false],   // z=22
+    ['Q', 'Q', 1, 'clockwise', false, true, true, false, false],   // z=24
+    ['K', 'K', 1, 'clockwise', false, true, true, false, false],   // z=26
+    ['JOKER', '🃏', 1, 'clockwise', true, true, false, false, false],   // z=28
   ];
   for (const [id, rank, moves, direction, release, replay, exitBullseye, isWild, noFastTrack] of matrix) {
     state.cards.set(id, {
@@ -745,60 +749,91 @@ function calculateValidMoves() {
         for (let s = 0; s < steps; s++) {
           const h = trackSeq[s];
           const occ = state.board.get(h);
-          if (occ && occ.playerIdx === ci && s < steps - 1) { blocked = true; break; }
+          // rules.json :: MOV_NO_PASS_OWN (z=9) — cannot pass own peg
+          // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates exempt
+          if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
+            blocked = true; break;
+          }
         }
+        // rules.json :: MOV_NO_LAND_OWN (z=6) — cannot land on own peg
         const destOcc = state.board.get(dest);
         if (destOcc && destOcc.playerIdx === ci) blocked = true;
         if (!blocked) {
           moves.push({ type: 'move', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
 
-          // ── CHOICE: Enter FT when landing on an FT hole ──
-          // Also offer enterFastTrack so player can gain FT status on this turn
-          // Skip if peg must exit FT area (e.g., just exited bullseye)
-          // FastTrack entry is clockwise-only (never on backward/4).
+          // rules.json :: FT_ENTRY_EXACT (z=8) — exact landing on ft-* clockwise grants FT.
+          // rules.json :: FT_NO_BACKWARD_ENTRY (z=16) — !rules.noFastTrack guard (Card 4).
           if (dir === 'clockwise' && dest.startsWith('ft-') && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
             moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
           }
+        }
+      }
 
-          // ── FT EXIT OPTIONS ──
-          // When peg is on FT, offer exit at each intermediate FT hole along the path
-          if (peg.onFasttrack) {
-            for (let s = 0; s < steps - 1; s++) {
-              const h = trackSeq[s];
-              if (h.startsWith('ft-')) {
-                const exitOcc = state.board.get(h);
-                if (!exitOcc || exitOcc.playerIdx !== ci) {
-                  moves.push({
-                    type: 'exitFastTrack', pegIdx: pi, dest: h,
-                    steps: s + 1, from: peg.holeId,
-                    path: trackSeq.slice(0, s + 1)
-                  });
-                }
+      // ── PENULTIMATE FT HOLE → BULLSEYE CHOICE ──
+      // rules.json :: BULL_ENTRY_PENULTIMATE (z=18) — !FT peg may divert to
+      //               bullseye when penult lands on `ft-*` (clockwise only).
+      // rules.json :: BULL_ENTRY_1STEP_FT     (z=12) — FT peg may also divert
+      //               (no `!peg.onFasttrack` guard).
+      // rules.json :: BULL_NO_BACKWARD        (z=24) — `!rules.noFastTrack`.
+      // rules.json :: BULL_MAX_ONE_PEG        (z=30) — bullseye occupancy check.
+      // rules.json :: FT_RING_PASS_RELAX      (z=72) — own pegs on `ft-*`
+      //               intermediates are passable; penult itself must be free.
+      if (dir === 'clockwise' && !rules.noFastTrack &&
+        !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps - 1) {
+        const penultimate = trackSeq[steps - 2];
+        if (penultimate && penultimate.startsWith('ft-')) {
+          let bullPathBlocked = false;
+          for (let s = 0; s < steps - 1; s++) {
+            const h = trackSeq[s];
+            const occ = state.board.get(h);
+            if (occ && occ.playerIdx === ci) {
+              if (s === steps - 2 || !h.startsWith('ft-')) {
+                bullPathBlocked = true; break;
               }
             }
           }
-
-          // ── PENULTIMATE FT HOLE → BULLSEYE CHOICE ──
-          // If the second-to-last step lands on an FT hole, offer bullseye as alternative
-          if (!peg.onFasttrack && steps >= 2 && !rules.noFastTrack) {
-            const penultimate = trackSeq[steps - 2];
-            if (penultimate && penultimate.startsWith('ft-')) {
-              const bullOcc = state.board.get('bullseye');
-              if (!bullOcc || bullOcc.playerIdx !== ci) {
-                moves.push({
-                  type: 'enterBullseye', pegIdx: pi, dest: 'bullseye',
-                  steps, from: peg.holeId,
-                  path: [...trackSeq.slice(0, steps - 1), 'bullseye']
-                });
-              }
+          if (!bullPathBlocked) {
+            const bullOcc = state.board.get('bullseye');
+            if (!bullOcc || bullOcc.playerIdx !== ci) {
+              moves.push({
+                type: 'enterBullseye', pegIdx: pi, dest: 'bullseye',
+                steps, from: peg.holeId,
+                path: [...trackSeq.slice(0, steps - 1), 'bullseye']
+              });
             }
           }
         }
       }
 
-      // FastTrack ring traversal — peg is ON an FT hole but NOT yet in FT mode
-      // Offers to enter FT and traverse the inner ring using the card's value
-      // Skip if peg just exited bullseye (mustExitFasttrack) — it should head to safe zone
+      // ── FT EXIT OPTIONS ──
+      // rules.json :: FT_NO_PASS_OWN_FT  (z=32) — superseded for ft-* by relax;
+      //               concrete enforcement: cannot LAND on own ft-* hole.
+      // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are
+      //               passable; only suppress exit AT that hole (continue scan).
+      // rules.json :: FT_RING_CLOCKWISE  (z=24) — exits scan clockwise only.
+      if (peg.onFasttrack && dir === 'clockwise') {
+        const maxExitStep = Math.min(steps, trackSeq.length);
+        for (let s = 0; s < maxExitStep; s++) {
+          const h = trackSeq[s];
+          const occ = state.board.get(h);
+          if (occ && occ.playerIdx === ci) {
+            if (!h.startsWith('ft-')) break;
+            continue;
+          }
+          if (h.startsWith('ft-')) {
+            moves.push({
+              type: 'exitFastTrack', pegIdx: pi, dest: h,
+              steps: s + 1, from: peg.holeId,
+              path: trackSeq.slice(0, s + 1)
+            });
+          }
+        }
+      }
+
+      // ── FT RING TRAVERSAL (peg ON ft-*, not yet in FT mode) ──
+      // rules.json :: FT_RING_CLOCKWISE  (z=24) — clockwise traversal only.
+      // rules.json :: FT_NO_BACKWARD_ENTRY (z=16) — `!rules.noFastTrack`.
+      // rules.json :: FT_NO_PASS_OWN_FT  (z=32) — must exit at own ft-{bp}.
       if (dir === 'clockwise' && getHoleType(peg.holeId) === 'fasttrack' && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
         const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
         const ftSeq = [];
@@ -824,8 +859,12 @@ function calculateValidMoves() {
           for (let s = 0; s < steps; s++) {
             const h = ftSeq[s];
             const occ = state.board.get(h);
-            if (occ && occ.playerIdx === ci && s < steps - 1) { ftBlocked = true; break; }
+            // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates passable
+            if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
+              ftBlocked = true; break;
+            }
           }
+          // rules.json :: MOV_NO_LAND_OWN (z=6) — destination occupancy check
           const ftDestOcc = state.board.get(ftDest);
           if (ftDestOcc && ftDestOcc.playerIdx === ci) ftBlocked = true;
           if (!ftBlocked) {
@@ -845,7 +884,11 @@ function calculateValidMoves() {
   }
 
   // ── 7-SPLIT LOGIC ──
-  // If card is 7 and 2+ pegs are on the board, generate split combinations
+  // rules.json :: CARD_7_SPLIT       (z=38) — 2 pegs, a+b=7, both clockwise, both legal.
+  // rules.json :: CARD_7_SOLO        (z=40) — 1 peg in play → single 7-step move.
+  // rules.json :: CARD_7_FT_HANDOFF  (z=42) — FT-priority + on-ring constraint.
+  // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are passable.
+  // Three variants per (a, b, pi1, pi2): STANDARD | BULL-LEFT | BULL-RIGHT.
   if (rules.isWild && rules.movement === 7) {
     const activePegs = [];
     for (let pi = 0; pi < player.pegs.length; pi++) {
@@ -855,7 +898,85 @@ function calculateValidMoves() {
       }
     }
     if (activePegs.length >= 2) {
-      // Generate all (a, b) splits where a + b = 7, a >= 1, b >= 1
+      const _ownFt = `ft-${bp}`;
+
+      // Helper: is the rim half of length n (positions seq[0..n-1]) reachable?
+      // Cannot land on own peg. FT-ring relax (user_directive_2026-04-25):
+      // own pegs on `ft-*` intermediate holes do NOT block — pegs may pass each
+      // other on the ring; only the destination must be unoccupied by self.
+      const _rimReachable = (seq, n) => {
+        if (seq.length < n) return false;
+        for (let s = 0; s < n; s++) {
+          const h = seq[s];
+          const o = state.board.get(h);
+          if (!o || o.playerIdx !== ci) continue;
+          if (s === n - 1) return false;
+          if (!h.startsWith('ft-')) return false;
+        }
+        return true;
+      };
+
+      // Helper: build bullseye route for half of length n. Returns path or null.
+      // Conditions: n >= 2, seq[n-2] is an FT hole, no own pegs blocking path
+      // (penult must be free; FT-ring relax allows passing through own pegs on
+      // earlier `ft-*` intermediates).
+      const _bullPath = (seq, n) => {
+        if (n < 2 || seq.length < n) return null;
+        const penult = seq[n - 2];
+        if (!penult || !penult.startsWith('ft-')) return null;
+        for (let s = 0; s < n - 1; s++) {
+          const h = seq[s];
+          const o = state.board.get(h);
+          if (!o || o.playerIdx !== ci) continue;
+          if (s === n - 2) return null;
+          if (!h.startsWith('ft-')) return null;
+        }
+        return [...seq.slice(0, n - 1), 'bullseye'];
+      };
+
+      // Helper: FT-status rule (user_directive_2026-04-25, refined).
+      // General principle: "all pegs on FT must complete FT before any other
+      // move can be made." For a Card 7 split:
+      //   1. If the player has N FT pegs, the split must include min(N,2)
+      //      of them as either peg1 or peg2 (can't substitute a non-FT peg
+      //      while an FT peg is still available to use).
+      //   2. Each FT peg involved in the split must keep its half ENTIRELY
+      //      on the FT ring — every position in its path starts with 'ft-'.
+      //      Landing on own ft-{bp} counts as completion (still on FT).
+      //      Leaving FT mid-split (to outer rim, safe, or bullseye) is
+      //      forbidden — that's "leaving FT" which would lose FT for all.
+      //   3. Untouched FT pegs (when player has 3+ FT pegs) keep FT status.
+      //   4. Partial FT movement is legal — peg2 with only 2 steps left on
+      //      the ring may move 2 (doesn't have to complete).
+      const _ftPegCount = player.pegs.filter(p => p.onFasttrack).length;
+      const _isAllFT = (path) =>
+        Array.isArray(path) && path.every(h => typeof h === 'string' && h.startsWith('ft-'));
+      const _ftRuleOK = (path1, path2, peg1, peg2) => {
+        if (_ftPegCount === 0) return true;
+        const ftInSplit = (peg1.onFasttrack ? 1 : 0) + (peg2.onFasttrack ? 1 : 0);
+        if (ftInSplit < Math.min(_ftPegCount, 2)) return false;
+        if (peg1.onFasttrack && !_isAllFT(path1)) return false;
+        if (peg2.onFasttrack && !_isAllFT(path2)) return false;
+        return true;
+      };
+
+      // Bullseye occupancy gate — own peg already on bullseye blocks variants.
+      const _bullFree = () => {
+        const o = state.board.get('bullseye');
+        return !o || o.playerIdx !== ci;
+      };
+
+      const _pushSplit = (key, pi1, dest1, steps1, from1, path1, pi2, dest2, steps2, from2, path2) => {
+        // Both pegs cannot land on the same hole (would land on own peg).
+        if (dest1 === dest2) return;
+        if (moves.some(m => m._splitKey === key)) return;
+        moves.push({
+          type: 'split', _splitKey: key,
+          pegIdx: pi1, dest: dest1, steps: steps1, from: from1, path: path1,
+          peg2Idx: pi2, dest2, steps2, from2, path2,
+        });
+      };
+
       for (let a = 1; a <= 6; a++) {
         const b = 7 - a;
         for (let i = 0; i < activePegs.length; i++) {
@@ -864,50 +985,45 @@ function calculateValidMoves() {
             const pi1 = activePegs[i], pi2 = activePegs[j];
             const peg1 = player.pegs[pi1], peg2 = player.pegs[pi2];
 
-            // FT split rule: if peg1 is on FT and peg2 is NOT on FT,
-            // peg1 must move at least to its own FT hole (complete FT traversal)
-            // before peg2 can use the remaining moves
-            if (peg1.onFasttrack && !peg2.onFasttrack) {
-              const ownFt = `ft-${bp}`;
-              const ftSeq = getTrackSequence(peg1, player, 'clockwise');
-              const ownFtIdx = ftSeq.indexOf(ownFt);
-              // peg1 must move at least (ownFtIdx+1) steps to reach/pass own FT hole
-              if (ownFtIdx >= 0 && a < ownFtIdx + 1) continue;
-            }
-
             const seq1 = getTrackSequence(peg1, player, 'clockwise');
             const seq2 = getTrackSequence(peg2, player, 'clockwise');
             if (seq1.length < a || seq2.length < b) continue;
             const dest1 = seq1[a - 1], dest2 = seq2[b - 1];
-            // Check blocking for both halves
-            let blocked = false;
-            for (let s = 0; s < a; s++) {
-              const occ = state.board.get(seq1[s]);
-              if (occ && occ.playerIdx === ci && s < a - 1) { blocked = true; break; }
-            }
-            if (!blocked) {
-              const occ1 = state.board.get(dest1);
-              if (occ1 && occ1.playerIdx === ci) blocked = true;
-            }
-            if (!blocked) {
-              for (let s = 0; s < b; s++) {
-                const occ = state.board.get(seq2[s]);
-                if (occ && occ.playerIdx === ci && s < b - 1) { blocked = true; break; }
+
+            const aReachable = _rimReachable(seq1, a);
+            const bReachable = _rimReachable(seq2, b);
+            const path1Bull = _bullPath(seq1, a);
+            const path2Bull = _bullPath(seq2, b);
+            const bullOK = _bullFree();
+
+            // VARIANT 1: STANDARD (rim/FT both halves)
+            if (aReachable && bReachable) {
+              const path1 = seq1.slice(0, a);
+              const path2 = seq2.slice(0, b);
+              if (_ftRuleOK(path1, path2, peg1, peg2)) {
+                _pushSplit(`${pi1}:${a}-${pi2}:${b}`,
+                  pi1, dest1, a, peg1.holeId, path1,
+                  pi2, dest2, b, peg2.holeId, path2);
               }
             }
-            if (!blocked) {
-              const occ2 = state.board.get(dest2);
-              if (occ2 && occ2.playerIdx === ci) blocked = true;
+
+            // VARIANT 2: peg1 → bullseye, peg2 → rim
+            if (path1Bull && bReachable && bullOK) {
+              const path2 = seq2.slice(0, b);
+              if (_ftRuleOK(path1Bull, path2, peg1, peg2)) {
+                _pushSplit(`${pi1}:${a}B-${pi2}:${b}`,
+                  pi1, 'bullseye', a, peg1.holeId, path1Bull,
+                  pi2, dest2, b, peg2.holeId, path2);
+              }
             }
-            if (!blocked) {
-              // Avoid duplicate splits — (peg1=a, peg2=b) is unique from (peg1=b, peg2=a)
-              const key = `${pi1}:${a}-${pi2}:${b}`;
-              if (!moves.some(m => m._splitKey === key)) {
-                moves.push({
-                  type: 'split', _splitKey: key,
-                  pegIdx: pi1, dest: dest1, steps: a, from: peg1.holeId, path: seq1.slice(0, a),
-                  peg2Idx: pi2, dest2, steps2: b, from2: peg2.holeId, path2: seq2.slice(0, b),
-                });
+
+            // VARIANT 3: peg1 → rim, peg2 → bullseye
+            if (aReachable && path2Bull && bullOK) {
+              const path1 = seq1.slice(0, a);
+              if (_ftRuleOK(path1, path2Bull, peg1, peg2)) {
+                _pushSplit(`${pi1}:${a}-${pi2}:${b}B`,
+                  pi1, dest1, a, peg1.holeId, path1,
+                  pi2, 'bullseye', b, peg2.holeId, path2Bull);
               }
             }
           }
@@ -916,42 +1032,12 @@ function calculateValidMoves() {
     }
   }
 
-  // ── FT OVERTAKE CHECK ──
-  // Filter out FT moves where peg would overtake or land on own peg
-  // (must exit at previous FT hole instead — handled by generating alternate moves)
-  const ftOverrideMoves = [];
-  for (let mi = moves.length - 1; mi >= 0; mi--) {
-    const m = moves[mi];
-    if (m.type !== 'move') continue;
-    const peg = player.pegs[m.pegIdx];
-    if (!peg.onFasttrack) continue;
-    // Check path for own pegs on FT holes
-    let exitNeeded = -1;
-    for (let s = 0; s < m.path.length; s++) {
-      const h = m.path[s];
-      if (h.startsWith('ft-')) {
-        const occ = state.board.get(h);
-        if (occ && occ.playerIdx === ci && s < m.path.length - 1) {
-          exitNeeded = s;
-          break;
-        }
-      }
-    }
-    if (exitNeeded >= 0 && exitNeeded > 0) {
-      // Must exit at the FT hole BEFORE the blockage
-      const exitHole = m.path[exitNeeded - 1];
-      if (exitHole.startsWith('ft-')) {
-        moves[mi] = {
-          ...m, dest: exitHole, steps: exitNeeded,
-          path: m.path.slice(0, exitNeeded),
-          _ftExitForced: true,
-        };
-      }
-    } else if (exitNeeded === 0) {
-      // Blocked immediately — remove move
-      moves.splice(mi, 1);
-    }
-  }
+  // ── FT OVERTAKE CHECK (removed) ──
+  // Previously rewrote FT 'move' moves into forced exits when an own peg
+  // sat ahead on the ring. Under the FT-ring relax (user_directive_2026-04-25),
+  // pegs may PASS own pegs on `ft-*` holes — only landing is forbidden, and
+  // that's already enforced upstream in the move generator. Forced-exit
+  // alternatives are still surfaced by the FT EXIT OPTIONS block.
 
   // ── FASTTRACK PRIORITY RULE ──
   // If any of the player's pegs are on FastTrack, they MUST move a FT peg.
@@ -1393,8 +1479,10 @@ function executeMove(moveIdx) {
     case 'exitBullseye':
       placePeg(peg, move.dest, ci);
       peg.onFasttrack = false;
-      peg.eligibleForSafeZone = true;
       peg.mustExitFasttrack = true;
+      // eligibleForSafeZone is set by the universal circuit-completion block below
+      // ONLY when exit dest === own ft-{bp}. Backward-stepped exits to other FT holes
+      // do NOT complete a circuit on their own.
       if (window.ManifoldAudio) ManifoldAudio.playEnter();
       log(`${getCurrentPlayerName()} exited Bullseye! 🚀`);
       break;
@@ -1411,6 +1499,12 @@ function executeMove(moveIdx) {
         peg.lockedToSafeZone = true;
         peg.mood = 'RELAXED';
       }
+      if (move.dest === 'bullseye') {
+        peg.mood = 'TRIUMPHANT';
+        _deferredCutscenes.push(['bullseye', {
+          peg, playerColor: player.color, playerName: player.name, playerId: ci
+        }]);
+      }
       // Second peg moves
       const peg2 = player.pegs[move.peg2Idx];
       if (!peg2.eligibleForSafeZone && move.path2 && move.path2.includes(safeEntry)) {
@@ -1420,6 +1514,12 @@ function executeMove(moveIdx) {
       if (getHoleType(move.dest2) === 'safezone') {
         peg2.lockedToSafeZone = true;
         peg2.mood = 'RELAXED';
+      }
+      if (move.dest2 === 'bullseye') {
+        peg2.mood = 'TRIUMPHANT';
+        _deferredCutscenes.push(['bullseye', {
+          peg: peg2, playerColor: player.color, playerName: player.name, playerId: ci
+        }]);
       }
       log(`${getCurrentPlayerName()} split 7: peg moved ${move.steps} + ${move.steps2}`);
       break;
@@ -1432,6 +1532,7 @@ function executeMove(moveIdx) {
   //   2. Path/dest passes through player's own FT hole (ft-{bp}) — from FT or bullseye
   // Card 4 backward: passing safe entry counts, but can't back INTO safe zone
   //   (eligibility is set, but safe zone entry only happens on a forward turn)
+  // Strategic-move flourish: peg dances when it first becomes eligible.
   {
     const bp = player.boardPosition;
     const ownFT = `ft-${bp}`;
@@ -1442,6 +1543,9 @@ function executeMove(moveIdx) {
         move.dest === safeEntry || path.includes(safeEntry)) {
         peg.eligibleForSafeZone = true;
         log(`🔄 ${peg.nickname || peg.id} completed a circuit — eligible for safe zone`);
+        if (window.triggerPegPose && peg.id) {
+          setTimeout(() => window.triggerPegPose(peg.id, 'dance'), 0);
+        }
       }
     }
     // Split: also check peg2
@@ -1453,21 +1557,47 @@ function executeMove(moveIdx) {
           move.dest2 === safeEntry || path2.includes(safeEntry)) {
           peg2.eligibleForSafeZone = true;
           log(`🔄 ${peg2.nickname || peg2.id} completed a circuit — eligible for safe zone`);
+          if (window.triggerPegPose && peg2.id) {
+            setTimeout(() => window.triggerPegPose(peg2.id, 'dance'), 0);
+          }
         }
       }
     }
   }
 
   // ── FASTTRACK STATUS ENFORCEMENT ──
-  // enterFastTrack, enterBullseye, exitFastTrack, and FT-to-FT moves preserve
-  // OTHER pegs' FT status. exitFastTrack clears the moved peg's own status
-  // (already done above) but doesn't strip other pegs.
+  // rules.json :: FT_LOSS_ON_4           (z=48) — Card 4 strips ALL player FT pegs.
+  // rules.json :: FT_LOSS_ON_NON_FT_MOVE (z=56) — non-FT-traversing move strips at end of turn.
+  // rules.json :: FT_LOSS_VOLUNTARY_EXIT (z=64) — moved peg leaving ft-* loses FT.
+  // rules.json :: CARD_7_FT_HANDOFF      (z=42) — split FT-preservation rule.
   const destIsFT = getHoleType(move.dest) === 'fasttrack';
-  const isFTPreserving =
+  const _curCardForFT = state.deck.get('currentCard');
+  const _curCardRules = _curCardForFT ? CARDS[_curCardForFT.value] : null;
+  const cardStripsAllFT = !!(_curCardRules && _curCardRules.noFastTrack);
+
+  // Split FT-preservation (matches generation-time _ftRuleOK):
+  // FT is preserved iff every FT peg in the split kept its half entirely on
+  // the FT ring. Untouched FT pegs (3rd+) keep FT when this holds.
+  let _splitPreservesFT = false;
+  let _splitPeg2 = null;
+  if (move.type === 'split') {
+    _splitPeg2 = player.pegs[move.peg2Idx];
+    const _path1 = move.path || [];
+    const _path2 = move.path2 || [];
+    const _isAllFT = (path) =>
+      Array.isArray(path) && path.every(h => typeof h === 'string' && h.startsWith('ft-'));
+    const _peg1OK = !peg.onFasttrack || _isAllFT(_path1);
+    const _peg2OK = !_splitPeg2 || !_splitPeg2.onFasttrack || _isAllFT(_path2);
+    _splitPreservesFT = _peg1OK && _peg2OK;
+  }
+
+  const isFTPreserving = !cardStripsAllFT && (
     (move.type === 'enterFastTrack' && destIsFT) ||
     move.type === 'enterBullseye' ||
     move.type === 'exitFastTrack' ||
-    (move.type === 'move' && peg.onFasttrack && destIsFT);
+    (move.type === 'move' && peg.onFasttrack && destIsFT) ||
+    _splitPreservesFT
+  );
 
   if (!isFTPreserving) {
     // The moved peg itself loses FT if it was on FT and landed off it
@@ -1476,14 +1606,37 @@ function executeMove(moveIdx) {
       peg.fasttrackEntryHole = null;
       peg.mustExitFasttrack = false;
     }
+    // For splits, peg2 also moved — handle its individual landing identically
+    if (move.type === 'split' && _splitPeg2 && _splitPeg2.onFasttrack &&
+      getHoleType(move.dest2) !== 'fasttrack') {
+      _splitPeg2.onFasttrack = false;
+      _splitPeg2.fasttrackEntryHole = null;
+      _splitPeg2.mustExitFasttrack = false;
+    }
     // ALL other FT pegs also lose their status
     for (const p of player.pegs) {
-      if (p !== peg && p.onFasttrack) {
+      if (p === peg) continue;
+      if (move.type === 'split' && p === _splitPeg2) continue;
+      if (p.onFasttrack) {
         p.onFasttrack = false;
         p.fasttrackEntryHole = null;
         p.mustExitFasttrack = false;
         log(`⚠️ ${player.name}'s ${p.nickname || p.id} lost FastTrack status`);
       }
+    }
+  } else if (move.type === 'split') {
+    // Split preserved FT for the player overall, but moved pegs that landed
+    // off FT individually still lose their own FT status.
+    if (peg.onFasttrack && getHoleType(move.dest) !== 'fasttrack') {
+      peg.onFasttrack = false;
+      peg.fasttrackEntryHole = null;
+      peg.mustExitFasttrack = false;
+    }
+    if (_splitPeg2 && _splitPeg2.onFasttrack &&
+      getHoleType(move.dest2) !== 'fasttrack') {
+      _splitPeg2.onFasttrack = false;
+      _splitPeg2.fasttrackEntryHole = null;
+      _splitPeg2.mustExitFasttrack = false;
     }
   }
 
@@ -1491,8 +1644,15 @@ function executeMove(moveIdx) {
   syncPegMatrix();
 
   // Check win
+  // The home-hole peg must have completed a circuit (eligibleForSafeZone === true)
+  // to count as a real arrival — the 5th peg starts on home-{bp} at init and would
+  // otherwise trigger an instant win the moment the other 4 fill the safe zone.
   const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-  const onHome = player.pegs.filter(p => p.holeId === `home-${player.boardPosition}` && inSafe >= SAFE_ZONE_SIZE).length;
+  const onHome = player.pegs.filter(p =>
+    p.holeId === `home-${player.boardPosition}` &&
+    p.eligibleForSafeZone &&
+    inSafe >= SAFE_ZONE_SIZE
+  ).length;
   if (inSafe >= SAFE_ZONE_SIZE && onHome > 0) {
     state.meta.set('winner', ci);
     log(`🏆 ${getCurrentPlayerName()} WINS!`);
@@ -1556,8 +1716,14 @@ function executeMove(moveIdx) {
   // ── All cutscenes must complete before the next turn begins ──
   const advanceTurn = () => {
     if (state.meta.get('winner') !== null) {
+      const winnerName = getCurrentPlayerName();
       const gs = document.getElementById('game-status');
-      if (gs) gs.textContent = `🏆 ${getCurrentPlayerName()} WINS!`;
+      if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
+      if (typeof window !== 'undefined' && window.showReplayPrompt && !window._replayPromptShown) {
+        window._replayPromptShown = true;
+        // Defer so any in-flight cutscene/animation can play first
+        setTimeout(() => window.showReplayPrompt(winnerName), 1200);
+      }
       return;
     }
 
@@ -1675,13 +1841,55 @@ function botTurn() {
       // LogicLens: advance_delta × strategic_value → manifold z → move priority
       const _logicLens = window.FastTrackManifoldSubstrate?.lenses?.LogicLens;
 
+      // Circuit-completion lookups (used by scoring pass below)
+      const _bpForBot = player.boardPosition;
+      const _ownFTForBot = `ft-${_bpForBot}`;
+      const _safeEntryForBot = `outer-${_bpForBot}-2`;
+
+      // ── BULLSEYE RISK/REWARD (user_directive_2026-04-25) ──
+      // Bullseye is high-risk/high-reward. Score adjustment factors:
+      //   RISK   — opponent pegs on the open board can cut a bullseye-stuck peg
+      //            once it eventually exits; opponents on FT have a near-direct
+      //            path to bullseye and can cut on entry; you can only exit
+      //            bullseye on J/Q/K so each turn stuck = more cut chances.
+      //   REWARD — late game (most opponent pegs in safe zone) the board is
+      //            empty and the stuck-peg risk falls. A bullseye sit also
+      //            denies the spot to opponents.
+      // Result: _bullseyeAdjust is added to bullseye-related scores.
+      let _oppOnBoard = 0, _oppOnFT = 0, _oppInSafe = 0, _oppTotal = 0;
+      for (let _pi = 0; _pi < players.length; _pi++) {
+        if (_pi === ci) continue;
+        for (const _pg of players[_pi].pegs) {
+          _oppTotal++;
+          if (_pg.holeType === 'safezone' || _pg.holeType === 'home') _oppInSafe++;
+          else if (_pg.holeType !== 'holding') {
+            _oppOnBoard++;
+            if (_pg.onFasttrack) _oppOnFT++;
+          }
+        }
+      }
+      const _lateGameRatio = _oppTotal > 0 ? _oppInSafe / _oppTotal : 0;
+      const _threatPenalty = _oppOnBoard * 6 + _oppOnFT * 10;
+      const _safeBoardBonus = _lateGameRatio * 50;
+      const _bullseyeAdjust = Math.max(-90,
+        _safeBoardBonus - _threatPenalty * (1 - _lateGameRatio * 0.7));
+
       let bestIdx = 0, bestScore = -Infinity;
       for (let i = 0; i < vm.length; i++) {
         const m = vm[i];
         let score = Math.random() * 10; // small random tiebreaker
 
         if (m.type === 'enterFastTrack') score += w.fasttrack + 50;
-        else if (m.type === 'enterBullseye') score += w.fasttrack + 80;
+        else if (m.type === 'enterBullseye') {
+          score += w.fasttrack + 80 + _bullseyeAdjust;
+          // FT peg → bullseye is usually wasteful: traversing FT is faster.
+          // Only valuable if there's an opponent on bullseye to cut.
+          const _enterPeg = player.pegs[m.pegIdx];
+          const _bullOcc = state.board.get('bullseye');
+          const _isCut = _bullOcc && _bullOcc.playerIdx !== ci;
+          if (_enterPeg && _enterPeg.onFasttrack && !_isCut) score -= 60;
+          if (_isCut) { score += w.capture; m.captures = true; }
+        }
         else if (m.type === 'exitFastTrack') score += 20;
         else if (m.type === 'enter') score += 30;
         else if (m.type === 'exitBullseye') score += 40;
@@ -1699,6 +1907,98 @@ function botTurn() {
           if (getHoleType(m.dest) === 'safezone') { score += w.safe; m.toSafeZone = true; }
           // Risk: landing on exposed outer track
           if (getHoleType(m.dest) === 'outer') score += w.risk;
+        }
+
+        // ── CIRCUIT-COMPLETION BONUS ──
+        // If this move would set eligibleForSafeZone on a peg that doesn't have
+        // it yet, weight it heavily — it's the only way that peg can ever score.
+        // Covers Card-4 backward moves that land on/past the safe entry hole.
+        const _scoredPeg = player.pegs[m.pegIdx];
+        if (_scoredPeg && !_scoredPeg.eligibleForSafeZone) {
+          const _path = m.path || [];
+          const _passesOwnFT = m.dest === _ownFTForBot || _path.includes(_ownFTForBot);
+          const _passesSafeEntry = m.dest === _safeEntryForBot || _path.includes(_safeEntryForBot);
+          if (_passesOwnFT || _passesSafeEntry) {
+            m.completesCircuit = true;  // mark for LogicLens
+            score += 60;
+          }
+        }
+        // Split — also check peg2
+        if (m.type === 'split') {
+          const _scoredPeg2 = player.pegs[m.peg2Idx];
+          if (_scoredPeg2 && !_scoredPeg2.eligibleForSafeZone) {
+            const _path2 = m.path2 || [];
+            const _passesOwnFT2 = m.dest2 === _ownFTForBot || _path2.includes(_ownFTForBot);
+            const _passesSafeEntry2 = m.dest2 === _safeEntryForBot || _path2.includes(_safeEntryForBot);
+            if (_passesOwnFT2 || _passesSafeEntry2) {
+              m.completesCircuit = true;
+              score += 60;
+            }
+          }
+
+          // ── SPLIT STRATEGY EVALUATION (user_directive_2026-04-25) ──
+          // Bots must recognize the four high-value 7-split outcomes per half:
+          //   (1) FT-hole landing — positions a peg for FastTrack entry next turn
+          //   (2) Bullseye landing — best forward position on the board
+          //   (3) Safe-zone landing — "cleans up" a peg into the safe zone
+          //   (4) Cut shot — destination has an opponent peg
+          // Without these, splits get only the small random tiebreaker and bots
+          // pick splits arbitrarily, which makes them too easy to beat.
+          const _evalHalf = (dest, pegIdx) => {
+            if (!dest) return;
+            // Cut shot — opponent on destination
+            const occ = state.board.get(dest);
+            if (occ && occ.playerIdx !== ci) {
+              score += w.capture * 0.6;  // 60% weight per half (full split = both)
+              m.captures = true;
+              const movePeg = player.pegs[pegIdx];
+              if (movePeg && movePeg.rivalPegId && occ.pegId === movePeg.rivalPegId) {
+                score += 30;
+              }
+            }
+            // FT-hole positioning (peg lands ON its FT-ring node — sets up
+            // explicit enterFastTrack on a future turn)
+            if (typeof dest === 'string' && dest.startsWith('ft-')) {
+              score += 35;
+            }
+            // Bullseye landing — high-risk/high-reward: scaled by board state.
+            // FT-peg-to-bullseye on a split is usually wasteful unless cutting.
+            if (dest === 'bullseye') {
+              score += w.fasttrack + 50 + _bullseyeAdjust;
+              m.toBullseye = true;
+              const _movePeg = player.pegs[pegIdx];
+              const _bOcc = state.board.get('bullseye');
+              const _isCutB = _bOcc && _bOcc.playerIdx !== ci;
+              if (_movePeg && _movePeg.onFasttrack && !_isCutB) score -= 40;
+            }
+            // Safe-zone cleanup — moving a peg into safe zone via split half
+            if (getHoleType(dest) === 'safezone') {
+              score += w.safe * 0.6;
+              m.toSafeZone = true;
+            }
+            // Risk: outer-rim landing (matches single-move logic)
+            if (getHoleType(dest) === 'outer') {
+              score += w.risk * 0.5;
+            }
+          };
+          _evalHalf(m.dest, m.pegIdx);
+          _evalHalf(m.dest2, m.peg2Idx);
+
+          // Bonus when the split FULFILS the FT-reach-own-FT constraint —
+          // i.e. an FT peg's portion lands on/passes own ft-{bp}. This is the
+          // ONLY way a split keeps FT status alive for other FT pegs, so it
+          // should be preferred over splits that drop FT for everyone.
+          const _peg1 = player.pegs[m.pegIdx];
+          const _peg2 = player.pegs[m.peg2Idx];
+          if (_peg1?.onFasttrack || _peg2?.onFasttrack) {
+            const _ownFT = _ownFTForBot;
+            const _path1 = m.path || [];
+            const _path2b = m.path2 || [];
+            const _ftReached =
+              (_peg1?.onFasttrack && (m.dest === _ownFT || _path1.includes(_ownFT))) ||
+              (_peg2?.onFasttrack && (m.dest2 === _ownFT || _path2b.includes(_ownFT)));
+            if (_ftReached) score += 40;
+          }
         }
 
         // 🜂 LogicLens boost: z = advance_delta × strategic_value from manifold surface
@@ -1882,12 +2182,14 @@ const CutsceneManager = {
     if (window.CameraDirector) {
       const victimId = victimPeg.id || `peg-${victimPlayer.color}-0`;
       const victorId = victorPeg.id || `peg-${victorPlayer.color}-0`;
+      // Victim hangs head in shame as they get arc'd back to holding
+      if (window.triggerPegPose) window.triggerPegPose(victimId, 'shame');
       window.CameraDirector.followCutVictim(victimId, victorId, () => {
         // Victor reaction fires when camera switches to them
         this.showCelebrationGraphic('💪 VICTORY POSE! 💪', victorPlayer.color, false);
         this.showPegReaction(victorReaction, victorPlayer.color);
-        // Trigger victor pose animation in 3D
-        if (window.triggerPegPose) window.triggerPegPose(victorId, 'victory');
+        // Victor jumps around in celebration (more energetic than 'victory')
+        if (window.triggerPegPose) window.triggerPegPose(victorId, 'celebrate');
       });
     }
 
@@ -1919,6 +2221,9 @@ const CutsceneManager = {
     _manifoldEmit('fasttrack', { pegId: data.pegId, boardPos: data.boardPos || 0 });
     _manifoldStateUpdate();
 
+    // Peg dances on the FT ring entry
+    if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'dance');
+
     if (isFirst) {
       const reaction = getPegReaction(peg, 'onEnterFastTrack') || '⚡';
       this.showCelebrationGraphic('⚡ FASTTRACK! ⚡', playerColor, true);
@@ -1940,6 +2245,9 @@ const CutsceneManager = {
     if (window.ManifoldAudio) { ManifoldAudio.playBullseye(); ManifoldAudio.playFanfare('bullseye'); }
     _manifoldEmit('bullseye', { pegId: data.pegId, boardPos: 0 });
 
+    // Bullseye is the highest reward — celebrate (jumping + spin)
+    if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'celebrate');
+
     if (isFirst) {
       const reaction = getPegReaction(peg, 'onEnterBullseye') || '🎯';
       this.showCelebrationGraphic('🎯 BULLSEYE! 🎯', playerColor, true);
@@ -1959,6 +2267,9 @@ const CutsceneManager = {
     if (window.ManifoldAudio) { ManifoldAudio.playSafeZone(); ManifoldAudio.playFanfare('safeZone'); }
     _manifoldEmit('safezone', { pegId: data.pegId, boardPos: data.boardPos || 0 });
     _manifoldStateUpdate();
+
+    // Peg dances on safe-zone arrival
+    if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'dance');
 
     const reaction = getPegReaction(peg, 'onEnterSafeZone') || '🛡️';
     this.showCelebrationGraphic('🛡️ SAFE!', playerColor, true);

@@ -13,7 +13,7 @@ const GAMES = {
     brickbreaker3d: { title: 'BrickBreaker 3D', url: '/brickbreaker3d/index.html', multiplayer: true },
     starfighter: { title: 'StarFighter', url: '/starfighter/index.html', multiplayer: false },
     '4dtictactoe': { title: '4D TicTacToe', url: '/4DTicTacToe/index.html', multiplayer: true },
-    assemble: { title: 'Assemble', url: '/assemble/index.html', multiplayer: false },
+    cubic3d: { title: 'Cubic', url: '/cubic3d/index.html', multiplayer: false },
 };
 
 // ── MANIFOLD REGISTRY ─────────────────────────────────────────

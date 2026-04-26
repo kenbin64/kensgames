@@ -26,7 +26,7 @@
   const ManifoldBus = {
     emit(name, data) {
       (_h.get(name) || []).forEach(fn => fn(data));
-      (_h.get('*')  || []).forEach(fn => fn({ name, ...data }));
+      (_h.get('*') || []).forEach(fn => fn({ name, ...data }));
     },
     on(name, fn) {
       _h.set(name, [...(_h.get(name) || []), fn]);
@@ -87,8 +87,8 @@
     TRACK_MAX: 90,
     focus(pegData) {
       const entity = MI.ingest({
-        advance: Math.min(1, (pegData.boardPos  || 0) / this.TRACK_MAX),
-        threat:  Math.min(1, (pegData.threatCount || 0) / 4),
+        advance: Math.min(1, (pegData.boardPos || 0) / this.TRACK_MAX),
+        threat: Math.min(1, (pegData.threatCount || 0) / 4),
       }, {
         x: 'advance',
         y: d => 0.1 + d.threat * 0.9,   // floor glow even at zero threat
@@ -108,7 +108,7 @@
   const UILens = {
     focus(isHumanTurn, validMoveCount) {
       const entity = MI.ingest({
-        urgency:    isHumanTurn ? 1 : 0,
+        urgency: isHumanTurn ? 1 : 0,
         complexity: Math.min(1, validMoveCount / 12),
       }, { x: 'urgency', y: 'complexity', label: 'ui-speed', meta: { lens: 'UILens' } });
       const z = entity.manifold.z;
@@ -130,16 +130,22 @@
   const LogicLens = {
     score(move) {
       const strategic = Math.min(1,
-        (move.type === 'enterBullseye'  ? 1.0 : 0) +
+        (move.type === 'enterBullseye' ? 1.0 : 0) +
         (move.type === 'enterFastTrack' ? 0.7 : 0) +
-        (move.type === 'exitBullseye'   ? 0.5 : 0) +
-        (move.type === 'exitFastTrack'  ? 0.4 : 0) +
-        (move.type === 'enter'          ? 0.35: 0) +
-        (move.captures                  ? 0.8 : 0) +
-        (move.toSafeZone                ? 0.6 : 0)
+        (move.type === 'exitBullseye' ? 0.5 : 0) +
+        (move.type === 'exitFastTrack' ? 0.4 : 0) +
+        (move.type === 'enter' ? 0.35 : 0) +
+        (move.captures ? 0.8 : 0) +
+        (move.toSafeZone ? 0.6 : 0) +
+        (move.completesCircuit ? 0.9 : 0) +
+        (move.toBullseye ? 0.95 : 0)
       );
+      // For splits, sum the steps of both halves so advance reflects total board work
+      const totalSteps = move.type === 'split'
+        ? (Math.abs(move.steps || 0) + Math.abs(move.steps2 || 0))
+        : Math.abs(move.steps || move.count || 1);
       const entity = MI.ingest({
-        advance:   Math.min(1, Math.abs(move.steps || move.count || 1) / 14),
+        advance: Math.min(1, totalSteps / 14),
         strategic,
       }, { x: 'advance', y: 'strategic', label: 'move-score', meta: { lens: 'LogicLens' } });
       return entity.manifold.z;  // z = x · y IS the move priority
@@ -168,7 +174,7 @@
 
     // 4. UILens — write CSS custom props to draw button
     if (window.FastTrackCore) {
-      const ci   = window.FastTrackCore.state.players.get('current') || 0;
+      const ci = window.FastTrackCore.state.players.get('current') || 0;
       const pList = window.FastTrackCore.state.players.get('list') || [];
       const moves = window.FastTrackCore.state.turn.get('validMoves') || [];
       UILens.focus(pList[ci] && !pList[ci].isBot, moves.length);

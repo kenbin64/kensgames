@@ -21,6 +21,12 @@ const SFAudio = (function () {
   let _activeVoiceModule = 'au_female';
   const _pendingSpeechQueue = []; // deferred speaks awaiting voice load
 
+  // Natural-voice mode: when true, ignore each module's stylised rate/pitch
+  // and play the underlying neural/online voice at its native cadence. The
+  // per-module rate/pitch values stay on disk so we can flip this off once
+  // hand-recorded lines are available.
+  let _naturalVoiceMode = true;
+
   const VOICE_MODULES = {
     au_female: {
       label: 'Australian Female PA',
@@ -489,8 +495,13 @@ const SFAudio = (function () {
       }
 
       // ── Tier 4: quality preference (cloud/neural > local) ──
-      if (!v.localService) score += 12;
-      if (/online|neural|natural|enhanced/i.test(v.name)) score += 10;
+      // Bumped: with natural-voice mode (no pitch/rate distortion) the only
+      // way to sound human is to actually pick a neural voice. Push the
+      // weighting hard enough that a Microsoft/Google online voice will win
+      // over a local en-* match of the wrong gender.
+      if (!v.localService) score += 35;
+      if (/online|neural|natural|enhanced/i.test(v.name)) score += 30;
+      if (/multilingual/i.test(v.name)) score += 10;
 
       // ── Tier 5: hard penalties ──
       if (/generic|default|robot|espeak|festival/i.test(v.name)) score -= 100;
@@ -1761,8 +1772,11 @@ const SFAudio = (function () {
     const resolvedVoice = _voiceCacheByModule[moduleId] || _cachedVoice;
 
     const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = (opts.rate !== undefined ? opts.rate : voiceCfg.rate);
-    utter.pitch = (opts.pitch !== undefined ? opts.pitch : voiceCfg.pitch);
+    // Natural-voice mode forces rate=1.0 / pitch=1.0 so neural voices play
+    // as themselves. Explicit per-call opts.rate/opts.pitch always win.
+    const natural = _naturalVoiceMode;
+    utter.rate = (opts.rate !== undefined ? opts.rate : (natural ? 1.0 : voiceCfg.rate));
+    utter.pitch = (opts.pitch !== undefined ? opts.pitch : (natural ? 1.0 : voiceCfg.pitch));
     utter.volume = (opts.volume !== undefined ? opts.volume : voiceCfg.volume);
 
     if (resolvedVoice) {
@@ -1947,8 +1961,9 @@ const SFAudio = (function () {
     // Brief silence before speech (enemy slightly longer — "intercepted" feel)
     const preDelay = radioType === 'enemy' ? 160 : 90;
     setTimeout(() => {
-      // Estimate speech duration for post-click timing
-      const rateAdj = (voiceCfg && voiceCfg.rate) ? voiceCfg.rate : 1.0;
+      // Estimate speech duration for post-click timing. Natural mode plays
+      // at rate 1.0 regardless of per-module rate, so reflect that here.
+      const rateAdj = _naturalVoiceMode ? 1.0 : ((voiceCfg && voiceCfg.rate) ? voiceCfg.rate : 1.0);
       const estDuration = Math.max(800, (item.text.length * 62) / rateAdj);
 
       speak(item.text, {
@@ -2165,6 +2180,64 @@ const SFAudio = (function () {
     _strafeHissNodes.hissGain.gain.setTargetAtTime(vol, t, 0.02); // fast attack
   }
 
+  // ── Hull resonance buzz ─────────────────────────────────────────────
+  // Diegetic: alien drives radiate energy that resonates with our hull plating.
+  // Two detuned sawtooths through a bandpass filter, with an LFO wobbling the
+  // detune so the buzz reads as electromagnetic interference, not engine noise.
+  // Driven by setHullResonanceLevel(0..1) — proximity to nearest hostile.
+  let hullResonance = null;
+  let _hullResLevel = 0;
+  function startHullResonance() {
+    if (!ctx) init();
+    resume();
+    if (hullResonance) return;
+    const outGain = ctx.createGain();
+    outGain.gain.value = 0;
+    outGain.connect(masterGain);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 720;
+    bp.Q.value = 6;
+    bp.connect(outGain);
+    const oscA = ctx.createOscillator(); oscA.type = 'sawtooth'; oscA.frequency.value = 118;
+    const oscB = ctx.createOscillator(); oscB.type = 'sawtooth'; oscB.frequency.value = 124;
+    const gA = ctx.createGain(); gA.gain.value = 0.45;
+    const gB = ctx.createGain(); gB.gain.value = 0.45;
+    oscA.connect(gA); gA.connect(bp);
+    oscB.connect(gB); gB.connect(bp);
+    // LFO wobble on detune \u2014 the "energy resonance" shimmer.
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 6.3;
+    const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 14;
+    lfo.connect(lfoDepth); lfoDepth.connect(oscB.detune);
+    oscA.start(); oscB.start(); lfo.start();
+    hullResonance = { outGain, bp, oscA, oscB, gA, gB, lfo, lfoDepth };
+  }
+  function stopHullResonance() {
+    if (!hullResonance) return;
+    const t = ctx.currentTime;
+    hullResonance.outGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    const hr = hullResonance;
+    hullResonance = null;
+    setTimeout(() => {
+      try { hr.oscA.stop(); hr.oscB.stop(); hr.lfo.stop(); } catch (e) { }
+    }, 500);
+  }
+  // level 0..1 \u2014 caller passes proximity / pressure
+  function setHullResonanceLevel(level) {
+    if (!hullResonance) { if (level > 0.02) startHullResonance(); else return; }
+    if (!hullResonance) return;
+    const target = Math.max(0, Math.min(1, level));
+    _hullResLevel += (target - _hullResLevel) * 0.12;     // smooth
+    const t = ctx.currentTime;
+    const vol = Math.pow(_hullResLevel, 1.6) * 0.32;       // taper soft far, bite near
+    hullResonance.outGain.gain.setTargetAtTime(vol, t, 0.08);
+    // Bandpass climbs with intensity \u2014 buzz gets harsher and brighter as
+    // the source closes; pitch drifts up by a fifth at point-blank.
+    hullResonance.bp.frequency.setTargetAtTime(560 + _hullResLevel * 1300, t, 0.12);
+    hullResonance.lfo.frequency.setTargetAtTime(4 + _hullResLevel * 9, t, 0.15);
+    hullResonance.lfoDepth.gain.setTargetAtTime(8 + _hullResLevel * 26, t, 0.15);
+  }
+
   // ── Override a named crew member's voice module (e.g. let player pick commander accent) ──
   function setCrewVoiceModule(crewName, moduleId) {
     if (!VOICE_MODULES[moduleId]) return false;
@@ -2198,6 +2271,12 @@ const SFAudio = (function () {
   };
   function getPlayerVoiceMenu() { return PLAYER_VOICE_MENU; }
 
+  // ── Natural-voice mode toggle ──
+  // true (default): rate=1.0, pitch=1.0 — neural voices play as themselves.
+  // false: each module's stylised rate/pitch is applied (legacy mode).
+  function setNaturalVoiceMode(on) { _naturalVoiceMode = !!on; }
+  function isNaturalVoiceMode() { return _naturalVoiceMode; }
+
   return {
     init,
     resume,
@@ -2219,11 +2298,16 @@ const SFAudio = (function () {
     startStrafeHiss,
     stopStrafeHiss,
     setStrafeLevel,
+    startHullResonance,
+    stopHullResonance,
+    setHullResonanceLevel,
     setVoiceModule,
     getVoiceModule,
     listVoiceModules,
     setCrewVoiceModule,
     getPlayerVoiceMenu,
+    setNaturalVoiceMode,
+    isNaturalVoiceMode,
     debugVoiceScores,
     getCtx: () => ctx,
     getMasterGain: () => masterGain

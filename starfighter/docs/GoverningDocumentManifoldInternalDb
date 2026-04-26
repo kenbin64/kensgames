@@ -1,0 +1,117 @@
+
+From
+↓  To
+→
+LATEN
+T
+OBSE
+RVED
+MATE
+RIAL-
+IZING
+ACTIV
+E
+RESO
+N-
+ATING
+DAMP
+ENING
+COLLA
+PSING
+COLLA
+PSED
+allocat
+ed
+MATE
+RIALI
+ZING
+✗ ✗ ✗  ✓
+Algebr
+a
+compu
+ted
+✗ ✗ ✗ ✗
+ACTIV
+E
+✗ ✗ ✗ ✗  First✓
+R/W
+operati
+on
+✗ ✗ ✗
+RESO
+NATI
+NG
+✗ ✗ ✗ ✗ ✗  ✓
+Freq.
+below
+thresh
+old
+✗ ✗
+DAMP
+ENIN
+G
+✗ ✗ ✗ ✗  Re-✓
+excitat
+ion
+(new
+R/W)
+✗  ✓
+Dampe
+ning
+elapse
+d
+✗
+COLL
+APSI
+NG
+✗ ✗ ✗ ✗ ✗ ✗ ✗  Refs ✓
+releas
+ed;
+archiv
+ed
+COLL
+APSE
+D
+ ✓
+Resour
+ces
+reclai
+med
+✗ ✗ ✗ ✗ ✗ ✗ ✗
+NOTE
+The only non-sequential transition is DAMPENING → RESONATING (re-
+excitation), which occurs when a dampening point receives new read/write
+activity, restoring its resonance frequency above the collapse threshold. All
+other transitions follow the strict lifecycle sequence. The lifecycle is circular:
+COLLAPSED → LATENT completes the cycle.
+ButterflyFX™ Governing Document v1.0 — Confidential — © 2026 Kenneth Bingham
+Appendix C — Figure Index
+Figure Title Section
+Figure 1 Manifold Topology —
+Linear (z = xy) and
+Quadratic (z = xy²)
+Surfaces
+Section 2.4
+Figure 2 Gyroid Substrate — Dual
+Labyrinth Architecture
+Section 3.4
+Figure 3 The Resonant Lifecycle
+— Eight Phases of
+Manifold Point Evolution
+Section 4.4
+Figure 4 Bloom/Collapse
+Mechanics — Symmetric
+State Transitions
+Section 5.5
+Figure 5 Dimensional Flow —
+Axes, Traversal, and
+Rules
+Section 6.4
+Figure 6 Resolver Architecture —
+Six-Stage Pipeline
+Section 7.4
+— END OF DOCUMENT —
+“Store Geometry, Not Bytes™”
+ButterflyFX™ Dimensional Programming Engine
+Governing Document v1.0
+April 2026

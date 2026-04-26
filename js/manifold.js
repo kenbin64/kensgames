@@ -20,6 +20,8 @@
  *
  * STORAGE: 16 bytes per point (two Float64s in a typed array)
  * SURFACE: Schwarz Diamond + Gyroid blend — computed, never stored
+ *   Gyroid is the canonical substrate; Schwartz Diamond is an auxiliary lens.
+ *   See docs/SUBSTRATES.md for role split.
  * LENSES:  Pure functions from (x, y, z) → any domain
  *
  * One VPS. One equation. Infinite projections.
@@ -105,6 +107,37 @@ const Manifold = (() => {
   // m = x · y · z — manifold value (full multiplicative coupling of all 3 axes)
   function _z(x, y) { return x * y * y; }
   function _m(x, y, z) { return x * y * z; }
+
+  // COMPOSITION EQUATIONS — z as the sum of its parts
+  // zSum: straight sum of parts → whole.
+  // zFib: nth Fibonacci value; each whole = sum of the two prior wholes.
+  // zFibSeries: the first n Fibonacci wholes, [F(1)..F(n)].
+  function _zSum(parts) {
+    if (!parts || !parts.length) return 0;
+    let s = 0; for (let i = 0; i < parts.length; i++) s += +parts[i] || 0;
+    return s;
+  }
+  function _zFib(n) {
+    if (n <= 0) return 0;
+    let a = 0, b = 1;
+    for (let i = 1; i < n; i++) { const t = a + b; a = b; b = t; }
+    return b;
+  }
+  function _zFibSeries(n) {
+    const out = []; let a = 0, b = 1;
+    for (let i = 0; i < n; i++) { out.push(b); const t = a + b; a = b; b = t; }
+    return out;
+  }
+
+  // PROJECTION EQUATIONS — y as the division of x by the whole
+  // yLinear:    y = x / z         (linear inverse of z = x·y)
+  // yQuadratic: y = √(z / x)      (inverse of z = x·y²; "x divided by z²" framing)
+  function _yLinear(x, z) { return z === 0 ? 0 : x / z; }
+  function _yQuadratic(x, z) {
+    if (x === 0) return 0;
+    const r = z / x;
+    return r < 0 ? -Math.sqrt(-r) : Math.sqrt(r);
+  }
 
   function _surface(x, y) {
     const z = _z(x, y);
@@ -484,15 +517,32 @@ const Manifold = (() => {
       ids[count] = id;
       xs[count] = _xy[off];
       ys[count] = _xy[off + 1];
-      rs[count] = m?.radius || 10;
-      // Insert into grid cell + neighboring cells for objects that span boundaries
+      // Live radius/type from entity ref — radius is set after place() during
+      // per-type spawn (e.g. e.radius = dim('entity.bomber.radius')). Reading
+      // the stored snapshot leaves every entity at the constructor default of
+      // 10, collapsing every span to zero and losing capital-ship pairs.
+      rs[count] = (m?.ref?.radius != null) ? m.ref.radius : (m?.radius || 10);
+      // Insert into grid cell(s). Projectiles get span=1 so a fast bolt in cell X
+      // still meets a target in cell X±1 (fixes the original tunneling bug where
+      // lasers passed through enemies on adjacent-cell boundaries). Non-projectile
+      // small entities use span=0 — they move slowly enough that next-frame coverage
+      // is sufficient. Large entities span proportional to radius, capped to keep
+      // capital-ship insertion bounded (radius 5000 → 5×5 = 25 cells, not 17×17).
       const cx = (xs[count] / _gridCellSize) | 0;
       const cy = (ys[count] / _gridCellSize) | 0;
       const r = rs[count];
-      const span = r > _gridCellSize * 0.5 ? 1 : 0; // large objects check neighbors
-      for (let dx = -span; dx <= span; dx++) {
-        for (let dy = -span; dy <= span; dy++) {
-          _getCell((cx + dx) + ',' + (cy + dy)).push(count);
+      const t = m?.ref?.type || m?.type;
+      const isProj = t === 'laser' || t === 'torpedo' || t === 'machinegun' || t === 'bomb';
+      const span = r > _gridCellSize * 0.5
+        ? Math.min(3, Math.ceil(r / _gridCellSize))
+        : (isProj ? 1 : 0);
+      if (span === 0) {
+        _getCell(cx + ',' + cy).push(count);
+      } else {
+        for (let dx = -span; dx <= span; dx++) {
+          for (let dy = -span; dy <= span; dy++) {
+            _getCell((cx + dx) + ',' + (cy + dy)).push(count);
+          }
         }
       }
       count++;
@@ -667,9 +717,12 @@ const Manifold = (() => {
   // store game state at coordinates, not raw entity data.
   // ══════════════════════════════════════════════════════════════════════════
 
+  // write() chains revisions via `prev` so each coordinate keeps its full
+  // delta stack. read() still returns the latest data — callers unchanged.
   function write(coordinate, data) {
     const hash = _coordHash(coordinate);
-    _data.set(hash, { coordinate, data, timestamp: Date.now() });
+    const prev = _data.get(hash) || null;
+    _data.set(hash, { coordinate, data, timestamp: Date.now(), prev });
     return hash;
   }
 
@@ -681,6 +734,22 @@ const Manifold = (() => {
 
   function readAll() {
     return Array.from(_data.values());
+  }
+
+  // history(coord) → revisions newest-first as [{data, timestamp}, ...]
+  function history(coordinate) {
+    const out = [];
+    let cur = _data.get(_coordHash(coordinate));
+    while (cur) { out.push({ data: cur.data, timestamp: cur.timestamp }); cur = cur.prev; }
+    return out;
+  }
+
+  // at(coord, t) → the data revision active at timestamp t (the newest entry
+  // whose timestamp ≤ t). Returns null if t predates the first write.
+  function at(coordinate, t) {
+    let cur = _data.get(_coordHash(coordinate));
+    while (cur) { if (cur.timestamp <= t) return cur.data; cur = cur.prev; }
+    return null;
   }
 
   function queryNearby(center, radius = 10) {
@@ -749,6 +818,221 @@ const Manifold = (() => {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // DIMENSIONAL FRAMEWORK — the five verbs, seeds, lenses, presences
+  //
+  // ingest → expand → invoke → collapse → oscillate. Per the dimensional
+  // equation: identity rides on the manifold; behavior is plucked, not stored.
+  // Frame-indexed clock keeps oscillation deterministic across multiplayer
+  // and replays. Per-frame memoization keeps lens calls O(1) amortized.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const Dim = (() => {
+    const FIB = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987];
+    let _frame = 0;
+    let _now = 0;
+    let _dt = 1 / 60;
+    const _cache = new Map();
+
+    let _nextKind = 1;
+    const _kindByName = new Map();
+    function kind(name) {
+      let k = _kindByName.get(name);
+      if (k === undefined) { k = _nextKind++; _kindByName.set(name, k); }
+      return k;
+    }
+
+    function seed(k, identity, ancestry) {
+      return { kind: k, fib: 1, identity: identity, ancestry: ancestry || [] };
+    }
+
+    function ingest(k, identity) {
+      return seed(typeof k === 'number' ? k : kind(k), identity, []);
+    }
+
+    function expand(s, divider) {
+      const parts = divider ? divider(s) : [];
+      const i = Math.min(s.fib + 1, FIB.length - 1);
+      const childFib = FIB[i] || s.fib + 1;
+      const ancestry = s.ancestry.concat([s]);
+      return {
+        seed: s, fib: childFib,
+        structure: parts.map(p => ({ kind: s.kind, fib: childFib, identity: p, ancestry })),
+      };
+    }
+
+    function collapse(b, gatherer) {
+      const collapsed = gatherer ? gatherer(b) : (b.seed ? b.seed.identity : b);
+      const k = b.seed ? b.seed.kind : b.kind;
+      const ancestry = b.seed ? b.seed.ancestry.concat([b.seed]) : [];
+      return seed(k, collapsed, ancestry);
+    }
+
+    function oscillate(s, period) {
+      const fibPeriod = FIB[(s && s.fib != null ? s.fib : 1) % FIB.length] || 1;
+      const p = period || fibPeriod;
+      return Math.sin(((_frame % p) / p) * Math.PI * 2);
+    }
+
+    const _lenses = new Map();
+    function defineLens(id, fn) { _lenses.set(id, fn); return id; }
+    function observe(s, state, lens) {
+      const fn = typeof lens === 'function' ? lens : _lenses.get(lens);
+      if (!fn) return undefined;
+      const lensTag = typeof lens === 'function' ? (lens.name || '_anon') : lens;
+      const idTag = (s && s.identity && s.identity.id) != null
+        ? s.identity.id
+        : (s && s.identity != null ? s.identity : '_void');
+      const key = _frame + '|' + lensTag + '|' + idTag;
+      if (_cache.has(key)) return _cache.get(key);
+      const v = fn(s, state, Dim);
+      _cache.set(key, v);
+      return v;
+    }
+
+    function invoke(s, lens, state) { return observe(s, state, lens); }
+
+    // Presence: derive an entity's spatial occupancy this frame.
+    // Projectiles: swept segment from previous → current position.
+    // Other entities: sphere at current position.
+    // shape: 0 = sphere, 1 = segment. Pure: allocates one fresh presence.
+    // For the hot per-pair narrow phase use intersectsEntities(a, b, dt) — it
+    // computes both presences in locals and allocates nothing.
+    function presence(e, dt) {
+      if (!e || !e.position) return null;
+      const r = e.radius != null ? e.radius : 10;
+      const t = e.type;
+      const isProj = t === 'laser' || t === 'torpedo' || t === 'machinegun' || t === 'bomb';
+      const stepDt = dt != null ? dt : _dt;
+      const ez = e.position.z || 0;
+      if (isProj && e.velocity) {
+        return {
+          shape: 1, radius: r,
+          p0x: e.position.x - e.velocity.x * stepDt,
+          p0y: e.position.y - e.velocity.y * stepDt,
+          p0z: ez - (e.velocity.z || 0) * stepDt,
+          p1x: e.position.x, p1y: e.position.y, p1z: ez,
+        };
+      }
+      return { shape: 0, radius: r, p0x: e.position.x, p0y: e.position.y, p0z: ez };
+    }
+
+    // Allocation-free presence resolver. Pure entities → six floats per side.
+    // Keeps the narrow phase O(1) garbage in dense scenes (164 rocks * waves).
+    function _resolve(e, dt, out) {
+      const r = e.radius != null ? e.radius : 10;
+      const t = e.type;
+      const isProj = t === 'laser' || t === 'torpedo' || t === 'machinegun' || t === 'bomb';
+      const stepDt = dt != null ? dt : _dt;
+      const ez = e.position.z || 0;
+      out.r = r;
+      if (isProj && e.velocity) {
+        out.shape = 1;
+        out.p0x = e.position.x - e.velocity.x * stepDt;
+        out.p0y = e.position.y - e.velocity.y * stepDt;
+        out.p0z = ez - (e.velocity.z || 0) * stepDt;
+        out.p1x = e.position.x; out.p1y = e.position.y; out.p1z = ez;
+      } else {
+        out.shape = 0;
+        out.p0x = e.position.x; out.p0y = e.position.y; out.p0z = ez;
+      }
+    }
+    const _pa = { shape: 0, r: 0, p0x: 0, p0y: 0, p0z: 0, p1x: 0, p1y: 0, p1z: 0 };
+    const _pb = { shape: 0, r: 0, p0x: 0, p0y: 0, p0z: 0, p1x: 0, p1y: 0, p1z: 0 };
+    function intersectsEntities(a, b, dt) {
+      if (!a || !a.position || !b || !b.position) return false;
+      _resolve(a, dt, _pa);
+      _resolve(b, dt, _pb);
+      const rSum = _pa.r + _pb.r;
+      const rSumSq = rSum * rSum;
+      if (_pa.shape === 0 && _pb.shape === 0) {
+        const dx = _pa.p0x - _pb.p0x, dy = _pa.p0y - _pb.p0y, dz = _pa.p0z - _pb.p0z;
+        return dx * dx + dy * dy + dz * dz < rSumSq;
+      }
+      let A = _pa, B = _pb;
+      if (A.shape === 0) { A = _pb; B = _pa; }
+      const ax = A.p0x, ay = A.p0y, az = A.p0z;
+      const dx = A.p1x - ax, dy = A.p1y - ay, dz = A.p1z - az;
+      const dLen2 = dx * dx + dy * dy + dz * dz;
+      let bx, by, bz;
+      if (B.shape === 0) { bx = B.p0x; by = B.p0y; bz = B.p0z; }
+      else { bx = (B.p0x + B.p1x) * 0.5; by = (B.p0y + B.p1y) * 0.5; bz = (B.p0z + B.p1z) * 0.5; }
+      let t = 0;
+      if (dLen2 > 1e-6) {
+        t = ((bx - ax) * dx + (by - ay) * dy + (bz - az) * dz) / dLen2;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+      }
+      const cx = ax + dx * t - bx, cy = ay + dy * t - by, cz = az + dz * t - bz;
+      return cx * cx + cy * cy + cz * cz < rSumSq;
+    }
+
+    // Swept sphere (segment p0→p1 of radius pr) vs static sphere at (sx,sy,sz)
+    // of radius sr. Raw-numbers API so callers iterating typed arrays don't
+    // need to synthesize entity objects. Closest point on segment to sphere
+    // centre, then sphere-vs-sphere test at that point.
+    function intersectsSweptSphere(p0x, p0y, p0z, p1x, p1y, p1z, pr, sx, sy, sz, sr) {
+      const dx = p1x - p0x, dy = p1y - p0y, dz = p1z - p0z;
+      const dLen2 = dx * dx + dy * dy + dz * dz;
+      let t = 0;
+      if (dLen2 > 1e-6) {
+        t = ((sx - p0x) * dx + (sy - p0y) * dy + (sz - p0z) * dz) / dLen2;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+      }
+      const cx = p0x + dx * t - sx, cy = p0y + dy * t - sy, cz = p0z + dz * t - sz;
+      const rSum = pr + sr;
+      return cx * cx + cy * cy + cz * cz < rSum * rSum;
+    }
+
+    function intersects(pa, pb) {
+      if (!pa || !pb) return false;
+      const rSum = pa.radius + pb.radius;
+      const rSumSq = rSum * rSum;
+      if (pa.shape === 0 && pb.shape === 0) {
+        const dx = pa.p0x - pb.p0x, dy = pa.p0y - pb.p0y, dz = pa.p0z - pb.p0z;
+        return dx * dx + dy * dy + dz * dz < rSumSq;
+      }
+      // Ensure A is the segment (or first segment for segment-segment pairs)
+      let A = pa, B = pb;
+      if (A.shape === 0) { A = pb; B = pa; }
+      const ax = A.p0x, ay = A.p0y, az = A.p0z;
+      const dx = A.p1x - ax, dy = A.p1y - ay, dz = A.p1z - az;
+      const dLen2 = dx * dx + dy * dy + dz * dz;
+      let bx, by, bz;
+      if (B.shape === 0) { bx = B.p0x; by = B.p0y; bz = B.p0z; }
+      else {
+        bx = (B.p0x + B.p1x) * 0.5; by = (B.p0y + B.p1y) * 0.5; bz = (B.p0z + B.p1z) * 0.5;
+      }
+      let t = 0;
+      if (dLen2 > 1e-6) {
+        t = ((bx - ax) * dx + (by - ay) * dy + (bz - az) * dz) / dLen2;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+      }
+      const cx = ax + dx * t - bx, cy = ay + dy * t - by, cz = az + dz * t - bz;
+      return cx * cx + cy * cy + cz * cz < rSumSq;
+    }
+
+    function tick(dt) {
+      _frame++;
+      const step = dt != null ? dt : 1 / 60;
+      _now += step;
+      _dt = step;
+      _cache.clear();
+    }
+
+    function frame() { return _frame; }
+    function now() { return _now; }
+    function dt() { return _dt; }
+
+    return {
+      ingest, expand, collapse, invoke, oscillate,
+      seed, kind,
+      defineLens, observe,
+      presence, intersects, intersectsEntities, intersectsSweptSphere,
+      tick, frame, now, dt,
+      FIB,
+    };
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
   // PUBLIC API — same surface. 17.5x less memory.
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -782,6 +1066,15 @@ const Manifold = (() => {
     surface: _surface,    // Schwartz Diamond + gyroid + blend at (x,y)
     position3d: _position3d,
 
+    // Composition equations (z as the sum of its parts)
+    zSum: _zSum,
+    zFib: _zFib,
+    zFibSeries: _zFibSeries,
+
+    // Projection equations (y as the division of x by the whole)
+    yLinear: _yLinear,
+    yQuadratic: _yQuadratic,
+
     // Ingestion (data → two numbers, source dropped)
     ingest,
     ingestAll,
@@ -789,10 +1082,12 @@ const Manifold = (() => {
     nearest,
     resolveAxis,
 
-    // Data storage (substrate compat)
+    // Data storage (substrate compat) — write() chains revisions; read() returns latest
     write,
     read,
     readAll,
+    history,
+    at,
     queryNearby,
 
     // Surface math (pure functions, zero storage)
@@ -801,6 +1096,11 @@ const Manifold = (() => {
     // 🍴 Dining Philosophers — fork-based race condition eliminator
     // Every app/game shares this. No duplication.
     DiningPhilosophers,
+
+    // Dimensional framework — five verbs, seeds, lenses, presences,
+    // deterministic frame clock. Per docs/proposed_rules.md and
+    // starfighter/docs/dimensinal_equation.md.
+    dim: Dim,
 
     // Events
     on,

@@ -621,7 +621,7 @@ const LobbyMessageIntents = {
             const slot = data.assigned_slot;
             const slotType = data.slot_type;
             const avatarEmojis = { person_smile: '😊', person_cool: '😎', animal_lion: '🦁', animal_fox: '🦊', space_rocket: '🚀', fantasy_dragon: '🐲', scifi_robot: '🤖', sport_soccer: '⚽' };
-            const playerColors = ['#ff2020', '#2196ff', '#4caf50', '#ffeb3b', '#ff9800', '#9c27b0'];
+            const playerColors = ['#ff2020', '#2196ff', '#4caf50', '#ffeb3b', '#a0522d', '#9c27b0'];
 
             (slotType === 'replace-bot' && gameState.players[slot]) ? (() => {
                 gameState.players[slot].isAI = false;
@@ -8732,7 +8732,7 @@ function createNewPlayerSlot(request) {
     if (!availableSlots.hasEmptySlot) return -1;
 
     // Create new player with fresh start
-    const playerColors = ['#ff2020', '#2196ff', '#4caf50', '#ffeb3b', '#ff9800', '#9c27b0'];
+    const playerColors = ['#ff2020', '#2196ff', '#4caf50', '#ffeb3b', '#a0522d', '#9c27b0'];
     const newPlayer = {
         name: request.name,
         avatar: request.avatar,

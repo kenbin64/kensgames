@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KensGames — World Class Arcade Portal</title>
     <meta name="description"
-        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D, Alien Space Attack, 4D TicTacToe and Assemble. Powered by a geometry-driven game engine unlike anything else.">
+        content="KensGames — A world-class arcade gaming portal. Play FastTrack, BrickBreaker3D, Alien Space Attack, 4D TicTacToe and Cubic. Powered by a geometry-driven game engine unlike anything else.">
 
     <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
     <link rel="apple-touch-icon" href="/assets/images/logo/logo_thumbnail.png">
@@ -752,6 +752,10 @@
 
         .game-card:nth-child(5) {
             animation-delay: 0.45s;
+        }
+
+        .game-card:nth-child(6) {
+            animation-delay: 0.55s;
         }
 
         .game-card:hover {
@@ -1588,15 +1592,24 @@
                             decoding="async" fetchpriority="low" />
                     </div>
                     <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_landing.png"
-                                src="/assets/images/assembler_landing.png" alt="Assemble" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_lobby.png"
-                                src="/assets/images/assembler_lobby.png" alt="Assemble Lobby" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
+                        <div class="mini"></div>
                         <button class="go" onclick="goToGame('/brickbreaker3d/')">PLAY &#9654;</button>
+                    </div>
+                </div>
+
+                <div class="console" role="group" aria-label="Cubic 3D Tetris console"
+                    style="border-color: rgba(0,238,255,0.22)">
+                    <div class="console-head">
+                        <div class="console-title">Cubic</div>
+                        <div class="console-tag">3D Tetris</div>
+                    </div>
+                    <div class="console-screen"
+                        style="background:linear-gradient(160deg,#04040c,#0a1a2e);display:flex;align-items:center;justify-content:center;min-height:100px;">
+                        <span style="font-size:48px;opacity:0.75;">&#11035;</span>
+                    </div>
+                    <div class="console-foot">
+                        <div class="mini"></div>
+                        <button class="go" onclick="goToGame('/cubic3d/')">PLAY &#9654;</button>
                     </div>
                 </div>
 
@@ -1729,8 +1742,8 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
-                    <img data-imgatlas="auto" data-pngsrc="/4DTicTacToe/assets/images/manifold.png"
-                        src="/4DTicTacToe/assets/images/manifold.png" alt="4D TicTacToe" loading="lazy" decoding="async"
+                    <img data-imgatlas="auto" data-pngsrc="/assets/images/logo/manifold.png"
+                        src="/assets/images/logo/manifold.png" alt="4D TicTacToe" loading="lazy" decoding="async"
                         fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
@@ -1751,30 +1764,31 @@
             </div>
 
             <div class="game-card">
-                <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#04040c);">
-                    <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_landing.png"
-                        src="/assets/images/assembler_landing.png" alt="Assemble" loading="lazy" decoding="async"
-                        fetchpriority="low">
-                    <div class="thumb-strip" aria-hidden="true">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/assembler_lobby.png"
-                            src="/assets/images/assembler_lobby.png" alt="Assemble lobby" loading="lazy"
-                            decoding="async" fetchpriority="low">
+                <div class="game-image" style="background:linear-gradient(135deg,#04040c,#0a1a2e);">
+                    <div
+                        style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;padding:18px;">
+                        <span style="font-size:28px;color:#00eeff;text-shadow:0 0 14px #00eeff;">&#11035;</span>
+                        <span style="font-size:28px;color:#f1c644;text-shadow:0 0 14px #f1c644;">&#11035;</span>
+                        <span style="font-size:28px;color:#7a3cff;text-shadow:0 0 14px #7a3cff;">&#11035;</span>
+                        <span style="font-size:28px;color:#ff284f;text-shadow:0 0 14px #ff284f;">&#11035;</span>
                     </div>
-                    <span class="game-badge badge-live">&#9679; LIVE</span>
+                    <span class="game-badge"
+                        style="background:rgba(0,238,255,0.18);color:#00eeff;border-color:#00eeff;">NEW</span>
                 </div>
                 <div class="game-info">
                     <div>
-                        <div class="game-title">Assemble</div>
+                        <div class="game-title">Cubic</div>
                         <div class="game-meta">
                             <span class="game-tag">1 Player</span>
-                            <span class="game-tag">Physics</span>
-                            <span class="game-tag">Builder</span>
+                            <span class="game-tag">Puzzle</span>
+                            <span class="game-tag">3D Tetris</span>
                         </div>
-                        <div class="game-description">A modern erector set. Build contraptions from 50+ mechanical and
-                            electrical parts. Connect gears, motors, pistons, circuits. If your design is structurally
-                            sound, it runs. If not, watch it fail spectacularly.</div>
+                        <div class="game-description">Classic Tetris reimagined in three dimensions. A
+                            4&times;4&times;20 glass tower. Pieces fall through volume, not area. Rotate on two axes,
+                            clear full layers, and survive the acceleration. Built on the manifold engine &mdash; zero
+                            assets, all geometry.</div>
                     </div>
-                    <button class="btn-green" onclick="goToGame('/assemble/')">BUILD CONTRAPTION &#9654;</button>
+                    <button class="btn-green" onclick="goToGame('/cubic3d/')">PLAY CUBIC &#9654;</button>
                 </div>
             </div>
 
@@ -2147,7 +2161,7 @@
                     <li><a href="/brickbreaker3d/">BrickBreaker 3D</a></li>
                     <li><a href="/starfighter/">Alien Space Attack</a></li>
                     <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
-                    <li><a href="/assemble/">Assemble</a></li>
+                    <li><a href="/cubic3d/">Cubic</a></li>
                 </ul>
             </div>
             <div class="footer-col">

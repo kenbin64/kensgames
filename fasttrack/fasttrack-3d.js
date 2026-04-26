@@ -66,7 +66,7 @@ const ART_PLACEHOLDERS = [
   },
   // ── Right wall — spread apart to leave room for neon sign in center ──
   {
-    wall: 'right', x: -220, y: 260, width: 200, height: 150, file: 'parot.png',
+    wall: 'right', x: -220, y: 260, width: 200, height: 150, file: 'parrot.png',
     title: 'The Parrot', artist: 'Ken Bingham', medium: 'Acrylic', year: '2026',
     storeUrl: 'https://fineartamerica.com/featured/tropical-paradise-with-parrot-kenneth-bingham.html'
   },
@@ -543,13 +543,28 @@ const ManifoldAudio = {
 
   RT_SCALE: [0, 2, 4, 5, 7, 9, 11],   // C major (ionian)
   RT_BASE: 130.81,                     // C3
-  RT_BPM: 116,                        // snappy stride tempo
+  RT_BPM: 144,                        // toe-tapper tempo (was 132)
   _rtBeat: 0, _rtBar: 0, _rtSection: 0,
   _rtTimer: null, _rtGain: null, _rtFilter: null,
+  _rtBassGain: null, _rtPercGain: null, _rtBrassGain: null,
   _rtChords: null,     // current 8-bar chord sequence
   _rtMelody: null,     // current melodic hook (array of scale degrees)
   _rtLastChord: null,  // for Markov transitions
   _rtPhrase: 0,        // phrase counter — never repeats exactly
+
+  // Song form — V V C V B C Outro, then loop
+  RT_FORM: ['verse', 'verse', 'chorus', 'verse', 'bridge', 'chorus', 'outro'],
+  _rtFormIdx: 0,
+  _rtRestBars: 0,      // bars to rest after outro (lets the resolution breathe)
+
+  // Per-section character: dynamics, chord-palette bias, melody octave, brass mix
+  // brass: 0=none (verse opens lean), 1=stabs on 2&4, 2=sustained pad, 3=full chord hits
+  RT_SECTION_PROFILE: {
+    verse: { dyn: 0.90, octBias: 0, startChord: 0, brightness: 1000, bassRange: 1, brass: 0 },
+    chorus: { dyn: 1.20, octBias: 1, startChord: 3, brightness: 1500, bassRange: 2, brass: 1 },
+    bridge: { dyn: 1.00, octBias: 0, startChord: 5, brightness: 1200, bassRange: 1, brass: 2 },
+    outro: { dyn: 0.85, octBias: -1, startChord: 4, brightness: 800, bassRange: 1, brass: 3 },
+  },
 
   // Markov chord transitions: from → weighted choices [chord, weight]
   // Chords: 0=I 1=ii 2=iii 3=IV 4=V 5=vi 6=viidim  plus 7=V/V (secondary dom)
@@ -585,17 +600,21 @@ const ManifoldAudio = {
   },
 
   // Generate a fresh 8-bar chord progression via Markov chain
-  _rtGenChords() {
+  // Section name biases the starting chord (chorus opens on IV, bridge on vi, etc.)
+  _rtGenChords(sectionName) {
+    const profile = this.RT_SECTION_PROFILE[sectionName] || this.RT_SECTION_PROFILE.verse;
     const chords = [];
-    let cur = this._rtLastChord || 0;
+    let cur = profile.startChord;
     for (let i = 0; i < 8; i++) {
-      // Last 2 bars: force turnaround (IV → V → I resolution)
-      if (i === 6) cur = 3;      // IV
-      else if (i === 7) cur = 4; // V (resolves to I next section)
+      if (i === 0) cur = profile.startChord;
+      else if (i === 6) cur = 3;      // IV — turnaround
+      else if (i === 7) cur = 4;      // V → I
       else cur = this._rtPick(this.RT_MARKOV[cur] || [[0, 1]]);
       chords.push(cur);
     }
-    this._rtLastChord = 0; // resolve to I at top of next section
+    // Outro section ends on tonic instead of dominant for resolution
+    if (sectionName === 'outro') { chords[6] = 4; chords[7] = 0; }
+    this._rtLastChord = 0;
     return chords;
   },
 
@@ -625,11 +644,15 @@ const ManifoldAudio = {
     return mel;
   },
 
+  // Active section name (used by _playRtBeat for dynamics & timbre)
+  _rtSectionName: 'verse',
+
   startRagtimeAmbience() {
     if (!this.ctx) return;
     if (this._rtTimer) return;
 
     if (!this._rtGain) {
+      // Piano bus — lowpass-filtered for vintage warmth
       this._rtGain = this.ctx.createGain();
       this._rtFilter = this.ctx.createBiquadFilter();
       this._rtFilter.type = 'lowpass';
@@ -638,13 +661,42 @@ const ManifoldAudio = {
       this._rtGain.gain.setValueAtTime(0.06, this.ctx.currentTime);
       this._rtGain.connect(this._rtFilter);
       this._rtFilter.connect(this.ctx.destination);
+      // Upright bass bus — lowpass for woody body, deeper & beefier
+      this._rtBassGain = this.ctx.createGain();
+      const bassFilt = this.ctx.createBiquadFilter();
+      bassFilt.type = 'lowpass';
+      bassFilt.frequency.setValueAtTime(360, this.ctx.currentTime);  // a touch darker
+      bassFilt.Q.setValueAtTime(1.1, this.ctx.currentTime);           // resonant pluck
+      this._rtBassGain.gain.setValueAtTime(0.12, this.ctx.currentTime); // was 0.07 — deeper
+      this._rtBassGain.connect(bassFilt);
+      bassFilt.connect(this.ctx.destination);
+      // Brass bus — bandpass-shaped for trumpet/trombone color
+      this._rtBrassGain = this.ctx.createGain();
+      const brassFilt = this.ctx.createBiquadFilter();
+      brassFilt.type = 'bandpass';
+      brassFilt.frequency.setValueAtTime(1400, this.ctx.currentTime);
+      brassFilt.Q.setValueAtTime(1.4, this.ctx.currentTime);
+      this._rtBrassGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      this._rtBrassGain.connect(brassFilt);
+      brassFilt.connect(this.ctx.destination);
+      // Percussion bus — highpass for snare brushes & ride clicks
+      this._rtPercGain = this.ctx.createGain();
+      const percFilt = this.ctx.createBiquadFilter();
+      percFilt.type = 'highpass';
+      percFilt.frequency.setValueAtTime(1800, this.ctx.currentTime);
+      this._rtPercGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+      this._rtPercGain.connect(percFilt);
+      percFilt.connect(this.ctx.destination);
     }
     this._rtBeat = 0; this._rtBar = 0; this._rtSection = 0;
-    this._rtChords = this._rtGenChords();
+    this._rtFormIdx = 0;
+    this._rtSectionName = this.RT_FORM[0];
+    this._rtChords = this._rtGenChords(this._rtSectionName);
     this._rtMelody = this._rtGenMelody(this._rtChords);
     this._rtPhrase = 0;
+    this._rtRestBars = 0;
     this._scheduleRtBeat();
-    console.log('🎹 Ragtime ambience started (snappy stride, non-repeating)');
+    console.log('🎹 Ragtime ambience started — V-V-C-V-B-C-Outro form, piano + upright bass + brushes');
   },
 
   stopRagtimeAmbience() {
@@ -655,22 +707,45 @@ const ManifoldAudio = {
     if (!this.ctx || !this._rtGain) return;
     const beatDur = 60 / this.RT_BPM;
     const t = this.ctx.currentTime + 0.03;
-    this._playRtBeat(t, beatDur);
+
+    // Honor rest bars (silence between outro and next verse)
+    if (this._rtRestBars > 0) {
+      // Just the percussion ride continues quietly to keep the pulse
+      this._playRtRideOnly(t, beatDur);
+    } else {
+      this._playRtBeat(t, beatDur);
+    }
 
     this._rtBeat++;
     if (this._rtBeat >= 4) {
       this._rtBeat = 0;
       this._rtBar++;
+      // Decrement rest if we're in a rest period
+      if (this._rtRestBars > 0) this._rtRestBars--;
       if (this._rtBar >= 8) {
-        // New 8-bar section — fresh chords & melody every time
+        // Advance to next section in the form
         this._rtBar = 0;
         this._rtSection++;
         this._rtPhrase++;
-        this._rtChords = this._rtGenChords();
+        // Insert rest after outro before looping back
+        if (this._rtSectionName === 'outro' && this._rtRestBars === 0) {
+          this._rtRestBars = 1; // 1 bar of breathing room
+        }
+        this._rtFormIdx = (this._rtFormIdx + 1) % this.RT_FORM.length;
+        this._rtSectionName = this.RT_FORM[this._rtFormIdx];
+        this._rtChords = this._rtGenChords(this._rtSectionName);
         this._rtMelody = this._rtGenMelody(this._rtChords);
       }
     }
     this._rtTimer = setTimeout(() => this._scheduleRtBeat(), beatDur * 1000 - 8);
+  },
+
+  // Quiet ride-only fill during outro→verse rest (keeps the pulse alive)
+  _playRtRideOnly(t, dur) {
+    const eighth = dur / 2;
+    for (let i = 0; i < 2; i++) {
+      this._rtRideClick(t + i * eighth, 0.018, 0.20);
+    }
   },
 
   _playRtBeat(t, dur) {
@@ -678,6 +753,73 @@ const ManifoldAudio = {
     const triad = this.RT_TRIADS[chordNum];
     const b = this._rtBeat;
     const eighth = dur / 2;
+    const profile = this.RT_SECTION_PROFILE[this._rtSectionName] || this.RT_SECTION_PROFILE.verse;
+
+    // ═══ SECTION DYNAMICS — ramp filter cutoff & gain on section entry ═══
+    if (this._rtBar === 0 && b === 0 && this._rtFilter) {
+      this._rtFilter.frequency.cancelScheduledValues(t);
+      this._rtFilter.frequency.linearRampToValueAtTime(profile.brightness, t + 0.4);
+      this._rtGain.gain.cancelScheduledValues(t);
+      this._rtGain.gain.linearRampToValueAtTime(0.06 * profile.dyn, t + 0.4);
+    }
+
+    // ═══ UPRIGHT BASS — walking quarter notes (deeper, plays an octave below piano stride) ═══
+    // Walks: root → 5th → 3rd → chromatic-approach → next-root
+    {
+      const bassRoot = triad[0];
+      let bassDeg;
+      if (b === 0) bassDeg = bassRoot;                          // root
+      else if (b === 1) bassDeg = triad[2];                     // 5th
+      else if (b === 2) bassDeg = triad[1];                     // 3rd
+      else {
+        // Beat 4: chromatic approach to NEXT bar's root
+        const nextChord = this._rtChords[(this._rtBar + 1) % 8];
+        const nextRoot = this.RT_TRIADS[nextChord][0];
+        bassDeg = (nextRoot + (Math.random() > 0.5 ? 6 : 1)) % 7;
+      }
+      // Deeper octave by default (-2 instead of -1) — chorus reaches up to -1
+      const bassOct = profile.bassRange >= 2 && Math.random() > 0.6 ? -1 : -2;
+      this._rtBassNote(this._rtFreq(bassDeg, bassOct), t + 0.005, dur * 0.92, 0.85 * profile.dyn);
+    }
+
+    // ═══ BRASS SECTION — section-driven trumpet/trombone hits ═══
+    if (profile.brass === 1 && (b === 1 || b === 3)) {
+      // Chorus: short brass stabs on backbeat (call & response with snare)
+      const stabOct = 1;
+      triad.forEach((deg, i) => {
+        this._rtBrass(this._rtFreq(deg, stabOct), t + 0.006 + i * 0.004, dur * 0.32, 0.55 * profile.dyn);
+      });
+    } else if (profile.brass === 2 && b === 0) {
+      // Bridge: sustained pad — held chord across the bar
+      triad.forEach((deg, i) => {
+        this._rtBrass(this._rtFreq(deg, 1), t + i * 0.01, dur * 3.6, 0.32 * profile.dyn);
+      });
+    } else if (profile.brass === 3) {
+      // Outro: full triumphant chord on every beat, plus 5th below for weight
+      triad.forEach((deg, i) => {
+        this._rtBrass(this._rtFreq(deg, 1), t + i * 0.005, dur * 0.7, 0.6 * profile.dyn);
+      });
+      if (b === 0 || b === 2) {
+        this._rtBrass(this._rtFreq(triad[0], 0), t, dur * 0.8, 0.45 * profile.dyn);
+      }
+    }
+
+    // ═══ JAZZY PERCUSSION — brushed snare on 2&4, ride on every eighth, hat chick offbeats ═══
+    // Ride cymbal — gentle tick on every eighth note keeps the swing pulse
+    this._rtRideClick(t, 0.022, 0.42 * profile.dyn);
+    this._rtRideClick(t + eighth * 1.05, 0.018, 0.32 * profile.dyn);  // swung "and"
+    // Brushed snare on beats 2 & 4 (the ragtime backbeat)
+    if (b === 1 || b === 3) {
+      this._rtBrush(t + 0.004, 0.13, 0.62 * profile.dyn);
+    }
+    // Hi-hat chick on the "and" of 1 & 3 (light off-beat)
+    if (b === 0 || b === 2) {
+      this._rtHatChick(t + eighth * 1.0, 0.05, 0.30 * profile.dyn);
+    }
+    // Bass drum thump on beat 1 — adds pulse to the toe-tapper feel
+    if (b === 0) {
+      this._rtKick(t, 0.10, 0.5 * profile.dyn);
+    }
 
     // ═══ LEFT HAND — stride bass ═══
     // Beat 1 & 3: deep bass root (oom)
@@ -703,62 +845,68 @@ const ManifoldAudio = {
       }
     }
 
-    // ═══ RIGHT HAND — melodic hook + embellishments ═══
+    // ═══ RIGHT HAND — snappier melodic hook (staccato, more 16th pickups) ═══
     const hookDeg = this._rtMelody[this._rtBar];
-    const hookOct = 2;
+    const hookOct = 2 + (profile.octBias || 0);
+    const sxteenth = dur / 4;
 
     if (b === 0) {
-      // Beat 1: state the hook note — strong, slightly accented
-      this._rtNote(this._rtFreq(hookDeg, hookOct), t + eighth * 0.3, dur * 0.6, 0.75);
+      // Beat 1: short stab on the hook + 16th pickup back-end (snappier than sustained)
+      this._rtNote(this._rtFreq(hookDeg, hookOct), t + sxteenth * 0.4, sxteenth * 1.6, 0.85);
+      // 16th pickup into beat 2
+      if (Math.random() > 0.4) {
+        this._rtNote(this._rtFreq((hookDeg + 1) % 7, hookOct), t + dur - sxteenth * 0.9, sxteenth * 0.7, 0.45);
+      }
     } else if (b === 1) {
-      // Beat 2: syncopated answer — anticipate by an eighth note
+      // Beat 2: syncopated answer — anticipate by a 16th, kept very short
       const answerDeg = triad[Math.floor(Math.random() * 3)];
-      this._rtNote(this._rtFreq(answerDeg, hookOct), t + eighth * 0.5, dur * 0.45, 0.6);
-      // Ghost note double
-      if (Math.random() > 0.5) {
-        this._rtNote(this._rtFreq((answerDeg + 1) % 7, hookOct), t + eighth * 1.2, eighth * 0.5, 0.3);
+      this._rtNote(this._rtFreq(answerDeg, hookOct), t + sxteenth * 0.7, sxteenth * 1.4, 0.65);
+      // Ghost double — even shorter
+      if (Math.random() > 0.4) {
+        this._rtNote(this._rtFreq((answerDeg + 2) % 7, hookOct), t + sxteenth * 2.4, sxteenth * 0.8, 0.35);
       }
     } else if (b === 2) {
-      // Beat 3: scalar run or repeated hook — varies per phrase
+      // Beat 3: scalar run, arpeggio, or stutter — all faster (16ths instead of 8ths)
       if (this._rtPhrase % 3 === 0) {
-        // Descending run (3 notes)
-        for (let n = 0; n < 3; n++) {
-          this._rtNote(this._rtFreq((hookDeg - n + 7) % 7, hookOct), t + n * eighth * 0.6, eighth * 0.5, 0.55 - n * 0.08);
+        // Descending 16th-note run (4 notes)
+        for (let n = 0; n < 4; n++) {
+          this._rtNote(this._rtFreq((hookDeg - n + 7) % 7, hookOct), t + n * sxteenth, sxteenth * 0.85, 0.6 - n * 0.06);
         }
       } else if (this._rtPhrase % 3 === 1) {
-        // Ascending arpeggio through the triad
-        triad.forEach((deg, i) => {
-          this._rtNote(this._rtFreq(deg, hookOct), t + i * eighth * 0.55, eighth * 0.45, 0.55);
+        // Triad arpeggio in 16ths + return to root
+        const arp = [...triad, triad[0]];
+        arp.forEach((deg, i) => {
+          this._rtNote(this._rtFreq(deg, hookOct), t + i * sxteenth, sxteenth * 0.8, 0.55);
         });
       } else {
-        // Repeated note with increasing velocity (ragtime stutter)
-        for (let r = 0; r < 3; r++) {
-          this._rtNote(this._rtFreq(hookDeg, hookOct), t + r * eighth * 0.4, eighth * 0.3, 0.35 + r * 0.12);
+        // Repeated-note stutter — 4 quick 16ths, snappier accent on last
+        for (let r = 0; r < 4; r++) {
+          this._rtNote(this._rtFreq(hookDeg, hookOct), t + r * sxteenth, sxteenth * 0.6, 0.35 + r * 0.10);
         }
       }
     } else {
-      // Beat 4: fills, turns, chromatic runs — the spicy beat
+      // Beat 4: fills, turns, chromatic runs — the spicy beat (now snappier)
       const fillType = Math.random();
       if (fillType < 0.3) {
-        // Chromatic run up (4 semitones via scale neighbors)
-        for (let c = 0; c < 4; c++) {
-          this._rtNote(this._rtFreq((hookDeg + c) % 7, hookOct), t + c * 0.04, 0.06, 0.45);
+        // Chromatic run up — 5 notes in 32nd-ish density
+        for (let c = 0; c < 5; c++) {
+          this._rtNote(this._rtFreq((hookDeg + c) % 7, hookOct), t + c * 0.032, 0.05, 0.5);
         }
       } else if (fillType < 0.55) {
-        // Turn figure: note-above-note-below-note (mordent)
+        // Mordent turn — extra-snappy 5-note flourish
         const above = (hookDeg + 1) % 7;
         const below = (hookDeg + 6) % 7;
         [hookDeg, above, hookDeg, below, hookDeg].forEach((d, i) => {
-          this._rtNote(this._rtFreq(d, hookOct), t + i * 0.035, 0.055, 0.45);
+          this._rtNote(this._rtFreq(d, hookOct), t + i * 0.028, 0.045, 0.5);
         });
       } else if (fillType < 0.75) {
-        // Grace note + accent (crushed note into downbeat prep)
-        this._rtNote(this._rtFreq((hookDeg + 1) % 7, hookOct), t, 0.04, 0.35);
-        this._rtNote(this._rtFreq(hookDeg, hookOct), t + 0.04, dur * 0.5, 0.7);
+        // Grace note + accent into next downbeat
+        this._rtNote(this._rtFreq((hookDeg + 1) % 7, hookOct), t, 0.035, 0.4);
+        this._rtNote(this._rtFreq(hookDeg, hookOct), t + 0.04, sxteenth * 1.4, 0.78);
       } else {
-        // Octave jump — punchy
-        this._rtNote(this._rtFreq(hookDeg, hookOct), t, eighth * 0.4, 0.5);
-        this._rtNote(this._rtFreq(hookDeg, hookOct + 1), t + eighth * 0.5, eighth * 0.5, 0.65);
+        // Octave jump — punchy double-stab
+        this._rtNote(this._rtFreq(hookDeg, hookOct), t, sxteenth * 0.7, 0.55);
+        this._rtNote(this._rtFreq(hookDeg, hookOct + 1), t + sxteenth * 1.0, sxteenth * 0.8, 0.7);
       }
     }
 
@@ -806,6 +954,147 @@ const ManifoldAudio = {
     g2.connect(this._rtGain);
     osc2.start(t);
     osc2.stop(t + dur * 0.5 + 0.02);
+  },
+
+  // ─── UPRIGHT BASS — sine sub + triangle body, soft attack click ───
+  _rtBassNote(freq, t, dur, vol) {
+    if (!this.ctx || !this._rtBassGain) return;
+    // Sub fundamental — sine, deep & sustained
+    const sub = this.ctx.createOscillator();
+    const subG = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(freq * 0.5, t);
+    subG.gain.setValueAtTime(0.001, t);
+    subG.gain.linearRampToValueAtTime(vol, t + 0.018);
+    subG.gain.exponentialRampToValueAtTime(vol * 0.4, t + dur * 0.4);
+    subG.gain.linearRampToValueAtTime(0.001, t + dur);
+    sub.connect(subG); subG.connect(this._rtBassGain);
+    sub.start(t); sub.stop(t + dur + 0.05);
+    // Body — triangle at fundamental for the "wood" of the upright
+    const body = this.ctx.createOscillator();
+    const bodyG = this.ctx.createGain();
+    body.type = 'triangle';
+    body.frequency.setValueAtTime(freq, t);
+    bodyG.gain.setValueAtTime(0.001, t);
+    bodyG.gain.linearRampToValueAtTime(vol * 0.55, t + 0.012);
+    bodyG.gain.exponentialRampToValueAtTime(vol * 0.10, t + dur * 0.3);
+    bodyG.gain.linearRampToValueAtTime(0.001, t + dur * 0.85);
+    body.connect(bodyG); bodyG.connect(this._rtBassGain);
+    body.start(t); body.stop(t + dur + 0.05);
+  },
+
+  // ─── NOISE BUFFER — cached white noise for percussion ───
+  _rtNoiseBuf() {
+    if (this._rtNoise) return this._rtNoise;
+    const len = this.ctx.sampleRate * 0.5;
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    this._rtNoise = buf;
+    return buf;
+  },
+
+  // ─── BRUSHED SNARE — filtered noise burst with quick decay ───
+  _rtBrush(t, dur, vol) {
+    if (!this.ctx || !this._rtPercGain) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._rtNoiseBuf();
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2400, t);
+    bp.frequency.linearRampToValueAtTime(900, t + dur);
+    bp.Q.setValueAtTime(0.7, t);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(this._rtPercGain);
+    src.start(t); src.stop(t + dur + 0.02);
+  },
+
+  // ─── RIDE CYMBAL CLICK — short high-passed noise tick ───
+  _rtRideClick(t, dur, vol) {
+    if (!this.ctx || !this._rtPercGain) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._rtNoiseBuf();
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(5200, t);
+    hp.Q.setValueAtTime(0.6, t);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(hp); hp.connect(g); g.connect(this._rtPercGain);
+    src.start(t); src.stop(t + dur + 0.02);
+  },
+
+  // ─── HI-HAT CHICK — tighter, lower than ride; off-beat color ───
+  _rtHatChick(t, dur, vol) {
+    if (!this.ctx || !this._rtPercGain) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._rtNoiseBuf();
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(7000, t);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(hp); hp.connect(g); g.connect(this._rtPercGain);
+    src.start(t); src.stop(t + dur + 0.02);
+  },
+
+  // ─── BRASS — sawtooth + square stack with quick attack & lowpass for trumpet stab ───
+  _rtBrass(freq, t, dur, vol) {
+    if (!this.ctx || !this._rtBrassGain) return;
+    // Per-note lowpass envelope creates the brass "blat" — opens fast, closes
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(freq * 1.5, t);
+    lp.frequency.linearRampToValueAtTime(freq * 6, t + 0.025);   // bright attack
+    lp.frequency.linearRampToValueAtTime(freq * 3, t + dur);     // mellows
+    lp.Q.setValueAtTime(2.5, t);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.020);              // quick brass attack
+    g.gain.exponentialRampToValueAtTime(vol * 0.45, t + dur * 0.4);
+    g.gain.linearRampToValueAtTime(0.001, t + dur);
+    // Sawtooth — primary brass body
+    const saw = this.ctx.createOscillator();
+    saw.type = 'sawtooth';
+    saw.frequency.setValueAtTime(freq, t);
+    // Slight pitch wobble for naturalness (vibrato-ish)
+    saw.detune.setValueAtTime(-4, t);
+    saw.detune.linearRampToValueAtTime(4, t + dur);
+    // Square — adds bite
+    const sq = this.ctx.createOscillator();
+    sq.type = 'square';
+    sq.frequency.setValueAtTime(freq * 1.005, t);
+    const sqG = this.ctx.createGain();
+    sqG.gain.setValueAtTime(0.35, t);
+    saw.connect(lp);
+    sq.connect(sqG); sqG.connect(lp);
+    lp.connect(g); g.connect(this._rtBrassGain);
+    saw.start(t); sq.start(t);
+    saw.stop(t + dur + 0.05); sq.stop(t + dur + 0.05);
+  },
+
+  // ─── BASS DRUM — pitched sine kick for downbeat thump ───
+  _rtKick(t, dur, vol) {
+    if (!this.ctx || !this._rtPercGain) return;
+    // Pitched sine — drops from 110 Hz to 45 Hz for the "thump"
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + dur * 0.5);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    // Route through its own destination — bypass the highpass perc bus
+    osc.connect(g); g.connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + dur + 0.02);
   },
 };
 
@@ -1220,38 +1509,44 @@ function createBilliardRoom() {
   makeBaseWall(ROOM_WIDTH, new THREE.Vector3(0, ROOM_HEIGHT / 2, ROOM_DEPTH / 2), Math.PI);
 
   // Brick texture — tiled on the upper portion (above the wainscot)
+  // Walls are created inside the loader callback so the cloned textures
+  // inherit a valid Image (a clone made before load finishes never gets
+  // re-flagged with needsUpdate when the source image arrives).
   const WAINSCOT_TOP = 130;  // must match WAINSCOT_H below
-  const brickH = ROOM_HEIGHT - WAINSCOT_TOP;  // height of brick section
-  const brickTexLoader = new THREE.TextureLoader();
-  const brickTex = brickTexLoader.load('assets/images/art/Brick texture.png');
-  brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping;
-  brickTex.colorSpace = THREE.SRGBColorSpace;
+  const brickH = ROOM_HEIGHT - WAINSCOT_TOP;
+  const brickUrl = 'assets/images/art/' + encodeURIComponent('Brick texture.png');
+  new THREE.TextureLoader().load(brickUrl, (brickTex) => {
+    brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping;
+    brickTex.colorSpace = THREE.SRGBColorSpace;
 
-  const makeBrickWall = (w, pos, rotY) => {
-    const geo = new THREE.PlaneGeometry(w, brickH);
-    const tilesX = Math.round(w / 180);
-    const tilesY = Math.round(brickH / 180);
-    const tex = brickTex.clone();
-    tex.needsUpdate = true;
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(tilesX, tilesY);
-    const mat = new THREE.MeshStandardMaterial({
-      map: tex,
-      color: 0xffffff, roughness: 0.82, metalness: 0.02, side: THREE.DoubleSide,
-      envMapIntensity: 0.15
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    // Center the brick section between WAINSCOT_TOP and ROOM_HEIGHT
-    mesh.position.set(pos.x, WAINSCOT_TOP + brickH / 2, pos.z);
-    mesh.rotation.y = rotY || 0;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-  };
-  // Offset 1 unit inward so brick sits in front of base wall (no z-fighting)
-  makeBrickWall(ROOM_WIDTH, new THREE.Vector3(0, 0, -ROOM_DEPTH / 2 + 1), 0);
-  makeBrickWall(ROOM_DEPTH, new THREE.Vector3(-ROOM_WIDTH / 2 + 1, 0, 0), Math.PI / 2);
-  makeBrickWall(ROOM_DEPTH, new THREE.Vector3(ROOM_WIDTH / 2 - 1, 0, 0), -Math.PI / 2);
-  makeBrickWall(ROOM_WIDTH, new THREE.Vector3(0, 0, ROOM_DEPTH / 2 - 1), Math.PI);
+    const makeBrickWall = (w, pos, rotY) => {
+      const geo = new THREE.PlaneGeometry(w, brickH);
+      const tilesX = Math.max(1, Math.round(w / 220));
+      const tilesY = Math.max(1, Math.round(brickH / 220));
+      const tex = brickTex.clone();
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(tilesX, tilesY);
+      tex.needsUpdate = true;
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        color: 0xb8957a, roughness: 0.82, metalness: 0.02, side: THREE.DoubleSide,
+        envMapIntensity: 0.15
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(pos.x, WAINSCOT_TOP + brickH / 2, pos.z);
+      mesh.rotation.y = rotY || 0;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    };
+    // Offset 1 unit inward so brick sits in front of base wall (no z-fighting)
+    makeBrickWall(ROOM_WIDTH, new THREE.Vector3(0, 0, -ROOM_DEPTH / 2 + 1), 0);
+    makeBrickWall(ROOM_DEPTH, new THREE.Vector3(-ROOM_WIDTH / 2 + 1, 0, 0), Math.PI / 2);
+    makeBrickWall(ROOM_DEPTH, new THREE.Vector3(ROOM_WIDTH / 2 - 1, 0, 0), -Math.PI / 2);
+    makeBrickWall(ROOM_WIDTH, new THREE.Vector3(0, 0, ROOM_DEPTH / 2 - 1), Math.PI);
+    console.log('🧱 Brick walls loaded');
+  }, undefined, (err) => {
+    console.warn('🧱 Brick texture failed to load:', brickUrl, err);
+  });
 
   // ── ART DECO WALL PANELLING — 1920s speakeasy style ──
   // Walnut wainscot plank texture (quarter-sawn grain, warm amber)
@@ -1850,8 +2145,69 @@ function createBilliardRoom() {
     scene.add(sconceLight);
   });
 
+  // ── POLISHED WALNUT GRAIN — shared procedural texture for 1920s woodwork ──
+  // Quarter-sawn walnut: vertical grain lines, occasional knots & ray flecks.
+  // Returns a fresh CanvasTexture so caller can set its own repeat.
+  const makeWalnutGrainTexture = (repeatX = 2, repeatY = 1) => {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 512;
+    const cx = c.getContext('2d');
+    // Base — deep walnut brown with vertical gradient (heart→sap)
+    const grad = cx.createLinearGradient(0, 0, 256, 0);
+    grad.addColorStop(0.0, '#2a1608');
+    grad.addColorStop(0.4, '#3a1d0a');
+    grad.addColorStop(0.6, '#4a260e');
+    grad.addColorStop(1.0, '#2e1808');
+    cx.fillStyle = grad;
+    cx.fillRect(0, 0, 256, 512);
+    // Vertical grain lines — sinusoidal density
+    for (let x = 0; x < 256; x++) {
+      const wobble = Math.sin(x * 0.07) * 4 + Math.sin(x * 0.21) * 2;
+      const dark = (Math.sin(x * 0.5) + 1) * 0.5;
+      const a = 0.04 + dark * 0.10;
+      cx.strokeStyle = `rgba(0,0,0,${a.toFixed(3)})`;
+      cx.lineWidth = 1;
+      cx.beginPath();
+      cx.moveTo(x, 0);
+      for (let y = 0; y <= 512; y += 16) {
+        cx.lineTo(x + Math.sin((y + wobble) * 0.012) * 1.6, y);
+      }
+      cx.stroke();
+    }
+    // Subtle warm highlights
+    for (let i = 0; i < 80; i++) {
+      const hx = Math.random() * 256;
+      const hy = Math.random() * 512;
+      cx.fillStyle = `rgba(180,120,60,${(0.02 + Math.random() * 0.04).toFixed(3)})`;
+      cx.fillRect(hx, hy, 1 + Math.random() * 2, 30 + Math.random() * 60);
+    }
+    // 2-3 knots scattered
+    for (let k = 0; k < 3; k++) {
+      const kx = 30 + Math.random() * 196;
+      const ky = 60 + Math.random() * 392;
+      const kr = 6 + Math.random() * 8;
+      const kg = cx.createRadialGradient(kx, ky, 1, kx, ky, kr);
+      kg.addColorStop(0, 'rgba(20,8,2,0.85)');
+      kg.addColorStop(0.6, 'rgba(40,18,6,0.5)');
+      kg.addColorStop(1, 'rgba(40,18,6,0)');
+      cx.fillStyle = kg;
+      cx.beginPath();
+      cx.ellipse(kx, ky, kr * 1.4, kr, 0, 0, Math.PI * 2);
+      cx.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, repeatY);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  };
+
   // ── POOL CUE RACK — wall-mounted on left wall ──
-  const darkWood = new THREE.MeshStandardMaterial({ color: 0x2a1508, roughness: 0.35, metalness: 0.1 });
+  // Polished walnut: low roughness for the lacquered 1920s sheen.
+  const darkWood = new THREE.MeshStandardMaterial({
+    map: makeWalnutGrainTexture(1, 2),
+    color: 0x6a3818, roughness: 0.22, metalness: 0.18, envMapIntensity: 0.7
+  });
   const rackGroup = new THREE.Group();
   // Back plate
   const rackPlate = new THREE.Mesh(new THREE.BoxGeometry(6, 140, 60), darkWood);
@@ -2038,7 +2394,11 @@ function createBilliardRoom() {
 
   // ── 1930s SPEAKEASY PROPS & ORNAMENTS ──────────────────────────
   {
-    const darkWood = new THREE.MeshStandardMaterial({ color: 0x1a0e06, roughness: 0.30, metalness: 0.20 });
+    // Polished walnut for speakeasy props — shares the grain helper with the cue rack
+    const darkWood = new THREE.MeshStandardMaterial({
+      map: makeWalnutGrainTexture(2, 1),
+      color: 0x5a2e12, roughness: 0.20, metalness: 0.22, envMapIntensity: 0.8
+    });
     const brassOr = new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.18, metalness: 0.85 });
     const greenMat = new THREE.MeshStandardMaterial({ color: 0x1a6b2a, roughness: 0.75, metalness: 0.0 });
     const glassMat = new THREE.MeshStandardMaterial({
@@ -2120,9 +2480,75 @@ function createBilliardRoom() {
     }
     // Vertical column
     globeGrp.add(placed(new THREE.CylinderGeometry(3, 3, 30, 8), brassOr, 0, 90, 0));
-    // Globe sphere
-    const globeMat = new THREE.MeshStandardMaterial({ color: 0x1a4a6a, roughness: 0.45, metalness: 0.12 });
-    const globe = new THREE.Mesh(new THREE.SphereGeometry(18, 20, 16), globeMat);
+    // Globe sphere — procedural equirectangular Earth map (1920s parchment style)
+    const globeCanvas = document.createElement('canvas');
+    globeCanvas.width = 512; globeCanvas.height = 256;
+    const gcx = globeCanvas.getContext('2d');
+    // Ocean — aged sepia-blue parchment
+    const oceanGrad = gcx.createLinearGradient(0, 0, 0, 256);
+    oceanGrad.addColorStop(0, '#3a6b8a');
+    oceanGrad.addColorStop(0.5, '#2c5a78');
+    oceanGrad.addColorStop(1, '#244e6a');
+    gcx.fillStyle = oceanGrad;
+    gcx.fillRect(0, 0, 512, 256);
+    // Continent silhouettes — rough polygons in equirectangular layout
+    // Coords in canvas pixels (x: 0=180°W → 512=180°E, y: 0=90°N → 256=90°S)
+    const land = '#7a6038';
+    const landDark = '#5a4528';
+    gcx.fillStyle = land;
+    const polys = [
+      // North America
+      [[80, 60], [150, 55], [180, 80], [170, 120], [140, 150], [100, 140], [70, 110], [60, 80]],
+      // South America
+      [[155, 150], [185, 150], [195, 180], [185, 220], [170, 240], [155, 225], [150, 190]],
+      // Europe
+      [[245, 70], [290, 65], [300, 90], [280, 100], [250, 95]],
+      // Africa
+      [[250, 110], [295, 105], [310, 140], [300, 180], [280, 210], [260, 200], [245, 160]],
+      // Asia
+      [[300, 55], [420, 60], [430, 95], [400, 120], [360, 115], [320, 100], [300, 80]],
+      // India subcontinent
+      [[345, 115], [365, 115], [370, 140], [355, 150], [340, 135]],
+      // Australia
+      [[400, 180], [450, 180], [460, 205], [430, 215], [405, 205]],
+      // Greenland
+      [[200, 40], [230, 38], [235, 60], [215, 68], [200, 55]],
+      // Antarctica strip
+      [[0, 235], [512, 235], [512, 256], [0, 256]]
+    ];
+    polys.forEach(p => {
+      gcx.beginPath();
+      gcx.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length; i++) gcx.lineTo(p[i][0], p[i][1]);
+      gcx.closePath();
+      gcx.fill();
+    });
+    // Coast shading — outline darker
+    gcx.strokeStyle = landDark; gcx.lineWidth = 1.5;
+    polys.forEach(p => {
+      gcx.beginPath();
+      gcx.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length; i++) gcx.lineTo(p[i][0], p[i][1]);
+      gcx.closePath();
+      gcx.stroke();
+    });
+    // Lat/lon graticule — brass-line every 30°
+    gcx.strokeStyle = 'rgba(180,150,90,0.25)'; gcx.lineWidth = 0.5;
+    for (let lon = 0; lon <= 512; lon += 512 / 12) {
+      gcx.beginPath(); gcx.moveTo(lon, 0); gcx.lineTo(lon, 256); gcx.stroke();
+    }
+    for (let lat = 0; lat <= 256; lat += 256 / 6) {
+      gcx.beginPath(); gcx.moveTo(0, lat); gcx.lineTo(512, lat); gcx.stroke();
+    }
+    // Equator — bolder
+    gcx.strokeStyle = 'rgba(220,180,100,0.5)'; gcx.lineWidth = 1;
+    gcx.beginPath(); gcx.moveTo(0, 128); gcx.lineTo(512, 128); gcx.stroke();
+    const globeTex = new THREE.CanvasTexture(globeCanvas);
+    globeTex.colorSpace = THREE.SRGBColorSpace;
+    const globeMat = new THREE.MeshStandardMaterial({
+      map: globeTex, color: 0xffffff, roughness: 0.55, metalness: 0.10
+    });
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(18, 32, 24), globeMat);
     globe.position.y = 118;
     globe.rotation.z = 0.4;  // tilted axis
     globeGrp.add(globe);
@@ -4277,6 +4703,85 @@ function triggerPegPose(pegId, poseType) {
       requestAnimationFrame(animateVictory);
     }
     animateVictory();
+  } else if (poseType === 'celebrate') {
+    // Multi-bounce jumps with quick spins — exuberant victor reaction
+    const duration = 1800;
+    const baseY = mesh.position.y;
+    function animateCelebrate() {
+      const t = (performance.now() - startTime) / duration;
+      if (t > 1) {
+        mesh.position.y = baseY;
+        mesh.rotation.y = 0;
+        mesh.rotation.z = 0;
+        mesh.scale.set(1, 1, 1);
+        return;
+      }
+      // 4 sharp jumps — high amplitude, quick cadence
+      const jump = Math.abs(Math.sin(t * Math.PI * 4)) * 22 * (1 - t * 0.4);
+      mesh.position.y = baseY + jump;
+      // Fast double spin
+      mesh.rotation.y = t * Math.PI * 4;
+      // Tilt side-to-side at jump apex (arms-out feel)
+      mesh.rotation.z = Math.sin(t * Math.PI * 8) * 0.18 * (1 - t * 0.5);
+      // Squash on landing, stretch at apex
+      const stretch = 1 + Math.sin(t * Math.PI * 4) * 0.18;
+      const squash = 1 - Math.cos(t * Math.PI * 4) * 0.08;
+      mesh.scale.set(squash, stretch, squash);
+      requestAnimationFrame(animateCelebrate);
+    }
+    animateCelebrate();
+  } else if (poseType === 'shame') {
+    // Bow forward + slow head shake — vanquished peg reaction
+    const duration = 1600;
+    const baseY = mesh.position.y;
+    function animateShame() {
+      const t = (performance.now() - startTime) / duration;
+      if (t > 1) {
+        mesh.position.y = baseY;
+        mesh.rotation.x = 0;
+        mesh.rotation.z = 0;
+        mesh.rotation.y = 0;
+        return;
+      }
+      // Sink down slightly (slumped posture)
+      mesh.position.y = baseY - Math.sin(t * Math.PI) * 4;
+      // Bow forward (rotate around X), hold the bow, then return
+      const bow = Math.sin(t * Math.PI) * 0.55;
+      mesh.rotation.x = bow;
+      // Slow side-to-side head shake (no, no, no)
+      mesh.rotation.y = Math.sin(t * Math.PI * 3) * 0.35;
+      // Subtle lean
+      mesh.rotation.z = Math.sin(t * Math.PI * 1.5) * 0.05;
+      requestAnimationFrame(animateShame);
+    }
+    animateShame();
+  } else if (poseType === 'dance') {
+    // Rhythmic side-to-side hip-shake with light bounce — strategic-move flourish
+    const duration = 1300;
+    const baseY = mesh.position.y;
+    function animateDance() {
+      const t = (performance.now() - startTime) / duration;
+      if (t > 1) {
+        mesh.position.y = baseY;
+        mesh.position.x = mesh.position.x; // restore not needed (driven via offset)
+        mesh.rotation.y = 0;
+        mesh.rotation.z = 0;
+        mesh.scale.set(1, 1, 1);
+        return;
+      }
+      // Light bounce (3 small hops)
+      const hop = Math.abs(Math.sin(t * Math.PI * 3)) * 8;
+      mesh.position.y = baseY + hop;
+      // Hip-sway — gentle Z tilt sync'd with bounce
+      mesh.rotation.z = Math.sin(t * Math.PI * 6) * 0.22;
+      // Quick rhythmic Y-twist (shoulder shimmy feel)
+      mesh.rotation.y = Math.sin(t * Math.PI * 4) * 0.4;
+      // Subtle scale pulse on the beat
+      const pulse = 1 + Math.abs(Math.sin(t * Math.PI * 6)) * 0.08;
+      mesh.scale.set(pulse, 1 / Math.sqrt(pulse), pulse);
+      requestAnimationFrame(animateDance);
+    }
+    animateDance();
   }
 }
 

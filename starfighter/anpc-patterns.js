@@ -24,14 +24,17 @@ const SFPatterns = (function () {
   const CALLSIGNS = {
     player: ['Viper', 'Ghost', 'Talon', 'Reaper', 'Halo', 'Raven', 'Nomad', 'Specter'],
     wingman: ['Echo', 'Frost', 'Blade', 'Phoenix', 'Dagger', 'Razor', 'Striker', 'Condor'],
-    command: ['Overlord', 'Watchtower', 'Skyfather', 'Iron Crown', 'Command', 'Tower'],
-    boss: ['Black King', 'Widow', 'Tempest', 'Warlord', 'Seraph', 'Nightmare', 'Apex']
+    command: ['Resolute Actual', 'Resolute CIC', 'Resolute Tower', 'Overlord', 'Watchtower', 'Iron Crown', 'Command'],
+    station: ['Aurora Prime', 'Aurora PA', 'Aurora Control', 'Aurora Civil'],
+    support: ['Mercy', 'Mercy Actual', 'Lifeline', 'Lifeline Tanker'],
+    boss: ['Hive-King', 'Brood Mother', 'Honey-Maw', 'Hive-Prime', 'Black King', 'Widow', 'Warlord', 'Apex']
   };
 
   const NOUNS = {
     // Tactical entities
-    threats: ['bandit', 'bogey', 'hostile', 'contact', 'target', 'enemy', 'threat'],
-    threats_plural: ['bandits', 'bogeys', 'hostiles', 'contacts', 'targets', 'enemies', 'threats'],
+    threats: ['bandit', 'bogey', 'hostile', 'contact', 'target', 'enemy', 'threat', 'Zorgon', 'drone', 'swarmer', 'hive-fighter'],
+    threats_plural: ['bandits', 'bogeys', 'hostiles', 'contacts', 'targets', 'enemies', 'threats', 'Zorgons', 'drones', 'swarmers', 'hive-fighters'],
+    threats_capital: ['hive-ship', 'honey-ship', 'Zorgon capital', 'Brood vessel', 'capital unit'],
     missiles: ['missile', 'missile lock', 'inbound', 'fox-three', 'seeker', 'rocket'],
     missiles_plural: ['missiles', 'inbounds', 'seekers', 'rockets', 'ordnance'],
     radar: ['radar', 'scope', 'screen', 'returns', 'picture', 'signature'],
@@ -48,15 +51,17 @@ const SFPatterns = (function () {
     waypoint: ['waypoint', 'nav point', 'checkpoint', 'rally point', 'marker'],
 
     // Mission objectives
-    objectives: ['objective', 'target', 'package', 'primary', 'mission goal'],
+    objectives: ['Aurora Prime', 'the station', 'the Resolute', 'the carrier', 'the civilians', 'the wheel', 'objective', 'primary'],
     targets: ['target', 'objective point', 'hot zone', 'strike area', 'attack point'],
 
     // Narrative elements
     artifacts: ['artifact', 'prototype', 'warhead', 'data core', 'relay', 'device'],
-    structures: ['gate', 'fortress', 'flagship', 'citadel', 'installation', 'facility'],
+    structures: ['Aurora Prime', 'the Resolute', 'the wheel', 'the carrier', 'Mercy', 'Lifeline', 'the Hive-Moon', 'hive-ship'],
+    civilians: ['civilians', 'Aurora residents', 'twenty-one thousand souls', 'the families', 'the colonists'],
+    supports: ['Mercy', 'Lifeline', 'the medical frigate', 'the tanker', 'the support boat'],
 
     // Locations
-    zones: ['zone', 'area', 'sector', 'quadrant', 'region', 'space'],
+    zones: ['zone', 'area', 'sector', 'quadrant', 'region', 'space', 'system edge', 'Hive-Moon perimeter'],
     positions: ['position', 'location', 'coordinates', 'grid', 'point', 'station']
   };
 
@@ -157,14 +162,20 @@ const SFPatterns = (function () {
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: [VERB_ENGAGE] [ADJECTIVE_PRIORITY] [NOUN_THREATS]',
       '[VERB_ENGAGE] [ADJECTIVE_RANGE] [NOUN_THREATS], [CALLSIGN_DST] — [ADVERB_URGENCY]',
       '[CALLSIGN_DST], you are cleared [VERB_ENGAGE] [NOUN_THREATS] [ADVERB_MANNER]',
-      '[VERB_ENGAGE] those [NOUN_THREATS] [ADVERB_MANNER], [CALLSIGN_DST]'
+      '[VERB_ENGAGE] those [NOUN_THREATS] [ADVERB_MANNER], [CALLSIGN_DST]',
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], [VERB_ENGAGE] that [NOUN_THREATS_CAPITAL] — priority target',
+      '[CALLSIGN_DST], [NOUN_THREATS_CAPITAL] vectoring on [NOUN_STRUCTURES] — [VERB_NEUTRALIZE] it',
+      '[CALLSIGN_COMMAND]: weapons free on Zorgon contacts, [CALLSIGN_DST]'
     ],
 
     ORDER_COVER: [
       '[CALLSIGN_DST], [VERB_COVER] [NOUN_OBJECTIVES]',
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: [VERB_COVER] [ADJECTIVE_PRIORITY] [NOUN_OBJECTIVES] [ADVERB_URGENCY]',
       '[VERB_COVER] the [NOUN_OBJECTIVES], [CALLSIGN_DST] — don\'t let them through',
-      '[CALLSIGN_DST], stay on [NOUN_OBJECTIVES] — [VERB_COVER] at all costs'
+      '[CALLSIGN_DST], stay on [NOUN_OBJECTIVES] — [VERB_COVER] at all costs',
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], [VERB_COVER] [NOUN_OBJECTIVES] — [NOUN_CIVILIANS] aboard',
+      '[CALLSIGN_DST], [VERB_COVER] [NOUN_OBJECTIVES] — they get past you, they get the [NOUN_CIVILIANS]',
+      '[CALLSIGN_STATION]: [CALLSIGN_DST], we have [NOUN_CIVILIANS] in the wheel — keep them off us'
     ],
 
     ORDER_BREAK: [
@@ -237,7 +248,10 @@ const SFPatterns = (function () {
       '[CALLSIGN_DST], [ADJECTIVE_RANGE] [NOUN_THREATS_PLURAL] closing!',
       '[INTERJECTION_ALERT]! [ADJECTIVE_INTENSITY] [NOUN_THREATS_PLURAL] [ADVERB_DIRECTION]!',
       '[CALLSIGN_SRC]: [VERB_DETECT] [ADJECTIVE_PRIORITY] [NOUN_THREATS] — [CALLSIGN_DST], engage!',
-      'New [NOUN_THREATS_PLURAL] on [NOUN_RADAR] — [CALLSIGN_DST], heads up!'
+      'New [NOUN_THREATS_PLURAL] on [NOUN_RADAR] — [CALLSIGN_DST], heads up!',
+      '[CALLSIGN_SRC]: [NOUN_THREATS_CAPITAL] inbound — vector on [NOUN_STRUCTURES]!',
+      '[CALLSIGN_COMMAND]: hive-swarm breaking off the [NOUN_STRUCTURES] — [CALLSIGN_DST], intercept!',
+      '[CALLSIGN_STATION]: we are taking fire — [NOUN_THREATS_PLURAL] on the wheel!'
     ],
 
     // ── Combat reports ──
@@ -245,7 +259,9 @@ const SFPatterns = (function () {
       '[CALLSIGN_SRC]: [INTERJECTION_HIT] — [NOUN_THREATS] down',
       '[INTERJECTION_HIT]! [CALLSIGN_SRC] confirms kill',
       '[CALLSIGN_SRC]: [VERB_NEUTRALIZE] [NOUN_THREATS] — good effect on target',
-      '[CALLSIGN_SRC] to [CALLSIGN_DST]: [NOUN_THREATS] [ADJECTIVE_CONDITION] — splash one'
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: [NOUN_THREATS] [ADJECTIVE_CONDITION] — splash one',
+      '[CALLSIGN_SRC]: scratch one Zorgon — saw the honey burn off',
+      '[CALLSIGN_SRC]: hive-fighter cracked open — that\'s one less for the wheel'
     ],
 
     REPORT_HIT: [
@@ -268,7 +284,23 @@ const SFPatterns = (function () {
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: You sure this is just a milk run?',
       '[CALLSIGN_SRC]: I\'ve seen cleaner skies over a warzone',
       '[CALLSIGN_SRC]: [NOUN_RADAR] is [ADJECTIVE_HEAT] — maybe too quiet',
-      '[CALLSIGN_SRC] to [CALLSIGN_DST]: Enjoying the view up here?'
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: Enjoying the view up here?',
+      '[CALLSIGN_SRC]: My kid\'s in the wheel right now — you bet I\'m holding the line',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: Hundred days since the last convoy, you counting?',
+      '[CALLSIGN_SRC]: [NOUN_SUPPORTS] is on station if you need a top-off',
+      '[CALLSIGN_SRC]: Earth doesn\'t even know how bad it is out here',
+      // Lore: bees / catalyst / cooperative origin / capture intent
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: All this — over honey. You think about that?',
+      '[CALLSIGN_SRC]: Their pollinator went extinct, ours didn\'t — that\'s the whole war right there',
+      '[CALLSIGN_SRC]: They can\'t take the bees, [CALLSIGN_DST] — the bees would die in their slop. They have to come here',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: They built this place WITH us. You believe that?',
+      '[CALLSIGN_SRC]: Used to be we shipped them catalyst by the tonne. Now they want the whole farm',
+      '[CALLSIGN_SRC]: Whole species dies in a week without the juice. They know it. We know it',
+      '[CALLSIGN_SRC]: Aurora\'s the only factory in the galaxy that can keep them alive — that\'s why they want it intact',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: They\'re not trying to glass the wheel — they\'re trying to take it',
+      '[CALLSIGN_SRC]: Heard the science boys say our bees produce stronger than their old pollinator ever did',
+      '[CALLSIGN_SRC]: It\'s not malice, [CALLSIGN_DST]. They\'re starving. Doesn\'t mean we let them have it',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: Funny thing to die over — bee juice'
     ],
 
     BANTER_COMBAT: [
@@ -276,7 +308,17 @@ const SFPatterns = (function () {
       '[CALLSIGN_SRC]: Here they come — time to earn our pay',
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: Just like the sims, right?',
       '[CALLSIGN_SRC]: This is what we trained for',
-      '[CALLSIGN_SRC]: Let\'s show them how it\'s done'
+      '[CALLSIGN_SRC]: Let\'s show them how it\'s done',
+      '[CALLSIGN_SRC]: Pop the honey — make them bleed out',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: Twenty-one thousand reasons to keep shooting',
+      '[CALLSIGN_SRC]: For the wheel, [CALLSIGN_DST]',
+      // Lore: bees / catalyst / capture-not-destroy — said with bite under fire
+      '[CALLSIGN_SRC]: Boarders incoming — they want the wheel ALIVE!',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: They\'re not bombing Aurora — they\'re BOARDING. Stop the pods!',
+      '[CALLSIGN_SRC]: Crack the hull — watch the honey vent',
+      '[CALLSIGN_SRC] to [CALLSIGN_DST]: No catalyst, no Zorgons — keep killing them',
+      '[CALLSIGN_SRC]: Every one we drop is one less mouth at our table',
+      '[CALLSIGN_SRC]: They want us in chains running their farm — NOT TODAY'
     ],
 
     // ── Panic/Stress patterns ──
@@ -284,14 +326,80 @@ const SFPatterns = (function () {
       '[CALLSIGN_SRC]: I\'m hit bad — systems failing!',
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: Can\'t shake them — need help!',
       '[CALLSIGN_SRC]: [NOUN_SHIELDS] gone — [NOUN_HULL] critical!',
-      '[CALLSIGN_SRC]: Mayday mayday — [VERB_TAKING] heavy damage!'
+      '[CALLSIGN_SRC]: Mayday mayday — [VERB_TAKING] heavy damage!',
+      '[CALLSIGN_SRC]: Mercy, [CALLSIGN_SRC] inbound on auto — I\'m hurt bad!'
     ],
 
     PANIC_OVERWHELMED: [
       '[CALLSIGN_SRC]: Too many — can\'t keep up!',
       '[CALLSIGN_SRC] to [CALLSIGN_DST]: They\'re everywhere!',
       '[CALLSIGN_SRC]: I\'m outnumbered — requesting support!',
-      '[CALLSIGN_SRC]: Can\'t hold them — falling back!'
+      '[CALLSIGN_SRC]: Can\'t hold them — falling back!',
+      '[CALLSIGN_SRC]: Whole hive\'s on me — [CALLSIGN_DST], I need you over here!'
+    ],
+
+    // ── § Capital-asset alerts — broadcast on guard, all flights hear ──
+    // Real-world doctrine: when a station/baseship/support unit takes hits,
+    // command broadcasts on the guard channel with unit name + condition.
+    ALERT_STATION_HIT: [
+      '[CALLSIGN_STATION], all flights — [ASSET_NAME] taking fire, hull at [ASSET_HULL] percent!',
+      'Mayday mayday — [ASSET_NAME] under attack, [ASSET_HULL] percent integrity, all available fighters vector immediate!',
+      '[CALLSIGN_STATION] broadcasting on guard — [ASSET_NAME] hit, civilians in the wheel, defend defend defend!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] is taking hostile fire — all elements, vector home, weapons free!',
+      '[CALLSIGN_STATION]: this is Aurora Civil — we are under attack, repeat, [ASSET_NAME] under attack!',
+      // Capture-not-destroy doctrine — surface the boarding intent
+      '[CALLSIGN_COMMAND]: BOARDING PODS detected on [ASSET_NAME] — they want the wheel intact, intercept the pods!',
+      '[CALLSIGN_STATION]: hostile breach attempt on [ASSET_NAME] — they\'re coming for the catalyst labs!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] hit — surgical strikes only, they want it captured. Stop the boarders!'
+    ],
+
+    ALERT_BASESHIP_HIT: [
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] reports hostile contacts on the hull — [ASSET_HULL] percent integrity!',
+      'All flights, [CALLSIGN_COMMAND] — [ASSET_NAME] taking direct fire, vector to defend!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] hangar bay compromised — [CALLSIGN_DST], priority intercept!',
+      '[CALLSIGN_COMMAND] to all elements: carrier under attack, [ASSET_HULL] percent — collapse the perimeter!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] CIWS engaged — pilots, do not let them through!'
+    ],
+
+    ALERT_SUPPORT_HIT: [
+      '[CALLSIGN_SUPPORT]: [ASSET_NAME] taking hits — [ASSET_HULL] percent, requesting cover!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] under attack — nearest fighter, peel off and screen!',
+      '[CALLSIGN_SUPPORT]: we are not armed for this — [CALLSIGN_DST], we need you over here!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] is the only [NOUN_SUPPORTS] we have left — [VERB_COVER] it!'
+    ],
+
+    // ── § Auto-vector orders — military doctrine when stations hit ──
+    // The "vector home" call: standard procedure when a friendly capital
+    // takes fire, all available fighters auto-pilot to the contact point.
+    ORDER_VECTOR_DEFEND: [
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], auto-vector engaged — bring you in on [ASSET_NAME]\'s position',
+      '[CALLSIGN_COMMAND] to all flights: vector home, [VERB_ENGAGE] [NOUN_THREATS_PLURAL] on the [ASSET_NAME]!',
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], you are auto-vectored to defend — go weapons hot',
+      '[CALLSIGN_COMMAND]: All elements, doctrine is in effect — [VERB_REGROUP] on [ASSET_NAME], [VERB_COVER] the asset',
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], your nav is locked to [ASSET_NAME] — punch the burner, intercept'
+    ],
+
+    ORDER_AUTOPILOT_HOME: [
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], [ASSET_NAME] is critical — [ASSET_HULL] percent — autopilot RTB engaged!',
+      '[CALLSIGN_COMMAND]: All flights, mayday on [ASSET_NAME] — autopilot home, all weapons free!',
+      '[CALLSIGN_COMMAND]: [CALLSIGN_DST], breaking off your patrol — auto-vector to [ASSET_NAME], [ADVERB_URGENCY]!',
+      '[CALLSIGN_COMMAND]: [ASSET_NAME] won\'t hold — [CALLSIGN_DST], punch home, we need every gun on the wheel!',
+      '[CALLSIGN_COMMAND]: Doctrine alpha — [ASSET_NAME] critical, all fighters auto-pilot, comply, comply!'
+    ],
+
+    // ── § Comms posture — broadcast when the grid degrades ──
+    COMMS_DEGRADED: [
+      '[CALLSIGN_COMMAND]: Comms grid is [COMMS_STATUS] — pilots, fall back on visual, fly your training!',
+      '[CALLSIGN_COMMAND]: Channel integrity [COMMS_STATUS] — auto-vector is OFFLINE, you are on your own!',
+      '[CALLSIGN_COMMAND]: Lost the relay — [COMMS_STATUS] posture, [CALLSIGN_DST], use formation lights!',
+      '[CALLSIGN_COMMAND]: All flights, comms [COMMS_STATUS] — independent action authorized, defend the wheel!',
+      '[CALLSIGN_COMMAND] (static): ...repeat, comms [COMMS_STATUS]... break... [CALLSIGN_DST]... visual only...'
+    ],
+
+    COMMS_RESTORED: [
+      '[CALLSIGN_COMMAND]: Comms grid back up — all elements, check in!',
+      '[CALLSIGN_COMMAND]: Channel restored — [CALLSIGN_DST], radio check, over',
+      '[CALLSIGN_COMMAND]: Relay is hot again — auto-vector ONLINE, resume doctrine'
     ]
   };
 
@@ -315,10 +423,22 @@ const SFPatterns = (function () {
     // Callsigns
     result = result.replace(/\[CALLSIGN_SRC\]/g, context.callsignSrc || _pick(CALLSIGNS.wingman));
     result = result.replace(/\[CALLSIGN_DST\]/g, context.callsignDst || _pick(CALLSIGNS.player));
+    result = result.replace(/\[CALLSIGN_COMMAND\]/g, _pick(CALLSIGNS.command));
+    result = result.replace(/\[CALLSIGN_STATION\]/g, _pick(CALLSIGNS.station));
+    result = result.replace(/\[CALLSIGN_SUPPORT\]/g, _pick(CALLSIGNS.support));
+
+    // Capital-asset slots (filled from context when available)
+    result = result.replace(/\[ASSET_NAME\]/g, context.hitAssetName || _pick(NOUNS.structures));
+    result = result.replace(/\[ASSET_HULL\]/g, context.hitAssetHullPct != null ? String(context.hitAssetHullPct) : '50');
+    result = result.replace(/\[COMMS_STATUS\]/g, context.commsStatus || 'nominal');
 
     // Nouns
     result = result.replace(/\[NOUN_THREATS\]/g, _pick(NOUNS.threats));
     result = result.replace(/\[NOUN_THREATS_PLURAL\]/g, _pick(NOUNS.threats_plural));
+    result = result.replace(/\[NOUN_THREATS_CAPITAL\]/g, _pick(NOUNS.threats_capital));
+    result = result.replace(/\[NOUN_STRUCTURES\]/g, _pick(NOUNS.structures));
+    result = result.replace(/\[NOUN_CIVILIANS\]/g, _pick(NOUNS.civilians));
+    result = result.replace(/\[NOUN_SUPPORTS\]/g, _pick(NOUNS.supports));
     result = result.replace(/\[NOUN_MISSILES\]/g, _pick(NOUNS.missiles));
     result = result.replace(/\[NOUN_MISSILES_PLURAL\]/g, _pick(NOUNS.missiles_plural));
     result = result.replace(/\[NOUN_RADAR\]/g, _pick(NOUNS.radar));

@@ -990,6 +990,130 @@
       background: rgba(255, 255, 255, 0.12);
       color: #fff;
     }
+
+    /* ── Leave Game button — always visible, top-right next to gear ── */
+    #btn-leave-game {
+      position: fixed;
+      top: 12px;
+      right: 56px;
+      z-index: 50;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(28, 8, 12, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(220, 80, 80, 0.28);
+      color: rgba(255, 180, 180, 0.75);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    #btn-leave-game:hover {
+      background: rgba(180, 30, 40, 0.55);
+      color: #fff;
+      border-color: rgba(255, 120, 120, 0.6);
+      transform: scale(1.06);
+    }
+
+    @media (max-width: 600px) {
+      #btn-leave-game {
+        top: 8px;
+        right: 52px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+    }
+
+    /* ── Replay / End-of-game overlay ── */
+    #replay-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 110;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    #replay-overlay.open {
+      display: flex;
+    }
+
+    #replay-panel {
+      background: rgba(8, 10, 24, 0.92);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 215, 0, 0.25);
+      border-radius: 16px;
+      padding: 26px 28px;
+      min-width: 260px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 16px 64px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 215, 0, 0.08);
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      text-align: center;
+    }
+
+    #replay-panel h2 {
+      margin: 0 0 6px;
+      font-size: 1.3em;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #ffd966;
+      text-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+    }
+
+    #replay-winner {
+      margin: 0 0 18px;
+      font-size: 0.95em;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    #btn-replay-again,
+    #btn-replay-leave {
+      display: block;
+      width: 100%;
+      padding: 11px;
+      margin-top: 8px;
+      border-radius: 8px;
+      font-size: 0.95em;
+      font-family: 'Rajdhani', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #btn-replay-again {
+      background: rgba(0, 180, 255, 0.22);
+      border: 1px solid rgba(0, 180, 255, 0.45);
+      color: #9be3ff;
+    }
+
+    #btn-replay-again:hover {
+      background: rgba(0, 180, 255, 0.42);
+      color: #fff;
+    }
+
+    #btn-replay-leave {
+      background: rgba(220, 50, 50, 0.22);
+      border: 1px solid rgba(220, 50, 50, 0.4);
+      color: #ff8f8f;
+    }
+
+    #btn-replay-leave:hover {
+      background: rgba(220, 50, 50, 0.45);
+      color: #fff;
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -1054,8 +1178,21 @@
     <div id="move-hints"></div>
   </div>
 
+  <!-- ── Leave Game — always visible, top-right next to gear ── -->
+  <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
+
   <!-- ── Settings gear — top-right ── -->
   <button id="btn-settings" onclick="toggleSettings()" title="Settings">⚙</button>
+
+  <!-- ── Replay overlay — shown after game ends ── -->
+  <div id="replay-overlay" onclick="if(event.target===this)hideReplayPrompt()">
+    <div id="replay-panel">
+      <h2>🏆 Game Over</h2>
+      <p id="replay-winner">A new round awaits.</p>
+      <button id="btn-replay-again" onclick="playAgain()">↻ Play Again</button>
+      <button id="btn-replay-leave" onclick="leaveFromReplay()">✕ Leave Game</button>
+    </div>
+  </div>
 
   <!-- ── Settings overlay ── -->
   <div id="settings-overlay" onclick="if(event.target===this)toggleSettings()">
@@ -1176,10 +1313,41 @@
     }
 
     function exitGame() {
-      if (confirm('Exit this game?')) {
+      // Skip confirm if game is already over (replay overlay already shown)
+      const replayOpen = document.getElementById('replay-overlay').classList.contains('open');
+      if (replayOpen || confirm('Leave this game?')) {
         window.location.href = '/lobby/';
       }
     }
+
+    function leaveFromReplay() {
+      window.location.href = '/lobby/';
+    }
+
+    function playAgain() {
+      // Reload preserves scenario / player config carried in the URL
+      window.location.reload();
+    }
+
+    function showReplayPrompt(winnerName) {
+      const overlay = document.getElementById('replay-overlay');
+      if (!overlay) return;
+      const label = document.getElementById('replay-winner');
+      if (label) {
+        label.textContent = winnerName
+          ? `${winnerName} wins! Play again or return to the lobby.`
+          : 'Play again or return to the lobby.';
+      }
+      overlay.classList.add('open');
+    }
+
+    function hideReplayPrompt() {
+      const overlay = document.getElementById('replay-overlay');
+      if (overlay) overlay.classList.remove('open');
+    }
+
+    window.showReplayPrompt = showReplayPrompt;
+    window.hideReplayPrompt = hideReplayPrompt;
 
     // Wire intent manifold functions
     window.toggleSound = function () { const el = document.getElementById('vol-sfx'); el.value = el.value > 0 ? 0 : 70; setSfxVolume(el.value); };

@@ -74,7 +74,7 @@ const FastTrackThemes = {
                 0xb34dff,  // Plasma purple
                 0xffe633,  // Supernova yellow
                 0x33aaff,  // Nebula blue
-                0xff6633   // Nova orange
+                0xa0522d   // Nova ember (sienna)
             ],
             playerNames: ['Magenta', 'Cyber', 'Plasma', 'Nova', 'Nebula', 'Blaze'],
             holeColor: 0x0a0a14,
@@ -88,7 +88,7 @@ const FastTrackThemes = {
                 0xcd7f32,  // Bronze
                 0x228b22,  // Forest green
                 0xffd700,  // Gold
-                0xff8c00,  // Orange
+                0xa0522d,  // Sienna (darker, distinct from gold/yellow)
                 0x4169e1,  // Royal blue
                 0x7851a9   // Royal purple
             ],
@@ -105,7 +105,7 @@ const FastTrackThemes = {
                 0xc0c0c0,  // Moon gray
                 0xcd5c5c,  // Mars red
                 0xffd700,  // Sun yellow
-                0xff8c00,  // Jupiter orange
+                0xa0522d,  // Jupiter (sienna)
                 0x9370db   // Mercury purple
             ],
             playerNames: ['Neptune', 'Moon', 'Mars', 'Sun', 'Jupiter', 'Mercury'],
@@ -135,7 +135,7 @@ const FastTrackThemes = {
             boardMetalness: 0.05,
             playerColors: [
                 0x0077bb,  // Strong blue
-                0xff9900,  // Vivid orange
+                0xb8651b,  // Burnt sienna (darker, distinct from yellow)
                 0xdddddd,  // Near-white
                 0xffdd00,  // Bright yellow
                 0x222222,  // Near-black
@@ -154,7 +154,7 @@ const FastTrackThemes = {
                 0xffd700,  // Gold (the golden ratio color)
                 0xf4a460,  // Sandy brown (sunflower)
                 0xdaa520,  // Goldenrod
-                0xcd853f,  // Peru (nautilus shell)
+                0xa0522d,  // Sienna (nautilus shell)
                 0xb8860b,  // Dark goldenrod
                 0xe6be8a   // Pale gold
             ],
@@ -933,7 +933,7 @@ FastTrackThemes.register('billiard', {
         'assets/images/art/DrivingTheHerd.png',
         'assets/images/art/pigs.png',
         'assets/images/art/lighthouse.png',
-        'assets/images/art/parot.png'
+        'assets/images/art/rainyday.jpg'
     ],
 
     // Store chandelier meshes for hide/show during gameplay
@@ -1095,18 +1095,47 @@ FastTrackThemes.register('billiard', {
             { px: roomW, pz: -60, ry: -Math.PI / 2, w: roomD * 1.8 },
         ];
 
+        // Brick texture for interior wall surface (behind paintings + behind wainscot panel).
+        // One source texture, cloned per wall so each can carry its own repeat factor.
+        // Tile sized ~220x110 units → consistent brick scale across the differently-sized walls.
+        const _brickLoader = new THREE.TextureLoader();
+        const _brickSrc = _brickLoader.load('assets/images/Brick texture.png');
+        _brickSrc.wrapS = _brickSrc.wrapT = THREE.RepeatWrapping;
+        _brickSrc.anisotropy = 8;
+
         wallSegments.forEach(ws => {
-            // Upper wall
             const upperH = wallH - wainH;
+
+            // Per-wall brick textures (cloned so repeat is independent)
+            const upperBrickTex = _brickSrc.clone();
+            upperBrickTex.needsUpdate = true;
+            upperBrickTex.wrapS = upperBrickTex.wrapT = THREE.RepeatWrapping;
+            upperBrickTex.repeat.set(Math.max(1, ws.w / 220), Math.max(1, upperH / 110));
+
+            const wainBrickTex = _brickSrc.clone();
+            wainBrickTex.needsUpdate = true;
+            wainBrickTex.wrapS = wainBrickTex.wrapT = THREE.RepeatWrapping;
+            wainBrickTex.repeat.set(Math.max(1, ws.w / 220), Math.max(1, wainH / 110));
+
+            const upperBrickMat = new THREE.MeshStandardMaterial({
+                map: upperBrickTex, color: 0xb89484, roughness: 0.88, metalness: 0.02,
+                envMapIntensity: 0.3
+            });
+            const wainBrickMat = new THREE.MeshStandardMaterial({
+                map: wainBrickTex, color: 0x8a5a48, roughness: 0.85, metalness: 0.04,
+                envMapIntensity: 0.3
+            });
+
+            // Upper wall (behind paintings)
             const upperGeo = new THREE.PlaneGeometry(ws.w, upperH);
-            const upper = new THREE.Mesh(upperGeo, wallMat);
+            const upper = new THREE.Mesh(upperGeo, upperBrickMat);
             upper.position.set(ws.px, wainH + upperH / 2 - 80, ws.pz);
             upper.rotation.y = ws.ry;
             scene.add(upper); manager._sceneObjects.push(upper);
 
-            // Wainscoting (lower half panel)
+            // Wainscoting plane (lower half panel) — brick behind chair rail / baseboard / wood trim
             const wGeo = new THREE.PlaneGeometry(ws.w, wainH);
-            const wMesh = new THREE.Mesh(wGeo, wainscotMat);
+            const wMesh = new THREE.Mesh(wGeo, wainBrickMat);
             wMesh.position.set(ws.px, wainH / 2 - 80, ws.pz);
             wMesh.rotation.y = ws.ry;
             scene.add(wMesh); manager._sceneObjects.push(wMesh);

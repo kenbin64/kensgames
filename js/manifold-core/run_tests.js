@@ -10,7 +10,13 @@ const coreDir = __dirname;
 
 console.log('Loading manifold core modules...\n');
 
-// Load modules using require
+// The shim (manifold_surface.js) delegates to window.Manifold. Load the
+// unified manifold first under a window stub so the shim has a target.
+global.window = global.window || {};
+global.Manifold = require(path.join(coreDir, '..', 'manifold.js'));
+global.window.Manifold = global.Manifold;
+console.log('✓ Loaded manifold.js (unified core)');
+
 global.ManifoldSurface = require(path.join(coreDir, 'manifold_surface.js'));
 console.log('✓ Loaded manifold_surface.js');
 

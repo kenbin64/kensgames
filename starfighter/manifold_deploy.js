@@ -24,6 +24,7 @@ const fsz = fp => fs.existsSync(fp) ? fs.statSync(fp).size : 0;
 const X = [
   ['js/analytics.js', ROOT], ['js/manifold.js', ROOT],
   ['js/substrates/manifold_ingestor.js', ROOT],
+  ['js/access_session_bridge.js', ROOT], ['js/manifold_bridge.js', ROOT],
   ['manifold.js', SF], ['native/bridge.js', SF],
   ['manifold_native_substrate.js', SF],
   ['dimensional_substrate.js', SF], ['manifold_geometry_substrate.js', SF],
@@ -31,6 +32,7 @@ const X = [
   ['audio.js', SF], ['music.js', SF], ['anpc.js', SF], ['progression.js', SF],
   ['js/multiplayer-client.js', ROOT], ['multiplayer.js', SF],
   ['announcer.js', SF], ['core.js', SF], ['input.js', SF], ['3d.js', SF],
+  ['codex_data.js', SF], ['codex.js', SF], ['enhance.js', SF], ['intro.js', SF],
 ];
 
 console.log('\n🜂  z = xy²\n' + '─'.repeat(60));

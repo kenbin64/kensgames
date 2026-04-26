@@ -1,0 +1,51 @@
+{
+  "_comment": "Manifold: Cubic = Expression(z=xy) + Attributes + Substrate(Gyroid). Lens: Schwartz Diamond on well walls.",
+  "id": "cubic3d",
+  "name": "Cubic",
+  "slug": "cubic3d",
+  "description": "3D Tetris — drop and rotate polycube pieces into an elongated 4×4×20 tower well. Every piece is a point in a higher dimension; every layer a whole in a lower.",
+  "version": "1.0.0",
+  "path": "cubic3d/",
+  "entry": "index.html",
+  "server": "static",
+  "status": "production",
+  "dimension": {
+    "x": 4,
+    "y": 4,
+    "z": 16,
+    "_note": "z = x*y = 4*4 = 16 (cells per layer). Axiom satisfied."
+  },
+  "manifold": {
+    "expression": "z = x * y",
+    "x_axis": "well_cols",
+    "y_axis": "well_depth",
+    "z_axis": "cells_per_layer",
+    "layer": "3D_volume + 4D_temporal",
+    "dsl": [
+      "manifold cubic_well(x, y, t):",
+      "    z = x * y",
+      "    geometry  = BoxGeometry(x, ROWS, y) with wire grid",
+      "    behavior  = 'piece_gravity: dy/dt = -level_speed(t)'",
+      "    sound     = 'tone_synthesised: lock=sawtooth, clear=sine_chord, drop=square'",
+      "    light     = 'corner_accent: pulse = sin(t * phi) * 0.25 + 0.12'",
+      "    substrate = 'gyroid: sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = 0 (visual well skin)'",
+      "    lens      = 'schwartz_diamond: cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = 0 (wall geometry read-only)'"
+    ]
+  },
+  "substrates": {
+    "visual": "inline Three.js MeshPhysicalMaterial — clearcoat glass blocks, ACES filmic",
+    "audio": "inline Web Audio API — zero asset files, all tones synthesised from manifold coords",
+    "physics": "inline gravity ticker — lock delay 0.5s, 7-bag randomiser, kick table",
+    "input": "keyboard + orbit camera"
+  },
+  "portal": {
+    "tile_image": "assets/images/cubic3d_landing.png",
+    "lobby_image": "assets/images/cubic3d_lobby.png",
+    "badge": "NEW",
+    "tags": [
+      "1 Player",
+      "Puzzle",
+      "3D Tetris"
+    ]
+  }
+}

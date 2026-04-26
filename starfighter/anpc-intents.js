@@ -21,6 +21,15 @@ const SFIntents = (function () {
   // ═══════════════════════════════════════════════════════════════════════════
 
   const INTENTS = {
+    // ── Strategic alerts (top priority — base/station defense) ──
+    ALERT_STATION_HIT: 'ALERT_STATION_HIT',
+    ALERT_BASESHIP_HIT: 'ALERT_BASESHIP_HIT',
+    ALERT_SUPPORT_HIT: 'ALERT_SUPPORT_HIT',
+
+    // ── Comms status ──
+    COMMS_DEGRADED: 'COMMS_DEGRADED',
+    COMMS_RESTORED: 'COMMS_RESTORED',
+
     // ── Alerts (highest priority) ──
     ALERT_MISSILE: 'ALERT_MISSILE',
     ALERT_LOCK: 'ALERT_LOCK',
@@ -31,6 +40,8 @@ const SFIntents = (function () {
     PANIC_OVERWHELMED: 'PANIC_OVERWHELMED',
 
     // ── Orders (command → player/wing) ──
+    ORDER_VECTOR_DEFEND: 'ORDER_VECTOR_DEFEND',
+    ORDER_AUTOPILOT_HOME: 'ORDER_AUTOPILOT_HOME',
     ORDER_ENGAGE: 'ORDER_ENGAGE',
     ORDER_COVER: 'ORDER_COVER',
     ORDER_BREAK: 'ORDER_BREAK',
@@ -77,6 +88,11 @@ const SFIntents = (function () {
     THREAT_HEAVY: 5,        // 5+ enemies = heavy threat
     DISTANCE_CLOSE: 500,    // Enemy within 500m = close range
     DISTANCE_NEAR: 1500,    // Enemy within 1500m = near
+
+    // Capital-asset damage thresholds (Aurora Prime, Resolute, Mercy, Lifeline)
+    CAPITAL_GRAZE: 99,      // Any hit at all = Aurora PA broadcasts
+    CAPITAL_DAMAGED: 80,    // Below 80% hull = command issues defend orders
+    CAPITAL_CRITICAL: 40,   // Below 40% hull = full mayday, all hands vector home
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -129,6 +145,56 @@ const SFIntents = (function () {
     const shieldPct = (player.shields / player.maxShields) * 100;
     const fuelPct = (player.fuel / player.maxFuel) * 100;
 
+    // ── Capital-asset damage assessment ──
+    // Friendly capital units worth defending: baseship (Resolute), station
+    // (Aurora Prime), support frigates (Mercy/Lifeline). Pulled from
+    // state.baseship + state.entities[type in {station,medic,tanker,support}].
+    const capitalAssets = [];
+    if (state.baseship && state.baseship.maxHull > 0) {
+      capitalAssets.push({ name: state.baseship.name || 'Resolute', kind: 'baseship', e: state.baseship });
+    }
+    if (state.station && state.station.maxHull > 0) {
+      capitalAssets.push({ name: state.station.name || 'Aurora Prime', kind: 'station', e: state.station });
+    }
+    for (const e of entities) {
+      if (!e || !e.friendly || !e.maxHull) continue;
+      if (e.type === 'station' || e.type === 'aurora' || e.type === 'civilian-station') {
+        capitalAssets.push({ name: e.name || 'Aurora Prime', kind: 'station', e });
+      } else if (e.type === 'medic' || e.type === 'mercy') {
+        capitalAssets.push({ name: e.name || 'Mercy', kind: 'support', e });
+      } else if (e.type === 'tanker' || e.type === 'lifeline') {
+        capitalAssets.push({ name: e.name || 'Lifeline', kind: 'support', e });
+      }
+    }
+
+    let stationHit = null, baseshipHit = null, supportHit = null;
+    let stationCriticalHit = null, baseshipCriticalHit = null;
+    for (const c of capitalAssets) {
+      const pct = (c.e.hull / c.e.maxHull) * 100;
+      if (pct >= THRESHOLDS.CAPITAL_GRAZE) continue;
+      const hit = { name: c.name, kind: c.kind, hullPct: pct, e: c.e };
+      if (c.kind === 'station') {
+        if (!stationHit || pct < stationHit.hullPct) stationHit = hit;
+        if (pct < THRESHOLDS.CAPITAL_CRITICAL && (!stationCriticalHit || pct < stationCriticalHit.hullPct)) stationCriticalHit = hit;
+      } else if (c.kind === 'baseship') {
+        if (!baseshipHit || pct < baseshipHit.hullPct) baseshipHit = hit;
+        if (pct < THRESHOLDS.CAPITAL_CRITICAL && (!baseshipCriticalHit || pct < baseshipCriticalHit.hullPct)) baseshipCriticalHit = hit;
+      } else if (c.kind === 'support') {
+        if (!supportHit || pct < supportHit.hullPct) supportHit = hit;
+      }
+    }
+
+    // ── Comms state ──
+    // Honors explicit state.commsStatus if the engine sets it; otherwise
+    // degrades automatically when the Resolute (comms relay) drops below 40%.
+    let commsStatus = state.commsStatus || 'nominal';
+    if (commsStatus === 'nominal' && state.baseship && state.baseship.maxHull > 0) {
+      const bsp = (state.baseship.hull / state.baseship.maxHull) * 100;
+      if (bsp < THRESHOLDS.CAPITAL_CRITICAL) commsStatus = 'compromised';
+      else if (bsp < THRESHOLDS.CAPITAL_DAMAGED) commsStatus = 'degraded';
+    }
+    const commsCompromised = commsStatus === 'compromised';
+
     return {
       // Threat assessment
       hostileCount: hostiles.length,
@@ -149,6 +215,18 @@ const SFIntents = (function () {
       phase: state.phase,
       wave: state.wave,
 
+      // Capital assets under attack
+      stationHit,
+      stationCriticalHit,
+      baseshipHit,
+      baseshipCriticalHit,
+      supportHit,
+      anyCapitalHit: !!(stationHit || baseshipHit || supportHit),
+
+      // Comms posture
+      commsStatus,
+      commsCompromised,
+
       // Wingman status (if ANPC is wingman)
       wingmanAlive: anpc && anpc.role === 'wingman' ? true : false,
 
@@ -165,6 +243,45 @@ const SFIntents = (function () {
    * Logic gates - boolean conditions for intent triggering
    */
   const GATES = {
+    // ── Capital-asset alert gates (top priority — Aurora Prime, Resolute,
+    //    Mercy, Lifeline taking fire). These fire for ANY ANPC because
+    //    everyone on the channel hears the call when a station is hit.
+    ALERT_STATION_HIT: (tac, anpc) => {
+      return !!tac.stationHit;
+    },
+
+    ALERT_BASESHIP_HIT: (tac, anpc) => {
+      return !!tac.baseshipHit;
+    },
+
+    ALERT_SUPPORT_HIT: (tac, anpc) => {
+      return !!tac.supportHit;
+    },
+
+    // ── Auto-vector orders (military doctrine: when stations come under
+    //    attack, all available fighters auto-pilot to the threat unless the
+    //    comms grid is compromised). Restricted to lead/command voices. ──
+    ORDER_VECTOR_DEFEND: (tac, anpc) => {
+      return (
+        anpc && (anpc.role === 'lead' || anpc.role === 'command') &&
+        tac.anyCapitalHit &&
+        !tac.commsCompromised
+      );
+    },
+
+    ORDER_AUTOPILOT_HOME: (tac, anpc) => {
+      return (
+        anpc && (anpc.role === 'lead' || anpc.role === 'command') &&
+        (tac.stationCriticalHit || tac.baseshipCriticalHit) &&
+        !tac.commsCompromised
+      );
+    },
+
+    // ── Comms posture announcements ──
+    COMMS_DEGRADED: (tac, anpc) => {
+      return tac.commsCompromised && anpc && (anpc.role === 'lead' || anpc.role === 'command');
+    },
+
     // ── Panic gates ──
     PANIC: (tac, anpc) => {
       return (
@@ -281,6 +398,20 @@ const SFIntents = (function () {
   function resolveIntent(state, anpc, trigger = {}) {
     const tac = captureTacticalState(state, anpc);
 
+    // ── Priority 0: Capital-asset under attack (highest priority — these
+    //    interrupt everything; broadcast on the channel for all ANPCs) ──
+    if (GATES.ALERT_STATION_HIT(tac, anpc)) return INTENTS.ALERT_STATION_HIT;
+    if (GATES.ALERT_BASESHIP_HIT(tac, anpc)) return INTENTS.ALERT_BASESHIP_HIT;
+    if (GATES.ALERT_SUPPORT_HIT(tac, anpc)) return INTENTS.ALERT_SUPPORT_HIT;
+
+    // ── Priority 0b: Auto-vector orders from command (military doctrine —
+    //    fighters auto-pilot to defend stations unless comms compromised) ──
+    if (GATES.ORDER_AUTOPILOT_HOME(tac, anpc)) return INTENTS.ORDER_AUTOPILOT_HOME;
+    if (GATES.ORDER_VECTOR_DEFEND(tac, anpc)) return INTENTS.ORDER_VECTOR_DEFEND;
+
+    // ── Priority 0c: Comms posture announcement (rare, low frequency) ──
+    if (GATES.COMMS_DEGRADED(tac, anpc) && Math.random() < 0.08) return INTENTS.COMMS_DEGRADED;
+
     // ── Priority 1: Alerts (immediate danger) ──
     if (GATES.MISSILE_ALERT(tac, anpc)) return INTENTS.ALERT_MISSILE;
     if (GATES.LOCK_ALERT(tac, anpc)) return INTENTS.ALERT_LOCK;
@@ -347,11 +478,21 @@ const SFIntents = (function () {
     const playerCallsign = state.player && state.player.callsign ? state.player.callsign : 'Ghost';
     const anpcCallsign = anpc && anpc.callsign ? anpc.callsign : 'Wingman';
 
+    // Re-capture so the hit-asset name is available for slot fills
+    const tac = captureTacticalState(state, anpc);
+    const hitAsset =
+      tac.stationCriticalHit || tac.baseshipCriticalHit ||
+      tac.stationHit || tac.baseshipHit || tac.supportHit;
+
     return {
       callsignSrc: anpcCallsign,
       callsignDst: playerCallsign,
       role: anpc ? anpc.role : 'wingman',
-      tone: anpc ? anpc.tone : 'neutral'
+      tone: anpc ? anpc.tone : 'neutral',
+      hitAssetName: hitAsset ? hitAsset.name : null,
+      hitAssetKind: hitAsset ? hitAsset.kind : null,
+      hitAssetHullPct: hitAsset ? Math.round(hitAsset.hullPct) : null,
+      commsStatus: tac.commsStatus
     };
   }
 

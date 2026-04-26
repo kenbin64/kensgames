@@ -2,12 +2,12 @@
  * ============================================================
  * FASTTRACK MINIMAL GAME UI
  * ============================================================
- * 
+ *
  * Clean, minimal interface:
  * - Top left: Current player only (avatar, name, deck info)
  * - Right side: Retractable settings panel (cog icon)
  * - Dimensional drill-down navigation (ButterflyFX standard)
- * 
+ *
  * ButterflyFX Dimensional Programming Standard
  */
 
@@ -15,7 +15,7 @@
 
 const GameUIMinimal = {
     version: '1.0.0',
-    
+
     // State
     currentPlayer: null,
     deckCount: 52,
@@ -25,11 +25,11 @@ const GameUIMinimal = {
     players: [],  // All players for indicator bar
     currentPlayerIndex: 0,
     controlMode: 'automatic',  // 'automatic' or 'manual'
-    
+
     // Dimensional navigation state
     dimensionStack: [],       // navigation history for back-traversal
     currentDimension: 'root', // currently displayed dimension level
-    
+
     // DOM Elements
     elements: {
         container: null,
@@ -39,31 +39,31 @@ const GameUIMinimal = {
         overlay: null,
         indicatorBar: null
     },
-    
+
     // ============================================================
     // INITIALIZATION
     // ============================================================
-    
+
     init() {
         console.log('[GameUIMinimal] Initializing...');
-        
+
         // Detect mobile
         this.isMobile = window.innerWidth <= 768;
-        
+
         // Create styles
         this.injectStyles();
-        
+
         // Create UI elements
         this.createCurrentPlayerPanel();
         this.createPlayerIndicatorBar();
         this.createMenuPanel();
-        
+
         // Listen for resize
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
             this.updateLayout();
         });
-        
+
         // Auto-start music on first user interaction if toggle is active
         const startMusicOnce = () => {
             const toggle = document.getElementById('toggle-music');
@@ -77,18 +77,18 @@ const GameUIMinimal = {
         document.addEventListener('click', startMusicOnce, { once: true });
         document.addEventListener('touchstart', startMusicOnce, { once: true });
         document.addEventListener('keydown', startMusicOnce, { once: true });
-        
+
         console.log('[GameUIMinimal] Ready');
         return this;
     },
-    
+
     // ============================================================
     // STYLES
     // ============================================================
-    
+
     injectStyles() {
         if (document.getElementById('game-ui-minimal-styles')) return;
-        
+
         const style = document.createElement('style');
         style.id = 'game-ui-minimal-styles';
         style.textContent = `
@@ -114,14 +114,14 @@ const GameUIMinimal = {
                 opacity: 0.45;
                 pointer-events: auto;
             }
-            
+
             /* Disabled state — not the current human player's turn */
             #current-player-panel.panel-disabled {
                 opacity: 0.35;
                 filter: grayscale(0.5) brightness(0.7);
                 pointer-events: none;
             }
-            
+
             #current-player-panel:hover,
             #current-player-panel.active-turn {
                 opacity: 1;
@@ -130,12 +130,12 @@ const GameUIMinimal = {
                 box-shadow: 0 6.472px 29.124px rgba(0, 0, 0, 0.5),
                             0 0 48.54px var(--player-glow, rgba(52, 152, 219, 0.45));
             }
-            
+
             /* Flowing glow animation when it's the active player's turn */
             #current-player-panel.active-turn {
                 animation: panel-glow-flow 2.5s ease-in-out infinite;
             }
-            
+
             @keyframes panel-glow-flow {
                 0%, 100% {
                     box-shadow: 0 6.472px 29.124px rgba(0, 0, 0, 0.5),
@@ -150,7 +150,7 @@ const GameUIMinimal = {
                     border-color: #fff;
                 }
             }
-            
+
             .cp-avatar {
                 width: 64.72px;
                 height: 64.72px;
@@ -164,13 +164,13 @@ const GameUIMinimal = {
                 box-shadow: 0 0 16.18px var(--player-glow, rgba(52, 152, 219, 0.4));
                 flex-shrink: 0;
             }
-            
+
             .cp-info {
                 display: flex;
                 flex-direction: column;
                 gap: 1.618px;
             }
-            
+
             .cp-name {
                 font-size: 1.327em;
                 font-weight: 700;
@@ -181,7 +181,7 @@ const GameUIMinimal = {
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
-            
+
             .cp-turn-label {
                 font-size: 0.89em;
                 text-transform: uppercase;
@@ -189,7 +189,7 @@ const GameUIMinimal = {
                 color: var(--player-color, #3498db);
                 font-weight: 600;
             }
-            
+
             .cp-deck-info {
                 display: flex;
                 align-items: center;
@@ -198,7 +198,7 @@ const GameUIMinimal = {
                 padding-left: 12.944px;
                 border-left: 1.618px solid rgba(255, 255, 255, 0.15);
             }
-            
+
             .cp-deck-stack {
                 display: flex;
                 flex-direction: column;
@@ -206,11 +206,11 @@ const GameUIMinimal = {
                 cursor: pointer;
                 transition: transform 0.2s;
             }
-            
+
             .cp-deck-stack:hover {
                 transform: scale(1.05);
             }
-            
+
             /* Enlarge deck when it's time to draw */
             .cp-deck-stack.draw-ready .cp-deck-icon {
                 width: 77.664px;
@@ -218,12 +218,12 @@ const GameUIMinimal = {
                 animation: deckPulse 1.5s ease-in-out infinite;
                 box-shadow: 0 0 32.36px rgba(255, 215, 0, 0.6);
             }
-            
+
             @keyframes deckPulse {
                 0%, 100% { transform: scale(1); }
                 50% { transform: scale(1.05); }
             }
-            
+
             .cp-deck-icon {
                 width: 51.776px;
                 height: 67.956px;
@@ -243,7 +243,7 @@ const GameUIMinimal = {
                 box-shadow: 1.618px 1.618px 6.472px rgba(0,0,0,0.4);
                 position: relative;
             }
-            
+
             .cp-deck-icon::before {
                 content: '';
                 position: absolute;
@@ -256,7 +256,7 @@ const GameUIMinimal = {
                 border-radius: 3.236px;
                 pointer-events: none;
             }
-            
+
             .cp-deck-icon::after {
                 content: '';
                 position: absolute;
@@ -271,7 +271,7 @@ const GameUIMinimal = {
                 border: 1.618px solid rgba(255,255,255,0.3);
                 z-index: -1;
             }
-            
+
             .cp-drawn-card {
                 width: 58.248px;
                 height: 77.664px;
@@ -288,15 +288,15 @@ const GameUIMinimal = {
                 cursor: pointer;
                 transition: all 0.3s;
             }
-            
+
             .cp-drawn-card:hover {
                 transform: scale(1.12) rotate(-3deg);
             }
-            
+
             .cp-drawn-card.black {
                 color: #2c3e50;
             }
-            
+
             .cp-drawn-card.empty {
                 background: rgba(255,255,255,0.1);
                 border: 2.427px dashed rgba(255,255,255,0.3);
@@ -350,7 +350,7 @@ const GameUIMinimal = {
                 position: relative;
                 display: inline-flex;
             }
-            
+
             /* ===== MENU COG BUTTON - COMPLETELY REMOVED ===== */
             #menu-toggle-btn,
             #menu-toggle-btn:hover,
@@ -362,7 +362,7 @@ const GameUIMinimal = {
                 visibility: hidden !important;
                 opacity: 0 !important;
             }
-            
+
             /* ===== SIDE MENU PANEL ===== */
             #game-menu-panel {
                 position: fixed;
@@ -379,34 +379,34 @@ const GameUIMinimal = {
                 flex-direction: column;
                 overflow: hidden;
             }
-            
+
             #game-menu-panel.open {
                 right: 0;
             }
-            
+
             .menu-header {
                 padding: 70px 20px 20px;
                 border-bottom: 1px solid #333;
                 background: linear-gradient(180deg, rgba(52, 152, 219, 0.2), transparent);
             }
-            
+
             .menu-header h3 {
                 margin: 0;
                 font-size: 1.3em;
                 color: #fff;
                 font-weight: 700;
             }
-            
+
             .menu-content {
                 flex: 1;
                 overflow-y: auto;
                 padding: 15px;
             }
-            
+
             .menu-section {
                 margin-bottom: 20px;
             }
-            
+
             .menu-section-title {
                 font-size: 0.75em;
                 text-transform: uppercase;
@@ -655,7 +655,7 @@ const GameUIMinimal = {
                 margin-left: auto;
                 text-shadow: 0 0 8px rgba(74,222,128,0.5);
             }
-            
+
             .menu-btn {
                 width: 100%;
                 padding: 12px 15px;
@@ -672,17 +672,17 @@ const GameUIMinimal = {
                 align-items: center;
                 gap: 10px;
             }
-            
+
             .menu-btn:hover {
                 background: rgba(52, 152, 219, 0.2);
                 border-color: #3498db;
                 transform: translateX(5px);
             }
-            
+
             .menu-btn-icon {
                 font-size: 1.2em;
             }
-            
+
             .menu-toggle-row {
                 display: flex;
                 justify-content: space-between;
@@ -693,12 +693,12 @@ const GameUIMinimal = {
                 border-radius: 10px;
                 margin-bottom: 8px;
             }
-            
+
             .menu-toggle-label {
                 color: #ccc;
                 font-size: 0.9em;
             }
-            
+
             .menu-toggle {
                 width: 50px;
                 height: 26px;
@@ -708,11 +708,11 @@ const GameUIMinimal = {
                 position: relative;
                 transition: background 0.3s;
             }
-            
+
             .menu-toggle.active {
                 background: #27ae60;
             }
-            
+
             .menu-toggle::after {
                 content: '';
                 position: absolute;
@@ -724,11 +724,11 @@ const GameUIMinimal = {
                 border-radius: 50%;
                 transition: left 0.3s;
             }
-            
+
             .menu-toggle.active::after {
                 left: 27px;
             }
-            
+
             /* ===== VOLUME SLIDERS ===== */
             .menu-volume-row {
                 display: flex;
@@ -780,7 +780,7 @@ const GameUIMinimal = {
                 width: 30px;
                 text-align: right;
             }
-            
+
             /* ===== YOUR TURN POPUP ===== */
             #your-turn-popup {
                 position: fixed;
@@ -895,19 +895,19 @@ const GameUIMinimal = {
                 pointer-events: none;
                 transition: opacity 0.3s;
             }
-            
+
             #menu-overlay.visible {
                 opacity: 1;
                 pointer-events: auto;
             }
-            
+
             /* ===== ALL PLAYERS LIST IN MENU ===== */
             .players-list {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
             }
-            
+
             .player-list-item {
                 display: flex;
                 align-items: center;
@@ -918,12 +918,12 @@ const GameUIMinimal = {
                 border: 1px solid transparent;
                 transition: all 0.2s;
             }
-            
+
             .player-list-item.current {
                 border-color: var(--player-color, #3498db);
                 background: rgba(52, 152, 219, 0.1);
             }
-            
+
             .player-list-avatar {
                 width: 36px;
                 height: 36px;
@@ -934,22 +934,22 @@ const GameUIMinimal = {
                 justify-content: center;
                 font-size: 1.3em;
             }
-            
+
             .player-list-info {
                 flex: 1;
             }
-            
+
             .player-list-name {
                 color: #fff;
                 font-weight: 600;
                 font-size: 0.9em;
             }
-            
+
             .player-list-pegs {
                 font-size: 0.75em;
                 color: #888;
             }
-            
+
             /* ===== BOT BADGE ===== */
             .bot-badge {
                 display: inline-block;
@@ -964,21 +964,21 @@ const GameUIMinimal = {
                 text-transform: uppercase;
                 vertical-align: middle;
             }
-            
+
             .player-list-item.is-bot .player-list-avatar {
                 background: linear-gradient(135deg, #8e44ad, #6c3483);
             }
-            
+
             #current-player-panel.is-bot {
                 border-color: #9b59b6;
                 --player-color: #9b59b6;
                 --player-glow: rgba(155, 89, 182, 0.5);
             }
-            
+
             #current-player-panel.is-bot .cp-turn-label {
                 color: #9b59b6;
             }
-            
+
             /* ===== MOBILE ADJUSTMENTS ===== */
             @media (max-width: 768px) {
                 #current-player-panel {
@@ -987,88 +987,88 @@ const GameUIMinimal = {
                     padding: 8px 12px;
                     gap: 10px;
                 }
-                
+
                 .cp-avatar {
                     width: 42px;
                     height: 42px;
                     font-size: 22px;
                 }
-                
+
                 .cp-name {
                     font-size: 0.9em;
                     max-width: 80px;
                 }
-                
+
                 .cp-turn-label {
                     font-size: 0.6em;
                 }
-                
+
                 .cp-deck-info {
                     gap: 10px;
                     margin-left: 6px;
                     padding-left: 10px;
                 }
-                
+
                 .cp-deck-icon {
                     width: 36px;
                     height: 46px;
                     font-size: 0.75em;
                 }
-                
+
                 .cp-deck-stack.draw-ready .cp-deck-icon {
                     width: 54px;
                     height: 70px;
                 }
-                
+
                 .cp-drawn-card {
                     width: 38px;
                     height: 50px;
                     font-size: 1.15em;
                 }
-                
+
                 #game-menu-panel {
                     width: 320px;
                     right: -340px;
                 }
             }
-            
+
             @media (max-width: 480px) {
                 #current-player-panel {
                     max-width: calc(100vw - 16px);
                     flex-wrap: wrap;
                 }
-                
+
                 .cp-avatar {
                     width: 38px;
                     height: 38px;
                     font-size: 20px;
                 }
-                
+
                 .cp-deck-icon {
                     width: 34px;
                     height: 44px;
                     font-size: 0.7em;
                 }
-                
+
                 .cp-deck-stack.draw-ready .cp-deck-icon {
                     width: 50px;
                     height: 66px;
                 }
-                
+
                 .cp-drawn-card {
                     width: 36px;
                     height: 48px;
                     font-size: 1.1em;
                 }
-                
+
                 .cp-deck-label {
                     display: none;
                 }
-                
+
                 .cp-info {
                     display: none;
                 }
-                
+
                 .cp-turn-dots {
                     border-left: none;
                     border-top: 1px solid rgba(255, 255, 255, 0.12);
@@ -1079,14 +1079,14 @@ const GameUIMinimal = {
                     width: 100%;
                     justify-content: center;
                 }
-                
+
                 .pi-dot {
                     width: 20px;
                     height: 20px;
                     font-size: 9px;
                 }
             }
-            
+
             /* ===== PLAYER TURN INDICATORS (inside current-player panel) ===== */
             .cp-turn-dots {
                 display: flex;
@@ -1096,7 +1096,7 @@ const GameUIMinimal = {
                 padding-left: 8px;
                 border-left: 1px solid rgba(255, 255, 255, 0.15);
             }
-            
+
             .pi-dot {
                 width: 26px;
                 height: 26px;
@@ -1130,12 +1130,12 @@ const GameUIMinimal = {
                 padding: 0 2px;
                 line-height: 1;
             }
-            
+
             .pi-dot:hover {
                 transform: scale(1.15);
                 border-color: rgba(255, 255, 255, 0.7);
             }
-            
+
             .pi-dot.current {
                 transform: scale(1.18);
                 border: 2px solid #fff;
@@ -1143,12 +1143,12 @@ const GameUIMinimal = {
                             0 0 18px var(--dot-color, #555);
                 animation: pulse-glow 2s ease-in-out infinite;
             }
-            
+
             @keyframes pulse-glow {
                 0%, 100% { box-shadow: 0 0 10px var(--dot-color, #555), 0 0 18px var(--dot-color, #555); }
                 50% { box-shadow: 0 0 14px var(--dot-color, #555), 0 0 24px var(--dot-color, #555); }
             }
-            
+
             .pi-dot.is-bot::after {
                 content: '🤖';
                 position: absolute;
@@ -1163,7 +1163,7 @@ const GameUIMinimal = {
                 align-items: center;
                 justify-content: center;
             }
-            
+
             .pi-dot .pi-tooltip {
                 position: absolute;
                 top: 110%;
@@ -1181,21 +1181,21 @@ const GameUIMinimal = {
                 pointer-events: none;
                 transition: opacity 0.2s;
             }
-            
+
             .pi-dot:hover .pi-tooltip {
                 opacity: 1;
             }
-            
+
             .pi-tooltip-name {
                 font-weight: 600;
                 margin-bottom: 2px;
             }
-            
+
             .pi-tooltip-status {
                 font-size: 10px;
                 color: #aaa;
             }
-            
+
             /* Mobile: smaller dots */
             @media (max-width: 768px) {
                 .cp-turn-dots {
@@ -1203,13 +1203,13 @@ const GameUIMinimal = {
                     margin-left: 6px;
                     padding-left: 8px;
                 }
-                
+
                 .pi-dot {
                     width: 26px;
                     height: 26px;
                     font-size: 11px;
                 }
-                
+
                 .pi-dot.current {
                     transform: scale(1.15);
                 }
@@ -1221,19 +1221,19 @@ const GameUIMinimal = {
                 }
             }
         `;
-        
+
         document.head.appendChild(style);
     },
-    
+
     // ============================================================
     // CREATE UI ELEMENTS
     // ============================================================
-    
+
     createCurrentPlayerPanel() {
         // Remove existing
         const existing = document.getElementById('current-player-panel');
         if (existing) existing.remove();
-        
+
         const panel = document.createElement('div');
         panel.id = 'current-player-panel';
         panel.innerHTML = `
@@ -1255,29 +1255,29 @@ const GameUIMinimal = {
                 <!-- Populated by setPlayers() -->
             </div>
         `;
-        
+
         document.body.appendChild(panel);
         this.elements.playerPanel = panel;
-        
+
         // Click to draw card
         document.getElementById('cp-deck').addEventListener('click', () => {
             this.onDrawCard();
         });
     },
-    
+
     createPlayerIndicatorBar() {
         // Indicator bar is now embedded inside the current-player-panel
         // Just grab the reference
         this.elements.indicatorBar = document.getElementById('player-indicator-bar');
     },
-    
+
     updatePlayerIndicatorBar() {
         const bar = this.elements.indicatorBar;
         if (!bar || !this.players.length) {
             console.log('[GameUIMinimal.updatePlayerIndicatorBar] Skipping - bar:', !!bar, 'players:', this.players.length);
             return;
         }
-        
+
         console.log('[GameUIMinimal.updatePlayerIndicatorBar] Rendering', this.players.length, 'players');
         console.log('[GameUIMinimal.updatePlayerIndicatorBar] Player data:', this.players.map(p => ({
             name: p.name,
@@ -1286,11 +1286,11 @@ const GameUIMinimal = {
             isBot: p.isBot,
             isHuman: p.isHuman
         })));
-        
+
         // Use actual board theme colors if available, fallback to defaults
-        const fallbackColors = ['#e74c3c', '#3498db', '#f1c40f', '#27ae60', '#9b59b6', '#e67e22'];
+        const fallbackColors = ['#e74c3c', '#3498db', '#f1c40f', '#27ae60', '#9b59b6', '#a0522d'];
         const botIcons = ['🤖', '🔧', '⚙️', '🎮', '💻'];
-        
+
         bar.innerHTML = this.players.map((p, i) => {
             const isBot = p.isAI || p.isBot || (p.name && (p.name.includes('🤖') || p.name.includes('🔧')));
             const isCurrent = i === this.currentPlayerIndex;
@@ -1300,7 +1300,7 @@ const GameUIMinimal = {
                 try {
                     const themeColor = getThemedPlayerColor(i);
                     color = '#' + (themeColor >>> 0).toString(16).padStart(6, '0');
-                } catch(e) { /* fallback */ }
+                } catch (e) { /* fallback */ }
             } else if (p.colorHex) {
                 color = p.colorHex;
             }
@@ -1310,9 +1310,9 @@ const GameUIMinimal = {
             const pegsHome = p.pegsInSafeZone || p.pegsHome || 0;
             const pegsOnBoard = p.pegsOnBoard || 0;
             const status = isCurrent ? 'Playing...' : `Hold: ${pegsInHolding} | Board: ${pegsOnBoard} | Home: ${pegsHome}`;
-            
+
             return `
-                <div class="pi-dot ${isCurrent ? 'current' : ''} ${isBot ? 'is-bot' : ''}" 
+                <div class="pi-dot ${isCurrent ? 'current' : ''} ${isBot ? 'is-bot' : ''}"
                      style="--dot-color: ${color}; background: ${color};">
                     ${avatar}
                     <span class="pi-peg-badge">${pegsInHolding}</span>
@@ -1324,14 +1324,14 @@ const GameUIMinimal = {
             `;
         }).join('');
     },
-    
+
     createMenuPanel() {
         // Remove existing
         ['menu-toggle-btn', 'game-menu-panel', 'menu-overlay'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.remove();
         });
-        
+
         // Create overlay
         const overlay = document.createElement('div');
         overlay.id = 'menu-overlay';
@@ -1342,7 +1342,7 @@ const GameUIMinimal = {
         // REMOVED: Cog toggle button (replaced by new standardized control buttons)
         // The menu functionality is now accessed through the new UI buttons
         this.elements.menuToggle = null;
-        
+
         // Create menu panel (dimensional shell)
         const menu = document.createElement('div');
         menu.id = 'game-menu-panel';
@@ -1354,20 +1354,20 @@ const GameUIMinimal = {
                 <div class="dim-viewport" id="dim-viewport"></div>
             </div>
         `;
-        
+
         document.body.appendChild(menu);
         this.elements.menuPanel = menu;
-        
+
         // Render root dimension
         this.dimensionStack = [];
         this.currentDimension = 'root';
         this.renderDimension('root');
     },
-    
+
     // ============================================================
     // UPDATE METHODS
     // ============================================================
-    
+
     setCurrentPlayer(player, playerIndex = 0) {
         console.log('[GameUIMinimal.setCurrentPlayer] Called with player:', {
             name: player?.name,
@@ -1376,37 +1376,37 @@ const GameUIMinimal = {
             isHuman: player?.isHuman,
             isBot: player?.isBot
         }, 'playerIndex:', playerIndex);
-        
+
         this.currentPlayer = player;
         this.currentPlayerIndex = playerIndex;
-        
+
         const colors = [
             { color: '#e74c3c', glow: 'rgba(231, 76, 60, 0.5)' },
             { color: '#3498db', glow: 'rgba(52, 152, 219, 0.5)' },
             { color: '#f1c40f', glow: 'rgba(241, 196, 15, 0.5)' },
             { color: '#27ae60', glow: 'rgba(39, 174, 96, 0.5)' },
             { color: '#9b59b6', glow: 'rgba(155, 89, 182, 0.5)' },
-            { color: '#e67e22', glow: 'rgba(230, 126, 34, 0.5)' }
+            { color: '#a0522d', glow: 'rgba(160, 82, 45, 0.5)' }
         ];
-        
+
         const colorSet = colors[playerIndex % colors.length];
         const panel = this.elements.playerPanel;
-        
+
         if (panel) {
             panel.style.setProperty('--player-color', colorSet.color);
             panel.style.setProperty('--player-glow', colorSet.glow);
-            
+
             // Detect if this is a bot
             const isBot = player.isAI || player.isBot || (player.name && player.name.includes('🤖')) || (player.name && player.name.includes('🔧'));
-            
+
             // Bot icons rotation
             const botIcons = ['🤖', '🔧', '⚙️', '🎮', '💻'];
             const botIcon = botIcons[playerIndex % botIcons.length];
-            
+
             const avatarEl = document.getElementById('cp-avatar');
             const nameEl = document.getElementById('cp-name');
             const labelEl = document.querySelector('.cp-turn-label');
-            
+
             if (isBot) {
                 // Show bot icon and label
                 avatarEl.textContent = botIcon;
@@ -1431,11 +1431,11 @@ const GameUIMinimal = {
                 this.showYourTurnPopup();
             }
         }
-        
+
         // Update indicator bar to highlight current player
         this.updatePlayerIndicatorBar();
     },
-    
+
     setDeckCount(count) {
         this.deckCount = count;
         const deckEl = document.getElementById('cp-deck-count');
@@ -1443,7 +1443,7 @@ const GameUIMinimal = {
             deckEl.textContent = count;
         }
     },
-    
+
     // Enable/disable draw-ready state (enlarges deck when it's time to draw)
     setDeckDrawReady(ready) {
         const deckStack = document.getElementById('cp-deck');
@@ -1457,32 +1457,32 @@ const GameUIMinimal = {
             }
         }
     },
-    
+
     setDrawnCard(card) {
         this.drawnCard = card;
         const cardEl = document.getElementById('cp-drawn-card');
         const hintEl = document.getElementById('cp-card-hint');
-        
+
         if (!cardEl) return;
-        
+
         // Clear hint
         if (hintEl) {
             hintEl.className = 'cp-card-hint';
             hintEl.textContent = '';
         }
-        
+
         if (!card) {
             cardEl.className = 'cp-drawn-card empty';
             cardEl.textContent = '?';
             return;
         }
-        
+
         // Determine color
-        const isRed = card.suit === '♥' || card.suit === '♦' || 
-                      card.includes?.('♥') || card.includes?.('♦');
-        
+        const isRed = card.suit === '♥' || card.suit === '♦' ||
+            card.includes?.('♥') || card.includes?.('♦');
+
         cardEl.className = 'cp-drawn-card' + (isRed ? '' : ' black');
-        
+
         // Format card display
         if (typeof card === 'string') {
             cardEl.textContent = card;
@@ -1491,7 +1491,7 @@ const GameUIMinimal = {
         } else {
             cardEl.textContent = card;
         }
-        
+
         // Show contextual card hint
         if (hintEl) {
             const v = card.value || '';
@@ -1514,35 +1514,35 @@ const GameUIMinimal = {
             }
         }
     },
-    
+
     setPlayers(players, currentIndex = 0) {
         console.log('[GameUIMinimal.setPlayers] Called with', players?.length, 'players');
         console.log('[GameUIMinimal.setPlayers] Player data:', JSON.stringify(players?.map(p => ({
-            name: p.name, 
-            avatar: p.avatar, 
-            isAI: p.isAI, 
+            name: p.name,
+            avatar: p.avatar,
+            isAI: p.isAI,
             isHuman: p.isHuman
         }))));
-        
+
         this.players = players;
         this.currentPlayerIndex = currentIndex;
-        
+
         // Update indicator bar (always visible at bottom)
         this.updatePlayerIndicatorBar();
-        
+
         // Update menu list
         const list = document.getElementById('menu-players-list');
         if (!list) return;
-        
+
         const botIcons = ['🤖', '🔧', '⚙️', '🎮', '💻'];
-        
+
         list.innerHTML = players.map((p, i) => {
             const isBot = p.isAI || p.isBot || (p.name && p.name.includes('🤖')) || (p.name && p.name.includes('🔧'));
             const avatar = isBot ? botIcons[i % botIcons.length] : (p.avatar || '👤');
             const label = isBot ? 'Bot' : '';
-            
+
             return `
-            <div class="player-list-item ${i === currentIndex ? 'current' : ''} ${isBot ? 'is-bot' : ''}" 
+            <div class="player-list-item ${i === currentIndex ? 'current' : ''} ${isBot ? 'is-bot' : ''}"
                  style="--player-color: ${this.getPlayerColor(i)}">
                 <div class="player-list-avatar">${avatar}</div>
                 <div class="player-list-info">
@@ -1553,23 +1553,23 @@ const GameUIMinimal = {
         `;
         }).join('');
     },
-    
+
     getPlayerColor(index) {
-        const colors = ['#e74c3c', '#3498db', '#f1c40f', '#27ae60', '#9b59b6', '#e67e22'];
+        const colors = ['#e74c3c', '#3498db', '#f1c40f', '#27ae60', '#9b59b6', '#a0522d'];
         return colors[index % colors.length];
     },
-    
+
     // ============================================================
     // MENU CONTROLS
     // ============================================================
-    
+
     toggleMenu(force = null) {
         this.menuOpen = force !== null ? force : !this.menuOpen;
-        
+
         this.elements.menuPanel?.classList.toggle('open', this.menuOpen);
         this.elements.menuToggle?.classList.toggle('open', this.menuOpen);
         this.elements.overlay?.classList.toggle('visible', this.menuOpen);
-        
+
         // Reset to root dimension when opening
         if (this.menuOpen) {
             this.dimensionStack = [];
@@ -1577,16 +1577,16 @@ const GameUIMinimal = {
             this.renderDimension('root');
         }
     },
-    
+
     updateLayout() {
         // Adjust UI for screen size
         // Currently handled by CSS media queries
     },
-    
+
     // ============================================================
     // ACTION HANDLERS
     // ============================================================
-    
+
     onDrawCard() {
         // Dismiss turn popup immediately
         this.dismissYourTurnPopup();
@@ -1598,7 +1598,7 @@ const GameUIMinimal = {
         }
         console.log('[GameUIMinimal] Draw card triggered');
     },
-    
+
     setTheme(themeName) {
         if (typeof window.setTheme === 'function') {
             window.setTheme(themeName);
@@ -1611,19 +1611,19 @@ const GameUIMinimal = {
             this.renderDimension('theme');
         }
     },
-    
+
     setControlMode(mode) {
         this.controlMode = mode;
         window.gameControlMode = mode;
         console.log('[GameUIMinimal] Control mode set to:', mode);
-        
+
         // Save to localStorage
         try {
             localStorage.setItem('fasttrack_control_mode', mode);
         } catch (e) {
             console.warn('[GameUIMinimal] Could not save control mode to localStorage');
         }
-        
+
         // Re-render controls dimension to update active state
         if (this.currentDimension === 'controls') {
             this.renderDimension('controls');
@@ -1638,12 +1638,12 @@ const GameUIMinimal = {
      * Theme metadata — name, icon, about description
      */
     themeInfo: {
-        cosmic:       { icon: '🌌', label: 'Cosmic',       about: 'Deep space nebulae, floating shapes and stardust particles' },
-        spaceace:     { icon: '🚀', label: 'Space Ace ✦',  about: 'Retro arcade adventure with asteroids and cosmic dust' },
-        undersea:     { icon: '🌊', label: 'Undersea',     about: 'Ocean depths with jellyfish, sea turtles and coral' },
-        colosseum:    { icon: '⚔️', label: 'Colosseum',    about: 'Ancient Rome — toga-clad spectators and golden thrones' },
-        fibonacci:    { icon: '🔢', label: 'Fibonacci',    about: 'Mathematical beauty with golden spirals and sacred ratios' },
-        highcontrast: { icon: '👁️', label: 'Clean',        about: 'High contrast, minimal distractions for focused play' }
+        cosmic: { icon: '🌌', label: 'Cosmic', about: 'Deep space nebulae, floating shapes and stardust particles' },
+        spaceace: { icon: '🚀', label: 'Space Ace ✦', about: 'Retro arcade adventure with asteroids and cosmic dust' },
+        undersea: { icon: '🌊', label: 'Undersea', about: 'Ocean depths with jellyfish, sea turtles and coral' },
+        colosseum: { icon: '⚔️', label: 'Colosseum', about: 'Ancient Rome — toga-clad spectators and golden thrones' },
+        fibonacci: { icon: '🔢', label: 'Fibonacci', about: 'Mathematical beauty with golden spirals and sacred ratios' },
+        highcontrast: { icon: '👁️', label: 'Clean', about: 'High contrast, minimal distractions for focused play' }
     },
 
     /**
@@ -1673,14 +1673,14 @@ const GameUIMinimal = {
 
         let html = '';
         switch (dimensionId) {
-            case 'root':    html = this._renderRoot(); break;
-            case 'theme':   html = this._renderTheme(); break;
-            case 'sounds':  html = this._renderSounds(); break;
+            case 'root': html = this._renderRoot(); break;
+            case 'theme': html = this._renderTheme(); break;
+            case 'sounds': html = this._renderSounds(); break;
             case 'controls': html = this._renderControls(); break;
-            case 'camera':  html = this._renderCamera(); break;
-            case 'rules':   html = this._renderRules(); break;
+            case 'camera': html = this._renderCamera(); break;
+            case 'rules': html = this._renderRules(); break;
             case 'tutorial': html = this._renderTutorial(); break;
-            default:        html = this._renderRoot(); break;
+            default: html = this._renderRoot(); break;
         }
 
         // Wrap in animated layer
@@ -1715,13 +1715,13 @@ const GameUIMinimal = {
                 </div>
             </div>
         `;
-        
+
         const categories = [
-            { id: 'theme',    icon: '🎨', label: 'Theme' },
-            { id: 'sounds',   icon: '🔊', label: 'Sounds' },
+            { id: 'theme', icon: '🎨', label: 'Theme' },
+            { id: 'sounds', icon: '🔊', label: 'Sounds' },
             { id: 'controls', icon: '🎮', label: 'Controls' },
-            { id: 'camera',   icon: '📹', label: 'Camera Control' },
-            { id: 'rules',    icon: '📖', label: 'Rules' },
+            { id: 'camera', icon: '📹', label: 'Camera Control' },
+            { id: 'rules', icon: '📖', label: 'Rules' },
             { id: 'tutorial', icon: '🎓', label: 'Tutorial' }
         ];
 
@@ -1798,15 +1798,15 @@ const GameUIMinimal = {
     _renderControls() {
         const controlMode = window.gameControlMode || 'automatic';
         const isAutomatic = controlMode === 'automatic';
-        
+
         return `
             <div class="dim-back" onclick="GameUIMinimal.drillUp()">
                 <span class="dim-back-arrow">◂</span>
                 <span class="dim-back-label">Back</span>
             </div>
-            
+
             <div class="dim-section-header">Movement Mode</div>
-            
+
             <div class="dim-item ${isAutomatic ? 'active-item' : ''}" onclick="GameUIMinimal.setControlMode('automatic')">
                 <span class="dim-item-icon">🤖</span>
                 <div class="dim-item-text">
@@ -1815,7 +1815,7 @@ const GameUIMinimal = {
                 </div>
                 ${isAutomatic ? '<span class="dim-item-check">✓</span>' : ''}
             </div>
-            
+
             <div class="dim-item ${!isAutomatic ? 'active-item' : ''}" onclick="GameUIMinimal.setControlMode('manual')">
                 <span class="dim-item-icon">✋</span>
                 <div class="dim-item-text">
@@ -1824,9 +1824,9 @@ const GameUIMinimal = {
                 </div>
                 ${!isAutomatic ? '<span class="dim-item-check">✓</span>' : ''}
             </div>
-            
+
             <div class="dim-divider"></div>
-            
+
             <div class="dim-item" onclick="GameUIMinimal.askMom()">
                 <span class="dim-item-icon">👩‍�</span>
                 <div class="dim-item-text">
@@ -1840,9 +1840,9 @@ const GameUIMinimal = {
     _renderCamera() {
         const currentCam = window.currentCameraMode || 'chase';
         const cams = [
-            { id: 'chase',  icon: '🎬', label: 'Automatic',        about: 'Cinematic view that follows the action' },
-            { id: 'manual', icon: '✋', label: 'Manual',           about: 'Mouse-driven — drag to look around' },
-            { id: 'board',  icon: '🎯', label: 'Straight Down',   about: 'Overhead view of entire board' },
+            { id: 'chase', icon: '🎬', label: 'Automatic', about: 'Cinematic view that follows the action' },
+            { id: 'manual', icon: '✋', label: 'Manual', about: 'Mouse-driven — drag to look around' },
+            { id: 'board', icon: '🎯', label: 'Straight Down', about: 'Overhead view of entire board' },
             { id: 'pegeye', icon: '👁️', label: 'Follow Active Peg', about: 'Camera follows your active peg' }
         ];
 
@@ -1856,10 +1856,10 @@ const GameUIMinimal = {
                 <span class="dim-back-label">Back</span>
             </div>
             ${cams.map(c => {
-                const action = c.id === 'pegeye'
-                    ? 'GameUIMinimal.enterPegEyeView()'
-                    : `GameUIMinimal.setCameraView('${c.id}')`;
-                return `
+            const action = c.id === 'pegeye'
+                ? 'GameUIMinimal.enterPegEyeView()'
+                : `GameUIMinimal.setCameraView('${c.id}')`;
+            return `
                 <div class="dim-item ${c.id === currentCam ? 'active-item' : ''}"
                      onclick="${action}">
                     <span class="dim-item-icon">${c.icon}</span>
@@ -1982,11 +1982,11 @@ const GameUIMinimal = {
         }
         this.toggleMenu(false);
     },
-    
+
     toggleMusic() {
         const toggle = document.getElementById('toggle-music');
         toggle?.classList.toggle('active');
-        
+
         if (window.MusicSubstrate) {
             if (toggle?.classList.contains('active')) {
                 window.MusicSubstrate.play();
@@ -1995,20 +1995,20 @@ const GameUIMinimal = {
             }
         }
     },
-    
+
     toggleSFX() {
         const toggle = document.getElementById('toggle-sfx');
         toggle?.classList.toggle('active');
-        
+
         if (window.GameSFX) {
             window.GameSFX.enabled = toggle?.classList.contains('active');
         }
     },
-    
+
     toggleCommentary() {
         const toggle = document.getElementById('toggle-commentary');
         toggle?.classList.toggle('active');
-        
+
         if (window.CommentarySubstrate) {
             window.CommentarySubstrate.enabled = toggle?.classList.contains('active');
         }
@@ -2170,16 +2170,16 @@ const GameUIMinimal = {
         }
         this.toggleMenu(false);
     },
-    
+
     leaveGame() {
         // Detect game type from URL parameters
         const params = new URLSearchParams(window.location.search);
         const isOffline = params.get('offline') === 'true';
         const isPrivate = params.get('code') !== null;
         const isPublicLobby = params.get('session') !== null && !isPrivate;
-        
+
         let message, destination;
-        
+
         if (isPublicLobby) {
             // Public lobby game - return to lobby
             message = 'Leave this game and return to lobby?';
@@ -2193,65 +2193,65 @@ const GameUIMinimal = {
             message = 'Leave this game?';
             destination = 'index.html';
         }
-        
+
         if (confirm(message)) {
             // Close menu first
             this.toggleMenu(false);
-            
+
             // Disconnect from multiplayer if connected
             if (window.MultiplayerClient && typeof window.MultiplayerClient.disconnect === 'function') {
                 window.MultiplayerClient.disconnect();
             }
-            
+
             // Navigate to destination
             window.location.href = destination;
         }
     },
-    
+
     restartGame() {
         if (confirm('Restart the game?')) {
             location.reload();
         }
     },
-    
+
     exitGame() {
         if (confirm('Exit to main menu?')) {
             window.location.href = 'index.html';
         }
     },
-    
+
     // ============================================================
     // INTEGRATION
     // ============================================================
-    
+
     /**
      * Called when game state updates
      */
     updateFromGameState(gameState) {
         if (!gameState) return;
-        
+
         // Update current player
         const currentIdx = gameState.currentPlayerIndex || 0;
         const currentPlayer = gameState.players?.[currentIdx];
-        
+
         if (currentPlayer) {
             this.setCurrentPlayer(currentPlayer, currentIdx);
         }
-        
+
         // Update deck count
         if (gameState.deckCount !== undefined) {
             this.setDeckCount(gameState.deckCount);
         }
-        
+
         // Update drawn card
         this.setDrawnCard(gameState.currentCard || gameState.drawnCard || null);
-        
+
         // Update players list in menu
         if (gameState.players) {
             this.setPlayers(gameState.players, currentIdx);
         }
     },
-    
+
     /**
      * Disable old panel systems
      */
@@ -2261,12 +2261,12 @@ const GameUIMinimal = {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
-        
+
         // Disable old panel modules
         if (window.PlayerPanelsV2) {
             window.PlayerPanelsV2.enabled = false;
         }
-        
+
         console.log('[GameUIMinimal] Old panel systems disabled');
     }
 };

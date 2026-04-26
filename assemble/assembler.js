@@ -35,6 +35,32 @@ export const FAIL = {
   FRACTURE: 'fracture',
   BURNOUT: 'burnout',
   STALL: 'stall',
+  LEAK: 'leak',
+  NO_INPUT: 'no_input',
+};
+
+// ─── Bond modifiers (applied to connections, NOT parts) ───────
+// Each bond has a tensile strength (kN), a visual style, and
+// material flags consumed by the simulator: conductive, sealing,
+// rigid (no relative motion), removable (can be undone in-sim).
+export const BOND = {
+  NONE: 'none',
+  GLUE: 'glue',
+  TAPE: 'tape',
+  WELD: 'weld',
+  ZIPTIE: 'ziptie',
+  PAINT: 'paint',
+  SOLDER: 'solder',
+};
+
+export const BOND_DEFS = {
+  none: { label: 'None', icon: '·', color: 0x888888, strength: 0, dashed: false, opacity: 0.6, rigid: false, conductive: false, sealing: false, removable: true, width: 1 },
+  glue: { label: 'Glue', icon: '🩹', color: 0xf0c060, strength: 20, dashed: false, opacity: 0.9, rigid: true, conductive: false, sealing: true, removable: false, width: 2 },
+  tape: { label: 'Tape', icon: '📼', color: 0xc0c0c0, strength: 8, dashed: true, opacity: 0.8, rigid: false, conductive: false, sealing: false, removable: true, width: 2 },
+  weld: { label: 'Weld', icon: '🔥', color: 0xff5522, strength: 200, dashed: false, opacity: 1.0, rigid: true, conductive: true, sealing: true, removable: false, width: 3 },
+  ziptie: { label: 'Zip-Tie', icon: '🔗', color: 0x33cc66, strength: 15, dashed: true, opacity: 0.9, rigid: false, conductive: false, sealing: false, removable: true, width: 2 },
+  paint: { label: 'Paint', icon: '🎨', color: 0xcc66ff, strength: 2, dashed: false, opacity: 0.5, rigid: false, conductive: false, sealing: true, removable: true, width: 1 },
+  solder: { label: 'Solder', icon: '⚡', color: 0xddaa44, strength: 40, dashed: false, opacity: 1.0, rigid: true, conductive: true, sealing: false, removable: false, width: 2 },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -76,7 +102,7 @@ export class DimensionNode {
 // Connection — a shared point between two DimensionNodes
 // ═══════════════════════════════════════════════════════════════
 export class Connection {
-  constructor(nodeA, portIdxA, nodeB, portIdxB) {
+  constructor(nodeA, portIdxA, nodeB, portIdxB, bondType = BOND.NONE) {
     this.id = crypto.randomUUID();
     this.nodeA = nodeA;
     this.portA = nodeA.ports[portIdxA];
@@ -87,7 +113,10 @@ export class Connection {
     this.type = this.portA.type;
     this.active = true;
     this.line = null;   // THREE.Line for wires/pipes
+    this.bondType = BOND_DEFS[bondType] ? bondType : BOND.NONE;
   }
+
+  get bond() { return BOND_DEFS[this.bondType] || BOND_DEFS.none; }
 
   isCompatible() {
     const a = this.portA.type, b = this.portB.type;
@@ -112,6 +141,7 @@ export class AssembleEngine {
     this.running = false;
     this.simTime = 0;
     this._listeners = {};
+    this._activeLeaks = new Set(); // connId currently leaking this tick
   }
 
   // ── Event bus ───────────────────────────────────────────────
@@ -144,18 +174,30 @@ export class AssembleEngine {
   }
 
   // ── Connection management ────────────────────────────────────
-  connect(nodeAId, portIdxA, nodeBId, portIdxB) {
-    // Dedupe identical connections (either direction)
+  connect(nodeAId, portIdxA, nodeBId, portIdxB, bondType = BOND.NONE) {
+    // Dedupe identical connections (either direction). If a duplicate
+    // is found we keep the existing one but allow upgrading its bond
+    // (e.g. tape → weld) when the new request is stronger.
     for (const conn of this.connections.values()) {
       const sameDir = conn.nodeA.id === nodeAId && conn.portIdxA === portIdxA && conn.nodeB.id === nodeBId && conn.portIdxB === portIdxB;
       const oppDir = conn.nodeA.id === nodeBId && conn.portIdxA === portIdxB && conn.nodeB.id === nodeAId && conn.portIdxB === portIdxA;
-      if (sameDir || oppDir) return conn;
+      if (sameDir || oppDir) {
+        if (bondType !== BOND.NONE && BOND_DEFS[bondType]) {
+          const oldStrength = (BOND_DEFS[conn.bondType] || BOND_DEFS.none).strength;
+          const newStrength = BOND_DEFS[bondType].strength;
+          if (newStrength > oldStrength) {
+            conn.bondType = bondType;
+            this.emit('connectionUpdated', conn);
+          }
+        }
+        return conn;
+      }
     }
 
     const nA = this.nodes.get(nodeAId);
     const nB = this.nodes.get(nodeBId);
     if (!nA || !nB) return null;
-    const conn = new Connection(nA, portIdxA, nB, portIdxB);
+    const conn = new Connection(nA, portIdxA, nB, portIdxB, bondType);
     if (!conn.isCompatible()) {
       this.emit('connectionFailed', { reason: 'incompatible', conn });
       return null;
@@ -166,6 +208,14 @@ export class AssembleEngine {
     // Penetrators (nails/screws/etc) create a "hole" record in the target part.
     // (No mesh boolean op yet — this is metadata for future geometry tooling.)
     this._maybeRecordHole(conn);
+    return conn;
+  }
+
+  setConnectionBond(connId, bondType) {
+    const conn = this.connections.get(connId);
+    if (!conn || !BOND_DEFS[bondType]) return null;
+    conn.bondType = bondType;
+    this.emit('connectionUpdated', conn);
     return conn;
   }
 
@@ -236,6 +286,45 @@ export class AssembleEngine {
     return best;
   }
 
+  // ── AABB adjacency: snap a face flush against the closest node ────
+  // Used as a fallback when no compatible port is in range. Picks the
+  // axis with the smallest positive face-to-face gap; requires the
+  // other two axes to overlap so the parts share a face, not a corner.
+  findAdjacencyTarget(dragNode, threshold = 0.4) {
+    const dragHalf = nodeHalfExtents(dragNode);
+    let best = null;
+    let bestGap = threshold;
+    for (const node of this.nodes.values()) {
+      if (node.id === dragNode.id) continue;
+      const tgtHalf = nodeHalfExtents(node);
+      const axes = ['x', 'y', 'z'];
+      let snapAxis = null;
+      let snapGap = Infinity;
+      for (const ax of axes) {
+        const dd = Math.abs(node.position[ax] - dragNode.position[ax]);
+        const g = dd - (dragHalf[ax] + tgtHalf[ax]);
+        if (g >= 0 && g < snapGap) { snapGap = g; snapAxis = ax; }
+      }
+      if (snapAxis === null) continue;
+      let overlapOk = true;
+      for (const ax of axes) {
+        if (ax === snapAxis) continue;
+        const dd = Math.abs(node.position[ax] - dragNode.position[ax]);
+        const g = dd - (dragHalf[ax] + tgtHalf[ax]);
+        if (g > 0.05) { overlapOk = false; break; }
+      }
+      if (!overlapOk) continue;
+      if (snapGap < bestGap) {
+        bestGap = snapGap;
+        const sign = Math.sign(dragNode.position[snapAxis] - node.position[snapAxis]) || 1;
+        const snapPos = { ...dragNode.position };
+        snapPos[snapAxis] = node.position[snapAxis] + sign * (dragHalf[snapAxis] + tgtHalf[snapAxis]);
+        best = { node, axis: snapAxis, gap: snapGap, snapPos };
+      }
+    }
+    return best;
+  }
+
   // ── Grid snap ───────────────────────────────────────────────
   snapToGrid(pos) {
     return {
@@ -273,33 +362,92 @@ export class AssembleEngine {
     this.emit('simStep', { dt, time: this.simTime });
   }
 
+  // ── Bond-aware connection capability ─────────────────────────
+  // Returns { ok, leak, slip } describing how a connection should
+  // transmit its medium given the bond modifier applied to it.
+  _connCapability(conn) {
+    const bond = conn.bond || BOND_DEFS.none;
+    const t = conn.type;
+    if (t === PORT.WIRE || t === PORT.SOCKET) {
+      // Paint over a wire = insulator. Other bonds leave wire conducting.
+      const ok = conn.bondType !== BOND.PAINT;
+      return { ok, leak: false, slip: 1 };
+    }
+    if (t === PORT.PIPE || t === PORT.HOSE) {
+      // Pipe joint always lets flow through, but unsealed bonds leak.
+      // Default (none) seals at low pressure; tape/ziptie always leak.
+      const seals = bond.sealing || conn.bondType === BOND.NONE;
+      return { ok: true, leak: !seals, slip: 1 };
+    }
+    if (t === PORT.SHAFT || t === PORT.GEAR || t === PORT.BELT) {
+      // Rigid bond (or bare metal-on-metal) → full torque transfer.
+      // Removable / non-rigid bonds slip.
+      const slip = (bond.rigid || conn.bondType === BOND.NONE) ? 1 : 0.5;
+      return { ok: true, leak: false, slip };
+    }
+    return { ok: true, leak: false, slip: 1 };
+  }
+
+  // Source nodes that declare an inputType (well pump needs wire,
+  // generator needs shaft, boiler needs fuel pipe) only fire if
+  // something is actually feeding them. Returns the set of source
+  // ids that are starved so _propagate can skip them.
+  _checkSourceInputs() {
+    const starved = new Set();
+    for (const node of this.nodes.values()) {
+      if (node.behavior !== 'source') continue;
+      const inType = node.simProps && node.simProps.inputType;
+      if (!inType) continue;
+      const portType = inType === 'shaft' ? PORT.SHAFT : inType === 'pipe' ? PORT.PIPE : PORT.WIRE;
+      let fed = false;
+      for (const conn of this.connections.values()) {
+        if (!conn.active) continue;
+        if (conn.nodeA.id !== node.id && conn.nodeB.id !== node.id) continue;
+        if (conn.type !== portType && !(portType === PORT.WIRE && conn.type === PORT.SOCKET)) continue;
+        const cap = this._connCapability(conn);
+        if (cap.ok) { fed = true; break; }
+      }
+      if (!fed) {
+        starved.add(node.id);
+        if (node.failure === FAIL.NONE) {
+          node.failure = FAIL.NO_INPUT;
+          this.emit('failure', { node, mode: FAIL.NO_INPUT });
+        }
+      } else if (node.failure === FAIL.NO_INPUT) {
+        node.failure = FAIL.NONE; // recovered
+      }
+    }
+    return starved;
+  }
+
   // ── Propagation: traverse the dimension graph ────────────────
   _propagate() {
-    // Reset non-source nodes
     for (const node of this.nodes.values()) {
       if (node.behavior !== 'source') {
         node.rpm = 0; node.voltage = 0; node.pressure = 0; node.powered = false;
       }
     }
+    this._activeLeaks.clear();
+    const starved = this._checkSourceInputs();
 
-    // BFS from sources
     const visited = new Set();
     const queue = [];
 
     for (const node of this.nodes.values()) {
-      if (node.behavior === 'source' && node.failure === FAIL.NONE) {
-        node.powered = true;
-        if (node.simProps.outputType === 'shaft') node.rpm = node.simProps.rpm || 1200;
-        if (node.simProps.outputType === 'wire') node.voltage = node.simProps.voltage || 12;
-        if (node.simProps.outputType === 'pipe') node.pressure = node.simProps.pressure || 2;
-        queue.push(node);
-        visited.add(node.id);
-      }
+      if (node.behavior !== 'source') continue;
+      if (node.failure !== FAIL.NONE && node.failure !== FAIL.OVERLOAD) continue;
+      if (starved.has(node.id)) continue;
+      node.powered = true;
+      const out = (node.simProps && node.simProps.outputType) || 'wire';
+      if (out === 'shaft') node.rpm = node.simProps.rpm || 1200;
+      if (out === 'wire') node.voltage = node.simProps.voltage || 12;
+      if (out === 'pipe') node.pressure = node.simProps.pressure || 2;
+      queue.push(node);
+      visited.add(node.id);
     }
 
     while (queue.length) {
       const cur = queue.shift();
-      // Find all connections from this node
       for (const conn of this.connections.values()) {
         if (!conn.active) continue;
         let peer = null;
@@ -307,17 +455,18 @@ export class AssembleEngine {
         else if (conn.nodeB.id === cur.id) peer = conn.nodeA;
         if (!peer || visited.has(peer.id)) continue;
 
-        // Transmit by connection type
+        const cap = this._connCapability(conn);
+        if (!cap.ok) continue;   // bond blocks transmission entirely
+
         if (conn.type === PORT.SHAFT || conn.type === PORT.GEAR) {
           const ratio = gearRatio(cur, peer, conn);
-          peer.rpm = cur.rpm * ratio;
-          peer.torque = cur.torque / (ratio || 1);
+          peer.rpm = cur.rpm * ratio * cap.slip;
+          peer.torque = (cur.torque / (ratio || 1)) * cap.slip;
           peer.powered = Math.abs(peer.rpm) > 0.001;
         } else if (conn.type === PORT.WIRE || conn.type === PORT.SOCKET) {
           peer.voltage = cur.voltage;
           peer.current = cur.current;
           peer.powered = cur.voltage > 0;
-          // Motors convert voltage into shaft rpm (but require a rotor if configured).
           if (peer.behavior === 'motor') {
             const requiresRotor = !!(peer.simProps && peer.simProps.requiresRotor);
             const hasRotor = requiresRotor ? this._motorHasRotor(peer) : true;
@@ -327,18 +476,97 @@ export class AssembleEngine {
             peer.powered = Math.abs(peer.rpm) > 0.001;
           }
         } else if (conn.type === PORT.PIPE || conn.type === PORT.HOSE) {
-          peer.pressure = cur.pressure * 0.98; // small loss
-          peer.flow = cur.flow || 1;
+          // Unsealed joint loses pressure through the leak.
+          const lossFactor = cap.leak ? 0.4 : 0.98;
+          peer.pressure = cur.pressure * lossFactor;
+          peer.flow = (cur.flow || 1) * (cap.leak ? 0.5 : 1);
           peer.powered = true;
+          if (cap.leak && cur.pressure > 0.5) {
+            this._activeLeaks.add(conn.id);
+            this.emit('leak', { conn, pressure: cur.pressure, from: cur, to: peer });
+          }
         } else if (conn.type === PORT.BELT) {
-          const r1 = cur.simProps.radius || 0.5;
-          const r2 = peer.simProps.radius || 0.5;
-          peer.rpm = cur.rpm * (r1 / r2);
+          const r1 = (cur.simProps && cur.simProps.radius) || 0.5;
+          const r2 = (peer.simProps && peer.simProps.radius) || 0.5;
+          peer.rpm = cur.rpm * (r1 / r2) * cap.slip;
           peer.powered = Math.abs(peer.rpm) > 0.001;
         }
 
         visited.add(peer.id);
         queue.push(peer);
+      }
+    }
+
+    this._checkShorts();
+  }
+
+  // Short circuit: a wire path from one terminal of a voltage source
+  // to another terminal of the same source with no load (motor /
+  // logic / rotate / etc) on the path. Walks the wire-only graph.
+  _checkShorts() {
+    const isLoad = b => ['motor', 'rotate', 'load', 'logic', 'slide'].includes(b);
+    for (const src of this.nodes.values()) {
+      if (src.behavior !== 'source') continue;
+      if (src.failure !== FAIL.NONE) continue;
+      if (!src.simProps || src.simProps.outputType !== 'wire') continue;
+      // Get all wire/socket conns touching the source — these are its terminals.
+      const terms = [];
+      for (const conn of this.connections.values()) {
+        if (!conn.active) continue;
+        if (conn.type !== PORT.WIRE && conn.type !== PORT.SOCKET) continue;
+        const cap = this._connCapability(conn);
+        if (!cap.ok) continue;
+        if (conn.nodeA.id === src.id) terms.push({ conn, portIdx: conn.portIdxA, peer: conn.nodeB });
+        else if (conn.nodeB.id === src.id) terms.push({ conn, portIdx: conn.portIdxB, peer: conn.nodeA });
+      }
+      if (terms.length < 2) continue; // need at least two terminals to short
+      // BFS from each terminal on the wire-only graph; if a load is encountered
+      // first, this branch is fine; if another terminal of THIS source is reached
+      // before any load, it's a short.
+      const reachableFromTerm = (startPeer) => {
+        const seen = new Set([src.id, startPeer.id]);
+        const q = [startPeer];
+        const reached = new Set([startPeer.id]);
+        while (q.length) {
+          const n = q.shift();
+          if (isLoad(n.behavior)) continue; // load absorbs the path
+          for (const c of this.connections.values()) {
+            if (!c.active) continue;
+            if (c.type !== PORT.WIRE && c.type !== PORT.SOCKET) continue;
+            const cap = this._connCapability(c);
+            if (!cap.ok) continue;
+            const other = c.nodeA.id === n.id ? c.nodeB : c.nodeB.id === n.id ? c.nodeA : null;
+            if (!other || seen.has(other.id)) continue;
+            seen.add(other.id);
+            reached.add(other.id);
+            q.push(other);
+          }
+        }
+        return reached;
+      };
+      let shorted = false;
+      for (let i = 0; i < terms.length && !shorted; i++) {
+        // Two terminals of the same source landing on a single non-load
+        // peer node is itself a short (passthrough wire with no load).
+        if (!isLoad(terms[i].peer.behavior)) {
+          for (let j = 0; j < terms.length; j++) {
+            if (i === j) continue;
+            if (terms[j].peer.id === terms[i].peer.id) { shorted = true; break; }
+          }
+          if (shorted) break;
+        }
+        const reach = reachableFromTerm(terms[i].peer);
+        for (let j = 0; j < terms.length; j++) {
+          if (i === j) continue;
+          if (terms[j].peer.id === terms[i].peer.id) continue;
+          if (reach.has(terms[j].peer.id)) { shorted = true; break; }
+        }
+      }
+      if (shorted) {
+        src.failure = FAIL.SHORT;
+        src.powered = false;
+        src.voltage = 0;
+        this.emit('failure', { node: src, mode: FAIL.SHORT });
       }
     }
   }
@@ -405,7 +633,7 @@ export class AssembleEngine {
   // ── Serialise / load ─────────────────────────────────────────
   serialise() {
     return {
-      version: 1,
+      version: 2,
       nodes: [...this.nodes.values()].map(n => ({
         id: n.id, partId: n.partDef.id,
         position: n.position, rotation: n.rotation,
@@ -416,6 +644,7 @@ export class AssembleEngine {
         id: c.id,
         nodeAId: c.nodeA.id, portIdxA: c.portIdxA,
         nodeBId: c.nodeB.id, portIdxB: c.portIdxB,
+        bondType: c.bondType,
       })),
     };
   }
@@ -445,7 +674,7 @@ export class AssembleEngine {
       const nA = this.nodes.get(cd.nodeAId);
       const nB = this.nodes.get(cd.nodeBId);
       if (!nA || !nB) continue;
-      const conn = new Connection(nA, cd.portIdxA, nB, cd.portIdxB);
+      const conn = new Connection(nA, cd.portIdxA, nB, cd.portIdxB, cd.bondType || BOND.NONE);
       if (!conn.isCompatible()) {
         this.emit('connectionFailed', { reason: 'incompatible', conn });
         continue;
@@ -465,16 +694,33 @@ export class AssembleEngine {
     const functional = new Set(['motor', 'rotate', 'slide', 'load', 'logic']);
     const activeNodes = nodes.filter(n => functional.has(n.behavior));
     const spinning = nodes.filter(n => n.behavior === 'rotate' && n.powered && Math.abs(n.rpm) > 0.1).length;
+    const failedNodes = nodes.filter(n => n.failure !== FAIL.NONE);
+    const failureModes = [...new Set(failedNodes.map(n => n.failure))];
+    const loadsRunning = activeNodes.filter(n => n.powered && n.failure === FAIL.NONE).length;
+    const sound = failedNodes.length === 0;
+    // Success = built something with intent (≥1 source, ≥1 load),
+    // every load runs, no failures, no active leaks.
+    const success = sound
+      && sources.length > 0
+      && activeNodes.length > 0
+      && loadsRunning === activeNodes.length
+      && this._activeLeaks.size === 0;
     return {
       total: nodes.length,
       powered: nodes.filter(n => n.powered).length,
       sourcesPowered: sources.filter(n => n.powered).length,
-      activePowered: activeNodes.filter(n => n.powered).length,
+      sourcesTotal: sources.length,
+      loadsTotal: activeNodes.length,
+      loadsRunning,
+      activePowered: loadsRunning,
       spinning,
-      failed: nodes.filter(n => n.failure !== FAIL.NONE).length,
+      failed: failedNodes.length,
+      failureModes,
+      leaks: this._activeLeaks.size,
       connections: this.connections.size,
       totalMass: nodes.reduce((s, n) => s + n.mass, 0).toFixed(2),
-      structurallySound: nodes.every(n => n.failure === FAIL.NONE),
+      structurallySound: sound,
+      success,
     };
   }
 }
@@ -547,7 +793,8 @@ export class AssembleRenderer {
     this.scene.add(ground);
 
     // Ambient
-    this.scene.add(new THREE.AmbientLight(0x223344, 1.2));
+    const ambient = new THREE.AmbientLight(0x223344, 1.2);
+    this.scene.add(ambient);
 
     // Key light
     const key = new THREE.DirectionalLight(0x88aacc, 1.5);
@@ -569,6 +816,28 @@ export class AssembleRenderer {
     const acc = new THREE.PointLight(0x00ccff, 0.5, 40);
     acc.position.set(4, 2, -12);
     this.scene.add(acc);
+
+    // Track lights + base intensities + base exposure so a slider can scale them
+    this.lights = { ambient, key, fill, acc };
+    this._baseLightIntensity = {
+      ambient: ambient.intensity,
+      key: key.intensity,
+      fill: fill.intensity,
+      acc: acc.intensity,
+    };
+    this._baseExposure = this.renderer.toneMappingExposure;
+  }
+
+  // Multiplier in [0..3]. 1.0 = default.
+  setLightLevel(mult) {
+    const m = Math.max(0, Math.min(3, Number(mult) || 1));
+    if (!this.lights) return;
+    this.lights.ambient.intensity = this._baseLightIntensity.ambient * m;
+    this.lights.key.intensity = this._baseLightIntensity.key * m;
+    this.lights.fill.intensity = this._baseLightIntensity.fill * m;
+    this.lights.acc.intensity = this._baseLightIntensity.acc * m;
+    // Nudge tone-mapping exposure so very dim/bright settings still read well
+    this.renderer.toneMappingExposure = this._baseExposure * (0.6 + 0.4 * m);
   }
 
   _bindEngine() {
@@ -576,8 +845,40 @@ export class AssembleRenderer {
     this.engine.on('nodeRemoved', n => this._removeMesh(n));
     this.engine.on('connectionAdded', c => this._addConnLine(c));
     this.engine.on('connectionRemoved', c => this._removeConnLine(c));
+    this.engine.on('connectionUpdated', c => this.updateConnLine(c));
     this.engine.on('failure', ev => this._showFailure(ev));
+    this.engine.on('leak', ev => this._showLeak(ev));
+    this.engine.on('simStarted', () => this._resetVisuals());
+    this.engine.on('simStopped', () => this._resetVisuals());
     this.engine.on('simStep', ev => this._animateRunning(ev));
+  }
+
+  // Restore neutral colour/emissive on every part + connection line.
+  // Called when sim starts or stops so a previous failure tint does
+  // not bleed into the next run.
+  _resetVisuals() {
+    for (const [id, mesh] of this.meshMap) {
+      const node = this.engine.nodes.get(id);
+      if (!node || !mesh.material) continue;
+      const matD = MAT[node.matKey] || MAT.STEEL;
+      const baseColor = (node.color != null) ? node.color : matD.color;
+      mesh.material.color.setHex(baseColor);
+      if (mesh.material.emissive) mesh.material.emissive.setHex(0x000000);
+      mesh.material.emissiveIntensity = 0.0;
+    }
+    for (const [, line] of this.connLineMap) {
+      if (!line.userData || !line.material) continue;
+      if (line.userData.baseColor != null) line.material.color.setHex(line.userData.baseColor);
+      line.userData.leakUntil = 0;
+    }
+  }
+
+  _showLeak({ conn }) {
+    const line = this.connLineMap.get(conn.id);
+    if (!line || !line.material) return;
+    line.material.color.setHex(0x00ddff);
+    line.userData = line.userData || {};
+    line.userData.leakUntil = Date.now() + 600;
   }
 
   _buildMesh(node) {
@@ -801,16 +1102,44 @@ export class AssembleRenderer {
       new THREE.Vector3(posB.x, posB.y, posB.z),
     ];
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: portColor(conn.type), linewidth: 2 });
-    const line = new THREE.Line(geo, mat);
+    const bond = BOND_DEFS[conn.bondType] || BOND_DEFS.none;
+    // Bond colour overrides port colour when a bond is applied so the
+    // user can see at a glance which connections are glued/welded/etc.
+    const colour = (conn.bondType && conn.bondType !== BOND.NONE) ? bond.color : portColor(conn.type);
+    let mat, line;
+    if (bond.dashed) {
+      mat = new THREE.LineDashedMaterial({
+        color: colour,
+        linewidth: bond.width,
+        dashSize: 0.08,
+        gapSize: 0.05,
+        transparent: bond.opacity < 1,
+        opacity: bond.opacity,
+      });
+      line = new THREE.Line(geo, mat);
+      line.computeLineDistances();
+    } else {
+      mat = new THREE.LineBasicMaterial({
+        color: colour,
+        linewidth: bond.width,
+        transparent: bond.opacity < 1,
+        opacity: bond.opacity,
+      });
+      line = new THREE.Line(geo, mat);
+    }
     this.scene.add(line);
+    line.userData = { baseColor: colour, leakUntil: 0 };
     this.connLineMap.set(conn.id, line);
     conn.line = line;
   }
 
   _removeConnLine(conn) {
     const line = this.connLineMap.get(conn.id);
-    if (line) { this.scene.remove(line); line.geometry.dispose(); }
+    if (line) {
+      this.scene.remove(line);
+      line.geometry.dispose();
+      if (line.material) line.material.dispose();
+    }
     this.connLineMap.delete(conn.id);
   }
 
@@ -913,9 +1242,12 @@ export class AssembleRenderer {
   }
 
   updateGrid(gridSize) {
-    // Update grid divisions based on grid size
+    // Update grid divisions based on grid size.
+    // Snap precision is unbounded (uses gridSize directly); the visible
+    // grid lines are capped so very fine spacings don't produce thousands
+    // of helpers.
     const size = 40;
-    const divisions = Math.round(size / gridSize);
+    const divisions = Math.max(2, Math.min(200, Math.round(size / gridSize)));
 
     // Remove old grids
     if (this.gridHelper) this.scene.remove(this.gridHelper);
@@ -976,6 +1308,23 @@ export class AssembleRenderer {
 // ═══════════════════════════════════════════════════════════════
 function dist3(a, b) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2);
+}
+
+// Half-extents derived from partDef.geo. Falls back to a small cube
+// for unknown / model parts so adjacency snap still has something to
+// work with until we wire up real bounding-box readback from meshes.
+function nodeHalfExtents(node) {
+  const g = node.partDef && node.partDef.geo;
+  if (!g) return { x: 0.3, y: 0.3, z: 0.3 };
+  const a = g.args || [];
+  switch (g.type) {
+    case 'box': return { x: (a[0] || 0.6) / 2, y: (a[1] || 0.6) / 2, z: (a[2] || 0.6) / 2 };
+    case 'cyl': return { x: a[0] || 0.3, y: (a[1] || 0.6) / 2, z: a[0] || 0.3 };
+    case 'sphere': return { x: a[0] || 0.3, y: a[0] || 0.3, z: a[0] || 0.3 };
+    case 'cone': return { x: a[0] || 0.3, y: (a[1] || 0.6) / 2, z: a[0] || 0.3 };
+    case 'torus': { const r = (a[0] || 0.3) + (a[1] || 0.05); return { x: r, y: a[1] || 0.05, z: r }; }
+    default: return { x: 0.3, y: 0.3, z: 0.3 };
+  }
 }
 
 function worldPortPos(node, portDef) {

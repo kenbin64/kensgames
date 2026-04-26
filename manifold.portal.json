@@ -77,13 +77,18 @@
       "status": "production"
     },
     {
-      "id": "assemble",
-      "name": "Assemble",
-      "path": "assemble/",
-      "manifold": "assemble/manifold.game.json",
-      "entry": "assemble/index.html",
+      "id": "cubic3d",
+      "name": "Cubic",
+      "path": "cubic3d/",
+      "manifold": "cubic3d/manifold.game.json",
+      "entry": "cubic3d/index.html",
       "server": "static",
-      "status": "production"
+      "status": "production",
+      "dimension": {
+        "x": 4,
+        "y": 4,
+        "z": 16
+      }
     }
   ],
   "substrates": {

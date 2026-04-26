@@ -449,6 +449,7 @@ const Starfighter = (function () {
         { id: 'hull', label: 'Hull Repair', icon: '🔩', rarity: 1.0, flavour: 'Hull plating patched.', apply: p => { p.hull = Math.min(dim('player.hull'), p.hull + 40); } },
         { id: 'shield', label: 'Shield Restore', icon: '🔋', rarity: 1.2, flavour: 'Shield cells recharged.', apply: p => { p.shields = Math.min(dim('player.shields'), p.shields + 35); } },
         { id: 'fuel', label: 'Fuel Pack', icon: '⛽', rarity: 1.4, flavour: 'Fuel tanks topped off.', apply: p => { p.fuel = Math.min(dim('player.fuel'), p.fuel + dim('player.fuel') * 0.4); } },
+        { id: 'missile', label: 'Torpedo Pack', icon: '🚀', rarity: 1.6, flavour: 'Torpedo magazine reloaded.', apply: p => { p.torpedoes = Math.min(dim('cap.torpedoes'), p.torpedoes + 3); } },
     ];
 
     // Weighted random powerup type — rarer items less likely
@@ -707,6 +708,10 @@ const Starfighter = (function () {
 
     // The Manifold — ground truth for all entity state
     const M = window.SpaceManifold;
+    // Dimensional framework — five verbs / presence / intersects / frame clock.
+    // Lives on the unified Manifold (js/manifold.js); SpaceManifold.dim is the
+    // lens registry, so the two namespaces must not be conflated.
+    const MD = (window.Manifold && window.Manifold.dim) || null;
 
     // Dimensional shorthand — all game constants flow through SpaceManifold.dim()
     const dim = (name) => M.dim(name);
@@ -2890,6 +2895,12 @@ const Starfighter = (function () {
             }
             if (window.SF3D) { SF3D.setLaunchPhase(true); SF3D.showLaunchBay(); }
 
+            // Skip-training button is wave-1 only
+            if (state.wave !== 1) {
+                const _skipTrainBtn = document.getElementById('training-skip-btn');
+                if (_skipTrainBtn) _skipTrainBtn.style.display = 'none';
+            }
+
             const launchBtn = document.getElementById('launch-btn');
             if (launchBtn) launchBtn.style.display = 'none'; // auto-launch; no manual button
             const cd = document.getElementById('countdown-display');
@@ -2925,6 +2936,7 @@ const Starfighter = (function () {
         const _bdrCdEl = document.getElementById('bdr-countdown-secs');
         if (_bdrCdEl) _bdrCdEl.textContent = _bdrSecs;
         const _bdrTick = setInterval(() => {
+            if (window._bdrPaused) return;
             _bdrSecs--;
             const el = document.getElementById('bdr-countdown-secs');
             if (el) el.textContent = _bdrSecs;
@@ -3020,9 +3032,9 @@ const Starfighter = (function () {
     };
 
     const MANIFOLD_ARCHETYPES = {
-        enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 30, hullWave: 5, hullField: 4, speedBase: 160, speedWave: 10, speedField: 10, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
-        interceptor: { x: 1.45, y: 1.7, waveX: 0.1, waveY: 0.16, hullBase: 60, hullWave: 8, hullField: 6, speedBase: 320, speedWave: 15, speedField: 15, shieldsBase: 30, shieldsWave: 5, shieldsField: 5 },
-        bomber: { x: 1.7, y: 1.2, waveX: 0.12, waveY: 0.11, hullBase: 80, hullWave: 10, hullField: 8, speedBase: 100, speedWave: 6, speedField: 6, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 12, hullWave: 2, hullField: 1, speedBase: 160, speedWave: 10, speedField: 10, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        interceptor: { x: 1.45, y: 1.7, waveX: 0.1, waveY: 0.16, hullBase: 25, hullWave: 3, hullField: 2, speedBase: 320, speedWave: 15, speedField: 15, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
+        bomber: { x: 1.7, y: 1.2, waveX: 0.12, waveY: 0.11, hullBase: 40, hullWave: 4, hullField: 3, speedBase: 100, speedWave: 6, speedField: 6, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
         predator: { x: 2.2, y: 1.9, waveX: 0.1, waveY: 0.12, hullBase: 500, hullWave: 60, hullField: 20, speedBase: 280, speedWave: 10, speedField: 12, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
         dreadnought: { x: 3.6, y: 2.8, waveX: 0.08, waveY: 0.1, hullBase: 2000, hullWave: 200, hullField: 60, speedBase: 30, speedWave: 2, speedField: 3, shieldsBase: 1000, shieldsWave: 100, shieldsField: 40 },
         'alien-baseship': { x: 3.1, y: 2.4, waveX: 0.09, waveY: 0.11, hullBase: 1000, hullWave: 500, hullField: 80, speedBase: 40, speedWave: 3, speedField: 5, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
@@ -3087,13 +3099,32 @@ const Starfighter = (function () {
 
     // Spawn a tight cluster of enemies around a world-space center point.
     // Enemies share a clusterId so radar / wingman comms can reference them.
+    // Formation positions are a phi-spaced spiral in the surface tangent plane
+    // at the cluster center — the swarm geometry IS the manifold's signature
+    // at that point. Same surface, same formation, every spawn.
     function _spawnCluster(clusterId, clusterLabel, cx, cy, cz, enemyType, count, wave, opts) {
+        // Bias the cluster centre toward the nearest asteroid cluster so the
+        // ambushers materialise inside cover rather than open space. Only snap
+        // when an asteroid cluster is within ambush range (~3500m of intent).
+        if (window.SFEnhance && window.SFEnhance.nearestAsteroidCluster) {
+            const ac = window.SFEnhance.nearestAsteroidCluster(cx, cy, cz, 3500);
+            if (ac) { cx = ac.x; cy = ac.y; cz = ac.z; }
+        }
         state.clusters.push({ id: clusterId, label: clusterLabel, center: { x: cx, y: cy, z: cz }, total: count, alive: count });
-        const spread = 350; // formation spread radius
+        const spread = 350;
+        const frame = _surfaceFrame(cx, cy, cz);
+        const fieldHere = (M && M.diamond) ? M.diamond(cx, cy, cz) : 0;
+        const PHI = 1.6180339887498949;
+        const goldAngle = Math.PI * 2 / PHI;
         for (let i = 0; i < count; i++) {
-            const ax = cx + (Math.random() - 0.5) * spread * 2;
-            const ay = cy + (Math.random() - 0.5) * spread * 0.6;
-            const az = cz + (Math.random() - 0.5) * spread * 2;
+            // Sunflower / Fibonacci spiral in the tangent plane (a, b).
+            // Radius grows with sqrt(i) so density stays uniform across the disc.
+            const r = spread * Math.sqrt((i + 0.5) / Math.max(1, count));
+            const theta = i * goldAngle;
+            const ca = Math.cos(theta), sa = Math.sin(theta);
+            const ax = cx + (frame.a.x * ca + frame.b.x * sa) * r;
+            const ay = cy + (frame.a.y * ca + frame.b.y * sa) * r * 0.3;
+            const az = cz + (frame.a.z * ca + frame.b.z * sa) * r;
             const e = new Entity(enemyType, ax, ay, az);
             const profile = deriveCombatProfile(enemyType, wave, opts || {});
             e.hull = profile.hull;
@@ -3103,8 +3134,11 @@ const Starfighter = (function () {
             e._clusterId = clusterId;
             // Per-level fire rate (harder each wave)
             e._fireCooldownBase = _levelFireCooldown(wave);
-            // Wave 2+: interceptors always spread-fire, drones 50% chance
-            e._useSpread = wave >= 2 && (enemyType === 'interceptor' || Math.random() > 0.5);
+            // Wave 3+: interceptors always spread-fire; drones spread when the
+            // local field is in the aggressive (positive) lobe. Wave 2 stays
+            // single-shot to keep the difficulty ramp readable and the entity
+            // count per volley low.
+            e._useSpread = wave >= 3 && (enemyType === 'interceptor' || fieldHere > 0);
             // Type-specific setup
             if (enemyType === 'interceptor') {
                 e.radius = dim('entity.interceptor.radius');
@@ -3117,12 +3151,20 @@ const Starfighter = (function () {
         }
     }
 
-    // Enemy spread shot — 3-round fan fired by wave 2+ enemies alongside their laser
+    // Enemy spread shot — 3-round fan fired by wave 2+ enemies alongside their
+    // laser. Pellets fan in a phi-spaced triangle around the centerline; cone
+    // width derives from |field| at the firing position so agitated regions of
+    // the surface produce wider, less accurate volleys.
     function _fireEnemySpread(entity) {
         if (_countType('laser') + 3 >= dim('cap.lasers')) return;
+        const PHI = 1.6180339887498949;
+        const goldAngle = Math.PI * 2 / PHI;
+        const f = (M && M.diamond) ? M.diamond(entity.position.x, entity.position.y, entity.position.z) : 0;
+        const cone = 0.06 + Math.abs(f) * 0.18;
         for (let s = 0; s < 3; s++) {
-            const rx = (Math.random() - 0.5) * 0.18;
-            const ry = (Math.random() - 0.5) * 0.18;
+            const a = s * goldAngle;
+            const rx = Math.cos(a) * cone;
+            const ry = Math.sin(a) * cone;
             _q1.setFromEuler(new THREE.Euler(rx, ry, 0));
             _v1.set(0, 0, -8).applyQuaternion(entity.quaternion);
             const l = new Entity('laser',
@@ -3305,7 +3347,7 @@ const Starfighter = (function () {
             // ── Cluster count: grows with wave + chaos ──
             // Wave 1: 2. Wave 2–3: 2–3. Wave 4–5: 3–4. Wave 6+: up to 6.
             const rawClusters = 2 + Math.round(_mzL * (w * 0.7));
-            const clusterCount = Math.max(2, Math.min(6, rawClusters));
+            const clusterCount = Math.max(2, Math.min(9, rawClusters));
 
             // ── Enemy type availability per weapon-unlock tier ──
             const canInterceptor = w >= 2;
@@ -3336,7 +3378,7 @@ const Starfighter = (function () {
                 const isLast = c === clusterCount - 1;
                 // Per-cluster enemy count: fair share with ±40% random variation
                 const fairShare = Math.round(budget / clusterCount * (0.6 + Math.random() * 0.8));
-                const count = Math.max(2, Math.min(5, isLast ? remaining : Math.min(remaining - (clusterCount - c - 1), fairShare)));
+                const count = Math.max(2, Math.min(14, isLast ? remaining : Math.min(remaining - (clusterCount - c - 1), fairShare)));
                 remaining = Math.max(0, remaining - count);
 
                 // Pick type by weighted random
@@ -3494,6 +3536,7 @@ const Starfighter = (function () {
         // Auto-RTB after 5-second countdown
         let _wcSecs = 5;
         const _wcTick = setInterval(() => {
+            if (window._wcPaused) return;
             _wcSecs--;
             const el = document.getElementById('waveclear-cd');
             if (el) el.textContent = _wcSecs;
@@ -5036,6 +5079,8 @@ const Starfighter = (function () {
             if (M) {
                 M.evolve(safeDt);
             }
+            // Advance the dimensional clock and clear per-frame lens cache
+            if (MD) MD.tick(safeDt);
             if (_DPe) _DPe.releaseAll('ai');
 
             // Apply velocity → position for all entities (3D physics step)
@@ -5146,13 +5191,23 @@ const Starfighter = (function () {
                 if (isAProj && a.owner === 'enemy' && _isHostile(b.type)) continue;
                 if (isBProj && b.owner === 'enemy' && _isHostile(a.type)) continue;
 
-                // Use inline math so this works whether position is THREE.Vector3 or a plain {x,y,z}
-                const _cx = a.position.x - b.position.x;
-                const _cy = a.position.y - b.position.y;
-                const _cz = (a.position.z || 0) - (b.position.z || 0);
-                const distSq = _cx * _cx + _cy * _cy + _cz * _cz;
-                const rSum = a.radius + b.radius;
-                if (distSq < rSum * rSum) {
+                // Presence-based narrow phase via the dimensional framework.
+                // intersectsEntities resolves both entities in stack-only locals,
+                // allocating zero objects per pair — projectiles manifest as
+                // swept segments, everything else as spheres, segment/sphere
+                // tests answered uniformly so 1600 m/s lasers don't tunnel.
+                // Inline fallback covers builds without MD.
+                let _hit;
+                if (MD) {
+                    _hit = MD.intersectsEntities(a, b, safeDt);
+                } else {
+                    const _cx = a.position.x - b.position.x;
+                    const _cy = a.position.y - b.position.y;
+                    const _cz = (a.position.z || 0) - (b.position.z || 0);
+                    const rSum = a.radius + b.radius;
+                    _hit = (_cx * _cx + _cy * _cy + _cz * _cz) < rSum * rSum;
+                }
+                if (_hit) {
                     if (a.type === 'pickup' || b.type === 'pickup') {
                         const pick = a.type === 'pickup' ? a : b;
                         const other = a.type === 'pickup' ? b : a;
@@ -5329,6 +5384,9 @@ const Starfighter = (function () {
         // w (z = xy²) → quadratic power multiplier: turnRate, fireRange, cooldown
         const wNorm = Math.min(Math.abs(s.w), 100) / 100;   // 0..1
 
+        // field < 0 → seek cover (Schwarz Diamond inside-lobe), field > 0 → press attack
+        const coverSeek = Math.max(0, Math.min(1, -s.field));
+
         return {
             targetMode,
             turnRate: dim('enemy.turnRate') * (0.6 + absField * 2.0 + wNorm),
@@ -5339,6 +5397,7 @@ const Starfighter = (function () {
             jinkDist: 200 + wNorm * 200,
             heavyRange: dim('enemy.heavyRange') || 6000,
             heavyCooldown: dim('enemy.heavyCooldown') || 15,
+            coverSeek,
         };
     }
 
@@ -5382,22 +5441,47 @@ const Starfighter = (function () {
         return _playerAlive ? state.player : state.baseship;
     }
 
+    // Manifold-derived orthogonal frame at a position. n is the unit gradient
+    // (the "out of surface" direction); a and b span the tangent plane. Used
+    // anywhere we need a deterministic perpendicular direction in place of
+    // Math.random() — sidesteps, jinks, evades, formations, spread cones.
+    // Same position → same frame, every time. The surface IS the source.
+    function _surfaceFrame(px, py, pz) {
+        const g = (M && M.diamondGrad) ? M.diamondGrad(px, py, pz) : { x: 1, y: 0, z: 0 };
+        const gMag = Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) || 1e-9;
+        const nx = g.x / gMag, ny = g.y / gMag, nz = g.z / gMag;
+        const tx = Math.abs(nx) < 0.9 ? 1 : 0, ty = Math.abs(nx) < 0.9 ? 0 : 1, tz = 0;
+        let ax = ny * tz - nz * ty, ay = nz * tx - nx * tz, az = nx * ty - ny * tx;
+        const aMag = Math.sqrt(ax * ax + ay * ay + az * az) || 1e-9;
+        ax /= aMag; ay /= aMag; az /= aMag;
+        const bx = ny * az - nz * ay, by = nz * ax - nx * az, bz = nx * ay - ny * ax;
+        return { n: { x: nx, y: ny, z: nz }, a: { x: ax, y: ay, z: az }, b: { x: bx, y: by, z: bz } };
+    }
+
     // ── Evasion dimension: break turn when player has target lock ──
+    // Evade direction lies in the tangent plane to the surface — the entity
+    // breaks ALONG the surface, not perpendicular to it. Re-stamps every 1.5s
+    // using its current position, so the dance follows the surface as it moves.
     function _combatEvade(entity, dt) {
-        // Guard: initialise evade state if missing or direction lost
         if (!entity._evading || !entity._evadeDir) {
             entity._evading = true;
             entity._evadeTimer = 0;
-            const ex = (Math.random() - 0.5) * 2, ey = (Math.random() - 0.5) * 2, ez = (Math.random() - 0.5);
-            const elen = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
-            entity._evadeDir = new THREE.Vector3(ex / elen, ey / elen, ez / elen);
+            const fr = _surfaceFrame(entity.position.x, entity.position.y, entity.position.z);
+            entity._evadeDir = new THREE.Vector3(fr.a.x, fr.a.y, fr.a.z);
         }
         entity._evadeTimer += dt;
         if (entity._evadeTimer > 1.5) {
             entity._evadeTimer = 0;
-            const ex = (Math.random() - 0.5) * 2, ey = (Math.random() - 0.5) * 2, ez = (Math.random() - 0.5);
-            const elen = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
-            entity._evadeDir.set(ex / elen, ey / elen, ez / elen);
+            // Re-stamp: alternate tangent axis (a → b → -a → -b) for variation
+            // driven by the surface, not RNG.
+            const fr = _surfaceFrame(entity.position.x, entity.position.y, entity.position.z);
+            const phase = ((entity._evadePhase | 0) + 1) & 3;
+            entity._evadePhase = phase;
+            const v = phase === 0 ? fr.a
+                : phase === 1 ? fr.b
+                    : phase === 2 ? { x: -fr.a.x, y: -fr.a.y, z: -fr.a.z }
+                        : { x: -fr.b.x, y: -fr.b.y, z: -fr.b.z };
+            entity._evadeDir.set(v.x, v.y, v.z);
         }
         // Only call setFromUnitVectors when direction is valid (non-zero)
         const edLen = entity._evadeDir.lengthSq();
@@ -5422,14 +5506,19 @@ const Starfighter = (function () {
     }
 
     // ── Predator avoidance dimension ──
+    // Avoidance triggers when the local field is non-defensive (≥ -0.3) — i.e.
+    // the surface is not already hiding the entity in a cover lobe. Field-gated
+    // instead of probabilistic.
     function _combatAvoidPredator(entity, dt) {
+        const f = (M && M.diamond) ? M.diamond(entity.position.x, entity.position.y, entity.position.z) : 0;
+        if (f < -0.3) return false;
         for (let i = 0, len = state.entities.length; i < len; i++) {
             const pred = state.entities[i];
             if (pred.type !== 'predator' || pred.markedForDeletion) continue;
             const dx = pred.position.x - entity.position.x;
             const dy = pred.position.y - entity.position.y;
             const dz = pred.position.z - entity.position.z;
-            if (dx * dx + dy * dy + dz * dz < 160000 && Math.random() > 0.3) {
+            if (dx * dx + dy * dy + dz * dz < 160000) {
                 _v1.set(-dx, -dy, -dz).normalize();
                 _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
                 entity.quaternion.slerp(_q1, dt * 3.0);
@@ -5441,11 +5530,19 @@ const Starfighter = (function () {
     }
 
     // ── Jink dimension: close-range evasive strafe ──
+    // Sidestep direction is the tangent vector at the entity's position — the
+    // strafe runs ALONG the surface. The choice of axis (a vs b) flips on each
+    // re-stamp so jinks alternate naturally without ever touching RNG.
     function _combatJink(entity, dt, fwd) {
         if (!entity._jinxDir) {
-            entity._jinxDir = new THREE.Vector3(
-                (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5)
-            ).normalize();
+            const fr = _surfaceFrame(entity.position.x, entity.position.y, entity.position.z);
+            const phase = ((entity._jinxPhase | 0) + 1) & 3;
+            entity._jinxPhase = phase;
+            const v = phase === 0 ? fr.a
+                : phase === 1 ? fr.b
+                    : phase === 2 ? { x: -fr.a.x, y: -fr.a.y, z: -fr.a.z }
+                        : { x: -fr.b.x, y: -fr.b.y, z: -fr.b.z };
+            entity._jinxDir = new THREE.Vector3(v.x, v.y, v.z).normalize();
             entity._jinxTimer = 0;
         }
         entity._jinxTimer += dt;
@@ -5542,7 +5639,21 @@ const Starfighter = (function () {
         // Trait: avoid predator
         if (prof.traits.includes('avoid_predator') && _combatAvoidPredator(entity, dt)) return;
 
-        // Pursuit: turn toward target
+        // Manifold-derived cover seeking: when the symbolic field places this
+        // entity in a defensive lobe, hide behind the nearest asteroid (far
+        // side from current target). When the rock shatters, the next stamp
+        // re-derives coverSeek and exposure resumes.
+        if (prof.coverSeek > 0.4 && window.SFEnhance && SFEnhance.nearestCoverAsteroid) {
+            const seekR = Math.min(prof.fireRange * 0.8, 1800);
+            const cover = SFEnhance.nearestCoverAsteroid(entity.position, seekR);
+            if (cover) {
+                _v1.copy(cover.position).sub(target.position).normalize();
+                _v2.copy(cover.position).addScaledVector(_v1, cover.radius * 1.4);
+                _v1.copy(_v2).sub(entity.position).normalize();
+            }
+        }
+
+        // Pursuit: turn toward target (or cover anchor)
         _q1.setFromUnitVectors(_v2.set(0, 0, -1), _v1);
         entity.quaternion.slerp(_q1, dt * prof.turnRate);
         const fwd = _v2.set(0, 0, -1).applyQuaternion(entity.quaternion);
@@ -6870,6 +6981,25 @@ const Starfighter = (function () {
             case 2: fireTorpedo(p, 'player'); break;
             case 3: firePulseEMP(p, 'player'); break;
         }
+    }
+
+    // Kinetic ramming damage. Each side absorbs k · mass(other) · |Δv|², so
+    // the fighter trading paint with a bomber takes more than the bomber, and
+    // a fighter ramming a carrier is suicide. Scrapes below the Δv² floor do
+    // nothing — prevents nuisance damage from formation jostling and tractor
+    // beams. Mass falls back to a sane default so unknown types still bounce.
+    function _kineticMass(entity) {
+        const m = dim('mass.' + entity.type);
+        return (typeof m === 'number') ? m : dim('mass.default');
+    }
+    function _kineticImpactDamage(self, other) {
+        const ax = self.velocity?.x || 0, ay = self.velocity?.y || 0, az = self.velocity?.z || 0;
+        const bx = other.velocity?.x || 0, by = other.velocity?.y || 0, bz = other.velocity?.z || 0;
+        const dx = ax - bx, dy = ay - by, dz = az - bz;
+        const dvSq = dx * dx + dy * dy + dz * dz;
+        if (dvSq < dim('damage.kineticMinDvSq')) return 0;
+        const raw = dim('damage.kineticK') * _kineticMass(other) * dvSq;
+        return Math.min(dim('damage.kineticMaxPerHit'), raw);
     }
 
     function handleCollision(a, b) {

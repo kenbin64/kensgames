@@ -53,66 +53,74 @@ const SF3D = (function () {
     // LEGACY GLB SYSTEM (DEPRECATED — kept for backward compatibility)
     // This system is being phased out in favor of manifold substrates
     const glbModels = {};    // { modelName: THREE.Group }
+    // ── LOD policy ────────────────────────────────────────────────────
+    // Close range  : full-resolution original GLB (preserves panel detail
+    //                the optimized lod0 strips out)
+    // Mid distance : optimized lod1 (~half size, same silhouette)
+    // Far distance : optimized lod2 (sprite-class, used for swarms beyond
+    //                visual recognition range)
+    // The originals with a literal space in the filename are URI-encoded
+    // here so the loader fetches them correctly.
     const GLB_LOD = {
         enemy: [
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 250 },
-            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 550 },
+            { path: 'assets/models/AlienEnemyFighter.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod1.glb', distance: 350 },
+            { path: 'assets/models/optimized/AlienEnemyFighter_lod2.glb', distance: 900 },
         ],
         ally: [
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 220 },
-            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 480 },
+            { path: 'assets/models/HumanFriendlStarFighter.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod1.glb', distance: 320 },
+            { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 800 },
         ],
         'alien-baseship': [
-            { path: 'assets/models/optimized/AlienMotherShip_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 1300 },
-            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 2700 },
+            { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod1.glb', distance: 1500 },
+            { path: 'assets/models/optimized/AlienMotherShip_lod2.glb', distance: 3500 },
         ],
         predator: [
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb', distance: 380 },
-            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb', distance: 820 },
+            { path: 'assets/models/AlienEnemyPreditorDrone.glb', distance: 0 },
+            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod1.glb', distance: 500 },
+            { path: 'assets/models/optimized/AlienEnemyPreditorDrone_lod2.glb', distance: 1200 },
         ],
         baseship: [
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 2500 },
-            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 5500 },
+            { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod1.glb', distance: 2800 },
+            { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 6500 },
         ],
         station: [
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 4800 },
-            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 10000 },
+            { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod1.glb', distance: 5500 },
+            { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 12000 },
         ],
         interceptor: [
-            { path: 'assets/models/optimized/Interceptor_Needle_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/Interceptor_Needle_lod1.glb', distance: 250 },
-            { path: 'assets/models/optimized/Interceptor_Needle_lod2.glb', distance: 550 },
+            { path: 'assets/models/Interceptor_Needle.glb', distance: 0 },
+            { path: 'assets/models/optimized/Interceptor_Needle_lod1.glb', distance: 350 },
+            { path: 'assets/models/optimized/Interceptor_Needle_lod2.glb', distance: 900 },
         ],
         bomber: [
-            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod1.glb', distance: 320 },
-            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod2.glb', distance: 680 },
+            { path: 'assets/models/Bomber_Leviathan%20Tick.glb', distance: 0 },
+            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod1.glb', distance: 450 },
+            { path: 'assets/models/optimized/Bomber_Leviathan%20Tick_lod2.glb', distance: 1100 },
         ],
         dreadnought: [
-            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod1.glb', distance: 950 },
-            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod2.glb', distance: 2100 },
+            { path: 'assets/models/Dreadnought_Hive%20Throne.glb', distance: 0 },
+            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod1.glb', distance: 1200 },
+            { path: 'assets/models/optimized/Dreadnought_Hive%20Throne_lod2.glb', distance: 2800 },
         ],
         tanker: [
-            { path: 'assets/models/optimized/friendlyfueltanker_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/friendlyfueltanker_lod1.glb', distance: 250 },
-            { path: 'assets/models/optimized/friendlyfueltanker_lod2.glb', distance: 550 },
+            { path: 'assets/models/friendlyfueltanker.glb', distance: 0 },
+            { path: 'assets/models/optimized/friendlyfueltanker_lod1.glb', distance: 350 },
+            { path: 'assets/models/optimized/friendlyfueltanker_lod2.glb', distance: 800 },
         ],
         medic: [
-            { path: 'assets/models/optimized/freindly_medical_frigate_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/freindly_medical_frigate_lod1.glb', distance: 320 },
-            { path: 'assets/models/optimized/freindly_medical_frigate_lod2.glb', distance: 680 },
+            { path: 'assets/models/freindly_medical_frigate.glb', distance: 0 },
+            { path: 'assets/models/optimized/freindly_medical_frigate_lod1.glb', distance: 450 },
+            { path: 'assets/models/optimized/freindly_medical_frigate_lod2.glb', distance: 900 },
         ],
         rescue: [
-            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod1.glb', distance: 300 },
-            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod2.glb', distance: 600 },
+            { path: 'assets/models/Rescue%20Shuttle%20.glb', distance: 0 },
+            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod1.glb', distance: 400 },
+            { path: 'assets/models/optimized/Rescue%20Shuttle%20_lod2.glb', distance: 850 },
         ],
         earth: [
             { path: 'assets/models/optimized/Earth_lod0.glb', distance: 0 },
@@ -124,9 +132,9 @@ const SF3D = (function () {
             { path: 'assets/models/optimized/moon_lod1.glb', distance: 60000 },
         ],
         'hive-queen': [
-            { path: 'assets/models/optimized/HiveQueen_BossW10_lod0.glb', distance: 0 },
-            { path: 'assets/models/optimized/HiveQueen_BossW10_lod1.glb', distance: 1200 },
-            { path: 'assets/models/optimized/HiveQueen_BossW10_lod2.glb', distance: 2800 },
+            { path: 'assets/models/HiveQueen_BossW10.glb', distance: 0 },
+            { path: 'assets/models/optimized/HiveQueen_BossW10_lod1.glb', distance: 1500 },
+            { path: 'assets/models/optimized/HiveQueen_BossW10_lod2.glb', distance: 3500 },
         ],
     };
     // Scale factors — proportional to real ship sizes, forced perspective for celestials
@@ -182,7 +190,7 @@ const SF3D = (function () {
         egg: 500, youngling: 400,
     };
     const CULL_DIST = 50000; // beyond this, skip entirely (except celestials)
-    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship', 'rescue', 'science-ship']);
+    const _NO_CULL_TYPES = new Set(['earth', 'moon', 'baseship', 'station', 'alien-baseship', 'rescue', 'science-ship', 'alien-base', 'hive-queen']);
     const DOT_COLORS = {
         enemy: 0xff2222, predator: 0xcc0000, interceptor: 0xff4444, bomber: 0xff3333,
         dreadnought: 0xff0044, 'alien-baseship': 0xff00ff, tanker: 0x00ff88, medic: 0x44ffcc,
@@ -492,9 +500,16 @@ const SF3D = (function () {
         const SUN_POS = new THREE.Vector3(200000, 100000, 80000);
         const EARTH_POS = new THREE.Vector3(-15000, -55000, -25000);
 
-        // Ambient — very dim base so deep-shadow side isn't pitch black
-        const ambient = new THREE.AmbientLight(0x060610, 0.08);
+        // Ambient — base illumination so deep-shadow faces never read as
+        // pitch black. Stays low enough that the sun-lit side still pops
+        // and the cockpit visor filter can hold contrast.
+        const ambient = new THREE.AmbientLight(0x1a1a26, 0.35);
         scene.add(ambient);
+
+        // Hemisphere — soft top-down sky/ground gradient so curved hulls
+        // never have a pure-black band where neither sun nor fill reaches.
+        const hemi = new THREE.HemisphereLight(0x223344, 0x06060a, 0.45);
+        scene.add(hemi);
 
         // Primary sun directional light — intense (space has no atmosphere to soften)
         // Cockpit visor filter (toneMappingExposure) tames this to a viewable level
@@ -508,8 +523,9 @@ const SF3D = (function () {
         earthShine.position.copy(earthShineDir.clone().multiplyScalar(-1)); // light FROM Earth toward scene
         scene.add(earthShine);
 
-        // Very subtle fill from opposite sun (scattered starlight / nebula)
-        const fillLight = new THREE.DirectionalLight(0x0a0a1a, 0.08);
+        // Back-fill from opposite the sun — saturated cool so the dark
+        // side of any hull still resolves form rather than vanishing.
+        const fillLight = new THREE.DirectionalLight(0x334466, 0.55);
         fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
         scene.add(fillLight);
 
@@ -590,6 +606,18 @@ const SF3D = (function () {
         camera.add(cockpitLight);
         const cockpitAmbient = new THREE.HemisphereLight(0x4466aa, 0x112233, 1.0);
         camera.add(cockpitAmbient);
+
+        // ── Photon generator: forward spotlight that lights anything close
+        //    in front of the ship. Distance falloff means distant objects stay
+        //    dark; only debris/asteroids/enemies within ~2km catch the beam.
+        const photonLight = new THREE.SpotLight(0xddeeff, 6.0, 2200, Math.PI * 0.22, 0.45, 1.6);
+        photonLight.position.set(0, 0, -0.2);
+        photonLight.castShadow = false;
+        const photonTarget = new THREE.Object3D();
+        photonTarget.position.set(0, 0, -1000);
+        camera.add(photonLight);
+        camera.add(photonTarget);
+        photonLight.target = photonTarget;
 
         // Launch Bay
         createLaunchBay();
@@ -714,6 +742,21 @@ const SF3D = (function () {
         for (const key of celestialTypes) {
             if (GLB_LOD[key]) _loadGLBType(loader, key, GLB_LOD[key], false);
         }
+
+        // Combat / hero / support GLBs — eagerly fetch in the background
+        // so the first cluster the player engages renders the real ship
+        // models rather than falling back to manifold-procedural blobs.
+        // Off the loading-screen critical path: download proceeds while
+        // the prologue plays and the player sits in the launch bay.
+        const eagerCombatTypes = [
+            'enemy', 'interceptor', 'bomber', 'predator',
+            'ally', 'baseship', 'station',
+            'tanker', 'medic', 'rescue',
+            'dreadnought', 'alien-baseship', 'hive-queen',
+        ];
+        for (const key of eagerCombatTypes) {
+            if (GLB_LOD[key] && !_lazyState[key]) _triggerLazyLoad(key);
+        }
     }
 
     // LEGACY GLB PRELOAD (kept for backward compatibility)
@@ -749,8 +792,27 @@ const SF3D = (function () {
                 function (gltf) {
                     const model = gltf.scene;
                     model.traverse(child => {
-                        if (child.isMesh && child.material && child.material.map)
-                            child.material.map.encoding = THREE.sRGBEncoding;
+                        if (!child.isMesh || !child.material) return;
+                        // sRGB texture decode for any baked-in albedo.
+                        if (child.material.map) child.material.map.encoding = THREE.sRGBEncoding;
+                        // Material safety: Meshy GLBs ship with flat-black
+                        // diffuse on under-lit panels which read as pitch
+                        // black against the void. Bump near-black colors
+                        // to a dim grey so back-fill / hemi can register,
+                        // and ensure a faint emissive baseline so no face
+                        // ever vanishes entirely. Overridden later by
+                        // _applyBioluminescence for alien hulls.
+                        const c = child.material.color;
+                        if (c && (c.r + c.g + c.b) < 0.12) {
+                            c.setRGB(0.16, 0.16, 0.18);
+                        }
+                        if ('emissive' in child.material && child.material.emissive) {
+                            const e = child.material.emissive;
+                            if ((e.r + e.g + e.b) < 0.02) e.setRGB(0.02, 0.025, 0.04);
+                            if ((child.material.emissiveIntensity || 0) < 0.05) {
+                                child.material.emissiveIntensity = 0.15;
+                            }
+                        }
                     });
                     levelResults[idx] = { model, distance };
                     loaded++;
@@ -813,13 +875,28 @@ const SF3D = (function () {
     // ── Bioluminescent glow for alien species from Brown Giant ──
     // They glow like deep-sea creatures in the vacuum of space
     const ALIEN_GLOW_COLORS = {
-        enemy: { emissive: 0x22ff44, intensity: 1.4, pointColor: 0x44ff66, pointIntensity: 5.0, pointDist: 600 },
-        predator: { emissive: 0x44ff00, intensity: 1.8, pointColor: 0x66ff22, pointIntensity: 8.0, pointDist: 1200 },
-        interceptor: { emissive: 0x00ffcc, intensity: 1.5, pointColor: 0x22ffdd, pointIntensity: 6.0, pointDist: 600 },
-        bomber: { emissive: 0xff6600, intensity: 1.4, pointColor: 0xff8800, pointIntensity: 7.0, pointDist: 900 },
-        dreadnought: { emissive: 0xff0044, intensity: 1.6, pointColor: 0xff2266, pointIntensity: 14.0, pointDist: 5000 },
-        'alien-baseship': { emissive: 0xff00ff, intensity: 1.2, pointColor: 0xff44ff, pointIntensity: 12.0, pointDist: 4000 },
+        enemy: { emissive: 0x22ff44, intensity: 1.4, pointColor: 0x66ff88, pointIntensity: 11.0, pointDist: 1200, fireflyR: 90 },
+        predator: { emissive: 0x44ff00, intensity: 1.8, pointColor: 0x88ff44, pointIntensity: 16.0, pointDist: 1800, fireflyR: 140 },
+        interceptor: { emissive: 0x00ffcc, intensity: 1.5, pointColor: 0x44ffee, pointIntensity: 12.0, pointDist: 1100, fireflyR: 80 },
+        bomber: { emissive: 0xff6600, intensity: 1.4, pointColor: 0xffaa44, pointIntensity: 13.0, pointDist: 1400, fireflyR: 130 },
+        dreadnought: { emissive: 0xff0044, intensity: 1.6, pointColor: 0xff5588, pointIntensity: 22.0, pointDist: 5500, fireflyR: 400 },
+        'alien-baseship': { emissive: 0xff00ff, intensity: 1.2, pointColor: 0xff66ff, pointIntensity: 20.0, pointDist: 4500, fireflyR: 360 },
     };
+
+    // Shared firefly halo texture: radial gradient, additive-blended sprite.
+    let _fireflyTex = null;
+    function _getFireflyTexture() {
+        if (_fireflyTex) return _fireflyTex;
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const g = c.getContext('2d');
+        const rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+        rg.addColorStop(0, 'rgba(255,255,255,1)');
+        rg.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+        _fireflyTex = new THREE.CanvasTexture(c);
+        return _fireflyTex;
+    }
 
     // Running lights config for friendly / human ships — warm engine glow + nav beacons
     const FRIENDLY_LIGHT_CONFIGS = {
@@ -836,17 +913,17 @@ const SF3D = (function () {
     function _applyFriendlyLights(mesh, key) {
         const cfg = FRIENDLY_LIGHT_CONFIGS[key];
         if (!cfg) return;
-        // Engine exhaust glow — rear of ship
         const engine = new THREE.PointLight(cfg.engineColor, cfg.engineIntensity, cfg.engineDist);
         engine.name = 'engineGlow';
-        engine.position.set(0, 0, 1);  // +Z = rear of ship in Three.js
+        engine.position.set(0, 0, 1);
         mesh.add(engine);
-        // Nav beacon — top/front, pulsing handled by animation loop
         const nav = new THREE.PointLight(cfg.navColor, cfg.navIntensity, cfg.navDist);
         nav.name = 'navBeacon';
         nav.position.set(0, 0.5, -0.5);
         mesh.add(nav);
         mesh.userData.hasRunningLights = true;
+        mesh.userData.navBeaconRef = nav;
+        mesh.userData.engineGlowRef = engine;
     }
 
     // ── Glow Sphere: far-distance LOD tier — minimal geometry, maximum visibility ──
@@ -898,6 +975,16 @@ const SF3D = (function () {
         const light = new THREE.PointLight(cfg.pointColor, cfg.pointIntensity, cfg.pointDist);
         light.name = 'bioGlow';
         mesh.add(light);
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: _getFireflyTexture(), color: cfg.pointColor,
+            transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        }));
+        halo.name = 'bioHalo';
+        halo.scale.setScalar(cfg.fireflyR || 100);
+        halo.frustumCulled = false;
+        mesh.add(halo);
+        mesh.userData.bioGlowRef = light;
+        mesh.userData.bioHaloRef = halo;
     }
 
     // ── Clone a LOD model for a new entity ──
@@ -1211,6 +1298,15 @@ const SF3D = (function () {
     function showLaunchBay() {
         // Show the launch bay for next launch
         if (launchBayGroup) {
+            // Reset position — cinematic may have parked it downrange on prior launch
+            launchBayGroup.position.set(0, -32, 50);
+            launchBayGroup.rotation.set(0, 0, 0);
+            launchBayGroup.children.forEach(child => {
+                if (child.material) {
+                    child.material.opacity = 1.0;
+                    child.material.transparent = false;
+                }
+            });
             launchBayGroup.visible = true;
         }
     }
@@ -1793,17 +1889,26 @@ const SF3D = (function () {
 
         // ── Map entity types to manifold model keys ──
         const manifoldKey = type === 'wingman' ? 'ally' : type;
+        const glbKey = manifoldKey;
 
-        // Manifold-first by default. Set `?glb=1` to force GLB hero assets.
-        const _USE_GLB_HERO_ASSETS = (() => {
-            try { return new URLSearchParams(location.search).has('glb'); }
+        // Combat / hero / support / capital ships render from GLB whenever
+        // the model is loaded. Manifold-observed geometry serves only as
+        // an immediate fallback during the brief window before the GLB
+        // resolves on first encounter. `?nogab=1` forces manifold-only.
+        const _GLB_DISABLED = (() => {
+            try { return new URLSearchParams(location.search).has('nogab'); }
             catch { return false; }
         })();
-
-        // Optional: prefer detailed GLB models for large/hero objects when explicitly enabled.
-        const _PREFER_GLB = new Set(['baseship', 'station', 'earth', 'moon', 'tanker', 'medic', 'rescue', 'science-ship', 'alien-baseship', 'dreadnought', 'hive-queen']);
-        const glbKey = manifoldKey;
-        if (_USE_GLB_HERO_ASSETS && _PREFER_GLB.has(glbKey) && glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0) {
+        const _GLB_PREFERRED = new Set([
+            'enemy', 'interceptor', 'bomber', 'predator',
+            'dreadnought', 'alien-baseship', 'hive-queen',
+            'ally', 'baseship', 'station',
+            'tanker', 'medic', 'rescue', 'science-ship',
+            'earth', 'moon',
+        ]);
+        const glbReady = !_GLB_DISABLED && _GLB_PREFERRED.has(glbKey)
+            && glbModels[glbKey] && glbModels[glbKey].levels && glbModels[glbKey].levels.length > 0;
+        if (glbReady) {
             mesh = _cloneLOD(glbKey);
             mesh.scale.setScalar(GLB_SCALES[glbKey] || 10);
             if (type === 'wingman') mesh.userData.isWingman = true;
@@ -1818,6 +1923,14 @@ const SF3D = (function () {
             }
             scene.add(mesh);
             return mesh;
+        }
+        // GLB not yet loaded — trigger background fetch so the next
+        // entity of this type renders from the real model. Existing
+        // manifold-fallback meshes won't retro-swap, but subsequent
+        // spawns (next wave / next cluster) will be the real ship.
+        if (!_GLB_DISABLED && _GLB_PREFERRED.has(glbKey)
+            && GLB_LOD[glbKey] && !_lazyState[glbKey]) {
+            _triggerLazyLoad(glbKey);
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -1925,6 +2038,21 @@ const SF3D = (function () {
             mesh.add(new THREE.Mesh(new THREE.SphereGeometry(600, 16, 16), hiveGlow));
             const hiveLight = new THREE.PointLight(0xff44ff, 8, 15000);
             mesh.add(hiveLight);
+            // Far-distance billboard halo so the hive reads as a magenta glow
+            // on the horizon long before its mesh resolves.
+            const haloCanvas = document.createElement('canvas');
+            haloCanvas.width = haloCanvas.height = 256;
+            const hctx = haloCanvas.getContext('2d');
+            const hg = hctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+            hg.addColorStop(0, 'rgba(255,140,255,1)');
+            hg.addColorStop(0.25, 'rgba(220,60,200,0.55)');
+            hg.addColorStop(1, 'rgba(60,0,80,0)');
+            hctx.fillStyle = hg; hctx.fillRect(0, 0, 256, 256);
+            const haloTex = new THREE.CanvasTexture(haloCanvas);
+            const haloSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: 0xff66ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+            haloSprite.scale.setScalar(8000);
+            haloSprite.frustumCulled = false;
+            mesh.add(haloSprite);
             mesh.userData.alienGlow = true;
         } else if (type === 'predator') {
             // Predator Drone fallback: intense bioluminescent hunter
@@ -2809,18 +2937,29 @@ const SF3D = (function () {
             // Update LOD level selection based on camera distance
             if (mesh.isLOD) mesh.update(camera);
 
-            // Bioluminescent pulse — alien organisms glow rhythmically in space
+            // Firefly pulse \u2014 alien craft strobe like deep-sea organisms;
+            //    a fast carrier wave plus a slower stutter envelope so they
+            //    fade in and out instead of holding a steady glow.
             if (mesh.userData && mesh.userData.alienGlow) {
-                const glow = mesh.getObjectByName('bioGlow');
-                if (glow) {
-                    const pulse = 0.7 + 0.3 * Math.sin(_frameTime * 0.003 + e.id * 1.7);
-                    glow.intensity = glow.intensity * 0.9 + (pulse * (ALIEN_GLOW_COLORS[e.type] ? ALIEN_GLOW_COLORS[e.type].pointIntensity : 2.5)) * 0.1;
-                }
+                const cfg = ALIEN_GLOW_COLORS[e.type];
+                const base = cfg ? cfg.pointIntensity : 6.0;
+                const phase = (typeof e.id === 'number' ? e.id * 1.73 : 0);
+                const t = _frameTime * 0.001;
+                const fast = 0.5 + 0.5 * Math.sin(t * 7.0 + phase);
+                const slow = 0.35 + 0.65 * Math.max(0, Math.sin(t * 0.9 + phase * 0.5));
+                const pulse = 0.18 + 0.82 * fast * slow;
+                let glow = mesh.userData.bioGlowRef;
+                if (!glow) { glow = mesh.getObjectByName('bioGlow'); if (glow) mesh.userData.bioGlowRef = glow; }
+                if (glow) glow.intensity = glow.intensity * 0.6 + (pulse * base) * 0.4;
+                let halo = mesh.userData.bioHaloRef;
+                if (!halo) { halo = mesh.getObjectByName('bioHalo'); if (halo) mesh.userData.bioHaloRef = halo; }
+                if (halo && halo.material) halo.material.opacity = 0.35 + 0.55 * pulse;
             }
 
             // Running light pulse — friendly ships nav beacons slow-pulse (~0.7 Hz)
             if (mesh.userData && mesh.userData.hasRunningLights) {
-                const nav = mesh.getObjectByName('navBeacon');
+                let nav = mesh.userData.navBeaconRef;
+                if (!nav) { nav = mesh.getObjectByName('navBeacon'); if (nav) mesh.userData.navBeaconRef = nav; }
                 if (nav) {
                     const beaconPulse = 0.5 + 0.5 * Math.abs(Math.sin(_frameTime * 0.00215 + e.id * 2.3));
                     const baseCfg = FRIENDLY_LIGHT_CONFIGS[e.type] || FRIENDLY_LIGHT_CONFIGS['ally'];
