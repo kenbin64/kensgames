@@ -31,6 +31,12 @@ class SubstrateBase {
     this.config = config;
     this._cache = new Map();
     this._listeners = new Map();
+    // Field / loop / seedLog: prefer values injected by the registry, then
+    // properties hung on the manifold itself, then globals. The reversal —
+    // every lens reads the field directly; storage is just a cache.
+    this._field = config._field || (manifold && manifold.field) || _resolveGlobal('ManifoldField');
+    this._loop = config._loop || (manifold && manifold.loop) || _resolveGlobal('ManifoldLoop');
+    this._seedLog = config._seedLog || (manifold && manifold.seedLog) || _resolveGlobal('ManifoldSeedLog');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -46,12 +52,68 @@ class SubstrateBase {
   }
 
   /**
-   * Extract domain-specific data from a manifold coordinate
-   * @param {Array|Object} coordinate - Position on manifold
-   * @returns {Object} Domain-specific data
+   * Extract domain-specific data from a manifold coordinate.
+   *
+   * Reversal semantics: the field is the source of truth. The stored value
+   * (if any) is a cache layered on top. An untouched coordinate still yields
+   * a defined view — value, gradient, neighborhood — straight from the TPMS
+   * field. Subclasses that override extract() can stay storage-only (they
+   * already do) or call super.extract() to inherit the field view.
+   *
+   * @param {Array|Object} coordinate - Position on manifold (or seed vector)
+   * @returns {Object} Domain-specific data merged over the field view
    */
   extract(coordinate) {
-    return this.manifold.read(coordinate) || {};
+    const stored = (this.manifold && this.manifold.read) ? this.manifold.read(coordinate) : null;
+    const view = this.observeField(coordinate);
+    if (!stored) return view;
+    // Storage wins on collisions — preserves legacy contracts for substrates
+    // whose validators check stored-shape fields (mass, bodies, music, …).
+    return Object.assign({}, view, stored);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FIELD / LOOP / SEEDLOG — the reversal layer
+  // Every substrate gets these for free. Subclasses opt in by calling them.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Pure field observation at a coordinate or seed. No storage touched.
+   * Returns { coordinate, point, value, gradient, timestamp } — the manifold's
+   * answer to "what does the field say here?". This is the canonical lens.
+   * @param {Array|Object|number} seed
+   * @returns {Object}
+   */
+  observeField(seed) {
+    const F = this._field;
+    if (!F) return {};
+    const pt = _toFieldPoint(F, seed);
+    return {
+      coordinate: seed,
+      point: pt,
+      value: F.value(pt.x, pt.y, pt.z),
+      gradient: F.grad(pt.x, pt.y, pt.z),
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * Run one turn of the four-function loop on this seed: observe → solve →
+   * collapse → bloom. If a seed log is wired in, the bloom is appended.
+   * Returns the cycle record. This is the loop-driven counterpart to
+   * extract() — same field, but with intent and an audit trail.
+   * @param {Array|Object|number} seed
+   * @param {Array|Object} intent - Direction the lens wants the field to bend
+   * @returns {Object|null} { x, intent, observation, y, z, child } or null
+   */
+  observe(seed, intent) {
+    const L = this._loop, F = this._field;
+    if (!L || !F) return null;
+    const x = Array.isArray(seed) ? seed.slice() : [+seed || 0];
+    return L.cycle(x, intent || [0, 0, 0], this._seedLog || null, {
+      field: F,
+      meta: { substrate: this.name() },
+    });
   }
 
   /**
@@ -248,6 +310,32 @@ class SubstrateBase {
     }
     return String(coordinate);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE-LOCAL HELPERS — keep field/loop wiring in one place
+// ═══════════════════════════════════════════════════════════════════════════
+
+function _resolveGlobal(name) {
+  if (typeof window !== 'undefined' && window[name]) return window[name];
+  if (typeof globalThis !== 'undefined' && globalThis[name]) return globalThis[name];
+  if (typeof require === 'function') {
+    const mod = { ManifoldField: './manifold-field.js', ManifoldLoop: './manifold-loop.js', ManifoldSeedLog: './manifold-seedlog.js' }[name];
+    if (mod) { try { return require('../' + mod); } catch (e) { /* not in node, no-op */ } }
+  }
+  return null;
+}
+
+// Map any seed shape into a field point. Arrays go through seedToPoint;
+// {x,y,z} objects pass through; numbers are wrapped as a 1-vector seed.
+function _toFieldPoint(F, seed) {
+  if (seed && typeof seed === 'object' && !Array.isArray(seed)
+    && typeof seed.x === 'number' && typeof seed.y === 'number' && typeof seed.z === 'number') {
+    return { x: seed.x, y: seed.y, z: seed.z };
+  }
+  if (Array.isArray(seed)) return F.seedToPoint(seed);
+  if (typeof seed === 'number') return F.seedToPoint([seed]);
+  return F.seedToPoint([0]);
 }
 
 // Export for Node.js/CommonJS

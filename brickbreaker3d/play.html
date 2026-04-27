@@ -6,25 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BrickBreaker 3D - Manifold Audio Edition</title>
 
-  <script src="/js/require_auth.js"></script>
   <script>
-    (async () => {
-      const p = new URLSearchParams(window.location.search);
-      const mode = (p.get('mode') || '').toLowerCase();
-      const allowGuest = p.has('code');
-      await window.KGRequireAuth.guard({
-        allowGuest,
-        // Solo vs AI should be publicly accessible.
-        allowIf: () => mode === 'solo'
-      });
-
-      // Ensure a minimal local profile so gameplay UI doesn't hard-fail.
-      try {
-        if (!localStorage.getItem('username')) localStorage.setItem('username', 'Guest');
-        if (!localStorage.getItem('display_name')) localStorage.setItem('display_name', localStorage.getItem('username') || 'Guest');
-        if (!localStorage.getItem('kg_avatar')) localStorage.setItem('kg_avatar', JSON.stringify({ id: 'guest', emoji: '🎮' }));
-      } catch (e) { /* ignore */ }
-    })();
+    // Ensure a minimal local profile so gameplay UI doesn't hard-fail.
+    try {
+      if (!localStorage.getItem('username')) localStorage.setItem('username', 'Guest');
+      if (!localStorage.getItem('display_name')) localStorage.setItem('display_name', localStorage.getItem('username') || 'Guest');
+      if (!localStorage.getItem('kg_avatar')) localStorage.setItem('kg_avatar', JSON.stringify({ id: 'guest', emoji: '🎮' }));
+    } catch (e) { /* ignore */ }
   </script>
 
   <style>

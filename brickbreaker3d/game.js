@@ -154,9 +154,19 @@ function initScene() {
     // Renderer
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.physicallyCorrectLights = true;
+
+    // Manifold-derived PMREM env — supplies image-based lighting so PBR
+    // bricks/balls read with depth even before the live CubeCamera primes.
+    if (typeof ManifoldEnvironment !== 'undefined') {
+        ManifoldEnvironment.bind(renderer, scene, { seed: 'brickbreaker', palette: 'arena', size: 64 });
+    }
 
     // OrbitControls
     controls = new THREE.OrbitControls(camera, renderer.domElement);

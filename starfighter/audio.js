@@ -382,24 +382,9 @@ const SFAudio = (function () {
   let _thrustLevel = 0;       // current smoothed thrust intensity 0..1
   let _strafeHissNodes = null; // lateral/vertical RCS hiss nodes
 
-  // ── Sample-based audio (explosion shockwaves) ──
-  const _sampleBuffers = {};   // name → AudioBuffer
+  // ── Shockwave channel — fed by ManifoldInstrument.Burst (no samples) ──
   let shockwaveGain = null;    // dedicated gain node (muted by default)
-
-  const SAMPLE_MANIFEST = [
-    { name: 'shockwave_a', url: 'assets/sound/freesound_community-medium-explosion-40472.mp3' },
-    { name: 'shockwave_b', url: 'assets/sound/soundreality-explosion-fx-343683.mp3' },
-  ];
-
-  function _loadSamples() {
-    SAMPLE_MANIFEST.forEach(({ name, url }) => {
-      fetch(url)
-        .then(r => r.arrayBuffer())
-        .then(buf => ctx.decodeAudioData(buf))
-        .then(decoded => { _sampleBuffers[name] = decoded; })
-        .catch(() => { });  // silent fail — procedural fallback still works
-    });
-  }
+  let _shockwaveSeed = 0;      // monotonic so successive bursts diverge
 
   function init() {
     if (initialized) return;
@@ -413,7 +398,6 @@ const SFAudio = (function () {
     shockwaveGain.gain.value = 0;
     shockwaveGain.connect(masterGain);
 
-    _loadSamples();
     _initVoiceCache();
     initialized = true;
   }
@@ -912,13 +896,18 @@ const SFAudio = (function () {
     crunch.stop(t + 0.3);
   }
 
-  // Nearby shockwave — sample-based, muted by default
-  // Randomly picks one of two explosion recordings.
-  // Control volume with setShockwaveVolume(0..1).
+  // Nearby shockwave — Burst rendered from the manifold field, routed through
+  // shockwaveGain (muted by default). Each call advances a seed counter so
+  // consecutive shockwaves bloom distinct paths through the field — same
+  // event flavor, never the same waveform twice.
   function _playShockwave(t) {
-    const keys = Object.keys(_sampleBuffers);
-    if (keys.length === 0) return;           // samples not yet loaded
-    const buf = _sampleBuffers[keys[Math.floor(Math.random() * keys.length)]];
+    const I = (typeof window !== 'undefined') && window.ManifoldInstrument;
+    if (!I || !shockwaveGain) return;
+    _shockwaveSeed = (_shockwaveSeed + 1) | 0;
+    const parent = { seed: [0.71, 0.41, 0.29, _shockwaveSeed * 0.1719], dim: 1 };
+    const r = I.Burst(parent, 0.85, { sampleRate: ctx.sampleRate, dur: 0.6 });
+    const buf = ctx.createBuffer(1, r.pcm.length, ctx.sampleRate);
+    buf.copyToChannel(r.pcm, 0);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(shockwaveGain);

@@ -25,8 +25,14 @@ const SubstrateRegistry = (() => {
      * @param {Object} config - Global configuration
      */
     initialize(manifold, config = {}) {
+      // Auto-discover field / loop / seedLog from the unified manifold so
+      // every substrate inherits the reversal layer without explicit wiring.
+      const field = config.field || (manifold && manifold.field) || null;
+      const loop = config.loop || (manifold && manifold.loop) || null;
+      const seedLog = config.seedLog || (manifold && manifold.seedLog) || null;
       Object.assign(_config, {
         manifold,
+        field, loop, seedLog,
         ...config
       });
     },
@@ -83,7 +89,12 @@ const SubstrateRegistry = (() => {
       const SubstrateClass = registration.class;
       const mergedConfig = {
         ...registration.defaultConfig,
-        ...config
+        ...config,
+        // Inject the reversal layer — substrates pick these up in their base
+        // constructor and use them for observeField / observe / loop calls.
+        _field: _config.field || null,
+        _loop: _config.loop || null,
+        _seedLog: _config.seedLog || null,
       };
 
       const instance = new SubstrateClass(_config.manifold, mergedConfig);
@@ -181,6 +192,29 @@ const SubstrateRegistry = (() => {
         result[name] = substrate.extract(coordinate);
       }
       return result;
+    },
+
+    /**
+     * Field-driven observation — the reversal API. Reads the manifold field
+     * directly through a substrate's lens; storage is bypassed entirely.
+     * @param {string} name - Substrate name
+     * @param {Array|Object|number} seed
+     * @returns {Object} { coordinate, point, value, gradient, timestamp }
+     */
+    observeField(name, seed) {
+      return this.get(name).observeField(seed);
+    },
+
+    /**
+     * Drive one full observe → solve → collapse → bloom turn through a
+     * substrate. Bloom is appended to the seed log if one is wired in.
+     * @param {string} name - Substrate name
+     * @param {Array|Object|number} seed
+     * @param {Array} intent - Direction the lens wants the field to bend
+     * @returns {Object|null}
+     */
+    observe(name, seed, intent) {
+      return this.get(name).observe(seed, intent);
     },
 
     /**

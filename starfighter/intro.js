@@ -904,9 +904,8 @@
         return { scene, cam, renderer, groups };
     }
 
-    //    Single AudioContext, gain envelopes per beat. Optional MP3 hook
-    //    at assets/sound/intro.mp3 — if present, used as the score and
-    //    the synth becomes a quiet sweetener layer underneath.  ──────────
+    //    Single AudioContext, gain envelopes per beat. The score is the
+    //    synth — every voice is a manifold projection, no sample hook.  ──
     function startAudio(state) {
         let AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return { kill: () => { }, mood: () => { }, swell: () => { } };
@@ -922,22 +921,6 @@
         const verbHP = ctx.createBiquadFilter(); verbHP.type = 'highpass'; verbHP.frequency.value = 260;
         verbDelay.connect(verbHP).connect(verbFB).connect(verbDelay).connect(master);
         function send(node) { try { node.connect(verbDelay); } catch (_) { } }
-
-        // Optional pre-recorded score. If it loads, run synth quieter.
-        let mp3Layer = false;
-        const audioEl = new Audio();
-        audioEl.src = 'assets/sound/intro.mp3';
-        audioEl.preload = 'auto';
-        audioEl.crossOrigin = 'anonymous';
-        audioEl.addEventListener('canplaythrough', () => {
-            try {
-                const src = ctx.createMediaElementSource(audioEl);
-                const g = ctx.createGain(); g.gain.value = 0.85;
-                src.connect(g).connect(master);
-                audioEl.play().catch(() => { });
-                mp3Layer = true;
-            } catch (_) { /* element source already attached or CORS */ }
-        });
 
         // Sub drone \u2014 two detuned saws + octave through a low-pass.
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220; lp.Q.value = 0.7;
@@ -1066,11 +1049,9 @@
                         c1.stop(); c2.stop(); c3.stop(); c4.stop();
                         lfo.stop(); ctx.close();
                     } catch (_) { }
-                    try { audioEl.pause(); } catch (_) { }
                 }, 800);
             },
             mood(name) {
-                if (mp3Layer) { droneGain.gain.setTargetAtTime(0.04, ctx.currentTime, 0.6); return; }
                 const t = ctx.currentTime;
                 if (name === 'drone') {
                     droneGain.gain.setTargetAtTime(0.18, t, 1.0); lp.frequency.setTargetAtTime(220, t, 1.0);
@@ -1122,7 +1103,6 @@
                 }
             },
             swell() {
-                if (mp3Layer) return;
                 const t = ctx.currentTime;
                 timpani(t, 49); kick(t, 95, 35, 0.85); hit(t + 0.05);
                 chord(t + 0.1, [110, 165, 220, 277, 330], 4.0);

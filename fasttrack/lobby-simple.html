@@ -356,18 +356,13 @@
         <div class="mode-desc">Play against up to 3 AI bots. Perfect your strategy before facing humans.</div>
         <div class="mode-avail">Available &bull; Any skill level</div>
       </div>
-      <div class="mode-card" onclick="startMatchmaker()">
-        <span class="mode-icon" style="color:#00FFFF">&#9889;</span>
-        <div class="mode-title">Matchmaker</div>
-        <div class="mode-desc">Get matched with live players. Ranked system. Login required.</div>
-        <div class="mode-avail" id="mm-avail">Login required</div>
-      </div>
       <div class="mode-card" onclick="togglePrivate()">
         <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Private Game</div>
-        <div class="mode-desc">Create a room and share the code. Friends join from anywhere &mdash; no account needed.
-        </div>
-        <div class="mode-avail">No login to join</div>
+        <div class="mode-title">Play with Friends</div>
+        <div class="mode-desc">Create a room and share the 6-character code or link. Friends join from anywhere &mdash;
+          no
+          account needed.</div>
+        <div class="mode-avail">Free &bull; No signup</div>
       </div>
     </div>
 
@@ -382,8 +377,8 @@
         <div class="code-hint">Click code to copy &bull; Share with friends to join</div>
         <button class="btn btn-y btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
           GAME</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
-          to create a private room</div>
+        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Generating
+          room code...</div>
       </div>
       <div id="priv-join" style="display:none">
         <div class="arc-field">
@@ -402,67 +397,23 @@
   </div>
 
   <script src="/js/substrates/avatar_picker.js"></script>
-  <script src="/js/access_session_bridge.js"></script>
   <script>
-    let token = localStorage.getItem('user_token');
     let username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
     const av = AvatarPicker.get();
 
-    function _isSignedIn(t) {
-      return !!(t && !String(t).startsWith('guest-'));
-    }
-
-    function _refreshAuthFromStorage() {
-      token = localStorage.getItem('user_token');
-      username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
-      document.getElementById('p-name').textContent = username;
-      document.getElementById('mm-avail').textContent = _isSignedIn(token)
-        ? 'Available \u2022 Finding match...'
-        : 'Login required';
-    }
-
-    async function _maybeUpgradeFromAccess() {
-      if (_isSignedIn(token)) return true;
-      if (!window.KGAccessSession || typeof window.KGAccessSession.ensure !== 'function') return false;
-      const r = await window.KGAccessSession.ensure();
-      if (r && r.token) {
-        _refreshAuthFromStorage();
-        return _isSignedIn(token);
-      }
-      return false;
-    }
-
-    // Avatar badge
     document.getElementById('p-name').textContent = username;
     AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
     const badge = document.getElementById('av-badge');
     badge.textContent = av ? av.emoji : '?';
     if (!av) badge.style.color = 'var(--np)';
 
-    // Require avatar
     if (!AvatarPicker.has()) {
       AvatarPicker.show(() => location.reload(), true);
     }
 
-    // Online count removed — will be driven by real analytics
-
-    // Matchmaker availability
-    if (_isSignedIn(token)) document.getElementById('mm-avail').textContent = 'Available \u2022 Finding match...';
-    // Best-effort: if already authenticated via Access, mint a normal JWT so we don't require a second login.
-    _maybeUpgradeFromAccess();
-
     function startSolo() {
       if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
       window.location.href = '/fasttrack/index.html?mode=solo';
-    }
-
-    async function startMatchmaker() {
-      if (!_isSignedIn(token)) {
-        const ok = await _maybeUpgradeFromAccess();
-        if (!ok) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
-      }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
-      window.location.href = '/fasttrack/index.html?mode=multi';
     }
 
     function togglePrivate() {
@@ -478,26 +429,22 @@
     }
 
     let _code = '';
-    async function generateCode() {
-      if (!_isSignedIn(token)) {
-        const ok = await _maybeUpgradeFromAccess();
-        if (!ok) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
-      }
+    function generateCode() {
       _code = Math.random().toString(36).substring(2, 8).toUpperCase();
       document.getElementById('room-code').textContent = _code;
       document.getElementById('launch-btn').disabled = false;
-      document.getElementById('priv-status').textContent = 'Share code with friends. You start the game.';
+      const url = `${location.origin}/fasttrack/index.html?mode=private&code=${_code}`;
+      document.getElementById('priv-status').innerHTML = 'Share: <a href="' + url + '" style="color:var(--ny)">' + url + '</a>';
     }
 
     function copyCode() {
-      if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; }
+      if (!_code) return;
+      const url = `${location.origin}/fasttrack/index.html?mode=private&code=${_code}`;
+      navigator.clipboard?.writeText(url);
+      document.getElementById('priv-status').textContent = 'Link copied!';
     }
 
-    async function launchPrivate() {
-      if (!_isSignedIn(token)) {
-        const ok = await _maybeUpgradeFromAccess();
-        if (!ok) { window.location.href = '/login?redirect=/fasttrack/lobby.html'; return; }
-      }
+    function launchPrivate() {
       window.location.href = `/fasttrack/index.html?mode=private&code=${_code}&host=1`;
     }
 
@@ -506,13 +453,28 @@
       const name = document.getElementById('guest-name').value.trim() || 'Guest';
       const msg = document.getElementById('join-msg');
       if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      if (!localStorage.getItem('user_token')) {
-        localStorage.setItem('username', name);
-        localStorage.setItem('user_token', 'guest-' + Date.now());
-      }
+      localStorage.setItem('username', name);
       if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
       window.location.href = `/fasttrack/index.html?mode=private&code=${code}`;
     }
+
+    // URL shortcuts: ?action=private, ?action=join, ?code=ABC123
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const action = (params.get('action') || '').toLowerCase();
+      const codeParam = params.get('code');
+      if (action === 'private' || action === 'join' || codeParam) {
+        document.getElementById('priv-panel').classList.add('open');
+        if (action === 'join' || codeParam) {
+          privTab('join');
+          if (codeParam && /^[A-Z0-9]{6}$/i.test(codeParam)) {
+            document.getElementById('join-code').value = codeParam.toUpperCase();
+          }
+        } else {
+          generateCode();
+        }
+      }
+    })();
   </script>
 </body>
 

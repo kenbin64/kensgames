@@ -22,13 +22,24 @@ const fsz = fp => fs.existsSync(fp) ? fs.statSync(fp).size : 0;
 
 // x: source dimensions
 const X = [
-  ['js/analytics.js', ROOT], ['js/manifold.js', ROOT],
+  ['js/analytics.js', ROOT],
+  // Manifold kernel — field + loop + codec must precede manifold.js so the
+  // unified manifold can resolve them via window globals at load time. The
+  // instrument and conductor follow so audio.js / intro.js can voice the
+  // field. The worklet is NOT bundled — it is fetched directly by addModule.
+  ['js/manifold-codec.js', ROOT],
+  ['js/manifold-field.js', ROOT],
+  ['js/manifold-loop.js', ROOT],
+  ['js/manifold-instrument.js', ROOT],
+  ['js/manifold-conductor.js', ROOT],
+  ['js/manifold.js', ROOT],
   ['js/substrates/manifold_ingestor.js', ROOT],
   ['js/access_session_bridge.js', ROOT], ['js/manifold_bridge.js', ROOT],
   ['manifold.js', SF], ['native/bridge.js', SF],
   ['manifold_native_substrate.js', SF],
   ['dimensional_substrate.js', SF], ['manifold_geometry_substrate.js', SF],
   ['lib/three/three.min.js', ROOT], ['lib/three/GLTFLoader.js', ROOT],
+  ['js/manifold-environment.js', ROOT],
   ['audio.js', SF], ['music.js', SF], ['anpc.js', SF], ['progression.js', SF],
   ['js/multiplayer-client.js', ROOT], ['multiplayer.js', SF],
   ['announcer.js', SF], ['core.js', SF], ['input.js', SF], ['3d.js', SF],

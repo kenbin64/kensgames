@@ -2628,61 +2628,10 @@
         transform: rotate(360deg)
       }
     }
-
-    /* ═══════════════════════════════════════
-       SCUTTLE INDICATOR — Backspace hold to scuttle ship
-       ═══════════════════════════════════════ */
-    #scuttle-indicator {
-      display: none;
-      position: absolute;
-      left: 50%;
-      top: 38%;
-      transform: translateX(-50%);
-      z-index: 96;
-      font-family: monospace;
-      color: #ff8866;
-      text-align: center;
-      pointer-events: none;
-      text-shadow: 0 0 10px rgba(255, 80, 40, 0.6);
-    }
-
-    #scuttle-indicator.active {
-      display: block
-    }
-
-    .scuttle-label {
-      font-size: 0.95em;
-      letter-spacing: 4px;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-
-    .scuttle-bar {
-      width: 240px;
-      height: 6px;
-      background: rgba(80, 20, 10, 0.5);
-      border: 1px solid rgba(255, 80, 40, 0.5);
-      overflow: hidden;
-    }
-
-    .scuttle-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #ff5522, #ffaa44);
-      transition: width 0.05s linear;
-    }
   </style>
 
   <!-- ═══ RESPAWN OVERLAY — button-based fighter lost screen ═══ -->
   <div id="respawn-overlay"><!-- content injected by JS --></div>
-
-  <!-- ═══ SCUTTLE INDICATOR — Backspace hold progress ═══ -->
-  <div id="scuttle-indicator">
-    <div class="scuttle-label">SCUTTLE — HOLD BACKSPACE</div>
-    <div class="scuttle-bar">
-      <div class="scuttle-bar-fill" id="scuttle-bar-fill"></div>
-    </div>
-  </div>
 
   <!-- ═══ WAVE CLEAR OVERLAY — blue flash, return to base ═══ -->
   <div id="waveclear-overlay"><!-- content injected by JS --></div>
@@ -2853,7 +2802,7 @@
       });
     });
   </script>
-  <script src="starfighter.bundle.js?v=c417b397a9b0823f"></script>
+  <script src="starfighter.bundle.js?v=e6b330034c8e3049"></script>
 </body>
 
 </html>

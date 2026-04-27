@@ -415,70 +415,17 @@ function connectToLobby() {
         lobbyWebSocket.onopen = () => {
             console.log('[Lobby] Connected');
 
-            (async () => {
-                // SSO: if authenticated via Cloudflare Access, mint a real KensGames JWT.
-                try {
-                    const existing = (() => {
-                        try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
-                    })();
-                    if (!existing || String(existing).startsWith('guest-')) {
-                        const res = await fetch('/api/auth/access-session', {
-                            method: 'GET',
-                            credentials: 'include',
-                            headers: { 'Accept': 'application/json' },
-                        });
-                        if (res && res.ok) {
-                            const data = await res.json();
-                            if (data && data.success && data.token) {
-                                try {
-                                    localStorage.setItem('user_token', data.token);
-                                    if (data.username) localStorage.setItem('username', data.username);
-                                    if (data.displayName) localStorage.setItem('display_name', data.displayName);
-                                    if (data.userId != null) localStorage.setItem('user_id', String(data.userId));
-                                } catch (e) { /* ignore */ }
-                            }
-                        }
-                    }
-                } catch (e) { /* ignore */ }
-
-                const token = (() => {
-                    try { return localStorage.getItem('user_token') || null; } catch (e) { return null; }
-                })();
-
-                const storedName = (() => {
-                    try { return localStorage.getItem('username') || localStorage.getItem('display_name') || null; } catch (e) { return null; }
-                })();
-
-                const avatarId = (() => {
-                    try {
-                        const av = JSON.parse(localStorage.getItem('kg_avatar') || 'null');
-                        return av && av.id ? av.id : null;
-                    } catch (e) {
-                        return null;
-                    }
-                })();
-
-                if (token) {
-                    myUsername = storedName || myUsername || ('Player' + Math.floor(Math.random() * 9999));
-                    myUserId = null;
-                    lobbyWebSocket.send(JSON.stringify({
-                        type: 'auth',
-                        token,
-                        username: myUsername,
-                        guest_name: myUsername,
-                        avatar_id: avatarId
-                    }));
-                } else {
-                    // Guests allowed for invite-code and solo flows
-                    myUsername = myUsername || ('Player' + Math.floor(Math.random() * 9999));
-                    myUserId = 'guest_' + Date.now();
-                    lobbyWebSocket.send(JSON.stringify({
-                        type: 'guest_login',
-                        name: myUsername
-                    }));
-                }
-                resolve();
+            const storedName = (() => {
+                try { return localStorage.getItem('username') || localStorage.getItem('display_name') || null; } catch (e) { return null; }
             })();
+
+            myUsername = storedName || myUsername || ('Player' + Math.floor(Math.random() * 9999));
+            myUserId = 'guest_' + Date.now();
+            lobbyWebSocket.send(JSON.stringify({
+                type: 'guest_login',
+                name: myUsername
+            }));
+            resolve();
         };
 
         lobbyWebSocket.onmessage = (event) => {
@@ -7821,32 +7768,6 @@ function showPlayAgainButton(winner) {
     }
 
     overlay.appendChild(btnContainer);
-
-    // Guest sign-up prompt — show after game for non-signed-in players
-    if (!localStorage.getItem('ft_user')) {
-        const signupDiv = document.createElement('div');
-        Object.assign(signupDiv.style, {
-            marginTop: '20px',
-            padding: '14px 18px',
-            background: 'linear-gradient(135deg, rgba(0,255,255,0.08), rgba(191,0,255,0.06))',
-            border: '1px solid rgba(0,255,255,0.25)',
-            borderRadius: '12px',
-            textAlign: 'center'
-        });
-        signupDiv.innerHTML = `
-                <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:8px;">Create an account to host your own games &amp; track stats</div>
-                <button id="postgame-signup-btn" style="padding:10px 28px;font-size:14px;font-weight:700;
-                    background:linear-gradient(135deg,rgba(0,255,255,0.6),rgba(0,200,255,0.5));
-                    border:1px solid rgba(0,255,255,0.5);border-radius:20px;color:#fff;cursor:pointer;
-                    box-shadow:0 0 15px rgba(0,255,255,0.3);transition:all 0.3s;">
-                    ✨ Sign Up
-                </button>
-            `;
-        overlay.appendChild(signupDiv);
-        signupDiv.querySelector('#postgame-signup-btn').onclick = () => {
-            window.location.href = '/lobby/';
-        };
-    }
 
     document.body.appendChild(overlay);
 }

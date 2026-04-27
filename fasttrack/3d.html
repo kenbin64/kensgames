@@ -7,7 +7,7 @@
   <title>FastTrack 3D — Manifold Gaming</title>
   <script>
     if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
-      window.location.replace('/lobby/');
+      window.location.replace('/fasttrack/');
     }
   </script>
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
@@ -1249,6 +1249,13 @@
   <script src="../../js/manifold.js?v=7"></script>
   <script src="../../js/substrates/manifold_ingestor.js"></script>
 
+  <!-- 🜂 MANIFOLD KERNEL — codec, field, loop, instrument (audio = field samples) -->
+  <script src="../../js/manifold-codec.js"></script>
+  <script src="../../js/manifold-field.js"></script>
+  <script src="../../js/manifold-loop.js"></script>
+  <script src="../../js/manifold-instrument.js"></script>
+  <script src="../../js/manifold-conductor.js"></script>
+
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
   <script src="fasttrack-game-core.js"></script>
 
@@ -1316,12 +1323,12 @@
       // Skip confirm if game is already over (replay overlay already shown)
       const replayOpen = document.getElementById('replay-overlay').classList.contains('open');
       if (replayOpen || confirm('Leave this game?')) {
-        window.location.href = '/lobby/';
+        window.location.href = '/fasttrack/';
       }
     }
 
     function leaveFromReplay() {
-      window.location.href = '/lobby/';
+      window.location.href = '/fasttrack/';
     }
 
     function playAgain() {

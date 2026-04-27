@@ -1,1455 +1,555 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * KENSGAMES UNIFIED GAME SERVER
- * ═══════════════════════════════════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 🜂 KENSGAMES UNIFIED LOBBY — manifold projection over WebSocket
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
- * WebSocket server for ALL games: FastTrack, BrickBreaker3D, Starfighter,
- * ConnectIV, SwartzDiamond, and future titles.
+ * Round 2 of the paradigm reversal. The server is now a TRANSPORT; identity
+ * lives in the seed log via server/manifold-projection.js. Every session,
+ * player, and lifecycle event is a bloom on the four-function loop.
  *
- * Listens on port 8765 — nginx proxies wss://kensgames.com/ws here.
+ *   wire protocol:  unchanged (drop-in for FastTrack / Starfighter clients)
+ *   authority:      seed log (state/seeds.jsonl) — the manifold's backup
+ *   runtime:        TPMS field (js/manifold-field.js) — the manifold itself
  *
- * Features:
- *   - Game-agnostic session management (game_id on every session)
- *   - Invite codes that resolve to the correct game automatically
- *   - Real-time state relay for action games (Starfighter, BrickBreaker)
- *   - Turn-based state relay for board games (FastTrack, ConnectIV)
- *   - Matchmaking by game type
- *   - Guest + authenticated auth
- *   - AI bot slots
- *   - Chat + guilds
- *
- * Protocol: JSON over WebSocket. Every message has { type: '...' }.
+ * Listens on PORT (default 8765). nginx proxies wss://kensgames.com/ws here.
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
+'use strict';
 
-const WebSocket = require('ws');
-const crypto = require('crypto');
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const WebSocket = require('ws');
 
-const AuthHandler = require('./auth-handler');
+const Field = require('../js/manifold-field.js');
+const Proj = require('./manifold-projection.js');
 
-const PORT = 8765;
+const PORT = parseInt(process.env.LOBBY_PORT || '8765', 10);
+const SEED_LOG = process.env.SEED_LOG || path.join(__dirname, '..', 'state', 'seeds.jsonl');
+const REPO_ROOT = path.join(__dirname, '..');
 
-const authHandler = new AuthHandler();
+// ── Boot: open seed log, bloom games from manifests ─────────────────────────
+const log = Proj.load(SEED_LOG);
 
-function stableGuestIdFromToken(token) {
-  if (!token || typeof token !== 'string') return null;
-  if (!token.startsWith('guest-')) return null;
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
-  return `guest_${hash.slice(0, 16)}`;
-}
-
-function postAuthSendSessionState(ws, userId) {
-  if (!userId) return;
-  const session = findSessionByPlayer(userId);
-  if (!session) return;
-
-  // Unified clients expect a session_update to hydrate UI.
-  send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'resume' });
-  if (session.status === 'playing') {
-    send(ws, { type: 'game_started', session: sanitizeSession(session) });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// In-memory state
-// ═══════════════════════════════════════════════════════════════════════════
-
-const users = new Map();       // oddddd oddddd user_id → { user_id, username, password_hash, ... }
-const sessions = new Map();    // session_id → { session_id, session_code, host_id, players, ... }
-const codeIndex = new Map();   // 6-char code → session_id
-const connections = new Map(); // ws → { user_id, user }
-
-let nextUserId = 1;
-let nextSessionId = 1;
-
-// AI name pool
-const AI_NAMES = [
-  'Bot Alpha', 'Bot Bravo', 'Bot Charlie', 'Bot Delta',
-  'Bot Echo', 'Bot Sierra', 'Bot Tango', 'Bot Whiskey'
-];
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════════════════════
-
-function generateId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
-}
-
-function generateCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  // Ensure uniqueness
-  if (codeIndex.has(code)) return generateCode();
-  return code;
-}
-
-// Call the auth API server (port 3000)
-function authApiRequest(path, body) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify(body);
-    const req = http.request({
-      hostname: '127.0.0.1',
-      port: 3000,
-      path,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch (e) { reject(new Error('Invalid JSON from auth API')); }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(5000, () => { req.destroy(); reject(new Error('Auth API timeout')); });
-    req.write(payload);
-    req.end();
+function bootGameCatalog() {
+  // Portal manifest first (provides display names + dimensions).
+  const portalPath = path.join(REPO_ROOT, 'manifold.portal.json');
+  const games = [];
+  try {
+    const portal = JSON.parse(fs.readFileSync(portalPath, 'utf8'));
+    (portal.games || []).forEach(g => games.push({
+      id: g.id, name: g.name, dimension: g.dimension || null, manifest: g.manifest,
+    }));
+  } catch (e) { /* portal manifest optional */ }
+  // Per-game manifests for dimension data.
+  games.forEach(g => {
+    if (g.dimension) return;
+    try {
+      const mp = path.join(REPO_ROOT, g.id, 'manifold.game.json');
+      const mg = JSON.parse(fs.readFileSync(mp, 'utf8'));
+      g.dimension = mg.dimension || { x: 1, y: 1, z: 1 };
+      g.maxPlayers = mg.dimension && mg.dimension.x;
+    } catch (e) { g.dimension = { x: 1, y: 1, z: 1 }; }
   });
-}
-
-function authApiValidateToken(token) {
-  return new Promise((resolve, reject) => {
-    const req = http.request({
-      hostname: '127.0.0.1',
-      port: 3000,
-      path: '/api/auth/validate',
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch (e) { reject(new Error('Invalid JSON from auth validate')); }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(5000, () => { req.destroy(); reject(new Error('Auth validate timeout')); });
-    req.end();
+  // Fallback minimal catalog for known games not in the manifest.
+  const have = new Set(games.map(g => g.id));
+  [['fasttrack', 'Fast Track', 6], ['starfighter', 'Starfighter', 6],
+  ['brickbreaker3d', 'BrickBreaker 3D', 4], ['4dtictactoe', '4D Tic-Tac-Toe', 4],
+  ['cubic3d', 'Cubic', 4]].forEach(([id, name, mp]) => {
+    if (!have.has(id)) games.push({ id, name, dimension: { x: mp, y: 1, z: mp }, maxPlayers: mp });
   });
+  games.forEach(g => Proj.ensureGame(log, g.id, g.dimension, g.name));
+  return games;
 }
 
-function hashPassword(pw) {
-  return crypto.createHash('sha256').update(pw).digest('hex');
+const CATALOG = bootGameCatalog();
+const CATALOG_BY_ID = Object.fromEntries(CATALOG.map(g => [g.id, g]));
+
+// ── In-memory caches projected from the seed log ───────────────────────────
+// These are CACHES of the log frontier, not authority. On restart they are
+// rebuilt from the log in O(N) where N = active sessions.
+const liveSessions = new Map();   // session_x_id → { x, players, settings, status, …ephemeral }
+const connections = new Map();    // ws → { user_id, user, session_x_id }
+
+function freshSession(sx, gameId, hostUser, isPrivate) {
+  const game = CATALOG_BY_ID[gameId] || { name: gameId, maxPlayers: 6 };
+  return {
+    x: sx,
+    session_id: sx.id,
+    session_code: Proj.codeFromSeed(sx.seed),
+    game_id: gameId,
+    game_name: game.name,
+    host_id: hostUser.user_id,
+    host_username: hostUser.username,
+    is_private: !!isPrivate,
+    max_players: game.maxPlayers || 6,
+    players: [],
+    settings: { lobby_accepted: false },
+    status: 'waiting',
+    created_at: Date.now(),
+  };
 }
 
-function send(ws, data) {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
-
-function broadcast(sessionId, data, excludeWs) {
-  const session = sessions.get(sessionId);
-  if (!session) return;
-  for (const [ws, conn] of connections) {
-    if (ws === excludeWs) continue;
-    if (session.players.some(p => p.user_id === conn.user_id)) {
-      send(ws, data);
-    }
-  }
-}
-
-function broadcastAll(data) {
-  for (const [ws] of connections) {
-    send(ws, data);
-  }
-}
-
-function getWsByUserId(userId) {
-  for (const [ws, conn] of connections) {
-    if (conn.user_id === userId) return ws;
-  }
-  return null;
-}
-
-// ── Registered game types ──
-const GAME_REGISTRY = {
-  fasttrack: { name: 'Fast Track', path: '/fasttrack/3d.html', lobby: '/fasttrack/lobby.html', maxPlayers: 6, type: 'turn' },
-  brickbreaker: { name: 'BrickBreaker 3D', path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html', maxPlayers: 4, type: 'realtime' },
-  starfighter: { name: 'Starfighter', path: '/starfighter/index.html', lobby: '/starfighter/lobby.html', maxPlayers: 6, type: 'realtime' },
-  connectiv: { name: 'ConnectIV', path: '/connectiv/index.html', lobby: '/connectiv/lobby.html', maxPlayers: 2, type: 'turn' },
-  swartzdia: { name: 'Swartz Diamond', path: '/swartzdia/index.html', lobby: '/swartzdia/lobby.html', maxPlayers: 4, type: 'turn' },
-  cubemarble: { name: 'Cube Marble', path: '/cubemarble/index.html', lobby: '/cubemarble/lobby.html', maxPlayers: 4, type: 'turn' },
-  tictactoe: { name: '4D TicTacToe', path: '/4DTicTacToe/index.html', lobby: '/4DTicTacToe/lobby.html', maxPlayers: 4, type: 'turn' },
-};
-
-function resetLobbyAcceptance(session) {
-  if (!session) return;
-  if (!session.settings) session.settings = {};
-  session.settings.lobby_accepted = false;
-}
-
-function broadcastSessionUpdate(session, extra) {
-  if (!session) return;
-  broadcast(session.session_id, { type: 'session_update', session: sanitizeSession(session), ...(extra || {}) });
-}
-
-function getPublicSessions(gameId) {
-  const result = [];
-  for (const [, session] of sessions) {
-    if (session.status !== 'waiting') continue;
-    if (session.is_private) continue;
-    if (gameId && session.game_id !== gameId) continue; // filter by game
-    result.push(sanitizeSession(session));
-  }
-  return result;
-}
-
-function sanitizeSession(s) {
+function sanitize(s) {
   return {
     session_id: s.session_id,
     session_code: s.session_code,
-    game_id: s.game_id || 'fasttrack',
-    game_name: (GAME_REGISTRY[s.game_id] || {}).name || s.game_id,
+    game_id: s.game_id,
+    game_name: s.game_name,
     host_id: s.host_id,
     host_username: s.host_username,
     is_private: s.is_private,
     max_players: s.max_players,
     player_count: s.players.length,
     players: s.players.map(p => ({
-      user_id: p.user_id,
-      username: p.username,
-      avatar_id: p.avatar_id,
-      is_host: p.is_host,
-      is_ai: p.is_ai,
-      slot: p.slot,
-      ready: p.ready
+      user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
     })),
     settings: s.settings,
-    status: s.status
+    status: s.status,
+    manifold: { x_id: s.x.id, dim: s.x.dim, parent: s.x.parent },
   };
 }
 
-function findSessionByPlayer(userId) {
-  for (const [, session] of sessions) {
-    if (session.players.some(p => p.user_id === userId)) {
-      return session;
-    }
+function send(ws, data) {
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+}
+function broadcastSession(s, data, exclude) {
+  for (const [ws, conn] of connections) {
+    if (ws === exclude) continue;
+    if (conn.session_x_id === s.session_id) send(ws, data);
   }
-  return null;
+}
+function broadcastAll(data) { for (const [ws] of connections) send(ws, data); }
+
+function sessionByCode(code) {
+  // First try the live cache (newest), then fall back to a pure observe of
+  // the seed log frontier — proves the "code is observable, not stored" path.
+  const code6 = String(code || '').toUpperCase();
+  for (const s of liveSessions.values()) if (s.session_code === code6) return s;
+  const sx = Proj.findSessionByCode(log, code6);
+  return sx ? liveSessions.get(sx.id) || null : null;
 }
 
-function removePlayerFromSession(userId) {
-  const session = findSessionByPlayer(userId);
-  if (!session) return null;
-
-  session.players = session.players.filter(p => p.user_id !== userId);
-
-  // Re-index slots
-  session.players.forEach((p, i) => { p.slot = i; });
-
-  // If empty or host left, clean up
-  if (session.players.length === 0 || (session.host_id === userId && session.players.filter(p => !p.is_ai).length === 0)) {
-    sessions.delete(session.session_id);
-    codeIndex.delete(session.session_code);
-    broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: session.session_id });
-    return session;
+function publicSessions(gameId) {
+  const out = [];
+  for (const s of liveSessions.values()) {
+    if (s.status !== 'waiting' || s.is_private) continue;
+    if (gameId && s.game_id !== gameId) continue;
+    out.push(sanitize(s));
   }
-
-  // Transfer host if needed
-  if (session.host_id === userId) {
-    const newHost = session.players.find(p => !p.is_ai);
-    if (newHost) {
-      session.host_id = newHost.user_id;
-      session.host_username = newHost.username;
-      newHost.is_host = true;
-    }
-  }
-
-  return session;
+  return out;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Message handlers
-// ═══════════════════════════════════════════════════════════════════════════
+function leaveCurrentSession(ws, conn) {
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return null;
+  s.players = s.players.filter(p => p.user_id !== conn.user_id);
+  s.players.forEach((p, i) => { p.slot = i; });
+  conn.session_x_id = null;
+  if (s.players.length === 0 || (s.host_id === conn.user_id && s.players.filter(p => !p.is_ai).length === 0)) {
+    liveSessions.delete(s.session_id);
+    broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
+    return s;
+  }
+  if (s.host_id === conn.user_id) {
+    const newHost = s.players.find(p => !p.is_ai);
+    if (newHost) { s.host_id = newHost.user_id; s.host_username = newHost.username; newHost.is_host = true; }
+  }
+  broadcastSession(s, {
+    type: 'player_left', username: conn.user.username,
+    players: s.players.map(p => ({
+      user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+    }))
+  });
+  return s;
+}
 
+// ── Handlers ────────────────────────────────────────────────────────────────
 const handlers = {};
 
-handlers.ping = (ws) => {
-  send(ws, { type: 'pong' });
-};
+handlers.ping = (ws) => send(ws, { type: 'pong' });
+handlers.cancel_join_request = () => { /* no-op */ };
 
-// Some join flows send this when the user hits Cancel on a join spinner.
-// We don't currently keep a pending-approval queue, so this is a no-op.
-handlers.cancel_join_request = () => { };
-
-// --- Unified auth (KGMultiplayer) ---
-// Accepts { token, username, guest_name, avatar_id }
-// - token missing OR token starts with "guest-" → guest_login
-// - otherwise validate JWT via Auth API and treat as signed-in user
-handlers.auth = async (ws, data) => {
-  const token = data && data.token ? String(data.token) : '';
-  const username = (data && (data.username || data.guest_name)) ? String(data.username || data.guest_name) : 'Guest';
-  const avatarId = (data && data.avatar_id) ? String(data.avatar_id) : (data && data.avatarId) ? String(data.avatarId) : null;
-
-  // Guest path
-  if (!token || token.startsWith('guest-')) {
-    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
-  }
-
-  // Signed-in path (validate token)
-  try {
-    const res = await authApiValidateToken(token);
-    if (res.status !== 200 || !res.body || !res.body.valid) {
-      // Fallback to guest if token invalid (keeps invite links usable)
-      return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile' });
-    }
-
-    const userId = `user_${res.body.userId}`;
-    const user = {
-      user_id: userId,
-      id: userId,
-      username: username.slice(0, 20),
-      avatar_id: avatarId || 'person_smile',
-      is_guest: false,
-      prestige_level: 'bronze',
-      prestige_points: 0,
-      games_played: 0,
-      games_won: 0,
-      guild_id: null
-    };
-
-    connections.set(ws, { user_id: userId, user });
-    send(ws, { type: 'auth_success', action: 'token_auth', user, user_id: user.user_id, username: user.username });
-    postAuthSendSessionState(ws, userId);
-  } catch (e) {
-    console.error('[Lobby] Auth validate error:', e.message);
-    // Non-fatal: allow guest so invites still work
-    return handlers.guest_login(ws, { name: username, avatar_id: avatarId || 'person_smile', token });
-  }
-};
-
-// --- Auth ---
+function stableGuestId(token) {
+  if (!token || typeof token !== 'string' || !token.startsWith('guest-')) return null;
+  return 'guest_' + crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
+}
 
 handlers.guest_login = (ws, data) => {
-  const stableId = stableGuestIdFromToken(data && data.token ? String(data.token) : '');
-  const userId = stableId || generateId('guest');
-  const username = (data.name || `Guest_${Math.random().toString(36).slice(2, 6)}`).slice(0, 20);
-  const avatarId = data.avatar_id || 'person_smile';
-
+  const token = data && data.token ? String(data.token) : '';
+  const userId = stableGuestId(token) || ('guest_' + crypto.randomBytes(6).toString('hex'));
+  const username = String((data && (data.name || data.username || data.guest_name)) || 'Guest').slice(0, 20);
+  const avatarId = (data && (data.avatar_id || data.avatarId)) || 'person_smile';
   const user = {
-    user_id: userId,
-    id: userId,
-    username,
-    avatar_id: avatarId,
-    is_guest: true,
-    prestige_level: 'bronze',
-    prestige_points: 0,
-    games_played: 0,
-    games_won: 0,
-    guild_id: null
+    user_id: userId, id: userId, username, avatar_id: avatarId, is_guest: true,
+    prestige_level: 'bronze', prestige_points: 0, games_played: 0, games_won: 0, guild_id: null
   };
-
-  connections.set(ws, { user_id: userId, user });
-
-  send(ws, {
-    type: 'auth_success',
-    action: 'guest_login',
-    user,
-    user_id: user.user_id,
-    username: user.username
-  });
-
-  postAuthSendSessionState(ws, userId);
-};
-
-handlers.login = async (ws, data) => {
-  const { username, password } = data;
-  if (!username || !password) {
-    send(ws, { type: 'error', message: 'Username and password required' });
-    return;
-  }
-
-  try {
-    const res = await authApiRequest('/api/auth/login', { username, password });
-    if (res.body.success) {
-      const userId = `user_${res.body.userId}`;
-      const user = {
-        user_id: userId,
-        id: userId,
-        username: res.body.username || username,
-        avatar_id: 'person_smile',
-        is_guest: false,
-        prestige_level: 'bronze',
-        prestige_points: 0,
-        games_played: 0,
-        games_won: 0,
-        guild_id: null,
-        auth_token: res.body.token
-      };
-      // Cache in local users map
-      users.set(username, user);
-      connections.set(ws, { user_id: userId, user });
-      send(ws, {
-        type: 'auth_success',
-        action: 'login',
-        user: { ...user, auth_token: undefined },
-        user_id: user.user_id,
-        username: user.username
-      });
-    } else {
-      send(ws, { type: 'error', message: res.body.error || 'Invalid credentials' });
+  connections.set(ws, { user_id: userId, user, session_x_id: null });
+  send(ws, { type: 'auth_success', action: 'guest_login', user, user_id: userId, username });
+  for (const s of liveSessions.values()) {
+    if (s.players.some(p => p.user_id === userId)) {
+      connections.get(ws).session_x_id = s.session_id;
+      send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
+      if (s.status === 'playing') send(ws, { type: 'game_started', session: sanitize(s) });
+      break;
     }
-  } catch (e) {
-    console.error('[Lobby] Auth API login error:', e.message);
-    send(ws, { type: 'error', message: 'Login service unavailable. Try again.' });
   }
 };
-
-handlers.register = async (ws, data) => {
-  const { username, password } = data;
-  if (!username || !password) {
-    send(ws, { type: 'error', message: 'Username and password required' });
-    return;
-  }
-  if (username.length < 3) {
-    send(ws, { type: 'error', message: 'Username must be at least 3 characters' });
-    return;
-  }
-  if (password.length < 4) {
-    send(ws, { type: 'error', message: 'Password must be at least 4 characters' });
-    return;
-  }
-
-  try {
-    const res = await authApiRequest('/api/auth/register', {
-      username,
-      password,
-      email: data.email || null
-    });
-    if (res.body.success) {
-      const userId = `user_${res.body.userId}`;
-      const user = {
-        user_id: userId,
-        id: userId,
-        username: res.body.username || username,
-        avatar_id: 'person_smile',
-        is_guest: false,
-        prestige_level: 'bronze',
-        prestige_points: 0,
-        games_played: 0,
-        games_won: 0,
-        guild_id: null,
-        auth_token: res.body.token
-      };
-      users.set(username, user);
-      connections.set(ws, { user_id: userId, user });
-      send(ws, {
-        type: 'auth_success',
-        action: 'register',
-        user: { ...user, auth_token: undefined },
-        user_id: user.user_id,
-        username: user.username
-      });
-    } else {
-      send(ws, { type: 'error', message: res.body.error || 'Registration failed' });
-    }
-  } catch (e) {
-    console.error('[Lobby] Auth API register error:', e.message);
-    send(ws, { type: 'error', message: 'Registration service unavailable. Try again.' });
-  }
-};
-
+handlers.auth = (ws, data) => handlers.guest_login(ws, {
+  token: data && data.token, name: data && (data.username || data.guest_name),
+  avatar_id: data && (data.avatar_id || data.avatarId),
+});
+handlers.login = (ws, data) => handlers.guest_login(ws, data);
+handlers.register = (ws, data) => handlers.guest_login(ws, data);
 handlers.logout = (ws) => {
   const conn = connections.get(ws);
-  if (conn) {
-    removePlayerFromSession(conn.user_id);
-  }
-  connections.delete(ws);
+  if (conn) { leaveCurrentSession(ws, conn); connections.delete(ws); }
   send(ws, { type: 'logged_out' });
 };
-
 handlers.get_profile = (ws) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  send(ws, { type: 'profile', user: { ...conn.user, password_hash: undefined } });
+  const conn = connections.get(ws); if (!conn) return;
+  send(ws, { type: 'profile', user: conn.user });
 };
-
 handlers.update_profile = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-
-  if (data.avatar_id) {
-    conn.user.avatar_id = data.avatar_id;
-    if (!conn.user.is_guest && users.has(conn.user.username)) {
-      users.get(conn.user.username).avatar_id = data.avatar_id;
-    }
-  }
-
-  send(ws, { type: 'profile_updated', user: { ...conn.user, password_hash: undefined } });
+  const conn = connections.get(ws); if (!conn) return;
+  if (data && data.avatar_id) conn.user.avatar_id = data.avatar_id;
+  if (data && data.username) conn.user.username = String(data.username).slice(0, 20);
+  send(ws, { type: 'profile_updated', user: conn.user });
 };
-
-// --- Sessions ---
+handlers.update_player_info = handlers.update_profile;
 
 handlers.create_session = (ws, data) => {
   const conn = connections.get(ws);
-  if (!conn) {
-    send(ws, { type: 'error', message: 'Not authenticated' });
-    return;
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  if (conn.session_x_id) leaveCurrentSession(ws, conn);
+  const gameId = (data && data.game_id) || 'fasttrack';
+  if (!CATALOG_BY_ID[gameId]) return send(ws, { type: 'error', message: 'Unknown game: ' + gameId });
+  const isPrivate = !!(data && data.private);
+  const mode = (data && data.mode) || (isPrivate ? 'private' : 'public');
+  const sx = Proj.bloomSession(log, gameId, mode, conn.user_id, { is_private: isPrivate });
+  const s = freshSession(sx, gameId, conn.user, isPrivate);
+  if (data && typeof data.max_players === 'number') {
+    s.max_players = Math.min(Math.max(data.max_players, 2), s.max_players);
   }
-
-  // Guests may create PRIVATE invite-code sessions, but not public listings.
-  if (conn.user.is_guest && !(data && data.private)) {
-    send(ws, { type: 'error', message: 'Sign in to create public games' });
-    return;
-  }
-
-  // Leave any existing session first
-  const existing = findSessionByPlayer(conn.user_id);
-  if (existing) {
-    removePlayerFromSession(conn.user_id);
-    broadcast(existing.session_id, {
-      type: 'player_left',
-      username: conn.user.username,
-      players: existing.players.map(p => ({
-        user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-        is_host: p.is_host, is_ai: p.is_ai, slot: p.slot
-      }))
-    }, ws);
-  }
-
-  const sessionId = generateId('session');
-  const code = generateCode();
-  // Game ID: which game is this session for? Defaults to fasttrack for backward compat.
-  const gameId = data.game_id || 'fasttrack';
-  const gameInfo = GAME_REGISTRY[gameId] || {};
-  const maxPlayers = Math.min(Math.max(data.max_players || gameInfo.maxPlayers || 4, 2), gameInfo.maxPlayers || 6);
-
-  const session = {
-    session_id: sessionId,
-    session_code: code,
-    game_id: gameId,
-    host_id: conn.user_id,
-    host_username: conn.user.username,
-    is_private: !!data.private,
-    max_players: maxPlayers,
-    settings: { ...(data.settings || {}), lobby_accepted: false },
-    status: 'waiting',
-    created_at: Date.now(),
-    players: [{
-      user_id: conn.user_id,
-      username: conn.user.username,
-      avatar_id: conn.user.avatar_id,
-      is_host: true,
-      is_ai: false,
-      slot: 0,
-      ready: true
-    }]
-  };
-
-  sessions.set(sessionId, session);
-  codeIndex.set(code, sessionId);
-
-  // Game-agnostic share URL — portal join page resolves the game from the code
-  const shareUrl = `/lobby/join.html?code=${code}`;
-
-  send(ws, {
-    type: 'session_created',
-    session: sanitizeSession(session),
-    share_code: code,
-    share_url: shareUrl
+  if (data && data.settings) Object.assign(s.settings, data.settings);
+  s.players.push({
+    user_id: conn.user_id, username: conn.user.username,
+    avatar_id: conn.user.avatar_id, is_host: true, is_ai: false, slot: 0, ready: false
   });
-
-  broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: sessionId });
+  liveSessions.set(s.session_id, s);
+  conn.session_x_id = s.session_id;
+  send(ws, { type: 'session_created', session: sanitize(s) });
+  if (!isPrivate) broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
 };
 
 handlers.list_sessions = (ws, data) => {
-  const gameId = (data && data.game_id) || null; // optional filter
-  send(ws, { type: 'session_list', sessions: getPublicSessions(gameId) });
+  send(ws, { type: 'session_list', sessions: publicSessions(data && data.game_id) });
 };
 
-// ── Quick Matchmaking ──
-// Finds or creates a public game for the requested game_id
-handlers.matchmake = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-
-  // Spec: matchmaking requires sign-in
-  if (conn.user.is_guest) {
-    send(ws, { type: 'error', message: 'Sign in to use matchmaking' });
-    return;
+function joinExisting(ws, conn, s) {
+  if (s.status !== 'waiting') return send(ws, { type: 'error', message: 'Game already started' });
+  if (s.players.length >= s.max_players) return send(ws, { type: 'error', message: 'Game is full' });
+  if (s.players.some(p => p.user_id === conn.user_id)) {
+    conn.session_x_id = s.session_id;
+    return send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
   }
-
-  const gameId = data.game_id || 'fasttrack';
-  const existing = findSessionByPlayer(conn.user_id);
-  if (existing) removePlayerFromSession(conn.user_id);
-
-  // Find a waiting public session for this game
-  for (const [, session] of sessions) {
-    if (session.game_id !== gameId) continue;
-    if (session.status !== 'waiting') continue;
-    if (session.is_private) continue;
-    if (session.players.length >= session.max_players) continue;
-
-    // Join this session
-    const slot = session.players.length;
-    const player = {
-      user_id: conn.user_id,
-      username: conn.user.username,
-      avatar_id: conn.user.avatar_id,
-      is_host: false,
-      is_ai: false,
-      slot,
-      ready: false
-    };
-    session.players.push(player);
-
-    resetLobbyAcceptance(session);
-
-    const playersPayload = session.players.map(p => ({
-      user_id: p.user_id,
-      username: p.username,
-      avatar_id: p.avatar_id,
-      is_host: p.is_host,
-      is_ai: p.is_ai,
-      slot: p.slot,
-      ready: p.ready
-    }));
-
-    broadcast(session.session_id, {
-      type: 'player_joined',
-      session: sanitizeSession(session),
-      player: {
-        user_id: player.user_id,
-        username: player.username,
-        avatar_id: player.avatar_id,
-        is_host: false,
-        is_ai: false,
-        slot: player.slot,
-        ready: player.ready
-      },
-      players: playersPayload,
-      username: conn.user.username
-    });
-
-    send(ws, { type: 'session_joined', session: sanitizeSession(session) });
-
-    // Starfighter Versus: auto-start when both players are present.
-    if (gameId === 'starfighter' && session.players.length >= 2) {
-      if (!session.settings) session.settings = {};
-      session.settings.lobby_accepted = true;
-      session.status = 'playing';
-      for (const p of session.players) {
-        const pws = getWsByUserId(p.user_id);
-        if (pws) send(pws, { type: 'game_started', session: sanitizeSession(session) });
-      }
-      broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: session.session_id });
-    }
-    return;
-  }
-
-  // No match found — create a new public session
-  const gameInfo = GAME_REGISTRY[gameId] || {};
-  const sessionId = generateId('session');
-  const code = generateCode();
-  const session = {
-    session_id: sessionId,
-    session_code: code,
-    game_id: gameId,
-    host_id: conn.user_id,
-    host_username: conn.user.username,
-    is_private: false,
-    // Starfighter Versus is 2-player quick match
-    max_players: (gameId === 'starfighter') ? 2 : (gameInfo.maxPlayers || 4),
-    settings: { lobby_accepted: false },
-    status: 'waiting',
-    created_at: Date.now(),
-    players: [{
-      user_id: conn.user_id,
-      username: conn.user.username,
-      avatar_id: conn.user.avatar_id,
-      is_host: true,
-      is_ai: false,
-      slot: 0,
-      ready: true
-    }]
-  };
-  sessions.set(sessionId, session);
-  codeIndex.set(code, sessionId);
-  send(ws, { type: 'matchmake_result', action: 'created', session: sanitizeSession(session) });
-  broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: sessionId });
-};
-
-// ── Resolve Code → Game ──
-// Client sends a code, server responds with which game it belongs to + session info
-handlers.resolve_code = (ws, data) => {
-  const code = (data.code || '').toUpperCase().trim();
-  const sessionId = codeIndex.get(code);
-  if (!sessionId) {
-    send(ws, { type: 'resolve_code_result', found: false, code });
-    return;
-  }
-  const session = sessions.get(sessionId);
-  if (!session) {
-    send(ws, { type: 'resolve_code_result', found: false, code });
-    return;
-  }
-  const gameInfo = GAME_REGISTRY[session.game_id] || {};
-  send(ws, {
-    type: 'resolve_code_result',
-    found: true,
-    code,
-    game_id: session.game_id,
-    game_name: gameInfo.name || session.game_id,
-    game_path: gameInfo.path || '/',
-    game_lobby_path: gameInfo.lobby || gameInfo.path || '/',
-    session: sanitizeSession(session),
+  if (conn.session_x_id) leaveCurrentSession(ws, conn);
+  Proj.bloomPlayer(log, s.x, { user_id: conn.user_id, username: conn.user.username });
+  s.players.push({
+    user_id: conn.user_id, username: conn.user.username,
+    avatar_id: conn.user.avatar_id, is_host: false, is_ai: false, slot: s.players.length, ready: false
   });
-};
-
-handlers.join_session = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) {
-    send(ws, { type: 'error', message: 'Not authenticated' });
-    return;
-  }
-
-  // Back-compat: allow { code } in join_session by delegating
-  if (data && data.code) {
-    return handlers.join_by_code(ws, { code: data.code });
-  }
-
-  // Spec: joining via browsing/match sessions requires sign-in (invite codes are the exception)
-  if (conn.user.is_guest && !(data && data.allow_guest)) {
-    send(ws, { type: 'error', message: 'Sign in to join games (invite codes are the exception)' });
-    return;
-  }
-
-  const session = sessions.get(data.session_id);
-  if (!session) {
-    send(ws, { type: 'error', message: 'Game not found' });
-    return;
-  }
-
-  // Rejoin / resume: if the player is already in this session, allow it even if started.
-  // This enables lobby → game navigation and reconnects for stable guest tokens.
-  if (session.players.some(p => p.user_id === conn.user_id)) {
-    send(ws, { type: 'session_joined', session: sanitizeSession(session), action: 'rejoined' });
-    send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'rejoined' });
-    if (session.status === 'playing') {
-      send(ws, { type: 'game_started', session: sanitizeSession(session) });
-    }
-    return;
-  }
-  if (session.status !== 'waiting') {
-    send(ws, { type: 'error', message: 'Game already started' });
-    return;
-  }
-  if (session.players.length >= session.max_players) {
-    send(ws, { type: 'error', message: 'Game is full' });
-    return;
-  }
-  if (session.players.some(p => p.user_id === conn.user_id)) {
-    send(ws, { type: 'error', message: 'Already in this game' });
-    return;
-  }
-
-  // Leave existing session
-  const existing = findSessionByPlayer(conn.user_id);
-  if (existing) removePlayerFromSession(conn.user_id);
-
-  const player = {
-    user_id: conn.user_id,
-    username: conn.user.username,
-    avatar_id: conn.user.avatar_id,
-    is_host: false,
-    is_ai: false,
-    slot: session.players.length,
-    ready: false
-  };
-  session.players.push(player);
-
-  resetLobbyAcceptance(session);
-
-  // Notify joiner
-  send(ws, { type: 'session_joined', session: sanitizeSession(session) });
-
-  // Notify others in session
-  broadcast(session.session_id, {
-    type: 'player_joined',
-    player: {
-      user_id: player.user_id,
-      username: player.username,
-      avatar_id: player.avatar_id,
-      is_host: false,
-      is_ai: false,
-      slot: player.slot
-    },
-    players: session.players.map(p => ({
+  s.settings.lobby_accepted = false;
+  conn.session_x_id = s.session_id;
+  send(ws, { type: 'session_joined', session: sanitize(s) });
+  broadcastSession(s, {
+    type: 'player_joined', username: conn.user.username,
+    players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   }, ws);
+  broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'joined' });
+}
 
-  // Also send a canonical session update for unified clients
-  broadcastSessionUpdate(session, { action: 'player_joined' });
-  send(ws, { type: 'session_update', session: sanitizeSession(session), action: 'joined' });
+handlers.join_session = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  const s = liveSessions.get(data && data.session_id);
+  if (!s) return send(ws, { type: 'error', message: 'Game not found' });
+  joinExisting(ws, conn, s);
 };
 
 handlers.join_by_code = (ws, data) => {
   const conn = connections.get(ws);
-  if (!conn) {
-    send(ws, { type: 'error', message: 'Not authenticated' });
-    return;
-  }
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  const s = sessionByCode(data && data.code);
+  if (!s) return send(ws, { type: 'error', message: 'Invalid game code' });
+  joinExisting(ws, conn, s);
+};
 
-  const code = (data.code || '').toUpperCase().trim();
-  const sessionId = codeIndex.get(code);
-  if (!sessionId) {
-    send(ws, { type: 'error', message: 'Invalid game code' });
-    return;
-  }
-
-  // Delegate to join_session
-  handlers.join_session(ws, { session_id: sessionId, allow_guest: true });
+handlers.resolve_code = (ws, data) => {
+  const code = String((data && data.code) || '').toUpperCase();
+  const s = sessionByCode(code);
+  if (!s) return send(ws, { type: 'resolve_code_result', found: false, code });
+  send(ws, { type: 'resolve_code_result', found: true, code, session: sanitize(s) });
 };
 
 handlers.leave_session = (ws) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session) return;
-
-  const sessionId = session.session_id;
-  removePlayerFromSession(conn.user_id);
-
-  resetLobbyAcceptance(session);
-
+  const conn = connections.get(ws); if (!conn) return;
+  leaveCurrentSession(ws, conn);
   send(ws, { type: 'left_session' });
-
-  // Notify remaining
-  if (sessions.has(sessionId)) {
-    broadcast(sessionId, {
-      type: 'player_left',
-      username: conn.user.username,
-      players: session.players.map(p => ({
-        user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-        is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
-      }))
-    });
-
-    broadcastSessionUpdate(session, { action: 'player_left' });
-  }
-};
-
-handlers.update_player_info = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-
-  if (data.username) {
-    conn.user.username = data.username.slice(0, 20);
-  }
-  if (data.avatar_id) {
-    conn.user.avatar_id = data.avatar_id;
-  }
-
-  // Update in session too
-  const session = findSessionByPlayer(conn.user_id);
-  if (session) {
-    const player = session.players.find(p => p.user_id === conn.user_id);
-    if (player) {
-      if (data.username) player.username = conn.user.username;
-      if (data.avatar_id) player.avatar_id = conn.user.avatar_id;
-    }
-    if (session.host_id === conn.user_id && data.username) {
-      session.host_username = conn.user.username;
-    }
-  }
 };
 
 handlers.update_session_settings = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
-
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.host_id !== conn.user_id) return;
-
-  if (data.settings) {
-    session.settings = { ...session.settings, ...data.settings };
-  }
-  if (data.max_players) {
-    session.max_players = Math.min(Math.max(data.max_players, 2), 6);
-  }
-
-  send(ws, { type: 'session_settings_updated', session: sanitizeSession(session) });
-  broadcastSessionUpdate(session, { action: 'settings_updated' });
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s || s.host_id !== conn.user_id) return;
+  if (data && data.settings) Object.assign(s.settings, data.settings);
+  s.settings.lobby_accepted = false;
+  broadcastSession(s, { type: 'session_settings_updated', session: sanitize(s) });
 };
 
-// Host acceptance gate (ready-check then accept)
+handlers.toggle_ready = (ws) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return;
+  const player = s.players.find(p => p.user_id === conn.user_id);
+  if (!player) return;
+  player.ready = !player.ready;
+  s.settings.lobby_accepted = false;
+  const payload = sanitize(s);
+  broadcastSession(s, { type: 'ready_update', session: payload, user_id: conn.user_id, ready: player.ready });
+  send(ws, { type: 'ready_update', session: payload, user_id: conn.user_id, ready: player.ready });
+};
+
 handlers.accept_lobby = (ws) => {
   const conn = connections.get(ws);
   if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session) return;
-  if (session.host_id !== conn.user_id) {
-    send(ws, { type: 'error', message: 'Only the host can accept the group' });
-    return;
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return;
+  if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can accept the group' });
+  if (!s.players.every(p => p.is_ai || p.ready)) {
+    return send(ws, { type: 'error', message: 'All players must be ready before accepting' });
   }
-
-  const allHumansReady = session.players
-    .filter(p => !p.is_ai)
-    .every(p => !!p.ready);
-
-  if (!allHumansReady) {
-    send(ws, { type: 'error', message: 'All players must be ready before accepting' });
-    return;
-  }
-
-  if (!session.settings) session.settings = {};
-  session.settings.lobby_accepted = true;
-  broadcastSessionUpdate(session, { action: 'accepted' });
-  send(ws, { type: 'lobby_accepted', session: sanitizeSession(session) });
+  s.settings.lobby_accepted = true;
+  Proj.bloomEvent(log, s.x, [1, 1, 0, 0, 0, 0], { kind: 'lobby_accepted', session_id: s.session_id });
+  broadcastSession(s, { type: 'lobby_accepted', session: sanitize(s) });
+  send(ws, { type: 'lobby_accepted', session: sanitize(s) });
 };
 
 handlers.add_ai_player = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
-
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.host_id !== conn.user_id) {
-    send(ws, { type: 'error', message: 'Only host can add bots' });
-    return;
-  }
-  if (session.players.length >= session.max_players) {
-    send(ws, { type: 'error', message: 'Game is full' });
-    return;
-  }
-
-  const aiCount = session.players.filter(p => p.is_ai).length;
-  if (aiCount >= 3) {
-    send(ws, { type: 'error', message: 'Maximum 3 bots allowed' });
-    return;
-  }
-
-  const aiId = generateId('ai');
-  const aiName = AI_NAMES[aiCount] || `Bot ${aiCount + 1}`;
-  const aiAvatars = ['scifi_robot', 'robot', 'space_rocket'];
-
-  const bot = {
-    user_id: aiId,
-    username: aiName,
-    avatar_id: aiAvatars[aiCount % aiAvatars.length],
-    is_host: false,
-    is_ai: true,
-    is_bot: true,
-    slot: session.players.length,
-    ready: true,
-    ai_level: data.level || 'medium'
-  };
-  session.players.push(bot);
-
-  resetLobbyAcceptance(session);
-
-  // Notify all in session
-  broadcast(session.session_id, {
-    type: 'player_joined',
-    player: {
-      user_id: bot.user_id,
-      username: bot.username,
-      avatar_id: bot.avatar_id,
-      is_host: false,
-      is_ai: true,
-      slot: bot.slot
-    },
-    players: session.players.map(p => ({
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s || s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only host can add bots' });
+  if (s.players.length >= s.max_players) return send(ws, { type: 'error', message: 'Game is full' });
+  const aiCount = s.players.filter(p => p.is_ai).length;
+  if (aiCount >= 3) return send(ws, { type: 'error', message: 'Maximum 3 bots allowed' });
+  const aiId = 'ai_' + crypto.randomBytes(4).toString('hex');
+  const aiName = (data && data.name) || ('Bot ' + (aiCount + 1));
+  s.players.push({
+    user_id: aiId, username: aiName, avatar_id: 'robot',
+    is_host: false, is_ai: true, slot: s.players.length, ready: true
+  });
+  s.settings.lobby_accepted = false;
+  broadcastSession(s, {
+    type: 'player_joined', username: aiName,
+    players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
-
-  // Also send to the host who added the bot
-  send(ws, {
-    type: 'player_joined',
-    player: {
-      user_id: bot.user_id,
-      username: bot.username,
-      avatar_id: bot.avatar_id,
-      is_host: false,
-      is_ai: true,
-      slot: bot.slot
-    },
-    players: session.players.map(p => ({
-      user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
-    }))
-  });
+  broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'ai_added' });
 };
-
-// Aliases for unified clients
-handlers.add_ai = (ws, data) => handlers.add_ai_player(ws, { level: data && data.difficulty ? data.difficulty : (data && data.level ? data.level : 'medium') });
 
 handlers.remove_ai_player = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
-
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.host_id !== conn.user_id) return;
-
-  let removed = false;
-  if (data.player_id) {
-    const idx = session.players.findIndex(p => p.user_id === data.player_id && p.is_ai);
-    if (idx !== -1) {
-      session.players.splice(idx, 1);
-      removed = true;
-    }
-  } else {
-    // Remove last AI
-    for (let i = session.players.length - 1; i >= 0; i--) {
-      if (session.players[i].is_ai) {
-        session.players.splice(i, 1);
-        removed = true;
-        break;
-      }
-    }
-  }
-
-  if (removed) {
-    resetLobbyAcceptance(session);
-    // Re-slot
-    session.players.forEach((p, i) => { p.slot = i; });
-
-    const playersPayload = session.players.map(p => ({
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s || s.host_id !== conn.user_id) return;
+  const aiId = data && data.user_id;
+  const idx = s.players.findIndex(p => p.is_ai && p.user_id === aiId);
+  if (idx < 0) return;
+  const removed = s.players.splice(idx, 1)[0];
+  s.players.forEach((p, i) => { p.slot = i; });
+  s.settings.lobby_accepted = false;
+  broadcastSession(s, {
+    type: 'player_left', username: removed.username,
+    players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
-    }));
-
-    // Notify everyone in session including the sender
-    broadcast(session.session_id, {
-      type: 'player_left',
-      username: 'Bot',
-      players: playersPayload
-    });
-    send(ws, {
-      type: 'player_left',
-      username: 'Bot',
-      players: playersPayload
-    });
-  }
+    }))
+  });
+  broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'ai_removed' });
 };
-
-handlers.remove_ai = (ws, data) => handlers.remove_ai_player(ws, { player_id: (data && data.player_id) || null });
 
 handlers.start_game = (ws) => {
   const conn = connections.get(ws);
   if (!conn) return;
-
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session) {
-    send(ws, { type: 'error', message: 'Not in a game' });
-    return;
-  }
-  if (session.host_id !== conn.user_id) {
-    send(ws, { type: 'error', message: 'Only the host can start the game' });
-    return;
-  }
-  if (session.players.length < 2) {
-    send(ws, { type: 'error', message: 'Need at least 2 players' });
-    return;
-  }
-
-  const allHumansReady = session.players
-    .filter(p => !p.is_ai)
-    .every(p => !!p.ready);
-  if (!allHumansReady) {
-    send(ws, { type: 'error', message: 'All players must be ready' });
-    return;
-  }
-
-  if (!session.settings || session.settings.lobby_accepted !== true) {
-    send(ws, { type: 'error', message: 'Host must accept the group before launch' });
-    return;
-  }
-
-  session.status = 'playing';
-
-  const payload = {
-    type: 'game_started',
-    session: sanitizeSession(session)
-  };
-
-  // Notify all players including host
-  for (const [clientWs, clientConn] of connections) {
-    if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      send(clientWs, payload);
-    }
-  }
-
-  broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: session.session_id });
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return send(ws, { type: 'error', message: 'Not in a game' });
+  if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can start the game' });
+  if (s.players.length < 2) return send(ws, { type: 'error', message: 'Need at least 2 players' });
+  if (!s.players.every(p => p.is_ai || p.ready)) return send(ws, { type: 'error', message: 'All players must be ready' });
+  if (!s.settings.lobby_accepted) return send(ws, { type: 'error', message: 'Host must accept the group before launch' });
+  s.status = 'playing';
+  Proj.bloomEvent(log, s.x, [0, 0, 0, 0, 1, 1], { kind: 'game_started', session_id: s.session_id, game_id: s.game_id });
+  broadcastSession(s, { type: 'game_started', session: sanitize(s) });
+  if (!s.is_private) broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
 };
 
-// --- Real-Time Game State Relay ---
-// These handlers support both real-time (Starfighter, BrickBreaker)
-// and turn-based (FastTrack, ConnectIV, TicTacToe) games.
-// The server is a RELAY — it doesn't understand game logic, just forwards state.
-
-// Player state — high-frequency position/velocity updates (action games, ~20 Hz)
-handlers.player_state = (ws, data) => {
+// In-play relay. Frame-rate messages — NOT logged. The seed log keeps
+// identity history; the field re-derives runtime state on demand.
+function relay(type, ws, data) {
   const conn = connections.get(ws);
   if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.status !== 'playing') return;
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return;
+  broadcastSession(s, Object.assign({ type, from: conn.user_id }, data || {}), ws);
+}
+handlers.player_state = (ws, data) => relay('player_state', ws, data);
+handlers.game_action = (ws, data) => relay('game_action', ws, data);
+handlers.game_state = (ws, data) => relay('game_state', ws, data);
+handlers.chat = (ws, data) => relay('chat', ws, Object.assign({}, data, {
+  username: (connections.get(ws) || {}).user && connections.get(ws).user.username,
+}));
 
-  // Relay to all other players in the session
-  const payload = {
-    type: 'player_state',
-    user_id: conn.user_id,
-    username: conn.user.username,
-    ...data // x, y, z, qx, qy, qz, qw, vx, vy, vz, hull, shields, etc.
-  };
-  delete payload.type; // re-add clean
-  const msg = JSON.stringify({ type: 'player_state', ...payload });
-  for (const [clientWs, clientConn] of connections) {
-    if (clientConn.user_id === conn.user_id) continue;
-    if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      if (clientWs.readyState === 1) clientWs.send(msg);
-    }
-  }
-};
-
-// Game action — any discrete game event (fire weapon, play card, move piece)
-handlers.game_action = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.status !== 'playing') return;
-
-  const payload = JSON.stringify({
-    type: 'game_action',
-    user_id: conn.user_id,
-    username: conn.user.username,
-    action: data.action,    // e.g. 'fire', 'move_piece', 'play_card'
-    payload: data.payload,  // game-specific data
-    seq: data.seq || 0,     // sequence number for ordering
-    timestamp: Date.now(),
-  });
-  for (const [clientWs, clientConn] of connections) {
-    if (clientConn.user_id === conn.user_id) continue;
-    if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      if (clientWs.readyState === 1) clientWs.send(payload);
-    }
-  }
-};
-
-// Game state — authoritative state snapshot from host (periodic or on key events)
-handlers.game_state = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.status !== 'playing') return;
-  // Only host can broadcast authoritative state
-  if (session.host_id !== conn.user_id) return;
-
-  const payload = JSON.stringify({
-    type: 'game_state',
-    state: data.state,      // game-specific state blob
-    seq: data.seq || 0,
-    timestamp: Date.now(),
-  });
-  for (const [clientWs, clientConn] of connections) {
-    if (clientConn.user_id === conn.user_id) continue;
-    if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      if (clientWs.readyState === 1) clientWs.send(payload);
-    }
-  }
-};
-
-// Game over — any player can signal, but only host's is authoritative
 handlers.game_over = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session || session.status !== 'playing') return;
-
-  session.status = 'finished';
-
-  const payload = JSON.stringify({
-    type: 'game_over',
-    result: data.result,    // 'win', 'loss', 'draw', etc.
-    winner: data.winner,    // user_id or null
-    scores: data.scores,    // { user_id: score, ... }
-    message: data.message,
-  });
-  for (const [clientWs, clientConn] of connections) {
-    if (session.players.some(p => p.user_id === clientConn.user_id)) {
-      if (clientWs.readyState === 1) clientWs.send(payload);
-    }
-  }
-
-  // Clean up session after 30 seconds
-  setTimeout(() => {
-    sessions.delete(session.session_id);
-    codeIndex.delete(session.session_code);
-  }, 30000);
-};
-
-// --- Chat ---
-
-handlers.chat = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-
-  const message = (data.message || '').slice(0, 500);
-  if (!message) return;
-
-  broadcastAll({
-    type: 'chat',
-    username: conn.user.username,
-    avatar_id: conn.user.avatar_id,
-    message,
-    timestamp: Date.now()
-  });
-};
-
-// --- Search ---
-
-handlers.search_users = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  const query = (data.query || '').toLowerCase();
-  const results = [];
-  for (const [, u] of users) {
-    if (u.username.toLowerCase().includes(query)) {
-      results.push({
-        user_id: u.user_id,
-        username: u.username,
-        avatar_id: u.avatar_id,
-        prestige_level: u.prestige_level,
-        prestige_points: u.prestige_points,
-        games_played: u.games_played,
-        games_won: u.games_won
-      });
-    }
-    if (results.length >= 20) break;
-  }
-  send(ws, { type: 'user_search_results', users: results });
-};
-
-// --- Guilds (stubs — return empty to avoid client errors) ---
-
-handlers.create_guild = (ws, data) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  const guildId = generateId('guild');
-  const guild = {
-    guild_id: guildId,
-    id: guildId,
-    name: (data.name || 'Guild').slice(0, 30),
-    tag: (data.tag || 'TAG').slice(0, 4).toUpperCase(),
-    guildmaster_id: conn.user_id,
-    members: [{ user_id: conn.user_id, username: conn.user.username, online: true }],
-    total_prestige: 0
-  };
-  conn.user.guild_id = guildId;
-  send(ws, { type: 'guild_created', guild });
-};
-
-handlers.search_guilds = (ws) => {
-  send(ws, { type: 'guild_search_results', guilds: [] });
-};
-
-handlers.join_guild = (ws) => {
-  send(ws, { type: 'error', message: 'Guild not found' });
-};
-
-handlers.leave_guild = (ws) => {
-  send(ws, { type: 'guild_left' });
-};
-
-handlers.get_guild_details = (ws) => {
-  send(ws, { type: 'guild_details', guild: null, members: [], tournaments: [], pendingInvites: [] });
-};
-
-handlers.get_guild_members = (ws) => {
-  send(ws, { type: 'guild_members', members: [] });
-};
-
-handlers.get_guild_tournaments = (ws) => {
-  send(ws, { type: 'guild_tournaments', tournaments: [], pendingInvites: [] });
-};
-
-handlers.disband_guild = (ws) => {
-  send(ws, { type: 'guild_disbanded', message: 'Guild has been disbanded' });
-};
-
-handlers.boot_guild_member = (ws) => {
-  // No-op
-};
-
-handlers.create_guild_game = (ws) => {
-  send(ws, { type: 'error', message: 'Guild games coming soon' });
-};
-
-handlers.invite_guild_member = (ws) => {
-  // No-op stub
-};
-
-handlers.create_guild_tournament = (ws) => {
-  send(ws, { type: 'error', message: 'Tournaments coming soon' });
-};
-
-handlers.respond_tournament_invite = (ws) => {
-  // No-op
-};
-
-// --- Chat stubs ---
-
-handlers.guild_chat_message = () => { };
-handlers.toggle_guild_chat = () => { };
-handlers.update_chat_preference = () => { };
-handlers.approve_chat_user = () => { };
-handlers.deny_chat_user = () => { };
-handlers.get_blocked_users = (ws) => {
-  send(ws, { type: 'blocked_users', blockedUsers: [], blockedByUsers: [] });
-};
-handlers.block_user = () => { };
-handlers.unblock_user = () => { };
-handlers.search_users_to_block = (ws) => {
-  send(ws, { type: 'block_search_results', users: [] });
-};
-handlers.toggle_ready = (ws) => {
-  const conn = connections.get(ws);
-  if (!conn) return;
-  const session = findSessionByPlayer(conn.user_id);
-  if (!session) return;
-  const player = session.players.find(p => p.user_id === conn.user_id);
-  if (player) {
-    player.ready = !player.ready;
-
-    resetLobbyAcceptance(session);
-
-    const sessionPayload = sanitizeSession(session);
-    broadcast(session.session_id, { type: 'ready_update', session: sessionPayload, user_id: conn.user_id, ready: player.ready });
-    send(ws, { type: 'ready_update', session: sessionPayload, user_id: conn.user_id, ready: player.ready });
-
-    // Back-compat message
-    broadcast(session.session_id, {
-      type: 'player_ready_changed',
-      user_id: conn.user_id,
-      ready: player.ready,
-      username: conn.user.username
-    });
-    send(ws, {
-      type: 'player_ready_changed',
-      user_id: conn.user_id,
-      ready: player.ready,
-      username: conn.user.username
-    });
-
-    broadcastSessionUpdate(session, { action: 'ready_changed' });
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return;
+  s.status = 'ended';
+  Proj.bloomEvent(log, s.x, [-1, 0, 0, 0, 1, 0], { kind: 'game_over', session_id: s.session_id, result: (data && data.result) || null });
+  broadcastSession(s, { type: 'game_over', session: sanitize(s), result: (data && data.result) || null });
+  liveSessions.delete(s.session_id);
+  for (const [cws, cconn] of connections) {
+    if (cconn.session_x_id === s.session_id) cconn.session_x_id = null;
   }
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HTTP + WebSocket Server (same port)
-// ═══════════════════════════════════════════════════════════════════════════
+// Catalog endpoint — clients can ask the manifold for the registered games.
+handlers.list_games = (ws) => send(ws, {
+  type: 'game_catalog', games: CATALOG.map(g => ({
+    id: g.id, name: g.name, dimension: g.dimension, max_players: g.maxPlayers,
+  }))
+});
 
+// Stubs: client-expected message shapes for features not yet manifold-backed.
+const STUBS = {
+  search_users: { type: 'user_search_results', users: [] },
+  search_users_to_block: { type: 'block_search_results', users: [] },
+  block_user: { type: 'blocked_users', blockedUsers: [], blockedByUsers: [] },
+  unblock_user: { type: 'blocked_users', blockedUsers: [], blockedByUsers: [] },
+  get_blocked_users: { type: 'blocked_users', blockedUsers: [], blockedByUsers: [] },
+  update_chat_preference: { type: 'chat_preference_updated' },
+  approve_chat_user: { type: 'chat_user_approved' },
+  deny_chat_user: { type: 'chat_user_denied' },
+  search_guilds: { type: 'guild_search_results', guilds: [] },
+  create_guild: { type: 'error', message: 'Guilds coming soon' },
+  join_guild: { type: 'error', message: 'Guilds coming soon' },
+  leave_guild: { type: 'guild_left' },
+  disband_guild: { type: 'guild_disbanded', message: 'Guilds coming soon' },
+  get_guild_details: { type: 'guild_details', guild: null, members: [], tournaments: [], pendingInvites: [] },
+  get_guild_members: { type: 'guild_members', members: [] },
+  get_guild_tournaments: { type: 'guild_tournaments', tournaments: [], pendingInvites: [] },
+  invite_guild_member: { type: 'error', message: 'Guilds coming soon' },
+  boot_guild_member: { type: 'error', message: 'Guilds coming soon' },
+  toggle_guild_chat: { type: 'guild_chat_toggled' },
+  guild_chat_message: { type: 'guild_chat_message_ack' },
+  create_guild_game: { type: 'error', message: 'Guild games coming soon' },
+  create_guild_tournament: { type: 'error', message: 'Tournaments coming soon' },
+  respond_tournament_invite: { type: 'tournament_invite_response_ack' },
+};
+Object.keys(STUBS).forEach(k => { handlers[k] = (ws) => send(ws, STUBS[k]); });
+
+
+
+// ── HTTP + WebSocket transport ──────────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
-  const url = req.url || '/';
-  if (url === '/' || url === '/health' || url === '/status') {
-    const body = {
-      service: 'fasttrack-lobby',
-      status: 'ok',
-      transport: 'websocket',
-      wsEndpoint: '/ws',
-      connections: connections.size,
-      waitingSessions: getPublicSessions().length,
-      ts: new Date().toISOString(),
-    };
+  if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify(body, null, 2));
+    res.end(JSON.stringify({
+      status: 'ok',
+      connections: connections.size,
+      live_sessions: liveSessions.size,
+      seed_log_entries: log.count(),
+      catalog: CATALOG.map(g => g.id),
+    }));
     return;
   }
-
+  if (req.url === '/manifold/frontier') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      games: Proj.frontier(log, 'game').map(s => ({ id: s.id, meta: s.meta })),
+      sessions: Proj.frontier(log, 'session').map(s => ({ id: s.id, meta: s.meta, code: Proj.codeFromSeed(s.seed) })),
+      players: Proj.frontier(log, 'player').length,
+    }));
+    return;
+  }
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health or WebSocket upgrade on /ws' }));
+  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, or WebSocket upgrade' }));
 });
 
 const wss = new WebSocket.Server({ server: httpServer });
 
 wss.on('connection', (ws) => {
   console.log(`[Lobby] New connection (total: ${wss.clients.size})`);
-
-  // Send welcome
-  send(ws, {
-    type: 'connected',
-    message: 'Welcome to Fast Track Lobby!'
-  });
+  send(ws, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
 
   ws.on('message', async (raw) => {
     let data;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      send(ws, { type: 'error', message: 'Invalid message format' });
+    try { data = JSON.parse(raw); }
+    catch { return send(ws, { type: 'error', message: 'Invalid message format' }); }
+    const handler = handlers[data.type];
+    if (!handler) {
+      console.warn(`[Lobby] Unknown message type: ${data.type}`);
       return;
     }
-
-    const handler = handlers[data.type];
-    if (handler) {
-      try {
-        await handler(ws, data);
-      } catch (err) {
-        console.error(`[Lobby] Handler error for ${data.type}:`, err);
-        send(ws, { type: 'error', message: 'Server error' });
-      }
-    } else {
-      console.warn(`[Lobby] Unknown message type: ${data.type}`);
+    try { await handler(ws, data); }
+    catch (err) {
+      console.error(`[Lobby] Handler error for ${data.type}:`, err);
+      send(ws, { type: 'error', message: 'Server error' });
     }
   });
 
   ws.on('close', () => {
     const conn = connections.get(ws);
-    if (conn) {
-      // Remove from any session
-      const session = findSessionByPlayer(conn.user_id);
-      if (session) {
-        const sessionId = session.session_id;
-        removePlayerFromSession(conn.user_id);
-        if (sessions.has(sessionId)) {
-          broadcast(sessionId, {
-            type: 'player_left',
-            username: conn.user.username,
-            players: session.players.map(p => ({
-              user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-              is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
-            }))
-          });
-        }
-      }
-      connections.delete(ws);
-    }
+    if (conn) { leaveCurrentSession(ws, conn); connections.delete(ws); }
     console.log(`[Lobby] Disconnected (total: ${wss.clients.size})`);
   });
 
-  ws.on('error', (err) => {
-    console.error('[Lobby] WebSocket error:', err.message);
-  });
+  ws.on('error', (err) => console.error('[Lobby] WebSocket error:', err.message));
 });
 
-// Cleanup stale sessions every 5 minutes
+// Cleanup stale waiting sessions every 5 minutes (30-min idle threshold).
 setInterval(() => {
-  const staleThreshold = Date.now() - (30 * 60 * 1000); // 30 minutes
-  for (const [id, session] of sessions) {
-    if (session.created_at < staleThreshold && session.status === 'waiting') {
-      codeIndex.delete(session.session_code);
-      sessions.delete(id);
+  const stale = Date.now() - 30 * 60 * 1000;
+  for (const [id, s] of liveSessions) {
+    if (s.created_at < stale && s.status === 'waiting') {
+      liveSessions.delete(id);
+      broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: id });
       console.log(`[Lobby] Cleaned up stale session ${id}`);
     }
   }
 }, 5 * 60 * 1000);
 
-httpServer.listen(PORT, () => {
-  console.log(`═══════════════════════════════════════════════`);
-  console.log(`  Fast Track Lobby Server`);
-  console.log(`  HTTP health: http://0.0.0.0:${PORT}/health`);
-  console.log(`  WebSocket: ws://0.0.0.0:${PORT}`);
-  console.log(`  nginx proxies wss://kensgames.com/ws → here`);
-  console.log(`═══════════════════════════════════════════════`);
-});
+if (require.main === module) {
+  httpServer.listen(PORT, () => {
+    console.log('═══════════════════════════════════════════════');
+    console.log('  Kensgames Unified Lobby — manifold projection');
+    console.log(`  HTTP health:  http://0.0.0.0:${PORT}/health`);
+    console.log(`  WebSocket:    ws://0.0.0.0:${PORT}`);
+    console.log(`  Seed log:     ${SEED_LOG} (${log.count()} entries)`);
+    console.log(`  Catalog:      ${CATALOG.map(g => g.id).join(', ')}`);
+    console.log('═══════════════════════════════════════════════');
+  });
+}
+
+module.exports = { httpServer, wss, handlers, liveSessions, connections, log, CATALOG };

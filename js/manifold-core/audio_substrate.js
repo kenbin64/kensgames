@@ -22,13 +22,13 @@ class AudioSubstrate extends SubstrateBase {
   }
 
   extract(coordinate) {
-    const raw = this.manifold.read(coordinate);
-
-    if (!raw) {
-      return this._getDefaults();
-    }
-
+    // Reversal: field is the source, storage is the cache. The field view
+    // (point, value, gradient) flows through every extraction; stored audio
+    // params override field metadata only on key collision.
+    const view = this.observeField(coordinate);
+    const raw = (this.manifold && this.manifold.read ? this.manifold.read(coordinate) : null) || {};
     return {
+      ...view,
       music: this._extractMusic(raw),
       soundEffects: this._extractSoundEffects(raw),
       spatialAudio: this._extractSpatialAudio(raw),

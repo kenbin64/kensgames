@@ -703,7 +703,7 @@ const Starfighter = (function () {
         if (window.SFAudio && SFAudio.pauseAll) SFAudio.pauseAll();
         if ('speechSynthesis' in window && speechSynthesis.speaking) speechSynthesis.cancel();
         if (window.SFMusic && SFMusic.stop) SFMusic.stop();
-        window.location.href = '/lobby/';
+        window.location.href = '/';
     }
 
     // The Manifold — ground truth for all entity state

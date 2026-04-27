@@ -356,17 +356,12 @@
         </div>
         <div class="mode-avail">Available &bull; High score tracked</div>
       </div>
-      <div class="mode-card" onclick="startMatchmaker()">
-        <span class="mode-icon" style="color:#00FFFF">&#9889;</span>
-        <div class="mode-title">Head-to-Head</div>
-        <div class="mode-desc">Race a live opponent. First to clear the board wins. Login required.</div>
-        <div class="mode-avail" id="mm-avail">Login required</div>
-      </div>
       <div class="mode-card" onclick="togglePrivate()">
         <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Private Match</div>
-        <div class="mode-desc">Challenge a specific friend. Create a room and share the 6-character code.</div>
-        <div class="mode-avail">No login to join</div>
+        <div class="mode-title">Play with Friends</div>
+        <div class="mode-desc">Create a room and share the 6-character code or link. Friends join from anywhere &mdash;
+          no account needed.</div>
+        <div class="mode-avail">Free &bull; No signup</div>
       </div>
     </div>
     <div class="private-panel" id="priv-panel">
@@ -379,8 +374,8 @@
         <div class="code-hint">Click to copy &bull; Share with opponent</div>
         <button class="btn btn-acc btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
           MATCH</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Login required
-          to create a private room</div>
+        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Generating
+          room code...</div>
       </div>
       <div id="priv-join" style="display:none">
         <div class="arc-field"><label>Room Code</label><input class="arc-input" id="join-code" placeholder="ABC123"
@@ -395,37 +390,10 @@
     </div>
   </div>
   <script src="/js/substrates/avatar_picker.js"></script>
-  <script src="/js/require_auth.js"></script>
-  <script src="/js/access_session_bridge.js"></script>
   <script src="/js/multiplayer-client.js"></script>
   <script>
-    let token = localStorage.getItem('user_token');
     let username = localStorage.getItem('username') || 'Guest';
     const av = AvatarPicker.get();
-
-    function _isSignedIn(t) {
-      return !!(t && !String(t).startsWith('guest-'));
-    }
-
-    function _refreshAuthFromStorage() {
-      token = localStorage.getItem('user_token');
-      username = localStorage.getItem('username') || 'Guest';
-      document.getElementById('p-name').textContent = username;
-      document.getElementById('mm-avail').textContent = _isSignedIn(token)
-        ? 'Available \u2022 Ready'
-        : 'Login required';
-    }
-
-    async function _maybeUpgradeFromAccess() {
-      if (_isSignedIn(token)) return true;
-      if (!window.KGAccessSession || typeof window.KGAccessSession.ensure !== 'function') return false;
-      const r = await window.KGAccessSession.ensure();
-      if (r && r.token) {
-        _refreshAuthFromStorage();
-        return _isSignedIn(token);
-      }
-      return false;
-    }
 
     document.getElementById('p-name').textContent = username;
     AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
@@ -434,10 +402,6 @@
     if (!av) badge.style.color = 'var(--np)';
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
 
-    if (_isSignedIn(token)) document.getElementById('mm-avail').textContent = 'Available \u2022 Ready';
-    // Best-effort: if already authenticated via Access, mint a normal JWT so we don't require a second login.
-    _maybeUpgradeFromAccess();
-
     // Shared multiplayer client for BrickBreaker3D
     const bbmp = new KGMultiplayer('brickbreaker');
     let _bbConnected = false;
@@ -445,71 +409,37 @@
     function ensureMpConnected(cb) {
       if (_bbConnected) { cb(); return; }
       bbmp.on('authenticated', () => { _bbConnected = true; cb(); });
-      // Grab latest values (token/username can be upgraded from Access after page load)
       const u = localStorage.getItem('username') || username || 'Guest';
-      const t = localStorage.getItem('user_token') || token || null;
-      bbmp.connect({ username: u, token: t });
+      bbmp.connect({ username: u });
     }
 
     function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/brickbreaker3d/play.html?mode=solo'; }
-
-    async function startMatchmaker() {
-      if (!_isSignedIn(token)) {
-        if (window.KGRequireAuth && typeof window.KGRequireAuth.guard === 'function') {
-          await window.KGRequireAuth.guard({ allowGuest: false });
-          _refreshAuthFromStorage();
-          if (!_isSignedIn(token)) return;
-        } else {
-          const ok = await _maybeUpgradeFromAccess();
-          if (!ok) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
-        }
-      }
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
-      ensureMpConnected(() => {
-        bbmp.on('session_update', (s) => {
-          if (s.player_count >= 2) {
-            window.location.href = `/brickbreaker3d/play.html?mode=multi&session=${s.session_id}`;
-          } else {
-            document.getElementById('mm-avail').textContent = 'Searching for opponent...';
-          }
-        });
-        bbmp.matchmake();
-      });
-    }
 
     function togglePrivate() { const p = document.getElementById('priv-panel'); p.classList.toggle('open'); if (p.classList.contains('open')) generateCode(); }
     function privTab(tab) { document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab)); document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none'; document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none'; }
 
     let _code = '';
-    async function generateCode() {
-      if (!_isSignedIn(token)) {
-        const ok = await _maybeUpgradeFromAccess();
-        if (!ok) { document.getElementById('priv-status').textContent = 'Login required to create a private room'; return; }
-      }
+    function generateCode() {
       ensureMpConnected(() => {
         bbmp.on('session_update', (s) => {
           _code = s.session_code;
           document.getElementById('room-code').textContent = _code;
           document.getElementById('launch-btn').disabled = false;
-          document.getElementById('priv-status').textContent = 'Share code with opponent. You start the match.';
+          const url = `${location.origin}/brickbreaker3d/play.html?mode=private&code=${_code}`;
+          document.getElementById('priv-status').innerHTML = 'Share: <a href="' + url + '" style="color:var(--accent)">' + url + '</a>';
         });
         bbmp.createGame({ private: true, maxPlayers: 4 });
       });
     }
 
-    function copyCode() { if (_code) { navigator.clipboard?.writeText(_code); document.getElementById('priv-status').textContent = 'Code copied!'; } }
+    function copyCode() {
+      if (!_code) return;
+      const url = `${location.origin}/brickbreaker3d/play.html?mode=private&code=${_code}`;
+      navigator.clipboard?.writeText(url);
+      document.getElementById('priv-status').textContent = 'Link copied!';
+    }
 
-    async function launchPrivate() {
-      if (!_isSignedIn(token)) {
-        if (window.KGRequireAuth && typeof window.KGRequireAuth.guard === 'function') {
-          await window.KGRequireAuth.guard({ allowGuest: false });
-          _refreshAuthFromStorage();
-          if (!_isSignedIn(token)) return;
-        } else {
-          const ok = await _maybeUpgradeFromAccess();
-          if (!ok) { window.location.href = '/login?redirect=/brickbreaker3d/lobby.html'; return; }
-        }
-      }
+    function launchPrivate() {
       window.location.href = `/brickbreaker3d/play.html?mode=private&code=${_code}&host=1`;
     }
 
@@ -518,9 +448,8 @@
       const name = document.getElementById('guest-name').value.trim() || 'Guest';
       const msg = document.getElementById('join-msg');
       if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      if (!localStorage.getItem('user_token')) { localStorage.setItem('username', name); localStorage.setItem('user_token', 'guest-' + Date.now()); }
+      localStorage.setItem('username', name);
       if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      // Use unified server to resolve code and join
       ensureMpConnected(() => {
         bbmp.on('code_resolved', (d) => {
           if (d.found) {
@@ -532,6 +461,16 @@
         bbmp.resolveCode(code);
       });
     }
+
+    // Auto-join via URL param: /brickbreaker3d/lobby.html?code=ABC123
+    (function () {
+      const codeParam = new URLSearchParams(location.search).get('code');
+      if (codeParam && /^[A-Z0-9]{6}$/i.test(codeParam)) {
+        document.getElementById('priv-panel').classList.add('open');
+        privTab('join');
+        document.getElementById('join-code').value = codeParam.toUpperCase();
+      }
+    })();
   </script>
 </body>
 

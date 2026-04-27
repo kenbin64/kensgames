@@ -24,6 +24,13 @@ Thumbs.db
 dist/
 build/
 
+# Manifold runtime state — append-only seed log, derived not source
+state/
+
+# Editor / AI assistant chat transcripts accidentally written into tree
+**/## GitHub Copilot Chat.md
+**/Copilot Chat*.md
+
 # Manifold deploy artifacts (z = xy² — built, not committed)
 starfighter/starfighter.bundle.js
 starfighter/starfighter.bundle.js.gz

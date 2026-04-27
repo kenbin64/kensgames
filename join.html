@@ -86,8 +86,8 @@
     <div class="row">
       <div class="code" id="code">------</div>
     </div>
-    <p class="msg" style="margin-top:14px">If you aren’t redirected automatically, go back to <a href="/lobby/">the
-        lobby</a> and join with your code.</p>
+    <p class="msg" style="margin-top:14px">If you aren’t redirected automatically, go back to the <a href="/">portal</a>
+      and join with your code.</p>
   </div>
 
   <script>
@@ -131,7 +131,7 @@
 
           const rawPath = isFastTrack
             ? '/fasttrack/join.html'
-            : (d.game_lobby_path || d.game_path || '/lobby/');
+            : (d.game_lobby_path || d.game_path || '/');
 
           const url = new URL(rawPath, location.origin);
           url.searchParams.set('code', code);

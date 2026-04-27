@@ -489,12 +489,22 @@ const SF3D = (function () {
         // Renderer setup
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         // Cockpit visor filter — sun in space is blinding; the canopy polarizes
         // light down to a level the human eye (and HUD) can tolerate
         renderer.toneMappingExposure = 0.55;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.physicallyCorrectLights = true;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
+
+        // Manifold-derived environment map — gives PBR ship hulls subtle
+        // image-based reflections so shadow sides aren't dead black.
+        if (typeof ManifoldEnvironment !== 'undefined') {
+            ManifoldEnvironment.bind(renderer, scene, { seed: 'starfighter', palette: 'space', size: 64 });
+        }
 
         // ── Sun direction — all lighting derives from this ──
         const SUN_POS = new THREE.Vector3(200000, 100000, 80000);

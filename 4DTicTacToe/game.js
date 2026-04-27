@@ -16,6 +16,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.physicallyCorrectLights = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000008);
 scene.fog = new THREE.FogExp2(0x00000C, 0.007);
@@ -54,67 +58,138 @@ const saturn = makeSaturn();
 // Procedural gas giant -- replaces jupiter.glb (3.5 MB). Banded vertex colors, same style as makeSaturn.
 function makeJupiter() { const g = new THREE.SphereGeometry(7, 48, 32); const cols = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < g.attributes.position.count; i++) { const y = g.attributes.position.getY(i); const band = Math.sin(y * 2.6) * 0.5 + 0.5; const storm = Math.sin(y * 1.1 + Math.cos(y * 5.2) * 1.8) * 0.5 + 0.5; cols[i * 3] = 0.82 + storm * .12 - band * .08; cols[i * 3 + 1] = 0.58 + band * .18; cols[i * 3 + 2] = 0.30 + storm * .10; } g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 10 })); m.position.set(-75, -18, -80); scene.add(m); return m; }
 const jupiter = makeJupiter();
-// Procedural Schwartz-D (Diamond) shell -- fallback if connect4.glb fails to load.
-// Implicit: sin(x)sin(y)sin(z) + sin(x)cos(y)cos(z) + cos(x)sin(y)cos(z) + cos(x)cos(y)sin(z) = 0
-function makeSchwartzShell() { const g = new THREE.IcosahedronGeometry(6, 6), pos = g.attributes.position, k = 0.55; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); const sx = Math.sin(k * x), cx = Math.cos(k * x); const sy = Math.sin(k * y), cy = Math.cos(k * y); const sz = Math.sin(k * z), cz = Math.cos(k * z); const F = sx * sy * sz + sx * cy * cz + cx * sy * cz + cx * cy * sz; const d = 0.45 * F / 2; const r = Math.sqrt(x * x + y * y + z * z) || 1; pos.setXYZ(i, x * (1 + d / r), y * (1 + d / r), z * (1 + d / r)); } g.computeVertexNormals(); const m = new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({ color: 0x1a2255, emissive: 0x08083a, metalness: 0.6, roughness: 0.35, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false })); m.renderOrder = -1; boardGroup.add(m); return m; }
-let glbOverlay = null;
-const glbColliders = []; // populated after GLB loads -- used as hard-body collider for the ball.
+// Procedural 7×7×7 gyroid manifold -- runtime geometry derived from the equation
+//   g(x,y,z) = sin(kx)cos(ky) + sin(ky)cos(kz) + sin(kz)cos(kx)
+// k chosen so the period tiles 7× across the play volume diameter, giving a 7³ grid
+// of interconnected chambers and passageways. The iso=0 surface is built once via
+// marching tetrahedra (no examples deps) and used as a translucent visual shell;
+// the same equation drives ball-vs-manifold collision (see gyroidGuide / gyroidWall).
+const GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;            // matches PLAY_HX (CELL=2.8, BALL_R=0.18)
+const GY_K = (7 * Math.PI) / (2 * GY_HALF);            // 7 surface periods across the diameter
+const WALL_THRESHOLD = 0.55;                            // |g| > threshold => inside a wall lobe
+function gyroidValue(x, y, z) {
+  const sx = Math.sin(GY_K * x), cx = Math.cos(GY_K * x);
+  const sy = Math.sin(GY_K * y), cy = Math.cos(GY_K * y);
+  const sz = Math.sin(GY_K * z), cz = Math.cos(GY_K * z);
+  return sx * cy + sy * cz + sz * cx;
+}
+function gyroidGrad(x, y, z, out) {
+  const k = GY_K;
+  const sx = Math.sin(k * x), cx = Math.cos(k * x);
+  const sy = Math.sin(k * y), cy = Math.cos(k * y);
+  const sz = Math.sin(k * z), cz = Math.cos(k * z);
+  out.set(k * (cx * cy - sz * sx), k * (-sx * sy + cy * cz), k * (-sy * sz + cz * cx));
+  return out;
+}
+// Marching tetrahedra over a regular cube grid -> BufferGeometry of the gyroid iso=0 surface.
+// Each cube splits into 6 tets sharing the (0,0,0)-(1,1,1) diagonal; per-tet 16-case lookup.
+function _gyroidMesh(halfExt, RES) {
+  const TE = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]];
+  const TETS = [[0, 1, 3, 7], [0, 3, 2, 7], [0, 2, 6, 7], [0, 6, 4, 7], [0, 4, 5, 7], [0, 5, 1, 7]];
+  const MT = [
+    [], [0, 1, 2], [0, 3, 4], [1, 2, 4, 1, 4, 3],
+    [1, 3, 5], [0, 2, 5, 0, 5, 3], [0, 1, 5, 0, 5, 4], [2, 4, 5],
+    [2, 4, 5], [0, 1, 5, 0, 5, 4], [0, 2, 5, 0, 5, 3], [1, 3, 5],
+    [1, 2, 4, 1, 4, 3], [0, 3, 4], [0, 1, 2], []
+  ];
+  const OFF = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+  const N = RES, S = (2 * halfExt) / N, stride = N + 1, stride2 = stride * stride;
+  const grid = new Float32Array(stride * stride * stride);
+  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) for (let k = 0; k <= N; k++) {
+    grid[i * stride2 + j * stride + k] = gyroidValue(-halfExt + i * S, -halfExt + j * S, -halfExt + k * S);
+  }
+  const positions = [], normals = [], _gn = new THREE.Vector3();
+  const cv = new Array(8), cp = new Array(8);
+  for (let c = 0; c < 8; c++) cp[c] = [0, 0, 0];
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+    for (let c = 0; c < 8; c++) {
+      const o = OFF[c];
+      cv[c] = grid[(i + o[0]) * stride2 + (j + o[1]) * stride + (k + o[2])];
+      cp[c][0] = -halfExt + (i + o[0]) * S;
+      cp[c][1] = -halfExt + (j + o[1]) * S;
+      cp[c][2] = -halfExt + (k + o[2]) * S;
+    }
+    for (let t = 0; t < 6; t++) {
+      const tet = TETS[t];
+      const v0 = cv[tet[0]], v1 = cv[tet[1]], v2 = cv[tet[2]], v3 = cv[tet[3]];
+      let idx = 0;
+      if (v0 >= 0) idx |= 1; if (v1 >= 0) idx |= 2;
+      if (v2 >= 0) idx |= 4; if (v3 >= 0) idx |= 8;
+      const tri = MT[idx]; if (!tri.length) continue;
+      const pa = cp[tet[0]], pb = cp[tet[1]], pc = cp[tet[2]], pd = cp[tet[3]];
+      const vs = [v0, v1, v2, v3], ps = [pa, pb, pc, pd];
+      for (let n = 0; n < tri.length; n++) {
+        const e = tri[n], a = TE[e][0], b = TE[e][1];
+        const va = vs[a], vb = vs[b], denom = vb - va;
+        const u = Math.abs(denom) < 1e-8 ? 0.5 : -va / denom;
+        const px = ps[a][0] + u * (ps[b][0] - ps[a][0]);
+        const py = ps[a][1] + u * (ps[b][1] - ps[a][1]);
+        const pz = ps[a][2] + u * (ps[b][2] - ps[a][2]);
+        positions.push(px, py, pz);
+        gyroidGrad(px, py, pz, _gn); const m = _gn.length() || 1;
+        normals.push(-_gn.x / m, -_gn.y / m, -_gn.z / m);
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geo;
+}
+function makeManifoldLattice() {
+  const halfExt = GY_HALF;
+  const group = new THREE.Group();
+  // Translucent gyroid surface -- semi-transparent membrane so the marble is visible inside.
+  const meshGeo = _gyroidMesh(halfExt, 40);
+  const meshMat = new THREE.MeshPhysicalMaterial({
+    color: 0x6699ff, emissive: 0x111a44, emissiveIntensity: 0.32,
+    metalness: 0.05, roughness: 0.18,
+    transmission: 0.55, thickness: 0.3, ior: 1.32,
+    transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+    depthWrite: false, envMap, envMapIntensity: 1.4,
+    clearcoat: 0.6, clearcoatRoughness: 0.25
+  });
+  const surfaceMesh = new THREE.Mesh(meshGeo, meshMat); surfaceMesh.renderOrder = -1;
+  group.add(surfaceMesh);
+  // Inner glow points -- ride the iso surface for a luminous chamber-edge feel.
+  const samples = [], colors = [], N = 40;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let q = 0; q < N; q++) {
+    const x = (i / (N - 1) - 0.5) * 2 * halfExt;
+    const y = (j / (N - 1) - 0.5) * 2 * halfExt;
+    const z = (q / (N - 1) - 0.5) * 2 * halfExt;
+    if (Math.abs(gyroidValue(x, y, z)) < 0.06) {
+      samples.push(x, y, z);
+      const t = y / halfExt * 0.5 + 0.5;
+      colors.push(0.30 + 0.30 * (1 - t), 0.55 + 0.20 * t, 0.95);
+    }
+  }
+  const pgeo = new THREE.BufferGeometry();
+  pgeo.setAttribute('position', new THREE.Float32BufferAttribute(samples, 3));
+  pgeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  group.add(new THREE.Points(pgeo, new THREE.PointsMaterial({
+    size: 0.07, vertexColors: true, transparent: true, opacity: 0.6,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  })));
+  // Outer cage so the cube silhouette stays legible against the deep starfield.
+  const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(halfExt * 2, halfExt * 2, halfExt * 2));
+  group.add(new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x2244aa, transparent: true, opacity: 0.45 })));
+  group.renderOrder = -1;
+  boardGroup.add(group);
+  group.userData.surfaceMesh = surfaceMesh;
+  return group;
+}
+let glbOverlay = makeManifoldLattice();
+// Per-cell sphere obstacles in nodePositions handle the cell-snap collisions; the lattice
+// itself is decorative, so the GLB collider arrays stay empty and the bounce/safety helpers no-op.
+const glbColliders = [];
 const glbRay = new THREE.Raycaster();
 const glbDir = new THREE.Vector3();
 const glbN = new THREE.Vector3();
 const glbNMat = new THREE.Matrix3();
-// Load the real connect4.glb manifold and use it as the visible structure.
-// Exposes a promise so the preloader can wait for the cube before fading.
-const glbReady = new Promise((resolve) => {
-  if (typeof THREE.GLTFLoader !== 'function') { glbOverlay = makeSchwartzShell(); resolve('fallback'); return; }
-  const loader = new THREE.GLTFLoader();
-  loader.load('assets/models/connect4.glb', gltf => {
-    const root = gltf.scene || gltf.scenes[0];
-    // Auto-fit the model into the lattice volume.
-    const box = new THREE.Box3().setFromObject(root);
-    const size = new THREE.Vector3(); box.getSize(size);
-    const center = new THREE.Vector3(); box.getCenter(center);
-    const targetSize = CELL * (G - 1) * 1.05;
-    const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scl = targetSize / maxDim;
-    root.scale.setScalar(scl);
-    root.position.set(-center.x * scl, -center.y * scl + 0.5, -center.z * scl);
-    root.updateMatrixWorld(true);
-    root.traverse(o => {
-      if (o.isMesh && o.material) {
-        const mats = Array.isArray(o.material) ? o.material : [o.material];
-        mats.forEach(m => {
-          m.envMap = envMap; m.envMapIntensity = 1.8;
-          if ('metalness' in m) m.metalness = Math.max(m.metalness, 0.55);
-          if ('roughness' in m) m.roughness = Math.min(m.roughness, 0.25);
-          if ('clearcoat' in m) { m.clearcoat = 1.0; m.clearcoatRoughness = 0.05; }
-          m.transparent = true;
-          m.opacity = 0.33;
-          m.depthWrite = false;
-          m.side = THREE.DoubleSide; // collide on both faces of thin walls
-          m.needsUpdate = true;
-        });
-        if (o.geometry && !o.geometry.boundsTree) {
-          o.geometry.computeBoundingBox();
-          o.geometry.computeBoundingSphere();
-        }
-        glbColliders.push(o);
-      }
-    });
-    boardGroup.add(root);
-    glbOverlay = root;
-    resolve('glb');
-  }, evt => {
-    // GLTFLoader emits ProgressEvent with loaded/total bytes when the server provides Content-Length.
-    if (typeof window.onGlbProgress === 'function') {
-      const frac = (evt && evt.lengthComputable && evt.total) ? (evt.loaded / evt.total) : 0;
-      window.onGlbProgress(frac);
-    }
-  }, err => { console.warn('connect4.glb failed, using procedural fallback', err); glbOverlay = makeSchwartzShell(); resolve('fallback'); });
-});
-// Ball radius is intentionally small relative to CELL so it fits through the gyroid passages.
-// Passage half-width in a Schwarz-D pattern with period 2*CELL is roughly 0.4*CELL ≈ 1.12;
-// BALL_R = 0.18 leaves ~0.94 units of clearance, plenty to roll along contours without snagging.
+const glbReady = Promise.resolve('procedural');
+// Ball radius is intentionally small relative to the gyroid period so it fits through passages.
+// With 7 periods across the diameter (period = 2*GY_HALF/7 ~ 1.25), the passage cross-section
+// half-width is roughly 0.32 * period ~ 0.40; BALL_R = 0.18 leaves ~0.22 of clearance per side.
 const CELL = 2.8, BALL_R = 0.18;
 function nodePos(gx, gy, gz) { return new THREE.Vector3((gx - 1.5) * CELL, (gy - 1.5) * CELL * 0.92 + 0.5, (gz - 1.5) * CELL); }
 // Saddle/tube lattice (z=xy surfaces) removed -- the GLB manifold is now the only visible structure.
@@ -139,9 +214,10 @@ function makeBallMat(p, ei) {
   const c = BCOLS[p];
   return new THREE.MeshPhysicalMaterial({
     color: c.base, emissive: c.emissive, emissiveIntensity: ei != null ? ei : 0.12,
-    metalness: 0.35, roughness: 0.08,
-    clearcoat: 1.0, clearcoatRoughness: 0.015,
-    envMap, envMapIntensity: 2.6, reflectivity: 1.0
+    metalness: 0.25, roughness: 0.04,
+    clearcoat: 1.0, clearcoatRoughness: 0.008,
+    envMap, envMapIntensity: 3.2, reflectivity: 1.0,
+    sheen: 0.4, sheenColor: new THREE.Color(c.glow), sheenRoughness: 0.25
   });
 }
 function makeFallingBallMat(p) { return makeBallMat(p, 0.18); }
@@ -292,23 +368,65 @@ const TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;    // initial ghost-ball hove
 // gives a small headroom above that, floor mirrors below.
 const Y_CEIL = PLAY_HX + CELL * 1.2 + BALL_R;
 const FLOOR_Y = -(PLAY_HX + CELL * 1.2 + BALL_R);
-// Gyroid SDF for collision: g = sin(kx)cos(ky) + sin(ky)cos(kz) + sin(kz)cos(kx).
-// With k = pi / CELL the period is 2*CELL, so cells alternate as gyroid pockets.
-const GY_K = Math.PI / CELL;
-const WALL_THRESHOLD = 0.55;   // |g| > threshold = "inside" the gyroid wall
-function gyroidValue(x, y, z) {
-  const sx = Math.sin(GY_K * x), cx = Math.cos(GY_K * x);
-  const sy = Math.sin(GY_K * y), cy = Math.cos(GY_K * y);
-  const sz = Math.sin(GY_K * z), cz = Math.cos(GY_K * z);
-  return sx * cy + sy * cz + sz * cx;
-}
-function gyroidGrad(x, y, z, out) {
-  const k = GY_K;
-  const sx = Math.sin(k * x), cx = Math.cos(k * x);
-  const sy = Math.sin(k * y), cy = Math.cos(k * y);
-  const sz = Math.sin(k * z), cz = Math.cos(k * z);
-  out.set(k * (cx * cy - sz * sx), k * (-sx * sy + cy * cz), k * (-sy * sz + cz * cx));
-  return out;
+// Gyroid path-following physics: ball "meanders" along the iso=0 surface contours.
+// Soft regime: a gradient force pushes the ball out of wall lobes (|g| > WALL_THRESHOLD)
+// toward the nearest passage. Hard regime: when the ball is buried deep in a wall lobe
+// (|g| > WALL_HARD), reflect velocity along the surface normal so it cannot tunnel
+// through. Tangential velocity is preserved with high retention so the ball keeps
+// following the gyroid path; spin is updated from (n x v) so visual rotation matches.
+const WALL_HARD = 1.55;
+const _gyLocal = new THREE.Vector3();
+const _gyN = new THREE.Vector3();
+function gyroidGuide(dt) {
+  if (!physBall || physBall.settled) return;
+  _gyLocal.set(physBall.x, physBall.y, physBall.z);
+  boardGroup.worldToLocal(_gyLocal);
+  if (Math.abs(_gyLocal.x) > GY_HALF || Math.abs(_gyLocal.y) > GY_HALF || Math.abs(_gyLocal.z) > GY_HALF) return;
+  const g = gyroidValue(_gyLocal.x, _gyLocal.y, _gyLocal.z);
+  const ag = Math.abs(g);
+  if (ag < WALL_THRESHOLD) return;
+  gyroidGrad(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyN);
+  const gmag = _gyN.length();
+  if (gmag < 1e-4) return;
+  // Outward normal points from inside the wall toward the iso=0 passage (sign opposite to g).
+  _gyN.multiplyScalar(-Math.sign(g) / gmag);
+  _gyN.transformDirection(boardGroup.matrixWorld); // local rotation -> world (no scale)
+  if (ag < WALL_HARD) {
+    // Soft regime: gentle nudge toward passage, scaled by depth into wall.
+    const depth = (ag - WALL_THRESHOLD) / (WALL_HARD - WALL_THRESHOLD);
+    const F = 95 * depth;
+    physBall.vx += _gyN.x * F * dt;
+    physBall.vy += _gyN.y * F * dt;
+    physBall.vz += _gyN.z * F * dt;
+    physBall.spinX += (_gyN.y * physBall.vz - _gyN.z * physBall.vy) * 0.012 * dt;
+    physBall.spinY += (_gyN.z * physBall.vx - _gyN.x * physBall.vz) * 0.012 * dt;
+    physBall.spinZ += (_gyN.x * physBall.vy - _gyN.y * physBall.vx) * 0.012 * dt;
+    return;
+  }
+  // Hard regime: project ball back to the WALL_HARD shell along the outward normal,
+  // then reflect velocity with high tangential retention so the ball rolls along the
+  // wall surface rather than dying on impact.
+  const overshoot = (ag - WALL_HARD) / gmag;          // local-space distance into wall
+  physBall.x += _gyN.x * overshoot;
+  physBall.y += _gyN.y * overshoot;
+  physBall.z += _gyN.z * overshoot;
+  const vn = physBall.vx * _gyN.x + physBall.vy * _gyN.y + physBall.vz * _gyN.z;
+  if (vn < 0) {
+    Audio4D.onTap(-vn);
+    physBall.vx -= (1 + RESTIT) * vn * _gyN.x;
+    physBall.vy -= (1 + RESTIT) * vn * _gyN.y;
+    physBall.vz -= (1 + RESTIT) * vn * _gyN.z;
+    const vAfterN = physBall.vx * _gyN.x + physBall.vy * _gyN.y + physBall.vz * _gyN.z;
+    const vtx = physBall.vx - vAfterN * _gyN.x;
+    const vty = physBall.vy - vAfterN * _gyN.y;
+    const vtz = physBall.vz - vAfterN * _gyN.z;
+    physBall.vx = _gyN.x * vAfterN + vtx * 0.97;
+    physBall.vy = _gyN.y * vAfterN + vty * 0.97;
+    physBall.vz = _gyN.z * vAfterN + vtz * 0.97;
+    physBall.spinX += (_gyN.y * vtz - _gyN.z * vty) * 0.07;
+    physBall.spinY += (_gyN.z * vtx - _gyN.x * vtz) * 0.07;
+    physBall.spinZ += (_gyN.x * vty - _gyN.y * vtx) * 0.07;
+  }
 }
 // Lattice-node sphere obstacles (visible saddle tiles): ball bounces off them.
 const NODE_R = CELL * 0.32; // collision radius for each saddle node
@@ -712,6 +830,7 @@ function physSubstep(dt) {
   physBall.vx *= BALL_AIR; physBall.vz *= BALL_AIR;
   collideBallVsGlb(px, py, pz);
   safetyScanGlb();
+  gyroidGuide(dt);
   // Collide against each visible lattice node treated as a sphere obstacle.
   for (let i = 0; i < nodePositions.length; i++) {
     const n = nodePositions[i].p;
@@ -868,9 +987,7 @@ window.addEventListener('resize', () => { camera.aspect = window.innerWidth / wi
 function setPreloadProgress(p) { document.getElementById('pre-bar').style.width = p + '%'; }
 function setPreloadMsg(m) { const el = document.getElementById('pre-msg'); if (el) el.textContent = m; }
 function finishPreload() { const pre = document.getElementById('preloader'); pre.style.opacity = '0'; setTimeout(() => pre.style.display = 'none', 850); }
-// GLB load reserves the 30%-95% band of the bar so the cube is the visible bottleneck.
-window.onGlbProgress = function (frac) { setPreloadProgress(30 + Math.max(0, Math.min(1, frac)) * 65); };
-// Bootstrap: load scenarios from manifest (attribute), then wait for the manifold cube before fading.
+// Bootstrap: load scenarios from manifest, then settle the manifold lattice before fading.
 camera.position.copy(CAM_PRESETS.A.pos); camera.lookAt(CAM_PRESETS.A.target);
 camPos.copy(CAM_PRESETS.A.pos); camPosT.copy(CAM_PRESETS.A.pos);
 requestAnimationFrame(animate);
@@ -878,9 +995,9 @@ const manifestReady = fetch('./manifold.game.json').then(r => r.json()).then(cfg
   SCENARIOS = (cfg.attributes && cfg.attributes.scenarios) || [];
   selectedScenario = SCENARIOS[0] || null;
   buildScenarioSelect();
-  setPreloadProgress(30);
-  setPreloadMsg('LOADING MANIFOLD CUBE...');
-}).catch(err => { console.error('manifold.game.json load failed', err); setPreloadProgress(30); });
+  setPreloadProgress(70);
+  setPreloadMsg('SETTLING MANIFOLD LATTICE...');
+}).catch(err => { console.error('manifold.game.json load failed', err); setPreloadProgress(70); });
 Promise.all([manifestReady, glbReady]).then(() => {
   setPreloadProgress(100);
   setPreloadMsg('READY');

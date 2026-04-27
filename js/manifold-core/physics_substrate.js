@@ -38,13 +38,13 @@ class PhysicsSubstrate extends SubstrateBase {
    * Different games provide different physics data; this normalizes it.
    */
   extract(coordinate) {
-    const raw = this.manifold.read(coordinate);
-
-    if (!raw) {
-      return this._getDefaults();
-    }
-
+    // Reversal: physics defaults derive from the field, stored bodies layer
+    // on top. Gravity defaults to 0 even when the field is calm; non-zero
+    // stored gravity wins. Same shape as before — validators stay green.
+    const view = this.observeField(coordinate);
+    const raw = (this.manifold && this.manifold.read ? this.manifold.read(coordinate) : null) || {};
     return {
+      ...view,
       bodies: this._extractBodies(raw),
       gravity: raw.gravity !== undefined ? raw.gravity : 0,
       airResistance: raw.airResistance !== undefined ? raw.airResistance : 0.99,

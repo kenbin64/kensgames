@@ -1477,7 +1477,6 @@
         }
     </style>
     <script src="/js/analytics.js"></script>
-    <script src="/js/access_status.js" defer></script>
     <script src="/js/imgatlas.js?v=20260418" defer></script>
 </head>
 
@@ -1502,7 +1501,6 @@
             </ul>
             <div class="nav-auth">
                 <div id="kg-player"></div>
-                <div id="access-status"></div>
             </div>
         </nav>
     </header>
@@ -1545,15 +1543,14 @@
                 <p>A new breed of arcade gaming where every game, every score, and every player exists in a unified
                     geometric space. No ads. No pay-to-win. Just pure skill.</p>
                 <div class="hero-cta">
-                    <a class="btn-play" href="/lobby/"
-                        style="text-decoration:none;display:inline-flex;align-items:center">&#9654; ENTER ARCADE</a>
+                    <a class="btn-play" href="#games"
+                        style="text-decoration:none;display:inline-flex;align-items:center">&#9654; PLAY NOW</a>
                     <a class="btn-ghost btn-play"
                         style="background:transparent;color:var(--neon-cyan);border:2px solid var(--neon-cyan);box-shadow:var(--glow-cyan);text-decoration:none;display:inline-flex;align-items:center"
-                        href="/fasttrack/">GUEST MODE</a>
+                        href="/fasttrack/">FASTTRACK &#9654;</a>
                 </div>
-                <div class="hero-note">Free account &nbsp;&#9632;&nbsp; Global leaderboards &nbsp;&#9632;&nbsp;
-                    Cross-game
-                    achievements &nbsp;&#9632;&nbsp; No credit card</div>
+                <div class="hero-note">Free &nbsp;&#9632;&nbsp; Play with bots &nbsp;&#9632;&nbsp;
+                    Play with friends via code or link &nbsp;&#9632;&nbsp; No signup</div>
             </div>
 
             <div class="arcade-wall" aria-label="Arcade consoles">
@@ -1873,66 +1870,6 @@
         </div>
     </section>
 
-    <div class="modal-overlay" id="auth-modal">
-        <div class="modal">
-            <button class="modal-close" onclick="closeModal()">&#10005;</button>
-            <div class="modal-tabs">
-                <button class="modal-tab active" onclick="switchTab('login')">Sign In</button>
-                <button class="modal-tab" onclick="switchTab('register')">Join Free</button>
-                <button class="modal-tab" onclick="switchTab('forgot')">Forgot Password</button>
-            </div>
-            <div class="modal-panel active" id="panel-login">
-                <h3>Sign In</h3>
-                <div class="modal-sub">Welcome back, player. Your stats await.</div>
-                <form onsubmit="handleLogin(event)">
-                    <div class="form-group"><label>Email or Username</label><input type="text" id="login-user"
-                            placeholder="player@kensgames.com" required></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="login-pass"
-                            placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required></div>
-                    <button type="submit" class="form-submit">&#9654; SIGN IN</button>
-                    <div class="form-msg" id="login-msg"></div>
-                </form>
-                <div style="margin-top:20px;border-top:1px solid rgba(0,255,255,0.1);padding-top:20px">
-                    <button class="btn-ghost" style="width:100%;margin-bottom:8px"
-                        onclick="oauthLogin('google')">Continue with Google</button>
-                    <button class="btn-ghost" style="width:100%;" onclick="oauthLogin('discord')">Continue with
-                        Discord</button>
-                </div>
-                <div class="form-footer">No account? <a onclick="switchTab('register')">Join free</a> &nbsp;|&nbsp; <a
-                        onclick="switchTab('forgot')">Forgot password?</a></div>
-            </div>
-            <div class="modal-panel" id="panel-register">
-                <h3>Join Free</h3>
-                <div class="modal-sub">Create your player profile. Zero cost, forever.</div>
-                <form onsubmit="handleRegister(event)">
-                    <div class="form-group"><label>Username</label><input type="text" id="reg-username"
-                            placeholder="ArcadeHero99" required minlength="3"></div>
-                    <div class="form-group"><label>Email</label><input type="email" id="reg-email"
-                            placeholder="you@email.com" required></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="reg-pass"
-                            placeholder="Min 8 characters" required minlength="8"></div>
-                    <button type="submit" class="form-submit"
-                        style="background:var(--neon-pink);box-shadow:var(--glow-pink)">&#9654; CREATE ACCOUNT</button>
-                    <div class="form-msg" id="reg-msg"></div>
-                </form>
-                <div class="form-footer">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
-            </div>
-            <div class="modal-panel" id="panel-forgot">
-                <h3>Reset Password</h3>
-                <div class="modal-sub">Enter your email and we will send a reset link.</div>
-                <form onsubmit="handleForgot(event)">
-                    <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email"
-                            placeholder="you@email.com" required></div>
-                    <button type="submit" class="form-submit"
-                        style="background:var(--neon-purple);border-color:var(--neon-purple);box-shadow:var(--glow-pink)">&#9654;
-                        SEND RESET LINK</button>
-                    <div class="form-msg" id="forgot-msg"></div>
-                </form>
-                <div class="form-footer"><a onclick="switchTab('login')">&#8592; Back to Sign In</a></div>
-            </div>
-        </div>
-    </div>
-
     <!-- ── ABOUT ─────────────────────────────────────────────── -->
     <section class="page-section" id="about">
         <div class="section-header">
@@ -2167,7 +2104,7 @@
             <div class="footer-col">
                 <h4>Portal</h4>
                 <ul>
-                    <li><a href="/lobby/">Game Lobby</a></li>
+                    <li><a href="#games">Games</a></li>
                     <li><a href="/discover.html">Discover</a></li>
                     <li><a href="#engine">The Engine</a></li>
                     <li><a href="#upcoming">Coming Soon</a></li>
@@ -2210,93 +2147,7 @@
             container.appendChild(s);
         }
 
-        function openModal(tab) {
-            document.getElementById('auth-modal').classList.add('open');
-            switchTab(tab || 'login');
-        }
-        function closeModal() {
-            document.getElementById('auth-modal').classList.remove('open');
-        }
-        document.getElementById('auth-modal').addEventListener('click', e => {
-            if (e.target === e.currentTarget) closeModal();
-        });
-        function switchTab(tab) {
-            const tabs = ['login', 'register', 'forgot'];
-            document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
-            document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
-            document.getElementById('panel-' + tab).classList.add('active');
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const msg = document.getElementById('login-msg');
-            msg.textContent = 'Authenticating...'; msg.className = 'form-msg';
-            try {
-                const res = await fetch('/api/auth/login', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: document.getElementById('login-user').value, password: document.getElementById('login-pass').value })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    localStorage.setItem('user_token', data.token);
-                    localStorage.setItem('username', data.username || data.user?.username);
-                    msg.textContent = 'Welcome back!'; msg.className = 'form-msg ok';
-                    setTimeout(() => { closeModal(); window.location.href = '/lobby'; }, 800);
-                } else {
-                    msg.textContent = data.error || data.message || 'Invalid credentials'; msg.className = 'form-msg err';
-                }
-            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const msg = document.getElementById('reg-msg');
-            msg.textContent = 'Creating account...'; msg.className = 'form-msg';
-            try {
-                const res = await fetch('/api/auth/register', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: document.getElementById('reg-username').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    msg.textContent = 'Account created! Check your email to verify.'; msg.className = 'form-msg ok';
-                    setTimeout(() => switchTab('login'), 2500);
-                } else {
-                    msg.textContent = data.error || data.message || 'Registration failed'; msg.className = 'form-msg err';
-                }
-            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
-        }
-
-        async function handleForgot(e) {
-            e.preventDefault();
-            const msg = document.getElementById('forgot-msg');
-            msg.textContent = 'Sending reset link...'; msg.className = 'form-msg';
-            try {
-                const res = await fetch('/api/auth/forgot-password', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: document.getElementById('forgot-email').value })
-                });
-                const data = await res.json();
-                msg.textContent = res.ok ? 'Reset link sent - check your inbox' : (data.error || data.message || 'Error');
-                msg.className = 'form-msg ' + (res.ok ? 'ok' : 'err');
-            } catch { msg.textContent = 'Connection error'; msg.className = 'form-msg err'; }
-        }
-
-        function oauthLogin(provider) { window.location.href = '/api/auth/' + provider; }
-        function playAsGuest() {
-            localStorage.setItem('user_token', 'guest-' + Date.now());
-            // Let the player choose a real profile even as a guest.
-            localStorage.removeItem('username');
-            localStorage.removeItem('display_name');
-            KGPlayerProfile.ensure(true, () => { window.location.href = '/lobby/'; });
-        }
-        function goToGame(path) {
-            // Player profile required before entering any game.
-            KGPlayerProfile.ensure(true, () => { window.location.href = path; });
-        }
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-        const urlParam = new URLSearchParams(location.search).get('modal');
-        if (urlParam) openModal(urlParam);
+        function goToGame(path) { window.location.href = path; }
 
         // Replace heavyweight PNG thumbnails with fast JSON atlases when available.
         (function applyAtlasesEarly() {

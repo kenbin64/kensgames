@@ -1093,6 +1093,25 @@ const Manifold = (() => {
     // Surface math (pure functions, zero storage)
     surface: { gyroid, diamond, blend, diamondGrad },
 
+    // TPMS field kernel (Gyroid + Schwartz Diamond + trig). The runtime
+    // manifold the four-function loop (observe / solve / collapse / bloom)
+    // operates on. Loaded from js/manifold-field.js — same module the
+    // server consumes via require(), so client and server share one fabric.
+    field: (typeof window !== 'undefined' && window.ManifoldField)
+      || (typeof globalThis !== 'undefined' && globalThis.ManifoldField)
+      || (typeof require === 'function' ? (() => { try { return require('./manifold-field.js'); } catch (e) { return null; } })() : null),
+
+    // Four-function loop: observe → solve → collapse → bloom. Operates on
+    // the field above; consumed by the lobby and per-game lenses.
+    loop: (typeof window !== 'undefined' && window.ManifoldLoop)
+      || (typeof globalThis !== 'undefined' && globalThis.ManifoldLoop)
+      || (typeof require === 'function' ? (() => { try { return require('./manifold-loop.js'); } catch (e) { return null; } })() : null),
+
+    // Append-only seed log — the backup. memory() everywhere, file(path) in Node.
+    seedLog: (typeof window !== 'undefined' && window.ManifoldSeedLog)
+      || (typeof globalThis !== 'undefined' && globalThis.ManifoldSeedLog)
+      || (typeof require === 'function' ? (() => { try { return require('./manifold-seedlog.js'); } catch (e) { return null; } })() : null),
+
     // 🍴 Dining Philosophers — fork-based race condition eliminator
     // Every app/game shares this. No duplication.
     DiningPhilosophers,

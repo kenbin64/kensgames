@@ -483,19 +483,12 @@
           board tracks every run.</div>
         <div class="mode-avail">Available &bull; All skill levels</div>
       </div>
-      <div class="mode-card" onclick="startMatchmaker()">
-        <span class="mode-icon" style="color:#FF00FF">&#9889;</span>
-        <div class="mode-title">Versus Mode</div>
-        <div class="mode-desc">Two pilots, one sector. First to 10 kills or highest score when time expires wins. Login
-          required.</div>
-        <div class="mode-avail" id="mm-avail">Login required</div>
-      </div>
       <div class="mode-card" onclick="togglePrivate()">
         <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Wing Squad</div>
-        <div class="mode-desc">Fly with a friend. Create a squad room and share the code. No account needed to join.
-        </div>
-        <div class="mode-avail">No login to join</div>
+        <div class="mode-title">Play with Friends</div>
+        <div class="mode-desc">Fly with friends. Create a squad room and share the 6-character code or link. No account
+          needed.</div>
+        <div class="mode-avail">Free &bull; No signup</div>
       </div>
       <div class="mode-card" onclick="toggleBrowse()">
         <span class="mode-icon" style="color:#4488FF">&#128269;</span>
@@ -587,30 +580,11 @@
     </div>
   </div>
 
-  <!-- Post-game prompt for guests -->
-  <div class="postgame-modal" id="postgame">
-    <div class="postgame-box">
-      <div style="font-size:48px;margin-bottom:12px;">&#127942;</div>
-      <div class="postgame-title">Mission Complete!</div>
-      <div class="postgame-sub">Great flying, pilot! Create a free account to save your kill record to the galactic
-        leaderboard and track your progress across all KensGames.</div>
-      <div class="postgame-btns">
-        <a href="/register" class="btn btn-p">&#9654; Create Account</a>
-        <button class="btn btn-ghost" onclick="document.getElementById('postgame').classList.remove('open')">Maybe
-          Later</button>
-      </div>
-    </div>
-  </div>
-
   <script src="/js/substrates/avatar_picker.js"></script>
-  <script src="/js/require_auth.js"></script>
-  <script src="/js/access_session_bridge.js"></script>
   <script src="/js/multiplayer-client.js"></script>
   <script src="/starfighter/multiplayer.js"></script>
   <script>
-    let token = localStorage.getItem('user_token');
     let username = localStorage.getItem('username') || 'Pilot';
-    let isGuest = !token || String(token).startsWith('guest-');
     const av = AvatarPicker.get();
     document.getElementById('p-name').textContent = username;
     AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
@@ -618,37 +592,6 @@
     badge.textContent = av ? av.emoji : '?';
     if (!av) badge.style.color = 'var(--np)';
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
-
-    if (!isGuest) document.getElementById('mm-avail').textContent = 'Available \u2022 Find opponent';
-
-    function _refreshAuthFromStorage() {
-      token = localStorage.getItem('user_token');
-      username = localStorage.getItem('username') || 'Pilot';
-      isGuest = !token || String(token).startsWith('guest-');
-      document.getElementById('p-name').textContent = username;
-      document.getElementById('mm-avail').textContent = !isGuest
-        ? 'Available \u2022 Find opponent'
-        : 'Login required';
-    }
-
-    async function _maybeUpgradeFromAccess() {
-      if (!isGuest) return true;
-      if (!window.KGAccessSession || typeof window.KGAccessSession.ensure !== 'function') return false;
-      const r = await window.KGAccessSession.ensure();
-      if (r && r.token) {
-        _refreshAuthFromStorage();
-        return !isGuest;
-      }
-      return false;
-    }
-
-    // Best-effort: if already authenticated via Access, mint a normal JWT so we don't require a second login.
-    _maybeUpgradeFromAccess();
-
-    // Show post-game prompt if URL has ?postgame=1 (set by game after session ends for guests)
-    if (new URLSearchParams(location.search).get('postgame') === '1' && !token) {
-      document.getElementById('postgame').classList.add('open');
-    }
 
     // ── Desktop download banner ──────────────────────────────────
     // Hide entirely when already running inside Electron
@@ -824,17 +767,7 @@
       window.location.href = '/starfighter/index.html?mode=solo';
     }
 
-    async function startMatchmaker() {
-      if (isGuest) {
-        if (window.KGRequireAuth && typeof window.KGRequireAuth.guard === 'function') {
-          await window.KGRequireAuth.guard({ allowGuest: false });
-          _refreshAuthFromStorage();
-          if (isGuest) return;
-        } else {
-          const ok = await _maybeUpgradeFromAccess();
-          if (!ok) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; }
-        }
-      }
+    function startMatchmaker() {
       if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
       _setPrivStatus('Matchmaking: finding opponent...', false);
       document.getElementById('priv-panel').classList.add('open');
@@ -979,11 +912,7 @@
       }).join('');
     }
 
-    async function joinBrowseRoom(code) {
-      if (isGuest) {
-        const ok = await _maybeUpgradeFromAccess();
-        if (!ok) { window.location.href = '/login?redirect=/starfighter/lobby.html'; return; }
-      }
+    function joinBrowseRoom(code) {
       if (!AvatarPicker.has()) { AvatarPicker.show(() => joinBrowseRoom(code), true); return; }
       document.getElementById('priv-panel').classList.add('open');
       privTab('join');
