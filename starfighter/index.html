@@ -2598,14 +2598,18 @@
   </div>
 
   <!-- ═══ LOADING SPINNER — shown until all assets preloaded ═══ -->
-  <!-- Fullscreen resume overlay + button (hidden until ESC exits immersion) -->
+  <!-- Fullscreen resume overlay + button (visible whenever pointer-lock isn't held) -->
   <div id="fs-resume-overlay"></div>
-  <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO RESUME</div>
+  <div id="fs-resume" onclick="SFInput.enterImmersive()">&#9654; CLICK TO ENGAGE FLIGHT CONTROLS</div>
 
   <div id="loading-screen"
     style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999">
-    <img src="assets/textures/starfighterlogo.png" alt="STARFIGHTER"
-      style="max-width:320px;width:80%;margin-bottom:32px;filter:drop-shadow(0 0 20px rgba(0,255,255,0.4))">
+    <div
+      style="font-family:'Orbitron','Courier New',monospace;color:#0ff;font-size:36px;letter-spacing:0.45em;font-weight:700;margin-bottom:8px;text-shadow:0 0 18px rgba(0,255,255,0.45)">
+      STARFIGHTER</div>
+    <div
+      style="font-family:'Courier New',monospace;color:rgba(0,255,255,0.55);font-size:11px;letter-spacing:0.4em;margin-bottom:36px">
+      HOLD THE LINE</div>
     <div
       style="width:64px;height:64px;border:4px solid rgba(0,255,255,0.15);border-top:4px solid #0ff;border-radius:50%;animation:spin 1s linear infinite">
     </div>
@@ -2772,10 +2776,12 @@
       AGAIN</button>
   </div>
 
-  <!-- Manifold Architecture -->
-  <!-- Native Platform Bridge (Electron/Capacitor/Browser) -->
-  <!-- Three.js -->
-  <!-- Manifold Substrates (Dimensional Programming) -->
+  <!-- Three.js (global THREE + GLTFLoader) — required by bundle.js, intro.js, enhance.js -->
+  <script src="/lib/three/three.min.js"></script>
+  <script src="/lib/three/GLTFLoader.js"></script>
+  <!-- Unified Manifold core + bridge — bundle.js's SpaceManifold delegates to window.Manifold -->
+  <script src="/js/manifold.js"></script>
+  <script src="/js/manifold_bridge.js"></script>
   <!-- Game Logic -->
   <script>
     window.addEventListener('DOMContentLoaded', () => {
@@ -2802,7 +2808,15 @@
       });
     });
   </script>
-  <script src="starfighter.bundle.js?v=e6b330034c8e3049"></script>
+  <!-- Input subsystem (window.SFInput) — bundle.js consumes but does not define it -->
+  <script src="input.js?v=20260428d"></script>
+  <script src="bundle.js?v=20260428d"></script>
+  <!-- Codex / Enhance / Intro live outside bundle.js — load them as standalone scripts so the
+       cinematic prologue (SFIntro) auto-boots and the post-bundle enhancers can attach. -->
+  <script src="codex_data.js?v=20260428d"></script>
+  <script src="codex.js?v=20260428d"></script>
+  <script src="enhance.js?v=20260428d"></script>
+  <script src="intro.js?v=20260428d"></script>
 </body>
 
 </html>

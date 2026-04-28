@@ -132,12 +132,14 @@ const SFInput = (function () {
 
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement === document.body) {
-                // Locked — hide cursor
+                // Locked — hide cursor and the resume prompt
                 document.body.classList.add('immersed');
+                _setResumePromptVisible(false);
             } else {
-                // Pointer lock lost — pause game and allow in-game buttons
+                // Pointer lock lost — pause game, surface click-to-resume
                 document.body.classList.remove('immersed');
                 if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(true);
+                if (!_isElectron) _setResumePromptVisible(true);
             }
         });
 
@@ -612,9 +614,20 @@ const SFInput = (function () {
         toggle.innerText = panel.classList.contains('open') ? '◀' : '▶';
     }
 
+    // ── Resume prompt visibility helper (browser only) ──
+    function _setResumePromptVisible(visible) {
+        const btn = document.getElementById('fs-resume');
+        const dim = document.getElementById('fs-resume-overlay');
+        if (btn) btn.style.display = visible ? 'block' : 'none';
+        if (dim) dim.style.display = visible ? 'block' : 'none';
+    }
+
     // ── Immersive mode: fullscreen + pointer lock + cursor hidden ──
     function enterImmersive() {
         const _isElectron = !!(window.NativeApp && window.NativeApp.isElectron);
+
+        // Optimistically hide the resume prompt; pointerlockchange will re-show on failure.
+        _setResumePromptVisible(false);
 
         if (_isElectron) {
             // Electron: window is already fullscreen and frameless — just grab pointer lock
@@ -631,6 +644,12 @@ const SFInput = (function () {
             } else {
                 document.body.requestPointerLock();
             }
+            // Pointer lock requires user activation. If a deferred caller (e.g. setTimeout)
+            // invoked us, the request will be silently denied — surface the resume prompt
+            // so the player has a clickable target to grab input.
+            setTimeout(() => {
+                if (document.pointerLockElement !== document.body) _setResumePromptVisible(true);
+            }, 400);
         }
         document.body.classList.add('immersed');
         if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(false);

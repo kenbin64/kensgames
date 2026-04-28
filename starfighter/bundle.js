@@ -3372,12 +3372,15 @@ const SF3D = (function () {
   // LOD levels: [{ path, distance }] — distance is the camera distance at which
   // Three.js switches FROM this level to the next (coarser) one.
   // Model paths — single LOD using full original GLBs
+  // Preloaded entries point at the lightweight optimized LOD-tier so the
+  // loading screen clears quickly. Combat-only entries keep the full mesh
+  // since they lazy-load on first encounter once the game is already running.
   const GLB_LOD = {
     enemy: [
       { path: 'assets/models/AlienEnemyFighter.glb', distance: 0 },
     ],
     ally: [
-      { path: 'assets/models/HumanFriendlStarFighter.glb', distance: 0 },
+      { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 0 },
     ],
     'alien-baseship': [
       { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
@@ -3386,10 +3389,10 @@ const SF3D = (function () {
       { path: 'assets/models/AlienEnemyPreditorDrone.glb', distance: 0 },
     ],
     baseship: [
-      { path: 'assets/models/HumanSpaceBattleShip.glb', distance: 0 },
+      { path: 'assets/models/optimized/HumanSpaceBattleShip_lod2.glb', distance: 0 },
     ],
     station: [
-      { path: 'assets/models/HumanSpaceStationWithAritificalGravity.glb', distance: 0 },
+      { path: 'assets/models/optimized/HumanSpaceStationWithAritificalGravity_lod2.glb', distance: 0 },
     ],
     // New enemy types
     interceptor: [
@@ -3408,11 +3411,11 @@ const SF3D = (function () {
     medic: [
       { path: 'assets/models/freindly_medical_frigate.glb', distance: 0 },
     ],
-    // Earth uses full hi-poly model (single level) — it's always distant, always impressive
+    // Earth — small enough to keep full
     earth: [
       { path: 'assets/models/Earth.glb', distance: 0 },
     ],
-    // Moon uses full model — visible from combat area
+    // Moon — small enough to keep full
     moon: [
       { path: 'assets/models/moon.glb', distance: 0 },
     ],
@@ -3895,6 +3898,18 @@ const SF3D = (function () {
   let _modelsLoaded = 0;
   let _allModelsReady = false;
   let _onReadyCallback = null;
+  let _loadTimeoutId = null;
+  const _LOAD_TIMEOUT_MS = 25000; // hard cap — never let the spinner hang
+
+  function _markReady(reason) {
+    if (_allModelsReady) return;
+    _allModelsReady = true;
+    if (_loadTimeoutId) { clearTimeout(_loadTimeoutId); _loadTimeoutId = null; }
+    console.log('Models ready (' + reason + ') — clearing loading screen');
+    const loadScreen = document.getElementById('loading-screen');
+    if (loadScreen) loadScreen.style.display = 'none';
+    if (_onReadyCallback) _onReadyCallback();
+  }
 
   function _updateLoadingProgress(label) {
     _modelsLoaded++;
@@ -3903,13 +3918,7 @@ const SF3D = (function () {
     const text = document.getElementById('loading-text');
     if (bar) bar.style.width = pct + '%';
     if (text) text.textContent = label ? ('LOADING ' + label.toUpperCase() + '...') : ('LOADING ' + pct + '%');
-    if (_modelsLoaded >= _totalModelsToLoad) {
-      _allModelsReady = true;
-      console.log('All GLB models loaded — game ready');
-      const loadScreen = document.getElementById('loading-screen');
-      if (loadScreen) loadScreen.style.display = 'none';
-      if (_onReadyCallback) _onReadyCallback();
-    }
+    if (_modelsLoaded >= _totalModelsToLoad) _markReady('all-loaded');
   }
 
   function onAllModelsReady(cb) { _onReadyCallback = cb; if (_allModelsReady) cb(); }
@@ -3926,6 +3935,15 @@ const SF3D = (function () {
     Object.entries(GLB_LOD).forEach(([key, levels]) => {
       if (PRELOAD_MODELS.has(key)) _totalModelsToLoad += levels.length;
     });
+
+    // Hard timeout: if any preload stalls (slow CDN, dropped chunk, oversized
+    // asset on a weak link), the spinner clears anyway and the procedural
+    // fallbacks take over so the player can actually play.
+    if (_loadTimeoutId) clearTimeout(_loadTimeoutId);
+    _loadTimeoutId = setTimeout(function () {
+      console.warn('Preload timeout (' + _modelsLoaded + '/' + _totalModelsToLoad + ') — releasing loading screen');
+      _markReady('timeout');
+    }, _LOAD_TIMEOUT_MS);
 
     Object.entries(GLB_LOD).forEach(([key, levels]) => {
       if (PRELOAD_MODELS.has(key)) {
@@ -4509,7 +4527,7 @@ const SF3D = (function () {
 
     // Load GLB cockpit model
     const gltfLoader = new THREE.GLTFLoader();
-    gltfLoader.load('assets/models/firstPersonStarFighterCockpit.glb',
+    gltfLoader.load('assets/models/optimized/firstPersonStarFighterCockpit_lod0.glb',
       function (gltf) {
         cockpitModel = gltf.scene;
 
