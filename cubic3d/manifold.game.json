@@ -38,6 +38,18 @@
     "physics": "inline gravity ticker — lock delay 0.5s, 7-bag randomiser, kick table",
     "input": "keyboard + orbit camera"
   },
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "wellGrid",
+      "currentPiece",
+      "nextPiece",
+      "score",
+      "level",
+      "lines"
+    ]
+  },
   "portal": {
     "tile_image": "assets/images/cubic3d_landing.png",
     "lobby_image": "assets/images/cubic3d_lobby.png",

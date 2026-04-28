@@ -168,11 +168,13 @@ def build_registry(portal: dict, game_specs: list[dict]) -> dict:
     games_out = []
     for spec in game_specs:
         dim = spec.get("dimension", {})
+        manifold_val = spec.get("manifold")
+        fallback_id  = manifold_val if isinstance(manifold_val, str) else spec.get("id", "unknown")
         games_out.append({
-            "id":      spec["manifold"],
+            "id":      spec.get("id", fallback_id),
             "name":    spec["name"],
             "version": spec.get("version", "1.0.0"),
-            "path":    spec.get("_portal_path", spec.get("manifold", "unknown") + "/"),
+            "path":    spec.get("_portal_path") or (fallback_id + "/"),
             "entry":   spec.get("entry", "index.html"),
             "lobby":   spec.get("lobby"),
             "status":  spec.get("status", "production"),
