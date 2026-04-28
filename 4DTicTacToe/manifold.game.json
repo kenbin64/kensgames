@@ -13,7 +13,7 @@
   "substrates": {
     "plane": "manifold.js:BoardManifold",
     "height": "manifold.js:Turns",
-    "render": "game.js:CanvasRenderer",
+    "render": "game.js:animate",
     "_note": "plane = 3D board lattice; height = 4D turn deltas. game.js is thin: input -> substrate.apply() -> lens -> render."
   },
   "params": {

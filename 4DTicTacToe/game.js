@@ -1410,7 +1410,9 @@ function finishPreload() { const pre = document.getElementById('preloader'); pre
 camera.position.copy(CAM_PRESETS.A.pos); camera.lookAt(CAM_PRESETS.A.target);
 camPos.copy(CAM_PRESETS.A.pos); camPosT.copy(CAM_PRESETS.A.pos);
 requestAnimationFrame(animate);
+let __MANIFEST__ = null;
 const manifestReady = fetch('./manifold.game.json').then(r => r.json()).then(cfg => {
+  __MANIFEST__ = cfg;
   SCENARIOS = (cfg.attributes && cfg.attributes.scenarios) || [];
   selectedScenario = SCENARIOS[0] || null;
   buildScenarioSelect();
@@ -1434,5 +1436,15 @@ Promise.all([manifestReady, glbReady]).then(() => {
   setPreloadProgress(100);
   setPreloadMsg('READY');
   setTimeout(finishPreload, 400);
+  // Bridge after manifest resolves so dimensions yield from the manifold.
+  if (typeof ManifoldBridge !== 'undefined') {
+    const m = __MANIFEST__ || {};
+    ManifoldBridge.init({
+      id: (typeof m.manifold === 'string' ? m.manifold : '4dconnect'),
+      version: m.version || '2.0.0',
+      x: m.dimension?.x ?? 2,
+      y: m.dimension?.y ?? 12,
+      exposes: () => ({ currentPlayer, numPlayers, grid: G, scores: Array.from({ length: numPlayers }, (_, i) => TS.score(i + 1)), isGameOver, filled: BM.filled(), scenario: currentScenario && currentScenario.id })
+    });
+  }
 });
-if (typeof ManifoldBridge !== 'undefined') ManifoldBridge.init({ id: '4dconnect', version: '2.0.0', x: 4, y: 4, exposes: () => ({ currentPlayer, numPlayers, grid: G, scores: Array.from({ length: numPlayers }, (_, i) => TS.score(i + 1)), isGameOver, filled: BM.filled(), scenario: currentScenario && currentScenario.id }) });
