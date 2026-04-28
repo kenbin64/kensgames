@@ -10,8 +10,10 @@ let raycaster, floorPlane;
 let reflectCubeRT = null;
 let reflectCubeCam = null;
 let __reflectFrame = 0;
-const REFLECTION_RES = 128;
-const REFLECTION_UPDATE_EVERY = 8; // update cubemap every N frames
+// Manifold-driven constants (defaults below; overwritten from
+// manifold.game.json `params` at window.load — see loadManifoldParams).
+let REFLECTION_RES = 128;
+let REFLECTION_UPDATE_EVERY = 8;
 
 // Game objects
 let balls = [], paddles = [], bricks = [], players = [];
@@ -24,24 +26,24 @@ const IMPACT_GROW = 3.4;          // final radius multiplier over lifetime
 const BRICK_COLORS = { red: 0xcc2222, orange: 0xcc7700, yellow: 0xbbbb00, green: 0x22aa22 };
 const PLAYER_COLORS = [0x00ccff, 0xff3366, 0x39ff14, 0xffaa00]; // cyan, pink, green, orange
 const COLORS = { cyan: 0x00ffff, dark: 0x0a0a1a };
-const PHI = 1.618;
-const BALL_RADIUS = 1;
-const PADDLE_RADIUS = 4.5;
-const PADDLE_THICKNESS = 0.85;
+let PHI = 1.618;
+let BALL_RADIUS = 1;
+let PADDLE_RADIUS = 4.5;
+let PADDLE_THICKNESS = 0.85;
 const PADDLE_BEVEL = 0.94; // top radius ratio to create a subtle bevel
 
 // Ball speeds (PHI-scaled — golden-ratio kick over the previous baseline so
 // rallies feel snappier without breaking paddle reaction time).
-const SPEED_EASY = 0.25 * PHI;   // ≈ 0.405
-const SPEED_HARD = 0.4 * PHI;    // ≈ 0.647
-const SPEED_MULTI = 0.3 * PHI;   // ≈ 0.485
+let SPEED_EASY = 0.25 * PHI;   // ≈ 0.405
+let SPEED_HARD = 0.4 * PHI;    // ≈ 0.647
+let SPEED_MULTI = 0.3 * PHI;   // ≈ 0.485
 
 // Ball dynamics (pseudo-physics)
 // NOTE: Units are per-frame; tuned to keep the existing “feel” while adding arch + chaos.
 const GRAVITY = 0.00075;              // downward acceleration (adds an arc)
 const FREE_FLIGHT_DRAG = 0.99935;     // slow energy bleed (walls/ceiling restore)
-const MIN_BALL_SPEED = 0.22 * PHI;    // ≈ 0.356 — scaled with base speeds so clamps don't pinch
-const MAX_BALL_SPEED = 0.85 * PHI;    // ≈ 1.375 — scaled with base speeds so clamps don't pinch
+let MIN_BALL_SPEED = 0.22 * PHI;    // ≈ 0.356 — scaled with base speeds so clamps don't pinch
+let MAX_BALL_SPEED = 0.85 * PHI;    // ≈ 1.375 — scaled with base speeds so clamps don't pinch
 const WALL_BOOST = 1.035;
 const CEILING_BOOST = 1.06;
 const WALL_BOOST_ADD = 0.004;
@@ -119,7 +121,7 @@ const LAYER_BOOST = [
 ];
 
 // Dynamic arena dimensions — wider with more paddles, height stays fixed
-const ARENA_HEIGHT = 50;  // always 50 tall
+let ARENA_HEIGHT = 50;  // always 50 tall
 let ARENA_WIDTH = 50;     // X and Z — grows with player count
 let HALF_H = 25;          // half height (constant)
 let HALF_W = 25;          // half width (dynamic)
@@ -488,9 +490,10 @@ function setupPlayers() {
     const ballsPerPlayer = isMulti ? fib1to4(numPlayers) : 1;
     const numBalls = isMulti ? (numPlayers * ballsPerPlayer) : 1; // solo = 1 ball at a time
     const baseSpeed = isMulti ? SPEED_MULTI : (gameMode === 'easy' ? SPEED_EASY : SPEED_HARD);
-    // Lives scaling: 1p=5, 2p=4, 3p=3, 4p=2
-    // Solo difficulty is speed-based; lives stay at 5.
-    const lives = isMulti ? Math.max(2, 6 - numPlayers) : 5;
+    // Lives scaling: 1p=lives_solo, 2p=4, 3p=3, 4p=2 (multi = max(2, 6-numPlayers))
+    // Solo lives is yielded from the manifold (params.lives_solo).
+    const livesSolo = (window.__BB_MANIFOLD__?.params?.lives_solo) ?? 5;
+    const lives = isMulti ? Math.max(2, 6 - numPlayers) : livesSolo;
 
     // Create players
     for (let i = 0; i < numPlayers; i++) {
@@ -1330,18 +1333,48 @@ function endGame(msg) {
     }
 }
 
+// Manifold-first: pull tuning constants from manifold.game.json. Defaults
+// declared at top of file are the fallback if the fetch fails (offline,
+// 404, …) so the game stays playable.
+async function loadManifoldParams() {
+    try {
+        const res = await fetch('manifold.game.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const m = await res.json();
+        window.__BB_MANIFOLD__ = m;
+        const p = m.params || {};
+        if (typeof p.phi === 'number') PHI = p.phi;
+        if (typeof p.ball_radius === 'number') BALL_RADIUS = p.ball_radius;
+        if (typeof p.paddle_radius === 'number') PADDLE_RADIUS = p.paddle_radius;
+        if (typeof p.paddle_thickness === 'number') PADDLE_THICKNESS = p.paddle_thickness;
+        if (typeof p.arena_height === 'number') ARENA_HEIGHT = p.arena_height;
+        if (typeof p.reflection_resolution === 'number') REFLECTION_RES = p.reflection_resolution;
+        if (typeof p.reflection_update_every === 'number') REFLECTION_UPDATE_EVERY = p.reflection_update_every;
+        // Speeds are PHI-scaled — recompute against the (possibly updated) PHI.
+        SPEED_EASY = (p.speed_easy_phi ?? 0.25) * PHI;
+        SPEED_HARD = (p.speed_hard_phi ?? 0.4) * PHI;
+        SPEED_MULTI = (p.speed_multi_phi ?? 0.3) * PHI;
+        MIN_BALL_SPEED = (p.min_ball_speed_phi ?? 0.22) * PHI;
+        MAX_BALL_SPEED = (p.max_ball_speed_phi ?? 0.85) * PHI;
+    } catch (e) {
+        console.warn('[brickbreaker3d] manifold params load failed; using defaults', e);
+    }
+}
+
 // Initialize on load
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    await loadManifoldParams();
     initScene();
     animate();
 
     // ── MANIFOLD BRIDGE ───────────────────────────────────────────
     if (typeof ManifoldBridge !== 'undefined') {
+        const m = window.__BB_MANIFOLD__ || {};
         ManifoldBridge.init({
-            id: 'brickbreaker3d',
-            version: '1.0.0',
-            x: 2,
-            y: 22,
+            id: m.manifold || 'brickbreaker3d',
+            version: m.version || '1.0.0',
+            x: m.dimension?.x ?? 2,
+            y: m.dimension?.y ?? 22,
             exposes: () => ({
                 gameActive,
                 gamePaused,

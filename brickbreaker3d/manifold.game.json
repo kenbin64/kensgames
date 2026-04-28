@@ -38,6 +38,22 @@
     "model": "golden_ratio_speed",
     "_note": "Speed boost per brick layer uses golden ratio φ ≈ 1.618"
   },
+  "params": {
+    "_note": "Tunable constants yielded to game.js at load (manifold-first; no hardcoded duplicates).",
+    "phi": 1.618,
+    "ball_radius": 1,
+    "paddle_radius": 4.5,
+    "paddle_thickness": 0.85,
+    "speed_easy_phi": 0.25,
+    "speed_hard_phi": 0.4,
+    "speed_multi_phi": 0.3,
+    "min_ball_speed_phi": 0.22,
+    "max_ball_speed_phi": 0.85,
+    "arena_height": 50,
+    "lives_solo": 5,
+    "reflection_resolution": 128,
+    "reflection_update_every": 8
+  },
   "build": {
     "assets": [
       "*.html",

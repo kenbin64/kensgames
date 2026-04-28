@@ -16,6 +16,22 @@
     "render": "game.js:CanvasRenderer",
     "_note": "plane = 3D board lattice; height = 4D turn deltas. game.js is thin: input -> substrate.apply() -> lens -> render."
   },
+  "params": {
+    "_note": "Tunable constants yielded to game.js at bootstrap (manifold-first; defaults in game.js are the fallback if fetch fails).",
+    "grid_for_players": {
+      "1": 3,
+      "2": 4,
+      "3": 5,
+      "4": 5
+    },
+    "physics": {
+      "grav": -62,
+      "restit": 0.28,
+      "damp": 0.72,
+      "settle_v": 0.30,
+      "ball_air": 0.992
+    }
+  },
   "attributes": {
     "grid": 4,
     "players": [

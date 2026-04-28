@@ -8,7 +8,8 @@ const P1 = BM.P1, P2 = BM.P2, P3 = BM.P3, P4 = BM.P4;
 // Player count <-> recommended grid edge. Solved-game density (cells/player ~16-55) is the
 // playable sweet spot; below 16 a 4-in-a-row becomes near-impossible (4 stones must be
 // collinear out of 16 placements, much of which gravity dumps onto the bottom layer).
-const GRID_FOR_PLAYERS = { 1: 3, 2: 4, 3: 5, 4: 5 };
+// Defaults; overwritten from manifold.game.json:params at bootstrap (see manifest fetch below).
+let GRID_FOR_PLAYERS = { 1: 3, 2: 4, 3: 5, 4: 5 };
 function gridForPlayers(n) { return GRID_FOR_PLAYERS[n] || 4; }
 let numPlayers = 2;
 const dirsOf = sc => (sc && sc.modes === 'diag') ? BM.DIAG_DIRS : BM.DIRS;
@@ -402,7 +403,8 @@ const Audio4D = (() => {
   };
 })();
 
-const GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
+// Physics tunables; overwritten from manifold.game.json:params.physics at bootstrap.
+let GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
 // Lattice spans gx,gz in 0..G-1 → world coords (gx-1.5)*CELL ∈ [-4.2, +4.2] for G=4.
 let PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;          // tight x half-extent
@@ -1412,6 +1414,19 @@ const manifestReady = fetch('./manifold.game.json').then(r => r.json()).then(cfg
   SCENARIOS = (cfg.attributes && cfg.attributes.scenarios) || [];
   selectedScenario = SCENARIOS[0] || null;
   buildScenarioSelect();
+  // Manifold-first: yield tuning constants from params (kept-as-default if absent).
+  const p = cfg.params || {};
+  if (p.grid_for_players) {
+    const gfp = {};
+    for (const k of Object.keys(p.grid_for_players)) gfp[+k] = p.grid_for_players[k];
+    GRID_FOR_PLAYERS = gfp;
+  }
+  const ph = p.physics || {};
+  if (typeof ph.grav === 'number') GRAV = ph.grav;
+  if (typeof ph.restit === 'number') RESTIT = ph.restit;
+  if (typeof ph.damp === 'number') DAMP = ph.damp;
+  if (typeof ph.settle_v === 'number') SETTLE_V = ph.settle_v;
+  if (typeof ph.ball_air === 'number') BALL_AIR = ph.ball_air;
   setPreloadProgress(70);
   setPreloadMsg('SETTLING MANIFOLD LATTICE...');
 }).catch(err => { console.error('manifold.game.json load failed', err); setPreloadProgress(70); });
