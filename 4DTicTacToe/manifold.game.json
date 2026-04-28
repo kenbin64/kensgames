@@ -56,7 +56,7 @@
         "winLen": 4,
         "modes": "all",
         "special": null,
-        "desc": "4 in a row ΓÇö any direction.\n76 possible winning lines."
+        "desc": "4 in a row — any direction.\n76 possible winning lines."
       },
       {
         "id": "blitz",
@@ -92,7 +92,7 @@
         "winLen": 4,
         "modes": "all",
         "special": "territory",
-        "desc": "Fill the board ΓÇö most\nwinning combos wins."
+        "desc": "Fill the board — most\nwinning combos wins."
       },
       {
         "id": "speed",
@@ -102,7 +102,7 @@
         "modes": "all",
         "special": null,
         "timer": 10,
-        "desc": "10 seconds per turn.\nMiss it ΓÇö forfeit the drop!"
+        "desc": "10 seconds per turn.\nMiss it — forfeit the drop!"
       }
     ]
   },
