@@ -23,9 +23,15 @@ Usage
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# A substrate ref is either an inline/shared marker or a `path/to/file.js`
+# (optionally `:Symbol`). Anything else is declarative prose and is skipped
+# at the path-existence check.
+_SUBSTRATE_FILE_RE = re.compile(r"^[A-Za-z0-9_./-]+\.js(:[A-Za-z0-9_]+)?$")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -107,12 +113,24 @@ def validate_dimension(game_id: str, dim: dict) -> list[str]:
 
 
 def validate_substrates(game_id: str, substrates: dict, game_path: Path) -> list[str]:
-    """Warn about substrate files that are referenced but not found on disk."""
+    """Warn about substrate files that are referenced but not found on disk.
+
+    Skips entries that aren't file paths: `shared:`/`inline:` markers and
+    declarative prose values (e.g. an "_note" key or a description like
+    "inline Web Audio API — synthesised from manifold coords"). A ref is
+    only path-checked when it matches `<file>.js` or `<file>.js:Symbol`.
+    """
     warnings: list[str] = []
     for key, ref in substrates.items():
+        if not isinstance(ref, str):
+            continue
         if ref.startswith("shared:") or ref.startswith("inline:"):
-            continue        # shared/inline substrates — skip path check
-        candidate = game_path / ref
+            continue
+        if not _SUBSTRATE_FILE_RE.match(ref):
+            continue        # declarative metadata, not a file path
+        # A ref like "module.js:Symbol" — only the file portion is on disk.
+        file_part = ref.split(":", 1)[0]
+        candidate = game_path / file_part
         if not candidate.exists():
             warnings.append(f"[{game_id}] substrate '{key}' → {ref} not found at {candidate}")
     return warnings
