@@ -11,22 +11,13 @@
   },
   "entry": "index.html",
   "substrates": {
-    "core": "core.js",
+    "bundle": "bundle.js",
+    "codex": "codex.js",
+    "codex_data": "codex_data.js",
+    "enhance": "enhance.js",
     "input": "input.js",
-    "audio": "audio.js",
-    "music": "music.js",
-    "manifold": "manifold.js",
-    "geometry": "manifold_geometry_substrate.js",
-    "audio_sub": "manifold_audio_substrate.js",
-    "native": "manifold_native_substrate.js",
-    "anpc": "anpc_manifold.js",
-    "hive_queen": "hive_queen_manifold.js",
-    "spectrum": "spectrum_manifold.js",
-    "rendering": "3d.js",
-    "progression": "progression.js",
-    "music_comp": "music_compositor.js",
-    "sfx_comp": "sfx_compositor.js",
-    "phrase_comp": "phrase_compositor.js"
+    "intro": "intro.js",
+    "multiplayer": "multiplayer.js"
   },
   "manifold_bridge": {
     "entry_var": "window.__MANIFOLD__",
@@ -39,14 +30,6 @@
       "wave",
       "emotion"
     ]
-  },
-  "npc": {
-    "type": "ANPC",
-    "manifold": "anpc_manifold.js",
-    "cognition": "anpc.js",
-    "intents": "anpc-intents.js",
-    "patterns": "anpc-patterns.js",
-    "history": "anpc-history.js"
   },
   "server": {
     "type": "node",

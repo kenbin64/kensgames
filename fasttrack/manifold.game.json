@@ -14,20 +14,15 @@
   "join": "join.html",
   "play": "play.html",
   "substrates": {
-    "auth": "auth_substrate.js",
-    "board": "board_manifold.js",
-    "cards": "card_logic_substrate.js",
-    "deck": "card_deck_substrate.js",
-    "peg": "peg_substrate.js",
-    "ai": "ai_manifold.js",
-    "multiplayer": "multiplayer_client.js",
-    "audio": "audio_substrate.js",
-    "music": "music_substrate.js",
-    "lobby": "lobby_substrate.js",
+    "core": "fasttrack-game-core.js",
+    "manifold": "fasttrack_manifold_substrate.js",
+    "render3d": "fasttrack-3d.js",
+    "renderer3d": "schwarz_diamond_renderer.js",
     "analytics": "analytics_substrate.js",
-    "moves": "move_generation_substrate.js",
     "growth": "growth_substrate.js",
-    "potential": "potential_substrate.js"
+    "seo": "seo_substrate.js",
+    "lobby_client": "lobby_client.js",
+    "avatars": "avatars.js"
   },
   "manifold_bridge": {
     "entry_var": "window.__MANIFOLD__",
@@ -45,8 +40,7 @@
   },
   "build": {
     "test_files": [
-      "test_fasttrack_rules.js",
-      "test_game_flows.js"
+      "test_fasttrack_rules.js"
     ],
     "spec": "fasttrack_game_spec.json",
     "assets": [
