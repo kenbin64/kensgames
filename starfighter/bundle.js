@@ -231,7 +231,37 @@ const SpaceManifold = (function () {
 
     // ── Damage ──
     'damage.eggSplash': 20,
-    'damage.collision': 50,
+    'damage.collision': 50,                // legacy flat ram damage (fallback if mass missing)
+    // Kinetic ramming: dmg_to_X = kineticK · mass(other) · |Δv|² , clamped & gated.
+    // Calibrated so a player (mass 10) head-on with an interceptor (mass 10) at
+    // 500 m/s closing speed ≈ 25 dmg each side; player (10) ramming a baseship
+    // (mass 2000) at 400 m/s ≈ 320 dmg to the player (lethal), 1.6 dmg to the
+    // baseship — i.e. you bounce off carriers, but a fighter trade is fair.
+    'damage.kineticK': 1e-5,
+    'damage.kineticMinDvSq': 5000,         // |Δv|² threshold (~70 m/s) below which scrapes do nothing
+    'damage.kineticMaxPerHit': 500,        // hard cap so freak edge cases never one-shot capital ships
+
+    // ── Mass (kg-ish, only ratios matter for kinetic damage) ──
+    'mass.player': 10,
+    'mass.wingman': 10,
+    'mass.interceptor': 10,
+    'mass.bomber': 30,
+    'mass.predator': 80,
+    'mass.dreadnought': 800,
+    'mass.alien-baseship': 1500,
+    'mass.baseship': 2000,
+    'mass.mothership': 5000,
+    'mass.alien-base': 3000,
+    'mass.hive': 3000,
+    'mass.tanker': 1500,
+    'mass.medic': 800,
+    'mass.rescue': 400,
+    'mass.science-ship': 600,
+    'mass.station': 4000,
+    'mass.egg': 5,
+    'mass.youngling': 8,
+    'mass.pickup': 1,
+    'mass.default': 20,
 
     // ── Timing ──
     'timing.launch': 8.0,    // launch sequence seconds
