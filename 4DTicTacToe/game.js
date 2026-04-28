@@ -1,9 +1,16 @@
-﻿'use strict';
+'use strict';
 // 4D Connect -- thin runtime: input -> substrate -> lens -> render.
 // Rules live in manifold.js (BoardManifold 3D + Turns 4D). Config lives in manifold.game.json.
 const TRNG = { _b: new Uint32Array(16), _i: 16, _r() { crypto.getRandomValues(this._b); this._i = 0; }, f() { if (this._i >= 16) this._r(); return this._b[this._i++] / 0xFFFFFFFF; }, i(a, b) { return Math.floor(this.f() * (b - a + 1)) + a; }, pick(a) { return a[this.i(0, a.length - 1)]; }, shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = this.i(0, i);[r[i], r[j]] = [r[j], r[i]]; } return r; } };
 const BM = window.BoardManifold, TS = window.Turns;
-const G = BM.GRID, P1 = BM.P1, P2 = BM.P2;
+let G = BM.GRID;
+const P1 = BM.P1, P2 = BM.P2, P3 = BM.P3, P4 = BM.P4;
+// Player count <-> recommended grid edge. Solved-game density (cells/player ~16-55) is the
+// playable sweet spot; below 16 a 4-in-a-row becomes near-impossible (4 stones must be
+// collinear out of 16 placements, much of which gravity dumps onto the bottom layer).
+const GRID_FOR_PLAYERS = { 1: 4, 2: 4, 3: 5, 4: 6 };
+function gridForPlayers(n) { return GRID_FOR_PLAYERS[n] || 4; }
+let numPlayers = 2;
 const dirsOf = sc => (sc && sc.modes === 'diag') ? BM.DIAG_DIRS : BM.DIRS;
 let SCENARIOS = [], PLAYERS = [];
 let selectedScenario = null, currentScenario = null;
@@ -24,8 +31,15 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000008);
 scene.fog = new THREE.FogExp2(0x00000C, 0.007);
 const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 900);
-function makeEnvTex() { const W = 256, H = 128, d = new Uint8Array(W * H * 4); for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; d[i] = 2; d[i + 1] = 1; d[i + 2] = 10; d[i + 3] = 255; const n = Math.sin(x * 7.31 + y * 13.7) * Math.cos(x * 11.1 - y * 5.93); if (n > 0.975) { d[i] = 220; d[i + 1] = 235; d[i + 2] = 255; } else if (n > 0.96) { d[i] = 0; d[i + 1] = 180; d[i + 2] = 230; } else if (n > 0.955) { d[i] = 255; d[i + 1] = 220; d[i + 2] = 80; } const lat = Math.abs((y / H) - 0.5) * 2; d[i + 2] = Math.min(255, d[i + 2] + Math.max(0, 1 - lat * 3.5) * 30); } const tex = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); tex.mapping = THREE.EquirectangularReflectionMapping; tex.needsUpdate = true; return tex; }
-const envMap = makeEnvTex();
+function makeEnvTex() { const W = 256, H = 128, d = new Uint8Array(W * H * 4); for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; d[i] = 2; d[i + 1] = 1; d[i + 2] = 10; d[i + 3] = 255; const n = Math.sin(x * 7.31 + y * 13.7) * Math.cos(x * 11.1 - y * 5.93); if (n > 0.975) { d[i] = 220; d[i + 1] = 235; d[i + 2] = 255; } else if (n > 0.96) { d[i] = 0; d[i + 1] = 180; d[i + 2] = 230; } else if (n > 0.955) { d[i] = 255; d[i + 1] = 220; d[i + 2] = 80; } const lat = Math.abs((y / H) - 0.5) * 2; d[i + 2] = Math.min(255, d[i + 2] + Math.max(0, 1 - lat * 3.5) * 30); } const tex = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); tex.mapping = THREE.EquirectangularReflectionMapping; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.needsUpdate = true; return tex; }
+// Pre-process the equirect starfield through PMREMGenerator so it can be used as both
+// scene.environment (IBL for every MeshStandardMaterial) and per-material envMap (mirror
+// reflections on the cube shell and the ball). PMREM is mandatory in r128 -- a raw
+// DataTexture used directly throws "object must have callable @@iterator".
+const _pmrem = new THREE.PMREMGenerator(renderer); _pmrem.compileEquirectangularShader();
+const _envSrc = makeEnvTex();
+const envMap = _pmrem.fromEquirectangular(_envSrc).texture;
+_envSrc.dispose(); _pmrem.dispose();
 scene.environment = envMap;
 scene.add(new THREE.AmbientLight(0x080816, 2.2));
 const keyLight = new THREE.DirectionalLight(0x8899ff, 1.4); keyLight.position.set(10, 20, 14); scene.add(keyLight);
@@ -58,124 +72,127 @@ const saturn = makeSaturn();
 // Procedural gas giant -- replaces jupiter.glb (3.5 MB). Banded vertex colors, same style as makeSaturn.
 function makeJupiter() { const g = new THREE.SphereGeometry(7, 48, 32); const cols = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < g.attributes.position.count; i++) { const y = g.attributes.position.getY(i); const band = Math.sin(y * 2.6) * 0.5 + 0.5; const storm = Math.sin(y * 1.1 + Math.cos(y * 5.2) * 1.8) * 0.5 + 0.5; cols[i * 3] = 0.82 + storm * .12 - band * .08; cols[i * 3 + 1] = 0.58 + band * .18; cols[i * 3 + 2] = 0.30 + storm * .10; } g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 10 })); m.position.set(-75, -18, -80); scene.add(m); return m; }
 const jupiter = makeJupiter();
-// Procedural 7×7×7 gyroid manifold -- runtime geometry derived from the equation
-//   g(x,y,z) = sin(kx)cos(ky) + sin(ky)cos(kz) + sin(kz)cos(kx)
-// k chosen so the period tiles 7× across the play volume diameter, giving a 7³ grid
-// of interconnected chambers and passageways. The iso=0 surface is built once via
-// marching tetrahedra (no examples deps) and used as a translucent visual shell;
-// the same equation drives ball-vs-manifold collision (see gyroidGuide / gyroidWall).
-const GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;            // matches PLAY_HX (CELL=2.8, BALL_R=0.18)
-const GY_K = (7 * Math.PI) / (2 * GY_HALF);            // 7 surface periods across the diameter
-const WALL_THRESHOLD = 0.55;                            // |g| > threshold => inside a wall lobe
-function gyroidValue(x, y, z) {
-  const sx = Math.sin(GY_K * x), cx = Math.cos(GY_K * x);
-  const sy = Math.sin(GY_K * y), cy = Math.cos(GY_K * y);
-  const sz = Math.sin(GY_K * z), cz = Math.cos(GY_K * z);
-  return sx * cy + sy * cz + sz * cx;
+// Saddle lattice: GxGxG chambers tiling the play cube. Each chamber holds a single
+// z = x*y saddle patch in cell-local coords. Adjacent chambers are rotated 90deg
+// (about X for +X steps, about Y for +Y steps, 0 along Z) so the saddle edges meet
+// continuously across cell faces -- this is the "Blender array tool" composition rule.
+// The membrane surface is f_cell(p_local) = z' - x' * y', with grad (-y', -x', 1).
+// |grad| >= 1 everywhere => no critical-point collision singularities (the failure
+// mode of the previous Schwartz Diamond field).
+// Grid-dependent geometry constants. Recomputed by rebuildWorld(newG) when player count
+// changes the grid size. CELL is the chamber edge in world units; the cube is GxGxG chambers.
+let GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;               // play cube half-extent (matches PLAY_HX, BALL_R=0.18)
+let SADDLE_CELL = (2 * GY_HALF) / G;                    // saddle chamber edge length
+let SADDLE_HALF = SADDLE_CELL * 0.5;                    // saddle chamber half-width
+const _cellQ = new THREE.Quaternion(), _cellQInv = new THREE.Quaternion();
+const _cellLocal = new THREE.Vector3();
+const _qX = new THREE.Quaternion(), _qY = new THREE.Quaternion();
+const _xAxis = new THREE.Vector3(1, 0, 0), _yAxis = new THREE.Vector3(0, 1, 0);
+function saddleCellCenter(cx, cy, cz, out) {
+  return out.set((cx + 0.5 - G * 0.5) * SADDLE_CELL,
+    (cy + 0.5 - G * 0.5) * SADDLE_CELL,
+    (cz + 0.5 - G * 0.5) * SADDLE_CELL);
 }
-function gyroidGrad(x, y, z, out) {
-  const k = GY_K;
-  const sx = Math.sin(k * x), cx = Math.cos(k * x);
-  const sy = Math.sin(k * y), cy = Math.cos(k * y);
-  const sz = Math.sin(k * z), cz = Math.cos(k * z);
-  out.set(k * (cx * cy - sz * sx), k * (-sx * sy + cy * cz), k * (-sy * sz + cz * cx));
-  return out;
+function saddleCellQuaternion(_cx, _cy, _cz, out) {
+  // Winki primitive tiles cleanly with no per-cell rotation -- its built-in folding
+  // handles continuity between adjacent chambers. Identity quaternion for every cell.
+  return out.set(0, 0, 0, 1);
 }
-// Marching tetrahedra over a regular cube grid -> BufferGeometry of the gyroid iso=0 surface.
-// Each cube splits into 6 tets sharing the (0,0,0)-(1,1,1) diagonal; per-tet 16-case lookup.
-function _gyroidMesh(halfExt, RES) {
-  const TE = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]];
-  const TETS = [[0, 1, 3, 7], [0, 3, 2, 7], [0, 2, 6, 7], [0, 6, 4, 7], [0, 4, 5, 7], [0, 5, 1, 7]];
-  const MT = [
-    [], [0, 1, 2], [0, 3, 4], [1, 2, 4, 1, 4, 3],
-    [1, 3, 5], [0, 2, 5, 0, 5, 3], [0, 1, 5, 0, 5, 4], [2, 4, 5],
-    [2, 4, 5], [0, 1, 5, 0, 5, 4], [0, 2, 5, 0, 5, 3], [1, 3, 5],
-    [1, 2, 4, 1, 4, 3], [0, 3, 4], [0, 1, 2], []
-  ];
-  const OFF = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
-  const N = RES, S = (2 * halfExt) / N, stride = N + 1, stride2 = stride * stride;
-  const grid = new Float32Array(stride * stride * stride);
-  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) for (let k = 0; k <= N; k++) {
-    grid[i * stride2 + j * stride + k] = gyroidValue(-halfExt + i * S, -halfExt + j * S, -halfExt + k * S);
+// Saddle field in cell-local coords: f = z - (x*y)/SADDLE_HALF, scaled so |z|_max == SADDLE_HALF
+// (the chamber half-width). The "z = xy" primitive is preserved in normalised units (u=x/h, v=y/h).
+// |grad f| = sqrt(1 + (x/h)^2 + (y/h)^2) >= 1 everywhere -- collision is well-conditioned.
+function saddleSignedDistance(lx, ly, lz) {
+  const h = SADDLE_HALF;
+  const f = lz - (lx * ly) / h;
+  const gMag = Math.sqrt(1 + (lx * lx + ly * ly) / (h * h));
+  return f / gMag;
+}
+function saddleGrad(lx, ly, _lz, out) {
+  const h = SADDLE_HALF;
+  return out.set(-ly / h, -lx / h, 1);
+}
+// Visual lattice: load winki.glb (a single z=xy chamber primitive baked in Blender) and
+// instance it 4x4x4 with NO rotation. The primitive's built-in geometry handles continuity
+// at chamber boundaries, so each cell is just translated to its chamber centre.
+// Cached source winki geometry: the GLB only needs to be loaded once, even if the grid is
+// resized between games (the InstancedMesh is rebuilt with a fresh count from this source).
+let _winkiSrc = null;
+function _winkiInstancedMesh(srcMesh) {
+  const saddleInstanceCount = G * G * G;
+  // Bake the source node's transform into the geometry, then recentre & uniform-scale so
+  // the primitive bbox spans exactly one chamber (SADDLE_CELL across each axis).
+  const geo = srcMesh.geometry.clone();
+  geo.applyMatrix4(srcMesh.matrixWorld);
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox, size = new THREE.Vector3(); bb.getSize(size);
+  const center = new THREE.Vector3(); bb.getCenter(center);
+  const recenter = new THREE.Matrix4().makeTranslation(-center.x, -center.y, -center.z);
+  geo.applyMatrix4(recenter);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = SADDLE_CELL / maxDim;
+  geo.applyMatrix4(new THREE.Matrix4().makeScale(scale, scale, scale));
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x88bbff, emissive: 0x335577, emissiveIntensity: 0.55,
+    metalness: 0.35, roughness: 0.18,
+    envMap, envMapIntensity: 1.2,
+    transparent: true, opacity: 0.32, side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
+  inst.renderOrder = 1;
+  const _m = new THREE.Matrix4(), _t = new THREE.Vector3();
+  const _q = new THREE.Quaternion(0, 0, 0, 1), _s = new THREE.Vector3(1, 1, 1);
+  let i = 0;
+  for (let cz = 0; cz < G; cz++) for (let cy = 0; cy < G; cy++) for (let cx = 0; cx < G; cx++) {
+    saddleCellCenter(cx, cy, cz, _t);
+    _m.compose(_t, _q, _s);
+    inst.setMatrixAt(i++, _m);
   }
-  const positions = [], normals = [], _gn = new THREE.Vector3();
-  const cv = new Array(8), cp = new Array(8);
-  for (let c = 0; c < 8; c++) cp[c] = [0, 0, 0];
-  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
-    for (let c = 0; c < 8; c++) {
-      const o = OFF[c];
-      cv[c] = grid[(i + o[0]) * stride2 + (j + o[1]) * stride + (k + o[2])];
-      cp[c][0] = -halfExt + (i + o[0]) * S;
-      cp[c][1] = -halfExt + (j + o[1]) * S;
-      cp[c][2] = -halfExt + (k + o[2]) * S;
-    }
-    for (let t = 0; t < 6; t++) {
-      const tet = TETS[t];
-      const v0 = cv[tet[0]], v1 = cv[tet[1]], v2 = cv[tet[2]], v3 = cv[tet[3]];
-      let idx = 0;
-      if (v0 >= 0) idx |= 1; if (v1 >= 0) idx |= 2;
-      if (v2 >= 0) idx |= 4; if (v3 >= 0) idx |= 8;
-      const tri = MT[idx]; if (!tri.length) continue;
-      const pa = cp[tet[0]], pb = cp[tet[1]], pc = cp[tet[2]], pd = cp[tet[3]];
-      const vs = [v0, v1, v2, v3], ps = [pa, pb, pc, pd];
-      for (let n = 0; n < tri.length; n++) {
-        const e = tri[n], a = TE[e][0], b = TE[e][1];
-        const va = vs[a], vb = vs[b], denom = vb - va;
-        const u = Math.abs(denom) < 1e-8 ? 0.5 : -va / denom;
-        const px = ps[a][0] + u * (ps[b][0] - ps[a][0]);
-        const py = ps[a][1] + u * (ps[b][1] - ps[a][1]);
-        const pz = ps[a][2] + u * (ps[b][2] - ps[a][2]);
-        positions.push(px, py, pz);
-        gyroidGrad(px, py, pz, _gn); const m = _gn.length() || 1;
-        normals.push(-_gn.x / m, -_gn.y / m, -_gn.z / m);
-      }
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  return geo;
+  inst.instanceMatrix.needsUpdate = true;
+  return inst;
 }
 function makeManifoldLattice() {
-  const halfExt = GY_HALF;
   const group = new THREE.Group();
-  // Translucent gyroid surface -- semi-transparent membrane so the marble is visible inside.
-  const meshGeo = _gyroidMesh(halfExt, 40);
-  const meshMat = new THREE.MeshPhysicalMaterial({
-    color: 0x6699ff, emissive: 0x111a44, emissiveIntensity: 0.32,
-    metalness: 0.05, roughness: 0.18,
-    transmission: 0.55, thickness: 0.3, ior: 1.32,
-    transparent: true, opacity: 0.55, side: THREE.DoubleSide,
-    depthWrite: false, envMap, envMapIntensity: 1.4,
-    clearcoat: 0.6, clearcoatRoughness: 0.25
+  // Outer cage -- bright cube silhouette so the saddle lattice bbox reads as a perfect cube.
+  const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2));
+  group.add(new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.85 })));
+  // Translucent reflective cube shell. BackSide so we see through the front into the
+  // chambers but still catch starfield reflections on the inside walls.
+  const shellGeo = new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2);
+  const shellMat = new THREE.MeshStandardMaterial({
+    color: 0x223a66, emissive: 0x081428, emissiveIntensity: 0.35,
+    metalness: 0.85, roughness: 0.08,
+    envMap, envMapIntensity: 1.4,
+    transparent: true, opacity: 0.16, side: THREE.BackSide,
+    depthWrite: false
   });
-  const surfaceMesh = new THREE.Mesh(meshGeo, meshMat); surfaceMesh.renderOrder = -1;
-  group.add(surfaceMesh);
-  // Inner glow points -- ride the iso surface for a luminous chamber-edge feel.
-  const samples = [], colors = [], N = 40;
-  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let q = 0; q < N; q++) {
-    const x = (i / (N - 1) - 0.5) * 2 * halfExt;
-    const y = (j / (N - 1) - 0.5) * 2 * halfExt;
-    const z = (q / (N - 1) - 0.5) * 2 * halfExt;
-    if (Math.abs(gyroidValue(x, y, z)) < 0.06) {
-      samples.push(x, y, z);
-      const t = y / halfExt * 0.5 + 0.5;
-      colors.push(0.30 + 0.30 * (1 - t), 0.55 + 0.20 * t, 0.95);
-    }
-  }
-  const pgeo = new THREE.BufferGeometry();
-  pgeo.setAttribute('position', new THREE.Float32BufferAttribute(samples, 3));
-  pgeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  group.add(new THREE.Points(pgeo, new THREE.PointsMaterial({
-    size: 0.07, vertexColors: true, transparent: true, opacity: 0.6,
-    depthWrite: false, blending: THREE.AdditiveBlending
-  })));
-  // Outer cage so the cube silhouette stays legible against the deep starfield.
-  const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(halfExt * 2, halfExt * 2, halfExt * 2));
-  group.add(new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x2244aa, transparent: true, opacity: 0.45 })));
-  group.renderOrder = -1;
+  const shell = new THREE.Mesh(shellGeo, shellMat); shell.renderOrder = 0; group.add(shell);
   boardGroup.add(group);
-  group.userData.surfaceMesh = surfaceMesh;
+  // First call fetches winki.glb, caches the source mesh in _winkiSrc, then builds the
+  // instanced grid. Subsequent calls (after a grid resize) skip the fetch and rebuild
+  // immediately from the cached source.
+  const buildInstanced = (srcMesh) => {
+    const inst = _winkiInstancedMesh(srcMesh);
+    group.add(inst);
+    group.userData.surfaceMesh = inst;
+    // Register as a raycast collider so the ball bounces off the actual winki surface
+    // (motion-path test in collideBallVsGlb + 10-direction safety scan in safetyScanGlb).
+    glbColliders.push(inst);
+  };
+  if (_winkiSrc) {
+    buildInstanced(_winkiSrc);
+  } else {
+    const loader = new THREE.GLTFLoader();
+    loader.load('assets/models/winki.glb', (gltf) => {
+      let srcMesh = null;
+      gltf.scene.updateMatrixWorld(true);
+      gltf.scene.traverse(o => { if (!srcMesh && o.isMesh) srcMesh = o; });
+      if (!srcMesh) return;
+      _winkiSrc = srcMesh;
+      buildInstanced(srcMesh);
+    }, undefined, (err) => { console.warn('winki.glb load failed', err); });
+  }
   return group;
 }
 let glbOverlay = makeManifoldLattice();
@@ -187,19 +204,28 @@ const glbDir = new THREE.Vector3();
 const glbN = new THREE.Vector3();
 const glbNMat = new THREE.Matrix3();
 const glbReady = Promise.resolve('procedural');
-// Ball radius is intentionally small relative to the gyroid period so it fits through passages.
-// With 7 periods across the diameter (period = 2*GY_HALF/7 ~ 1.25), the passage cross-section
-// half-width is roughly 0.32 * period ~ 0.40; BALL_R = 0.18 leaves ~0.22 of clearance per side.
-const CELL = 2.8, BALL_R = 0.18;
-function nodePos(gx, gy, gz) { return new THREE.Vector3((gx - 1.5) * CELL, (gy - 1.5) * CELL * 0.92 + 0.5, (gz - 1.5) * CELL); }
+// Ball diameter = half the chamber edge, so a settled ball fills the centre of one winki
+// chamber with chamber/4 of clearance on every side -- enough room to seal cleanly without
+// jamming an adjacent chamber's neighbourhood.
+// CELL is the chamber edge in world units (kept fixed across grid sizes so the lattice
+// reads the same regardless of edge length). BALL_R = chamber/4 -> diameter == half chamber.
+let CELL = 2.8, BALL_R = SADDLE_CELL * 0.25;
+// Connect-4 cell positions are now identical to winki chamber centres (board-local space).
+// This lets a settled ball snap exactly to the chamber it physically came to rest in.
+function nodePos(gx, gy, gz) {
+  return new THREE.Vector3(
+    (gx + 0.5 - G * 0.5) * SADDLE_CELL,
+    (gy + 0.5 - G * 0.5) * SADDLE_CELL,
+    (gz + 0.5 - G * 0.5) * SADDLE_CELL);
+}
 // Saddle/tube lattice (z=xy surfaces) removed -- the GLB manifold is now the only visible structure.
 // nodePositions below still drives invisible per-cell sphere collisions for the falling ball.
 const haloGroup = new THREE.Group(); scene.add(haloGroup);
 const HCFGS = [{ r: 9.5, tube: 0.12, color: 0x8800ff, speed: 0.22, tiltX: 0, tiltZ: 0 }, { r: 10.2, tube: 0.08, color: 0x00aaff, speed: -0.15, tiltX: Math.PI / 3, tiltZ: 0.2 }, { r: 9.8, tube: 0.06, color: 0xff00aa, speed: 0.10, tiltX: -Math.PI / 4, tiltZ: 0.4 }];
 const haloMeshes = HCFGS.map(cfg => { const geo = new THREE.TorusGeometry(cfg.r, cfg.tube, 12, 90); const mat = new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.55, depthWrite: false }); const m = new THREE.Mesh(geo, mat); m.rotation.x = cfg.tiltX; m.rotation.z = cfg.tiltZ; m.userData = cfg; haloGroup.add(m); return m; });
-const atmoGeo = new THREE.SphereGeometry(12.5, 28, 28);
-const atmoMat = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x4400bb) } }, vertexShader: `varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`, fragmentShader: `uniform vec3 uColor;uniform float uTime;varying vec3 vN;void main(){float rim=1.0-abs(dot(vN,vec3(0.0,0.0,1.0)));float pulse=0.85+0.15*sin(uTime*1.4);float a=pow(rim,2.8)*0.35*pulse;gl_FragColor=vec4(uColor,a);}`, transparent: true, side: THREE.BackSide, depthWrite: false });
-scene.add(new THREE.Mesh(atmoGeo, atmoMat));
+// Atmosphere sphere removed -- it was wrapping the cube in a purple haze that hid the
+// Schwartz Diamond structure. The faceLights + outer cage already provide the silhouette.
+const atmoMat = { uniforms: { uTime: { value: 0 } } };  // animate() still pokes uTime; harmless no-op
 // Jewel-tone palette: ruby red, forest green, deep purple, gold. P1/P2 use the first two; the rest are reserved for AI/team variants.
 const BPALETTE = [
   { base: 0x7a0a18, emissive: 0x1a0205, glow: 0xc81a2a }, // ruby red
@@ -207,23 +233,43 @@ const BPALETTE = [
   { base: 0x2a0850, emissive: 0x0a0218, glow: 0x6020c8 }, // deep purple
   { base: 0x6a4a08, emissive: 0x1a1002, glow: 0xd9a82a }  // gold
 ];
-const BCOLS = { [P1]: BPALETTE[0], [P2]: BPALETTE[1] };
-const BGEO = new THREE.SphereGeometry(BALL_R, 28, 28), HGEO = new THREE.SphereGeometry(BALL_R * 1.7, 14, 14), RGEO = new THREE.TorusGeometry(BALL_R * 1.55, 0.025, 8, 32), WGEO = new THREE.SphereGeometry(BALL_R * 2.4, 18, 18);
+const BCOLS = { [P1]: BPALETTE[0], [P2]: BPALETTE[1], [P3]: BPALETTE[2], [P4]: BPALETTE[3] };
+// Ball/halo/ring/win-glow geometries: rebuilt by rebuildWorld() whenever BALL_R changes
+// with the grid size. All consumers (placedBalls, ghostBall, physBall, win glows) read these
+// at construction so a fresh size flows through naturally on the next spawn.
+let BGEO = new THREE.SphereGeometry(BALL_R, 28, 28),
+  HGEO = new THREE.SphereGeometry(BALL_R * 1.7, 14, 14),
+  RGEO = new THREE.TorusGeometry(BALL_R * 1.55, 0.025, 8, 32),
+  WGEO = new THREE.SphereGeometry(BALL_R * 2.4, 18, 18);
 // Solid jewel-stone ball, polished and reflective. Used both for the falling ball and for settled balls.
-function makeBallMat(p, ei) {
-  const c = BCOLS[p];
-  return new THREE.MeshPhysicalMaterial({
-    color: c.base, emissive: c.emissive, emissiveIntensity: ei != null ? ei : 0.12,
-    metalness: 0.25, roughness: 0.04,
-    clearcoat: 1.0, clearcoatRoughness: 0.008,
-    envMap, envMapIntensity: 3.2, reflectivity: 1.0,
-    sheen: 0.4, sheenColor: new THREE.Color(c.glow), sheenRoughness: 0.25
+// Placed balls use the bright glow colour as the emissive to override the muted darker emissive
+// from BPALETTE so the stones read as lit jewels instead of dark spheres lost in the cube.
+function makeBallMat(p, ei, opts) {
+  const c = BCOLS[p], o = opts || {};
+  return new THREE.MeshStandardMaterial({
+    color: c.base, emissive: o.emissive != null ? o.emissive : c.emissive, emissiveIntensity: ei != null ? ei : 0.12,
+    metalness: 0.95, roughness: 0.06,
+    envMap, envMapIntensity: 1.6
   });
 }
 function makeFallingBallMat(p) { return makeBallMat(p, 0.18); }
 function makeHaloMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.035), side: THREE.BackSide, depthWrite: false }); }
+// Outer corona shell sized between halo and win-glow so the placed stone reads from any angle.
+function makeCoronaMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.18), side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending }); }
 const placedBalls = [];
-function addPlacedBall(gx, gy, gz, p) { const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 0.6)); const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.07)); const ring = new THREE.Mesh(RGEO, new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: 0.22 })); const pos = nodePos(gx, gy, gz);[mesh, halo, ring].forEach(o => { o.position.copy(pos); boardGroup.add(o); }); ring.rotation.x = Math.PI / 2; placedBalls.push({ mesh, halo, ring, gx, gy, gz, p }); }
+function addPlacedBall(gx, gy, gz, p) {
+  // Settled stones glow from within (emissive == glow colour, intensity 1.4) and are wrapped
+  // in a halo + corona + equatorial ring. The corona uses additive blending so multiple balls
+  // packed together stack brightness rather than occluding each other.
+  const mesh = new THREE.Mesh(BGEO, makeBallMat(p, 1.4, { emissive: BCOLS[p].glow }));
+  const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.32));
+  const corona = new THREE.Mesh(WGEO, makeCoronaMat(p, 0.18));
+  const ring = new THREE.Mesh(RGEO, new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const pos = nodePos(gx, gy, gz);
+  [mesh, halo, corona, ring].forEach(o => { o.position.copy(pos); boardGroup.add(o); });
+  ring.rotation.x = Math.PI / 2;
+  placedBalls.push({ mesh, halo, corona, ring, gx, gy, gz, p });
+}
 const winGlows = [];
 function showWinGlows(cells) { cells.forEach(([gx, gy, gz]) => { const m = new THREE.Mesh(WGEO, new THREE.MeshBasicMaterial({ color: 0xffee00, transparent: true, opacity: 0.42, side: THREE.BackSide, depthWrite: false })); m.position.copy(nodePos(gx, gy, gz)); boardGroup.add(m); winGlows.push(m); }); }
 function clearWinGlows() { winGlows.forEach(m => boardGroup.remove(m)); winGlows.length = 0; }
@@ -360,83 +406,179 @@ const Audio4D = (() => {
 const GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
 // Lattice spans gx,gz in 0..G-1 → world coords (gx-1.5)*CELL ∈ [-4.2, +4.2] for G=4.
-const PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;        // tight x half-extent
-const PLAY_HZ = (G - 1) * 0.5 * CELL + BALL_R;        // tight z half-extent
-const TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;    // initial ghost-ball hover plane (replaced per-frame by _aimYWorld)
+let PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;          // tight x half-extent
+let PLAY_HZ = (G - 1) * 0.5 * CELL + BALL_R;          // tight z half-extent
+let TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;      // initial ghost-ball hover plane (replaced per-frame by _aimYWorld)
 // Y bounds widened so the ball can't escape vertically regardless of which cube face is currently up.
 // Spawn happens at _aimYWorld which is just above the rotated cube's highest world-Y vertex; ceiling
 // gives a small headroom above that, floor mirrors below.
-const Y_CEIL = PLAY_HX + CELL * 1.2 + BALL_R;
-const FLOOR_Y = -(PLAY_HX + CELL * 1.2 + BALL_R);
-// Gyroid path-following physics: ball "meanders" along the iso=0 surface contours.
-// Soft regime: a gradient force pushes the ball out of wall lobes (|g| > WALL_THRESHOLD)
-// toward the nearest passage. Hard regime: when the ball is buried deep in a wall lobe
-// (|g| > WALL_HARD), reflect velocity along the surface normal so it cannot tunnel
-// through. Tangential velocity is preserved with high retention so the ball keeps
-// following the gyroid path; spin is updated from (n x v) so visual rotation matches.
-const WALL_HARD = 1.55;
+let Y_CEIL = PLAY_HX + CELL * 1.2 + BALL_R;
+let FLOOR_Y = -(PLAY_HX + CELL * 1.2 + BALL_R);
+// Saddle-lattice collision. Each substep:
+//   1. Hard cube wall in board-local space (handles rotated cubes correctly).
+//   2. Per-cell saddle membrane: identify which chamber the ball is in, transform into
+//      cell-local frame, evaluate signed distance to f = z' - x'*y' = 0.
+//      - If sign vs physBall.side flipped between prev and curr: binary search for the
+//        crossing along the board-local segment and reflect the ball back at that t.
+//      - Else if |signedDist| < BALL_R: push along grad to the home side.
+// |grad(f)|_cell-local = sqrt(1 + x'^2 + y'^2) >= 1 everywhere, so the signed-distance
+// approximation is always well-conditioned (no critical-point teleport mode).
 const _gyLocal = new THREE.Vector3();
+const _gyPrev = new THREE.Vector3();
 const _gyN = new THREE.Vector3();
-function gyroidGuide(dt) {
+const _gyWorldN = new THREE.Vector3();
+const _gyWorldPos = new THREE.Vector3();
+const _gyCellIdx = new THREE.Vector3();
+const _gyCellCenter = new THREE.Vector3();
+const _gyTmp = new THREE.Vector3();
+function _saddleCellOf(lx, ly, lz, out) {
+  let cx = Math.floor((lx + GY_HALF) / SADDLE_CELL);
+  let cy = Math.floor((ly + GY_HALF) / SADDLE_CELL);
+  let cz = Math.floor((lz + GY_HALF) / SADDLE_CELL);
+  if (cx < 0) cx = 0; else if (cx > G - 1) cx = G - 1;
+  if (cy < 0) cy = 0; else if (cy > G - 1) cy = G - 1;
+  if (cz < 0) cz = 0; else if (cz > G - 1) cz = G - 1;
+  return out.set(cx, cy, cz);
+}
+// Convert board-local point -> cell-local (for the cell at cellIdx). Reuses _cellQ.
+function _toCellLocal(blx, bly, blz, cellIdx, out) {
+  saddleCellCenter(cellIdx.x, cellIdx.y, cellIdx.z, _gyCellCenter);
+  out.set(blx - _gyCellCenter.x, bly - _gyCellCenter.y, blz - _gyCellCenter.z);
+  saddleCellQuaternion(cellIdx.x, cellIdx.y, cellIdx.z, _cellQ);
+  _cellQInv.copy(_cellQ).invert();
+  return out.applyQuaternion(_cellQInv);
+}
+// Signed distance to the saddle in the cell containing board-local (blx,bly,blz).
+function _saddleSignedAt(blx, bly, blz) {
+  _saddleCellOf(blx, bly, blz, _gyCellIdx);
+  _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
+  return saddleSignedDistance(_cellLocal.x, _cellLocal.y, _cellLocal.z);
+}
+function gyroidGuide(dt, pwx, pwy, pwz) {
   if (!physBall || physBall.settled) return;
-  _gyLocal.set(physBall.x, physBall.y, physBall.z);
-  boardGroup.worldToLocal(_gyLocal);
-  if (Math.abs(_gyLocal.x) > GY_HALF || Math.abs(_gyLocal.y) > GY_HALF || Math.abs(_gyLocal.z) > GY_HALF) return;
-  const g = gyroidValue(_gyLocal.x, _gyLocal.y, _gyLocal.z);
-  const ag = Math.abs(g);
-  if (ag < WALL_THRESHOLD) return;
-  gyroidGrad(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyN);
-  const gmag = _gyN.length();
-  if (gmag < 1e-4) return;
-  // Outward normal points from inside the wall toward the iso=0 passage (sign opposite to g).
-  _gyN.multiplyScalar(-Math.sign(g) / gmag);
-  _gyN.transformDirection(boardGroup.matrixWorld); // local rotation -> world (no scale)
-  if (ag < WALL_HARD) {
-    // Soft regime: gentle nudge toward passage, scaled by depth into wall.
-    const depth = (ag - WALL_THRESHOLD) / (WALL_HARD - WALL_THRESHOLD);
-    const F = 95 * depth;
-    physBall.vx += _gyN.x * F * dt;
-    physBall.vy += _gyN.y * F * dt;
-    physBall.vz += _gyN.z * F * dt;
-    physBall.spinX += (_gyN.y * physBall.vz - _gyN.z * physBall.vy) * 0.012 * dt;
-    physBall.spinY += (_gyN.z * physBall.vx - _gyN.x * physBall.vz) * 0.012 * dt;
-    physBall.spinZ += (_gyN.x * physBall.vy - _gyN.y * physBall.vx) * 0.012 * dt;
+  _gyLocal.set(physBall.x, physBall.y, physBall.z); boardGroup.worldToLocal(_gyLocal);
+  // --- 1. Cube hard wall (axis-aligned in local space). ---
+  const lim = GY_HALF - BALL_R;
+  let cubeBounced = 0;
+  if (_gyLocal.x < -lim) { _gyLocal.x = -lim; cubeBounced |= 1; }
+  else if (_gyLocal.x > lim) { _gyLocal.x = lim; cubeBounced |= 1; }
+  if (_gyLocal.y < -lim) { _gyLocal.y = -lim; cubeBounced |= 2; }
+  else if (_gyLocal.y > lim) { _gyLocal.y = lim; cubeBounced |= 2; }
+  if (_gyLocal.z < -lim) { _gyLocal.z = -lim; cubeBounced |= 4; }
+  else if (_gyLocal.z > lim) { _gyLocal.z = lim; cubeBounced |= 4; }
+  if (cubeBounced) {
+    _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
+    physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
+    if (cubeBounced & 1) { _gyWorldN.set(Math.sign(_gyLocal.x), 0, 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
+    if (cubeBounced & 2) { _gyWorldN.set(0, Math.sign(_gyLocal.y), 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.10); }
+    if (cubeBounced & 4) { _gyWorldN.set(0, 0, Math.sign(_gyLocal.z)).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
+  }
+  if (physBall.side === undefined) return;
+  // Once the winki GLB collider is loaded, raycast handles the membrane (collideBallVsGlb +
+  // safetyScanGlb). The analytic saddle stays as a fallback only while the GLB is loading.
+  if (glbColliders.length) return;
+  // --- 2. Per-cell saddle membrane. ---
+  _gyPrev.set(pwx, pwy, pwz); boardGroup.worldToLocal(_gyPrev);
+  const dPrev = _saddleSignedAt(_gyPrev.x, _gyPrev.y, _gyPrev.z);
+  const dCurr = _saddleSignedAt(_gyLocal.x, _gyLocal.y, _gyLocal.z);
+  const home = physBall.side;
+  const tunneled = (home * dPrev) > 0 && (home * dCurr) <= 0;
+  if (tunneled) {
+    // Binary search for the membrane crossing t in [0,1].
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) * 0.5;
+      const x = _gyPrev.x + (_gyLocal.x - _gyPrev.x) * mid;
+      const y = _gyPrev.y + (_gyLocal.y - _gyPrev.y) * mid;
+      const z = _gyPrev.z + (_gyLocal.z - _gyPrev.z) * mid;
+      if ((home * _saddleSignedAt(x, y, z)) > 0) lo = mid; else hi = mid;
+    }
+    _gyLocal.x = _gyPrev.x + (_gyLocal.x - _gyPrev.x) * lo;
+    _gyLocal.y = _gyPrev.y + (_gyLocal.y - _gyPrev.y) * lo;
+    _gyLocal.z = _gyPrev.z + (_gyLocal.z - _gyPrev.z) * lo;
+    // Compute outward normal in board-local: rotate cell-local grad by cell quaternion.
+    _saddleCellOf(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx);
+    _toCellLocal(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx, _cellLocal);
+    saddleGrad(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
+    saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
+    _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+    _gyLocal.x += _gyN.x * BALL_R;
+    _gyLocal.y += _gyN.y * BALL_R;
+    _gyLocal.z += _gyN.z * BALL_R;
+    _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
+    physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
+    _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
+    const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+    if (vn < 0) {
+      if (-vn > 2) Audio4D.onTap(-vn);
+      physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
+      physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
+      physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
+      const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+      physBall.vx = _gyWorldN.x * vAfter + (physBall.vx - vAfter * _gyWorldN.x) * 0.92;
+      physBall.vy = _gyWorldN.y * vAfter + (physBall.vy - vAfter * _gyWorldN.y) * 0.92;
+      physBall.vz = _gyWorldN.z * vAfter + (physBall.vz - vAfter * _gyWorldN.z) * 0.92;
+    }
     return;
   }
-  // Hard regime: project ball back to the WALL_HARD shell along the outward normal,
-  // then reflect velocity with high tangential retention so the ball rolls along the
-  // wall surface rather than dying on impact.
-  const overshoot = (ag - WALL_HARD) / gmag;          // local-space distance into wall
-  physBall.x += _gyN.x * overshoot;
-  physBall.y += _gyN.y * overshoot;
-  physBall.z += _gyN.z * overshoot;
-  const vn = physBall.vx * _gyN.x + physBall.vy * _gyN.y + physBall.vz * _gyN.z;
+  // --- 3. Thickness collision (ball still on home side, surface within BALL_R). ---
+  if ((home * dCurr) >= BALL_R) return;
+  const overshoot = BALL_R - home * dCurr;
+  _saddleCellOf(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx);
+  _toCellLocal(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx, _cellLocal);
+  saddleGrad(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
+  saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
+  _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+  _gyLocal.x += _gyN.x * overshoot;
+  _gyLocal.y += _gyN.y * overshoot;
+  _gyLocal.z += _gyN.z * overshoot;
+  _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
+  physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
+  _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
+  const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
   if (vn < 0) {
-    Audio4D.onTap(-vn);
-    physBall.vx -= (1 + RESTIT) * vn * _gyN.x;
-    physBall.vy -= (1 + RESTIT) * vn * _gyN.y;
-    physBall.vz -= (1 + RESTIT) * vn * _gyN.z;
-    const vAfterN = physBall.vx * _gyN.x + physBall.vy * _gyN.y + physBall.vz * _gyN.z;
-    const vtx = physBall.vx - vAfterN * _gyN.x;
-    const vty = physBall.vy - vAfterN * _gyN.y;
-    const vtz = physBall.vz - vAfterN * _gyN.z;
-    physBall.vx = _gyN.x * vAfterN + vtx * 0.97;
-    physBall.vy = _gyN.y * vAfterN + vty * 0.97;
-    physBall.vz = _gyN.z * vAfterN + vtz * 0.97;
-    physBall.spinX += (_gyN.y * vtz - _gyN.z * vty) * 0.07;
-    physBall.spinY += (_gyN.z * vtx - _gyN.x * vtz) * 0.07;
-    physBall.spinZ += (_gyN.x * vty - _gyN.y * vtx) * 0.07;
+    if (-vn > 2) Audio4D.onTap(-vn);
+    physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
+    physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
+    physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
+    const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+    const vtx = physBall.vx - vAfter * _gyWorldN.x;
+    const vty = physBall.vy - vAfter * _gyWorldN.y;
+    const vtz = physBall.vz - vAfter * _gyWorldN.z;
+    physBall.vx = _gyWorldN.x * vAfter + vtx * 0.96;
+    physBall.vy = _gyWorldN.y * vAfter + vty * 0.96;
+    physBall.vz = _gyWorldN.z * vAfter + vtz * 0.96;
+    physBall.spinX += (_gyWorldN.y * vtz - _gyWorldN.z * vty) * 0.06;
+    physBall.spinY += (_gyWorldN.z * vtx - _gyWorldN.x * vtz) * 0.06;
+    physBall.spinZ += (_gyWorldN.x * vty - _gyWorldN.y * vtx) * 0.06;
+  }
+}
+function reflectVel(n, restit) {
+  const vn = physBall.vx * n.x + physBall.vy * n.y + physBall.vz * n.z;
+  if (vn < 0) {
+    physBall.vx -= (1 + restit) * vn * n.x;
+    physBall.vy -= (1 + restit) * vn * n.y;
+    physBall.vz -= (1 + restit) * vn * n.z;
   }
 }
 // Lattice-node sphere obstacles (visible saddle tiles): ball bounces off them.
-const NODE_R = CELL * 0.32; // collision radius for each saddle node
+// Cell-sphere collision disabled: with the Schwartz Diamond walls now providing the meander,
+// a 4x4x4 grid of bumper spheres acts as a "lid" that catches the ball on the top face.
+// nodePositions still drives the final cell-snap in nearestFreeCell; only the per-substep
+// collision loop is short-circuited by NODE_R = 0.
+const NODE_R = 0;
 // Each node stores its local lattice position (lp) AND a world-space cache (p) that is
 // recomputed from the boardGroup matrix whenever a ball is released. Rotation is locked
 // during flight, so the world cache stays valid for the entire physics run.
 const nodePositions = [];
-for (let gx = 0; gx < G; gx++)
-  for (let gy = 0; gy < G; gy++)
-    for (let gz = 0; gz < G; gz++) { const lp = nodePos(gx, gy, gz); nodePositions.push({ gx, gy, gz, lp, p: lp.clone() }); }
+// Repopulate nodePositions for the current G. Called at boot and from rebuildWorld() on grid resize.
+function rebuildNodePositions() {
+  nodePositions.length = 0;
+  for (let gx = 0; gx < G; gx++)
+    for (let gy = 0; gy < G; gy++)
+      for (let gz = 0; gz < G; gz++) { const lp = nodePos(gx, gy, gz); nodePositions.push({ gx, gy, gz, lp, p: lp.clone() }); }
+}
+rebuildNodePositions();
 function refreshNodeWorldCache() { boardGroup.updateMatrixWorld(true); for (let i = 0; i < nodePositions.length; i++) { nodePositions[i].p.copy(nodePositions[i].lp).applyMatrix4(boardGroup.matrixWorld); } }
 
 let physBall = null;       // active falling ball
@@ -463,11 +605,63 @@ const _aimHit = new THREE.Vector3();
 const _aimNDC = new THREE.Vector2();
 const _aimCorner = new THREE.Vector3();
 let _aimYWorld = TOP_Y;
-const CUBE_CORNERS = (() => { const c = []; for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) c.push(new THREE.Vector3(sx * PLAY_HX, sy * PLAY_HX, sz * PLAY_HZ)); return c; })();
+// CUBE_CORNERS is repopulated by rebuildWorld() whenever PLAY_HX/HZ change with the grid.
+let CUBE_CORNERS = [];
+function rebuildCubeCorners() {
+  CUBE_CORNERS = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1])
+    CUBE_CORNERS.push(new THREE.Vector3(sx * PLAY_HX, sy * PLAY_HX, sz * PLAY_HZ));
+}
+rebuildCubeCorners();
+// Rebuild every grid-dependent piece of world state for a new edge length. Disposes the old
+// glbOverlay (cage + shell + winki instance), clears collider list, recomputes constants, and
+// rebuilds geometry caches/lookup tables. Caller (resetGame) is responsible for clearing
+// placedBalls / physBall / ghostBall before invoking this.
+function rebuildWorld(newG) {
+  if (newG === G && glbOverlay) return;          // no-op if size unchanged after first build
+  // 1. Tear down the previous lattice. dispose() releases GPU buffers; glbColliders is rebuilt
+  //    below from the new InstancedMesh that makeManifoldLattice() will register.
+  if (glbOverlay) {
+    boardGroup.remove(glbOverlay);
+    glbOverlay.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { const m = o.material; (Array.isArray(m) ? m : [m]).forEach(x => x.dispose()); }
+    });
+  }
+  glbColliders.length = 0;
+  // 2. Update the manifold model and our local mirror, then recompute everything derived from G.
+  G = newG | 0;
+  BM.setGrid(G);
+  GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;
+  SADDLE_CELL = (2 * GY_HALF) / G;
+  SADDLE_HALF = SADDLE_CELL * 0.5;
+  BALL_R = SADDLE_CELL * 0.25;
+  PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;
+  PLAY_HZ = (G - 1) * 0.5 * CELL + BALL_R;
+  TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;
+  Y_CEIL = PLAY_HX + CELL * 1.2 + BALL_R;
+  FLOOR_Y = -(PLAY_HX + CELL * 1.2 + BALL_R);
+  // 3. Rebuild ball geometries at the new BALL_R. Old geos are disposed because addPlacedBall /
+  //    spawn helpers clone material per-mesh but reuse the shared geometry, so a fresh handle
+  //    is required for new balls to render at the correct size.
+  BGEO.dispose(); HGEO.dispose(); RGEO.dispose(); WGEO.dispose();
+  BGEO = new THREE.SphereGeometry(BALL_R, 28, 28);
+  HGEO = new THREE.SphereGeometry(BALL_R * 1.7, 14, 14);
+  RGEO = new THREE.TorusGeometry(BALL_R * 1.55, 0.025, 8, 32);
+  WGEO = new THREE.SphereGeometry(BALL_R * 2.4, 18, 18);
+  // 4. Rebuild lookup caches that index by G.
+  rebuildNodePositions();
+  rebuildCubeCorners();
+  // 5. Build the new lattice; if winki.glb is cached this completes synchronously, otherwise
+  //    the InstancedMesh is registered when the loader callback fires.
+  glbOverlay = makeManifoldLattice();
+}
 function updateAimPlane() {
   boardGroup.updateMatrixWorld(true);
   let maxY = -Infinity;
   for (let i = 0; i < CUBE_CORNERS.length; i++) { _aimCorner.copy(CUBE_CORNERS[i]).applyMatrix4(boardGroup.matrixWorld); if (_aimCorner.y > maxY) maxY = _aimCorner.y; }
+  // Hover ghost just above the cube so the player can aim, but spawn the actual physics ball
+  // INSIDE the top face (see spawnPhysBall) so it immediately enters the Diamond passage system.
   _aimYWorld = maxY + BALL_R + 0.4;
   _aimPlane.constant = -_aimYWorld;
 }
@@ -505,14 +699,45 @@ function syncGhostToCursor() {
   moveGhostFromClient(lastMouseX, lastMouseY);
 }
 
-function spawnPhysBall(x, y, z, p) {
+function spawnPhysBall(x, y, z, p, predicted) {
   if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
   const mesh = new THREE.Mesh(BGEO, makeFallingBallMat(p));
   mesh.renderOrder = 5;
   const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.03));
-  mesh.position.set(x, y, z); halo.position.copy(mesh.position);
+  // Drop the ball into the centre of the saddle chamber under the cursor on the CURRENT
+  // WORLD-UP face of the (possibly rotated/snapped) cube:
+  //   1. Find which local axis is most aligned with world +Y.
+  //   2. Place spawn just inside that face along the face-normal axis.
+  //   3. Snap the two in-plane coords to the nearest saddle chamber centre so the ball
+  //      enters cleanly above one specific cell rather than near a saddle edge.
+  const _spawnLocal = new THREE.Vector3(x, y, z);
+  boardGroup.worldToLocal(_spawnLocal);
+  const faceIdx = localUpAxis();
+  const ax = (faceIdx >> 1);                       // 0=X, 1=Y, 2=Z is the face-normal axis
+  const sgn = (faceIdx % 2 === 0) ? +1 : -1;        // +face vs -face
+  const inset = GY_HALF - BALL_R * 1.5;
+  const slabComp = sgn * inset;
+  const inA = (ax === 0) ? 'y' : 'x';
+  const inB = (ax === 2) ? 'y' : 'z';
+  if (ax === 0) _spawnLocal.x = slabComp;
+  else if (ax === 1) _spawnLocal.y = slabComp;
+  else _spawnLocal.z = slabComp;
+  // Snap in-plane coords to the nearest chamber centre: chamber k spans
+  // [-GY_HALF + k*SADDLE_CELL, -GY_HALF + (k+1)*SADDLE_CELL], centre at -GY_HALF + (k+0.5)*SADDLE_CELL.
+  const _snap = v => {
+    let k = Math.floor((v + GY_HALF) / SADDLE_CELL);
+    if (k < 0) k = 0; else if (k > G - 1) k = G - 1;
+    return -GY_HALF + (k + 0.5) * SADDLE_CELL;
+  };
+  _spawnLocal[inA] = _snap(_spawnLocal[inA]);
+  _spawnLocal[inB] = _snap(_spawnLocal[inB]);
+  const dSpawn = _saddleSignedAt(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z);
+  const side = dSpawn >= 0 ? 1 : -1;
+  const v0 = -1;                                   // m/s downward in world
+  boardGroup.localToWorld(_spawnLocal);
+  mesh.position.copy(_spawnLocal); halo.position.copy(mesh.position);
   scene.add(mesh); scene.add(halo);
-  physBall = { mesh, halo, x, y, z, vx: 0, vy: -1, vz: 0, p, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0 };
+  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null };
   return true;
 }
 // Snap the cube's rotation to the nearest cube symmetry so that one local axis aligns to world-up.
@@ -552,6 +777,28 @@ function snapAimToColumn(aimLocal, faceIdx) {
   });
   return { latA: lat[0], latB: lat[1], faceIdx };
 }
+// Predict where the ball WILL land the instant it's released. Knowing this up-front lets the
+// snap animation always glide downward into the target chamber instead of (after-the-fact)
+// jumping sideways or upward to whatever empty cell happened to be nearest the rest position.
+// Walks the column (latA,latB,faceIdx) from the bottom face upward; first empty cell wins.
+//   ax (faceIdx>>1) is the gravity axis, sign tells which end of that axis is "up".
+//   sign=+1: top face at +half, bottom at index 0, fill upward (k=0..G-1).
+//   sign=-1: top face at -half, bottom at index G-1, fill downward (k=G-1..0).
+function predictLanding(latA, latB, faceIdx) {
+  const ax = (faceIdx >> 1);
+  const sign = (faceIdx % 2 === 0) ? +1 : -1;
+  const start = sign === 1 ? 0 : G - 1;
+  const end = sign === 1 ? G : -1;
+  const step = sign;
+  for (let k = start; k !== end; k += step) {
+    let gx, gy, gz;
+    if (ax === 0) { gx = k; gy = latA; gz = latB; }
+    else if (ax === 1) { gx = latA; gy = k; gz = latB; }
+    else { gx = latA; gy = latB; gz = k; }
+    if (!BM.getCell(gx, gy, gz)) return [gx, gy, gz];
+  }
+  return null;
+}
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
   // Capture the ghost's current world-space aim point BEFORE we snap, so the ball spawns
@@ -572,7 +819,12 @@ function releaseBall() {
   const col = snapAimToColumn(aimLocal, faceIdx);
   const wp = topFaceWorldPos(col.latA, col.latB, col.faceIdx);
   const spawnW = wp.clone(); boardGroup.localToWorld(spawnW);
-  spawnPhysBall(spawnW.x, _aimYWorld, spawnW.z, p);
+  // Predict the landing cell at release. Stored on physBall so onBallSettled can snap straight
+  // down into the chosen column instead of searching for whatever cell ended up nearest after
+  // the ball bounced through the saddle. If the column is somehow already full (shouldn't
+  // happen given the column UI), fall back to the post-hoc nearest-cell search at settle time.
+  const predicted = predictLanding(col.latA, col.latB, col.faceIdx);
+  spawnPhysBall(spawnW.x, _aimYWorld, spawnW.z, p, predicted);
   Audio4D.onRelease();
   if (camFollow) { camLookT.set(spawnW.x, 3, spawnW.z); camPosT.set(spawnW.x * 0.5 + 6, _aimYWorld + 4, spawnW.z * 0.5 + 12); }
 }
@@ -671,10 +923,76 @@ function pollGamepad() {
 }
 setInterval(pollGamepad, 60);
 function aiSim(fn) { const snap = BM.snapshot(); const r = fn(); BM.restore(snap); return r; }
-function aiPickColumn() { const cols = BM.openColumns(); if (!cols.length) return null; if (aiDiff === 'easy' || TRNG.f() < 0.18) return TRNG.pick(cols); const opp = currentPlayer === P1 ? P2 : P1; for (const [gx, gz] of TRNG.shuffle(cols)) { if (aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, currentPlayer); return BM.checkWin(currentPlayer, currentScenario); })) return [gx, gz]; } for (const [gx, gz] of TRNG.shuffle(cols)) { if (aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, opp); return BM.checkWin(opp, currentScenario); })) return [gx, gz]; } if (aiDiff === 'hard') { const scored = cols.map(([gx, gz]) => { const myT = aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, currentPlayer); return BM.countThreats(currentPlayer); }); const opT = aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, opp); return BM.countThreats(opp); }); return { gx, gz, score: myT * 2 + opT * 1.5 + (1.5 - Math.abs(gx - 1.5) * 0.2 - Math.abs(gz - 1.5) * 0.2) + TRNG.f() * 0.4 }; }); scored.sort((a, b) => b.score - a.score); return [scored[0].gx, scored[0].gz]; } const scored = cols.map(([gx, gz]) => ({ gx, gz, score: 4 - Math.abs(gx - 1.5) - Math.abs(gz - 1.5) + TRNG.f() })); scored.sort((a, b) => b.score - a.score); return [scored[0].gx, scored[0].gz]; }
-function updateHUD() { const isP1 = currentPlayer === P1; const n1 = document.getElementById('name-p1').textContent, n2 = document.getElementById('name-p2').textContent; document.getElementById('turn-indicator').textContent = `\u25CF ${isP1 ? n1 : n2}`; document.getElementById('turn-indicator').style.color = isP1 ? 'var(--p1)' : 'var(--p2)'; document.getElementById('panel-p1').classList.toggle('active', isP1); document.getElementById('panel-p2').classList.toggle('active', !isP1); document.getElementById('badge-p1').classList.toggle('pulse', isP1); document.getElementById('badge-p2').classList.toggle('pulse', !isP1); document.getElementById('moves-p1').textContent = TS.count(P1); document.getElementById('moves-p2').textContent = TS.count(P2); document.getElementById('streak-p1').textContent = TS.streak(P1); document.getElementById('streak-p2').textContent = TS.streak(P2); document.getElementById('combo-p1').textContent = BM.countThreats(P1); document.getElementById('combo-p2').textContent = BM.countThreats(P2); }
-function renderLogs() { for (const p of [P1, P2]) document.getElementById(`log-p${p}`).innerHTML = TS.log(p).map(m => `<div class="log-entry">${m}</div>`).join(''); }
-function renderScores() { document.getElementById('score-p1').textContent = TS.score(P1); document.getElementById('score-p2').textContent = TS.score(P2); }
+// All players except the current one are treated as adversaries -- we block the strongest threat
+// among them rather than just the single "other" player from the original 2-player code.
+function opponentsOf(p) { const out = []; for (let i = 1; i <= numPlayers; i++) if (i !== p) out.push(i); return out; }
+function aiPickColumn() {
+  const cols = BM.openColumns(); if (!cols.length) return null;
+  if (aiDiff === 'easy' || TRNG.f() < 0.18) return TRNG.pick(cols);
+  const opps = opponentsOf(currentPlayer);
+  // Win if we can.
+  for (const [gx, gz] of TRNG.shuffle(cols)) {
+    if (aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, currentPlayer); return BM.checkWin(currentPlayer, currentScenario); })) return [gx, gz];
+  }
+  // Block any opponent's immediate win.
+  for (const [gx, gz] of TRNG.shuffle(cols)) {
+    for (const opp of opps) {
+      if (aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, opp); return BM.checkWin(opp, currentScenario); })) return [gx, gz];
+    }
+  }
+  // Half-cube centre nudges the bias to the middle of whatever G we're playing.
+  const mid = (G - 1) * 0.5;
+  if (aiDiff === 'hard') {
+    const scored = cols.map(([gx, gz]) => {
+      const myT = aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, currentPlayer); return BM.countThreats(currentPlayer); });
+      const opT = opps.reduce((s, opp) => s + aiSim(() => { const gy = BM.lowestFree(gx, gz); BM.setCell(gx, gy, gz, opp); return BM.countThreats(opp); }), 0);
+      return { gx, gz, score: myT * 2 + opT * 1.5 + (1.5 - Math.abs(gx - mid) * 0.2 - Math.abs(gz - mid) * 0.2) + TRNG.f() * 0.4 };
+    });
+    scored.sort((a, b) => b.score - a.score); return [scored[0].gx, scored[0].gz];
+  }
+  const scored = cols.map(([gx, gz]) => ({ gx, gz, score: G - Math.abs(gx - mid) - Math.abs(gz - mid) + TRNG.f() }));
+  scored.sort((a, b) => b.score - a.score); return [scored[0].gx, scored[0].gz];
+}
+// Per-player jewel colours used by the turn indicator. Mirrors BPALETTE order.
+const PLAYER_HEX = ['#ff2244', '#22aa44', '#9966ff', '#ddaa33'];
+// Track the last player we announced so updateHUD can fire the turn banner only on actual turn
+// transitions, not on every HUD refresh (move-count tick, threat recount, etc.).
+let _lastAnnouncedPlayer = 0, _turnAnnounceHide = null;
+function announceTurn(p) {
+  const el = document.getElementById('turn-announce'); if (!el) return;
+  const nm = document.getElementById('name-p' + p);
+  const colour = PLAYER_HEX[p - 1] || '#fff';
+  el.textContent = `${(nm ? nm.textContent : 'PLAYER ' + p)}'S TURN`;
+  el.style.color = colour;
+  el.style.boxShadow = `0 0 28px ${colour}55`;
+  el.classList.add('show');
+  if (_turnAnnounceHide) clearTimeout(_turnAnnounceHide);
+  _turnAnnounceHide = setTimeout(() => el.classList.remove('show'), 1400);
+}
+function updateHUD() {
+  const name = document.getElementById('name-p' + currentPlayer);
+  const ti = document.getElementById('turn-indicator');
+  if (name && ti) { ti.textContent = `\u25CF ${name.textContent}`; ti.style.color = PLAYER_HEX[currentPlayer - 1] || '#fff'; }
+  for (let p = 1; p <= 4; p++) {
+    const isMe = p === currentPlayer, active = p <= numPlayers;
+    const panel = document.getElementById('panel-p' + p); if (panel) panel.classList.toggle('active', isMe && active);
+    const badge = document.getElementById('badge-p' + p); if (badge) badge.classList.toggle('pulse', isMe && active);
+    const nameEl = document.getElementById('name-p' + p);
+    if (nameEl) nameEl.style.color = (isMe && active) ? PLAYER_HEX[p - 1] : '#e0eaff';
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('moves-p' + p, TS.count(p));
+    set('streak-p' + p, TS.streak(p));
+    set('combo-p' + p, BM.countThreats(p));
+  }
+  // Fire the turn banner only when control actually moves to a different player and the game
+  // is still in progress -- skipping the win/draw moment so the result card isn't stepped on.
+  if (!isGameOver && currentPlayer !== _lastAnnouncedPlayer) {
+    _lastAnnouncedPlayer = currentPlayer;
+    announceTurn(currentPlayer);
+  }
+}
+function renderLogs() { for (let p = 1; p <= numPlayers; p++) { const el = document.getElementById(`log-p${p}`); if (el) el.innerHTML = TS.log(p).map(m => `<div class="log-entry">${m}</div>`).join(''); } }
+function renderScores() { for (let p = 1; p <= 4; p++) { const el = document.getElementById(`score-p${p}`); if (el) el.textContent = TS.score(p); } }
 function showResult(title, sub, tally, color) { document.getElementById('result-title').textContent = title; document.getElementById('result-title').style.color = color; document.getElementById('result-line').textContent = sub; document.getElementById('result-tally').textContent = tally; document.getElementById('result-overlay').classList.add('show'); }
 // (legacy buildColUI / refreshColBtns now defined as no-ops below)
 function startTurnTimer() { if (!currentScenario.timer) return; clearTurnTimer(); timerLeft = currentScenario.timer; const el = document.getElementById('turn-timer'); el.style.color = 'var(--cyan)'; el.textContent = timerLeft + 's'; turnTimer = setInterval(() => { timerLeft--; el.textContent = timerLeft + 's'; if (timerLeft <= 3) el.style.color = '#ff4444'; if (timerLeft <= 0) { clearTurnTimer(); const avail = BM.openColumns(); if (avail.length) { const [gx, gz] = TRNG.pick(avail); dropBall(gx, gz); } } }, 1000); }
@@ -716,7 +1034,10 @@ function dropBall(gx, gz) {
 }
 function physStep(dt) {
   if (!physBall || physBall.settled) return;
-  const STEPS = 7, hdt = dt / STEPS;
+  // 16 substeps so each integration step moves the ball less than one ball-diameter even
+  // at terminal velocity (roughly 30 m/s). This prevents tunneling through the Diamond
+  // membrane in narrow passage segments where the surface curves rapidly.
+  const STEPS = 16, hdt = dt / STEPS;
   for (let s = 0; s < STEPS; s++) { if (!physBall || physBall.settled) break; physSubstep(hdt); }
   if (!physBall) return;
   physBall.mesh.position.set(physBall.x, physBall.y, physBall.z);
@@ -748,6 +1069,7 @@ const _scanOrigin = new THREE.Vector3();
 function safetyScanGlb() {
   if (!glbColliders.length || !physBall) return;
   _scanOrigin.set(physBall.x, physBall.y, physBall.z);
+  let contacts = 0;
   for (let i = 0; i < _scanDirs.length; i++) {
     const d = _scanDirs[i];
     glbRay.set(_scanOrigin, d);
@@ -759,6 +1081,7 @@ function safetyScanGlb() {
     if (!h.face) continue;
     const overlap = (BALL_R + 0.01) - h.distance;
     if (overlap <= 0) continue;
+    contacts++;
     glbN.copy(h.face.normal);
     glbNMat.getNormalMatrix(h.object.matrixWorld);
     glbN.applyMatrix3(glbNMat).normalize();
@@ -774,6 +1097,13 @@ function safetyScanGlb() {
       physBall.vy -= (1 + RESTIT) * vIn * d.y;
       physBall.vz -= (1 + RESTIT) * vIn * d.z;
     }
+  }
+  // Bleed energy proportional to how pinched the ball is. With contacts on >=2 sides
+  // (wedged in a saddle throat), apply heavy tangential damping so residual rattle
+  // decays into a settle instead of perpetual oscillation.
+  if (contacts >= 2) {
+    const k = 0.78;
+    physBall.vx *= k; physBall.vy *= k; physBall.vz *= k;
   }
 }
 function collideBallVsGlb(px, py, pz) {
@@ -830,27 +1160,9 @@ function physSubstep(dt) {
   physBall.vx *= BALL_AIR; physBall.vz *= BALL_AIR;
   collideBallVsGlb(px, py, pz);
   safetyScanGlb();
-  gyroidGuide(dt);
-  // Collide against each visible lattice node treated as a sphere obstacle.
-  for (let i = 0; i < nodePositions.length; i++) {
-    const n = nodePositions[i].p;
-    const dx = physBall.x - n.x, dy = physBall.y - n.y, dz = physBall.z - n.z;
-    const d2 = dx * dx + dy * dy + dz * dz;
-    const minD = NODE_R + BALL_R;
-    if (d2 < minD * minD && d2 > 1e-8) {
-      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d;
-      const overlap = minD - d;
-      physBall.x += nx * overlap; physBall.y += ny * overlap; physBall.z += nz * overlap;
-      const vn = physBall.vx * nx + physBall.vy * ny + physBall.vz * nz;
-      if (vn < 0) {
-        if (-vn > 4) Audio4D.onTap(-vn);
-        physBall.vx -= (1 + RESTIT) * vn * nx;
-        physBall.vy -= (1 + RESTIT) * vn * ny;
-        physBall.vz -= (1 + RESTIT) * vn * nz;
-        physBall.vx *= 0.93; physBall.vz *= 0.93;
-      }
-    }
-  }
+  gyroidGuide(dt, px, py, pz);
+  // Lattice node sphere collision intentionally skipped (NODE_R = 0); the saddle membrane
+  // provides all the meander, and nodePositions is only used for final cell-snap on settle.
   // Collide against already-placed balls so cells are sealed.
   for (let i = 0; i < placedBalls.length; i++) {
     const b = placedBalls[i].mesh.position;
@@ -869,46 +1181,122 @@ function physSubstep(dt) {
       }
     }
   }
-  // Hard AABB containment: ball can never leave the lattice cube.
-  if (physBall.x < -PLAY_HX) { physBall.x = -PLAY_HX; physBall.vx = Math.abs(physBall.vx) * RESTIT; }
-  if (physBall.x > PLAY_HX) { physBall.x = PLAY_HX; physBall.vx = -Math.abs(physBall.vx) * RESTIT; }
-  if (physBall.z < -PLAY_HZ) { physBall.z = -PLAY_HZ; physBall.vz = Math.abs(physBall.vz) * RESTIT; }
-  if (physBall.z > PLAY_HZ) { physBall.z = PLAY_HZ; physBall.vz = -Math.abs(physBall.vz) * RESTIT; }
-  if (physBall.y > Y_CEIL) { physBall.y = Y_CEIL; physBall.vy = -Math.abs(physBall.vy) * RESTIT; }
-  if (physBall.y < FLOOR_Y) {
-    physBall.y = FLOOR_Y;
-    physBall.vy = Math.abs(physBall.vy) * RESTIT;
-    physBall.vx *= 0.85; physBall.vz *= 0.85;
-  }
+  // Cube hard wall is enforced inside gyroidGuide() in local space (handles rotated cubes
+  // correctly). The previous world-space AABB clamps were redundant and pinned the ball to
+  // the wrong boundary when the cube was rotated, so they have been removed.
   const speed2 = physBall.vx * physBall.vx + physBall.vy * physBall.vy + physBall.vz * physBall.vz;
+  // Slow-phase chamber-centre attractor. Once the ball is moving slowly enough that bouncing
+  // is essentially over, apply a gentle pull toward the nearest free chamber centre at-or-below
+  // the current Y. The pull strength ramps up as speed approaches zero, so fast bounces are
+  // unaffected and slow drift is steered into a void centre. By the time the ball satisfies
+  // the SETTLE_V/timer condition it is already at (or very near) the chamber centre, making
+  // the post-settle snap visually a no-op instead of a teleport/lerp.
+  const ATTRACT_GATE = SETTLE_V * 3;            // start nudging once below ~3x settle speed
+  const ATTRACT_MAX = 26;                       // m/s^2 at zero speed; gentle compared to GRAV (-62)
+  if (speed2 < ATTRACT_GATE * ATTRACT_GATE) {
+    const tgt = nearestFreeNode(physBall.x, physBall.y, physBall.z, physBall.y + BALL_R * 0.5);
+    if (tgt) {
+      const dx = tgt.p.x - physBall.x, dy = tgt.p.y - physBall.y, dz = tgt.p.z - physBall.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > 1e-3) {
+        const slow = 1 - Math.sqrt(speed2) / ATTRACT_GATE;   // 0..1, peak at standstill
+        const a = ATTRACT_MAX * slow;
+        physBall.vx += (dx / d) * a * dt;
+        physBall.vy += (dy / d) * a * dt;
+        physBall.vz += (dz / d) * a * dt;
+      }
+    }
+  }
   if (speed2 < SETTLE_V * SETTLE_V) {
     physBall.settleTimer += dt;
-    if (physBall.settleTimer > 0.4) { physBall.settled = true; onBallSettled(); }
+    if (physBall.settleTimer > 0.4) { physBall.settled = true; onBallSettled(); return; }
   } else { physBall.settleTimer = 0; }
+  // Stuck-detect: a ball wedged between two saddle walls in a tight throat will keep
+  // bouncing with non-zero speed forever. If world-Y stops decreasing for a sustained
+  // window (ball isn't making progress to the bottom), force a settle so it snaps to
+  // the nearest empty cell via nearestFreeCell.
+  if (physBall.y < physBall.lowY - 0.05) { physBall.lowY = physBall.y; physBall.stuckTime = 0; }
+  else { physBall.stuckTime += dt; }
+  if (physBall.stuckTime > 0.9) { physBall.settled = true; onBallSettled(); }
 }
-// Snap a settled world position to the nearest unoccupied lattice cell.
-function nearestFreeCell(x, y, z) {
+// Find the nearest unoccupied lattice node. `yLimit` (optional) excludes nodes whose world-Y
+// is above the limit so callers can enforce "no upward motion against gravity". Returns the
+// nodePositions entry (with cached world-space `.p`), or null. Shared by the settle-snap and
+// the slow-phase chamber-centre attractor so both agree on the destination.
+function nearestFreeNode(x, y, z, yLimit) {
   let best = null, bestD = Infinity;
+  const cap = yLimit != null ? yLimit : Infinity;
   for (let i = 0; i < nodePositions.length; i++) {
-    const { gx, gy, gz, p } = nodePositions[i];
-    if (BM.getCell(gx, gy, gz)) continue;
-    const dx = x - p.x, dy = y - p.y, dz = z - p.z;
+    const n = nodePositions[i];
+    if (BM.getCell(n.gx, n.gy, n.gz)) continue;
+    if (n.p.y > cap) continue;
+    const dx = x - n.p.x, dy = y - n.p.y, dz = z - n.p.z;
     const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestD) { bestD = d; best = [gx, gy, gz]; }
+    if (d < bestD) { bestD = d; best = n; }
   }
   return best;
 }
+function nearestFreeCell(x, y, z, yLimit) {
+  const n = nearestFreeNode(x, y, z, yLimit);
+  return n ? [n.gx, n.gy, n.gz] : null;
+}
 function describeWin(cells, sc) { return sc.special === 'cube' ? 'PERFECT CUBE COMPLETED!' : (BM.dirLabel(cells) || '').toUpperCase(); }
 function nameOf(p) { return document.getElementById(`name-p${p}`).textContent; }
-function tallyStr() { return `P1: ${TS.score(P1)}  |  P2: ${TS.score(P2)}`; }
+function tallyStr() { const out = []; for (let p = 1; p <= numPlayers; p++) out.push(`P${p}: ${TS.score(p)}`); return out.join('  |  '); }
+// Snap-animation state. While non-null, the falling physBall mesh is being lerped from where
+// the ball physically rested to the chamber-centre world position. animate() advances `t` and
+// fires `onDone` (which runs finishPlacement) when the lerp completes. We keep `physBall` alive
+// during the animation so the existing mesh is what the player sees moving -- no flicker.
+let snapAnim = null;
+const _snapTmp = new THREE.Vector3();
 function onBallSettled() {
   const p = physBall.p;
-  const cell = nearestFreeCell(physBall.x, physBall.y, physBall.z);
+  // Cell selection respects gravity: prefer the closest free cell at-or-below the ball's rest
+  // height (so the snap reads as a settle/roll, never as floating upward). If no such cell
+  // exists -- e.g. the ball wedged near the top of an otherwise-empty column -- fall back to
+  // the predicted column landing computed at release; that target is always the lowest free
+  // cell in the chosen column and is therefore both deterministic and physically plausible.
+  const yLimit = physBall.y + BALL_R * 0.5;
+  let cell = nearestFreeCell(physBall.x, physBall.y, physBall.z, yLimit);
+  if (!cell && physBall.predicted && !BM.getCell(physBall.predicted[0], physBall.predicted[1], physBall.predicted[2])) {
+    cell = physBall.predicted;
+  }
+  if (!cell) cell = nearestFreeCell(physBall.x, physBall.y, physBall.z);
   Audio4D.onSettle();
-  scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
   boardGlow.intensity = 0;
-  if (!cell) { isDropping = false; if (!isGameOver) maybeSpawnTurnBall(); return; }
+  if (!cell) {
+    scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
+    isDropping = false; if (!isGameOver) maybeSpawnTurnBall(); return;
+  }
+  // Compute the chamber-centre in world space (boardGroup may be at a 90deg rotation snap).
   const [gx, gy, gz] = cell;
+  const toWorld = nodePos(gx, gy, gz); boardGroup.localToWorld(toWorld);
+  snapAnim = {
+    mesh: physBall.mesh, halo: physBall.halo,
+    from: new THREE.Vector3(physBall.x, physBall.y, physBall.z),
+    to: toWorld,
+    t: 0, dur: 0.32,                    // ~320ms feels continuous, not teleport-y
+    onDone: () => finishPlacement(p, cell)
+  };
+}
+// Advance the active snap animation. Smoothstep easing means the ball decelerates into its
+// chamber rather than snapping linearly. Called from animate() once per frame.
+function stepSnapAnim(dt) {
+  if (!snapAnim) return;
+  snapAnim.t += dt;
+  const a = Math.min(snapAnim.t / snapAnim.dur, 1);
+  const e = a * a * (3 - 2 * a);
+  _snapTmp.lerpVectors(snapAnim.from, snapAnim.to, e);
+  snapAnim.mesh.position.copy(_snapTmp);
+  snapAnim.halo.position.copy(_snapTmp);
+  if (a >= 1) { const cb = snapAnim.onDone; snapAnim = null; cb(); }
+}
+function finishPlacement(p, cell) {
+  const [gx, gy, gz] = cell;
+  // Now that the visual has arrived at the chamber centre, swap the falling-ball mesh out for
+  // the permanent placedBall (with its emissive shells). Keeping the previous mesh until this
+  // point avoids a one-frame gap where the ball would disappear before the glowing version pops in.
+  if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
   BM.setCell(gx, gy, gz, p);
   addPlacedBall(gx, gy, gz, p);
   Audio4D.onPlace(p);
@@ -936,33 +1324,39 @@ function onBallSettled() {
     isGameOver = true;
     Audio4D.stopMusic();
     if (currentScenario.special === 'territory') {
-      const p1L = BM.countAllLines(P1), p2L = BM.countAllLines(P2);
-      const winner = p1L > p2L ? P1 : p2L > p1L ? P2 : 0;
-      const color = winner === P1 ? '#2255ff' : winner === P2 ? '#ff2200' : '#ffee00';
+      // Territory mode: highest line count wins. Ties (multiple players sharing the max) are draws.
+      const lines = []; for (let p = 1; p <= numPlayers; p++) lines.push({ p, n: BM.countAllLines(p) });
+      const max = lines.reduce((m, x) => Math.max(m, x.n), 0);
+      const top = lines.filter(x => x.n === max);
+      const winner = top.length === 1 ? top[0].p : 0;
+      const color = winner ? PLAYER_HEX[winner - 1] : '#ffee00';
       if (winner) { TS.awardWin(winner); renderScores(); }
       const wn = winner === 0 ? 'DRAW' : `${nameOf(winner)} WINS`;
-      setTimeout(() => showResult(wn, `Lines: P1=${p1L}  P2=${p2L}`, 'TERRITORY WAR COMPLETE', color), 700);
+      const breakdown = lines.map(x => `P${x.p}=${x.n}`).join('  ');
+      setTimeout(() => showResult(wn, `Lines: ${breakdown}`, 'TERRITORY WAR COMPLETE', color), 700);
     } else {
       setTimeout(() => showResult('DRAW', 'The lattice is full', tallyStr(), '#ffee00'), 500);
     }
     isDropping = false; refreshColBtns(); updateHUD(); return;
   }
-  currentPlayer = currentPlayer === P1 ? P2 : P1;
+  // Cycle through 1..numPlayers (1-player mode just keeps re-spawning P1 -- effectively a sandbox).
+  currentPlayer = numPlayers <= 1 ? P1 : ((currentPlayer % numPlayers) + 1);
   isDropping = false;
   updateHUD();
   if (camFollow) setTimeout(() => { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); }, 600);
   maybeSpawnTurnBall();
 }
 // Hand control to the next actor: AI auto-drops, a human gets a cursor ball.
+// In multiplayer-vs-AI mode the AI controls every slot from P2..numPlayers; humans only control P1.
+function isAiTurn() { return vsMode === 'ai' && currentPlayer !== P1; }
 function maybeSpawnTurnBall() {
   if (isGameOver) return;
-  if (vsMode === 'ai' && currentPlayer === P2) {
+  if (isAiTurn()) {
     setTimeout(() => {
       if (isGameOver || isDropping) return;
       let col = null;
       try { col = aiPickColumn(); } catch (err) { console.warn('aiPickColumn threw', err); }
       if (!col) {
-        // Fallback: pick any free cell directly from the lattice.
         const free = nodePositions.filter(n => !BM.getCell(n.gx, n.gy, n.gz));
         if (free.length) col = [free[(Math.random() * free.length) | 0].gx, free[(Math.random() * free.length) | 0].gz];
       }
@@ -977,12 +1371,36 @@ function maybeSpawnTurnBall() {
 function buildScenarioSelect() { const grid = document.getElementById('ss-grid'); grid.innerHTML = ''; SCENARIOS.forEach((sc, i) => { const card = document.createElement('div'); card.className = 'ss-card' + (i === 0 ? ' sel' : ''); card.innerHTML = `<div class="ss-icon">${sc.icon}</div><div class="ss-name">${sc.name}</div><div class="ss-desc">${sc.desc}</div>`; card.onclick = () => { document.querySelectorAll('.ss-card').forEach(c => c.classList.remove('sel')); card.classList.add('sel'); selectedScenario = sc; }; grid.appendChild(card); }); }
 function setVsMode(mode) { vsMode = mode; document.getElementById('pvp-btn').classList.toggle('sel', mode === 'pvp'); document.getElementById('ai-btn').classList.toggle('sel', mode === 'ai'); document.getElementById('diff-row').classList.toggle('show', mode === 'ai'); document.getElementById('name-p2').textContent = mode === 'ai' ? 'AI OPPONENT' : 'PLAYER 2'; }
 function setDiff(d) { aiDiff = d; document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('sel')); document.getElementById(d === 'medium' ? 'diff-med' : `diff-${d}`).classList.add('sel'); }
+// Pick the player count for the next game. Updates the scenario-select UI and toggles which
+// player panels are visible. Actual grid resize happens in startGame() via rebuildWorld().
+function setNumPlayers(n) {
+  numPlayers = Math.max(1, Math.min(4, n | 0));
+  for (let i = 1; i <= 4; i++) {
+    const btn = document.getElementById('np-' + i);
+    if (btn) btn.classList.toggle('sel', i === numPlayers);
+  }
+  for (let i = 1; i <= 4; i++) {
+    const panel = document.getElementById('panel-p' + i);
+    if (panel) panel.style.display = (i <= numPlayers) ? '' : 'none';
+  }
+}
 function showScenarioSelect() { document.getElementById('result-overlay').classList.remove('show'); document.getElementById('scenario-select').classList.add('show'); }
-function startGame() { currentScenario = selectedScenario; document.getElementById('scenario-select').classList.remove('show'); document.getElementById('scenario-tag').textContent = currentScenario.name; document.querySelectorAll('.panel-mode').forEach(e => e.textContent = currentScenario.name); resetGame(true); Audio4D.startMusic(); }
+function startGame() {
+  currentScenario = selectedScenario;
+  document.getElementById('scenario-select').classList.remove('show');
+  document.getElementById('scenario-tag').textContent = currentScenario.name;
+  document.querySelectorAll('.panel-mode').forEach(e => e.textContent = currentScenario.name);
+  // Resize the world to match player count BEFORE resetGame clears state, so the new
+  // nodePositions / placement geometry is in place when the first ghost ball spawns.
+  rebuildWorld(gridForPlayers(numPlayers));
+  setNumPlayers(numPlayers);   // ensure panel visibility reflects current count
+  resetGame(true);
+  Audio4D.startMusic();
+}
 function rematch() { document.getElementById('result-overlay').classList.remove('show'); resetGame(false); Audio4D.startMusic(); }
-function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') document.getElementById('name-p2').textContent = 'AI OPPONENT'; maybeSpawnTurnBall(); }
+function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); snapAnim = null; _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') document.getElementById('name-p2').textContent = 'AI OPPONENT'; maybeSpawnTurnBall(); }
 let lastT = 0;
-function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.05 + 0.02 * Math.sin(uTime * 1.8 + i * 1.3); b.ring.material.opacity = 0.16 + 0.08 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); renderer.render(scene, camera); }
+function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); stepSnapAnim(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); renderer.render(scene, camera); }
 window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
 function setPreloadProgress(p) { document.getElementById('pre-bar').style.width = p + '%'; }
 function setPreloadMsg(m) { const el = document.getElementById('pre-msg'); if (el) el.textContent = m; }
@@ -1003,4 +1421,4 @@ Promise.all([manifestReady, glbReady]).then(() => {
   setPreloadMsg('READY');
   setTimeout(finishPreload, 400);
 });
-if (typeof ManifoldBridge !== 'undefined') ManifoldBridge.init({ id: '4dconnect', version: '2.0.0', x: 4, y: 4, exposes: () => ({ currentPlayer, scores: [TS.score(P1), TS.score(P2)], isGameOver, filled: BM.filled(), scenario: currentScenario && currentScenario.id }) });
+if (typeof ManifoldBridge !== 'undefined') ManifoldBridge.init({ id: '4dconnect', version: '2.0.0', x: 4, y: 4, exposes: () => ({ currentPlayer, numPlayers, grid: G, scores: Array.from({ length: numPlayers }, (_, i) => TS.score(i + 1)), isGameOver, filled: BM.filled(), scenario: currentScenario && currentScenario.id }) });

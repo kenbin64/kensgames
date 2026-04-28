@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 4D TIC-TAC-TOE -- Manifold Substrate
  * Manifold = Expression + Attributes + Substrate
  * Expression: m=x*y*z (Schwartz-diamond triply-periodic lattice)
@@ -10,7 +10,8 @@
  * Rule Zero: nothing stored beyond the 64-byte cell array and the turn list.
  */
 window.BoardManifold = (() => {
-  const G = 4, N = G ** 3, EMPTY = 0, P1 = 1, P2 = 2;
+  let G = 4, N = G ** 3;
+  const EMPTY = 0, P1 = 1, P2 = 2, P3 = 3, P4 = 4;
   // 13 line directions in a 3D lattice (half-space, per axis sign convention)
   const DIRS = [
     [1, 0, 0], [0, 1, 0], [0, 0, 1],
@@ -19,11 +20,15 @@ window.BoardManifold = (() => {
   ];
   // Diagonals = directions touching 2+ axes
   const DIAG_DIRS = DIRS.filter(([dx, dy, dz]) => (dx ? 1 : 0) + (dy ? 1 : 0) + (dz ? 1 : 0) > 1);
-  const cells = new Uint8Array(N);
+  let cells = new Uint8Array(N);
+  // Grid-aware accessors close over the current G via the outer let-binding so setGrid()
+  // resizes cleanly without touching call sites in game.js.
   const idx = (x, y, z) => z * G * G + y * G + x;
   const ok = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < G && y < G && z < G;
   const getCell = (x, y, z) => cells[idx(x, y, z)];
   const setCell = (x, y, z, v) => { cells[idx(x, y, z)] = v; };
+  // Resize the lattice to a new edge length and clear it. Called from game.js startGame().
+  const setGrid = (newG) => { G = newG | 0; N = G ** 3; cells = new Uint8Array(N); };
   // Gravity: lowest unoccupied y in column (x,z)
   const lowestFree = (x, z) => { for (let y = 0; y < G; y++)if (!getCell(x, y, z)) return y; return -1; };
   const columnFull = (x, z) => lowestFree(x, z) < 0;
@@ -94,7 +99,10 @@ window.BoardManifold = (() => {
     const axes = ['X', 'Y', 'Z'].filter((_, i) => line[1][i] !== line[0][i]);
     return (line.length) + ' in a row -- ' + (axes.length === 1 ? axes[0] + ' axis' : axes.join('/') + ' diagonal');
   };
-  return { GRID: G, EMPTY, P1, P2, DIRS, DIAG_DIRS, getCell, setCell, place, lowestFree, columnFull, findLine, checkCube, countAllLines, countThreats, checkWin, boardFull, reset, snapshot, restore, eachOccupied, filled, manifoldValue, saddleZ, columnOccupancy, openColumns, dirLabel };
+  // GRID is exposed as a getter so callers always see the current edge length after setGrid().
+  const api = { EMPTY, P1, P2, P3, P4, DIRS, DIAG_DIRS, setGrid, getCell, setCell, place, lowestFree, columnFull, findLine, checkCube, countAllLines, countThreats, checkWin, boardFull, reset, snapshot, restore, eachOccupied, filled, manifoldValue, saddleZ, columnOccupancy, openColumns, dirLabel };
+  Object.defineProperty(api, 'GRID', { get: () => G });
+  return api;
 })();
 
 /**
@@ -104,36 +112,40 @@ window.BoardManifold = (() => {
  * maintained on record() -- database-index pattern, Rule Zero efficient.
  */
 window.Turns = (() => {
-  const P1 = 1, P2 = 2, LOGCAP = 6;
-  let turns = [];                    // source of truth: [{p,gx,gy,gz,scenarioId,isWin,winCells}]
-  let counts = [0, 0];               // index: moves per player           -- O(1) read
-  let scores = [0, 0];               // index: cumulative session wins     -- O(1) read
-  let streaks = [0, 0];              // index: consecutive wins            -- O(1) read
-  let logs = [[], []];               // index: last LOGCAP formatted moves -- O(1) read (head = newest)
+  const P1 = 1, P2 = 2, P3 = 3, P4 = 4, MAXP = 4, LOGCAP = 6;
+  // Counter banks are sized for MAXP so the same module supports 1..4 players without
+  // a reset-time reallocation. Unused slots stay at 0 -- cheap and avoids index drama.
+  let turns = [];
+  let counts = new Array(MAXP).fill(0);
+  let scores = new Array(MAXP).fill(0);
+  let streaks = new Array(MAXP).fill(0);
+  let logs = Array.from({ length: MAXP }, () => []);
   const fmt = t => `X${t.gx + 1}Z${t.gz + 1}Y${t.gy + 1}`;
   const record = t => {
     turns.push(t);
-    const pi = t.p - 1, oi = pi ^ 1;
+    const pi = t.p - 1;
     counts[pi]++;
     logs[pi].unshift(fmt(t)); if (logs[pi].length > LOGCAP) logs[pi].pop();
-    if (t.isWin) { scores[pi]++; streaks[pi]++; streaks[oi] = 0; }
+    // On any win, the winner's streak advances and every other player's streak resets to 0.
+    if (t.isWin) { scores[pi]++; streaks[pi]++; for (let i = 0; i < MAXP; i++) if (i !== pi) streaks[i] = 0; }
     return t;
   };
-  // Award win without a cell placement (e.g. territory victory on board-full)
-  const awardWin = p => { const pi = p - 1, oi = pi ^ 1; scores[pi]++; streaks[pi]++; streaks[oi] = 0; };
+  const awardWin = p => { const pi = p - 1; scores[pi]++; streaks[pi]++; for (let i = 0; i < MAXP; i++) if (i !== pi) streaks[i] = 0; };
   const count = p => counts[p - 1];
   const log = (p, n = LOGCAP) => logs[p - 1].slice(0, n);
   const streak = p => streaks[p - 1];
   const score = p => scores[p - 1];
   const reset = ({ resetScores } = {}) => {
-    turns = []; counts = [0, 0]; logs = [[], []];
-    if (resetScores) { scores = [0, 0]; streaks = [0, 0]; }
+    turns = [];
+    counts = new Array(MAXP).fill(0);
+    logs = Array.from({ length: MAXP }, () => []);
+    if (resetScores) { scores = new Array(MAXP).fill(0); streaks = new Array(MAXP).fill(0); }
   };
   const last = () => turns[turns.length - 1] || null;
   const length = () => turns.length;
   const identity = i => { const t = turns[i]; return t ? (t.gz * 16 + t.gy * 4 + t.gx) * (i + 1) : 0; };
   const snapshot = () => ({ turns: turns.slice(), scores: scores.slice() });
-  return { P1, P2, record, awardWin, count, log, streak, score, reset, last, length, identity, snapshot };
+  return { P1, P2, P3, P4, record, awardWin, count, log, streak, score, reset, last, length, identity, snapshot };
 })();
 
 if (typeof module !== 'undefined') module.exports = { BoardManifold: window.BoardManifold, Turns: window.Turns };

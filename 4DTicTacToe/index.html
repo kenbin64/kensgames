@@ -23,6 +23,7 @@
   <div class="player-panel p1-panel active" id="panel-p1">
     <div class="panel-badge p1-badge pulse" id="badge-p1">1</div>
     <div class="panel-name" id="name-p1">PLAYER 1</div>
+    <span class="score-lbl">WINS</span>
     <div class="panel-score p1-score" id="score-p1">0</div>
     <hr class="panel-div">
     <div class="panel-stat"><span class="stat-lbl">MOVES</span><span class="stat-v1" id="moves-p1">0</span></div>
@@ -36,6 +37,7 @@
   <div class="player-panel p2-panel" id="panel-p2">
     <div class="panel-badge p2-badge" id="badge-p2">2</div>
     <div class="panel-name" id="name-p2">PLAYER 2</div>
+    <span class="score-lbl">WINS</span>
     <div class="panel-score p2-score" id="score-p2">0</div>
     <hr class="panel-div">
     <div class="panel-stat"><span class="stat-lbl">MOVES</span><span class="stat-v2" id="moves-p2">0</span></div>
@@ -49,6 +51,7 @@
   <div class="player-panel p3-panel" id="panel-p3" style="display:none">
     <div class="panel-badge p3-badge" id="badge-p3">3</div>
     <div class="panel-name" id="name-p3">PLAYER 3</div>
+    <span class="score-lbl">WINS</span>
     <div class="panel-score p3-score" id="score-p3">0</div>
     <hr class="panel-div">
     <div class="panel-stat"><span class="stat-lbl">MOVES</span><span class="stat-v3" id="moves-p3">0</span></div>
@@ -62,6 +65,7 @@
   <div class="player-panel p4-panel" id="panel-p4" style="display:none">
     <div class="panel-badge p4-badge" id="badge-p4">4</div>
     <div class="panel-name" id="name-p4">PLAYER 4</div>
+    <span class="score-lbl">WINS</span>
     <div class="panel-score p4-score" id="score-p4">0</div>
     <hr class="panel-div">
     <div class="panel-stat"><span class="stat-lbl">MOVES</span><span class="stat-v4" id="moves-p4">0</span></div>
@@ -77,6 +81,7 @@
     <div id="turn-indicator" style="color:var(--p1)">&#9899; PLAYER 1</div>
     <div id="turn-timer"></div>
   </div>
+  <div id="turn-announce"></div>
   <div id="aim-hint"
     style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);font:10px 'Press Start 2P',monospace;color:#88ddff;letter-spacing:0.06em;text-shadow:0 0 8px rgba(0,180,255,0.55);pointer-events:none;z-index:5;opacity:0.9">
     MOVE MOUSE &middot; LEFT-CLICK TO DROP &middot; RIGHT-DRAG TO ORBIT</div>
@@ -93,6 +98,13 @@
     <div class="ss-row">
       <button class="ss-vs-btn pvp-btn sel" id="pvp-btn" onclick="setVsMode('pvp')">&#9889; VS PLAYER</button>
       <button class="ss-vs-btn ai-btn" id="ai-btn" onclick="setVsMode('ai')">VS AI</button>
+    </div>
+    <div class="ss-diff-row" id="np-row">
+      <span style="font-size:8px;color:var(--dim);letter-spacing:1px;align-self:center">PLAYERS:</span>
+      <button class="diff-btn" id="np-1" onclick="setNumPlayers(1)">1</button>
+      <button class="diff-btn sel" id="np-2" onclick="setNumPlayers(2)">2</button>
+      <button class="diff-btn" id="np-3" onclick="setNumPlayers(3)">3</button>
+      <button class="diff-btn" id="np-4" onclick="setNumPlayers(4)">4</button>
     </div>
     <div class="ss-diff-row" id="diff-row">
       <span style="font-size:8px;color:var(--dim);letter-spacing:1px;align-self:center">AI:</span>

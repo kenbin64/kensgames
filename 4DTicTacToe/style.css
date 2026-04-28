@@ -166,19 +166,35 @@
       }
     }
 
+    /* Player name is the primary identifier under the avatar badge -- bumped from 8px/dim to
+       13px/bright so the name reads at a glance instead of disappearing under the score. */
     .panel-name {
       text-align: center;
       font-family: 'Orbitron', monospace;
-      font-size: 8px;
+      font-size: 13px;
+      font-weight: 700;
       letter-spacing: 2px;
-      color: var(--dim);
+      color: #e0eaff;
+      margin-top: 4px;
     }
 
+    /* Score reduced from 38px to a stat-sized 20px so a "0" doesn't visually dominate the panel
+       at game start; the score is informational, not the headline. */
     .panel-score {
       text-align: center;
-      font-size: 38px;
+      font-size: 20px;
       font-weight: 900;
       line-height: 1;
+    }
+
+    .score-lbl {
+      display: block;
+      text-align: center;
+      font-family: 'Orbitron', monospace;
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--dim);
+      margin-bottom: 1px;
     }
 
     .p1-score {
@@ -319,6 +335,34 @@
       font-size: 9px;
       letter-spacing: 1px;
       min-height: 14px;
+    }
+
+    /* Turn announcement banner. Appears centred near the top of the screen for ~1.4s when the
+       active player changes. Pointer-events disabled so it never blocks the cursor ball aim. */
+    #turn-announce {
+      position: fixed;
+      top: 110px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.6);
+      z-index: 200;
+      font-family: 'Orbitron', monospace;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      padding: 14px 32px;
+      border-radius: 10px;
+      background: rgba(0, 0, 10, .55);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, .15);
+      color: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease, transform .35s cubic-bezier(.2, 1.6, .4, 1);
+    }
+
+    #turn-announce.show {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
     }
 
     #col-grid {
@@ -601,13 +645,22 @@
       box-shadow: 0 0 24px rgba(100, 100, 255, .3);
     }
 
+    /* Win/draw card: compact, centred, semi-transparent. Replaces the previous full-screen
+       blur-out so the player can still see the winning line on the board behind the card. */
     #result-overlay {
       display: none;
       position: fixed;
-      inset: 0;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       z-index: 400;
-      background: rgba(0, 0, 10, .9);
-      backdrop-filter: blur(14px);
+      background: rgba(0, 0, 10, .85);
+      border: 1px solid rgba(0, 200, 255, .3);
+      border-radius: 12px;
+      padding: 28px 38px;
+      box-shadow: 0 0 60px rgba(0, 200, 255, .2), 0 0 30px rgba(180, 0, 255, .15);
+      pointer-events: auto;
+      min-width: 320px;
       flex-direction: column;
       align-items: center;
       justify-content: center;

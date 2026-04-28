@@ -131,7 +131,7 @@ def validate_game(game_cfg: dict, game_spec: dict) -> tuple[list[str], list[str]
     """
     Returns (errors, warnings).
     """
-    gid    = game_spec.get("manifold", game_spec.get("id", "unknown"))
+    gid    = game_cfg.get("id") or game_spec.get("id", "unknown")
     gpath  = ROOT / game_cfg.get("path", "")
     errors: list[str] = []
     warnings: list[str] = []
@@ -313,7 +313,9 @@ def compile_portal(
             all_errors.append(f"[{gcfg['id']}] manifold.game.json not found: {manifold_path}")
             continue
         spec = load_json(manifold_path)
-        spec['_portal_path'] = gcfg.get('path', spec.get('manifold', gcfg['id']) + '/')
+        manifold_val = spec.get('manifold', gcfg['id'])
+        default_path = (manifold_val if isinstance(manifold_val, str) else gcfg['id']) + '/'
+        spec['_portal_path'] = gcfg.get('path', default_path)
         game_specs.append(spec)
 
         errors, warnings = validate_game(gcfg, spec)
