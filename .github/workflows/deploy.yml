@@ -30,7 +30,7 @@ concurrency:
 env:
   VPS_HOST: 172.81.62.217
   VPS_USER: root
-  DEPLOY_PATH: /var/www/kensgames.com
+  DEPLOY_PATH: /var/www/kensgames.com/public
   HELIX_PATH: /opt/butterflyfx/dimensionsos/helix
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
@@ -160,9 +160,13 @@ jobs:
             --exclude='*.pdf' \
             --exclude='manifold.portal.json' \
             --exclude='dist/' \
+            --exclude='tests/' \
+            --exclude='scripts/' \
+            --exclude='state/' \
             --exclude='fasttrack/' \
             --exclude='brickbreaker3d/' \
             --exclude='4DTicTacToe/' \
+            --exclude='cubic3d/' \
             --exclude='starfighter/' \
             --exclude='assemble/' \
             --exclude='server/' \
@@ -176,7 +180,6 @@ jobs:
           rsync -avz --delete \
             --exclude='*.test.js' \
             --exclude='*.sh' \
-            --exclude='manifold.game.json' \
             --exclude='node_modules/' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
             fasttrack/ \
@@ -186,7 +189,6 @@ jobs:
         if: inputs.game == '' || inputs.game == 'brickbreaker3d'
         run: |
           rsync -avz --delete \
-            --exclude='manifold.game.json' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
             brickbreaker3d/ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/brickbreaker3d/
@@ -195,10 +197,17 @@ jobs:
         if: inputs.game == '' || inputs.game == '4dtictactoe'
         run: |
           rsync -avz --delete \
-            --exclude='manifold.game.json' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
             4DTicTacToe/ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/4DTicTacToe/
+
+      - name: Deploy game — cubic3d
+        if: inputs.game == '' || inputs.game == 'cubic3d'
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
+            cubic3d/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/cubic3d/
 
       - name: Deploy game — starfighter
         if: inputs.game == '' || inputs.game == 'starfighter'
@@ -206,7 +215,6 @@ jobs:
           rsync -avz --delete \
             --exclude='*.test.js' \
             --exclude='*.sh' \
-            --exclude='manifold.game.json' \
             --exclude='tests/' \
             --exclude='electron/' \
             --exclude='downloads/' \
@@ -218,7 +226,6 @@ jobs:
         if: inputs.game == '' || inputs.game == 'assemble'
         run: |
           rsync -avz --delete \
-            --exclude='manifold.game.json' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -o StrictHostKeyChecking=no" \
             assemble/ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/assemble/
@@ -260,19 +267,22 @@ jobs:
           ssh -i ~/.ssh/id_ed25519_mcp \
               -o StrictHostKeyChecking=no \
               ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-              bash -s << 'ENDSSH'
+              "DEPLOY_PATH='${{ env.DEPLOY_PATH }}' bash -s" << 'ENDSSH'
             set -e
             echo "=== Manifold Deployment — Post-Deploy ==="
+            echo "DEPLOY_PATH=${DEPLOY_PATH}"
 
-            # Install server dependencies
-            cd /var/www/kensgames.com/server
-            npm ci --omit=dev
-
-            # Restart Node server via PM2
-            pm2 restart kensgames-server 2>/dev/null || \
-              pm2 start /var/www/kensgames.com/server/index.js \
-                --name kensgames-server \
-                --env production
+            # Restart Node server via PM2 (only if server dir was deployed)
+            if [ -f "${DEPLOY_PATH}/server/package.json" ]; then
+              cd "${DEPLOY_PATH}/server"
+              npm ci --omit=dev
+              pm2 restart kensgames-server 2>/dev/null || \
+                pm2 start "${DEPLOY_PATH}/server/index.js" \
+                  --name kensgames-server \
+                  --env production
+            else
+              echo "(no server/package.json present — skipping pm2 step)"
+            fi
 
             # Reload nginx
             nginx -t && systemctl reload nginx
