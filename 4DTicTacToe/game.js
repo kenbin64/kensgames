@@ -8,7 +8,7 @@ const P1 = BM.P1, P2 = BM.P2, P3 = BM.P3, P4 = BM.P4;
 // Player count <-> recommended grid edge. Solved-game density (cells/player ~16-55) is the
 // playable sweet spot; below 16 a 4-in-a-row becomes near-impossible (4 stones must be
 // collinear out of 16 placements, much of which gravity dumps onto the bottom layer).
-const GRID_FOR_PLAYERS = { 1: 4, 2: 4, 3: 5, 4: 6 };
+const GRID_FOR_PLAYERS = { 1: 3, 2: 4, 3: 5, 4: 5 };
 function gridForPlayers(n) { return GRID_FOR_PLAYERS[n] || 4; }
 let numPlayers = 2;
 const dirsOf = sc => (sc && sc.modes === 'diag') ? BM.DIAG_DIRS : BM.DIRS;
@@ -136,8 +136,7 @@ function _winkiInstancedMesh(srcMesh) {
     color: 0x88bbff, emissive: 0x335577, emissiveIntensity: 0.55,
     metalness: 0.35, roughness: 0.18,
     envMap, envMapIntensity: 1.2,
-    transparent: true, opacity: 0.32, side: THREE.DoubleSide,
-    depthWrite: false
+    side: THREE.FrontSide
   });
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
   inst.renderOrder = 1;

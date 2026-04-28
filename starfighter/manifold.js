@@ -125,13 +125,13 @@ const SpaceManifold = (function () {
     'weapon.laser.damage': 15,     // per hit
     'weapon.laser.maxAge': 1.0,    // seconds (range = speed × age)
     'weapon.laser.fireRate': 6,      // rounds per second
-    'weapon.laser.radius': 2,      // collision radius
+    'weapon.laser.radius': 4,      // collision radius
     'weapon.laser.fuelCost': 0.3,    // fuel per shot
     'weapon.gun.speed': 1200,      // m/s — slower but more spread
     'weapon.gun.damage': 6,       // low damage per round
     'weapon.gun.maxAge': 1.8,     // shorter range than laser
     'weapon.gun.fireRate': 18,    // rounds per second (rapid)
-    'weapon.gun.radius': 1.5,    // smaller projectile
+    'weapon.gun.radius': 3,    // smaller projectile
     'weapon.gun.fuelCost': 0.15,  // fuel per round (cheap per shot, adds up)
     'weapon.gun.spread': 0.04,   // radians max spread per axis
     'weapon.pulse.speed': 0,      // no projectile — spherical burst
@@ -188,6 +188,14 @@ const SpaceManifold = (function () {
     'support.medic.shieldThreshold': 10,  // shields % below which medic call is valid (dire)
     'support.autopilotSpeed': 360,        // m/s cruise speed to support ship
     'support.returnSpeed': 300,           // m/s cruise speed back to combat
+
+    // ── Target Lock ── (acquire-then-hold; enemy can shake via evasion)
+    'targeting.acquireDot': 0.993,        // cos(~7°): fresh acquisition cone
+    'targeting.refreshDot': 0.993,        // re-centering on target resets hold timer
+    'targeting.breakDot': 0.866,          // cos(~30°): lock breaks if target leaves this cone
+    'targeting.holdRange': 5000,          // m: lock breaks beyond this distance
+    'targeting.holdTime': 5.0,            // s: max hold after acquisition without refresh
+    'targeting.shakeRate': 8.0,           // s of timer added per unit angular slip (target evading)
     'entity.egg.radius': 18,    // 3× human scale
     'entity.egg.hull': 30,
     'entity.egg.hatchTime': 4,

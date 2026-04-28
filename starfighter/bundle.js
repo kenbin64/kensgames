@@ -125,13 +125,13 @@ const SpaceManifold = (function () {
     'weapon.laser.damage': 15,     // per hit
     'weapon.laser.maxAge': 1.0,    // seconds (range = speed × age)
     'weapon.laser.fireRate': 6,      // rounds per second
-    'weapon.laser.radius': 2,      // collision radius
+    'weapon.laser.radius': 4,      // collision radius
     'weapon.laser.fuelCost': 0.3,    // fuel per shot
     'weapon.gun.speed': 1200,      // m/s — slower but more spread
     'weapon.gun.damage': 6,       // low damage per round
     'weapon.gun.maxAge': 1.8,     // shorter range than laser
     'weapon.gun.fireRate': 18,    // rounds per second (rapid)
-    'weapon.gun.radius': 1.5,    // smaller projectile
+    'weapon.gun.radius': 3,    // smaller projectile
     'weapon.gun.fuelCost': 0.15,  // fuel per round (cheap per shot, adds up)
     'weapon.gun.spread': 0.04,   // radians max spread per axis
     'weapon.pulse.speed': 0,      // no projectile — spherical burst
@@ -188,6 +188,14 @@ const SpaceManifold = (function () {
     'support.medic.shieldThreshold': 10,  // shields % below which medic call is valid (dire)
     'support.autopilotSpeed': 360,        // m/s cruise speed to support ship
     'support.returnSpeed': 300,           // m/s cruise speed back to combat
+
+    // ── Target Lock ── (acquire-then-hold; enemy can shake via evasion)
+    'targeting.acquireDot': 0.993,        // cos(~7°): fresh acquisition cone
+    'targeting.refreshDot': 0.993,        // re-centering on target resets hold timer
+    'targeting.breakDot': 0.866,          // cos(~30°): lock breaks if target leaves this cone
+    'targeting.holdRange': 5000,          // m: lock breaks beyond this distance
+    'targeting.holdTime': 5.0,            // s: max hold after acquisition without refresh
+    'targeting.shakeRate': 8.0,           // s of timer added per unit angular slip (target evading)
     'entity.egg.radius': 18,    // 3× human scale
     'entity.egg.hull': 30,
     'entity.egg.hatchTime': 4,
@@ -10453,19 +10461,33 @@ const Starfighter = (function () {
 
   function checkWave() {
     const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling') && !e.markedForDeletion);
-    if (enemies.length === 0 && state.phase === 'combat') {
-      // Cancel any active support call
-      _clearSupport();
-      // All enemies cleared - time to return to baseship
-      state.phase = 'land-approach';
-      state.autopilotActive = false; // Reset autopilot for fresh approach
-      state.autopilotTimer = 0;
+    if (enemies.length === 0 && state.phase === 'combat' && !state._supportPhase) {
       SFAnnouncer.onWaveClear();
 
       // GDD §9.3: Music intensity drops on wave clear
       if (window.SFMusic) {
         SFMusic.setSection('exploration');
         SFMusic.setIntensity(0.2);
+      }
+
+      // Auto-route post-sortie: optional medical waypoint, then landing autopilot via _clearSupport handoff
+      const p = state.player;
+      const damaged = p && !p.markedForDeletion && (p.hull < 90 || p.shields < 30);
+      const medicAvail = _medicEntity && !_medicEntity.markedForDeletion;
+      state._supportReturnPos = state.baseship
+        ? state.baseship.position.clone().add(new THREE.Vector3(0, 0, 400))
+        : (p ? p.position.clone() : null);
+      state._postSupportAutoLand = true;
+
+      if (damaged && medicAvail) {
+        state._supportCall = 'medic';
+        state._supportTarget = _medicEntity;
+        state._supportPhase = 'approach';
+        state._supportDockTimer = 0;
+        SFAnnouncer.onSupportAccepted('medic', _medicEntity._callsign || 'Medic');
+        if (window.SFAudio) SFAudio.playSound('comm_beep');
+      } else {
+        _clearSupport(); // fires the auto-land handoff immediately
       }
     }
   }
@@ -11021,7 +11043,7 @@ const Starfighter = (function () {
       }
 
       // Auto-targeting: crosshair tracks and locks enemies in range + cone
-      updateCrosshairTargeting();
+      updateCrosshairTargeting(safeDt);
 
       // AI sets intent (velocity) on enemies and torpedoes — for loop, no closure
       // 🍴 Fork-guarded: skip entities whose fork was revoked mid-frame
@@ -12068,14 +12090,25 @@ const Starfighter = (function () {
   }
 
   function _clearSupport() {
+    const handoffToLanding = !!state._postSupportAutoLand;
     state._supportCall = null;
     state._supportTarget = null;
     state._supportPhase = null;
     state._supportDockTimer = 0;
     state._supportReturnPos = null;
     state._supportLastComm = 0;
+    state._postSupportAutoLand = false;
     const cdEl = document.getElementById('countdown-display');
     if (cdEl) cdEl.style.display = 'none';
+
+    // Post-sortie handoff: medical detour finished (or aborted) — engage landing autopilot
+    if (handoffToLanding && state.phase === 'combat') {
+      state.phase = 'land-approach';
+      state.autopilotActive = true;
+      state.autopilotTimer = 0;
+      SFAnnouncer.onAutopilotEngage();
+      if (window.SFAudio) SFAudio.playSound('hud_power_up');
+    }
 
     // Update button visibility
     _updateSupportButtons();
@@ -12528,21 +12561,60 @@ const Starfighter = (function () {
     if (bestTarget && window.SFAudio) SFAudio.playSound('lock_tone');
   }
 
-  // ── Auto-targeting: check if any enemy is in crosshair cone and in range ──
-  // Updates crosshair color and auto-locks when target is centered
+  // ── Auto-targeting: acquire-then-hold lock; evasion erodes the timer ──
+  // Crosshair establishes lock when an enemy enters the acquisition cone, then maintains
+  // it through the wider break cone for up to holdTime seconds. Angular slip (target
+  // drifting away from aim point — caused by evasive maneuvers) accelerates timer decay.
   let _crosshairLocked = false;
   let _crosshairTarget = null;
+  let _lockHoldTimer = 0;
+  let _lockPrevDot = 0;
 
-  function updateCrosshairTargeting() {
+  function _breakLock(crosshair) {
+    _crosshairLocked = false;
+    _crosshairTarget = null;
+    _lockHoldTimer = 0;
+    _lockPrevDot = 0;
+    if (state.player) state.player.lockedTarget = null;
+    if (crosshair) crosshair.classList.remove('locked');
+  }
+
+  function updateCrosshairTargeting(dt) {
     const p = state.player;
     const crosshair = document.getElementById('crosshair');
     if (!crosshair || !p) return;
 
     _v1.set(0, 0, -1).applyQuaternion(p.quaternion); // player forward
 
+    // ── Hold phase: maintain existing lock through the break cone ──
+    if (_crosshairLocked && _crosshairTarget && !_crosshairTarget.markedForDeletion) {
+      _v2.copy(_crosshairTarget.position).sub(p.position);
+      const dist = _v2.length();
+      if (dist <= dim('targeting.holdRange')) {
+        _v2.multiplyScalar(1 / dist);
+        const dot = _v1.dot(_v2);
+        if (dot >= dim('targeting.breakDot')) {
+          // Angular slip = how fast target is escaping aim point (proxy for evasive maneuvers)
+          const slip = Math.max(0, _lockPrevDot - dot);
+          _lockHoldTimer += (dt || 0) + slip * dim('targeting.shakeRate');
+          _lockPrevDot = dot;
+          if (dot >= dim('targeting.refreshDot')) _lockHoldTimer = 0; // re-centering refreshes
+          if (_lockHoldTimer < dim('targeting.holdTime')) {
+            p.lockedTarget = _crosshairTarget;
+            crosshair.classList.add('locked');
+            crosshair.classList.remove('tracking');
+            return;
+          }
+        }
+      }
+      _breakLock(crosshair);
+    } else if (_crosshairLocked) {
+      _breakLock(crosshair);
+    }
+
+    // ── Acquisition phase: scan for fresh target ──
     let bestTarget = null;
     let bestDot = -1;
-
     const ents = state.entities;
     for (let i = 0, len = ents.length; i < len; i++) {
       const e = ents[i];
@@ -12551,12 +12623,11 @@ const Starfighter = (function () {
 
       _v2.copy(e.position).sub(p.position);
       const dist = _v2.length();
-      if (dist > 4000) continue; // weapon range — close enough to fire
+      if (dist > 4000) continue; // weapon range
 
       _v2.multiplyScalar(1 / dist);
       const dot = _v1.dot(_v2);
 
-      // ~5° cone for precise crosshair alignment (cos(5°) ≈ 0.996)
       // ~15° cone for tracking awareness (cos(15°) ≈ 0.966)
       if (dot > 0.966 && dot > bestDot) {
         bestDot = dot;
@@ -12564,32 +12635,23 @@ const Starfighter = (function () {
       }
     }
 
-    const wasLocked = _crosshairLocked;
-
-    if (bestTarget && bestDot > 0.993) {
-      // Target is centered in crosshair — full lock
+    if (bestTarget && bestDot >= dim('targeting.acquireDot')) {
       _crosshairLocked = true;
       _crosshairTarget = bestTarget;
+      _lockHoldTimer = 0;
+      _lockPrevDot = bestDot;
       p.lockedTarget = bestTarget;
       crosshair.classList.add('locked');
       crosshair.classList.remove('tracking');
+      if (window.SFAudio) SFAudio.playSound('lock_tone');
     } else if (bestTarget) {
-      // Target near crosshair — tracking (amber)
-      _crosshairLocked = false;
       _crosshairTarget = bestTarget;
       crosshair.classList.remove('locked');
       crosshair.classList.add('tracking');
     } else {
-      // No target — default green
-      _crosshairLocked = false;
       _crosshairTarget = null;
       crosshair.classList.remove('locked');
       crosshair.classList.remove('tracking');
-    }
-
-    // Play lock tone on fresh lock
-    if (_crosshairLocked && !wasLocked && window.SFAudio) {
-      SFAudio.playSound('lock_tone');
     }
   }
 
