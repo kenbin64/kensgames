@@ -171,6 +171,27 @@
   <script src="../../lib/three/three.min.js"></script>
   <script src="../../lib/three/OrbitControls.js"></script>
   <script src="game.js"></script>
+  <script>
+    // Auto-launch from lobby intent: ?mode=solo | multi&players=N | private&code=X&players=N
+    (function autoLaunchFromLobby() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const mode = params.get('mode');
+        if (!mode) return;
+        const players = Math.max(2, Math.min(4, parseInt(params.get('players') || '0', 10) || 0));
+        const start = () => {
+          if (typeof startGame !== 'function') return false;
+          if (mode === 'solo') startGame('easy');
+          else if (mode === 'multi' || mode === 'private') startGame('multi' + (players || 2));
+          else return false;
+          return true;
+        };
+        const tryStart = () => { if (!start()) setTimeout(tryStart, 50); };
+        if (document.readyState === 'complete') tryStart();
+        else window.addEventListener('load', tryStart, { once: true });
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </body>
 
 </html>

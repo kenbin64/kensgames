@@ -83,11 +83,25 @@
       "manifold": "cubic3d/manifold.game.json",
       "entry": "cubic3d/index.html",
       "server": "static",
-      "status": "production",
+      "status": "pending",
       "dimension": {
         "x": 4,
         "y": 4,
         "z": 16
+      }
+    },
+    {
+      "id": "assemble",
+      "name": "Assemble",
+      "path": "assemble/",
+      "manifold": "assemble/manifold.game.json",
+      "entry": "assemble/index.html",
+      "server": "static",
+      "status": "pending",
+      "dimension": {
+        "x": 2,
+        "y": 20,
+        "z": 40
       }
     }
   ],

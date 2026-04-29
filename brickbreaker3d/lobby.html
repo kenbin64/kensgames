@@ -139,172 +139,6 @@
       font-size: 11px;
       color: var(--txm);
     }
-
-    .online-count {
-      margin-left: auto;
-      text-align: right;
-      font-family: var(--fa);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .online-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      box-shadow: var(--gaccent);
-      margin-right: 5px;
-      animation: pulse 1.5s ease infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .3
-      }
-    }
-
-    .modes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      width: 100%;
-      max-width: 740px;
-      margin-bottom: 32px;
-    }
-
-    .mode-card {
-      background: rgba(20, 4, 20, .9);
-      border: 2px solid rgba(255, 0, 255, .25);
-      border-radius: 6px;
-      padding: 28px 22px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .25s;
-    }
-
-    .mode-card:hover {
-      border-color: var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 20px rgba(255, 0, 255, .06);
-      transform: translateY(-6px);
-    }
-
-    .mode-icon {
-      font-size: 44px;
-      margin-bottom: 14px;
-      display: block;
-      filter: drop-shadow(0 0 8px currentColor);
-    }
-
-    .mode-title {
-      font-family: var(--fa);
-      font-size: 14px;
-      font-weight: 900;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .mode-desc {
-      font-size: 12px;
-      color: var(--txm);
-      line-height: 1.7;
-      margin-bottom: 18px;
-    }
-
-    .mode-avail {
-      font-family: var(--fa);
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: var(--ng);
-      text-transform: uppercase;
-    }
-
-    .private-panel {
-      display: none;
-      width: 100%;
-      max-width: 520px;
-      background: rgba(20, 4, 20, .9);
-      border: 2px solid rgba(255, 0, 255, .3);
-      border-radius: 6px;
-      padding: 28px;
-    }
-
-    .private-panel.open {
-      display: block;
-      animation: fadeUp .3s ease;
-    }
-
-    .priv-tabs {
-      display: flex;
-      gap: 0;
-      margin-bottom: 22px;
-      border-bottom: 2px solid rgba(255, 0, 255, .2);
-    }
-
-    .priv-tab {
-      font-family: var(--fa);
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 8px 16px;
-      background: none;
-      border: none;
-      color: var(--txm);
-      cursor: pointer;
-      text-transform: uppercase;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: all .2s;
-    }
-
-    .priv-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-
-    .code-display {
-      font-family: var(--fa);
-      font-size: 36px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-align: center;
-      padding: 20px;
-      background: rgba(255, 0, 255, .05);
-      border: 1px solid rgba(255, 0, 255, .2);
-      border-radius: 4px;
-      margin-bottom: 14px;
-      cursor: pointer;
-    }
-
-    .code-hint {
-      font-size: 11px;
-      color: var(--txm);
-      text-align: center;
-      margin-bottom: 16px;
-    }
-
-    .btn-acc {
-      background: var(--accent);
-      color: var(--bg);
-      border-color: var(--accent);
-      box-shadow: var(--gaccent);
-    }
-
-    .btn-acc:hover {
-      transform: scale(1.04);
-      box-shadow: var(--gaccent), 0 0 30px var(--accent);
-    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -318,10 +152,9 @@
           style="height:22px;width:auto;vertical-align:middle;margin-right:8px;">KEN<span>S</span>GAMES</a>
       <ul class="arc-nav-links">
         <li><a href="/">&#8592; Portal</a></li>
-        <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+        <li><a href="/fasttrack/lobby-simple.html">FastTrack</a></li>
         <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
         <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
-        <li><a href="/cubic3d/">Cubic</a></li>
       </ul>
       <div class="arc-nav-right" id="nav-avatar"></div>
     </div>
@@ -346,55 +179,18 @@
         <div class="player-name" id="p-name">Player</div>
         <div class="player-meta">3D Arcade &bull; Solo &amp; Head-to-Head</div>
       </div>
-
     </div>
-    <div class="modes">
-      <div class="mode-card" onclick="startSolo()">
-        <span class="mode-icon" style="color:#FF00FF">&#127918;</span>
-        <div class="mode-title">Solo Run</div>
-        <div class="mode-desc">Beat your high score against wave after wave of bricks. Unlocks power-ups and new levels.
-        </div>
-        <div class="mode-avail">Available &bull; High score tracked</div>
-      </div>
-      <div class="mode-card" onclick="togglePrivate()">
-        <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Play with Friends</div>
-        <div class="mode-desc">Create a room and share the 6-character code or link. Friends join from anywhere &mdash;
-          no account needed.</div>
-        <div class="mode-avail">Free &bull; No signup</div>
-      </div>
-    </div>
-    <div class="private-panel" id="priv-panel">
-      <div class="priv-tabs">
-        <button class="priv-tab active" onclick="privTab('create')">Create Room</button>
-        <button class="priv-tab" onclick="privTab('join')">Join with Code</button>
-      </div>
-      <div id="priv-create">
-        <div class="code-display" id="room-code" onclick="copyCode()">------</div>
-        <div class="code-hint">Click to copy &bull; Share with opponent</div>
-        <button class="btn btn-acc btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
-          MATCH</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Generating
-          room code...</div>
-      </div>
-      <div id="priv-join" style="display:none">
-        <div class="arc-field"><label>Room Code</label><input class="arc-input" id="join-code" placeholder="ABC123"
-            maxlength="6"
-            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
-        </div>
-        <div class="arc-field"><label>Your Name (guests)</label><input class="arc-input" id="guest-name"
-            placeholder="Brick Destroyer"></div>
-        <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN MATCH</button>
-        <div class="arc-msg" id="join-msg"></div>
-      </div>
-    </div>
+    <!-- Unified multiplayer panel mount (Solo vs AI / Play a Friend) -->
+    <div id="mp-panel-host" style="width:100%;max-width:560px;margin:0 auto 24px;"></div>
   </div>
-  <script src="/js/substrates/avatar_picker.js"></script>
-  <script src="/js/multiplayer-client.js"></script>
-  <script>
-    let username = localStorage.getItem('username') || 'Guest';
-    const av = AvatarPicker.get();
 
+  <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js"></script>
+  <script>
+    let username = localStorage.getItem('username') || 'Player';
+    const av = AvatarPicker.get();
     document.getElementById('p-name').textContent = username;
     AvatarPicker.renderBadge(document.getElementById('nav-avatar'));
     const badge = document.getElementById('av-badge');
@@ -402,75 +198,31 @@
     if (!av) badge.style.color = 'var(--np)';
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
 
-    // Shared multiplayer client for BrickBreaker3D
-    const bbmp = new KGMultiplayer('brickbreaker');
-    let _bbConnected = false;
-
-    function ensureMpConnected(cb) {
-      if (_bbConnected) { cb(); return; }
-      bbmp.on('authenticated', () => { _bbConnected = true; cb(); });
-      const u = localStorage.getItem('username') || username || 'Guest';
-      bbmp.connect({ username: u });
-    }
-
-    function startSolo() { if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; } window.location.href = '/brickbreaker3d/play.html?mode=solo'; }
-
-    function togglePrivate() { const p = document.getElementById('priv-panel'); p.classList.toggle('open'); if (p.classList.contains('open')) generateCode(); }
-    function privTab(tab) { document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab)); document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none'; document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none'; }
-
-    let _code = '';
-    function generateCode() {
-      ensureMpConnected(() => {
-        bbmp.on('session_update', (s) => {
-          _code = s.session_code;
-          document.getElementById('room-code').textContent = _code;
-          document.getElementById('launch-btn').disabled = false;
-          const url = `${location.origin}/brickbreaker3d/play.html?mode=private&code=${_code}`;
-          document.getElementById('priv-status').innerHTML = 'Share: <a href="' + url + '" style="color:var(--accent)">' + url + '</a>';
-        });
-        bbmp.createGame({ private: true, maxPlayers: 4 });
-      });
-    }
-
-    function copyCode() {
-      if (!_code) return;
-      const url = `${location.origin}/brickbreaker3d/play.html?mode=private&code=${_code}`;
-      navigator.clipboard?.writeText(url);
-      document.getElementById('priv-status').textContent = 'Link copied!';
-    }
-
-    function launchPrivate() {
-      window.location.href = `/brickbreaker3d/play.html?mode=private&code=${_code}&host=1`;
-    }
-
-    function joinPrivate() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('guest-name').value.trim() || 'Guest';
-      const msg = document.getElementById('join-msg');
-      if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      localStorage.setItem('username', name);
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      ensureMpConnected(() => {
-        bbmp.on('code_resolved', (d) => {
-          if (d.found) {
-            window.location.href = `/brickbreaker3d/play.html?mode=private&code=${code}`;
-          } else {
-            msg.textContent = 'Room not found. Check the code.'; msg.className = 'arc-msg err';
-          }
-        });
-        bbmp.resolveCode(code);
-      });
-    }
-
-    // Auto-join via URL param: /brickbreaker3d/lobby.html?code=ABC123
-    (function () {
-      const codeParam = new URLSearchParams(location.search).get('code');
-      if (codeParam && /^[A-Z0-9]{6}$/i.test(codeParam)) {
-        document.getElementById('priv-panel').classList.add('open');
-        privTab('join');
-        document.getElementById('join-code').value = codeParam.toUpperCase();
-      }
-    })();
+    KGMultiplayerPanel.mount('#mp-panel-host', {
+      gameId: 'brickbreaker3d',
+      gameName: 'BrickBreaker 3D',
+      minPlayers: 1,
+      maxPlayers: 4,
+      onLaunch: (session) => {
+        try {
+          sessionStorage.setItem('kg_session', JSON.stringify({
+            session_id: session.session_id, session_code: session.session_code,
+            game_id: session.game_id, host_id: session.host_id, my_user_id: session.my_user_id,
+            is_host: session.is_host, players: session.players,
+          }));
+        } catch (e) { /* ignore */ }
+        const code = session.session_code;
+        const players = (session.players || []).length || 1;
+        const hasHumans = (session.players || []).some(p => !p.is_ai && p.user_id !== session.my_user_id);
+        if (hasHumans) {
+          window.location.href = '/brickbreaker3d/play.html?mode=private&code=' + encodeURIComponent(code) + '&players=' + players;
+        } else if (players > 1) {
+          window.location.href = '/brickbreaker3d/play.html?mode=multi&players=' + players;
+        } else {
+          window.location.href = '/brickbreaker3d/play.html?mode=solo';
+        }
+      },
+    });
   </script>
 </body>
 

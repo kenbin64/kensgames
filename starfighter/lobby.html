@@ -180,128 +180,6 @@
       }
     }
 
-    .modes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      width: 100%;
-      max-width: 740px;
-      margin-bottom: 32px;
-    }
-
-    .mode-card {
-      background: rgba(2, 8, 20, .9);
-      border: 2px solid rgba(0, 255, 255, .25);
-      border-radius: 6px;
-      padding: 28px 22px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .25s;
-    }
-
-    .mode-card:hover {
-      border-color: var(--accent);
-      box-shadow: var(--gaccent), inset 0 0 20px rgba(0, 255, 255, .06);
-      transform: translateY(-6px);
-    }
-
-    .mode-icon {
-      font-size: 44px;
-      margin-bottom: 14px;
-      display: block;
-      filter: drop-shadow(0 0 8px currentColor);
-    }
-
-    .mode-title {
-      font-family: var(--fa);
-      font-size: 14px;
-      font-weight: 900;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .mode-desc {
-      font-size: 12px;
-      color: var(--txm);
-      line-height: 1.7;
-      margin-bottom: 18px;
-    }
-
-    .mode-avail {
-      font-family: var(--fa);
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: var(--ng);
-      text-transform: uppercase;
-    }
-
-    .private-panel {
-      display: none;
-      width: 100%;
-      max-width: 520px;
-      background: rgba(2, 8, 20, .9);
-      border: 2px solid rgba(0, 255, 255, .3);
-      border-radius: 6px;
-      padding: 28px;
-    }
-
-    .private-panel.open {
-      display: block;
-      animation: fadeUp .3s ease;
-    }
-
-    .priv-tabs {
-      display: flex;
-      gap: 0;
-      margin-bottom: 22px;
-      border-bottom: 2px solid rgba(0, 255, 255, .2);
-    }
-
-    .priv-tab {
-      font-family: var(--fa);
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 8px 16px;
-      background: none;
-      border: none;
-      color: var(--txm);
-      cursor: pointer;
-      text-transform: uppercase;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: all .2s;
-    }
-
-    .priv-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-
-    .code-display {
-      font-family: var(--fa);
-      font-size: 36px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      text-shadow: var(--gaccent);
-      text-align: center;
-      padding: 20px;
-      background: rgba(0, 255, 255, .04);
-      border: 1px solid rgba(0, 255, 255, .2);
-      border-radius: 4px;
-      margin-bottom: 14px;
-      cursor: pointer;
-    }
-
-    .code-hint {
-      font-size: 11px;
-      color: var(--txm);
-      text-align: center;
-      margin-bottom: 16px;
-    }
-
     /* Post-game registration prompt */
     .postgame-modal {
       display: none;
@@ -475,28 +353,8 @@
       </div>
 
     </div>
-    <div class="modes">
-      <div class="mode-card" onclick="startSolo()">
-        <span class="mode-icon" style="color:#00FF41">&#128640;</span>
-        <div class="mode-title">Solo Campaign</div>
-        <div class="mode-desc">Waves of alien formations, each smarter than the last. Survive as long as you can. Kill
-          board tracks every run.</div>
-        <div class="mode-avail">Available &bull; All skill levels</div>
-      </div>
-      <div class="mode-card" onclick="togglePrivate()">
-        <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Play with Friends</div>
-        <div class="mode-desc">Fly with friends. Create a squad room and share the 6-character code or link. No account
-          needed.</div>
-        <div class="mode-avail">Free &bull; No signup</div>
-      </div>
-      <div class="mode-card" onclick="toggleBrowse()">
-        <span class="mode-icon" style="color:#4488FF">&#128269;</span>
-        <div class="mode-title">Browse Games</div>
-        <div class="mode-desc">See active squads waiting for pilots. Join an open game with one click.</div>
-        <div class="mode-avail" id="browse-avail">Available</div>
-      </div>
-    </div>
+    <!-- Unified multiplayer panel mount (Solo vs AI / Play a Friend) -->
+    <div id="mp-panel-host" style="width:100%;max-width:560px;margin:0 auto 24px;"></div>
     <!-- Desktop Client Download Banner -->
     <div class="download-banner" id="dl-banner">
       <div class="dl-header">
@@ -518,71 +376,13 @@
         </a>
       </div>
     </div>
-    <!-- Browse Games Panel -->
-    <div class="private-panel" id="browse-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div
-          style="font-family:var(--fa);font-size:12px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;">
-          AVAILABLE SQUADS</div>
-        <button class="btn btn-ghost" onclick="refreshRoomList()" style="font-size:10px;padding:4px 12px;">&#8635;
-          Refresh</button>
-      </div>
-      <div id="room-list" style="min-height:80px;">
-        <div style="color:var(--txm);font-size:12px;text-align:center;padding:20px;">Connecting...</div>
-      </div>
-      <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:12px;">Auto-refreshes every 5 seconds
-      </div>
-    </div>
-    <div class="private-panel" id="priv-panel">
-      <div class="priv-tabs">
-        <button class="priv-tab active" onclick="privTab('create')">Create Squad</button>
-        <button class="priv-tab" onclick="privTab('join')">Join with Code</button>
-      </div>
-      <div id="priv-create">
-        <div class="code-display" id="room-code" onclick="copyCode()">------</div>
-        <div class="code-hint">Click to copy &bull; Send to your wing-man</div>
-        <div id="squad-roster" style="margin-top:14px;"></div>
-        <div id="squad-controls" style="display:none;margin-top:14px;">
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="toggleReadySelf()" id="ready-btn"
-              style="font-size:10px;padding:4px 14px;">READY</button>
-            <button class="btn btn-ghost" onclick="addBot()" id="add-bot-btn" style="font-size:10px;padding:4px 14px;">+
-              BOT</button>
-            <button class="btn btn-ghost" onclick="removeBot()" id="remove-bot-btn"
-              style="font-size:10px;padding:4px 14px;">- BOT</button>
-            <button class="btn btn-ghost" onclick="acceptSquad()" id="accept-btn"
-              style="font-size:10px;padding:4px 14px;">ACCEPT</button>
-          </div>
-        </div>
-        <button class="btn btn-c btn-full" onclick="launchPrivate()" id="launch-btn" disabled
-          style="margin-top:14px;">&#9654; LAUNCH
-          MISSION</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Create a squad
-          room to get a code.</div>
-      </div>
-      <div id="priv-join" style="display:none">
-        <div class="arc-field"><label>Squad Code</label><input class="arc-input" id="join-code" placeholder="ABC123"
-            maxlength="6"
-            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
-        </div>
-        <div class="arc-field"><label>Pilot Name (guests)</label><input class="arc-input" id="guest-name"
-            placeholder="Ace Pilot"></div>
-        <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN SQUAD</button>
-        <div class="arc-msg" id="join-msg"></div>
-        <div id="squad-roster-join" style="margin-top:14px;"></div>
-        <div style="display:none;margin-top:14px;" id="join-controls">
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="toggleReadySelf()" id="ready-btn-2"
-              style="font-size:10px;padding:4px 14px;">READY</button>
-          </div>
-        </div>
-      </div>
-    </div>
+
   </div>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
   <script src="/js/multiplayer-client.js"></script>
-  <script src="/starfighter/multiplayer.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js"></script>
   <script>
     let username = localStorage.getItem('username') || 'Pilot';
     const av = AvatarPicker.get();
@@ -611,314 +411,31 @@
       });
     }
 
-    let _mpStarted = false;
-    let _mpReady = false;
-    let _mpQueue = [];
-    let _currentSession = null;
-    let _currentCode = '';
-    let _browseTimer = null;
-
-    function _setPrivStatus(text, isErr) {
-      const el = document.getElementById('priv-status');
-      el.textContent = text;
-      el.style.color = isErr ? 'var(--np)' : 'var(--txm)';
-    }
-
-    function _setJoinMsg(text, isErr) {
-      const el = document.getElementById('join-msg');
-      el.textContent = text;
-      el.className = 'arc-msg' + (isErr ? ' err' : '');
-    }
-
-    function _ensureMp() {
-      if (_mpStarted) return;
-      if (!window.SFMultiplayer) {
-        _setPrivStatus('Multiplayer unavailable (missing SFMultiplayer).', true);
-        return;
-      }
-      const callsign = localStorage.getItem('username') || 'Pilot';
-      SFMultiplayer.connect(callsign, _onMpEvent);
-      _mpStarted = true;
-    }
-
-    function _mpCall(fn) {
-      _ensureMp();
-      if (_mpReady) fn();
-      else _mpQueue.push(fn);
-    }
-
-    function _flushMpQueue() {
-      const q = _mpQueue;
-      _mpQueue = [];
-      q.forEach(fn => {
-        try { fn(); } catch { /* ignore */ }
-      });
-    }
-
-    function _onMpEvent(event, data) {
-      if (event === 'connected') {
-        _mpReady = true;
-        _flushMpQueue();
-        return;
-      }
-      if (event === 'room_update') {
-        _currentSession = data;
-        _currentCode = (data && data.session_code) ? data.session_code : (_currentCode || '');
-        if (_currentCode) document.getElementById('room-code').textContent = _currentCode;
-        _renderSquad();
-        _updateControls();
-      } else if (event === 'share_code') {
-        _currentCode = data;
-        document.getElementById('room-code').textContent = _currentCode;
-        _setPrivStatus('Code ready. Share it with your wing-man.', false);
-        _updateControls();
-      } else if (event === 'room_list') {
-        _renderRoomList(Array.isArray(data) ? data : []);
-      } else if (event === 'game_start') {
-        const code = (data && data.session && data.session.session_code) ? data.session.session_code : _currentCode;
-        if (!code) return;
-        // Reconnects are supported (stable guest tokens). The game page re-joins by code.
-        window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
-      } else if (event === 'error') {
-        _setPrivStatus(String(data || 'Server error'), true);
-        _setJoinMsg(String(data || 'Server error'), true);
-      }
-    }
-
-    function _renderSquad() {
-      const rosterA = document.getElementById('squad-roster');
-      const rosterB = document.getElementById('squad-roster-join');
-      const s = _currentSession;
-      if (!s || !Array.isArray(s.players) || s.players.length === 0) {
-        const msg = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:12px;">No squad yet.</div>';
-        rosterA.innerHTML = msg;
-        rosterB.innerHTML = msg;
-        return;
-      }
-
-      const accepted = !!(s.settings && s.settings.lobby_accepted);
-      const playersHtml = s.players.map(p => {
-        const badge = p.is_host ? '★' : (p.is_ai ? '🤖' : '•');
-        const ready = p.ready ? '<span style="color:var(--ng);">READY</span>' : '<span style="color:var(--ny);">NOT READY</span>';
-        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid rgba(0,255,255,.10);">'
-          + '<div style="display:flex;gap:8px;align-items:center;min-width:0;">'
-          + '<span style="color:var(--accent);">' + badge + '</span>'
-          + '<span style="color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">' + (p.username || 'Pilot') + '</span>'
-          + '</div>'
-          + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:1px;">' + ready + '</div>'
-          + '</div>';
-      }).join('');
-
-      const hdr = '<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 2px 8px;">'
-        + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;">SQUAD</div>'
-        + '<div style="font-family:var(--fa);font-size:10px;letter-spacing:1px;color:' + (accepted ? 'var(--ng)' : 'var(--ny)') + ';">' + (accepted ? 'ACCEPTED' : 'NOT ACCEPTED') + '</div>'
-        + '</div>';
-
-      const box = '<div style="background:rgba(0,255,255,.03);border:1px solid rgba(0,255,255,.14);border-radius:4px;overflow:hidden;">'
-        + hdr + playersHtml + '</div>';
-
-      rosterA.innerHTML = box;
-      rosterB.innerHTML = box;
-    }
-
-    function _updateControls() {
-      const s = _currentSession;
-      const controls = document.getElementById('squad-controls');
-      const joinControls = document.getElementById('join-controls');
-      const launchBtn = document.getElementById('launch-btn');
-      const acceptBtn = document.getElementById('accept-btn');
-      const addBotBtn = document.getElementById('add-bot-btn');
-      const removeBotBtn = document.getElementById('remove-bot-btn');
-      const readyBtnA = document.getElementById('ready-btn');
-      const readyBtnB = document.getElementById('ready-btn-2');
-
-      if (!s) {
-        controls.style.display = 'none';
-        joinControls.style.display = 'none';
-        launchBtn.disabled = true;
-        return;
-      }
-
-      controls.style.display = 'block';
-      joinControls.style.display = 'block';
-
-      const players = Array.isArray(s.players) ? s.players : [];
-      const accepted = !!(s.settings && s.settings.lobby_accepted);
-      const isHostNow = !!(window.SFMultiplayer && SFMultiplayer.isHost);
-      const allHumansReady = players.filter(p => !p.is_ai).every(p => !!p.ready);
-
-      const selfId = window.SFMultiplayer ? SFMultiplayer.playerId : null;
-      const self = selfId ? players.find(p => p.user_id === selfId) : null;
-      const selfReady = !!(self && self.ready);
-      if (readyBtnA) readyBtnA.textContent = selfReady ? 'UNREADY' : 'READY';
-      if (readyBtnB) readyBtnB.textContent = selfReady ? 'UNREADY' : 'READY';
-
-      // Host-only controls
-      addBotBtn.style.display = isHostNow ? 'inline-flex' : 'none';
-      removeBotBtn.style.display = isHostNow ? 'inline-flex' : 'none';
-      acceptBtn.style.display = isHostNow ? 'inline-flex' : 'none';
-
-      acceptBtn.disabled = !(isHostNow && allHumansReady && !accepted);
-      launchBtn.disabled = !(isHostNow && accepted && players.length >= 2);
-    }
-
-    function startSolo() {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
-      window.location.href = '/starfighter/index.html?mode=solo';
-    }
-
-    function startMatchmaker() {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startMatchmaker(), true); return; }
-      _setPrivStatus('Matchmaking: finding opponent...', false);
-      document.getElementById('priv-panel').classList.add('open');
-      privTab('create');
-      _mpCall(() => SFMultiplayer.matchmake());
-    }
-
-    function togglePrivate() {
-      const p = document.getElementById('priv-panel');
-      const opening = !p.classList.contains('open');
-      p.classList.toggle('open');
-      if (opening) {
-        _ensureMp();
-        privTab('create');
-        createSquad();
-      }
-    }
-
-    function privTab(tab) {
-      document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab));
-      document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none';
-      document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none';
-    }
-
-    function createSquad() {
-      _setPrivStatus('Creating squad room...', false);
-      document.getElementById('room-code').textContent = '------';
-      _currentSession = null;
-      _currentCode = '';
-      document.getElementById('launch-btn').disabled = true;
-      _mpCall(() => SFMultiplayer.createRoom({ max_players: 6, settings: { mode: 'coop' } }));
-    }
-
-    function copyCode() {
-      if (_currentCode) {
-        navigator.clipboard?.writeText(_currentCode);
-        _setPrivStatus('Code copied!', false);
-      }
-    }
-
-    function toggleReadySelf() {
-      _mpCall(() => SFMultiplayer.toggleReady());
-    }
-
-    function acceptSquad() {
-      _mpCall(() => SFMultiplayer.acceptLobby());
-      _setPrivStatus('Squad accepted. Launch when ready.', false);
-    }
-
-    function addBot() {
-      _mpCall(() => SFMultiplayer.addBot('medium'));
-    }
-
-    function removeBot() {
-      _mpCall(() => SFMultiplayer.removeBot(null));
-    }
-
-    function launchPrivate() {
-      _mpCall(() => {
-        if (!SFMultiplayer.isHost) {
-          _setPrivStatus('Only the host can launch the mission.', true);
-          return;
+    // Unified multiplayer panel: profile gate → mode chooser → roster build → launch.
+    // On launch: stash resolved session for game-side reader (phase 2) and hand off via
+    // the existing in-game URL contract so gameplay continues to work today.
+    KGMultiplayerPanel.mount('#mp-panel-host', {
+      gameId: 'starfighter',
+      gameName: 'Alien Space Attack',
+      minPlayers: 2,
+      maxPlayers: 6,
+      onLaunch: (session) => {
+        try {
+          sessionStorage.setItem('kg_session', JSON.stringify({
+            session_id: session.session_id, session_code: session.session_code,
+            game_id: session.game_id, host_id: session.host_id, my_user_id: session.my_user_id,
+            is_host: session.is_host, players: session.players,
+          }));
+        } catch { /* ignore */ }
+        const code = session.session_code;
+        const hasHumans = (session.players || []).some(p => !p.is_ai && p.user_id !== session.my_user_id);
+        if (hasHumans) {
+          window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
+        } else {
+          window.location.href = '/starfighter/index.html?mode=solo';
         }
-        // If not yet accepted, try accepting first (server may reject if not all humans ready).
-        if (_currentSession && !(_currentSession.settings && _currentSession.settings.lobby_accepted)) {
-          SFMultiplayer.acceptLobby();
-        }
-        SFMultiplayer.startGame();
-        _setPrivStatus('Launching mission...', false);
-      });
-    }
-
-    function joinPrivate() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('guest-name').value.trim() || 'Pilot';
-      if (code.length !== 6) {
-        _setJoinMsg('Enter a 6-character code', true);
-        return;
-      }
-      // Apply guest name BEFORE connecting/authing.
-      if (!localStorage.getItem('username') || document.getElementById('guest-name').value.trim()) {
-        localStorage.setItem('username', name);
-        document.getElementById('p-name').textContent = name;
-      }
-      _ensureMp();
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      _setJoinMsg('Joining squad…', false);
-      _mpCall(() => SFMultiplayer.joinRoom(code));
-      document.getElementById('priv-panel').classList.add('open');
-      privTab('join');
-    }
-
-    // Auto-join if redirected from /lobby/join.html?code=...
-    (function autoJoinFromUrl() {
-      const params = new URLSearchParams(location.search);
-      const code = (params.get('code') || '').trim().toUpperCase();
-      if (code && code.length === 6) {
-        document.getElementById('priv-panel').classList.add('open');
-        privTab('join');
-        document.getElementById('join-code').value = code;
-        joinPrivate();
-      }
-    })();
-
-    // ── Browse Games (Unified Lobby) ──
-    function toggleBrowse() {
-      const p = document.getElementById('browse-panel');
-      p.classList.toggle('open');
-      if (p.classList.contains('open')) {
-        _ensureMp();
-        refreshRoomList();
-        _browseTimer = setInterval(refreshRoomList, 5000);
-      } else {
-        if (_browseTimer) clearInterval(_browseTimer);
-        _browseTimer = null;
-      }
-    }
-
-    function refreshRoomList() {
-      if (!window.SFMultiplayer) return;
-      _mpCall(() => SFMultiplayer.listRooms());
-    }
-
-    function _renderRoomList(rooms) {
-      const el = document.getElementById('room-list');
-      if (!rooms.length) {
-        el.innerHTML = '<div style="color:var(--txm);font-size:12px;text-align:center;padding:20px;">No public squads right now. Start one with Wing Squad!</div>';
-        return;
-      }
-      el.innerHTML = rooms.map(r => {
-        const status = r.status === 'waiting' ? '🟢' : r.status === 'playing' ? '🟡' : '⚫';
-        const code = r.session_code || '------';
-        const count = (r.player_count != null) ? r.player_count : ((r.players || []).length);
-        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,255,255,.1);">'
-          + '<div><span style="margin-right:8px;">' + status + '</span>'
-          + '<span style="font-family:var(--fa);font-size:12px;color:var(--accent);">' + code + '</span>'
-          + '<span style="font-size:11px;color:var(--txm);margin-left:12px;">' + count + '/' + r.max_players + ' pilots</span></div>'
-          + (r.status === 'waiting'
-            ? '<button class="btn btn-g" style="font-size:10px;padding:4px 14px;" onclick="joinBrowseRoom(\'' + code + '\')">JOIN</button>'
-            : '<span style="font-size:10px;color:var(--ny);">In Progress</span>')
-          + '</div>';
-      }).join('');
-    }
-
-    function joinBrowseRoom(code) {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinBrowseRoom(code), true); return; }
-      document.getElementById('priv-panel').classList.add('open');
-      privTab('join');
-      document.getElementById('join-code').value = code;
-      joinPrivate();
-    }
+      },
+    });
   </script>
 </body>
 

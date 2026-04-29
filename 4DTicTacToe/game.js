@@ -18,6 +18,52 @@ let selectedScenario = null, currentScenario = null;
 let vsMode = 'pvp', aiDiff = 'easy';
 let currentPlayer = P1, isGameOver = false, isDropping = false;
 let turnTimer = null, timerLeft = 0;
+// In-game move relay over the live KGMultiplayer socket carried in by the lobby panel.
+// The panel hands us session.client (an authed KGMultiplayer instance) on launch; from then on
+// the local actor commits a move locally (full physics), broadcasts the resolved (gx,gy,gz,p)
+// via game_action, and remote peers apply the same coordinates by calling finishPlacement
+// directly (skipping physics) under the _applying guard so the broadcast does not echo.
+const KGSync = {
+  online: false, isHost: false, mySlot: 0, client: null, _applying: false, _onAction: null,
+  init(session) {
+    this.reset();
+    if (!session || !session.client) return;
+    const players = session.players || [];
+    const idx = players.findIndex(p => p.user_id === session.my_user_id && !p.is_ai);
+    this.client = session.client; this.online = true;
+    this.isHost = !!session.is_host; this.mySlot = (idx >= 0) ? (idx + 1) : 0;
+    this._onAction = (data) => {
+      if (!data || data.action !== 'move' || !data.payload) return;
+      const { gx, gy, gz, p } = data.payload;
+      if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number') return;
+      KGSync._applyRemote(gx, gy, gz, p);
+    };
+    this.client.on('game_action', this._onAction);
+  },
+  reset() {
+    if (this.client && this._onAction) { try { this.client.off('game_action', this._onAction); } catch { /* ignore */ } }
+    this.online = false; this.isHost = false; this.mySlot = 0;
+    this.client = null; this._applying = false; this._onAction = null;
+  },
+  canActLocally() {
+    if (!this.online) return true;
+    if (vsMode === 'ai' && currentPlayer !== P1) return this.isHost; // AI runs on host only
+    return this.mySlot !== 0 && this.mySlot === currentPlayer;
+  },
+  broadcast(gx, gy, gz, p) {
+    if (!this.online || this._applying || !this.client) return;
+    try { this.client.sendAction('move', { gx, gy, gz, p }); } catch (e) { console.warn('[KGSync] send fail', e); }
+  },
+  _applyRemote(gx, gy, gz, p) {
+    if (isGameOver || BM.getCell(gx, gy, gz)) return;
+    if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; }
+    if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
+    snapAnim = null; isDropping = true; clearTurnTimer();
+    this._applying = true;
+    try { finishPlacement(p, [gx, gy, gz]); }
+    finally { this._applying = false; }
+  },
+};
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -802,6 +848,7 @@ function predictLanding(latA, latB, faceIdx) {
 }
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
+  if (!KGSync.canActLocally()) return;
   // Capture the ghost's current world-space aim point BEFORE we snap, so the ball spawns
   // above the column the player was actually pointing at (re-projected after snap).
   const p = ghostBall.p;
@@ -1020,6 +1067,7 @@ function topFaceWorldPos(latA, latB, faceIdx) {
 // (gx, gz)-th column on whichever face is currently up.
 function dropBall(gx, gz) {
   if (isDropping || isGameOver) return;
+  if (!KGSync.canActLocally()) return;
   clearTurnTimer(); isDropping = true;
   if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; }
   snapBoardRotation();
@@ -1299,6 +1347,7 @@ function finishPlacement(p, cell) {
   // point avoids a one-frame gap where the ball would disappear before the glowing version pops in.
   if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
   BM.setCell(gx, gy, gz, p);
+  KGSync.broadcast(gx, gy, gz, p);
   addPlacedBall(gx, gy, gz, p);
   Audio4D.onPlace(p);
   emitParticles(nodePos(gx, gy, gz), 28, BCOLS[p].glow);
@@ -1353,6 +1402,7 @@ function isAiTurn() { return vsMode === 'ai' && currentPlayer !== P1; }
 function maybeSpawnTurnBall() {
   if (isGameOver) return;
   if (isAiTurn()) {
+    if (KGSync.online && !KGSync.isHost) return; // host runs the AI and broadcasts the result
     setTimeout(() => {
       if (isGameOver || isDropping) return;
       let col = null;
@@ -1365,6 +1415,7 @@ function maybeSpawnTurnBall() {
       else { console.warn('AI: no moves available'); }
     }, 500 + TRNG.f() * 400);
   } else {
+    if (KGSync.online && KGSync.mySlot && KGSync.mySlot !== currentPlayer) return; // wait for remote actor
     spawnGhostBall(currentPlayer);
     startTurnTimer();
   }
@@ -1386,6 +1437,36 @@ function setNumPlayers(n) {
   }
 }
 function showScenarioSelect() { document.getElementById('result-overlay').classList.remove('show'); document.getElementById('scenario-select').classList.add('show'); }
+// Open the unified KGMultiplayerPanel; it gates on profile, gathers humans + AI,
+// then hands the resolved session here so the existing startGame() runs unchanged.
+function openMultiplayerPanel() {
+  const overlay = document.getElementById('mp-panel-overlay');
+  const host = document.getElementById('mp-panel-host');
+  if (!overlay || !host || typeof KGMultiplayerPanel === 'undefined') {
+    console.warn('[4D] multiplayer panel unavailable, falling back to local startGame()');
+    return startGame();
+  }
+  overlay.style.display = 'flex';
+  KGMultiplayerPanel.mount(host, {
+    gameId: '4dtictactoe',
+    gameName: '4D Connect',
+    minPlayers: 2,
+    maxPlayers: 4,
+    onLaunch: (session) => {
+      const players = (session && session.players) || [];
+      numPlayers = Math.max(1, Math.min(4, players.length));
+      vsMode = players.some(p => p.is_ai) ? 'ai' : 'pvp';
+      for (let i = 0; i < numPlayers; i++) {
+        const el = document.getElementById('name-p' + (i + 1));
+        if (el) el.textContent = (players[i].username || ('PLAYER ' + (i + 1))).toUpperCase();
+      }
+      KGSync.init(session);
+      try { KGMultiplayerPanel.unmount(); } catch { /* ignore */ }
+      overlay.style.display = 'none';
+      startGame();
+    },
+  });
+}
 function startGame() {
   currentScenario = selectedScenario;
   document.getElementById('scenario-select').classList.remove('show');

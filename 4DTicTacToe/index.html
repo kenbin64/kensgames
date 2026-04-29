@@ -112,7 +112,11 @@
       <button class="diff-btn" id="diff-med" onclick="setDiff('medium')">MEDIUM</button>
       <button class="diff-btn" id="diff-hard" onclick="setDiff('hard')">HARD</button>
     </div>
-    <button class="launch-btn" onclick="startGame()">LAUNCH &#8594;</button>
+    <button class="launch-btn" onclick="openMultiplayerPanel()">LAUNCH &#8594;</button>
+  </div>
+  <div id="mp-panel-overlay"
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,8,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+    <div id="mp-panel-host" style="width:100%;max-width:520px;"></div>
   </div>
   <div id="result-overlay">
     <div id="result-title"></div>
@@ -132,6 +136,10 @@
     </div>
   </div>
   <script src="/js/manifold_bridge.js"></script>
+  <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js"></script>
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/GLTFLoader.js"></script>
   <script src="manifold.js"></script>

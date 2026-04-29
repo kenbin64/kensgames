@@ -348,55 +348,14 @@
       </div>
     </div>
 
-    <!-- Mode selection -->
-    <div class="modes">
-      <div class="mode-card" onclick="startSolo()">
-        <span class="mode-icon" style="color:#00FF41">&#129302;</span>
-        <div class="mode-title">Solo vs AI</div>
-        <div class="mode-desc">Play against up to 3 AI bots. Perfect your strategy before facing humans.</div>
-        <div class="mode-avail">Available &bull; Any skill level</div>
-      </div>
-      <div class="mode-card" onclick="togglePrivate()">
-        <span class="mode-icon" style="color:#FFE800">&#128273;</span>
-        <div class="mode-title">Play with Friends</div>
-        <div class="mode-desc">Create a room and share the 6-character code or link. Friends join from anywhere &mdash;
-          no
-          account needed.</div>
-        <div class="mode-avail">Free &bull; No signup</div>
-      </div>
-    </div>
-
-    <!-- Private game panel -->
-    <div class="private-panel" id="priv-panel">
-      <div class="priv-tabs">
-        <button class="priv-tab active" onclick="privTab('create')">Create Room</button>
-        <button class="priv-tab" onclick="privTab('join')">Join with Code</button>
-      </div>
-      <div id="priv-create">
-        <div class="code-display" id="room-code" onclick="copyCode()">------</div>
-        <div class="code-hint">Click code to copy &bull; Share with friends to join</div>
-        <button class="btn btn-y btn-full" onclick="launchPrivate()" id="launch-btn" disabled>&#9654; LAUNCH
-          GAME</button>
-        <div style="font-size:11px;color:var(--txm);text-align:center;margin-top:10px;" id="priv-status">Generating
-          room code...</div>
-      </div>
-      <div id="priv-join" style="display:none">
-        <div class="arc-field">
-          <label>Room Code</label>
-          <input class="arc-input" id="join-code" placeholder="ABC123" maxlength="6"
-            style="text-transform:uppercase;letter-spacing:6px;font-family:var(--fa);font-size:20px;text-align:center;">
-        </div>
-        <div class="arc-field">
-          <label>Your Name (guests)</label>
-          <input class="arc-input" id="guest-name" placeholder="Arcade Player">
-        </div>
-        <button class="btn btn-g btn-full" onclick="joinPrivate()">&#9654; JOIN ROOM</button>
-        <div class="arc-msg" id="join-msg"></div>
-      </div>
-    </div>
+    <!-- Unified multiplayer panel mount -->
+    <div id="mp-panel-host" style="width:100%;max-width:560px;margin:0 auto;"></div>
   </div>
 
   <script src="/js/substrates/avatar_picker.js"></script>
+  <script src="/js/substrates/player_profile.js"></script>
+  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js"></script>
   <script>
     let username = localStorage.getItem('username') || localStorage.getItem('display_name') || 'Guest';
     const av = AvatarPicker.get();
@@ -407,74 +366,32 @@
     badge.textContent = av ? av.emoji : '?';
     if (!av) badge.style.color = 'var(--np)';
 
-    if (!AvatarPicker.has()) {
-      AvatarPicker.show(() => location.reload(), true);
-    }
-
-    function startSolo() {
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => startSolo(), true); return; }
-      window.location.href = '/fasttrack/index.html?mode=solo';
-    }
-
-    function togglePrivate() {
-      const p = document.getElementById('priv-panel');
-      p.classList.toggle('open');
-      if (p.classList.contains('open')) generateCode();
-    }
-
-    function privTab(tab) {
-      document.querySelectorAll('.priv-tab').forEach((t, i) => t.classList.toggle('active', ['create', 'join'][i] === tab));
-      document.getElementById('priv-create').style.display = tab === 'create' ? 'block' : 'none';
-      document.getElementById('priv-join').style.display = tab === 'join' ? 'block' : 'none';
-    }
-
-    let _code = '';
-    function generateCode() {
-      _code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      document.getElementById('room-code').textContent = _code;
-      document.getElementById('launch-btn').disabled = false;
-      const url = `${location.origin}/fasttrack/index.html?mode=private&code=${_code}`;
-      document.getElementById('priv-status').innerHTML = 'Share: <a href="' + url + '" style="color:var(--ny)">' + url + '</a>';
-    }
-
-    function copyCode() {
-      if (!_code) return;
-      const url = `${location.origin}/fasttrack/index.html?mode=private&code=${_code}`;
-      navigator.clipboard?.writeText(url);
-      document.getElementById('priv-status').textContent = 'Link copied!';
-    }
-
-    function launchPrivate() {
-      window.location.href = `/fasttrack/index.html?mode=private&code=${_code}&host=1`;
-    }
-
-    function joinPrivate() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      const name = document.getElementById('guest-name').value.trim() || 'Guest';
-      const msg = document.getElementById('join-msg');
-      if (code.length !== 6) { msg.textContent = 'Enter a 6-character code'; msg.className = 'arc-msg err'; return; }
-      localStorage.setItem('username', name);
-      if (!AvatarPicker.has()) { AvatarPicker.show(() => joinPrivate(), true); return; }
-      window.location.href = `/fasttrack/index.html?mode=private&code=${code}`;
-    }
-
-    // URL shortcuts: ?action=private, ?action=join, ?code=ABC123
-    (function () {
-      const params = new URLSearchParams(location.search);
-      const action = (params.get('action') || '').toLowerCase();
-      const codeParam = params.get('code');
-      if (action === 'private' || action === 'join' || codeParam) {
-        document.getElementById('priv-panel').classList.add('open');
-        if (action === 'join' || codeParam) {
-          privTab('join');
-          if (codeParam && /^[A-Z0-9]{6}$/i.test(codeParam)) {
-            document.getElementById('join-code').value = codeParam.toUpperCase();
-          }
+    // Unified multiplayer panel: profile gate → mode chooser → roster build → launch.
+    // On launch: stash resolved session for game-side reader (phase 2) and hand off via
+    // the existing in-game URL contract so gameplay continues to work today.
+    KGMultiplayerPanel.mount('#mp-panel-host', {
+      gameId: 'fasttrack',
+      gameName: 'FastTrack',
+      minPlayers: 2,
+      maxPlayers: 4,
+      onLaunch: (session) => {
+        try {
+          sessionStorage.setItem('kg_session', JSON.stringify({
+            session_id: session.session_id, session_code: session.session_code,
+            game_id: session.game_id, host_id: session.host_id, my_user_id: session.my_user_id,
+            is_host: session.is_host, players: session.players,
+          }));
+        } catch { /* ignore */ }
+        const code = session.session_code;
+        const isHost = session.is_host;
+        const hasHumans = (session.players || []).some(p => !p.is_ai && p.user_id !== session.my_user_id);
+        if (hasHumans) {
+          window.location.href = `/fasttrack/index.html?mode=private&code=${code}${isHost ? '&host=1' : ''}`;
         } else {
-          generateCode();
+          window.location.href = `/fasttrack/index.html?mode=solo`;
         }
-      }
-    })();
+      },
+    });
   </script>
 </body>
 
