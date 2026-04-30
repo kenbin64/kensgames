@@ -285,6 +285,17 @@ const SpaceManifold = (function () {
     // ── Hive ──
     'hive.hull': 5000,
 
+    // ── Gyroid Interior Tuning ──
+    'gyroid.wallBand': 0.082,              // lower = wider safe corridors, fewer wall grazes
+    'gyroid.collisionPush': 200,           // wall ejection strength
+    'gyroid.collisionKick': 26,            // bounce impulse
+    'gyroid.collisionDamping': 0.86,       // post-impact velocity retention
+    'gyroid.damageScale': 0.038,           // wall impact damage scaler
+    'gyroid.weapon.speed': 940,            // gyroid lance cruise speed
+    'gyroid.weapon.contourStick': 1.0,     // 1.0 = fully tangent to wall contour
+    'gyroid.weapon.homing': 150,           // target pull while staying tangent
+    'gyroid.weapon.damageScale': 0.82,     // multiplier against torpedo damage baseline
+
     // ── Deploy — manifold asset tiers ──
     // Tier 0: preload (visible at spawn), Tier 1: lazy (first encounter), Tier 2: deferred (late waves)
     'deploy.tier0.budget': 170000000,  // ~160MB budget for preloaded models
@@ -2199,8 +2210,35 @@ const SFAnnouncer = (function () {
   function onRespawnReady() {
     const snap = _snap();
     const hostiles = _countHostiles();
-    const line = _anpcSpeak('deck', 'status_update', { status: `replacement on rail, ${hostiles} hostiles active, wave ${_state.wave}` });
-    _addComm(_crew('deck'), line || `${_cs()}, replacement on rail. ${hostiles} ${_pick(V.contacts)} active. Wave ${_state.wave}.`, 'base');
+    const livesLeft = _state.livesRemaining;
+    const maxLives = _state.maxLives;
+    const wave = _state.wave;
+
+    // Phase 1: Deck officer — pilot transfer confirmed (immediate)
+    const deckLine = _anpcForceSpeak('deck', 'status_update', { status: `pilot transfer confirmed, replacement on rail, wave ${wave}` });
+    _addComm(_crew('deck'), deckLine || `${_cs()}, pilot transfer confirmed. Replacement on rail for wave ${wave}.`, 'base');
+
+    // Phase 2 (~1.5s): Command — mission re-brief with lives status
+    setTimeout(() => {
+      const s = _snap();
+      const baseNote = s.basePct < 50 ? ` Resolute hull at ${s.basePct}% — she needs cover.` : '';
+      const livesNote = livesLeft < maxLives
+        ? `You have ${livesLeft} ship${livesLeft !== 1 ? 's' : ''} remaining for this sortie.`
+        : `Full complement standing by.`;
+      const brief = `${livesNote} ${hostiles} hostile${hostiles !== 1 ? 's' : ''} still active on wave ${wave}.${baseNote}`;
+      const cmdLine = _anpcForceSpeak('command', 'launch_prep', { wave, pilotSlot: maxLives - livesLeft + 1, maxLives, missionBrief: brief });
+      _addComm(_crew('command'), cmdLine || brief, 'warning');
+    }, 1500);
+
+    // Phase 3 (~3s): Sensor — current threat snapshot
+    setTimeout(() => {
+      const s = _snap();
+      const sensLine = _anpcForceSpeak('sensor', 'threat_brief', {
+        threats: `${hostiles} ${_pick(V.contacts)}`,
+        watchPhrase: `base ${V.hullStatus(s.basePct)}`,
+      });
+      _addComm(_crew('sensor'), sensLine || `${hostiles} ${_pick(V.contacts)} active. ${V.hullStatus(s.basePct)}.`, wave >= 2 ? 'warning' : 'info');
+    }, 3000);
   }
 
   function onWaveClear() {
@@ -5102,6 +5140,22 @@ const SF3D = (function () {
       mesh.add(new THREE.Mesh(new THREE.SphereGeometry(100, 8, 8), coreMat));
       _addGlowLight(mesh, 'dreadnought');
       mesh.userData.alienGlow = true;
+    } else if (type === 'asteroid') {
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8e8372, roughness: 0.95, metalness: 0.02 });
+      const g = new THREE.DodecahedronGeometry(1, 0);
+      const s = owner && owner._asteroidStage === 2 ? 48 : owner && owner._asteroidStage === 1 ? 82 : 150;
+      g.scale(s, s * 0.92, s * 1.08);
+      mesh.add(new THREE.Mesh(g, bodyMat));
+    } else if (type === 'relay-node') {
+      const shell = new THREE.Mesh(new THREE.OctahedronGeometry(58, 0), new THREE.MeshBasicMaterial({ color: 0xff66cc, transparent: true, opacity: 0.86 }));
+      mesh.add(shell);
+      mesh.add(new THREE.Mesh(new THREE.SphereGeometry(24, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffccff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending })));
+    } else if (type === 'rescue-pod') {
+      const podGeo = new THREE.CapsuleGeometry(18, 46, 4, 8);
+      const podMat = new THREE.MeshStandardMaterial({ color: 0x66ccff, emissive: 0x113355, metalness: 0.35, roughness: 0.5 });
+      const podMesh = new THREE.Mesh(podGeo, podMat);
+      podMesh.rotation.x = Math.PI / 2;
+      mesh.add(podMesh);
     } else if (type === 'tanker') {
       // Tanker fallback: white-orange utility craft
       const bodyMat = new THREE.MeshStandardMaterial({ color: 0xccbbaa, metalness: 0.5, roughness: 0.5 });
@@ -5861,6 +5915,14 @@ const SF3D = (function () {
         entityMeshes.set(e.id, mesh);
       }
 
+      // Viewport-first culling: skip transform writes when the entity is offscreen.
+      const cullRadius = Math.max(8, (e.radius || 10) * 1.25);
+      _tmpSphere.center.copy(e.position);
+      _tmpSphere.radius = cullRadius;
+      const onScreen = _viewFrustum.intersectsSphere(_tmpSphere);
+      mesh.visible = onScreen;
+      if (!onScreen) continue;
+
       // Delta-only transform updates.
       const ud = mesh.userData;
       if (ud._px !== e.position.x || ud._py !== e.position.y || ud._pz !== e.position.z) {
@@ -5871,14 +5933,6 @@ const SF3D = (function () {
         mesh.quaternion.copy(e.quaternion);
         ud._qx = e.quaternion.x; ud._qy = e.quaternion.y; ud._qz = e.quaternion.z; ud._qw = e.quaternion.w;
       }
-
-      // On-screen work only: if outside camera frustum, hide and skip expensive updates.
-      const cullRadius = Math.max(8, (e.radius || 10) * 1.25);
-      _tmpSphere.center.copy(mesh.position);
-      _tmpSphere.radius = cullRadius;
-      const onScreen = _viewFrustum.intersectsSphere(_tmpSphere);
-      mesh.visible = onScreen;
-      if (!onScreen) continue;
 
       // Update LOD level selection based on camera distance
       if (mesh.isLOD) mesh.update(camera);
@@ -8296,6 +8350,67 @@ const Starfighter = (function () {
     playerKills: 0,
     clusters: [],           // [{id, label, center:{x,y,z}, total, alive}] active enemy clusters
     _clusterCallTimer: 0,   // countdown to next wingman cluster guidance callout
+    _sortieBaseDims: null,
+    _lastSortieBoostWave: 0,
+    _simTick: 0,
+    _hiveMissionReady: false,
+    _hiveAuroraLocated: false,
+    _hiveSpecimenRecovered: false,
+    _queenChamberUnlocked: false,
+    _specimenAnalyzeTimer: 0,
+    _gyroidWarnTimer: 0,
+    _hiveAuroraMarker: null,
+    _hiveSpecimenMarker: null,
+    _queenChamberMarker: null,
+    _hiveAnchor: null,
+    _hiveEntryRadius: 5600,
+    _inGyroidInterior: false,
+    _hiveEntryAnnounced: false,
+    _gyroidDefendersSpawned: false,
+    _gyroidWeaponUnlocked: false,
+    _honeycombPowerups: [],
+    _auroraDockReady: false,
+    _auroraDockDone: false,
+    _storyCutsceneActive: false,
+    _hiveIngestCutsceneShown: false,
+    _carrierDestroyed: false,
+    _queenBreachShots: 0,
+    _queenGuardWaveSpawned: false,
+    _peaceMessageDelivered: false,
+    _wave7StoryShown: false,
+    _wave8StoryShown: false,
+    _asteroidSortieActive: false,
+    _asteroidFragmentsCreated: 0,
+    _carrierDefenseActive: false,
+    _carrierDefenseTimer: 0,
+    _carrierCannonTimer: 0,
+    _carrierDefenseHive: null,
+    _retrySortiePending: false,
+    _sortieCheckpointWave: 0,
+    _sortieCheckpoint: null,
+    _resumeFromSave: false,
+    _sortieScenario: null,
+    _sortieObjectiveText: '',
+    _scenarioNodes: [],
+    _scenarioRescueTarget: 0,
+    _scenarioRescueCollected: 0,
+    _scenarioRelayTarget: 0,
+    _scenarioRelayDestroyed: 0,
+    _adaptivePerfTier: 0,
+    _adaptivePerfTimer: 0,
+    _offscreenAIDivisorBoost: 0,
+    _offscreenPhysicsDivisorBoost: 0,
+    _adaptiveRadarMinMs: 40,
+    _adaptiveHudModulo: 3,
+    _sortieBuff: {
+      laserDamageScale: 1,
+      torpedoDamageScale: 1,
+      gunSpreadScale: 1,
+      gunFireRateScale: 1,
+      shieldRegen: 0,
+      boostCooldownScale: 1,
+      fuelCostScale: 1,
+    },
   };
 
   // ── Kill Feed ──
@@ -8321,6 +8436,35 @@ const Starfighter = (function () {
         const opacity = Math.max(0, 1 - age / FADE_DURATION);
         return '<div style="color:' + e.color + ';opacity:' + opacity.toFixed(2) + ';margin-bottom:3px;text-shadow:0 0 6px ' + e.color + ';">' + e.text + '</div>';
       }).join('');
+  }
+
+  function _updateSortieRetryBanner() {
+    let el = document.getElementById('sortie-retry-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sortie-retry-banner';
+      el.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:220;pointer-events:none;font-family:monospace;font-size:11px;letter-spacing:1px;padding:7px 12px;border:1px solid rgba(255,175,90,0.45);background:rgba(32,14,6,0.76);color:#ffcf9f;border-radius:5px;display:none;';
+      document.body.appendChild(el);
+    }
+
+    const activePhase = state.phase === 'combat' || state.phase === 'bay-ready' || state.phase === 'launching' || state.respawning;
+    const shouldShow = activePhase && (state.livesRemaining < state.maxLives || state._retrySortiePending);
+    if (!shouldShow) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const cp = state._sortieCheckpointWave === state.wave ? 'CHECKPOINT: SORTIE START' : 'CHECKPOINT: LIVE';
+    if (state._retrySortiePending) {
+      el.innerHTML = `SORTIE ${state.wave} RETRY ARMED | PILOTS RESETTING | ${cp}`;
+      el.style.color = '#ffd4b0';
+      el.style.borderColor = 'rgba(255,145,88,0.65)';
+    } else {
+      el.innerHTML = `SORTIE ${state.wave} | PILOTS ${state.livesRemaining}/${state.maxLives} | ${cp}`;
+      el.style.color = '#ffcf9f';
+      el.style.borderColor = 'rgba(255,175,90,0.45)';
+    }
+    el.style.display = 'block';
   }
 
   // Communication system — fully reactive, no canned dialog
@@ -8669,13 +8813,18 @@ const Starfighter = (function () {
     if (state.livesRemaining <= 0) {
       if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, 0, state.maxLives);
       if (window.SFAudio) SFAudio.playSound('warning');
-      setTimeout(() => gameOver(`MISSION FAILED — ${reason}`), 1200);
+      state._retrySortiePending = true;
+      state._replacementBriefing = `Sortie reset protocol armed. Relaunching sortie ${state.wave} with a fresh 3-ship wing.`;
+      state.respawning = true;
+      state.respawnTimer = 5.0;
+      state.respawnReason = `ALL FIGHTERS LOST — RESET SORTIE ${state.wave}`;
+      _showRespawnScreen();
       return;
     }
 
     state._replacementBriefing = _makeDynamicBattleBrief();
     state.respawning = true;
-    state.respawnTimer = dim('timing.respawn');
+    state.respawnTimer = (dim ? dim('timing.respawn') : null) || 7.0; // countdown before return to launch bay
     state.respawnReason = reason;
 
     if (window.SFAnnouncer) SFAnnouncer.onPlayerDestroyed(reason, state.livesRemaining, state.maxLives);
@@ -8765,7 +8914,212 @@ const Starfighter = (function () {
     return _setPaused(!state.paused);
   }
 
+  const _CAMPAIGN_SAVE_KEY = 'sf_campaign_save_v1';
+
+  function _campaignSavePayload() {
+    if (!state.player || !state.baseship) return null;
+    return {
+      wave: state.wave,
+      score: state.score,
+      kills: state.kills,
+      playerKills: state.playerKills,
+      livesRemaining: state.livesRemaining,
+      maxLives: state.maxLives,
+      player: {
+        hull: state.player.hull,
+        shields: state.player.shields,
+        fuel: state.player.fuel,
+        torpedoes: state.player.torpedoes,
+      },
+      baseship: {
+        hull: state.baseship.hull,
+        shields: state.baseship.shields,
+      },
+      checkpointWave: state._sortieCheckpointWave || 0,
+      checkpoint: state._sortieCheckpoint || null,
+      savedAt: Date.now(),
+    };
+  }
+
+  function saveGame(manual) {
+    if (state.isMultiplayer) {
+      if (manual) addComm(_crew('ops'), 'Save unavailable in multiplayer matches.', 'warning');
+      return false;
+    }
+    try {
+      const payload = _campaignSavePayload();
+      if (!payload) return false;
+      localStorage.setItem(_CAMPAIGN_SAVE_KEY, JSON.stringify(payload));
+      if (manual) addComm(_crew('ops'), `Game saved. Sortie ${state.wave} checkpoint stored.`, 'base');
+      return true;
+    } catch (_) {
+      if (manual) addComm(_crew('ops'), 'Save failed. Storage unavailable.', 'warning');
+      return false;
+    }
+  }
+
+  function _loadCampaignSave() {
+    if (state.isMultiplayer) return false;
+    try {
+      const raw = localStorage.getItem(_CAMPAIGN_SAVE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data || !data.wave) return false;
+
+      state.wave = Math.max(1, data.wave | 0);
+      state.score = Math.max(0, data.score | 0);
+      state.kills = Math.max(0, data.kills | 0);
+      state.playerKills = Math.max(0, data.playerKills | 0);
+      state.maxLives = dim('lives.max');
+      state.livesRemaining = Math.max(1, Math.min(state.maxLives, data.livesRemaining | 0 || state.maxLives));
+
+      _applySortieProgression(state.wave);
+
+      if (data.player && state.player) {
+        state.player.hull = Math.max(1, Math.min(dim('player.hull'), data.player.hull || dim('player.hull')));
+        state.player.shields = Math.max(0, Math.min(dim('player.shields'), data.player.shields || dim('player.shields')));
+        state.player.fuel = Math.max(0, Math.min(dim('player.fuel'), data.player.fuel || dim('player.fuel')));
+        state.player.torpedoes = Math.max(0, data.player.torpedoes | 0 || dim('player.torpedoes'));
+      }
+      if (data.baseship && state.baseship) {
+        state.baseship.hull = Math.max(1, Math.min(dim('baseship.hull'), data.baseship.hull || dim('baseship.hull')));
+        state.baseship.shields = Math.max(0, Math.min(dim('baseship.shields'), data.baseship.shields || dim('baseship.shields')));
+      }
+
+      state._sortieCheckpointWave = data.checkpointWave | 0;
+      state._sortieCheckpoint = data.checkpoint || null;
+      state._resumeFromSave = true;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function _captureSortieCheckpoint() {
+    if (!state.player || !state.baseship) return;
+    state._sortieCheckpointWave = state.wave;
+    state._sortieCheckpoint = {
+      wave: state.wave,
+      score: state.score,
+      kills: state.kills,
+      playerKills: state.playerKills,
+      baseHull: state.baseship.hull,
+      baseShields: state.baseship.shields,
+      playerHull: state.player.hull,
+      playerShields: state.player.shields,
+      playerFuel: state.player.fuel,
+      playerTorpedoes: state.player.torpedoes,
+    };
+  }
+
+  function _restoreCurrentSortieCheckpoint() {
+    const cp = state._sortieCheckpoint;
+    if (!cp || state._sortieCheckpointWave !== state.wave) {
+      _captureSortieCheckpoint();
+      return;
+    }
+
+    state.score = cp.score;
+    state.kills = cp.kills;
+    state.playerKills = cp.playerKills;
+    if (state.baseship) {
+      state.baseship.hull = cp.baseHull;
+      state.baseship.shields = cp.baseShields;
+    }
+    if (state.player) {
+      state.player.hull = cp.playerHull;
+      state.player.shields = cp.playerShields;
+      state.player.fuel = cp.playerFuel;
+      state.player.torpedoes = cp.playerTorpedoes;
+    }
+  }
+
+  function _clearSortieEntitiesForRetry() {
+    for (let i = state.entities.length - 1; i >= 0; i--) {
+      const e = state.entities[i];
+      if (!e) continue;
+      if (e.type === 'baseship') continue;
+      if (M) M.remove(e.id);
+      state.entities[i] = state.entities[state.entities.length - 1];
+      state.entities.pop();
+    }
+    if (M) M.reap();
+  }
+
+  function _restartCurrentSortie() {
+    _clearSortieEntitiesForRetry();
+    _restoreCurrentSortieCheckpoint();
+    _clearSupport();
+
+    state.livesRemaining = state.maxLives;
+    state._retrySortiePending = false;
+    state.respawning = false;
+    state.respawnTimer = 0;
+
+    state._hiveMissionReady = false;
+    state._hiveAuroraLocated = false;
+    state._hiveSpecimenRecovered = false;
+    state._queenChamberUnlocked = false;
+    state._specimenAnalyzeTimer = 0;
+    state._gyroidWarnTimer = 0;
+    state._hiveAuroraMarker = null;
+    state._hiveSpecimenMarker = null;
+    state._queenChamberMarker = null;
+    state._hiveAnchor = null;
+    state._inGyroidInterior = false;
+    state._hiveEntryAnnounced = false;
+    state._gyroidDefendersSpawned = false;
+    state._honeycombPowerups = [];
+    state._carrierDefenseActive = false;
+    state._carrierDefenseTimer = 0;
+    state._carrierCannonTimer = 0;
+    state._carrierDefenseHive = null;
+    state._asteroidSortieActive = false;
+    state._asteroidFragmentsCreated = 0;
+
+    state.player = new Player();
+    state.player.hull = cpOr(dim('player.hull'), state._sortieCheckpoint && state._sortieCheckpoint.playerHull);
+    state.player.shields = cpOr(dim('player.shields'), state._sortieCheckpoint && state._sortieCheckpoint.playerShields);
+    state.player.fuel = cpOr(dim('player.fuel'), state._sortieCheckpoint && state._sortieCheckpoint.playerFuel);
+    state.player.torpedoes = cpOr(dim('player.torpedoes'), state._sortieCheckpoint && state._sortieCheckpoint.playerTorpedoes);
+    state.entities.push(state.player);
+    if (window.SFInput) SFInput.init(state.player);
+
+    state.phase = 'bay-ready';
+    state.launchTimer = 0;
+    state._launchAudioPlayed = false;
+    state._launchBlastPlayed = false;
+    state._paBriefingDone = false;
+
+    if (window.SF3D) {
+      SF3D.setLaunchPhase(true);
+      SF3D.showLaunchBay();
+      SF3D.showCockpit(true);
+    }
+    if (window.SFAudio) {
+      SFAudio.stopCockpitHum();
+      SFAudio.stopThrustRumble();
+      SFAudio.stopStrafeHiss();
+      SFAudio.startBayAmbience();
+    }
+    const hud = document.getElementById('gameplay-hud');
+    if (hud) hud.style.opacity = '1';
+    const cd = document.getElementById('countdown-display');
+    if (cd) {
+      cd.style.display = 'block';
+      cd.innerHTML = `<span style="font-size:0.35em;color:#ffaa66">SORTIE ${state.wave} RESET</span><br><span style="font-size:0.35em;color:#88ccff">All pilots replenished. Relaunching...</span>`;
+    }
+
+    addComm(_crew('command'), `Sortie ${state.wave} reset. Three new fighters deployed; mission progress retained.`, 'warning');
+    _scheduleAutoLaunch(2500);
+  }
+
+  function cpOr(fallback, maybe) {
+    return (maybe === undefined || maybe === null) ? fallback : maybe;
+  }
+
   function exitGame() {
+    if (!state.isMultiplayer) saveGame(false);
     state.running = false;
     if (document.pointerLockElement) document.exitPointerLock();
     if (window.SFAudio && SFAudio.pauseAll) SFAudio.pauseAll();
@@ -8779,6 +9133,841 @@ const Starfighter = (function () {
 
   // Dimensional shorthand — all game constants flow through SpaceManifold.dim()
   const dim = (name) => M.dim(name);
+
+  function _captureSortieBaseDims() {
+    if (state._sortieBaseDims) return;
+    state._sortieBaseDims = {
+      laserDamage: dim('weapon.laser.damage') || 15,
+      gunDamage: dim('weapon.gun.damage') || 6,
+      torpedoDamage: dim('weapon.torpedo.damage') || 80,
+      empRange: dim('weapon.pulse.range') || 400,
+      torpedoMag: dim('player.torpedoes') || 8,
+      shieldCap: dim('player.shields') || 100,
+      fuelCap: dim('player.fuel') || 100,
+      fuelRegen: dim('player.fuelRegen') || 2,
+      maxSpeed: dim('player.maxSpeed') || 250,
+      acquireDot: dim('targeting.acquireDot') || 0.993,
+      breakDot: dim('targeting.breakDot') || 0.866,
+    };
+  }
+
+  function _sortieGainLines(sortie) {
+    if (sortie <= 1) return [];
+    const lines = [];
+    if (sortie >= 2) lines.push('Target-link module online (+lock stability).');
+    if (sortie >= 3) lines.push('Laser couplers tuned (+laser output).');
+    if (sortie >= 4) lines.push('Warhead package upgraded (+torpedo yield).');
+    if (sortie >= 5) lines.push('Interceptor frame tuning (+speed and fuel regen).');
+    if (sortie >= 6) lines.push('Hive breach kit loaded (+anti-hive strike profile).');
+    if (sortie >= 7) lines.push('Sample courier hardening (+shield reserve).');
+    if (sortie >= 8) lines.push('Queen assault doctrine active (+full combat output).');
+    return lines;
+  }
+
+  function _fibStep(sortie) {
+    const fib = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55];
+    const idx = Math.max(0, Math.min(fib.length - 1, sortie - 1));
+    return fib[idx];
+  }
+
+  function _applySortieProgression(sortie) {
+    if (!M || !M.setDim) return [];
+    _captureSortieBaseDims();
+    const base = state._sortieBaseDims;
+    const fib = _fibStep(sortie);
+    const fibMax = _fibStep(10);
+    const fibNorm = fib / fibMax;
+
+    const laserMult = 1 + (fibNorm * 0.78);
+    const gunMult = 1 + (fibNorm * 0.52);
+    const torpMult = 1 + (fibNorm * 1.02);
+    const empMult = 1 + (fibNorm * 0.34);
+    const lockEase = fibNorm * 0.032;
+    const lockHold = fibNorm * 0.105;
+
+    M.setDim('weapon.laser.damage', Math.round(base.laserDamage * laserMult));
+    M.setDim('weapon.gun.damage', Math.round(base.gunDamage * gunMult));
+    M.setDim('weapon.torpedo.damage', Math.round(base.torpedoDamage * torpMult));
+    M.setDim('weapon.pulse.range', Math.round(base.empRange * empMult));
+    M.setDim('targeting.acquireDot', Math.max(0.94, base.acquireDot - lockEase));
+    M.setDim('targeting.breakDot', Math.max(0.72, base.breakDot - lockHold));
+
+    const torpBonus = Math.min(8, Math.floor(fibNorm * 9));
+    const shieldBonus = Math.round(fibNorm * 80);
+    const fuelBonus = Math.round(fibNorm * 64);
+    const regenBonus = +(fibNorm * 2.6).toFixed(2);
+    const speedBonus = Math.round(fibNorm * 95);
+
+    M.setDim('player.torpedoes', base.torpedoMag + torpBonus);
+    M.setDim('player.shields', base.shieldCap + shieldBonus);
+    M.setDim('player.fuel', base.fuelCap + fuelBonus);
+    M.setDim('player.fuelRegen', +(base.fuelRegen + regenBonus).toFixed(2));
+    M.setDim('player.maxSpeed', base.maxSpeed + speedBonus);
+
+    if (state.player && !state.player.markedForDeletion) {
+      state.player.torpedoes = dim('player.torpedoes');
+      state.player.shields = Math.min(dim('player.shields'), state.player.shields + 15);
+      state.player.maxSpeed = dim('player.maxSpeed');
+      state.player.fuel = Math.min(dim('player.fuel'), state.player.fuel + 10);
+    }
+
+    state._lastSortieBoostWave = sortie;
+    return _sortieGainLines(sortie);
+  }
+
+  function _isInPlayerViewport(entity, maxDist, cosHalfFov) {
+    if (!state.player || !entity || entity.markedForDeletion) return false;
+    if (entity === state.player) return true;
+    const p = state.player;
+    const md = maxDist || dim('radar.range') || 15000;
+    const chf = cosHalfFov || 0.2;
+    const dx = entity.position.x - p.position.x;
+    const dy = entity.position.y - p.position.y;
+    const dz = entity.position.z - p.position.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq < 600 * 600) return true; // always process near contacts
+    if (distSq > md * md) return false;
+    const invLen = 1 / Math.sqrt(distSq || 1);
+    _v1.set(0, 0, -1).applyQuaternion(p.quaternion);
+    const dot = _v1.x * dx * invLen + _v1.y * dy * invLen + _v1.z * dz * invLen;
+    return dot >= chf;
+  }
+
+  function _updateAdaptivePerfBudget(frameDt) {
+    state._adaptivePerfTimer -= frameDt;
+    if (state._adaptivePerfTimer > 0) return;
+    state._adaptivePerfTimer = 0.35;
+
+    let projectiles = 0;
+    let hostiles = 0;
+    const ents = state.entities;
+    for (let i = 0, len = ents.length; i < len; i++) {
+      const e = ents[i];
+      if (!e || e.markedForDeletion) continue;
+      if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo' || e.type === 'plasma' || e.type === 'gyroid-lance') projectiles++;
+      else if (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'asteroid') hostiles++;
+    }
+
+    const pressure = state.entities.length + (projectiles * 0.7) + (hostiles * 0.5);
+    let tier = 0;
+    if (pressure > 280 || frameDt > 0.032) tier = 2;
+    else if (pressure > 180 || frameDt > 0.024) tier = 1;
+
+    state._adaptivePerfTier = tier;
+    if (tier === 2) {
+      state._offscreenAIDivisorBoost = 4;
+      state._offscreenPhysicsDivisorBoost = 2;
+      state._adaptiveRadarMinMs = 85;
+      state._adaptiveHudModulo = 5;
+    } else if (tier === 1) {
+      state._offscreenAIDivisorBoost = 2;
+      state._offscreenPhysicsDivisorBoost = 1;
+      state._adaptiveRadarMinMs = 60;
+      state._adaptiveHudModulo = 4;
+    } else {
+      state._offscreenAIDivisorBoost = 0;
+      state._offscreenPhysicsDivisorBoost = 0;
+      state._adaptiveRadarMinMs = 40;
+      state._adaptiveHudModulo = 3;
+    }
+  }
+
+  function _shouldProcessEntityAI(entity) {
+    if (!entity || entity.markedForDeletion) return false;
+    if (entity.type === 'player' || entity.type === 'baseship') return true;
+    if (entity.type === 'tanker' || entity.type === 'medic') return true;
+    if (entity.type === 'torpedo' || entity.type === 'laser' || entity.type === 'machinegun' || entity.type === 'plasma') return true;
+    if (_isInPlayerViewport(entity, (dim('radar.range') || 15000) * 1.05, 0.12)) return true;
+    if (!state.player || !entity.position) return false;
+    const dx = entity.position.x - state.player.position.x;
+    const dy = entity.position.y - state.player.position.y;
+    const dz = entity.position.z - state.player.position.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    const rr = dim('radar.range') || 15000;
+    const divisor = (distSq > (rr * rr * 0.85) ? 8 : 5) + (state._offscreenAIDivisorBoost || 0);
+    const bucket = (entity.id && entity.id.charCodeAt(0)) ? entity.id.charCodeAt(0) % divisor : 0;
+    return ((state._simTick + bucket) % divisor) === 0;
+  }
+
+  function _ensureHiveLabyrinthMission() {
+    if (state._hiveMissionReady || state.wave < 7 || !window.THREE) return;
+    const hive = state.entities.find(e => e.type === 'alien-base' && !e.markedForDeletion);
+    const anchor = hive
+      ? hive.position.clone()
+      : (state.baseship ? state.baseship.position.clone().add(new THREE.Vector3(15000, 600, -9000)) : new THREE.Vector3(15000, 600, -9000));
+
+    state._hiveAnchor = anchor.clone();
+
+    state._hiveAuroraMarker = {
+      id: 'obj-aurora',
+      type: 'aurora-objective',
+      position: anchor.clone().add(new THREE.Vector3(-3400, 380, 2200)),
+      markedForDeletion: false,
+      radius: 450,
+    };
+    state._hiveSpecimenMarker = {
+      id: 'obj-specimen',
+      type: 'honeycomb-specimen',
+      position: anchor.clone().add(new THREE.Vector3(1800, -280, -3200)),
+      markedForDeletion: false,
+      radius: 320,
+    };
+    state._queenChamberMarker = {
+      id: 'obj-queen',
+      type: 'queen-chamber-locked',
+      position: anchor.clone().add(new THREE.Vector3(0, 900, 3600)),
+      markedForDeletion: false,
+      radius: 1200,
+    };
+
+    state._hiveMissionReady = true;
+    state._hiveAuroraLocated = false;
+    state._hiveSpecimenRecovered = false;
+    state._queenChamberUnlocked = false;
+    state._inGyroidInterior = false;
+    state._hiveEntryAnnounced = false;
+    state._gyroidDefendersSpawned = false;
+    state._gyroidWeaponUnlocked = false;
+    state._specimenAnalyzeTimer = 0;
+    state._honeycombPowerups = [
+      { id: 'hc-1', type: 'honeycomb-powerup', position: anchor.clone().add(new THREE.Vector3(-1500, 120, -1200)), picked: false },
+      { id: 'hc-2', type: 'honeycomb-powerup', position: anchor.clone().add(new THREE.Vector3(900, -240, 1500)), picked: false },
+      { id: 'hc-3', type: 'honeycomb-powerup', position: anchor.clone().add(new THREE.Vector3(2600, 260, -800)), picked: false },
+      { id: 'hc-4', type: 'honeycomb-powerup', position: anchor.clone().add(new THREE.Vector3(-2400, -220, 900)), picked: false },
+    ];
+    addComm(_crew('science'), 'Gyroid labyrinth entered. Reach Aurora, recover a hive specimen, then Queen chamber access can be solved on radar.', 'warning');
+  }
+
+  function _spawnGyroidDefenders() {
+    if (state._gyroidDefendersSpawned || !state.player || !state._hiveAnchor) return;
+    const base = state.player.position.clone();
+    const defs = [
+      { type: 'interceptor', off: new THREE.Vector3(600, 100, -900) },
+      { type: 'interceptor', off: new THREE.Vector3(-700, -140, -700) },
+      { type: 'bomber', off: new THREE.Vector3(300, 220, 1100) },
+      { type: 'enemy', off: new THREE.Vector3(-900, 80, 900) },
+    ];
+    for (let i = 0; i < defs.length; i++) {
+      const d = defs[i];
+      const pos = base.clone().add(d.off);
+      const e = new Entity(d.type, pos.x, pos.y, pos.z);
+      const profile = deriveCombatProfile(d.type, Math.max(5, state.wave));
+      e.hull = profile.hull;
+      e.maxSpeed = profile.maxSpeed;
+      e.shields = profile.shields || 0;
+      if (d.type === 'interceptor') e.radius = dim('entity.interceptor.radius');
+      if (d.type === 'bomber') {
+        e.radius = dim('entity.bomber.radius');
+        e._bombCooldown = 0;
+        e._bombInterval = dim('enemy.bomber.bombInterval');
+      }
+      state.entities.push(e);
+    }
+    state._gyroidDefendersSpawned = true;
+    addComm(_crew('tactical'), 'Zorgon defenders inside the gyroid! Enemy fighters converging in corridor space.', 'warning');
+  }
+
+  function _showStoryCinematic(title, lines, done) {
+    state._storyCutsceneActive = true;
+    const overlay = document.createElement('div');
+    overlay.id = 'sf-story-cinematic';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9800;background:radial-gradient(circle at 50% 45%, rgba(255,80,0,0.18), rgba(0,0,0,0.94) 62%);display:flex;align-items:center;justify-content:center;pointer-events:auto;';
+    overlay.innerHTML =
+      '<div style="max-width:920px;padding:22px 28px;border:1px solid rgba(255,130,40,0.55);background:rgba(8,8,12,0.84);box-shadow:0 0 40px rgba(255,110,20,0.35);font-family:monospace;text-align:center;">'
+      + '<div style="font-size:13px;letter-spacing:4px;color:#ff9955;margin-bottom:14px;">STORY EVENT</div>'
+      + '<div id="sf-story-title" style="font-size:28px;letter-spacing:2px;color:#ffd8aa;text-shadow:0 0 20px rgba(255,140,80,0.65);margin-bottom:14px;">' + title + '</div>'
+      + '<div id="sf-story-line" style="font-size:16px;line-height:1.7;color:#ffd5b0;min-height:120px;white-space:pre-wrap;"></div>'
+      + '<div style="font-size:11px;color:#ffb67a;margin-top:14px;">Press SPACE to continue</div>'
+      + '</div>';
+    document.body.appendChild(overlay);
+
+    const lineEl = overlay.querySelector('#sf-story-line');
+    let idx = 0;
+    const step = () => {
+      if (!lineEl) return;
+      if (idx >= lines.length) return;
+      lineEl.textContent = lines[idx++];
+      if (window.SFAudio) SFAudio.playSound('comm_beep');
+      if (idx < lines.length) {
+        setTimeout(step, 1900);
+      }
+    };
+    step();
+
+    const finish = () => {
+      document.removeEventListener('keydown', onKey, true);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      state._storyCutsceneActive = false;
+      if (done) done();
+    };
+    const onKey = (e) => {
+      if (e.code !== 'Space' && e.code !== 'Enter') return;
+      e.preventDefault();
+      finish();
+    };
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(finish, Math.max(5200, lines.length * 2000));
+  }
+
+  function _spawnQueenGuards() {
+    if (state._queenGuardWaveSpawned || !state._queenChamberMarker) return;
+    const q = state._queenChamberMarker.position;
+    const guards = [
+      { type: 'dreadnought', off: new THREE.Vector3(0, 220, -1200) },
+      { type: 'interceptor', off: new THREE.Vector3(520, -180, -700) },
+      { type: 'interceptor', off: new THREE.Vector3(-560, 140, -760) },
+      { type: 'bomber', off: new THREE.Vector3(300, 90, 940) },
+    ];
+    for (let i = 0; i < guards.length; i++) {
+      const g = guards[i];
+      const pos = q.clone().add(g.off);
+      const e = new Entity(g.type, pos.x, pos.y, pos.z);
+      const profile = deriveCombatProfile(g.type, Math.max(7, state.wave));
+      e.hull = profile.hull;
+      e.maxSpeed = profile.maxSpeed;
+      e.shields = profile.shields || 0;
+      e._queenGuard = true;
+      if (g.type === 'interceptor') e.radius = dim('entity.interceptor.radius');
+      if (g.type === 'bomber') e.radius = dim('entity.bomber.radius');
+      if (g.type === 'dreadnought') e.radius = dim('entity.dreadnought.radius');
+      state.entities.push(e);
+    }
+    state._queenGuardWaveSpawned = true;
+    addComm(_crew('tactical'), 'Queen chamber guard ring detected. Break their line and hold formation.', 'warning');
+  }
+
+  function _spawnAsteroidChunk(position, stage, inheritedVelocity) {
+    if (!position) return null;
+    const radiusByStage = [170, 92, 52];
+    const hullByStage = [95, 52, 28];
+    const speedByStage = [85, 140, 185];
+    const stageIdx = Math.max(0, Math.min(2, stage | 0));
+    const a = new Entity('asteroid', position.x, position.y, position.z);
+    a._asteroidStage = stageIdx;
+    a.radius = radiusByStage[stageIdx];
+    a.hull = hullByStage[stageIdx];
+    a.maxSpeed = speedByStage[stageIdx];
+    if (inheritedVelocity) a.velocity.copy(inheritedVelocity);
+    else {
+      a.velocity.set((Math.random() - 0.5) * a.maxSpeed, (Math.random() - 0.5) * a.maxSpeed * 0.7, (Math.random() - 0.5) * a.maxSpeed);
+    }
+    state.entities.push(a);
+    return a;
+  }
+
+  function _spawnAsteroidSortie() {
+    state._asteroidSortieActive = true;
+    state._asteroidFragmentsCreated = 0;
+    const center = state.baseship ? state.baseship.position.clone() : new THREE.Vector3();
+    for (let i = 0; i < 16; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const elev = (Math.random() - 0.5) * 0.45;
+      const dist = 2600 + Math.random() * 3200;
+      const p = new THREE.Vector3(
+        center.x + Math.cos(ang) * dist,
+        center.y + Math.sin(elev) * 1100,
+        center.z + Math.sin(ang) * dist
+      );
+      const towardCenter = center.clone().sub(p).normalize().multiplyScalar(60 + Math.random() * 80);
+      _spawnAsteroidChunk(p, 0, towardCenter);
+    }
+    addComm(_crew('command'), 'Sortie Three: asteroid belt intercept. Keep firing and clear all debris before it reaches the carrier.', 'warning');
+    addComm(_crew('science'), 'Fragmentation warning: each asteroid strike creates smaller, faster debris.', 'warning');
+  }
+
+  function _fragmentAsteroid(asteroid, projectile) {
+    if (!asteroid || asteroid.type !== 'asteroid' || asteroid.markedForDeletion) return;
+    const stage = asteroid._asteroidStage || 0;
+    asteroid.markedForDeletion = true;
+    if (M) M.remove(asteroid.id);
+    if (window.SF3D) SF3D.spawnImpactEffect(asteroid.position, 0xffaa44);
+    state.score += 15 + (2 - Math.min(2, stage)) * 10;
+
+    if (stage >= 2) return;
+    const maxFragments = 140;
+    if (state._asteroidFragmentsCreated >= maxFragments) return;
+    const spawnCount = 2 + (Math.random() > 0.62 ? 1 : 0);
+    const parentV = asteroid.velocity ? asteroid.velocity.clone() : new THREE.Vector3();
+    for (let i = 0; i < spawnCount; i++) {
+      if (state._asteroidFragmentsCreated >= maxFragments) break;
+      const off = new THREE.Vector3((Math.random() - 0.5) * asteroid.radius * 0.7, (Math.random() - 0.5) * asteroid.radius * 0.55, (Math.random() - 0.5) * asteroid.radius * 0.7);
+      const vel = parentV.clone().add(new THREE.Vector3((Math.random() - 0.5) * 150, (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 150));
+      _spawnAsteroidChunk(asteroid.position.clone().add(off), stage + 1, vel);
+      state._asteroidFragmentsCreated++;
+    }
+    if (projectile) projectile.markedForDeletion = true;
+  }
+
+  function _updateCarrierDefenseSortie(dt) {
+    if (state.wave !== 6 || !state._carrierDefenseActive || !state.baseship || !state.player) return;
+    state._carrierDefenseTimer += dt;
+
+    let hive = state._carrierDefenseHive;
+    if (!hive || hive.markedForDeletion) {
+      hive = state.entities.find(e => e.type === 'alien-base' && !e.markedForDeletion) || null;
+      state._carrierDefenseHive = hive;
+    }
+    if (!hive) return;
+
+    const toBase = state.baseship.position.clone().sub(hive.position);
+    const dist = Math.max(1, toBase.length());
+    const closingSpeed = 55 + state.wave * 9;
+    if (dist > 2100) {
+      toBase.normalize();
+      hive.position.addScaledVector(toBase, closingSpeed * dt);
+    }
+    hive.radius = dim('entity.alien-base.radius') * (1 + Math.max(0, state.wave - 5) * 0.18);
+
+    state._carrierCannonTimer -= dt;
+    if (state._carrierCannonTimer <= 0) {
+      state._carrierCannonTimer = 0.35;
+      let target = null;
+      let bestD = Infinity;
+      for (let i = 0, len = state.entities.length; i < len; i++) {
+        const e = state.entities[i];
+        if (e.markedForDeletion) continue;
+        if (!(e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'predator' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'asteroid')) continue;
+        const dx = e.position.x - state.baseship.position.x;
+        const dy = e.position.y - state.baseship.position.y;
+        const dz = e.position.z - state.baseship.position.z;
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d < bestD) { bestD = d; target = e; }
+      }
+      if (target && bestD < 9000 * 9000) {
+        const aim = target.position.clone().sub(state.baseship.position).normalize();
+        if (aim.lengthSq() > 0.0001) {
+          _q1.setFromUnitVectors(_v1.set(0, 0, -1), aim);
+          state.baseship.quaternion.slerp(_q1, 0.45);
+        }
+        fireLaser(state.baseship, 'wingman');
+      }
+    }
+
+    if (!state._hiveIngestCutsceneShown && (dist < 2500 || state._carrierDefenseTimer > 68)) {
+      state._hiveIngestCutsceneShown = true;
+      _showStoryCinematic('HIVE KILL SHOT', [
+        'The hive breaches carrier armor with a singular bio-lance. Resolute is mortally wounded.',
+        'Aurora wheel-ship is swallowed whole by the growing gyroid hive to enslave humanity into honey-production.',
+        'New theater unlocked: inside the hive. Survive and extract the civilians.'
+      ], () => {
+        state._carrierDestroyed = true;
+        state._carrierDefenseActive = false;
+        state._auroraDockReady = true;
+        if (state.baseship) {
+          state.baseship.hull = Math.max(120, state.baseship.hull * 0.06);
+          state.baseship.shields = 0;
+        }
+        for (let i = 0, len = state.entities.length; i < len; i++) {
+          const e = state.entities[i];
+          if (e.markedForDeletion) continue;
+          if (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'predator' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'egg' || e.type === 'youngling' || e.type === 'asteroid') {
+            e.markedForDeletion = true;
+            if (M) M.remove(e.id);
+          }
+        }
+      });
+    }
+  }
+
+  function _applyGyroidCollision(entity, dt) {
+    if (!M || !M.diamond || !entity || entity.markedForDeletion) return;
+    if (entity.type !== 'player' && entity.type !== 'wingman' && entity.type !== 'enemy' && entity.type !== 'interceptor' && entity.type !== 'bomber' && entity.type !== 'predator') return;
+    const px = entity.position.x;
+    const py = entity.position.y;
+    const pz = entity.position.z;
+    const f = M.diamond(px, py, pz);
+    const af = Math.abs(f);
+    const wallBand = dim('gyroid.wallBand') || 0.082;
+    if (af >= wallBand) return;
+
+    let nx = 0, ny = 0, nz = 0;
+    if (M.diamondGrad) {
+      const g = M.diamondGrad(px, py, pz);
+      const gl = Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) || 1;
+      const sign = f >= 0 ? 1 : -1;
+      nx = (g.x / gl) * sign;
+      ny = (g.y / gl) * sign;
+      nz = (g.z / gl) * sign;
+    } else {
+      nx = 0; ny = 1; nz = 0;
+    }
+
+    const penetration = (wallBand - af) * (dim('gyroid.collisionPush') || 200);
+    entity.position.x += nx * (penetration * dt + 6);
+    entity.position.y += ny * (penetration * dt + 6);
+    entity.position.z += nz * (penetration * dt + 6);
+
+    const vn = entity.velocity.x * nx + entity.velocity.y * ny + entity.velocity.z * nz;
+    if (vn < 0) {
+      const kick = (-vn + (dim('gyroid.collisionKick') || 26));
+      entity.velocity.x += nx * kick;
+      entity.velocity.y += ny * kick;
+      entity.velocity.z += nz * kick;
+    }
+    entity.velocity.multiplyScalar(dim('gyroid.collisionDamping') || 0.86);
+
+    if (entity.type === 'player') {
+      entity._gyroidHitCooldown = Math.max(0, (entity._gyroidHitCooldown || 0) - dt);
+      if (entity._gyroidHitCooldown <= 0) {
+        const spd = entity.velocity.length();
+        const dmg = Math.max(2, Math.min(18, spd * (dim('gyroid.damageScale') || 0.038)));
+        entity.takeDamage(dmg);
+        entity._gyroidHitCooldown = 0.2;
+        if (state._gyroidWarnTimer <= 0) {
+          addComm(_crew('ops'), 'Gyroid wall impact. Follow the radar corridors and stay in the void lanes.', 'warning');
+          state._gyroidWarnTimer = 2.5;
+        }
+      }
+    }
+  }
+
+  function _resetSortieScenario() {
+    state._sortieScenario = null;
+    state._sortieObjectiveText = '';
+    state._scenarioNodes = [];
+    state._scenarioRescueTarget = 0;
+    state._scenarioRescueCollected = 0;
+    state._scenarioRelayTarget = 0;
+    state._scenarioRelayDestroyed = 0;
+    state._sortieBuff = {
+      laserDamageScale: 1,
+      torpedoDamageScale: 1,
+      gunSpreadScale: 1,
+      gunFireRateScale: 1,
+      shieldRegen: 0,
+      boostCooldownScale: 1,
+      fuelCostScale: 1,
+    };
+  }
+
+  function _spawnRelayNodes(count) {
+    const targetCount = Math.max(1, count | 0);
+    const center = state.baseship ? state.baseship.position.clone() : new THREE.Vector3();
+    for (let i = 0; i < targetCount; i++) {
+      const ang = (Math.PI * 2 * i) / targetCount + (Math.random() - 0.5) * 0.5;
+      const dist = 2800 + Math.random() * 2200;
+      const y = (Math.random() - 0.5) * 1100;
+      const p = new THREE.Vector3(center.x + Math.cos(ang) * dist, center.y + y, center.z + Math.sin(ang) * dist);
+      const n = new Entity('relay-node', p.x, p.y, p.z);
+      n.radius = 95;
+      n.hull = 140;
+      n.shields = 0;
+      n.maxSpeed = 0;
+      n.velocity.set(0, 0, 0);
+      state.entities.push(n);
+      state._scenarioNodes.push(n);
+    }
+    state._scenarioRelayTarget = targetCount;
+  }
+
+  function _spawnRescuePods(count) {
+    const targetCount = Math.max(1, count | 0);
+    const center = state.baseship ? state.baseship.position.clone() : new THREE.Vector3();
+    for (let i = 0; i < targetCount; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 2200 + Math.random() * 2900;
+      const p = new THREE.Vector3(center.x + Math.cos(ang) * dist, center.y + (Math.random() - 0.5) * 700, center.z + Math.sin(ang) * dist);
+      const pod = new Entity('rescue-pod', p.x, p.y, p.z);
+      pod.radius = 52;
+      pod.hull = 1;
+      pod.shields = 0;
+      pod.maxSpeed = 42;
+      pod.velocity.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 20);
+      state.entities.push(pod);
+      state._scenarioNodes.push(pod);
+    }
+    state._scenarioRescueTarget = targetCount;
+  }
+
+  function _configureRandomSortieScenario(wave) {
+    _resetSortieScenario();
+    if (wave === 3 || wave === 6 || wave >= 7) return;
+
+    const pool = [
+      {
+        id: 'relay-sabotage',
+        name: 'Relay Sabotage',
+        objective: 'Destroy hive relay nodes',
+        buffLine: 'ABILITY: VECTOR BURST (boost recovers faster).',
+        setup: () => {
+          _spawnRelayNodes(2 + (wave >= 5 ? 1 : 0));
+          state._sortieBuff.boostCooldownScale = 0.62;
+        },
+      },
+      {
+        id: 'rescue-pods',
+        name: 'Rescue Sweep',
+        objective: 'Recover civilian rescue pods',
+        buffLine: 'ABILITY: AEGIS FIELD (shield regen online).',
+        setup: () => {
+          _spawnRescuePods(2 + (wave >= 4 ? 1 : 0));
+          state._sortieBuff.shieldRegen = 2.8;
+        },
+      },
+      {
+        id: 'laser-overcharge',
+        name: 'Overcharge Strike',
+        objective: 'Eliminate all hostiles',
+        buffLine: 'WEAPON MOD: PHASE LANCER (+laser damage, -laser fuel cost).',
+        setup: () => {
+          state._sortieBuff.laserDamageScale = 1.34;
+          state._sortieBuff.fuelCostScale = 0.82;
+        },
+      },
+      {
+        id: 'torpedo-salvo',
+        name: 'Capital Breaker',
+        objective: 'Eliminate all hostiles',
+        buffLine: 'WEAPON MOD: TORPEDO SALVO (+torpedo payload +damage).',
+        setup: () => {
+          state._sortieBuff.torpedoDamageScale = 1.3;
+          if (state.player) state.player.torpedoes += 4;
+          const capShip = state.entities.find(e => e.type === 'alien-baseship' && !e.markedForDeletion);
+          if (!capShip && wave >= 2) {
+            const r = 7800 + Math.random() * 1600;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const ab = new Entity('alien-baseship', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+            const profile = deriveCombatProfile('alien-baseship', wave, { speedScale: 1.0 });
+            ab.hull = profile.hull;
+            ab.maxSpeed = profile.maxSpeed;
+            ab._manifoldDerivation = profile.trace;
+            ab.radius = dim('entity.alien-baseship.radius');
+            state.entities.push(ab);
+          }
+        },
+      },
+      {
+        id: 'gunship-rake',
+        name: 'Gunship Rake',
+        objective: 'Eliminate all hostiles',
+        buffLine: 'WEAPON MOD: KINETIC RAKE (faster machine-gun, tighter spread).',
+        setup: () => {
+          state._sortieBuff.gunSpreadScale = 0.58;
+          state._sortieBuff.gunFireRateScale = 1.35;
+        },
+      },
+    ];
+
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    state._sortieScenario = pick;
+    if (pick.setup) pick.setup();
+    state._sortieObjectiveText = pick.objective;
+
+    addComm(_crew('command'), `Sortie variant: ${pick.name}. Objective: ${pick.objective}.`, 'warning');
+    if (pick.buffLine) addComm(_crew('science'), pick.buffLine, 'base');
+  }
+
+  function _scenarioObjectiveLabel() {
+    if (!state._sortieScenario) return '';
+    if (state._sortieScenario.id === 'relay-sabotage') {
+      return `RELAYS ${state._scenarioRelayDestroyed}/${state._scenarioRelayTarget}`;
+    }
+    if (state._sortieScenario.id === 'rescue-pods') {
+      return `PODS ${state._scenarioRescueCollected}/${state._scenarioRescueTarget}`;
+    }
+    return state._sortieObjectiveText || '';
+  }
+
+  function _isScenarioObjectiveComplete(hostilesAlive) {
+    if (!state._sortieScenario) return hostilesAlive === 0;
+    const sid = state._sortieScenario.id;
+    if (sid === 'relay-sabotage') {
+      return state._scenarioRelayDestroyed >= state._scenarioRelayTarget && hostilesAlive <= 3;
+    }
+    if (sid === 'rescue-pods') {
+      return state._scenarioRescueCollected >= state._scenarioRescueTarget && hostilesAlive <= 4;
+    }
+    return hostilesAlive === 0;
+  }
+
+  function _updateSortieScenario(dt) {
+    if (state.phase !== 'combat' || !state.player || state.player.markedForDeletion) return;
+
+    if (state._sortieBuff.shieldRegen > 0) {
+      state.player.shields = Math.min(dim('player.shields'), state.player.shields + state._sortieBuff.shieldRegen * dt);
+    }
+
+    if (!state._sortieScenario || state._sortieScenario.id !== 'rescue-pods') return;
+    const p = state.player.position;
+    for (let i = 0, len = state.entities.length; i < len; i++) {
+      const e = state.entities[i];
+      if (e.type !== 'rescue-pod' || e.markedForDeletion) continue;
+      const dx = e.position.x - p.x;
+      const dy = e.position.y - p.y;
+      const dz = e.position.z - p.z;
+      if (dx * dx + dy * dy + dz * dz < 180 * 180) {
+        e.markedForDeletion = true;
+        if (M) M.remove(e.id);
+        state._scenarioRescueCollected++;
+        state.score += 180;
+        addComm(_crew('ops'), `Rescue pod secured (${state._scenarioRescueCollected}/${state._scenarioRescueTarget}).`, 'base');
+      }
+    }
+  }
+
+  function _updateHiveLabyrinthMission(dt) {
+    if (state.wave < 7) return;
+    _ensureHiveLabyrinthMission();
+    if (!state.player || state.player.markedForDeletion || !state._hiveMissionReady) return;
+
+    if (state.wave === 7 && !state._wave7StoryShown) {
+      state._wave7StoryShown = true;
+      addComm(_crew('science'), 'Sortie Seven: recover a live hive specimen. Aurora cannot reveal the Queen chamber without it.', 'warning');
+    }
+    if (state.wave >= 8 && !state._wave8StoryShown) {
+      state._wave8StoryShown = true;
+      addComm(_crew('command'), 'Sortie Eight: breach the Queen chamber with Gyroid Lance strikes, then subdue the hive monarch.', 'warning');
+    }
+
+    state._gyroidWarnTimer = Math.max(0, state._gyroidWarnTimer - dt);
+    const p = state.player.position;
+
+    if (state._hiveAnchor) {
+      const distToCenter = p.distanceTo(state._hiveAnchor);
+      const wasInside = state._inGyroidInterior;
+      state._inGyroidInterior = distToCenter <= state._hiveEntryRadius;
+      if (state._inGyroidInterior && !wasInside) {
+        if (!state._hiveEntryAnnounced) {
+          addComm(_crew('science'), 'Hive skin is porous. You are inside the gyroid lattice now; wall collisions are live.', 'warning');
+          state._hiveEntryAnnounced = true;
+        }
+        if (!state._gyroidWeaponUnlocked) {
+          state._gyroidWeaponUnlocked = true;
+          addComm(_crew('science'), 'Special weapon unlocked: Gyroid Lance. It rides corridor contours and tracks void lanes.', 'warning');
+        }
+        _spawnGyroidDefenders();
+      }
+    }
+
+    if (!state._hiveAuroraLocated && state._hiveAuroraMarker) {
+      if (p.distanceToSquared(state._hiveAuroraMarker.position) < 900 * 900) {
+        state._hiveAuroraLocated = true;
+        addComm(_crew('science'), 'Aurora located inside the hive. Recover a wall specimen to unlock a route to the Queen chamber.', 'warning');
+      }
+    }
+
+    if (state._hiveAuroraLocated && state._auroraDockReady && !state._auroraDockDone && state._hiveAuroraMarker) {
+      if (p.distanceToSquared(state._hiveAuroraMarker.position) < 520 * 520) {
+        state._auroraDockDone = true;
+        state.player.hull = Math.min(dim('player.hull'), state.player.hull + 65);
+        state.player.shields = Math.min(dim('player.shields'), state.player.shields + 85);
+        state.player.fuel = Math.min(dim('player.fuel'), state.player.fuel + 70);
+        state.player.torpedoes = Math.max(state.player.torpedoes, dim('player.torpedoes'));
+        addComm(_crew('deck'), 'Aurora docking corridor stable. Emergency resupply complete; strike package rearmed.', 'base');
+      }
+    }
+
+    if (!state._hiveSpecimenRecovered && state._hiveSpecimenMarker) {
+      if (p.distanceToSquared(state._hiveSpecimenMarker.position) < 480 * 480) {
+        state._hiveSpecimenRecovered = true;
+        state._hiveSpecimenMarker.markedForDeletion = true;
+        state._specimenAnalyzeTimer = 8.0;
+        addComm(_crew('science'), 'Hive specimen secured. Sending sample to Aurora labs for corridor breach analysis.', 'base');
+      }
+    }
+
+    for (let i = 0; i < state._honeycombPowerups.length; i++) {
+      const hc = state._honeycombPowerups[i];
+      if (hc.picked || !hc.position) continue;
+      if (p.distanceToSquared(hc.position) < 340 * 340) {
+        hc.picked = true;
+        if (state.player) {
+          state.player.shields = Math.min(dim('player.shields'), state.player.shields + 20);
+          state.player.fuel = Math.min(dim('player.fuel'), state.player.fuel + 25);
+          state.player.hull = Math.min(dim('player.hull'), state.player.hull + 8);
+        }
+        state.score += 120;
+        addComm(_crew('ops'), 'Honeycomb powerup collected. Shields, fuel, and hull restored.', 'base');
+      }
+    }
+
+    if (state._hiveSpecimenRecovered && !state._queenChamberUnlocked) {
+      if (state.wave < 8) {
+        state._specimenAnalyzeTimer -= dt;
+        if (state._specimenAnalyzeTimer <= 0) {
+          state._queenChamberUnlocked = true;
+          if (state._queenChamberMarker) state._queenChamberMarker.type = 'queen-chamber-open';
+          addComm(_crew('command'), 'Aurora confirms breach protocol. Queen chamber path is now open on radar. Push through!', 'warning');
+        }
+      } else {
+        const chamber = state._queenChamberMarker && state._queenChamberMarker.position;
+        if (chamber) {
+          let breachHits = 0;
+          for (let i = 0, len = state.entities.length; i < len; i++) {
+            const e = state.entities[i];
+            if (e.type !== 'gyroid-lance' || e.owner !== 'player' || e.markedForDeletion) continue;
+            const dx = e.position.x - chamber.x;
+            const dy = e.position.y - chamber.y;
+            const dz = e.position.z - chamber.z;
+            if (dx * dx + dy * dy + dz * dz < 1200 * 1200) {
+              e.markedForDeletion = true;
+              breachHits++;
+            }
+          }
+          if (breachHits > 0) {
+            state._queenBreachShots += breachHits;
+            if (state._queenBreachShots < 3 && state._gyroidWarnTimer <= 0) {
+              const need = Math.max(0, 3 - state._queenBreachShots);
+              addComm(_crew('science'), `Chamber seal reacting. ${need} more lance strike${need === 1 ? '' : 's'} needed.`, 'warning');
+              state._gyroidWarnTimer = 1.8;
+            }
+          }
+          if (state._queenBreachShots >= 3 && !state._queenChamberUnlocked) {
+            state._queenChamberUnlocked = true;
+            if (state._queenChamberMarker) state._queenChamberMarker.type = 'queen-chamber-open';
+            addComm(_crew('command'), 'Queen chamber breached. Hostile guard signatures incoming.', 'warning');
+            _spawnQueenGuards();
+          }
+        }
+      }
+    }
+
+    if (state._queenChamberUnlocked && !state._queenGuardWaveSpawned) {
+      _spawnQueenGuards();
+    }
+
+    if (state._queenChamberUnlocked && !state._peaceMessageDelivered && state._queenChamberMarker) {
+      let guardsAlive = 0;
+      for (let i = 0, len = state.entities.length; i < len; i++) {
+        const e = state.entities[i];
+        if (!e.markedForDeletion && e._queenGuard) guardsAlive++;
+      }
+      if (guardsAlive === 0) {
+        const q = state._queenChamberMarker.position;
+        if (p.distanceToSquared(q) < 760 * 760) {
+          state._peaceMessageDelivered = true;
+          state.score += 2500;
+          addComm(_crew('command'), 'Queen subdued. Aurora transmits message of peace. Hive hostility collapsing sector-wide.', 'base');
+          addComm(_crew('science'), 'Long-range manifold echo detected beyond this system. A multidimensional threat is approaching.', 'warning');
+        }
+      }
+    }
+
+    if (!state._queenChamberUnlocked && state._queenChamberMarker) {
+      const q = state._queenChamberMarker.position;
+      const dx = p.x - q.x;
+      const dy = p.y - q.y;
+      const dz = p.z - q.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      const lockRadius = 2200;
+      if (distSq < lockRadius * lockRadius) {
+        const dl = Math.sqrt(distSq) || 1;
+        const nx = dx / dl, ny = dy / dl, nz = dz / dl;
+        const push = (lockRadius - dl) * 0.35;
+        p.x += nx * push;
+        p.y += ny * push;
+        p.z += nz * push;
+        state.player.velocity.x += nx * 40;
+        state.player.velocity.y += ny * 40;
+        state.player.velocity.z += nz * 40;
+        if (state._gyroidWarnTimer <= 0) {
+          addComm(_crew('science'), 'Queen chamber remains sealed. Specimen analysis is required before entry.', 'warning');
+          state._gyroidWarnTimer = 2.5;
+        }
+      }
+    }
+  }
 
   // Scratch vectors — reuse to avoid GC pressure in hot path
   const _v1 = new THREE.Vector3();
@@ -9038,7 +10227,7 @@ const Starfighter = (function () {
         this.boostTimer -= dt;
         if (this.boostTimer <= 0) {
           this.boostActive = false;
-          this.boostCooldown = dim('player.boostCooldown');
+          this.boostCooldown = dim('player.boostCooldown') * (state._sortieBuff ? state._sortieBuff.boostCooldownScale : 1);
         }
       } else if (this.afterburnerActive && this.fuel > 0) {
         currentMax = this.afterburnerSpeed;
@@ -9135,6 +10324,8 @@ const Starfighter = (function () {
   }
 
   function init() {
+    _applySortieProgression(state.wave);
+
     state.maxLives = dim('lives.max');
     state.livesRemaining = state.maxLives;
     state.respawning = false;
@@ -9183,6 +10374,21 @@ const Starfighter = (function () {
     state.gameMode = params.get('mode') || 'solo';     // solo | multi | private
     state.roomCode = params.get('code') || null;        // invite code for private games
     state.isMultiplayer = state.gameMode !== 'solo';
+
+    const btnSave = document.getElementById('btn-save');
+    if (btnSave) {
+      btnSave.style.display = state.isMultiplayer ? 'none' : '';
+      btnSave.disabled = !!state.isMultiplayer;
+      btnSave.style.opacity = state.isMultiplayer ? '0.45' : '1';
+      btnSave.title = state.isMultiplayer ? 'Saving disabled in multiplayer' : 'Save campaign progress';
+    }
+    const btnExit = document.getElementById('btn-exit');
+    if (btnExit && state.isMultiplayer) btnExit.innerHTML = '&#10162; LEAVE MATCH';
+
+    if (!state.isMultiplayer) {
+      _loadCampaignSave();
+      _applySortieProgression(state.wave);
+    }
 
     // Connect to multiplayer server if multiplayer mode
     if (state.isMultiplayer && window.SFMultiplayer) {
@@ -9276,6 +10482,10 @@ const Starfighter = (function () {
 
     if (window.SFAnnouncer) SFAnnouncer.onSecured();
     else addComm(_crew('deck'), `${_cs()}, fighter secured in bay. Wave ${state.wave} standing by.`, 'base');
+    if (state._resumeFromSave) {
+      addComm(_crew('ops'), `Campaign resumed at sortie ${state.wave}.`, 'base');
+      state._resumeFromSave = false;
+    }
     _setPauseButtonUI(false);
 
     // First wave: offer tutorial if player hasn't declined permanently
@@ -9871,6 +11081,13 @@ const Starfighter = (function () {
 
     // Adaptive briefing (text ticker only — no bot TTS)
     _queueAdaptiveLaunchBriefing();
+
+    if (state._lastSortieBoostWave === state.wave) {
+      const gains = _sortieGainLines(state.wave);
+      if (gains.length > 0) {
+        addComm(_crew('science'), `Sortie ${state.wave} upgrades active: ${gains[gains.length - 1]}`, 'base');
+      }
+    }
   }
 
   function completeLaunch() {
@@ -9943,16 +11160,44 @@ const Starfighter = (function () {
 
     // Spawn enemies BEFORE announcement so announcer sees them on scope
     spawnWave();
+    _captureSortieCheckpoint();
 
     if (window.SFAnnouncer) SFAnnouncer.onLaunchClear();
     else { const s = _snap(); addComm(_crew('deck'), `${_cs()}, clear of bay. ${s.totalHostile} contacts on scope.`, 'base'); }
+
+    if (state.wave === 3) {
+      addComm(_crew('command'), 'No hostile fighters in this lane. Clear the asteroid belt completely to secure the corridor.', 'warning');
+    } else if (state.wave === 6) {
+      addComm(_crew('command'), 'Defensive sortie: protect the carrier while the hive closes. Carrier cannons are online.', 'warning');
+    }
+    if (state._sortieScenario && state.wave !== 3 && state.wave !== 6 && state.wave < 7) {
+      const objectiveLine = _scenarioObjectiveLabel() || state._sortieObjectiveText;
+      if (objectiveLine) addComm(_crew('ops'), `Sortie objective: ${objectiveLine}.`, 'base');
+    }
+
+    // ── Wave 1: show Training Skip button ──
+    if (state.wave === 1) {
+      const trainSkip = document.getElementById('training-skip-btn');
+      if (trainSkip) trainSkip.style.display = 'block';
+    }
   }
 
   function completeLanding() {
     state.phase = 'docking';
     const prevWave = state.wave;
+    // Hide training skip button (wave 1 has ended)
+    const trainSkip = document.getElementById('training-skip-btn');
+    if (trainSkip) trainSkip.style.display = 'none';
     state.wave++;
+    const _sortieGains = _applySortieProgression(state.wave);
     state.player.torpedoes = dim('player.torpedoes');
+
+    // Sortie complete: full restoration of lives and hull
+    state.livesRemaining = state.maxLives;
+    state._sortieCheckpoint = null;
+    state._sortieCheckpointWave = 0;
+    state._retrySortiePending = false;
+    state.player.hull = dim('player.hull');
 
     // GDD §9.3: Shield restores, hull carries, fuel replenished
     state.player.shields = dim('player.shields');
@@ -10019,12 +11264,18 @@ const Starfighter = (function () {
     const _unlockBanner = _newUnlocked > _prevUnlocked
       ? `<div style="font-size:0.38em;color:#ffdd00;margin:6px 0 3px;text-shadow:0 0 10px #ff8800;">⬡ NEW WEAPON UNLOCKED: ${_wepNames[_newUnlocked - 1]} ⬡<br><span style="color:#aaccdd;font-size:0.9em;">Cycle weapons with [T]</span></div>`
       : '';
+    const _gainBanner = _sortieGains.length > 0
+      ? `<div style="font-size:0.36em;color:#9effc9;line-height:1.5;margin:6px 0 4px;">`
+      + `<span style="color:#58ffb0;">SORTIE ${state.wave} GAINS:</span> ${_sortieGains.join(' ')}`
+      + `</div>`
+      : '';
     countdownDisplay.innerHTML = `WAVE ${prevWave} COMPLETE<br>` +
       `<span style="font-size:0.5em;color:#88ccff">` +
       `Kills: ${state.kills} | Score: ${state.score}<br>` +
       `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / dim('baseship.hull')) * 100)}%` +
       `</span><br>` +
       _unlockBanner +
+      _gainBanner +
       shopHTML +
       `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
 
@@ -10043,7 +11294,9 @@ const Starfighter = (function () {
       }, 3000);
     }
 
-    // GDD §9.3: 8s docked, then show launch button for next wave
+    if (!state.isMultiplayer) saveGame(false);
+
+    // Sortie complete — return to launch bay immediately
     setTimeout(() => {
       state.player.position.set(0, -32, 50);
       state.player.velocity.set(0, 0, 0);
@@ -10061,7 +11314,11 @@ const Starfighter = (function () {
       state.cutsceneCamPos = null;
       state.cutsceneCamQuat = null;
       state.cutsceneVelocity = null;
-      state.player.hull = Math.min(dim('player.hull'), state.player.hull + 25); // partial hull repair
+      state.player.hull = dim('player.hull'); // full hull restore on sortie complete
+
+
+      // GDD: Lives are restored to full when a sortie is completed
+      state.livesRemaining = state.maxLives;
 
       // Resupply baseship if damaged
       state.baseship.hull = Math.min(dim('baseship.hull'), state.baseship.hull + dim('baseship.repairHull'));
@@ -10092,7 +11349,29 @@ const Starfighter = (function () {
       document.getElementById('ship-panel').style.display = 'none';
       document.getElementById('gameplay-hud').style.display = 'none';
       document.getElementById('crosshair').style.display = 'none';
+
+      // Auto-relaunch through the launch tube for the next wave. The
+      // historical `launch-btn` element was never built into the DOM, so
+      // bay-ready would otherwise hang indefinitely. 5s gives the player
+      // time to read the wave-clear summary before the cutscene kicks in.
+      _scheduleAutoLaunch(5000);
     }, 8000);
+  }
+
+  // ── Auto-relaunch helper — replaces the missing red launch button. ──
+  // Cancellable via state._autoLaunchTimer so a manual launch (or another
+  // schedule) doesn't double-fire the cutscene.
+  function _scheduleAutoLaunch(delayMs) {
+    if (state._autoLaunchTimer) {
+      clearTimeout(state._autoLaunchTimer);
+      state._autoLaunchTimer = null;
+    }
+    state._autoLaunchTimer = setTimeout(() => {
+      state._autoLaunchTimer = null;
+      if (state.phase !== 'bay-ready' || !state.running || state.paused) return;
+      if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+      _beginLaunchSequence();
+    }, delayMs || 5000);
   }
 
   const MANIFOLD_ARCHETYPES = {
@@ -10364,6 +11643,17 @@ const Starfighter = (function () {
     // ══════════════════════════════════════════════════════════════
     {
       const w = state.wave;
+
+      _configureRandomSortieScenario(w);
+
+      if (w === 3) {
+        _spawnAsteroidSortie();
+        spawnSupportAndWingmen();
+        SFAnnouncer.onWaveStart();
+        _clusterStartComm();
+        return;
+      }
+
       const _mx = Math.min(1.2, w * 0.14);               // wave intensity
       const _my = 0.55 + Math.random() * 0.45;           // chaos seed — different every wave
       const _mzL = _mx * _my;                             // linear manifold
@@ -10470,18 +11760,32 @@ const Starfighter = (function () {
         state.entities.push(dn);
       }
 
-      // Alien Hive — spawns once at wave 5 (victory objective)
-      if (w === 5 && !state.alienBaseSpawned) {
+      // Alien Hive — appears from wave 5 onward and grows/advances each sortie.
+      if (w >= 5) {
+        let hive = state.entities.find(e => e.type === 'alien-base' && !e.markedForDeletion);
+        if (!hive) {
+          const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
+          const hivePos = baseDir.multiplyScalar(15000);
+          hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
+          hive.hull = dim('hive.hull'); hive.maxSpeed = 0;
+          hive.velocity.set(0, 0, 0);
+          state.entities.push(hive);
+          state.alienBaseSpawned = true;
+          SFAnnouncer.onHiveDiscovered(hive);
+        }
         const baseDir = state.baseship ? state.baseship.position.clone().negate().normalize() : new THREE.Vector3(1, 0, 0);
-        const hivePos = baseDir.multiplyScalar(15000);
-        const hive = new Entity('alien-base', hivePos.x, hivePos.y + 200, hivePos.z);
-        hive.hull = dim('hive.hull'); hive.maxSpeed = 0;
-        hive.radius = dim('entity.alien-base.radius');
-        hive.velocity.set(0, 0, 0);
-        state.entities.push(hive);
-        state.alienBaseSpawned = true;
-        SFAnnouncer.onHiveDiscovered(hive);
+        const dist = Math.max(4200, 15000 - Math.max(0, w - 5) * 2100);
+        hive.position.copy(baseDir.multiplyScalar(dist)).add(new THREE.Vector3(0, 200, 0));
+        hive.radius = dim('entity.alien-base.radius') * (1 + Math.max(0, w - 5) * 0.16);
+        if (w === 6) {
+          state._carrierDefenseActive = true;
+          state._carrierDefenseTimer = 0;
+          state._carrierCannonTimer = 0;
+          state._carrierDefenseHive = hive;
+        }
       }
+
+      if (w >= 7) _ensureHiveLabyrinthMission();
 
       spawnSupportAndWingmen();
       SFAnnouncer.onWaveStart();
@@ -10490,8 +11794,11 @@ const Starfighter = (function () {
   }
 
   function checkWave() {
-    const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling') && !e.markedForDeletion);
-    if (enemies.length === 0 && state.phase === 'combat' && !state._supportPhase) {
+    const enemies = state.entities.filter(e => (e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' || e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' || e.type === 'egg' || e.type === 'youngling' || e.type === 'asteroid') && !e.markedForDeletion);
+    if (state.phase !== 'combat' || state._supportPhase) return;
+    if (!_isScenarioObjectiveComplete(enemies.length)) return;
+
+    {
       SFAnnouncer.onWaveClear();
 
       // GDD §9.3: Music intensity drops on wave clear
@@ -10527,6 +11834,9 @@ const Starfighter = (function () {
     const deathScreen = document.getElementById('death-screen');
     deathScreen.style.display = 'flex';
     document.getElementById('death-reason').innerText = reason;
+    // Hide training skip button on game over
+    const trainSkip = document.getElementById('training-skip-btn');
+    if (trainSkip) trainSkip.style.display = 'none';
     document.getElementById('gameplay-hud').style.display = 'none';
     document.getElementById('radar-overlay').style.display = 'none';
 
@@ -10581,7 +11891,102 @@ const Starfighter = (function () {
         + '<div style="font-size:14px;margin-top:4px;">' + tallyHtml + '</div>'
         + '</div>';
     }
+    // ── Alien Bee Cutscene (defeat only) — shown after a short delay ──
+    if (!isVictory) {
+      setTimeout(() => _showBeeCutscene(), 3200);
+    }
   }
+
+  // ── Alien Bee Cutscene: narrative overlay triggered on defeat ──
+  function _showBeeCutscene() {
+    const overlay = document.getElementById('bee-cutscene');
+    if (!overlay) return;
+    const deathScreen = document.getElementById('death-screen');
+    if (deathScreen) deathScreen.style.display = 'none';
+    overlay.style.display = 'flex';
+
+    // Start hex canvas animation
+    _startBeeHexCanvas();
+
+    // Fade in title
+    setTimeout(() => {
+      const title = document.getElementById('bee-title');
+      if (title) title.style.opacity = '1';
+    }, 400);
+
+    // Typewriter narrative
+    const narrativeEl = document.getElementById('bee-narrative');
+    const narrativeText = 'Humankind will be at the mercy of Intelligent alien Bees who are after Earth\'s hives. The Aurora and all its people face an unthinkable fate — enslaved as worker bees to an alien Queen.';
+    let charIdx = 0;
+    if (narrativeEl) {
+      narrativeEl.textContent = '';
+      const typeTimer = setInterval(() => {
+        if (charIdx < narrativeText.length) {
+          narrativeEl.textContent += narrativeText[charIdx++];
+        } else {
+          clearInterval(typeTimer);
+          // Fade in directive after narrative finishes
+          const directive = document.getElementById('bee-directive');
+          if (directive) directive.style.opacity = '1';
+          // Show Try Again button
+          setTimeout(() => {
+            const btn = document.getElementById('bee-try-again');
+            if (btn) btn.style.display = 'inline-block';
+            const lnk = document.getElementById('bee-lobby-link');
+            if (lnk) lnk.style.display = 'block';
+          }, 1000);
+        }
+      }, 32);
+    }
+  }
+
+  // ── Hex canvas: animated amber honeycomb background for bee cutscene ──
+  function _startBeeHexCanvas() {
+    const canvas = document.getElementById('bee-hex-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const HEX_R = 38, COL = '#ff8800';
+    let t = 0;
+    function drawHex(cx, cy, r, alpha) {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 6;
+        i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+          : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+      }
+      ctx.closePath();
+      ctx.strokeStyle = COL;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    function frame() {
+      if (!document.getElementById('bee-cutscene') || document.getElementById('bee-cutscene').style.display === 'none') return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      t += 0.012;
+      const w = canvas.width, h = canvas.height;
+      const dx = HEX_R * Math.sqrt(3);
+      const dy = HEX_R * 1.5;
+      for (let row = -1; row < Math.ceil(h / dy) + 2; row++) {
+        for (let col = -1; col < Math.ceil(w / dx) + 2; col++) {
+          const cx = col * dx + (row % 2 === 0 ? 0 : dx / 2);
+          const cy = row * dy;
+          const pulse = 0.35 + 0.3 * Math.sin(t + col * 0.4 + row * 0.3);
+          drawHex(cx, cy, HEX_R - 2, pulse);
+        }
+      }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── Try Again: restart from wave 1 ──
+  window._sfTryAgain = function () {
+    window.location.href = '/starfighter/index.html?mode=solo';
+  };
 
   function _aarRow(label, value) {
     return '<tr><td style="padding:2px 0;color:#88aacc;">' + label + '</td>'
@@ -10607,6 +12012,7 @@ const Starfighter = (function () {
   function _updateRespawn(dt) {
     if (!state.respawning) return false;
     state.respawnTimer -= dt;
+    _updateSortieRetryBanner();
 
     const cdEl = document.getElementById('countdown-display');
     if (cdEl) {
@@ -10617,16 +12023,21 @@ const Starfighter = (function () {
 
       if (!inBriefPhase) {
         cdEl.innerHTML = `<span style="color:#ff3030">${state.respawnReason || 'HULL INTEGRITY FAIL'}</span><br>` +
-          `<span style="font-size:0.44em;color:#ffaa44">SHIP DESTROYED — LIFE ${currentLife}/${state.maxLives} LOST</span><br>` +
-          `<span style="font-size:0.38em;color:#ffdd99">INITIATING PILOT ${nextLife}/${state.maxLives}...</span>`;
+          `<span style="font-size:0.44em;color:#ffaa44">YOU HAVE LOST ONE OF YOUR SHIPS</span><br>` +
+          `<span style="font-size:0.40em;color:#ffdd99">YOU HAVE <span style="color:#ff8844;font-weight:bold">${state.livesRemaining}</span> REMAINING FOR THIS SORTIE</span>`;
       } else {
-        cdEl.innerHTML = `<span style="color:#ff8844">${state._replacementVariant || 'Replacement frame online.'}</span><br>` +
-          `<span style="font-size:0.36em;color:#aee8ff">${state._replacementBriefing || _makeDynamicBattleBrief()}</span><br>` +
-          `<span style="font-size:0.34em;color:#ffdd99">LAUNCH BAY SYNC IN ${sec}s</span>`;
+        const briefText = state._replacementBriefing || _makeDynamicBattleBrief();
+        cdEl.innerHTML = `<span style="color:#88ccff;font-size:0.65em">RETURNING TO LAUNCH BAY — MISSION BRIEF</span><br>` +
+          `<span style="font-size:0.36em;color:#aee8ff">${briefText}</span><br>` +
+          `<span style="font-size:0.34em;color:#ffdd99">LAUNCHING IN ${sec}s</span>`;
       }
     }
 
     if (state.respawnTimer <= 0) {
+      if (state._retrySortiePending) {
+        _restartCurrentSortie();
+        return true;
+      }
       state.respawning = false;
       // Recreate player (Entity constructor already calls M.place)
       state.player = new Player();
@@ -10667,6 +12078,9 @@ const Starfighter = (function () {
       document.getElementById('ship-panel').style.display = 'none';
 
       SFAnnouncer.onRespawnReady();
+
+      // Same auto-relaunch as wave-clear: the red button never existed.
+      _scheduleAutoLaunch(4000);
     }
     return true; // signal: still in respawn phase, skip normal game logic
   }
@@ -10992,6 +12406,19 @@ const Starfighter = (function () {
 
       // ── Combat Phase (normal gameplay) ──
 
+      state._simTick = (state._simTick + 1) % 4096;
+      _updateAdaptivePerfBudget(dt);
+      _updateHiveLabyrinthMission(safeDt);
+      _updateCarrierDefenseSortie(safeDt);
+      _updateSortieScenario(safeDt);
+      checkWave();
+
+      if (state._storyCutsceneActive) {
+        if (window.SF3D) SF3D.render(state);
+        _frameCount++;
+        return;
+      }
+
       // Predator plasma disable check — blocks player input when disabled
       _updateDisabledState(safeDt);
 
@@ -11082,6 +12509,7 @@ const Starfighter = (function () {
       for (let i = 0, len = ents.length; i < len; i++) {
         const e = ents[i];
         if (_DPe && !_DPe.acquire(e.id, 'ai')) continue;
+        if (!_shouldProcessEntityAI(e)) continue;
         if (e.type === 'predator') updatePredatorAI(e, safeDt);
         else if (e.type === 'tanker') updateTankerAI(e, safeDt);
         else if (e.type === 'medic') updateMedicAI(e, safeDt);
@@ -11100,6 +12528,8 @@ const Starfighter = (function () {
           }
           _v1.set(0, 0, -1).applyQuaternion(e.quaternion);
           e.velocity.copy(_v1.multiplyScalar(spd));
+        } else if (e.type === 'gyroid-lance') {
+          _updateGyroidLance(e, safeDt);
         }
       }
 
@@ -11115,9 +12545,20 @@ const Starfighter = (function () {
         const e = ents[i];
         if (e.markedForDeletion) continue;
         if (_DPe && !_DPe.acquire(e.id, 'physics')) continue;
+        const inViewport = _isInPlayerViewport(e, (dim('radar.range') || 15000) * 1.25, -0.15);
+        if (!inViewport) {
+          const isProjectile = e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo' || e.type === 'plasma' || e.type === 'gyroid-lance';
+          if (e.type !== 'player' && !isProjectile && e.velocity.lengthSq() < 0.4) continue;
+          if (e.type !== 'player' && !isProjectile) {
+            const div = 3 + (state._offscreenPhysicsDivisorBoost || 0);
+            const bucket = (e.id && e.id.charCodeAt(0)) ? e.id.charCodeAt(0) % div : 0;
+            if (((state._simTick + bucket) % div) !== 0) continue;
+          }
+        }
         e.position.x += e.velocity.x * safeDt;
         e.position.y += e.velocity.y * safeDt;
         e.position.z += e.velocity.z * safeDt;
+        if (state._inGyroidInterior) _applyGyroidCollision(e, safeDt);
       }
       if (_DPe) _DPe.releaseAll('physics');
 
@@ -11136,11 +12577,11 @@ const Starfighter = (function () {
           }
         }
         // Projectile expiry: TTL (maxAge) + range-based
-        if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo') {
+        if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo' || e.type === 'gyroid-lance') {
           // Time-based expiry: lasers 2s, machinegun 1.5s, torpedoes 6s
           if (!e._spawnTime) e._spawnTime = state.elapsed;
           const age = state.elapsed - e._spawnTime;
-          const maxAge = e.maxAge || (e.type === 'torpedo' ? 6 : e.type === 'machinegun' ? 1.5 : 2);
+          const maxAge = e.maxAge || (e.type === 'torpedo' ? 6 : e.type === 'machinegun' ? 1.5 : e.type === 'gyroid-lance' ? 4.2 : 2);
           if (age > maxAge) {
             e.markedForDeletion = true;
             if (M) M.remove(e.id);
@@ -11169,6 +12610,8 @@ const Starfighter = (function () {
         if (a.markedForDeletion || b.markedForDeletion) continue;
         // Acquire forks for both entities — skip pair if either is revoked
         if (_DP && (!_DP.acquire(a.id, 'collision') || !_DP.acquire(b.id, 'collision'))) continue;
+        if (!_isInPlayerViewport(a, (dim('radar.range') || 15000) * 1.1, -0.2) &&
+          !_isInPlayerViewport(b, (dim('radar.range') || 15000) * 1.1, -0.2)) continue;
 
         // Skip player-baseship collision during launch phase
         // (shouldn't reach here since launch has early return, but safety net)
@@ -11200,8 +12643,8 @@ const Starfighter = (function () {
           continue;
         }
 
-        const isAProj = a.type === 'laser' || a.type === 'machinegun' || a.type === 'torpedo';
-        const isBProj = b.type === 'laser' || b.type === 'machinegun' || b.type === 'torpedo';
+        const isAProj = a.type === 'laser' || a.type === 'machinegun' || a.type === 'torpedo' || a.type === 'gyroid-lance';
+        const isBProj = b.type === 'laser' || b.type === 'machinegun' || b.type === 'torpedo' || b.type === 'gyroid-lance';
 
         if (isAProj && isBProj) continue;
         if ((isAProj && a.owner === b.type) || (isBProj && b.owner === a.type)) continue;
@@ -11259,13 +12702,16 @@ const Starfighter = (function () {
           if (distSq < closestDist) closestDist = distSq;
         }
         // Intensity formula: base 0.3 in combat, +proximity, +crowd, +baseship danger
-        let musicIntensity = 0.3;
+        let musicIntensity = 0.38;
         if (closestDist < 1600 * 1600) musicIntensity += 0.3; // fighter very close — urgency
         else if (closestDist < 1500 * 1500) musicIntensity += 0.15;
-        if (nearCount > 3) musicIntensity += 0.15; // multiple threats — crescendo
-        if (nearCount > 6) musicIntensity += 0.15; // major battle
+        if (nearCount > 3) musicIntensity += 0.2; // multiple threats — crescendo
+        if (nearCount > 6) musicIntensity += 0.22; // major battle
+        if (nearCount > 10) musicIntensity += 0.18; // saturation panic
         const basePct = state.baseship ? state.baseship.hull / dim('baseship.hull') : 1;
-        if (basePct < 0.3) musicIntensity += 0.15; // baseship in danger
+        if (basePct < 0.5) musicIntensity += 0.08;
+        if (basePct < 0.3) musicIntensity += 0.2; // baseship in danger
+        if (state.wave >= 6) musicIntensity += 0.08; // late-war pressure
         SFMusic.setIntensity(Math.min(1, musicIntensity));
 
         // Dynamic section switching based on combat proximity
@@ -11286,7 +12732,8 @@ const Starfighter = (function () {
           const pyn = py / 2000;
           const pzn = pz / 2000;
           const waveNorm = Math.min(1, state.wave / 12);
-          const threatNorm = Math.min(1, (nearCount / 8) + (enemyCount / 20));
+          const proximityNorm = closestDist < Infinity ? Math.max(0, 1 - (Math.sqrt(closestDist) / 2800)) : 0;
+          const threatNorm = Math.min(1, (nearCount / 6) + (enemyCount / 16) + proximityNorm * 0.45 + (state.wave >= 6 ? 0.12 : 0));
 
           let field = Math.sin(pxn * pyn);
           let phase = Math.atan2(pyn, pxn);
@@ -11313,7 +12760,8 @@ const Starfighter = (function () {
 
       // Throttle HUD/DOM updates to every 3rd frame (DOM is slow)
       _frameCount++;
-      if (_frameCount % 3 === 0) updateHUD();
+      const hudModulo = Math.max(2, state._adaptiveHudModulo || 3);
+      if (_frameCount % hudModulo === 0) updateHUD();
       if (window.SF3D) SF3D.render(state);
 
     } catch (err) {
@@ -12423,6 +13871,33 @@ const Starfighter = (function () {
     cdEl.style.color = '#ff0000';
   }
 
+  // ── Skip Training — ends wave 1 early by clearing hostiles and RTB'ing ──
+  function _skipTraining() {
+    if (state.wave !== 1 || state.phase !== 'combat') return;
+    // Hide the training skip button immediately
+    const trainSkip = document.getElementById('training-skip-btn');
+    if (trainSkip) trainSkip.style.display = 'none';
+    // Clear all hostile entities
+    const HOSTILE_TYPES = new Set(['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'egg', 'youngling']);
+    state.entities.forEach(e => {
+      if (HOSTILE_TYPES.has(e.type) && !e.markedForDeletion) e.markedForDeletion = true;
+    });
+    // Announce skip
+    if (window.SFAnnouncer) SFAnnouncer.onWaveClear();
+    addComm(_crew('deck'), `${_cs()}, training exercise complete. RTB for debrief.`, 'base');
+    // Trigger land-approach with autopilot
+    state.phase = 'land-approach';
+    state.autopilotActive = true;
+    state.autopilotTimer = 0;
+    const cdEl = document.getElementById('countdown-display');
+    if (cdEl) {
+      cdEl.style.display = 'block';
+      cdEl.style.fontSize = '2em';
+      cdEl.style.color = '#00ff88';
+      cdEl.innerHTML = 'TRAINING COMPLETE<br><span style="font-size:0.4em;color:#88ccff">Returning to bay - Wave 2 standing by</span>';
+    }
+  }
+
   // ── Request Dock — manual redock, player flies themselves ──
   function _requestDock() {
     if (state.phase !== 'combat') return;
@@ -12703,7 +14178,7 @@ const Starfighter = (function () {
     if (ownerType === 'player' && now - _lastFireTime < 1 / dim('weapon.laser.fireRate')) return;
     if (ownerType === 'player') {
       _lastFireTime = now;
-      const cost = dim('weapon.laser.fuelCost');
+      const cost = dim('weapon.laser.fuelCost') * (state._sortieBuff ? state._sortieBuff.fuelCostScale : 1);
       if (source.fuel < cost) return;
       source.fuel -= cost;
     }
@@ -12726,7 +14201,7 @@ const Starfighter = (function () {
     l.radius = dim('weapon.laser.radius');
     l.maxAge = dim('weapon.laser.maxAge') || 2;
     l._spawnTime = state.elapsed;
-    l.damage = dim('weapon.laser.damage');
+    l.damage = dim('weapon.laser.damage') * (state._sortieBuff ? state._sortieBuff.laserDamageScale : 1);
     state.entities.push(l);
     if (ownerType === 'player') state.missionStats.shotsFired++;
     if (window.SF3D) SF3D.spawnLaser(l);
@@ -12740,7 +14215,7 @@ const Starfighter = (function () {
     // Cap torpedo entities to prevent freeze
     if (_countType('torpedo') >= dim('cap.torpedoes')) return;
     if (ownerType === 'player') {
-      const cost = dim('weapon.torpedo.fuelCost');
+      const cost = dim('weapon.torpedo.fuelCost') * (state._sortieBuff ? state._sortieBuff.fuelCostScale : 1);
       if (source.fuel < cost) return;
       source.fuel -= cost;
     }
@@ -12761,7 +14236,7 @@ const Starfighter = (function () {
     t.target = source.lockedTarget;
     t.maxAge = dim('weapon.torpedo.maxAge') || 6;
     t._spawnTime = state.elapsed;
-    t.damage = dim('weapon.torpedo.damage');
+    t.damage = dim('weapon.torpedo.damage') * (state._sortieBuff ? state._sortieBuff.torpedoDamageScale : 1);
     t.launchTime = performance.now() / 1000;
     state.entities.push(t);
     if (ownerType === 'player') state.missionStats.shotsFired++;
@@ -12774,10 +14249,11 @@ const Starfighter = (function () {
   function fireMachineGun(source, ownerType) {
     if (ownerType === 'player' && state.phase !== 'combat') return;
     const now = performance.now() / 1000;
-    if (ownerType === 'player' && now - _lastGunFireTime < 1 / dim('weapon.gun.fireRate')) return;
+    const gunRate = dim('weapon.gun.fireRate') * (state._sortieBuff ? state._sortieBuff.gunFireRateScale : 1);
+    if (ownerType === 'player' && now - _lastGunFireTime < 1 / gunRate) return;
     if (ownerType === 'player') {
       _lastGunFireTime = now;
-      const cost = dim('weapon.gun.fuelCost');
+      const cost = dim('weapon.gun.fuelCost') * (state._sortieBuff ? state._sortieBuff.fuelCostScale : 1);
       if (source.fuel < cost) return;
       source.fuel -= cost;
     }
@@ -12790,7 +14266,7 @@ const Starfighter = (function () {
       source.position.z + _v1.z);
     g.quaternion.copy(source.quaternion);
     // Random spread — cone of fire
-    const spread = dim('weapon.gun.spread');
+    const spread = dim('weapon.gun.spread') * (state._sortieBuff ? state._sortieBuff.gunSpreadScale : 1);
     const rx = (Math.random() - 0.5) * spread;
     const ry = (Math.random() - 0.5) * spread;
     _q1.setFromEuler(new THREE.Euler(rx, ry, 0));
@@ -12846,6 +14322,75 @@ const Starfighter = (function () {
     SFAnnouncer.onEMP(stunCount, stunDur);
   }
 
+  let _lastGyroidFireTime = 0;
+  function fireGyroidLance(source, ownerType) {
+    if (ownerType === 'player' && state.phase !== 'combat') return;
+    const now = performance.now() / 1000;
+    if (ownerType === 'player' && now - _lastGyroidFireTime < 1 / 3.2) return;
+    if (ownerType === 'player') {
+      _lastGyroidFireTime = now;
+      const cost = 10;
+      if (source.fuel < cost) return;
+      source.fuel -= cost;
+    }
+    if (_countType('gyroid-lance') >= dim('cap.plasma')) return;
+
+    _v1.set(0, 0, -14).applyQuaternion(source.quaternion);
+    const g = new Entity('gyroid-lance',
+      source.position.x + _v1.x,
+      source.position.y + _v1.y,
+      source.position.z + _v1.z);
+    g.quaternion.copy(source.quaternion);
+    _v1.set(0, 0, -(dim('gyroid.weapon.speed') || 940)).applyQuaternion(g.quaternion);
+    g.velocity.copy(_v1);
+    g.owner = ownerType;
+    g.radius = 8;
+    g.maxAge = 4.2;
+    g.damage = Math.round(dim('weapon.torpedo.damage') * (dim('gyroid.weapon.damageScale') || 0.82));
+    g._spawnTime = state.elapsed;
+    g._hiveContour = true;
+    g.target = source.lockedTarget || null;
+    state.entities.push(g);
+    if (ownerType === 'player') state.missionStats.shotsFired++;
+    if (window.SF3D) SF3D.spawnLaser(g);
+    if (window.SFAudio) SFAudio.playSound('torpedo');
+  }
+
+  function _updateGyroidLance(entity, dt) {
+    if (!entity || entity.markedForDeletion || !M) return;
+    let nx = 0, ny = 0, nz = 0;
+    if (M.diamondGrad) {
+      const g = M.diamondGrad(entity.position.x, entity.position.y, entity.position.z);
+      const gl = Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) || 1;
+      nx = g.x / gl; ny = g.y / gl; nz = g.z / gl;
+    }
+    const speed = dim('gyroid.weapon.speed') || 940;
+    const contourStick = dim('gyroid.weapon.contourStick') || 1.0;
+    const homingGain = dim('gyroid.weapon.homing') || 150;
+    const v = entity.velocity;
+    const vn = v.x * nx + v.y * ny + v.z * nz;
+    v.x -= nx * vn * contourStick;
+    v.y -= ny * vn * contourStick;
+    v.z -= nz * vn * contourStick;
+
+    if (entity.target && !entity.target.markedForDeletion) {
+      const tx = entity.target.position.x - entity.position.x;
+      const ty = entity.target.position.y - entity.position.y;
+      const tz = entity.target.position.z - entity.position.z;
+      const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
+      const ndx = tx / tl, ndy = ty / tl, ndz = tz / tl;
+      const tdotn = ndx * nx + ndy * ny + ndz * nz;
+      v.x += (ndx - nx * tdotn) * homingGain * dt;
+      v.y += (ndy - ny * tdotn) * homingGain * dt;
+      v.z += (ndz - nz * tdotn) * homingGain * dt;
+    }
+
+    const vl = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) || 1;
+    v.x = (v.x / vl) * speed;
+    v.y = (v.y / vl) * speed;
+    v.z = (v.z / vl) * speed;
+  }
+
   // ── Fire primary — dispatches based on selected weapon ──
   function firePrimary() {
     const p = state.player;
@@ -12855,7 +14400,10 @@ const Starfighter = (function () {
       case 0: fireLaser(p, 'player'); break;
       case 1: fireMachineGun(p, 'player'); break;
       case 2: fireTorpedo(p, 'player'); break;
-      case 3: firePulseEMP(p, 'player'); break;
+      case 3:
+        if (state._gyroidWeaponUnlocked && state._inGyroidInterior) fireGyroidLance(p, 'player');
+        else firePulseEMP(p, 'player');
+        break;
     }
   }
 
@@ -12898,11 +14446,57 @@ const Starfighter = (function () {
       return;
     }
 
-    if (a.type === 'laser' || a.type === 'machinegun' || a.type === 'torpedo') {
+    if (a.type === 'asteroid' && b.type === 'asteroid') return;
+
+    const _isProjectile = (t) => t === 'laser' || t === 'machinegun' || t === 'torpedo' || t === 'gyroid-lance';
+    if (a.type === 'rescue-pod' || b.type === 'rescue-pod') {
+      const pod = a.type === 'rescue-pod' ? a : b;
+      const other = pod === a ? b : a;
+      if (other.type === 'player') {
+        if (!pod.markedForDeletion) {
+          pod.markedForDeletion = true;
+          if (M) M.remove(pod.id);
+          state._scenarioRescueCollected++;
+          state.score += 180;
+          addComm(_crew('ops'), `Rescue pod secured (${state._scenarioRescueCollected}/${state._scenarioRescueTarget}).`, 'base');
+        }
+      }
+      return;
+    }
+    if (a.type === 'relay-node' && _isProjectile(b.type)) {
+      a.takeDamage(b.damage || 18);
+      b.markedForDeletion = true;
+      if (a.markedForDeletion) {
+        state._scenarioRelayDestroyed++;
+        state.score += 220;
+        addComm(_crew('science'), `Relay node destroyed (${state._scenarioRelayDestroyed}/${state._scenarioRelayTarget}).`, 'warning');
+      }
+      return;
+    }
+    if (b.type === 'relay-node' && _isProjectile(a.type)) {
+      b.takeDamage(a.damage || 18);
+      a.markedForDeletion = true;
+      if (b.markedForDeletion) {
+        state._scenarioRelayDestroyed++;
+        state.score += 220;
+        addComm(_crew('science'), `Relay node destroyed (${state._scenarioRelayDestroyed}/${state._scenarioRelayTarget}).`, 'warning');
+      }
+      return;
+    }
+    if (a.type === 'asteroid' && _isProjectile(b.type)) {
+      _fragmentAsteroid(a, b);
+      return;
+    }
+    if (b.type === 'asteroid' && _isProjectile(a.type)) {
+      _fragmentAsteroid(b, a);
+      return;
+    }
+
+    if (a.type === 'laser' || a.type === 'machinegun' || a.type === 'torpedo' || a.type === 'gyroid-lance') {
       const damage = a.damage || (a.type === 'torpedo' ? 80 : 15);
-      const weaponLabel = a.type === 'torpedo' ? 'Torpedo' : a.type === 'machinegun' ? 'MG' : 'Laser';
+      const weaponLabel = a.type === 'torpedo' ? 'Torpedo' : a.type === 'machinegun' ? 'MG' : a.type === 'gyroid-lance' ? 'Gyroid Lance' : 'Laser';
       if (window.SF3D) {
-        const color = a.type === 'torpedo' ? 0x4488ff : a.type === 'machinegun' ? 0xffcc00 : 0x00ffaa;
+        const color = a.type === 'torpedo' ? 0x4488ff : a.type === 'machinegun' ? 0xffcc00 : a.type === 'gyroid-lance' ? 0xff66ff : 0x00ffaa;
         SF3D.spawnImpactEffect(a.position, color);
       }
       if (!(b.type === 'player' && state.phase === 'launching')) {
@@ -12921,11 +14515,11 @@ const Starfighter = (function () {
         }
       }
       a.markedForDeletion = true;
-    } else if (b.type === 'laser' || b.type === 'machinegun' || b.type === 'torpedo') {
+    } else if (b.type === 'laser' || b.type === 'machinegun' || b.type === 'torpedo' || b.type === 'gyroid-lance') {
       const damage = b.damage || (b.type === 'torpedo' ? 80 : 15);
-      const weaponLabel = b.type === 'torpedo' ? 'Torpedo' : b.type === 'machinegun' ? 'MG' : 'Laser';
+      const weaponLabel = b.type === 'torpedo' ? 'Torpedo' : b.type === 'machinegun' ? 'MG' : b.type === 'gyroid-lance' ? 'Gyroid Lance' : 'Laser';
       if (window.SF3D) {
-        const color = b.type === 'torpedo' ? 0x4488ff : b.type === 'machinegun' ? 0xffcc00 : 0x00ffaa;
+        const color = b.type === 'torpedo' ? 0x4488ff : b.type === 'machinegun' ? 0xffcc00 : b.type === 'gyroid-lance' ? 0xff66ff : 0x00ffaa;
         SF3D.spawnImpactEffect(b.position, color);
       }
       if (!(a.type === 'player' && state.phase === 'launching')) {
@@ -12966,6 +14560,7 @@ const Starfighter = (function () {
     if (!state.player || state.player.markedForDeletion) return;
     // Kill feed overlay — render every frame for fade animation
     _renderKillFeed();
+    _updateSortieRetryBanner();
     const speed = Math.floor(state.player.velocity.length());
     const throttle = Math.floor(state.player.throttle * 100);
     const fuel = Math.floor(state.player.fuel);
@@ -13017,13 +14612,20 @@ const Starfighter = (function () {
 
     // Flash warning if baseship critical
     let message = 'DEFEND THE BASESHIP';
+    if (state.wave === 3) {
+      const astLeft = state.entities.filter(e => e.type === 'asteroid' && !e.markedForDeletion).length;
+      message = `CLEAR ASTEROID BELT (${astLeft})`;
+    } else if (state._sortieScenario) {
+      message = _scenarioObjectiveLabel() || state._sortieObjectiveText || message;
+    }
     if (basePct < 20) {
       message = 'BASESHIP CRITICAL';
-      const msg = ge('hud-message');
-      if (msg) {
-        msg.style.color = msg.style.color === '#ff0000' ? '#ffff00' : '#ff0000';
-        msg.innerText = message;
-      }
+    }
+    const msg = ge('hud-message');
+    if (msg) {
+      if (basePct < 20) msg.style.color = msg.style.color === '#ff0000' ? '#ffff00' : '#ff0000';
+      else msg.style.color = '#00ffaa';
+      msg.innerText = message;
     }
 
     // ── Feed telemetry to 3D cockpit screens ──
@@ -13163,7 +14765,7 @@ const Starfighter = (function () {
       Math.abs(q.x - _lastRadarQx) + Math.abs(q.y - _lastRadarQy) +
       Math.abs(q.z - _lastRadarQz) + Math.abs(q.w - _lastRadarQw);
     const shouldUpdateRadar =
-      (now - _lastRadarPushMs) > 40 ||
+      (now - _lastRadarPushMs) > (state._adaptiveRadarMinMs || 40) ||
       posDeltaSq > 9 ||
       quatDrift > 0.0004 ||
       lockId !== _lastRadarLockId;
@@ -13635,13 +15237,16 @@ const Starfighter = (function () {
 
     // Sweep detection — check entity azimuth in ship-local space
     const TWO_PI = Math.PI * 2;
+    const radarMax = RADAR_RANGE * 1.2;
+    const radarMaxSq = radarMax * radarMax;
     state.entities.forEach(e => {
       if (e === state.player || e.type === 'laser' || e.type === 'machinegun' || e.type === 'baseship') return;
       const rx = e.position.x - pPos.x;
       const ry = e.position.y - pPos.y;
       const rz = e.position.z - pPos.z;
-      const dist = Math.sqrt(rx * rx + ry * ry + rz * rz);
-      if (dist < 1 || dist > RADAR_RANGE * 1.2) return;
+      const distSq = rx * rx + ry * ry + rz * rz;
+      if (distSq < 1 || distSq > radarMaxSq) return;
+      const dist = Math.sqrt(distSq);
 
       // Transform to ship-local for azimuth check
       const localDir = new THREE.Vector3(rx, ry, rz).normalize().applyQuaternion(invQuat);
@@ -13661,6 +15266,42 @@ const Starfighter = (function () {
         });
       }
     });
+
+    const _pushObjectiveContact = (obj, type) => {
+      if (!obj || !obj.position) return;
+      const rx = obj.position.x - pPos.x;
+      const ry = obj.position.y - pPos.y;
+      const rz = obj.position.z - pPos.z;
+      const dist = Math.sqrt(rx * rx + ry * ry + rz * rz);
+      if (dist < 1 || dist > RADAR_RANGE * 1.25) return;
+      const localDir = new THREE.Vector3(rx, ry, rz).normalize().applyQuaternion(invQuat);
+      radarContacts.set(obj, {
+        t: nowSec,
+        lx: localDir.x, ly: localDir.y, lz: localDir.z,
+        type: type,
+        dist: dist,
+      });
+    };
+
+    if (state._hiveMissionReady) {
+      if (state._hiveAuroraMarker) _pushObjectiveContact(state._hiveAuroraMarker, 'aurora-objective');
+      if (!state._hiveSpecimenRecovered && state._hiveSpecimenMarker) _pushObjectiveContact(state._hiveSpecimenMarker, 'honeycomb-specimen');
+      if (state._queenChamberMarker) {
+        _pushObjectiveContact(state._queenChamberMarker, state._queenChamberUnlocked ? 'queen-chamber-open' : 'queen-chamber-locked');
+      }
+      for (let i = 0; i < state._honeycombPowerups.length; i++) {
+        const hc = state._honeycombPowerups[i];
+        if (!hc.picked) _pushObjectiveContact(hc, 'honeycomb-powerup');
+      }
+    }
+    if (state._sortieScenario && state._scenarioNodes && state._scenarioNodes.length > 0) {
+      for (let i = 0; i < state._scenarioNodes.length; i++) {
+        const n = state._scenarioNodes[i];
+        if (!n || n.markedForDeletion) continue;
+        if (n.type === 'relay-node') _pushObjectiveContact(n, 'relay-node');
+        else if (n.type === 'rescue-pod') _pushObjectiveContact(n, 'rescue-pod');
+      }
+    }
 
     // Render contacts as fading phosphor blips
     radarBlipPool.forEach(b => b.visible = false);
@@ -13692,6 +15333,7 @@ const Starfighter = (function () {
 
     radarContacts.forEach((c, entity) => {
       const age = nowSec - c.t;
+      if (!entity || entity.markedForDeletion) { radarContacts.delete(entity); return; }
       if (age > SWEEP_PERIOD) { radarContacts.delete(entity); return; }
       if (blipIdx >= radarBlipPool.length) return;
 
@@ -13755,6 +15397,31 @@ const Starfighter = (function () {
       } else if (c.type === 'medic') {
         blip.material.color.setHex(0x44ffff);
         blip.scale.setScalar(1.3);
+      } else if (c.type === 'aurora-objective') {
+        blip.material.color.setHex(0x66aaff);
+        blip.scale.setScalar(2.0);
+      } else if (c.type === 'honeycomb-specimen') {
+        blip.material.color.setHex(0x00ff99);
+        blip.scale.setScalar(2.2 + Math.sin(performance.now() * 0.01) * 0.5);
+        blip.material.opacity = Math.max(fadeAlpha, 0.78);
+      } else if (c.type === 'honeycomb-powerup') {
+        blip.material.color.setHex(0xffbb33);
+        blip.scale.setScalar(1.7);
+      } else if (c.type === 'relay-node') {
+        blip.material.color.setHex(0xff66cc);
+        blip.scale.setScalar(2.1);
+      } else if (c.type === 'rescue-pod') {
+        blip.material.color.setHex(0x66ccff);
+        blip.scale.setScalar(1.8 + Math.sin(performance.now() * 0.008) * 0.2);
+      } else if (c.type === 'asteroid') {
+        blip.material.color.setHex(0xbb9966);
+        blip.scale.setScalar(1.15);
+      } else if (c.type === 'queen-chamber-locked') {
+        blip.material.color.setHex(0xff4422);
+        blip.scale.setScalar(2.5);
+      } else if (c.type === 'queen-chamber-open') {
+        blip.material.color.setHex(0xffdd33);
+        blip.scale.setScalar(2.8);
       } else {
         blip.material.color.setHex(0x4488ff);
         blip.scale.setScalar(1.0);
@@ -13796,6 +15463,7 @@ const Starfighter = (function () {
     fireTorpedo: () => fireTorpedo(state.player, 'player'),
     fireMachineGun: () => fireMachineGun(state.player, 'player'),
     firePulseEMP: () => firePulseEMP(state.player, 'player'),
+    saveGame: () => saveGame(true),
     cycleWeapon: () => state.player && state.player.cycleWeapon(),
     tryLockOnTarget: () => tryLockOnTarget(state.player),
     emergencyRTB: _triggerEmergencyRTB,
@@ -13806,7 +15474,8 @@ const Starfighter = (function () {
     pause: () => _setPaused(true),
     resume: () => _setPaused(false),
     exitGame,
-    openTutorial
+    openTutorial,
+    _skipTraining,
   };
 
 })();

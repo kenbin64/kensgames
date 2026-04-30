@@ -302,10 +302,16 @@ class KGMultiplayer {
       case 'ready_update':
       case 'matchmake_result':
       case 'session_settings_updated':
-        this.session = data.session;
-        this.sessionCode = data.session.session_code;
-        this.isHost = data.session.host_id === this.userId;
-        this._emit('session_update', data.session);
+        if (data.session) {
+          this.session = data.session;
+          this.sessionCode = data.session.session_code || this.sessionCode;
+          this.isHost = data.session.host_id === this.userId;
+          this._emit('session_update', data.session);
+        } else if (this.session) {
+          // Some legacy server events may omit a full session payload.
+          // Keep current session cache and still notify listeners to refresh.
+          this._emit('session_update', this.session);
+        }
         if (data.share_code) this._emit('share_code', data.share_code);
         break;
 

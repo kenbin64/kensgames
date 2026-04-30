@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DealForge - Revenue Ops Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <div class="backdrop"></div>
+  <main class="shell">
+    <header class="hero card">
+      <p class="eyebrow">Commercial MVP</p>
+      <h1>DealForge</h1>
+      <p class="subtitle">Build quotes, model ROI, and forecast weighted pipeline in one browser app.</p>
+      <div class="hero-actions">
+        <button id="seedBtn" class="ghost">Load demo data</button>
+        <button id="exportBtn" class="ghost">Export JSON</button>
+        <label class="import-label" for="importInput">Import JSON</label>
+        <input id="importInput" type="file" accept="application/json" />
+      </div>
+    </header>
+
+    <section class="grid top-grid">
+      <article class="card">
+        <h2>Quote Builder</h2>
+        <form id="quoteForm" class="inline-form">
+          <input id="quoteName" required placeholder="Line item (ex: Onboarding)" />
+          <input id="quoteQty" required type="number" min="1" value="1" />
+          <input id="quotePrice" required type="number" min="0" step="0.01" placeholder="Unit price" />
+          <button type="submit">Add item</button>
+        </form>
+        <div class="stack-small">
+          <label>Discount (%) <input id="discount" type="number" min="0" max="100" step="0.1" value="0" /></label>
+          <label>Tax (%) <input id="tax" type="number" min="0" max="100" step="0.1" value="0" /></label>
+          <label>Delivery Cost ($) <input id="cost" type="number" min="0" step="0.01" value="0" /></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Line Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="quoteRows"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card kpi-panel">
+        <h2>Pricing Signals</h2>
+        <div class="kpis">
+          <div><span>Subtotal</span><strong id="subtotalKpi">$0.00</strong></div>
+          <div><span>Total</span><strong id="totalKpi">$0.00</strong></div>
+          <div><span>Gross Profit</span><strong id="profitKpi">$0.00</strong></div>
+          <div><span>Margin</span><strong id="marginKpi">0%</strong></div>
+        </div>
+        <hr />
+        <h2>ROI Estimator</h2>
+        <div class="stack-small">
+          <label>Client current monthly cost ($) <input id="clientCost" type="number" min="0" step="0.01"
+              value="0" /></label>
+          <label>Expected monthly savings ($) <input id="clientSavings" type="number" min="0" step="0.01"
+              value="0" /></label>
+          <label>Months analyzed <input id="roiMonths" type="number" min="1" value="12" /></label>
+        </div>
+        <div class="roi-output" id="roiOutput">Enter values to calculate payback period and ROI.</div>
+      </article>
+    </section>
+
+    <section class="grid bottom-grid">
+      <article class="card">
+        <h2>Pipeline Forecast</h2>
+        <form id="dealForm" class="inline-form">
+          <input id="dealName" required placeholder="Deal name" />
+          <input id="dealValue" required type="number" min="0" step="0.01" placeholder="Deal value" />
+          <select id="dealStage">
+            <option value="lead">Lead</option>
+            <option value="qualified">Qualified</option>
+            <option value="proposal">Proposal</option>
+            <option value="negotiation">Negotiation</option>
+            <option value="closed">Closed Won</option>
+          </select>
+          <button type="submit">Add deal</button>
+        </form>
+        <ul id="dealList" class="deal-list"></ul>
+      </article>
+
+      <article class="card">
+        <h2>Forecast Metrics</h2>
+        <div class="kpis">
+          <div><span>Total Pipeline</span><strong id="pipeTotal">$0.00</strong></div>
+          <div><span>Weighted Forecast</span><strong id="pipeWeighted">$0.00</strong></div>
+          <div><span>Win Rate Proxy</span><strong id="winRate">0%</strong></div>
+          <div><span>Active Deals</span><strong id="activeDeals">0</strong></div>
+        </div>
+        <p class="muted">Stage weights: Lead 10%, Qualified 35%, Proposal 60%, Negotiation 80%, Closed 100%.</p>
+      </article>
+    </section>
+
+    <footer class="card footer">
+      <p>DealForge stores your data in local browser storage for immediate use. Add authentication, Stripe billing, and
+        multi-user sync to productionize.</p>
+    </footer>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+
+</html>

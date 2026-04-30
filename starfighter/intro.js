@@ -7,7 +7,7 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY = 'sfenhance.intro.seen.v1';
+    const STORAGE_KEY = 'sfenhance.intro.seen.play.v2';
     const FORCE_URL = (() => {
         try { return new URLSearchParams(location.search).get('intro') === '1'; }
         catch (_) { return false; }
@@ -17,19 +17,19 @@
     // act 1 — the pressure;  act 2 — the cooperation;  act 3 — the betrayal;
     // act 4 — the charge;  title — smash-cut card and hand-off.
     const T = [
-        { at: 2.0, dur: 6.5, line: 'Three thousand light-years from Earth, an alien civilisation is dying.', motif: 'void', mood: 'drone' },
-        { at: 10.0, dur: 6.5, line: 'The bees of Earth produce the only catalyst that keeps them alive.', motif: 'earth', mood: 'drone' },
-        { at: 18.0, dur: 6.5, line: 'We built Aurora Prime together. A fortress-city. Twenty-one thousand souls.', motif: 'baseship', mood: 'rise' },
-        { at: 26.0, dur: 6.5, line: 'Humans tended the hives. The Zorgons brought the science.', motif: 'baseship', mood: 'rise' },
-        { at: 34.0, dur: 5.5, line: 'For a generation, it was peace.', motif: 'baseship', mood: 'hold' },
+        { at: 2.0, dur: 6.5, line: 'Three thousand light-years from Earth, a dying empire crossed our sky.', motif: 'void', mood: 'drone' },
+        { at: 10.0, dur: 6.5, line: 'Their bioships fail without one catalyst: enzymes from Earth\'s bees.', motif: 'earth', mood: 'drone' },
+        { at: 18.0, dur: 6.5, line: 'So we forged Aurora Prime together: one fortress-city, twenty-one thousand souls.', motif: 'baseship', mood: 'rise' },
+        { at: 26.0, dur: 6.5, line: 'Humans kept the hives alive. Zorgon engineers kept the stations breathing.', motif: 'baseship', mood: 'rise' },
+        { at: 34.0, dur: 5.5, line: 'For one generation, it was peace.', motif: 'baseship', mood: 'hold' },
         { at: 41.0, dur: 1.5, line: '', motif: 'void', mood: 'shift' },
-        { at: 43.0, dur: 6.5, line: 'Then Earth\u2019s hives faltered. They came for ours.', motif: 'hive', mood: 'menace' },
-        { at: 51.0, dur: 6.5, line: 'They will not destroy the fortress. They cannot.', motif: 'siege', mood: 'menace' },
-        { at: 58.5, dur: 6.5, line: 'They need it whole \u2014 and us in it.', motif: 'siege', mood: 'menace' },
+        { at: 43.0, dur: 6.5, line: 'Then Earth\'s hives collapsed. The Hive Fleet turned toward Aurora.', motif: 'hive', mood: 'menace' },
+        { at: 51.0, dur: 6.5, line: 'A new queen leads them now, and her warrior caste does not negotiate.', motif: 'hive', mood: 'menace' },
+        { at: 58.5, dur: 6.5, line: 'They will not burn Aurora. They need it intact, with our people trapped inside.', motif: 'hiveReveal', mood: 'menace' },
         { at: 66.0, dur: 6.0, line: 'You fly for the Resolute. You fly for Aurora.', motif: 'cockpit', mood: 'charge' },
-        { at: 72.5, dur: 5.0, line: 'You fly so that they may not.', motif: 'cockpit', mood: 'charge' },
-        { at: 78.0, dur: 7.5, line: 'They are coming \u2014 not to kill us\u2026', motif: 'hiveReveal', mood: 'reveal' },
-        { at: 86.0, dur: 7.0, line: '\u2026but to make us worker bees in their hive.', motif: 'hiveReveal', mood: 'reveal' },
+        { at: 72.5, dur: 5.0, line: 'Learn fast. Earn stronger weapons. The war begins with your first launch.', motif: 'cockpit', mood: 'charge' },
+        { at: 78.0, dur: 7.5, line: 'The alien mothership is here. The Hive Queen is aboard.', motif: 'hiveReveal', mood: 'reveal' },
+        { at: 86.0, dur: 7.0, line: 'If we fail, humanity becomes the labor force of their living hive.', motif: 'hiveReveal', mood: 'reveal' },
         { at: 93.5, dur: 1.2, line: '', motif: 'black', mood: 'hold' },
         { at: 95.0, dur: 5.0, line: '', motif: 'title', mood: 'swell' }
     ];
@@ -38,7 +38,7 @@
     // ── Public API ────────────────────────────────────────────────────────
     function hasSeen() { try { return !!localStorage.getItem(STORAGE_KEY); } catch (_) { return false; } }
     function markSeen() { try { localStorage.setItem(STORAGE_KEY, '1'); } catch (_) { /* ignore */ } }
-    function shouldAutoplay() { return FORCE_URL || !hasSeen(); }
+    function shouldAutoplay() { return FORCE_URL || (isPlayPage() && !hasSeen()); }
 
     // ── Font loader (Cinzel: Trajan-like high-prestige serif) ─────────────
     function ensureFonts() {
@@ -63,7 +63,7 @@
             '<div id="sf-intro-bar-bot"></div>',
             '<div id="sf-intro-text"><span></span></div>',
             '<div id="sf-intro-title"><div class="t">STARFIGHTER</div><div class="s">HOLD THE LINE</div></div>',
-            '<button id="sf-intro-skip" type="button">SKIP INTRO &nbsp;\u203A</button>',
+            '<button id="sf-intro-skip" type="button">SKIP INTO GAME &nbsp;\u203A</button>',
             '<div id="sf-intro-hint">press any key to skip</div>'
         ].join('');
         const s = document.createElement('style');
@@ -411,61 +411,138 @@
             }
         },
 
-        // COCKPIT \u2014 HUD reticle, frame edges, faint canopy reflections.
-        //    A planet swings into view through the canopy and a distant star
-        //    sits on the horizon so the player can see they are flying somewhere.
+        // COCKPIT / LAUNCH TUBE — perspective interior with structural ribs,
+        //    armored wall panels, and guidance lights rushing by toward the
+        //    pilot to sell acceleration before the first combat launch.
         cockpit: function (ctx, w, h, age) {
-            const cx = w * 0.5, cy = h * 0.52;
-            // distant target sun on the horizon
-            drawSun(ctx, w, h, w * 0.78, h * 0.40, Math.min(w, h) * 0.018, SUN_BLUE);
-            // crescent planet through the canopy, lit from the sun's direction
-            const px = w * 0.30, py = h * 0.42, pr = Math.min(w, h) * 0.13;
-            const planet = ctx.createRadialGradient(px + pr * 0.55, py - pr * 0.25, pr * 0.1, px, py, pr);
-            planet.addColorStop(0, 'rgba(180,160,130,0.9)');
-            planet.addColorStop(0.55, 'rgba(90,70,55,0.7)');
-            planet.addColorStop(1, 'rgba(20,15,12,0.0)');
-            ctx.fillStyle = planet; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
-            // shadow side
-            const shade = ctx.createRadialGradient(px - pr * 0.4, py + pr * 0.25, pr * 0.1, px - pr * 0.2, py + pr * 0.3, pr * 1.1);
-            shade.addColorStop(0, 'rgba(0,0,0,0.7)');
-            shade.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.save(); ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.clip();
-            ctx.fillStyle = shade; ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2); ctx.restore();
-            // canopy frame
-            ctx.strokeStyle = 'rgba(120,200,210,0.75)'; ctx.lineWidth = Math.max(2, h * 0.006);
-            ctx.beginPath();
-            ctx.moveTo(w * 0.06, h * 0.18); ctx.lineTo(w * 0.06, h * 0.86); ctx.lineTo(w * 0.40, h * 0.95);
-            ctx.moveTo(w * 0.94, h * 0.18); ctx.lineTo(w * 0.94, h * 0.86); ctx.lineTo(w * 0.60, h * 0.95);
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(60,140,160,0.55)'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(w * 0.06, h * 0.30); ctx.lineTo(w * 0.94, h * 0.30); ctx.stroke();
-            // reticle
-            const R = Math.min(w, h) * 0.10;
-            ctx.strokeStyle = 'rgba(0,255,210,0.9)'; ctx.lineWidth = 1.4;
-            ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-            ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, 0, Math.PI * 2); ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(cx - R * 1.4, cy); ctx.lineTo(cx - R * 1.05, cy);
-            ctx.moveTo(cx + R * 1.05, cy); ctx.lineTo(cx + R * 1.4, cy);
-            ctx.moveTo(cx, cy - R * 1.4); ctx.lineTo(cx, cy - R * 1.05);
-            ctx.moveTo(cx, cy + R * 1.05); ctx.lineTo(cx, cy + R * 1.4);
-            ctx.stroke();
-            // tick marks on horizon line
-            ctx.strokeStyle = 'rgba(0,200,180,0.55)';
-            for (let i = -6; i <= 6; i++) {
-                const x = cx + i * R * 0.6;
-                const len = (i % 3 === 0) ? 10 : 5;
-                ctx.beginPath(); ctx.moveTo(x, cy + R * 1.6); ctx.lineTo(x, cy + R * 1.6 + len); ctx.stroke();
+            const cx = w * 0.5;
+            const vpY = h * 0.36;
+            const ringCount = 17;
+
+            // Base steel-blue tunnel fog.
+            const bg = ctx.createLinearGradient(0, 0, 0, h);
+            bg.addColorStop(0, 'rgba(8,12,20,0.98)');
+            bg.addColorStop(0.55, 'rgba(10,16,28,0.95)');
+            bg.addColorStop(1, 'rgba(3,6,12,1)');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Deep launch aperture at the vanishing point.
+            const aperture = ctx.createRadialGradient(cx, vpY, 0, cx, vpY, Math.min(w, h) * 0.4);
+            aperture.addColorStop(0, 'rgba(40,90,150,0.28)');
+            aperture.addColorStop(0.45, 'rgba(16,30,48,0.20)');
+            aperture.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = aperture;
+            ctx.fillRect(0, 0, w, h);
+
+            // Tube shell and ribs. Rings slide toward camera to mimic speed.
+            for (let i = 0; i < ringCount; i++) {
+                const t = ((i / ringCount) + age * 0.42) % 1;
+                const e = Math.pow(t, 1.9);
+                const y = vpY + e * (h * 0.68);
+                const halfW = w * (0.05 + e * 0.47);
+                const halfH = h * (0.03 + e * 0.20);
+                const a = 0.08 + e * 0.32;
+                ctx.strokeStyle = 'rgba(125,170,220,' + a.toFixed(3) + ')';
+                ctx.lineWidth = 1 + e * 2.4;
+                ctx.beginPath();
+                ctx.moveTo(cx - halfW, y - halfH);
+                ctx.lineTo(cx + halfW, y - halfH);
+                ctx.lineTo(cx + halfW * 0.92, y + halfH);
+                ctx.lineTo(cx - halfW * 0.92, y + halfH);
+                ctx.closePath();
+                ctx.stroke();
             }
-            // bottom HUD glow
-            const bot = ctx.createLinearGradient(0, h * 0.7, 0, h);
-            bot.addColorStop(0, 'rgba(0,180,200,0)');
-            bot.addColorStop(1, 'rgba(0,200,220,0.32)');
-            ctx.fillStyle = bot; ctx.fillRect(0, h * 0.7, w, h * 0.3);
-            // throttle pulse
-            const pulse = 0.5 + 0.5 * Math.sin(age * 5);
-            ctx.fillStyle = 'rgba(0,255,210,' + (0.35 + pulse * 0.35) + ')';
-            ctx.fillRect(w * 0.5 - 50, h * 0.92, 100 * pulse, 3);
+
+            // Side armor planes to make the tunnel feel enclosed and metallic.
+            const leftWall = ctx.createLinearGradient(0, 0, w * 0.26, 0);
+            leftWall.addColorStop(0, 'rgba(24,34,52,0.95)');
+            leftWall.addColorStop(1, 'rgba(10,16,28,0.05)');
+            ctx.fillStyle = leftWall;
+            ctx.beginPath();
+            ctx.moveTo(0, h * 0.14);
+            ctx.lineTo(w * 0.24, h * 0.28);
+            ctx.lineTo(w * 0.24, h * 0.96);
+            ctx.lineTo(0, h);
+            ctx.closePath();
+            ctx.fill();
+            const rightWall = ctx.createLinearGradient(w, 0, w * 0.74, 0);
+            rightWall.addColorStop(0, 'rgba(24,34,52,0.95)');
+            rightWall.addColorStop(1, 'rgba(10,16,28,0.05)');
+            ctx.fillStyle = rightWall;
+            ctx.beginPath();
+            ctx.moveTo(w, h * 0.14);
+            ctx.lineTo(w * 0.76, h * 0.28);
+            ctx.lineTo(w * 0.76, h * 0.96);
+            ctx.lineTo(w, h);
+            ctx.closePath();
+            ctx.fill();
+
+            // Guidance strips rushing by on both sides.
+            const laneCount = 24;
+            for (let i = 0; i < laneCount; i++) {
+                const t = ((i / laneCount) + age * 1.5) % 1;
+                const e = Math.pow(t, 1.7);
+                const y = vpY + e * (h * 0.67);
+                const side = w * (0.07 + e * 0.40);
+                const segW = 6 + e * 30;
+                const segH = 1.5 + e * 4.2;
+                const glowA = 0.08 + e * 0.62;
+                ctx.fillStyle = 'rgba(110,220,255,' + glowA.toFixed(3) + ')';
+                ctx.fillRect(cx - side - segW, y, segW, segH);
+                ctx.fillRect(cx + side, y, segW, segH);
+                ctx.fillStyle = 'rgba(160,245,255,' + (glowA * 0.45).toFixed(3) + ')';
+                ctx.fillRect(cx - side - segW, y - segH * 1.3, segW, segH * 0.55);
+                ctx.fillRect(cx + side, y - segH * 1.3, segW, segH * 0.55);
+            }
+
+            // Ceiling centerline nav lights.
+            const navCount = 12;
+            for (let i = 0; i < navCount; i++) {
+                const t = ((i / navCount) + age * 1.1) % 1;
+                const e = Math.pow(t, 1.55);
+                const y = vpY + e * (h * 0.46);
+                const ww = 2 + e * 9;
+                const aa = 0.12 + e * 0.5;
+                ctx.fillStyle = 'rgba(255,190,96,' + aa.toFixed(3) + ')';
+                ctx.fillRect(cx - ww * 0.5, y, ww, 2 + e * 2.8);
+            }
+
+            // Cockpit frame in foreground for parallax depth.
+            ctx.strokeStyle = 'rgba(120,190,220,0.70)';
+            ctx.lineWidth = Math.max(2, h * 0.006);
+            ctx.beginPath();
+            ctx.moveTo(w * 0.05, h * 0.10); ctx.lineTo(w * 0.08, h * 0.86); ctx.lineTo(w * 0.40, h * 0.98);
+            ctx.moveTo(w * 0.95, h * 0.10); ctx.lineTo(w * 0.92, h * 0.86); ctx.lineTo(w * 0.60, h * 0.98);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(56,126,150,0.65)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.08, h * 0.28); ctx.lineTo(cx, vpY); ctx.lineTo(w * 0.92, h * 0.28);
+            ctx.stroke();
+
+            // HUD reticle stays but is subtler during launch acceleration.
+            const R = Math.min(w, h) * 0.09;
+            const pulse = 0.5 + 0.5 * Math.sin(age * 8.0);
+            ctx.strokeStyle = 'rgba(20,245,215,' + (0.55 + pulse * 0.25).toFixed(3) + ')';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath(); ctx.arc(cx, h * 0.54, R, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - R * 1.35, h * 0.54); ctx.lineTo(cx - R * 0.95, h * 0.54);
+            ctx.moveTo(cx + R * 0.95, h * 0.54); ctx.lineTo(cx + R * 1.35, h * 0.54);
+            ctx.moveTo(cx, h * 0.54 - R * 1.35); ctx.lineTo(cx, h * 0.54 - R * 0.95);
+            ctx.moveTo(cx, h * 0.54 + R * 0.95); ctx.lineTo(cx, h * 0.54 + R * 1.35);
+            ctx.stroke();
+
+            // Forward-thrust bar at the console edge.
+            const thrust = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(age * 6.0 + 0.8));
+            const barW = w * 0.24;
+            const barX = cx - barW * 0.5;
+            const barY = h * 0.93;
+            ctx.fillStyle = 'rgba(20,40,52,0.82)';
+            ctx.fillRect(barX, barY, barW, 4);
+            ctx.fillStyle = 'rgba(70,255,220,0.78)';
+            ctx.fillRect(barX, barY, barW * thrust, 4);
         },
 
         // HIVE REVEAL \u2014 the hive ship rises from below, bathed in its own
@@ -660,7 +737,8 @@
             fighter: new T.Group(),
             enemies: new T.Group(),
             hive: new T.Group(),
-            dread: new T.Group()
+            queen: new T.Group(),
+            warrior: new T.Group()
         };
         Object.keys(groups).forEach(k => { groups[k].visible = false; scene.add(groups[k]); });
         // Enemy swarm: cloned fighters with per-instance phase offsets.
@@ -783,7 +861,8 @@
         loadGLB('assets/models/HumanFriendlStarFighter.glb', groups.fighter, 0.9);
         loadGLBSwarm('assets/models/AlienEnemyFighter.glb', groups.enemies, 0.7, ENEMY_COUNT);
         loadGLB('assets/models/AlienMotherShip.glb', groups.hive, 5.0);
-        loadGLB(encodeURI('assets/models/Dreadnought_Hive Throne.glb'), groups.dread, 3.0);
+        loadGLB('assets/models/HiveQueen_BossW10.glb', groups.queen, 2.9);
+        loadGLB(encodeURI('assets/models/zorgonWarrior'), groups.warrior, 2.0);
 
         const t0 = state._t0 || performance.now();
         let last = performance.now(), fade = 0;
@@ -813,7 +892,7 @@
             // Reset visibility
             groups.baseship.visible = false; groups.resolute.visible = false;
             groups.fighter.visible = false; groups.enemies.visible = false;
-            groups.hive.visible = false; groups.dread.visible = false;
+            groups.hive.visible = false; groups.queen.visible = false; groups.warrior.visible = false;
             if (name === 'baseship') {
                 if (!groups.baseship.userData.loaded) return false;
                 groups.baseship.visible = true;
@@ -849,6 +928,11 @@
                 groups.hive.visible = true;
                 groups.hive.position.set(0, -0.2, 0);
                 groups.hive.rotation.set(0.05, age * 0.06, 0);
+                if (groups.warrior.userData.loaded) {
+                    groups.warrior.visible = true;
+                    groups.warrior.position.set(-1.8, -0.9, 1.5);
+                    groups.warrior.rotation.set(0.1, -0.4 + Math.sin(age * 0.32) * 0.08, 0.02);
+                }
                 // Enemy fighters swarm around the mothership.
                 if (groups.enemies.userData.loaded) {
                     const since = age - (state.scene3dStartAge || 0);
@@ -861,7 +945,7 @@
                 return true;
             }
             if (name === 'hiveReveal') {
-                if (!groups.hive.userData.loaded && !groups.dread.userData.loaded) return false;
+                if (!groups.hive.userData.loaded && !groups.queen.userData.loaded) return false;
                 // Hive rises from below over ~7s, then sits ominously.
                 const rev = Math.min(1, (age - (state.scene3dStartAge || 0)) / 7.0);
                 const y = -3.5 + rev * 3.0;
@@ -870,11 +954,15 @@
                     groups.hive.position.set(0.4, y, -1.2);
                     groups.hive.rotation.set(0.02, 0.4 + age * 0.02, 0);
                 }
-                if (groups.dread.userData.loaded) {
-                    groups.dread.visible = true;
-                    // Dreadnought silhouette in front, off-centre, slow drift.
-                    groups.dread.position.set(-1.1, -0.4, 2.4);
-                    groups.dread.rotation.set(0.04, -0.5 + Math.sin(age * 0.12) * 0.05, 0);
+                if (groups.queen.userData.loaded) {
+                    groups.queen.visible = true;
+                    groups.queen.position.set(-1.0, -0.25, 2.25);
+                    groups.queen.rotation.set(0.03, -0.55 + Math.sin(age * 0.16) * 0.08, 0.01);
+                }
+                if (groups.warrior.userData.loaded) {
+                    groups.warrior.visible = true;
+                    groups.warrior.position.set(1.9, -0.8, 2.4);
+                    groups.warrior.rotation.set(0.06, 0.52 + Math.sin(age * 0.34) * 0.12, 0.02);
                 }
                 // Persistent swarm escorting the reveal at full intensity.
                 if (groups.enemies.userData.loaded) poseEnemies(age, 1.0);

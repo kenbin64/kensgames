@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealtyX Homes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Space+Grotesk:wght@600;700;800&family=Manrope:wght@400;500;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <canvas id="bg3d" aria-hidden="true"></canvas>
+
+  <header class="nav">
+    <a class="brand" href="/">RealtyX <span>Homes</span></a>
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="City, neighborhood, ZIP, address" />
+      <button id="searchBtn">Search</button>
+    </div>
+    <button class="save-btn">Saved Homes</button>
+  </header>
+
+  <main class="page">
+    <section class="controls card">
+      <h1>Find your next home.</h1>
+      <p class="lead">Realtor-style listing intelligence with immersive 3D market depth.</p>
+
+      <div class="chips">
+        <button class="chip active" data-hood="all">All Areas</button>
+        <button class="chip" data-hood="Core">Core</button>
+        <button class="chip" data-hood="North">North</button>
+        <button class="chip" data-hood="West">West</button>
+        <button class="chip" data-hood="Waterfront">Waterfront</button>
+      </div>
+
+      <div class="sliders">
+        <label>Max Price <span id="maxPriceVal">$1,500,000</span>
+          <input id="maxPrice" type="range" min="200000" max="3000000" step="50000" value="1500000" />
+        </label>
+        <label>Min Beds <span id="minBedsVal">2</span>
+          <input id="minBeds" type="range" min="1" max="6" step="1" value="2" />
+        </label>
+      </div>
+
+      <div class="kpis">
+        <div><strong id="sListings">0</strong><span>Homes</span></div>
+        <div><strong id="sAvg">$0</strong><span>Avg Price</span></div>
+        <div><strong id="sHot">0</strong><span>Hot Zones</span></div>
+      </div>
+    </section>
+
+    <section class="map card">
+      <div class="head-row">
+        <h2>Market Depth Map</h2>
+        <span class="pill">3D LIVE</span>
+      </div>
+      <canvas id="hero3d" aria-label="3D property map"></canvas>
+    </section>
+
+    <section class="results card">
+      <div class="head-row">
+        <h2>Property Results</h2>
+        <span id="resultMeta" class="muted"></span>
+      </div>
+      <div id="listings" class="listings"></div>
+    </section>
+  </main>
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>

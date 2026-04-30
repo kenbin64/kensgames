@@ -64,18 +64,20 @@ function showYourTurnPopup(playerName, playerColor) {
   dismissYourTurnPopup(); // clear any lingering popup
   const el = document.createElement('div');
   el.id = 'your-turn-popup';
-  el.innerHTML = `<span style="font-size:1.6em;">🎲</span> Your turn, <b>${playerName}</b>!`;
+  el.innerHTML = `<span style="font-size:1.8em;display:block;margin-bottom:6px;">🎲</span><span style="font-size:1.1em;display:block;letter-spacing:0.04em;">YOUR TURN</span><b style="font-size:1.3em;display:block;margin-top:4px;">${playerName}</b>`;
   Object.assign(el.style, {
     position: 'fixed', top: '50%', left: '50%',
     transform: 'translate(-50%, -50%) scale(0.7)',
-    padding: '22px 44px', borderRadius: '18px',
-    background: 'rgba(10,10,30,0.88)', color: '#fff',
-    fontSize: '1.35em', fontFamily: "'Segoe UI', sans-serif",
-    fontWeight: '600', textAlign: 'center',
-    border: `2px solid ${playerColor || '#00b4ff'}`,
-    boxShadow: `0 0 30px ${playerColor || '#00b4ff'}55, 0 8px 32px rgba(0,0,0,0.6)`,
+    padding: '28px 52px', borderRadius: '18px',
+    background: 'rgba(4,6,22,0.96)', color: '#fff',
+    fontSize: '1.1em', fontFamily: "'Orbitron','Segoe UI', sans-serif",
+    fontWeight: '700', textAlign: 'center',
+    border: `2.5px solid ${playerColor || '#00b4ff'}`,
+    boxShadow: `0 0 40px ${playerColor || '#00b4ff'}88, 0 12px 40px rgba(0,0,0,0.8)`,
     zIndex: '9999', pointerEvents: 'none',
     opacity: '0', transition: 'opacity 0.35s ease, transform 0.35s ease',
+    textShadow: `0 0 16px ${playerColor || '#00b4ff'}`,
+    minWidth: '240px',
   });
   document.body.appendChild(el);
   // Trigger entrance animation
@@ -343,9 +345,15 @@ function initGame(playerCount = 2, config = {}) {
   const humanName = (config.humanName || '').trim() || 'You';
   const humanAvatar = config.humanAvatar || '🎮';
   const aiDifficulty = config.aiDifficulty || 'normal';
+  const sessionPlayers = Array.isArray(config.sessionPlayers)
+    ? config.sessionPlayers.filter(p => p && typeof p === 'object')
+    : null;
   _usedPegNames.clear();
   _usedBotNames.clear();
-  state.players.set('count', playerCount);
+  const effectiveCount = (sessionPlayers && sessionPlayers.length >= 2)
+    ? sessionPlayers.length
+    : playerCount;
+  state.players.set('count', effectiveCount);
   state.players.set('current', 0);
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(0);
 
@@ -391,19 +399,38 @@ function initGame(playerCount = 2, config = {}) {
   // Meta
   state.meta.set('winner', null);
   state.meta.set('seed', Math.floor(Math.random() * 0xFFFFFFFF));
+  state.meta.set('myUserId', config.myUserId || null);
 
   // Players — each gets 5 pegs: 4 in holding, 1 on home hole
   const players = [];
-  for (let i = 0; i < playerCount; i++) {
-    const bp = getBalancedBoardPosition(i, playerCount);
+  const sessionBackedPlayers = (sessionPlayers && sessionPlayers.length >= 2)
+    ? sessionPlayers.slice().sort((a, b) => {
+      const sa = Number.isFinite(a.slot) ? a.slot : Number.MAX_SAFE_INTEGER;
+      const sb = Number.isFinite(b.slot) ? b.slot : Number.MAX_SAFE_INTEGER;
+      return sa - sb;
+    })
+    : null;
+
+  for (let i = 0; i < effectiveCount; i++) {
+    const bp = getBalancedBoardPosition(i, effectiveCount);
+    const sp = sessionBackedPlayers ? sessionBackedPlayers[i] : null;
+    const isBot = sp ? !!sp.is_ai : i > 0;
+    const name = sp
+      ? (sp.username || (isBot ? `🤖 Bot "${assignBotName()}"` : `Player ${i + 1}`))
+      : (i === 0 ? humanName : `🤖 Bot "${assignBotName()}"`);
+    const avatar = sp
+      ? ((sp.avatar && (sp.avatar.emoji || sp.avatar)) || (isBot ? '🤖' : '🎮'))
+      : (i === 0 ? humanAvatar : '🤖');
+
     const player = {
       index: i,
-      name: i === 0 ? humanName : `🤖 Bot "${assignBotName()}"`,
-      avatar: i === 0 ? humanAvatar : '🤖',
-      aiDifficulty: i > 0 ? aiDifficulty : null,
+      name,
+      avatar,
+      userId: sp ? sp.user_id : null,
+      aiDifficulty: isBot ? (sp && (sp.level || sp.aiDifficulty || aiDifficulty)) : null,
       color: PLAYER_COLORS[bp],
       boardPosition: bp,
-      isBot: i > 0,
+      isBot,
       pegs: Array.from({ length: PEGS_PER_PLAYER }, (_, p) => ({
         id: `p${i}-peg${p}`,
         holeId: 'holding',
@@ -439,7 +466,7 @@ function initGame(playerCount = 2, config = {}) {
 
   // Deck
   shuffleDeck();
-  log('Game started with ' + playerCount + ' players');
+  log('Game started with ' + effectiveCount + ' players');
 
   // Disable draw until camera + avatar blink are done
   const drawBtn = document.getElementById('draw-btn');
@@ -457,7 +484,11 @@ function initGame(playerCount = 2, config = {}) {
 
     const enableFirstTurn = () => {
       dismissYourTurnPopup();
-      if (drawBtn) drawBtn.disabled = false;
+      if (firstPlayer && firstPlayer.isBot) {
+        setTimeout(botTurn, 400);
+      } else {
+        if (drawBtn) drawBtn.disabled = false;
+      }
     };
 
     const startBlink = () => {

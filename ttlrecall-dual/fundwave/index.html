@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FundWave Impact</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Space+Grotesk:wght@600;700;800&family=Manrope:wght@400;500;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <canvas id="bg3d" aria-hidden="true"></canvas>
+
+  <header class="topbar">
+    <a href="/" class="brand">FundWave <span>Impact</span></a>
+    <nav>
+      <a href="#campaigns">Campaigns</a>
+      <a href="#impact">Impact</a>
+      <a href="#donate">Donate</a>
+    </nav>
+    <button class="start">Start a Fundraiser</button>
+  </header>
+
+  <main class="shell">
+    <section class="hero" id="donate">
+      <div class="copy">
+        <p class="eyebrow">Community Funding Platform</p>
+        <h1>Help fund what matters, fast.</h1>
+        <p class="lead">A trusted campaign network inspired by GoFundMe scale, with transparent goals, rapid donations,
+          and live impact telemetry.</p>
+        <div class="kpis">
+          <div><strong id="kRaised">$0</strong><span>Raised Today</span></div>
+          <div><strong id="kBackers">0</strong><span>Active Backers</span></div>
+          <div><strong id="kCampaigns">0</strong><span>Live Campaigns</span></div>
+        </div>
+      </div>
+      <aside class="donation-card panel">
+        <h2>Quick Donate</h2>
+        <label>Campaign
+          <select id="campaignSelect"></select>
+        </label>
+        <label>Amount (USD)
+          <input id="amount" type="number" min="5" step="5" value="50" />
+        </label>
+        <button id="donateBtn">Donate Now</button>
+        <p id="donateMsg" class="msg">Ready.</p>
+      </aside>
+    </section>
+
+    <section class="workspace" id="campaigns">
+      <article class="panel graph-panel">
+        <div class="head-row">
+          <h2>Impact Momentum</h2>
+          <span class="pill">3D IMMERSIVE</span>
+        </div>
+        <canvas id="impact3d" aria-label="3D campaign momentum visualization"></canvas>
+      </article>
+
+      <article class="panel list-panel" id="impact">
+        <div class="head-row">
+          <h2>Featured Campaigns</h2>
+          <span class="pill alt">LIVE</span>
+        </div>
+        <div id="campaignList" class="cards"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>

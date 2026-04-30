@@ -858,23 +858,35 @@
                     break;
 
                 case 'game_starting':
-                case 'game_started':
+                case 'game_started': {
                     addWRChat('system', 'Game is starting!');
-                    // Store session info for game board
+                    const launchSession = data.session || sessionData;
+                    const launchPlayers = (launchSession && launchSession.players) || [];
+                    const launchCode = (launchSession && launchSession.session_code) || '';
+                    // Write kg_session in the exact format fasttrack-3d.js reads
+                    sessionStorage.setItem('kg_session', JSON.stringify({
+                        session_id: launchSession && launchSession.session_id,
+                        session_code: launchCode,
+                        game_id: launchSession && launchSession.game_id,
+                        host_id: launchSession && launchSession.host_id,
+                        my_user_id: myUserId,
+                        is_host: false,
+                        players: launchPlayers,
+                    }));
+                    // Also keep ft_session for legacy compatibility
                     sessionStorage.setItem('ft_session', JSON.stringify({
-                        session: data.session || sessionData,
+                        session: launchSession,
                         user: { name: myUsername, user_id: myUserId, avatar_id: selectedAvatar },
                         wsUrl: LOBBY_WS_URL
                     }));
-                    // Redirect to game board
+                    // Redirect with the same params the host uses so fasttrack-3d.js
+                    // uses server-bootstrap + session cache for both players
                     setTimeout(() => {
-                        const p = new URLSearchParams({
-                            session: (data.session || sessionData).session_id,
-                            multiplayer: 'true'
-                        });
+                        const p = new URLSearchParams({ mode: 'private', code: launchCode });
                         window.location.href = `3d.html?${p.toString()}`;
                     }, 800);
                     break;
+                }
 
                 case 'error':
                     const activePhase = document.querySelector('.phase.active');

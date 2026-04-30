@@ -1,4 +1,32 @@
 'use strict';
+// Launch-button fail-safe: inline HTML calls openMultiplayerPanel(). If this file
+// partially fails later, keep a global stub so users never see ReferenceError.
+window.openMultiplayerPanel = window.openMultiplayerPanel || function () {
+  console.warn('[4D] openMultiplayerPanel fallback invoked before full init');
+  const overlay = document.getElementById('mp-panel-overlay');
+  const host = document.getElementById('mp-panel-host');
+  let inviteCode = null;
+  try {
+    const u = new URL(location.href);
+    inviteCode = (u.searchParams.get('code') || '').trim().toUpperCase() || null;
+  } catch { /* ignore */ }
+  if (overlay && host && typeof KGMultiplayerPanel !== 'undefined') {
+    overlay.style.display = 'flex';
+    KGGameSetup.mount(host, {
+      gameId: '4dtictactoe',
+      gameName: '4D Connect',
+      minPlayers: 2,
+      maxPlayers: 4,
+      inviteCode,
+      onLaunch: () => {
+        overlay.style.display = 'none';
+        if (typeof startGame === 'function') startGame();
+      },
+    });
+    return;
+  }
+  if (typeof startGame === 'function') startGame();
+};
 // 4D Connect -- thin runtime: input -> substrate -> lens -> render.
 // Rules live in manifold.js (BoardManifold 3D + Turns 4D). Config lives in manifold.game.json.
 const TRNG = { _b: new Uint32Array(16), _i: 16, _r() { crypto.getRandomValues(this._b); this._i = 0; }, f() { if (this._i >= 16) this._r(); return this._b[this._i++] / 0xFFFFFFFF; }, i(a, b) { return Math.floor(this.f() * (b - a + 1)) + a; }, pick(a) { return a[this.i(0, a.length - 1)]; }, shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = this.i(0, i);[r[i], r[j]] = [r[j], r[i]]; } return r; } };
@@ -29,9 +57,15 @@ const KGSync = {
     this.reset();
     if (!session || !session.client) return;
     const players = session.players || [];
-    const idx = players.findIndex(p => p.user_id === session.my_user_id && !p.is_ai);
+    const me = players.find(p => String(p.user_id) === String(session.my_user_id) && !p.is_ai) || null;
+    const idx = players.findIndex(p => String(p.user_id) === String(session.my_user_id) && !p.is_ai);
     this.client = session.client; this.online = true;
-    this.isHost = !!session.is_host; this.mySlot = (idx >= 0) ? (idx + 1) : 0;
+    this.isHost = !!session.is_host;
+    // Slot is the authoritative turn index from the lobby server. Falling back to array index
+    // can make every client think it's player 1 when player arrays are personalized per client.
+    this.mySlot = (me && Number.isFinite(+me.slot) && (+me.slot) > 0)
+      ? (+me.slot)
+      : ((idx >= 0) ? (idx + 1) : 0);
     this._onAction = (data) => {
       if (!data || data.action !== 'move' || !data.payload) return;
       const { gx, gy, gz, p } = data.payload;
@@ -183,7 +217,10 @@ function _winkiInstancedMesh(srcMesh) {
     color: 0x88bbff, emissive: 0x335577, emissiveIntensity: 0.55,
     metalness: 0.35, roughness: 0.18,
     envMap, envMapIntensity: 1.2,
-    side: THREE.FrontSide
+    side: THREE.FrontSide,
+    transparent: true,
+    opacity: 0.36,
+    depthWrite: false
   });
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
   inst.renderOrder = 1;
@@ -202,7 +239,13 @@ function makeManifoldLattice() {
   const group = new THREE.Group();
   // Outer cage -- bright cube silhouette so the saddle lattice bbox reads as a perfect cube.
   const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2));
-  group.add(new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.85 })));
+  const cageMat = new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.9, linewidth: 2 });
+  const cage = new THREE.LineSegments(cageE, cageMat);
+  group.add(cage);
+  // 2px-like cage thickness fallback: WebGL often ignores linewidth, so layer a second pass.
+  const cagePass2 = new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.55, linewidth: 2 }));
+  cagePass2.scale.setScalar(1.002);
+  group.add(cagePass2);
   // Translucent reflective cube shell. BackSide so we see through the front into the
   // chambers but still catch starfield reflections on the inside walls.
   const shellGeo = new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2);
@@ -210,7 +253,7 @@ function makeManifoldLattice() {
     color: 0x223a66, emissive: 0x081428, emissiveIntensity: 0.35,
     metalness: 0.85, roughness: 0.08,
     envMap, envMapIntensity: 1.4,
-    transparent: true, opacity: 0.16, side: THREE.BackSide,
+    transparent: true, opacity: 0.09, side: THREE.BackSide,
     depthWrite: false
   });
   const shell = new THREE.Mesh(shellGeo, shellMat); shell.renderOrder = 0; group.add(shell);
@@ -1243,9 +1286,13 @@ function physSubstep(dt) {
   const ATTRACT_GATE = SETTLE_V * 3;            // start nudging once below ~3x settle speed
   const ATTRACT_MAX = 26;                       // m/s^2 at zero speed; gentle compared to GRAV (-62)
   if (speed2 < ATTRACT_GATE * ATTRACT_GATE) {
-    const tgt = nearestFreeNode(physBall.x, physBall.y, physBall.z, physBall.y + BALL_R * 0.5);
+    const predTgt = predictedWorldTarget(physBall.predicted);
+    const tgt = predTgt || nearestFreeNode(physBall.x, physBall.y, physBall.z, physBall.y + BALL_R * 0.5);
     if (tgt) {
-      const dx = tgt.p.x - physBall.x, dy = tgt.p.y - physBall.y, dz = tgt.p.z - physBall.z;
+      const tx = predTgt ? predTgt.x : tgt.p.x;
+      const ty = predTgt ? predTgt.y : tgt.p.y;
+      const tz = predTgt ? predTgt.z : tgt.p.z;
+      const dx = tx - physBall.x, dy = ty - physBall.y, dz = tz - physBall.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (d > 1e-3) {
         const slow = 1 - Math.sqrt(speed2) / ATTRACT_GATE;   // 0..1, peak at standstill
@@ -1289,6 +1336,14 @@ function nearestFreeCell(x, y, z, yLimit) {
   const n = nearestFreeNode(x, y, z, yLimit);
   return n ? [n.gx, n.gy, n.gz] : null;
 }
+function predictedWorldTarget(predictedCell) {
+  if (!predictedCell) return null;
+  const [gx, gy, gz] = predictedCell;
+  if (BM.getCell(gx, gy, gz)) return null;
+  const wp = nodePos(gx, gy, gz);
+  boardGroup.localToWorld(wp);
+  return wp;
+}
 function describeWin(cells, sc) { return sc.special === 'cube' ? 'PERFECT CUBE COMPLETED!' : (BM.dirLabel(cells) || '').toUpperCase(); }
 function nameOf(p) { return document.getElementById(`name-p${p}`).textContent; }
 function tallyStr() { const out = []; for (let p = 1; p <= numPlayers; p++) out.push(`P${p}: ${TS.score(p)}`); return out.join('  |  '); }
@@ -1306,7 +1361,18 @@ function onBallSettled() {
   // the predicted column landing computed at release; that target is always the lowest free
   // cell in the chosen column and is therefore both deterministic and physically plausible.
   const yLimit = physBall.y + BALL_R * 0.5;
-  let cell = nearestFreeCell(physBall.x, physBall.y, physBall.z, yLimit);
+  let cell = null;
+  const predTgt = predictedWorldTarget(physBall.predicted);
+  if (predTgt && physBall.predicted) {
+    // If the ball settled near its release-predicted chamber, keep that chamber to avoid
+    // long sideways snap jumps into a different free cavity.
+    const dx = predTgt.x - physBall.x, dy = predTgt.y - physBall.y, dz = predTgt.z - physBall.z;
+    const maxSnap = SADDLE_CELL * 1.45;
+    if ((dx * dx + dy * dy + dz * dz) <= (maxSnap * maxSnap)) {
+      cell = physBall.predicted;
+    }
+  }
+  if (!cell) cell = nearestFreeCell(physBall.x, physBall.y, physBall.z, yLimit);
   if (!cell && physBall.predicted && !BM.getCell(physBall.predicted[0], physBall.predicted[1], physBall.predicted[2])) {
     cell = physBall.predicted;
   }
@@ -1420,9 +1486,38 @@ function maybeSpawnTurnBall() {
     startTurnTimer();
   }
 }
-function buildScenarioSelect() { const grid = document.getElementById('ss-grid'); grid.innerHTML = ''; SCENARIOS.forEach((sc, i) => { const card = document.createElement('div'); card.className = 'ss-card' + (i === 0 ? ' sel' : ''); card.innerHTML = `<div class="ss-icon">${sc.icon}</div><div class="ss-name">${sc.name}</div><div class="ss-desc">${sc.desc}</div>`; card.onclick = () => { document.querySelectorAll('.ss-card').forEach(c => c.classList.remove('sel')); card.classList.add('sel'); selectedScenario = sc; }; grid.appendChild(card); }); }
-function setVsMode(mode) { vsMode = mode; document.getElementById('pvp-btn').classList.toggle('sel', mode === 'pvp'); document.getElementById('ai-btn').classList.toggle('sel', mode === 'ai'); document.getElementById('diff-row').classList.toggle('show', mode === 'ai'); document.getElementById('name-p2').textContent = mode === 'ai' ? 'AI OPPONENT' : 'PLAYER 2'; }
-function setDiff(d) { aiDiff = d; document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('sel')); document.getElementById(d === 'medium' ? 'diff-med' : `diff-${d}`).classList.add('sel'); }
+function buildScenarioSelect() {
+  const grid = document.getElementById('ss-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  SCENARIOS.forEach((sc, i) => {
+    const card = document.createElement('div');
+    card.className = 'ss-card' + (i === 0 ? ' sel' : '');
+    card.innerHTML = `<div class="ss-icon">${sc.icon}</div><div class="ss-name">${sc.name}</div><div class="ss-desc">${sc.desc}</div>`;
+    card.onclick = () => {
+      document.querySelectorAll('.ss-card').forEach(c => c.classList.remove('sel'));
+      card.classList.add('sel');
+      selectedScenario = sc;
+    };
+    grid.appendChild(card);
+  });
+}
+function setVsMode(mode) {
+  vsMode = mode;
+  const pvpBtn = document.getElementById('pvp-btn');
+  const aiBtn = document.getElementById('ai-btn');
+  const diffRow = document.getElementById('diff-row');
+  if (pvpBtn) pvpBtn.classList.toggle('sel', mode === 'pvp');
+  if (aiBtn) aiBtn.classList.toggle('sel', mode === 'ai');
+  if (diffRow) diffRow.classList.toggle('show', mode === 'ai');
+  document.getElementById('name-p2').textContent = mode === 'ai' ? 'AI OPPONENT' : 'PLAYER 2';
+}
+function setDiff(d) {
+  aiDiff = d;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('sel'));
+  const active = document.getElementById(d === 'medium' ? 'diff-med' : `diff-${d}`);
+  if (active) active.classList.add('sel');
+}
 // Pick the player count for the next game. Updates the scenario-select UI and toggles which
 // player panels are visible. Actual grid resize happens in startGame() via rebuildWorld().
 function setNumPlayers(n) {
@@ -1436,26 +1531,34 @@ function setNumPlayers(n) {
     if (panel) panel.style.display = (i <= numPlayers) ? '' : 'none';
   }
 }
-function showScenarioSelect() { document.getElementById('result-overlay').classList.remove('show'); document.getElementById('scenario-select').classList.add('show'); }
+function showScenarioSelect() {
+  document.getElementById('result-overlay').classList.remove('show');
+  openMultiplayerPanel();
+}
 // Open the unified KGMultiplayerPanel; it gates on profile, gathers humans + AI,
 // then hands the resolved session here so the existing startGame() runs unchanged.
 function openMultiplayerPanel() {
   const overlay = document.getElementById('mp-panel-overlay');
   const host = document.getElementById('mp-panel-host');
+  let inviteCode = null;
+  try {
+    const u = new URL(location.href);
+    inviteCode = (u.searchParams.get('code') || '').trim().toUpperCase() || null;
+  } catch { /* ignore */ }
   if (!overlay || !host || typeof KGMultiplayerPanel === 'undefined') {
     console.warn('[4D] multiplayer panel unavailable, falling back to local startGame()');
     return startGame();
   }
   overlay.style.display = 'flex';
-  KGMultiplayerPanel.mount(host, {
+  KGGameSetup.mount(host, {
     gameId: '4dtictactoe',
     gameName: '4D Connect',
     minPlayers: 2,
     maxPlayers: 4,
-    onLaunch: (session) => {
-      const players = (session && session.players) || [];
-      numPlayers = Math.max(1, Math.min(4, players.length));
-      vsMode = players.some(p => p.is_ai) ? 'ai' : 'pvp';
+    inviteCode,
+    onLaunch: ({ session, players, playerCount, launchMode }) => {
+      numPlayers = Math.max(1, Math.min(4, playerCount));
+      vsMode = launchMode === 'ai' ? 'ai' : 'pvp';
       for (let i = 0; i < numPlayers; i++) {
         const el = document.getElementById('name-p' + (i + 1));
         if (el) el.textContent = (players[i].username || ('PLAYER ' + (i + 1))).toUpperCase();
@@ -1467,9 +1570,11 @@ function openMultiplayerPanel() {
     },
   });
 }
+// Ensure inline HTML handlers always resolve this symbol on window.
+window.openMultiplayerPanel = openMultiplayerPanel;
+
 function startGame() {
   currentScenario = selectedScenario;
-  document.getElementById('scenario-select').classList.remove('show');
   document.getElementById('scenario-tag').textContent = currentScenario.name;
   document.querySelectorAll('.panel-mode').forEach(e => e.textContent = currentScenario.name);
   // Resize the world to match player count BEFORE resetGame clears state, so the new
@@ -1517,6 +1622,9 @@ Promise.all([manifestReady, glbReady]).then(() => {
   setPreloadProgress(100);
   setPreloadMsg('READY');
   setTimeout(finishPreload, 400);
+  setTimeout(() => {
+    try { openMultiplayerPanel(); } catch (e) { console.warn('[4D] panel autostart failed', e); }
+  }, 0);
   // Bridge after manifest resolves so dimensions yield from the manifold.
   if (typeof ManifoldBridge !== 'undefined') {
     const m = __MANIFEST__ || {};

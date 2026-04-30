@@ -1,7 +1,22 @@
-  # KensGames Comprehensive 6-Game Product Spec (No-Code)
+# KensGames Comprehensive 4-Game Product Spec (No-Code)
+
+## 0. Revision Changelog (Compact)
+- Version: 4-game-revision-1
+- Date: 2026-04-30
+- Changed:
+  - Canonical live game set reduced to four games.
+  - Added Prime Directive and full lobby integrity/verification model.
+  - Added REST and Socket.IO contract guidance for lobby synchronization.
+  - Corrected landing behavior: 3 featured cards in viewport, then full and coming soon lists.
+- Added:
+  - X-Dimensional proof-of-concept statement and dedicated navigation/detail page requirement.
+  - Creator and credits section for platform, games, website, and art.
+- Removed from live canonical set:
+  - Assemble
+  - Cubic
 
 ## 1. Purpose
-This document defines the complete product specification for the five canonical KensGames titles and the shared KensGames portal experience.
+This document defines the complete product specification for the four canonical KensGames titles and the shared KensGames portal experience.
 
 This specification covers:
 - game identity and rules
@@ -10,43 +25,65 @@ This specification covers:
 - players, pieces, and match structures
 - landing pages and page copy
 - game setup wizards
-- modes-of-play wizards
+- multiplayer lobby model and validation rules
+- REST + Socket.IO interaction model
 - per-game launch button inventory (actual DOM buttons + handlers)
-- common game setup structure
 - required URL, filepath, and filename formats
 
-Authoritative game seeds are in universe and are reflected here as product requirements.
+If implementation and this spec diverge, this spec is the product source of truth until superseded.
 
-## 2. Canonical Game Set (All 6 Games)
+### 1.1 X-Dimensional Proof-of-Concept Statement
+KensGames Portal is a proof of concept for X-Dimensional programming, a unique programming paradigm where mathematical manifolds are treated as the source of truth rather than conventional bit/byte-first persistence models.
 
-### 2.1 Canonical IDs, Names, and Slugs
+### 1.2 Creator and Attribution
+- Created by Kenneth Bingham.
+- Role credit: Kenneth Bingham, Software Engineer.
+- Credit requirement: games, website, and art paintings are credited to Kenneth Bingham in product-facing credits and legal/about surfaces.
+
+## 2. Prime Directive (AI + System)
+
+### 2.1 Prime Directive
+Always preserve a valid, fair, fully initialized game state for all players, and never launch a game unless every required player (human or bot) is correctly registered, visible, and ready. When that cannot be guaranteed, gracefully fall back to a clearly explained Play with Bots experience.
+
+### 2.2 Supporting Principles
+- Identity first: always resolve game identity, player identity, host identity, bot identity, and session identity.
+- State integrity: no launch unless lobby state is coherent and complete.
+- Transparency: every lobby change is broadcast to all connected clients.
+- Graceful degradation: when launch validation fails or a game cannot be started, offer "Game not available at this time. Play with Bots instead?"
+- Autonomy and control:
+  - Host controls create game, invite, add/remove bots, remove players, launch.
+  - Guest controls display name, avatar, and ready state.
+
+## 3. Canonical Game Set (4 Games)
+
+### 3.1 Canonical IDs, Names, and Slugs
 1. fasttrack: FastTrack
 2. brickbreaker3d: BrickBreaker 3D
 3. 4dconnect: 4D Connect
 4. starfighter: Starfighter
-5. assemble: Assemble
-6. cubic3d: Cubic
 
-### 2.2 Current Path Reality and Canonical Route Rule
+### 3.2 Route and Legacy Compatibility Rules
 - Canonical public slug for the 4D game is 4dconnect.
-- Existing implementation paths also include 4DTicTacToe.
-- Product requirement: all player-facing links and copy must use 4D Connect / 4dconnect.
-- Compatibility requirement: 4DTicTacToe remains an accepted legacy path until migration is complete.
-- Cubic implementation lives at cubic3d/index.html; canonical public route is /cubic3d/.
+- Existing implementation paths include 4DTicTacToe.
+- Player-facing labels should use 4D Connect.
+- Compatibility rule: /4DTicTacToe/* remains a temporary accepted legacy path until migration to /4dconnect/* is complete.
 
-## 3. Shared KensGames Experience
+## 4. Shared KensGames Experience
 
-### 3.1 Product Principle
-- The portal is public-first and conversion-focused.
-- Browsing is open; participating in matches requires authentication.
-- Setup complexity is hidden behind guided modal wizards.
+### 4.1 Product Principle
+- Portal is public-first and conversion-focused.
+- Browsing is open.
+- Participating in multiplayer matches requires authentication.
+- Solo or bot-only modes may allow guest play.
+- Setup complexity is guided through modal wizard flow.
 
-### 3.2 Global Navigation and Shell
+### 4.2 Global Navigation and Shell
 Global top navigation contains:
 - KensGames logo
 - Discover
 - Lounge
 - Game Directory
+- X-Dimensional
 - Profile/Avatar area
 - Login or Logout (state-aware)
 
@@ -57,13 +94,14 @@ Global footer contains:
 - Community links
 - Build/version string
 
-### 3.3 Portal Information Architecture
+### 4.3 Portal Information Architecture
 Primary portal pages:
 1. Home landing
 2. Discover
 3. Lounge
 4. Showcase
-5. Auth entry pages (login/register/verify/reset/forgot)
+5. X-Dimensional detail page (paradigm explainer)
+6. Auth entry pages (login/register/verify/reset/forgot)
 
 Per-game page family:
 1. Game landing
@@ -71,42 +109,53 @@ Per-game page family:
 3. Game play surface
 4. Mode/setup overlays (wizard-driven)
 
-## 4. Page and Layout Specification
+## 5. Landing, Discover, Lounge Layout Rules
 
-### 4.1 Home Landing Page
-Purpose:
+### 5.1 Home Landing Page Purpose
 - explain what KensGames is
-- present all 5 games
+- present the four live canonical games
 - convert visitors into authenticated players
 
-Required sections:
+### 5.2 Home Landing Required Sections
 1. Hero section
-2. Featured games strip (all 6)
-3. How it works (Play in 3 steps)
-4. Social proof / activity band
-5. CTA band
+2. Featured games viewport strip
+3. Full games list
+4. Coming soon games list
+5. How it works (Play in 3 steps)
+6. Social proof/activity band
+7. CTA band
 
-Required hero text:
-- Headline: "Six Games. One Arcade Universe."
-- Subheadline: "Jump into FastTrack, BrickBreaker 3D, 4D Connect, Starfighter, Assemble, and Cubic with one account."
+### 5.3 Home Hero Copy
+- Headline: "Four Games. One Arcade Universe."
+- Subheadline: "Jump into FastTrack, BrickBreaker 3D, 4D Connect, and Starfighter with one account."
 - Primary CTA: "Play Now"
 - Secondary CTA: "Explore Games"
 
-Play button behavior:
-- Logged out: disabled visual state or intercept to login wizard
-- Logged in: routes directly to selected game lobby
+### 5.4 Featured + Full List Layout Correction (Authoritative)
+- First viewport section shows exactly 3 featured game cards in a horizontal strip.
+- Immediately below featured, show full list of games and coming soon games.
+- On large monitors:
+  - full list uses 3 cards per row grid.
+  - coming soon uses 3 cards per row grid.
+- On smartphones:
+  - lists collapse to a horizontal card carousel.
+  - one full-screen panel shown at a time.
+- Horizontal behavior rule (all breakpoints):
+  - no freeform page panning to the right.
+  - horizontal movement is only inside controlled card rails/carousels.
+  - vertical page scroll remains allowed for section-to-section reading.
 
-### 4.2 Discover Page
+### 5.5 Discover Page
 Purpose:
 - help players find the right game by style, duration, and player count
 
 Required elements:
 - filter chips: pace, players, session length, solo/multiplayer
 - game cards with tags and quick stats
-- "Why this game" explanation module
+- Why this game explanation module
 - launch CTA per card
 
-### 4.3 Lounge Page
+### 5.6 Lounge Page
 Purpose:
 - multiplayer aggregation hub
 
@@ -116,161 +165,228 @@ Required elements:
 - recent results and leaderboard snapshot
 - quick join actions
 
-### 4.4 Game Landing Page (Per Game)
-Purpose:
-- teach game fantasy and loop before lobby entry
+## 6. Conceptual Lobby Model
 
-Required blocks:
-1. game hero (name, tagline, key visual)
-2. core loop in 3 bullets
-3. mode cards
-4. expected session length
-5. player count
-6. controls summary
-7. "Play" CTA routing to lobby
+### 6.1 Core Objects
 
-### 4.5 Game Lobby Page (Per Game)
-Purpose:
-- single pre-match staging surface for all modes
+GameType:
+- id: fasttrack | starfighter | 4dtictactoe | brickbreaker3d
+- name: display name
+- minPlayers: integer
+- maxPlayers: integer
+- supportsBots: boolean
+- supportsSolo: boolean
 
-Required lobby elements:
-- game title and mode selector
-- party panel (host, players, readiness)
-- public queue panel (if applicable)
-- invite code panel
-- configuration summary card
-- start/launch controls (host authority)
+GameInstance:
+- id: UUID
+- gameTypeId: reference to GameType
+- hostId: playerId
+- code: short join code (for example 6 chars)
+- joinUrl: full URL with code
+- status: lobby | starting | inProgress | cancelled | completed
+- players: array of PlayerSlot
+- createdAt, updatedAt
 
-## 5. Visual Direction: Theme, Look, and Feel
+Player:
+- id: UUID persisted per device
+- displayName: string
+- avatarId: string
+- isHost: boolean
+- isBot: boolean
+- deviceId/clientId: verification identity
 
-### 5.1 Global KensGames Art Direction
-- Bold arcade clarity, high contrast, immediate readability.
-- Motion language: snappy, confidence-building, no sluggish transitions.
-- Typography: display-forward headers, legible body text, strong numeric readability.
-- UI style: dimensional surfaces, depth cues, clean spacing, low clutter.
+PlayerSlot:
+- slotIndex: 0..3
+- playerId: nullable
+- readyState: notReady | ready
+- isHostSlot: boolean
 
-### 5.2 Shared UX Tone
-- energetic, friendly, competitive but non-toxic
-- clear status language: ready, waiting, joined, approved, launching
-- short action labels and strong verbs
+### 6.2 High-Level Flows
 
-### 5.3 Accessibility Baseline
-- all key controls keyboard reachable
-- clear focus state on interactive elements
-- text contrast suitable for fast reading
-- no game-critical info conveyed by color alone
+Landing page:
+- each game card offers Play Solo with AI and Create Private Game
 
-## 6. Game Specifications (Rules, Themes, Elements, Players, Pieces, Launch Buttons)
+Create private game (host):
+1. Host taps Create Private Game.
+2. System creates GameInstance with status=lobby and host in slot 0.
+3. System generates code and joinUrl.
+4. UI shows:
+   - panel A: game name, code, URL, Copy URL, Manage Guests
+   - panel B: 4-slot player grid with host crown in slot 0
+   - Add Bot button
+   - Launch Game button (disabled until valid)
 
-### Common Game Setup Structure
-All games share this flow. Individual steps may be implicit (inline) or explicit (wizard modal).
+Guest join:
+1. Guest opens joinUrl.
+2. If local Player identity is missing, prompt for name + avatar and persist.
+3. Guest joins lobby and is assigned first free slot.
+4. Guest sees own slot plus all other slots in real time.
 
-```
-[Portal card PLAY button]
-        ↓
-[Game landing / entry page]
-        ↓
-[Auth gate] — logged out: login modal or guest bypass depending on mode
-        ↓
-[Mode selection] — solo / public match / private match / vs AI / co-op
-        ↓
-[Player configuration] — count, type (Human | AI | Bot), seat assignment
-        ↓
-[Match parameters] — ruleset, duration, board options (game-specific)
-        ↓
-[Ready / Launch] — host confirms, all seats filled or AI-padded
-        ↓
-[Play surface]
-        ↓
-[Post-match] — results, rematch, return to lobby
-```
+Ready system:
+- host can remove any non-host player or bot.
+- guests can toggle only their own ready state.
+- Launch Game enables only when:
+  - playerCount >= gameType.minPlayers
+  - every occupied slot is ready
+  - GameInstance status is lobby
+
+## 7. Technical Instructions (REST + Socket.IO)
+
+### 7.1 REST Endpoints
+
+Player identity:
+- POST /api/player
+  - body: { displayName, avatarId }
+  - returns: { playerId }
+- GET /api/player/me
+
+Game lifecycle:
+- POST /api/games
+  - body: { gameTypeId }
+  - auth: host playerId
+  - returns: GameInstance with host in slot 0
+- GET /api/games/:code
+- POST /api/games/:id/join
+  - body: { playerId }
+- POST /api/games/:id/add-bot
+- POST /api/games/:id/remove-player
+  - body: { slotIndex }
+- POST /api/games/:id/set-ready
+  - body: { playerId, ready: boolean }
+- POST /api/games/:id/launch
+
+Launch verification on POST /api/games/:id/launch:
+1. status must be lobby
+2. player count must meet minPlayers
+3. occupied slots must have non-null player identity
+4. occupied slots must all be ready
+
+Validation failure response:
+- do not transition to inProgress
+- return clear error message:
+  - "Game not available at this time. Play with Bots instead?"
+
+Fallback behavior when Play with Bots is accepted:
+- create a new GameInstance with host plus bot-filled required slots
+- bots auto-ready
+- allowed only when GameType.supportsBots = true
+
+### 7.2 Socket.IO Events
+Namespace: /games
+
+Server -> Client events:
+- lobby_state (full snapshot)
+- player_joined
+- player_left
+- player_ready_changed
+- player_removed
+- bot_added
+- game_status_changed (lobby -> starting -> inProgress)
+- error
+
+Client -> Server events:
+- join_lobby { gameId, playerId }
+- set_ready { gameId, playerId, ready }
+- add_bot { gameId }
+- remove_player { gameId, slotIndex }
+- launch_game { gameId }
+
+Rule:
+- every lobby mutation is broadcast so all clients see the same synchronized 4-slot grid.
+
+## 8. Mobile-First UI Rules
+
+### 8.1 Viewport and Stacking
+- Main gameplay area must fit smartphone viewport.
+- If needed, scale board/canvas to fit width and height.
+- Mobile vertical order:
+  1. game header
+  2. main play area
+  3. player controls
+- Player controls anchored at bottom and must not obscure the board/arena.
+
+### 8.2 Landing Page Card Behavior
+- mobile uses full-width card rails.
+- action buttons are full width:
+  - Play Solo with AI
+  - Create Private Game
+
+### 8.3 Lobby Page Structure
+Top section:
+- game name
+- join code (large)
+- join URL and Copy URL button
+- Manage Guests button
+
+Middle section:
+- 4-slot player grid
+- slot 0 host with crown icon
+- slot rows show avatar, name, ready indicator (amber/green)
+- host sees Remove button for non-host slots
+- Add Bot button below grid
+
+Bottom section:
+- Launch Game full-width button
+- disabled until min players + all occupied ready
+
+### 8.4 Font and Tap Targets
+- smartphone base text should target 12pt where possible
+- allowed minimum text is 8pt in constrained layouts
+- critical text (buttons, join code, status) should remain at least 12pt
+- tap targets minimum 44px height
+
+### 8.5 Visual States
+- Ready indicator:
+  - amber = not ready
+  - green = ready
+- Launch button disabled labels:
+  - Waiting for players to be ready
+  - Need at least 2 players
+- Error fallback dialog:
+  - Game not available at this time. Play with Bots instead?
+  - Actions: Play with Bots, Cancel
+
+## 9. Game Specifications (4 Canonical Games)
+
+### 9.1 Common Setup Flow
+[Portal card Play] -> [Game landing] -> [Auth gate (mode-dependent)] -> [Mode selection] -> [Player configuration (human/bot)] -> [Match options] -> [Ready/Launch] -> [Play surface] -> [Post-match]
 
 Auth gate rules:
-- Solo / offline-vs-bot modes: guest play allowed, no account required.
-- Public match / ranked / private invite: account required, gate to login wizard.
-- Co-op and multiplayer: account required for host; guest join allowed via invite code on some games.
+- solo/offline-vs-bot can allow guest play
+- public/ranked/private multiplayer requires account for host
+- invite-code guest join may be allowed by game mode
 
-AI/bot seat behavior:
-- FastTrack: host explicitly adds bot seats before launch.
-- 4D Connect: all 4 player slots always present; any un-selected slot can be driven by AI (planned) or left for human keyboard player.
-- Starfighter: ANPC enemies always present; co-op human seats require auth.
-- BrickBreaker 3D, Assemble, Cubic: solo-first; multiplayer variants use lobby when available.
-
----
-
-## 6.1 FastTrack
+### 9.2 FastTrack
 Game fantasy:
-- A brisk peg race on a shared track with frequent lead changes.
-
-Theme and tone:
-- playful social competition, vintage arcade race energy.
+- brisk peg race with frequent lead changes
 
 Players:
 - min 2, max 4
-- solo variant allowed (time trial)
+- solo variant allowed
 - spectating allowed
-
-Pieces/elements:
-- board (shared track)
-- holes (single-occupancy positions)
-- pegs (player-owned)
-- turn phases (begin, decide, act, settle)
-
-Core rules:
-1. movement is forward toward finish
-2. branch decisions are made by active player
-3. capture returns opponent peg to start
-4. first player to finish all pegs wins (default)
-5. finished pegs cannot be captured
 
 Primary modes:
 - solo time trial
-- private match with invite
-- public match with host approval
+- private invite match
+- public host-approved match
 
 Launch button inventory (fasttrack/lobby.html):
 
 | Button / Action | Selector / Handler | Auth required | Description |
 |---|---|---|---|
-| Quick action: Public Game | `onclick="createPublicGame()"` | Yes | Creates public room, auto-fills bots if seats empty |
-| Quick action: Private Game | `onclick="showCreatePrivateGame()"` | Yes | Opens create-private modal; generates invite code |
-| Quick action: Join by Code | `onclick="showJoinByCode()"` | Yes | Opens join-by-invite-code modal |
-| Quick action: vs Bots | `onclick="playOfflineWithAI()"` | No (guest) | Offline solo vs AI, bypasses auth gate |
-| Play mode card: Public Game | `onclick="createPublicGame()"` | Yes | Same as quick action, in full mode card |
-| Play mode card: Private Game | `onclick="showCreatePrivateGame()"` | Yes | Same as quick action, in full mode card |
-| Play mode card: Join by Code | `onclick="showJoinByCode()"` | Yes | Same as quick action, in full mode card |
-| Play mode card: Offline vs Bots | `onclick="playOfflineWithAI()"` | No (guest) | Same as quick action, in full mode card |
-| Pre-auth: Play Offline vs Bots | `onclick="playOfflineWithAI()"` | No | Shown before login; bypasses auth entirely |
-| Pre-auth: Join Private Game | `onclick="showPrivateGameJoin()"` | No | Opens join modal for guest invite-code entry |
+| Quick action: Public Game | onclick="createPublicGame()" | Yes | Creates public room |
+| Quick action: Private Game | onclick="showCreatePrivateGame()" | Yes | Opens private game modal |
+| Quick action: Join by Code | onclick="showJoinByCode()" | Yes | Opens invite code join modal |
+| Quick action: vs Bots | onclick="playOfflineWithAI()" | No | Offline solo vs AI |
 
-Player setup: lobby seat panel — host selects player count (2–4), assigns each seat as Human or Bot before launch.
-
-## 6.2 BrickBreaker 3D
+### 9.3 BrickBreaker 3D
 Game fantasy:
-- Deflect and destroy in a 3D breakout arena.
-
-Theme and tone:
-- polished arcade impact, rhythmic volley flow.
+- 3D breakout arena with impact-driven rhythm
 
 Players:
 - min 1, max 4
-- solo campaign default
-- versus/co-op variants allowed
-- spectating allowed
-
-Pieces/elements:
-- paddle
-- ball(s)
-- brick field
-- power-ups
-- life/ball state
-
-Core rules:
-1. paddle deflects ball to keep it in play
-2. bricks are cleared through impact
-3. power-ups modify trajectory, control, or scoring potential
-4. loss state is all balls lost before clear condition
-5. victory is field clear or top score in multiplayer variant
+- solo default
+- versus/co-op variants supported
 
 Primary modes:
 - solo campaign
@@ -278,94 +394,50 @@ Primary modes:
 - versus score race
 - co-op clear
 
-Launch button inventory (brickbreaker3d/):
+Launch button inventory (brickbreaker3d):
 
 | Button / Action | Location | Auth required | Description |
 |---|---|---|---|
-| PLAY (portal card) | index.html portal card | No | Routes to `/brickbreaker3d/` landing |
-| Play Solo | brickbreaker3d/index.html landing CTA | No | Direct to solo play surface |
-| Multiplayer Lobby | brickbreaker3d/lobby.html | Yes | Opens seat selection for 2–4 player match |
+| PLAY (portal card) | portal card | No | Routes to /brickbreaker3d/ |
+| Play Solo | brickbreaker3d/index.html | No | Direct to solo surface |
+| Multiplayer Lobby | brickbreaker3d/lobby.html | Yes | Seat selection for multiplayer |
 
-Player setup: mode selection on landing page or lobby; solo is default.
-
-## 6.3 4D Connect
+### 9.4 4D Connect
 Game fantasy:
-- Place and align pieces across four-dimensional relationships.
-
-Theme and tone:
-- abstract geometric strategy, deliberate threat reading.
+- strategic placement and alignment across 4D relationships
 
 Players:
-- min 2, max 2
-- solo vs ANPC allowed
+- min 2, max 2 canonical multiplayer
+- local hot-seat support can expose multiple local seats in current build
 - spectating allowed
 
-Pieces/elements:
-- 4D board representation
-- player pieces
-- axis/face visualization aids
-- turn-based placement system
-
-Core rules:
-1. players alternate placing one piece per turn
-2. victory is required alignment along a valid 4D axis
-3. board fill with no alignment is draw
-4. full-board visibility is required
-5. strategic blocking and threat-building are required gameplay primitives
-
 Primary modes:
-- local hot-seat (1–4 human players, keyboard 1–4 to switch)
+- local hot-seat
 - ranked duel
 - casual duel
-- solo vs ANPC
-- puzzle/challenge boards (optional extension)
+- solo vs ANPC (planned/optional extension)
 
-Launch button inventory (4DTicTacToe/index.html):
+Launch button inventory (4DTicTacToe/index.html legacy path):
 
 | Button / Action | Selector / Handler | Auth required | Description |
 |---|---|---|---|
-| PLAY (portal card) | index.html portal card `goToGame('/4DTicTacToe/')` | No | Routes to 4D game surface |
-| Player card click | `card.addEventListener('click', () => selectPlayer(playerId))` | No | Selects active player 1–4 |
-| Key 1–4 | keyboard listener → `selectPlayer(n)` | No | Switch active player by keyboard |
-| CAM: FOLLOW | `#cam-btn` ctrl-btn | No | Toggles follow-ball vs free camera |
-| RESET VIEW | `#reset-view-btn` ctrl-btn | No | Returns camera to default position |
-| NEW GAME | `#new-game-btn` ctrl-btn (danger) | No | Resets board, scores, all 4 players |
-| REMATCH | `#rematch-btn` (in win overlay) | No | Re-starts with same player config |
-| NEW GAME (overlay) | `#overlay-new-game-btn` (in win overlay, danger) | No | Full reset from win overlay |
+| PLAY (portal card) | goToGame('/4DTicTacToe/') | No | Routes to legacy 4D path |
+| Player card click | selectPlayer(playerId) | No | Select active player |
+| Key 1-4 | selectPlayer(n) | No | Switch active player |
+| NEW GAME | #new-game-btn | No | Reset board/scores |
 
-Player setup: all 4 player slots are always on-board. Click a player card or press key 1–4 to select which player is
-currently dropping. Each player has a color (Ruby Red P1, Sapphire Green P2, Royal Purple P3, Gold P4). AI auto-play
-per player is a planned extension; current build is hot-seat only.
-
-## 6.4 Starfighter
+### 9.5 Starfighter
 Game fantasy:
-- High-speed dogfights in shared arenas.
-
-Theme and tone:
-- loud kinetic arcade combat, twitch skill expression.
+- high-speed dogfights in shared arenas
 
 Players:
 - min 1, max 8
 - solo vs ANPC allowed
-- spectating allowed
-
-Pieces/elements:
-- pilot ship
-- arena geometry
-- weapon systems
-- movement model (thrust, turn, evade)
-- match scoreboard/objective tracker
-
-Core rules:
-1. pilots score through kills/objective completion
-2. match ends when objective threshold is reached or timer expires
-3. respawn rules are mode-dependent
-4. positioning and momentum are central skill determinants
-5. kill feedback must be immediate and readable
+- co-op humans + ANPC enemies
 
 Primary modes:
-- solo skirmish vs ANPC waves (default, no auth)
-- co-op squadron (2–4 human + ANPC enemies, auth required)
+- solo skirmish vs ANPC waves
+- co-op squadron
 - free-for-all
 - team battle
 - objective control
@@ -374,217 +446,14 @@ Launch button inventory (starfighter/index.html):
 
 | Button / Action | Selector / Handler | Auth required | Description |
 |---|---|---|---|
-| PLAY SOLO ▶ FREE | `#solo-btn` `onclick="KG_LANDING.playSolo(this)"` | No (guest) | Launches solo ANPC skirmish immediately |
-| SIGN IN FOR CO-OP | `<a href="/login/index.html">` | — | Routes to auth; after login returns to co-op setup |
-| JOIN (invite code) | `onclick="KG_LANDING.openInviteJoin(inviteCodeValue)"` | No (guest join) | Joins private co-op game by 6-char invite code |
-| SKIP TRAINING | `onclick="Starfighter._skipTraining()"` (in-game) | — | Skips training mission |
-| PAUSE ⏸ | `onclick="Starfighter.togglePause()"` (in-game HUD) | — | Pause/resume |
-| ← LEAVE GAME | `onclick="Starfighter.exitGame()"` (in-game HUD) | — | Returns to landing |
-| Emergency RTB | `onclick="Starfighter.emergencyRTB()"` (in-game) | — | Warps ship to base |
-| Call Tanker | `onclick="Starfighter.callTanker()"` (in-game) | — | Requests fuel resupply |
-| Call Medic | `onclick="Starfighter.callMedic()"` (in-game) | — | Requests hull repair |
-| RESCUE | `onclick="SFRescue.requestRescue()"` (in-game) | — | Distress beacon |
-| Deploy CM | `onclick="SFThreatSys.deployCM()"` (in-game) | — | Countermeasures |
-| ▶ CLICK TO RESUME | `#fs-resume` `onclick="SFInput.enterImmersive()"` | — | Re-enters fullscreen pointer lock |
+| PLAY SOLO FREE | #solo-btn onclick="KG_LANDING.playSolo(this)" | No | Launches solo skirmish |
+| SIGN IN FOR CO-OP | /login/index.html link | Yes for host | Routes to auth for co-op |
+| JOIN (invite code) | onclick="KG_LANDING.openInviteJoin(inviteCodeValue)" | Guest join allowed | Join private co-op by code |
+| LEAVE GAME | onclick="Starfighter.exitGame()" | No | Returns to landing |
 
-Player setup: solo requires no config; co-op host creates private room and shares 6-char code.
+## 10. URL, Filepath, and Naming Standards
 
-## 6.5 Assemble
-Game fantasy:
-- Fit parts into complete items under turn or time constraints.
-
-Theme and tone:
-- tactile satisfying construction puzzle-play.
-
-Players:
-- min 1, max 4
-- solo free-build allowed
-- spectating allowed
-
-Pieces/elements:
-- part pool
-- target assemblies
-- fit validation system
-- completion scoring
-
-Core rules:
-1. valid fits advance item completion
-2. invalid fits consume opportunity (turn/time)
-3. completed items grant score
-4. win by highest score or target completion condition
-5. tie state is valid when scores match at end
-
-Primary modes:
-- solo free-build (default, no auth)
-- timed build race
-- turn-based build match
-- co-op assembly challenge
-
-Launch button inventory (assemble/index.html):
-
-| Button / Action | Selector / Handler | Auth required | Description |
-|---|---|---|---|
-| PLAY (portal card) | `goToGame('/assemble/')` | No | Routes to Assemble free-build tool |
-| 💡 Battery + Bulb | `onclick="loadFeatured('battery_bulb')"` | No | Loads starter electrical build |
-| 🌀 Motor + Fan | `onclick="loadFeatured('motor_fan')"` | No | Loads starter mechanical build |
-| ♨ Boiler + Gauge | `onclick="loadFeatured('boiler_gauge')"` | No | Loads starter pressure build |
-| 📍 SNAP: ON/OFF | `#btn-snap` `onclick="toggleSnap()"` | No | Toggles magnetic part snapping |
-| 🧲 AUTO-CONNECT: ON/OFF | `#btn-autoconnect` `onclick="toggleAutoConnect()"` | No | Toggles auto-joint detection |
-
-Player setup: free-build is single-player; multiplayer modes use a lobby (planned) with seat count 1–4.
-
-## 6.6 Cubic
-Game fantasy:
-- 3D Tetris — polycube pieces descend into a 4×4×20 glass tower. Clear full layers to survive.
-
-Theme and tone:
-- dark sci-fi, precise, meditative under pressure. Jewel-tone glass pieces against void.
-
-Players:
-- min 1, max 1 (solo)
-- no multiplayer in v1.0
-
-Pieces/elements:
-- 7 polycube piece types (I, O, T, S, Z, J, L) defined in XZ-plane
-- 4×4×20 well (COLS=4, DEPTH=4, ROWS=20)
-- ghost piece (semi-transparent hard-drop preview)
-- next-piece preview (separate mini Three.js scene, auto-rotates)
-- layer-clear animation
-
-Core rules:
-1. gravity pulls active piece downward; rate accelerates with level
-2. player rotates on two axes (Y and X) and translates on X and Z
-3. piece locks after 0.5 s on-surface or hard drop
-4. clearing a full 4×4 horizontal layer scores and shifts board down
-5. game ends when a new piece cannot spawn (tower full)
-
-Scoring:
-- single: 100×level, double: 300×level, triple: 500×level, quad: 800×level
-- hard drop: +2×distance, soft drop: +gravity×dt per frame
-
-Primary modes:
-- solo survival (single mode in v1.0)
-
-Launch button inventory (cubic3d/index.html):
-
-| Button / Action | Selector / Handler | Auth required | Description |
-|---|---|---|---|
-| PLAY CUBIC (portal card) | `goToGame('/cubic3d/')` | No | Routes to Cubic game surface |
-| START GAME | `#start-btn` `addEventListener('click')` state=menu | No | Starts new game from menu |
-| PLAY AGAIN | `#start-btn` (re-labelled) state=gameover | No | Restarts after game over |
-
-Keyboard controls:
-
-| Key | Action |
-|---|---|
-| ← / → | Move piece on X axis |
-| ↑ / ↓ | Move piece on Z axis (depth) |
-| A / D | Rotate piece on Y axis |
-| W / S | Rotate piece on X axis |
-| Space | Hard drop (instant lock) |
-| Shift | Soft drop (accelerated descent) |
-| P | Pause / resume |
-| Drag / scroll | Orbit camera |
-
-Player setup: no configuration — single player, game begins immediately on START.
-
-Manifold registration:
-- dimension: x=4 (cols), y=4 (depth), z=16 (cells/layer, z=x×y ✓)
-- expression: z = x·y
-- substrate: Gyroid (well visual skin)
-- lens: Schwartz Diamond (wall geometry, read-only)
-
----
-
-## 7. Setup Wizard Specification (All Games)
-
-### 7.1 Wizard Entry Points
-Wizard opens from:
-- Play click on game card (portal home, discover, lounge)
-- Create Match quick-action in game lobby
-- Join Match from lounge/discover/lobby
-- Invite code entry box on game landing page (Starfighter, FastTrack)
-
-Wizard is NOT used for:
-- Cubic: single-player only, no config needed; START GAME is the full entry.
-- Assemble free-build: no opponent config; just opens the tool.
-- Starfighter solo: no config; PLAY SOLO ▶ FREE launches directly.
-
-### 7.2 Wizard Step Model
-Standard setup wizard steps:
-1. Select mode
-2. Select player count and team structure
-3. Select privacy (public/private/friends/invite-only)
-4. Select ruleset and match options
-5. Review and create
-
-### 7.3 Host Controls
-Host can define:
-- seat count within game bounds
-- mode-specific parameters
-- whether join approval is required
-- invite code generation/expiration behavior
-
-### 7.4 Validation Rules
-- cannot exceed game max players
-- required fields must be complete before create
-- private/invite modes must produce valid invite artifact
-- invalid configurations are blocked with clear reason text
-
-## 8. Modes of Play Wizard Specification
-
-### 8.1 Global Mode Taxonomy
-Every game supports applicable subsets of these modes. Auth column reflects current implementation.
-
-| Mode | FastTrack | BrickBreaker | 4D Connect | Starfighter | Assemble | Cubic |
-|---|---|---|---|---|---|---|
-| Solo / Single-player | ✓ (time trial) | ✓ (campaign) | ✓ (hot-seat) | ✓ (vs ANPC) | ✓ (free-build) | ✓ (survival) |
-| vs AI / Bot | ✓ no-auth | planned | planned | ✓ ANPC | planned | — |
-| Public Match | ✓ auth | ✓ auth | planned | planned | planned | — |
-| Private / Invite Code | ✓ auth | planned | planned | ✓ guest join | planned | — |
-| Co-op | — | ✓ auth | — | ✓ auth | ✓ auth | — |
-| Ranked | planned | planned | ✓ auth | planned | planned | — |
-| Casual | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Tournament | optional | optional | optional | optional | optional | — |
-
-### 8.2 Mode Wizard Copy Requirements
-Per mode card, include:
-- mode name
-- one-line promise
-- expected duration
-- player count range
-- whether progression/ranking is affected
-
-### 8.3 Join Flow Outcomes
-- approved join: player enters lobby with ready toggle
-- pending join: waits in pending state panel
-- denied join: receives reason and rejoin options
-- invalid invite: clear error and retry path
-
-## 9. Landing and In-Flow Text Specification
-
-### 9.1 Global CTA Text
-- Primary: Play Now
-- Secondary: Explore Games
-- Tertiary: Learn the Rules
-
-### 9.2 Core Status Text
-- Waiting for Host
-- Pending Approval
-- Ready
-- Not Ready
-- Match Starting
-- Invite Code Copied
-- Invalid Invite Code
-
-### 9.3 Empty-State Text
-- Lounge empty: "No public matches live right now. Start one and set the pace."
-- Discover no results: "No games match those filters. Clear filters to see all five games."
-- Lobby no players: "You are first in this lobby. Invite players or switch to public."
-
-## 10. URL, Filepath, and Filename Format Standards
-
-## 10.1 URL Format (Canonical)
+### 10.1 Canonical URLs
 Portal-level:
 - /
 - /discover
@@ -597,141 +466,49 @@ Portal-level:
 - /verify-email
 
 Per-game canonical:
-- /{game-slug}/
-- /{game-slug}/lobby
-- /{game-slug}/play
-- /{game-slug}/modes
-- /{game-slug}/rules
-
-Allowed game-slug values:
-- fasttrack
-- brickbreaker3d
-- 4dconnect
-- starfighter
-- assemble
-- cubic3d
+- /fasttrack/
+- /brickbreaker3d/
+- /4dconnect/
+- /starfighter/
 
 Compatibility alias (temporary):
 - /4DTicTacToe/* redirects to /4dconnect/*
 
-## 10.2 Filepath Format (Canonical)
-Root portal pages:
-- kensgames-portal/manifold/index.html
-- kensgames-portal/manifold/discover.html
-- kensgames-portal/manifold/lounge.html
-- kensgames-portal/manifold/showcase.html
+### 10.2 Filepath Format (Current + Target)
+Current implementation roots are repo-root HTML and game folders.
+Canonical target convention for new work:
+- {repo}/manifold/index.html
+- {repo}/manifold/discover.html
+- {repo}/manifold/lounge.html
+- {repo}/manifold/showcase.html
+- {repo}/manifold/{game-slug}/index.html
+- {repo}/manifold/{game-slug}/lobby.html (multiplayer)
+- {repo}/manifold/{game-slug}/play.html (if separate)
 
-Per-game pages:
-- kensgames-portal/manifold/{game-slug}/index.html
-- kensgames-portal/manifold/{game-slug}/lobby.html  (not required for solo-only games)
-- kensgames-portal/manifold/{game-slug}/play.html   (not required when play surface is index.html)
-
-Seed identity files:
-- universe/games/{game-slug}/{game-slug}.x.json
-
-Cubic-specific paths:
-- cubic3d/index.html          — play surface (menu + game + gameover in one page)
-- cubic3d/manifold.game.json  — manifold registration
-
-## 10.3 Filename Format Rules
+### 10.3 Naming Rules
 - lowercase kebab-case for new route-oriented filenames
-- keep .x.json naming for universe seed filesyes aatThe
-- avoid mixed-case game directory names for new work
-- reserve uppercase-only exceptions for legacy compatibility paths
+- one canonical ID and one canonical slug per game
+- keep legacy mixed-case paths only for temporary compatibility
 
-## 10.4 Naming and ID Rules
-- One canonical ID per game.
-- One canonical slug per game.
-- Display names may include spaces/case styling.
-- URLs and directories must use canonical slug.
+## 11. Compliance Matrix
+1. Only four canonical games are shown as live games in navigation, discovery, and home featured sections.
+2. Each canonical game has a landing/entry and play surface.
+3. Multiplayer games expose lobby and invite-code join flows.
+4. Solo-first entry remains available where applicable without forced auth.
+5. Launch validation enforces readiness and minimum player constraints.
+6. On launch validation failure, Play with Bots fallback is offered where supported.
+7. Home landing respects the 3-featured-in-viewport rule and corrected list behavior.
+8. Canonical URL and naming rules are followed, with temporary 4DTicTacToe compatibility alias retained.
 
-## 11. Game Card and Lobby Element Inventory
+## 12. Acceptance Criteria
+1. A new user can understand each live game in under 30 seconds from landing pages.
+2. A logged-in host can create a valid private multiplayer lobby in under 20 seconds.
+3. A guest can start a solo session in under 10 seconds where solo guest mode is supported.
+4. Invite-code joins clearly indicate success/failure and next action.
+5. Launch button never enables while lobby validity rules are unmet.
+6. All lobby participants receive real-time synchronized slot state updates.
+7. Smartphone UI preserves readable controls and fixed bottom control zone.
+8. Home page shows exactly 3 featured games in first viewport and separate full + coming soon sections beneath.
 
-### 11.1 Required Game Card Elements
-- game title
-- one-line description
-- player count
-- duration
-- mode tags
-- state badge (solo, multiplayer, ranked, NEW for new games)
-- play CTA
-
-### 11.0 Portal Launch Button Summary (All 6 Games)
-
-| Game | Portal Card CTA | Routes to | Guest play? |
-|---|---|---|---|
-| FastTrack | PLAY FASTTRACK ▶ | /fasttrack/ | Bot mode only |
-| BrickBreaker 3D | PLAY BRICKBREAKER ▶ | /brickbreaker3d/ | Yes (solo) |
-| 4D Connect | PLAY 4D TICTACTOE ▶ | /4DTicTacToe/ | Yes (hot-seat) |
-| Starfighter | PLAY STARFIGHTER ▶ | /starfighter/ | Yes (PLAY SOLO ▶ FREE) |
-| Assemble | BUILD CONTRAPTION ▶ | /assemble/ | Yes (free-build) |
-| Cubic | PLAY CUBIC ▶ | /cubic3d/ | Yes (solo, START GAME) |
-
-### 11.2 Required Lobby Elements
-- host identity
-- seat list and readiness
-- mode summary
-- rule summary snapshot
-- invite controls
-- start conditions checklist
-
-## 12. Match Lifecycle Requirements
-1. Discover/select game
-2. Enter game landing
-3. Enter lobby
-4. Complete setup wizard
-5. Fill seats and ready-up
-6. Launch match
-7. Complete match
-8. Return to results and replay options
-
-Post-match requirements:
-- show placement and stats
-- offer rematch with same settings
-- offer return to lounge
-- offer mode switch without full re-entry
-
-## 13. Compliance Matrix (What Must Be True)
-1. All 6 games are represented in navigation, discovery, and the portal home arcade wall + featured games grid.
-2. Each game has at minimum a landing/entry page and a play surface.
-3. Multiplayer games have lobby and invite-code join flows.
-4. Solo-first games (Cubic, Assemble, BrickBreaker solo) are plaD W      yable without auth.
-5. Setup and mode selection are wizard-driven and consistent for multiplayer games.
-6. URL and filepath patterns are predictable and canonical.
-7. Legacy 4DTicTacToe paths remain compatible during migration.
-8. Game-specific rules preserve each game's identity and invariants.
-9. Every game satisfies the manifold axiom z = x·y in its manifold.game.json dimension block.
-10. All portal card play buttons use goToGame('/{slug}/') pattern.
-
-## 14. Acceptance Criteria
-1. A new user can understand each game in under 30 seconds from its landing page.
-2. A logged-in user can create a valid multiplayer match in under 20 seconds via wizard.
-3. A guest user can start a solo session in under 10 seconds (no auth, no wizard, one button).
-4. A friend can join private play using invite flow without ambiguity.
-5. Every game route and file path follows canonical naming rules.
-6. No page depends on hidden game-specific setup logic outside the wizard model.
-7. The portal home arcade wall shows all 6 console cards.
-8. The portal home featured games grid shows all 6 game cards with correct CTAs.
-9. Cubic START GAME button is present and functional at /cubic3d/.
-10. FastTrack lobby shows all 4 quick-action play-mode buttons before and after auth.
-
-## 15. Source Alignment Notes
-This spec aligns with existing canonical identity files and portal configuration, including:
-- universe game seeds for fasttrack, brickbreaker3d, 4dconnect, starfighter, assemble
-- manifold.portal.json game registry (6 games including cubic3d)
-- per-game manifold.game.json files
-- portal game registry and page inventory
-- gameplay onboarding flow principles (public browse, auth-to-play, lobby-first setup)
-
-If implementation and this spec diverge, the product decision process should update this document and the corresponding universe seeds together.
-
-## 16. Human vs AI Player Setup — Per-Game Reference
-
-| Game | Human seats | AI/Bot seats | Config surface | Notes |
-|---|---|---|---|---|
-| FastTrack | 2–4 | 0–3 (fill to 4) | Lobby wizard | Host explicitly adds bots; `playOfflineWithAI()` = all bots |
-| BrickBreaker 3D | 1–4 | 0–3 | Lobby (planned) | Solo default; bots fill empty seats |
-| 4D Connect | 1–4 | planned | Inline — player cards | All 4 slots always present; AI planned per slot |
-| Starfighter | 1–4 | ANPC enemies always | Landing page | Co-op humans join via invite code; enemies are always AI |
-| Assemble | 1–4 | planned | Lobby (planned) | Free-build is solo; competitive modes need lobby |
-| Cubic | 1 | 0 | None (single-player only) | No opponent; gravity is the adversary |
+## 13. Scope Note
+Assemble and Cubic are not canonical live games in this 4-game spec revision. They may appear only in Coming Soon or archival references until reintroduced by a future superseding specification.

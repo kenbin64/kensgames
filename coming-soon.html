@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kens Games | Coming Soon</title>
+  <meta name="description"
+    content="Kens Games is entering MVP lock. ButterflyFX and X-Dimensional programming are shaping the next release." />
+  <style>
+    :root {
+      --bg-0: #020611;
+      --bg-1: #041326;
+      --cyan: #43f0ff;
+      --amber: #f9c24a;
+      --text: #e7f8ff;
+      --muted: #8fb8c7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 30% 20%, #0a2746 0%, var(--bg-0) 55%, #000 100%);
+      color: var(--text);
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 1;
+      padding: 24px;
+      background: linear-gradient(to bottom, rgba(2, 6, 17, 0.35), rgba(2, 6, 17, 0.65));
+    }
+
+    .card {
+      width: min(920px, 96vw);
+      backdrop-filter: blur(6px);
+      background: rgba(2, 9, 18, 0.66);
+      border: 1px solid rgba(67, 240, 255, 0.34);
+      box-shadow: 0 0 36px rgba(67, 240, 255, 0.24), inset 0 0 26px rgba(67, 240, 255, 0.08);
+      border-radius: 16px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      color: var(--amber);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      text-shadow: 0 0 18px rgba(67, 240, 255, 0.45);
+    }
+
+    h2 {
+      margin: 8px 0 18px;
+      font-size: clamp(1rem, 2.4vw, 1.4rem);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    p {
+      margin: 10px auto;
+      max-width: 760px;
+      line-height: 1.55;
+      color: var(--muted);
+      font-size: clamp(0.94rem, 1.6vw, 1.06rem);
+    }
+
+    .pill {
+      display: inline-block;
+      margin-top: 14px;
+      border: 1px solid rgba(249, 194, 74, 0.55);
+      color: var(--amber);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .footer {
+      margin-top: 16px;
+      font-size: 0.82rem;
+      color: #7ea1af;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="stage"></canvas>
+  <div class="overlay">
+    <section class="card" aria-label="Kens Games Coming Soon">
+      <div class="eyebrow">MVP Lock In Progress</div>
+      <h1>Kens Games</h1>
+      <h2>Immersive Systems. Dimensional Intelligence. Coming Soon.</h2>
+      <p>
+        Kens Games is preparing a focused MVP release. Public access is temporarily limited while we complete strict
+        validation, bug closure, and release-gate checks.
+      </p>
+      <p>
+        This platform is built with <strong>ButterflyFX</strong>, where <strong>X-Dimensional Programming</strong> is a
+        core
+        operating paradigm. We model systems as manifold expressions so truth is derived, validated, and governed at
+        each release step.
+      </p>
+      <div class="pill">Only Production-Ready Artifacts Reach Prod</div>
+      <div class="footer">Created by Kenneth Bingham | ButterflyFX</div>
+    </section>
+  </div>
+  <script>
+    const c = document.getElementById('stage');
+    const ctx = c.getContext('2d');
+    let w = c.width = innerWidth;
+    let h = c.height = innerHeight;
+    const stars = Array.from({ length: 1400 }, () => ({
+      x: (Math.random() - 0.5) * w * 1.8,
+      y: (Math.random() - 0.5) * h * 1.8,
+      z: Math.random() * w,
+      pz: 0
+    }));
+
+    function resize() {
+      w = c.width = innerWidth;
+      h = c.height = innerHeight;
+    }
+    addEventListener('resize', resize);
+
+    function frame() {
+      ctx.fillStyle = 'rgba(1,6,14,0.38)';
+      ctx.fillRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2;
+      for (const s of stars) {
+        s.z -= 5.4;
+        if (s.z <= 1) {
+          s.x = (Math.random() - 0.5) * w * 1.8;
+          s.y = (Math.random() - 0.5) * h * 1.8;
+          s.z = w;
+          s.pz = s.z;
+        }
+
+        const sx = (s.x / s.z) * w + cx;
+        const sy = (s.y / s.z) * h + cy;
+        const px = (s.x / (s.pz || s.z)) * w + cx;
+        const py = (s.y / (s.pz || s.z)) * h + cy;
+
+        const a = Math.min(1, 1.2 - s.z / w);
+        ctx.strokeStyle = `rgba(67,240,255,${a})`;
+        ctx.lineWidth = a * 2.2;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
+
+        s.pz = s.z;
+      }
+
+      // Subtle manifold rings for enveloping depth
+      ctx.save();
+      ctx.translate(cx, cy);
+      for (let i = 0; i < 7; i++) {
+        const r = 100 + i * 82 + Math.sin((performance.now() / 1100) + i) * 8;
+        ctx.strokeStyle = `rgba(249,194,74,${0.03 + i * 0.01})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, r * 0.46, Math.sin(performance.now() / 5000) * 0.25, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      requestAnimationFrame(frame);
+    }
+    frame();
+  </script>
+</body>
+
+</html>

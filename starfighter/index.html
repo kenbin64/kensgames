@@ -9,7 +9,9 @@
     (function () {
       try {
         const p = new URLSearchParams(window.location.search);
-        const isPlay = p.has('mode') || p.has('code') || p.has('session');
+        // Check for x-dimensional session or query params
+        const hasDimensionalSession = typeof window.KENSGAMES_SESSION !== 'undefined';
+        const isPlay = hasDimensionalSession || p.has('mode') || p.has('code') || p.has('session');
         if (!isPlay) {
           // Treat /starfighter/ as the landing; gameplay lives behind explicit modes/codes.
           window.location.replace('/starfighter/lobby.html');
@@ -25,6 +27,9 @@
       }
     })();
   </script>
+
+  <!-- X-Dimensional Session Bridge -->
+  <script src="/js/dimensional-session-bridge.js"></script>
   <style>
     * {
       margin: 0;
@@ -89,1993 +94,2020 @@
     }
 
     @keyframes fsResumePulse {
+      @keyframes beePulse {
 
-      0%,
-      100% {
-        opacity: 0.9
+        0%,
+        100% {
+          transform: scale(1);
+          filter: drop-shadow(0 0 32px #ffaa00) drop-shadow(0 0 64px #ff6600);
+        }
+
+        50% {
+          transform: scale(1.12);
+          filter: drop-shadow(0 0 48px #ffcc00) drop-shadow(0 0 88px #ff4400);
+        }
       }
 
-      50% {
-        opacity: 1
+      @keyframes beeBtnGlow {
+
+        0%,
+        100% {
+          box-shadow: 0 0 24px rgba(255, 130, 0, 0.7);
+        }
+
+        50% {
+          box-shadow: 0 0 40px rgba(255, 200, 0, 0.9), 0 0 80px rgba(255, 100, 0, 0.5);
+        }
       }
-    }
 
-    /* ── Canvas fills entire viewport ── */
-    #game-canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: 1
-    }
+      @keyframes fsResumePulse {
 
-    /* ═══════════════════════════════════════
+        0%,
+        100% {
+          opacity: 0.9
+        }
+
+        50% {
+          opacity: 1
+        }
+      }
+
+      /* ── Canvas fills entire viewport ── */
+      #game-canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: 1
+      }
+
+      /* ═══════════════════════════════════════
        CROSSHAIR — always dead center
        ═══════════════════════════════════════ */
-    #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 44px;
-      height: 44px;
-      pointer-events: none;
-      z-index: 15;
-      display: none
-    }
-
-    #crosshair .ring {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 44px;
-      height: 44px;
-      border: 2px solid rgba(100, 255, 100, 0.7);
-      border-radius: 50%
-    }
-
-    #crosshair .dot {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 4px;
-      height: 4px;
-      background: rgba(100, 255, 100, 0.9);
-      border-radius: 50%
-    }
-
-    #crosshair .h-line {
-      position: absolute;
-      top: 50%;
-      left: -10px;
-      width: 64px;
-      height: 1px;
-      background: rgba(100, 255, 100, 0.5);
-      transform: translateY(-50%)
-    }
-
-    #crosshair .v-line {
-      position: absolute;
-      top: -10px;
-      left: 50%;
-      width: 1px;
-      height: 64px;
-      background: rgba(100, 255, 100, 0.5);
-      transform: translateX(-50%)
-    }
-
-    /* Corner brackets */
-    #crosshair .bracket {
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border-color: rgba(100, 255, 100, 0.6);
-      border-style: solid;
-      border-width: 0
-    }
-
-    #crosshair .bracket.tl {
-      top: -14px;
-      left: -14px;
-      border-top-width: 2px;
-      border-left-width: 2px
-    }
-
-    #crosshair .bracket.tr {
-      top: -14px;
-      right: -14px;
-      border-top-width: 2px;
-      border-right-width: 2px
-    }
-
-    #crosshair .bracket.bl {
-      bottom: -14px;
-      left: -14px;
-      border-bottom-width: 2px;
-      border-left-width: 2px
-    }
-
-    #crosshair .bracket.br {
-      bottom: -14px;
-      right: -14px;
-      border-bottom-width: 2px;
-      border-right-width: 2px
-    }
-
-    /* ── Crosshair TRACKING state — amber ── */
-    #crosshair.tracking .ring {
-      border-color: rgba(255, 180, 50, 0.8)
-    }
-
-    #crosshair.tracking .dot {
-      background: rgba(255, 180, 50, 0.9)
-    }
-
-    #crosshair.tracking .h-line,
-    #crosshair.tracking .v-line {
-      background: rgba(255, 180, 50, 0.5)
-    }
-
-    #crosshair.tracking .bracket {
-      border-color: rgba(255, 180, 50, 0.7)
-    }
-
-    /* ── Crosshair LOCKED state — red, pulsing ── */
-    #crosshair.locked .ring {
-      border-color: rgba(255, 50, 50, 0.9);
-      animation: lockPulse 0.6s ease-in-out infinite
-    }
-
-    #crosshair.locked .dot {
-      background: rgba(255, 50, 50, 1.0)
-    }
-
-    #crosshair.locked .h-line,
-    #crosshair.locked .v-line {
-      background: rgba(255, 50, 50, 0.6)
-    }
-
-    #crosshair.locked .bracket {
-      border-color: rgba(255, 50, 50, 0.8)
-    }
-
-    @keyframes lockPulse {
-
-      0%,
-      100% {
-        opacity: 1
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 44px;
+        height: 44px;
+        pointer-events: none;
+        z-index: 15;
+        display: none
       }
 
-      50% {
-        opacity: 0.5
+      #crosshair .ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 44px;
+        height: 44px;
+        border: 2px solid rgba(100, 255, 100, 0.7);
+        border-radius: 50%
       }
-    }
 
-    /* ── Backstory section visibility ── */
-    #panel-backstory {
-      display: none
-    }
+      #crosshair .dot {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 4px;
+        height: 4px;
+        background: rgba(100, 255, 100, 0.9);
+        border-radius: 50%
+      }
 
-    #controls-panel.show-backstory #panel-backstory {
-      display: block
-    }
+      #crosshair .h-line {
+        position: absolute;
+        top: 50%;
+        left: -10px;
+        width: 64px;
+        height: 1px;
+        background: rgba(100, 255, 100, 0.5);
+        transform: translateY(-50%)
+      }
 
-    /* ═══════════════════════════════════════
+      #crosshair .v-line {
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        width: 1px;
+        height: 64px;
+        background: rgba(100, 255, 100, 0.5);
+        transform: translateX(-50%)
+      }
+
+      /* Corner brackets */
+      #crosshair .bracket {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-color: rgba(100, 255, 100, 0.6);
+        border-style: solid;
+        border-width: 0
+      }
+
+      #crosshair .bracket.tl {
+        top: -14px;
+        left: -14px;
+        border-top-width: 2px;
+        border-left-width: 2px
+      }
+
+      #crosshair .bracket.tr {
+        top: -14px;
+        right: -14px;
+        border-top-width: 2px;
+        border-right-width: 2px
+      }
+
+      #crosshair .bracket.bl {
+        bottom: -14px;
+        left: -14px;
+        border-bottom-width: 2px;
+        border-left-width: 2px
+      }
+
+      #crosshair .bracket.br {
+        bottom: -14px;
+        right: -14px;
+        border-bottom-width: 2px;
+        border-right-width: 2px
+      }
+
+      /* ── Crosshair TRACKING state — amber ── */
+      #crosshair.tracking .ring {
+        border-color: rgba(255, 180, 50, 0.8)
+      }
+
+      #crosshair.tracking .dot {
+        background: rgba(255, 180, 50, 0.9)
+      }
+
+      #crosshair.tracking .h-line,
+      #crosshair.tracking .v-line {
+        background: rgba(255, 180, 50, 0.5)
+      }
+
+      #crosshair.tracking .bracket {
+        border-color: rgba(255, 180, 50, 0.7)
+      }
+
+      /* ── Crosshair LOCKED state — red, pulsing ── */
+      #crosshair.locked .ring {
+        border-color: rgba(255, 50, 50, 0.9);
+        animation: lockPulse 0.6s ease-in-out infinite
+      }
+
+      #crosshair.locked .dot {
+        background: rgba(255, 50, 50, 1.0)
+      }
+
+      #crosshair.locked .h-line,
+      #crosshair.locked .v-line {
+        background: rgba(255, 50, 50, 0.6)
+      }
+
+      #crosshair.locked .bracket {
+        border-color: rgba(255, 50, 50, 0.8)
+      }
+
+      @keyframes lockPulse {
+
+        0%,
+        100% {
+          opacity: 1
+        }
+
+        50% {
+          opacity: 0.5
+        }
+      }
+
+      /* ── Backstory section visibility ── */
+      #panel-backstory {
+        display: none
+      }
+
+      #controls-panel.show-backstory #panel-backstory {
+        display: block
+      }
+
+      /* ═══════════════════════════════════════
        MOBILE TOUCH HUD
        ═══════════════════════════════════════ */
-    #mobile-hud {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 20;
-    }
-
-    /* Nav Sphere — bottom center */
-    #mob-nav-sphere {
-      position: absolute;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 130px;
-      height: 130px;
-      border-radius: 50%;
-      border: 2.5px solid rgba(0, 255, 255, 0.4);
-      background: radial-gradient(circle at 40% 35%, rgba(0, 80, 120, 0.4), rgba(0, 20, 40, 0.6));
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 30px rgba(0, 255, 255, 0.05);
-      pointer-events: auto;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    #mob-nav-sphere.active {
-      border-color: rgba(0, 255, 255, 0.7);
-      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 40px rgba(0, 255, 255, 0.1);
-    }
-
-    #mob-nav-knob {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 44px;
-      height: 44px;
-      margin: -22px 0 0 -22px;
-      background: radial-gradient(circle, rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.15));
-      border: 2px solid rgba(0, 255, 255, 0.7);
-      border-radius: 50%;
-      transition: transform 0.06s ease-out;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-    }
-
-    .mob-nav-label {
-      position: absolute;
-      top: -18px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 9px;
-      color: rgba(0, 255, 255, 0.5);
-      font-family: 'Courier New', monospace;
-      letter-spacing: 2px;
-      pointer-events: none;
-    }
-
-    .mob-nav-thrust-label {
-      position: absolute;
-      bottom: -16px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 8px;
-      color: rgba(0, 255, 200, 0.4);
-      font-family: 'Courier New', monospace;
-      letter-spacing: 1px;
-      pointer-events: none;
-    }
-
-    /* Action button group — top-right, compact */
-    #mob-btn-group {
-      position: absolute;
-      right: 10px;
-      top: 60px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      pointer-events: auto;
-    }
-
-    .mob-btn {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      border: 2px solid rgba(0, 255, 255, 0.4);
-      background: rgba(0, 20, 40, 0.5);
-      color: #0ff;
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      font-weight: bold;
-      text-align: center;
-      pointer-events: auto;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .mob-btn:active,
-    .mob-btn.active {
-      background: rgba(0, 255, 255, 0.2);
-      border-color: #0ff;
-      box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
-    }
-
-    .mob-btn:focus-visible {
-      outline: 1px solid #0ff;
-      outline-offset: 2px;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-    }
-
-    .mob-btn:focus:not(:focus-visible) {
-      outline: none;
-    }
-
-    .mob-lock {
-      border-color: rgba(255, 0, 255, 0.5);
-      color: #f0f;
-    }
-
-    .mob-ab {
-      border-color: rgba(255, 255, 0, 0.5);
-      color: #ff0;
-    }
-
-    .mob-boost {
-      border-color: rgba(0, 160, 255, 0.5);
-      color: #0af;
-    }
-
-    .mob-rtb {
-      border-color: rgba(255, 68, 68, 0.6);
-      color: #f44;
-    }
-
-    /* Hint bar — fades out after 5s */
-    .mob-hint {
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 14px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 4px;
-      color: rgba(0, 255, 255, 0.7);
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      white-space: nowrap;
-      pointer-events: none;
-      animation: hintFade 6s ease forwards;
-    }
-
-    @keyframes hintFade {
-
-      0%,
-      70% {
-        opacity: 1;
+      #mobile-hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 20;
       }
 
-      100% {
-        opacity: 0;
+      /* Nav Sphere — bottom center */
+      #mob-nav-sphere {
+        position: absolute;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        border: 2.5px solid rgba(0, 255, 255, 0.4);
+        background: radial-gradient(circle at 40% 35%, rgba(0, 80, 120, 0.4), rgba(0, 20, 40, 0.6));
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 30px rgba(0, 255, 255, 0.05);
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
       }
-    }
 
-    /* Hide desktop console buttons on mobile */
-    @media (max-width: 1023px) and (hover: none) and (pointer: coarse) {
-      #console-buttons {
-        display: none !important;
+      #mob-nav-sphere.active {
+        border-color: rgba(0, 255, 255, 0.7);
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 40px rgba(0, 255, 255, 0.1);
       }
 
-      #ctrl-overlay,
-      #ctrl-hamburger {
-        display: none !important;
+      #mob-nav-knob {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 44px;
+        height: 44px;
+        margin: -22px 0 0 -22px;
+        background: radial-gradient(circle, rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.15));
+        border: 2px solid rgba(0, 255, 255, 0.7);
+        border-radius: 50%;
+        transition: transform 0.06s ease-out;
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
       }
-    }
 
-    /* ═══════════════════════════════════════
+      .mob-nav-label {
+        position: absolute;
+        top: -18px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 9px;
+        color: rgba(0, 255, 255, 0.5);
+        font-family: 'Courier New', monospace;
+        letter-spacing: 2px;
+        pointer-events: none;
+      }
+
+      .mob-nav-thrust-label {
+        position: absolute;
+        bottom: -16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 8px;
+        color: rgba(0, 255, 200, 0.4);
+        font-family: 'Courier New', monospace;
+        letter-spacing: 1px;
+        pointer-events: none;
+      }
+
+      /* Action button group — top-right, compact */
+      #mob-btn-group {
+        position: absolute;
+        right: 10px;
+        top: 60px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: auto;
+      }
+
+      .mob-btn {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 2px solid rgba(0, 255, 255, 0.4);
+        background: rgba(0, 20, 40, 0.5);
+        color: #0ff;
+        font-family: 'Courier New', monospace;
+        font-size: 9px;
+        font-weight: bold;
+        text-align: center;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .mob-btn:active,
+      .mob-btn.active {
+        background: rgba(0, 255, 255, 0.2);
+        border-color: #0ff;
+        box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+      }
+
+      .mob-btn:focus-visible {
+        outline: 1px solid #0ff;
+        outline-offset: 2px;
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+      }
+
+      .mob-btn:focus:not(:focus-visible) {
+        outline: none;
+      }
+
+      .mob-lock {
+        border-color: rgba(255, 0, 255, 0.5);
+        color: #f0f;
+      }
+
+      .mob-ab {
+        border-color: rgba(255, 255, 0, 0.5);
+        color: #ff0;
+      }
+
+      .mob-boost {
+        border-color: rgba(0, 160, 255, 0.5);
+        color: #0af;
+      }
+
+      .mob-rtb {
+        border-color: rgba(255, 68, 68, 0.6);
+        color: #f44;
+      }
+
+      /* Hint bar — fades out after 5s */
+      .mob-hint {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(0, 255, 255, 0.25);
+        border-radius: 4px;
+        color: rgba(0, 255, 255, 0.7);
+        font-family: 'Courier New', monospace;
+        font-size: 9px;
+        white-space: nowrap;
+        pointer-events: none;
+        animation: hintFade 6s ease forwards;
+      }
+
+      @keyframes hintFade {
+
+        0%,
+        70% {
+          opacity: 1;
+        }
+
+        100% {
+          opacity: 0;
+        }
+      }
+
+      /* Hide desktop console buttons on mobile */
+      @media (max-width: 1023px) and (hover: none) and (pointer: coarse) {
+        #console-buttons {
+          display: none !important;
+        }
+
+        #ctrl-overlay,
+        #ctrl-hamburger {
+          display: none !important;
+        }
+      }
+
+      /* ═══════════════════════════════════════
        CONSOLE TOGGLE BUTTONS — always-visible white rocket console style
        ═══════════════════════════════════════ */
-    #console-buttons {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 25;
-      display: flex;
-      gap: 12px;
-      pointer-events: auto
-    }
-
-    #console-buttons .console-btn {
-      padding: 10px 18px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      color: #c8e0f0;
-      background: linear-gradient(180deg, rgba(40, 50, 65, 0.95) 0%, rgba(20, 28, 38, 0.98) 100%);
-      border: 2px solid rgba(100, 130, 170, 0.5);
-      border-top-color: rgba(140, 180, 220, 0.6);
-      border-bottom-color: rgba(40, 60, 80, 0.8);
-      border-radius: 3px;
-      cursor: pointer;
-      text-transform: uppercase;
-      transition: all 0.15s ease;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 6px rgba(0, 0, 0, 0.5),
-        0 0 1px rgba(100, 160, 220, 0.3);
-      position: relative
-    }
-
-    #console-buttons .console-btn::before {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 4px;
-      right: 4px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(180, 210, 240, 0.2), transparent);
-      border-radius: 1px
-    }
-
-    #console-buttons .console-btn:hover,
-    #console-buttons .console-btn:focus-visible {
-      background: linear-gradient(180deg, rgba(50, 65, 85, 0.95) 0%, rgba(30, 40, 55, 0.98) 100%);
-      border-color: rgba(100, 200, 255, 0.6);
-      color: #e0f0ff;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 12px rgba(0, 180, 255, 0.15);
-      outline: 1px solid rgba(0, 200, 255, 0.5);
-      outline-offset: 2px
-    }
-
-    #console-buttons .console-btn:active {
-      background: linear-gradient(180deg, rgba(20, 28, 38, 0.98) 0%, rgba(40, 50, 65, 0.95) 100%);
-      border-top-color: rgba(40, 60, 80, 0.8);
-      border-bottom-color: rgba(140, 180, 220, 0.6);
-      box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.4),
-        0 1px 2px rgba(0, 0, 0, 0.3);
-      transform: translateY(1px)
-    }
-
-    #console-buttons .console-btn:focus:not(:focus-visible) {
-      outline: none
-    }
-
-    #console-buttons .console-btn.active {
-      background: linear-gradient(180deg, rgba(0, 50, 80, 0.95) 0%, rgba(0, 30, 50, 0.98) 100%);
-      border-color: rgba(0, 200, 255, 0.6);
-      color: #0ff;
-      box-shadow:
-        inset 0 1px 0 rgba(0, 255, 255, 0.1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 10px rgba(0, 200, 255, 0.2)
-    }
-
-    #console-buttons .console-btn.pulse-alert {
-      animation: supportPulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes supportPulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+      #console-buttons {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 25;
+        display: flex;
+        gap: 12px;
+        pointer-events: auto
       }
 
-      50% {
-        box-shadow: 0 0 14px rgba(255, 255, 255, 0.4), 0 0 24px currentColor;
+      #console-buttons .console-btn {
+        padding: 10px 18px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 1.5px;
+        color: #c8e0f0;
+        background: linear-gradient(180deg, rgba(40, 50, 65, 0.95) 0%, rgba(20, 28, 38, 0.98) 100%);
+        border: 2px solid rgba(100, 130, 170, 0.5);
+        border-top-color: rgba(140, 180, 220, 0.6);
+        border-bottom-color: rgba(40, 60, 80, 0.8);
+        border-radius: 3px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: all 0.15s ease;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+          0 2px 6px rgba(0, 0, 0, 0.5),
+          0 0 1px rgba(100, 160, 220, 0.3);
+        position: relative
       }
-    }
 
-    /* ═══════════════════════════════════════
+      #console-buttons .console-btn::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        right: 4px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(180, 210, 240, 0.2), transparent);
+        border-radius: 1px
+      }
+
+      #console-buttons .console-btn:hover,
+      #console-buttons .console-btn:focus-visible {
+        background: linear-gradient(180deg, rgba(50, 65, 85, 0.95) 0%, rgba(30, 40, 55, 0.98) 100%);
+        border-color: rgba(100, 200, 255, 0.6);
+        color: #e0f0ff;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+          0 2px 8px rgba(0, 0, 0, 0.5),
+          0 0 12px rgba(0, 180, 255, 0.15);
+        outline: 1px solid rgba(0, 200, 255, 0.5);
+        outline-offset: 2px
+      }
+
+      #console-buttons .console-btn:active {
+        background: linear-gradient(180deg, rgba(20, 28, 38, 0.98) 0%, rgba(40, 50, 65, 0.95) 100%);
+        border-top-color: rgba(40, 60, 80, 0.8);
+        border-bottom-color: rgba(140, 180, 220, 0.6);
+        box-shadow:
+          inset 0 2px 4px rgba(0, 0, 0, 0.4),
+          0 1px 2px rgba(0, 0, 0, 0.3);
+        transform: translateY(1px)
+      }
+
+      #console-buttons .console-btn:focus:not(:focus-visible) {
+        outline: none
+      }
+
+      #console-buttons .console-btn.active {
+        background: linear-gradient(180deg, rgba(0, 50, 80, 0.95) 0%, rgba(0, 30, 50, 0.98) 100%);
+        border-color: rgba(0, 200, 255, 0.6);
+        color: #0ff;
+        box-shadow:
+          inset 0 1px 0 rgba(0, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+          0 2px 8px rgba(0, 0, 0, 0.5),
+          0 0 10px rgba(0, 200, 255, 0.2)
+      }
+
+      #console-buttons .console-btn.pulse-alert {
+        animation: supportPulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes supportPulse {
+
+        0%,
+        100% {
+          box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+
+        50% {
+          box-shadow: 0 0 14px rgba(255, 255, 255, 0.4), 0 0 24px currentColor;
+        }
+      }
+
+      /* ═══════════════════════════════════════
        AVIATION-STYLE BUTTONS — tutorial / prompt overlays
        ═══════════════════════════════════════ */
-    .avtn-btn {
-      padding: 12px 28px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      border: 2px solid;
-      border-radius: 3px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      position: relative;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-        0 2px 6px rgba(0, 0, 0, 0.5)
-    }
+      .avtn-btn {
+        padding: 12px 28px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        border: 2px solid;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        position: relative;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+          0 2px 6px rgba(0, 0, 0, 0.5)
+      }
 
-    .avtn-btn::before {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 6px;
-      right: 6px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-      border-radius: 1px
-    }
+      .avtn-btn::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 6px;
+        right: 6px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+        border-radius: 1px
+      }
 
-    .avtn-btn-green {
-      color: #b0ffc0;
-      background: linear-gradient(180deg, rgba(20, 70, 40, 0.95) 0%, rgba(10, 40, 20, 0.98) 100%);
-      border-color: rgba(80, 200, 120, 0.6);
-      border-top-color: rgba(120, 240, 160, 0.5);
-      border-bottom-color: rgba(30, 80, 40, 0.8)
-    }
+      .avtn-btn-green {
+        color: #b0ffc0;
+        background: linear-gradient(180deg, rgba(20, 70, 40, 0.95) 0%, rgba(10, 40, 20, 0.98) 100%);
+        border-color: rgba(80, 200, 120, 0.6);
+        border-top-color: rgba(120, 240, 160, 0.5);
+        border-bottom-color: rgba(30, 80, 40, 0.8)
+      }
 
-    .avtn-btn-green:hover,
-    .avtn-btn-green:focus-visible {
-      background: linear-gradient(180deg, rgba(30, 90, 50, 0.95) 0%, rgba(15, 55, 30, 0.98) 100%);
-      border-color: rgba(100, 255, 140, 0.7);
-      color: #d0ffe0;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(80, 255, 120, 0.2);
-      outline: 1px solid rgba(80, 255, 120, 0.4);
-      outline-offset: 2px
-    }
+      .avtn-btn-green:hover,
+      .avtn-btn-green:focus-visible {
+        background: linear-gradient(180deg, rgba(30, 90, 50, 0.95) 0%, rgba(15, 55, 30, 0.98) 100%);
+        border-color: rgba(100, 255, 140, 0.7);
+        color: #d0ffe0;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 2px 8px rgba(0, 0, 0, 0.5),
+          0 0 14px rgba(80, 255, 120, 0.2);
+        outline: 1px solid rgba(80, 255, 120, 0.4);
+        outline-offset: 2px
+      }
 
-    .avtn-btn-green:active {
-      background: linear-gradient(180deg, rgba(10, 40, 20, 0.98) 0%, rgba(20, 70, 40, 0.95) 100%);
-      transform: translateY(1px)
-    }
+      .avtn-btn-green:active {
+        background: linear-gradient(180deg, rgba(10, 40, 20, 0.98) 0%, rgba(20, 70, 40, 0.95) 100%);
+        transform: translateY(1px)
+      }
 
-    .avtn-btn-red {
-      color: #ffc0b0;
-      background: linear-gradient(180deg, rgba(80, 30, 20, 0.95) 0%, rgba(45, 15, 10, 0.98) 100%);
-      border-color: rgba(200, 80, 60, 0.6);
-      border-top-color: rgba(240, 120, 100, 0.5);
-      border-bottom-color: rgba(80, 30, 20, 0.8)
-    }
+      .avtn-btn-red {
+        color: #ffc0b0;
+        background: linear-gradient(180deg, rgba(80, 30, 20, 0.95) 0%, rgba(45, 15, 10, 0.98) 100%);
+        border-color: rgba(200, 80, 60, 0.6);
+        border-top-color: rgba(240, 120, 100, 0.5);
+        border-bottom-color: rgba(80, 30, 20, 0.8)
+      }
 
-    .avtn-btn-red:hover,
-    .avtn-btn-red:focus-visible {
-      background: linear-gradient(180deg, rgba(100, 40, 28, 0.95) 0%, rgba(60, 22, 15, 0.98) 100%);
-      border-color: rgba(255, 100, 80, 0.7);
-      color: #ffe0d0;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(255, 80, 60, 0.2);
-      outline: 1px solid rgba(255, 100, 80, 0.4);
-      outline-offset: 2px
-    }
+      .avtn-btn-red:hover,
+      .avtn-btn-red:focus-visible {
+        background: linear-gradient(180deg, rgba(100, 40, 28, 0.95) 0%, rgba(60, 22, 15, 0.98) 100%);
+        border-color: rgba(255, 100, 80, 0.7);
+        color: #ffe0d0;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 2px 8px rgba(0, 0, 0, 0.5),
+          0 0 14px rgba(255, 80, 60, 0.2);
+        outline: 1px solid rgba(255, 100, 80, 0.4);
+        outline-offset: 2px
+      }
 
-    .avtn-btn-red:active {
-      background: linear-gradient(180deg, rgba(45, 15, 10, 0.98) 0%, rgba(80, 30, 20, 0.95) 100%);
-      transform: translateY(1px)
-    }
+      .avtn-btn-red:active {
+        background: linear-gradient(180deg, rgba(45, 15, 10, 0.98) 0%, rgba(80, 30, 20, 0.95) 100%);
+        transform: translateY(1px)
+      }
 
-    .avtn-btn-dim {
-      color: #889;
-      background: linear-gradient(180deg, rgba(35, 35, 40, 0.9) 0%, rgba(20, 20, 25, 0.95) 100%);
-      border-color: rgba(80, 80, 100, 0.4);
-      border-top-color: rgba(100, 100, 120, 0.3);
-      border-bottom-color: rgba(30, 30, 40, 0.6)
-    }
+      .avtn-btn-dim {
+        color: #889;
+        background: linear-gradient(180deg, rgba(35, 35, 40, 0.9) 0%, rgba(20, 20, 25, 0.95) 100%);
+        border-color: rgba(80, 80, 100, 0.4);
+        border-top-color: rgba(100, 100, 120, 0.3);
+        border-bottom-color: rgba(30, 30, 40, 0.6)
+      }
 
-    .avtn-btn-dim:hover,
-    .avtn-btn-dim:focus-visible {
-      background: linear-gradient(180deg, rgba(45, 45, 55, 0.9) 0%, rgba(28, 28, 35, 0.95) 100%);
-      border-color: rgba(120, 120, 150, 0.5);
-      color: #aab;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 2px 6px rgba(0, 0, 0, 0.5),
-        0 0 8px rgba(100, 100, 150, 0.1);
-      outline: 1px solid rgba(100, 100, 150, 0.3);
-      outline-offset: 2px
-    }
+      .avtn-btn-dim:hover,
+      .avtn-btn-dim:focus-visible {
+        background: linear-gradient(180deg, rgba(45, 45, 55, 0.9) 0%, rgba(28, 28, 35, 0.95) 100%);
+        border-color: rgba(120, 120, 150, 0.5);
+        color: #aab;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 2px 6px rgba(0, 0, 0, 0.5),
+          0 0 8px rgba(100, 100, 150, 0.1);
+        outline: 1px solid rgba(100, 100, 150, 0.3);
+        outline-offset: 2px
+      }
 
-    .avtn-select {
-      padding: 6px 12px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      letter-spacing: 1px;
-      color: #c8e0f0;
-      background: linear-gradient(180deg, rgba(30, 40, 55, 0.95) 0%, rgba(15, 22, 32, 0.98) 100%);
-      border: 1px solid rgba(80, 120, 170, 0.4);
-      border-radius: 2px;
-      cursor: pointer;
-      text-transform: uppercase;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.4)
-    }
+      .avtn-select {
+        padding: 6px 12px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: #c8e0f0;
+        background: linear-gradient(180deg, rgba(30, 40, 55, 0.95) 0%, rgba(15, 22, 32, 0.98) 100%);
+        border: 1px solid rgba(80, 120, 170, 0.4);
+        border-radius: 2px;
+        cursor: pointer;
+        text-transform: uppercase;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.4)
+      }
 
-    .avtn-select:focus {
-      border-color: rgba(0, 200, 255, 0.6);
-      outline: 1px solid rgba(0, 200, 255, 0.3);
-      outline-offset: 1px
-    }
+      .avtn-select:focus {
+        border-color: rgba(0, 200, 255, 0.6);
+        outline: 1px solid rgba(0, 200, 255, 0.3);
+        outline-offset: 1px
+      }
 
-    .avtn-select option {
-      background: #0a1520;
-      color: #c8e0f0
-    }
+      .avtn-select option {
+        background: #0a1520;
+        color: #c8e0f0
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        TUTORIAL LAYOUT CLASSES — used by JS tutorial overlay
        ═══════════════════════════════════════ */
-    .tut-section {
-      background: rgba(0, 20, 40, 0.5);
-      border: 1px solid rgba(0, 150, 200, 0.15);
-      border-radius: 4px;
-      padding: 14px;
-      margin-bottom: 12px
-    }
+      .tut-section {
+        background: rgba(0, 20, 40, 0.5);
+        border: 1px solid rgba(0, 150, 200, 0.15);
+        border-radius: 4px;
+        padding: 14px;
+        margin-bottom: 12px
+      }
 
-    .tut-section-title {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 3px;
-      color: #ffd24a;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      text-shadow: 0 0 8px rgba(255, 210, 74, 0.3)
-    }
+      .tut-section-title {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 3px;
+        color: #ffd24a;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        text-shadow: 0 0 8px rgba(255, 210, 74, 0.3)
+      }
 
-    .tut-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px
-    }
+      .tut-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px
+      }
 
-    .tut-key-group {
-      background: rgba(0, 10, 25, 0.4);
-      border: 1px solid rgba(0, 100, 150, 0.12);
-      border-radius: 3px;
-      padding: 10px
-    }
+      .tut-key-group {
+        background: rgba(0, 10, 25, 0.4);
+        border: 1px solid rgba(0, 100, 150, 0.12);
+        border-radius: 3px;
+        padding: 10px
+      }
 
-    .tut-key-label {
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #0ff;
-      margin-bottom: 6px;
-      text-transform: uppercase
-    }
+      .tut-key-label {
+        font-family: 'Courier New', monospace;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #0ff;
+        margin-bottom: 6px;
+        text-transform: uppercase
+      }
 
-    .tut-binding {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: #99bbcc;
-      margin-bottom: 3px;
-      line-height: 1.6
-    }
+      .tut-binding {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        color: #99bbcc;
+        margin-bottom: 3px;
+        line-height: 1.6
+      }
 
-    .tut-key {
-      display: inline-block;
-      padding: 1px 6px;
-      font-size: 10px;
-      font-weight: bold;
-      color: #e0f0ff;
-      background: linear-gradient(180deg, rgba(40, 55, 75, 0.9) 0%, rgba(25, 35, 50, 0.95) 100%);
-      border: 1px solid rgba(80, 130, 180, 0.4);
-      border-radius: 2px;
-      margin-right: 3px;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)
-    }
+      .tut-key {
+        display: inline-block;
+        padding: 1px 6px;
+        font-size: 10px;
+        font-weight: bold;
+        color: #e0f0ff;
+        background: linear-gradient(180deg, rgba(40, 55, 75, 0.9) 0%, rgba(25, 35, 50, 0.95) 100%);
+        border: 1px solid rgba(80, 130, 180, 0.4);
+        border-radius: 2px;
+        margin-right: 3px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        MISSION BRIEFING PANEL — standalone toggle panel
        ═══════════════════════════════════════ */
-    #mission-panel {
-      display: none;
-      position: absolute;
-      top: 80px;
-      left: 16px;
-      width: 320px;
-      max-height: 60vh;
-      overflow-y: auto;
-      z-index: 22;
-      background: rgba(0, 10, 20, 0.88);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 6px;
-      padding: 16px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      color: #0ff;
-      pointer-events: auto
-    }
+      #mission-panel {
+        display: none;
+        position: absolute;
+        top: 80px;
+        left: 16px;
+        width: 320px;
+        max-height: 60vh;
+        overflow-y: auto;
+        z-index: 22;
+        background: rgba(0, 10, 20, 0.88);
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 16px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        color: #0ff;
+        pointer-events: auto
+      }
 
-    #mission-panel.open {
-      display: block
-    }
+      #mission-panel.open {
+        display: block
+      }
 
-    #mission-panel h3 {
-      color: #ff8800;
-      font-size: 13px;
-      margin-bottom: 8px;
-      letter-spacing: 2px
-    }
+      #mission-panel h3 {
+        color: #ff8800;
+        font-size: 13px;
+        margin-bottom: 8px;
+        letter-spacing: 2px
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        CONTROLS TUTORIAL PANEL — standalone toggle panel
        ═══════════════════════════════════════ */
-    #tutorial-panel {
-      display: none;
-      position: absolute;
-      top: 80px;
-      right: 16px;
-      width: 320px;
-      max-height: 60vh;
-      overflow-y: auto;
-      z-index: 22;
-      background: rgba(0, 10, 20, 0.88);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 6px;
-      padding: 16px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      color: #0ff;
-      pointer-events: auto
-    }
+      #tutorial-panel {
+        display: none;
+        position: absolute;
+        top: 80px;
+        right: 16px;
+        width: 320px;
+        max-height: 60vh;
+        overflow-y: auto;
+        z-index: 22;
+        background: rgba(0, 10, 20, 0.88);
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 16px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        color: #0ff;
+        pointer-events: auto
+      }
 
-    #tutorial-panel.open {
-      display: block
-    }
+      #tutorial-panel.open {
+        display: block
+      }
 
-    #tutorial-panel h3 {
-      color: #0ff;
-      font-size: 13px;
-      margin-bottom: 8px;
-      letter-spacing: 2px
-    }
+      #tutorial-panel h3 {
+        color: #0ff;
+        font-size: 13px;
+        margin-bottom: 8px;
+        letter-spacing: 2px
+      }
 
-    #tutorial-panel ul {
-      list-style: none;
-      padding: 0
-    }
+      #tutorial-panel ul {
+        list-style: none;
+        padding: 0
+      }
 
-    #tutorial-panel li {
-      margin-bottom: 4px;
-      line-height: 1.6
-    }
+      #tutorial-panel li {
+        margin-bottom: 4px;
+        line-height: 1.6
+      }
 
-    #tutorial-panel kbd {
-      display: inline-block;
-      padding: 1px 5px;
-      font-size: 10px;
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 2px;
-      color: #0ff;
-      margin-right: 4px
-    }
+      #tutorial-panel kbd {
+        display: inline-block;
+        padding: 1px 5px;
+        font-size: 10px;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid rgba(0, 255, 255, 0.25);
+        border-radius: 2px;
+        color: #0ff;
+        margin-right: 4px
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        COMM MARQUEE — very top of screen, above cockpit
        ═══════════════════════════════════════ */
-    #comm-ticker {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 28px;
-      overflow: hidden;
-      pointer-events: none;
-      z-index: 20;
-      background: linear-gradient(180deg, rgba(0, 10, 20, 0.6) 0%, transparent 100%)
-    }
-
-    #comm-ticker-inner {
-      display: flex;
-      gap: 60px;
-      white-space: nowrap;
-      animation: marquee 30s linear infinite;
-      font-size: 12px;
-      line-height: 28px;
-      padding-left: 100%
-    }
-
-    @keyframes marquee {
-      0% {
-        transform: translateX(0)
+      #comm-ticker {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 28px;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 20;
+        background: linear-gradient(180deg, rgba(0, 10, 20, 0.6) 0%, transparent 100%)
       }
 
-      100% {
-        transform: translateX(-100%)
+      #comm-ticker-inner {
+        display: flex;
+        gap: 60px;
+        white-space: nowrap;
+        animation: marquee 30s linear infinite;
+        font-size: 12px;
+        line-height: 28px;
+        padding-left: 100%
       }
-    }
 
-    #comm-ticker-inner .comm-item {
-      display: inline
-    }
+      @keyframes marquee {
+        0% {
+          transform: translateX(0)
+        }
 
-    #comm-ticker-inner .comm-item.base {
-      color: #0ff
-    }
+        100% {
+          transform: translateX(-100%)
+        }
+      }
 
-    #comm-ticker-inner .comm-item.ally {
-      color: #0f0
-    }
+      #comm-ticker-inner .comm-item {
+        display: inline
+      }
 
-    #comm-ticker-inner .comm-item.enemy {
-      color: #f00
-    }
+      #comm-ticker-inner .comm-item.base {
+        color: #0ff
+      }
 
-    #comm-ticker-inner .comm-item.warning {
-      color: #f60;
-      font-weight: bold
-    }
+      #comm-ticker-inner .comm-item.ally {
+        color: #0f0
+      }
 
-    /* ═══════════════════════════════════════
+      #comm-ticker-inner .comm-item.enemy {
+        color: #f00
+      }
+
+      #comm-ticker-inner .comm-item.warning {
+        color: #f60;
+        font-weight: bold
+      }
+
+      /* ═══════════════════════════════════════
        SHIP PANEL — full-viewport overlay container
        All cockpit screen overlays live inside this.
        Shown/hidden by core.js on launch.
        ═══════════════════════════════════════ */
-    #ship-panel {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 10;
-      display: none
-    }
+      #ship-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+        display: none
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        CONTROLLER WIREFRAME OVERLAY — bottom-right
        ═══════════════════════════════════════ */
-    #ctrl-overlay {
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
-      z-index: 25;
-      pointer-events: none;
-      opacity: 0.55;
-      transition: opacity 0.3s;
-      display: none
-    }
-
-    #ctrl-overlay:hover {
-      opacity: 0.9
-    }
-
-    #ctrl-overlay svg {
-      display: block;
-      pointer-events: auto
-    }
-
-    #ctrl-overlay .ctrl-label {
-      font-family: 'Courier New', monospace;
-      font-size: 7px;
-      fill: #0ff;
-      dominant-baseline: middle;
-      text-anchor: middle
-    }
-
-    #ctrl-overlay .ctrl-label-action {
-      font-family: 'Courier New', monospace;
-      font-size: 6px;
-      fill: #ff8;
-      dominant-baseline: middle;
-      text-anchor: start
-    }
-
-    #ctrl-overlay .ctrl-wire {
-      fill: none;
-      stroke: rgba(0, 255, 255, 0.4);
-      stroke-width: 1
-    }
-
-    #ctrl-overlay .ctrl-wire-fill {
-      fill: rgba(0, 255, 255, 0.06);
-      stroke: rgba(0, 255, 255, 0.5);
-      stroke-width: 0.8
-    }
-
-    #ctrl-overlay .ctrl-btn-wire {
-      fill: rgba(0, 255, 255, 0.08);
-      stroke: rgba(0, 255, 255, 0.5);
-      stroke-width: 0.6
-    }
-
-    #ctrl-overlay .ctrl-dot {
-      fill: rgba(0, 255, 255, 0.3)
-    }
-
-    /* Mobile hamburger toggle */
-    #ctrl-hamburger {
-      display: none;
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
-      z-index: 26;
-      width: 36px;
-      height: 36px;
-      background: rgba(2, 8, 18, 0.85);
-      border: 1px solid rgba(0, 255, 255, 0.3);
-      border-radius: 6px;
-      cursor: pointer;
-      pointer-events: auto;
-      color: #0ff;
-      font-size: 20px;
-      align-items: center;
-      justify-content: center;
-      line-height: 36px;
-      text-align: center
-    }
-
-    #ctrl-hamburger:hover {
-      background: rgba(0, 40, 80, 0.8)
-    }
-
-    @media(max-width:768px) {
       #ctrl-overlay {
-        display: none !important;
-        bottom: 60px;
-        right: 10px
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        z-index: 25;
+        pointer-events: none;
+        opacity: 0.55;
+        transition: opacity 0.3s;
+        display: none
       }
 
-      #ctrl-overlay.mobile-open {
-        display: block !important
+      #ctrl-overlay:hover {
+        opacity: 0.9
       }
 
+      #ctrl-overlay svg {
+        display: block;
+        pointer-events: auto
+      }
+
+      #ctrl-overlay .ctrl-label {
+        font-family: 'Courier New', monospace;
+        font-size: 7px;
+        fill: #0ff;
+        dominant-baseline: middle;
+        text-anchor: middle
+      }
+
+      #ctrl-overlay .ctrl-label-action {
+        font-family: 'Courier New', monospace;
+        font-size: 6px;
+        fill: #ff8;
+        dominant-baseline: middle;
+        text-anchor: start
+      }
+
+      #ctrl-overlay .ctrl-wire {
+        fill: none;
+        stroke: rgba(0, 255, 255, 0.4);
+        stroke-width: 1
+      }
+
+      #ctrl-overlay .ctrl-wire-fill {
+        fill: rgba(0, 255, 255, 0.06);
+        stroke: rgba(0, 255, 255, 0.5);
+        stroke-width: 0.8
+      }
+
+      #ctrl-overlay .ctrl-btn-wire {
+        fill: rgba(0, 255, 255, 0.08);
+        stroke: rgba(0, 255, 255, 0.5);
+        stroke-width: 0.6
+      }
+
+      #ctrl-overlay .ctrl-dot {
+        fill: rgba(0, 255, 255, 0.3)
+      }
+
+      /* Mobile hamburger toggle */
       #ctrl-hamburger {
-        display: flex
+        display: none;
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        z-index: 26;
+        width: 36px;
+        height: 36px;
+        background: rgba(2, 8, 18, 0.85);
+        border: 1px solid rgba(0, 255, 255, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        pointer-events: auto;
+        color: #0ff;
+        font-size: 20px;
+        align-items: center;
+        justify-content: center;
+        line-height: 36px;
+        text-align: center
       }
-    }
 
-    /* Keep old panel toggle/panel hidden — replaced by overlay */
-    #controls-toggle {
-      display: none
-    }
+      #ctrl-hamburger:hover {
+        background: rgba(0, 40, 80, 0.8)
+      }
 
-    #controls-panel {
-      display: none
-    }
+      @media(max-width:768px) {
+        #ctrl-overlay {
+          display: none !important;
+          bottom: 60px;
+          right: 10px
+        }
 
-    /* ═══════════════════════════════════════
+        #ctrl-overlay.mobile-open {
+          display: block !important
+        }
+
+        #ctrl-hamburger {
+          display: flex
+        }
+      }
+
+      /* Keep old panel toggle/panel hidden — replaced by overlay */
+      #controls-toggle {
+        display: none
+      }
+
+      #controls-panel {
+        display: none
+      }
+
+      /* ═══════════════════════════════════════
        OVERLAYS — countdown, launch, death
        ═══════════════════════════════════════ */
-    #countdown-display {
-      position: absolute;
-      top: 45%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 60;
-      display: none;
-      font-size: 5em;
-      font-weight: bold;
-      color: #ffff00;
-      text-shadow: 0 0 30px #ffff00;
-      font-family: monospace
-    }
-
-    #launch-prompt {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 60;
-      display: none;
-      animation: flashLaunch 0.6s infinite
-    }
-
-    @keyframes flashLaunch {
-
-      0%,
-      100% {
-        opacity: 1;
-        color: #0f0;
-        text-shadow: 0 0 30px #0f0;
-        font-size: 1.8em
+      #countdown-display {
+        position: absolute;
+        top: 45%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 60;
+        display: none;
+        font-size: 5em;
+        font-weight: bold;
+        color: #ffff00;
+        text-shadow: 0 0 30px #ffff00;
+        font-family: monospace
       }
 
-      50% {
-        opacity: 0.3;
-        color: #00ff00;
-        text-shadow: 0 0 50px #00ff00;
-        font-size: 1.9em
+      #launch-prompt {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 60;
+        display: none;
+        animation: flashLaunch 0.6s infinite
       }
-    }
 
-    #launch-prompt b {
-      display: block;
-      font-weight: bold;
-      margin: 12px 0;
-      font-family: monospace;
-      letter-spacing: 2px
-    }
+      @keyframes flashLaunch {
 
-    #death-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(20, 0, 0, 0.85);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      font-size: 3em;
-      color: #f00;
-      text-shadow: 0 0 20px #f00;
-      z-index: 100;
-      pointer-events: auto
-    }
+        0%,
+        100% {
+          opacity: 1;
+          color: #0f0;
+          text-shadow: 0 0 30px #0f0;
+          font-size: 1.8em
+        }
 
-    #death-screen button {
-      margin-top: 30px;
-      padding: 10px 20px;
-      font-size: 0.4em;
-      background: #f00;
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
-      pointer-events: auto
-    }
+        50% {
+          opacity: 0.3;
+          color: #00ff00;
+          text-shadow: 0 0 50px #00ff00;
+          font-size: 1.9em
+        }
+      }
 
-    #death-screen button:hover {
-      background: #c00
-    }
+      #launch-prompt b {
+        display: block;
+        font-weight: bold;
+        margin: 12px 0;
+        font-family: monospace;
+        letter-spacing: 2px
+      }
 
-    /* Launch overlays */
-    .launch-overlay-full {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 50
-    }
+      #death-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(20, 0, 0, 0.85);
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 3em;
+        color: #f00;
+        text-shadow: 0 0 20px #f00;
+        z-index: 100;
+        pointer-events: auto
+      }
 
-    /* ═══════════════════════════════════════
+      #death-screen button {
+        margin-top: 30px;
+        padding: 10px 20px;
+        font-size: 0.4em;
+        background: #f00;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+        pointer-events: auto
+      }
+
+      #death-screen button:hover {
+        background: #c00
+      }
+
+      /* Launch overlays */
+      .launch-overlay-full {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 50
+      }
+
+      /* ═══════════════════════════════════════
        RESPAWN OVERLAY — fighter lost
        ═══════════════════════════════════════ */
-    #respawn-overlay {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(40, 0, 0, 0.92);
-      z-index: 95;
-      pointer-events: auto;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      animation: respawnFlash 0.5s ease-out
-    }
-
-    #respawn-overlay.active {
-      display: flex
-    }
-
-    @keyframes respawnFlash {
-      0% {
-        background: rgba(220, 0, 0, 0.7)
+      #respawn-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(40, 0, 0, 0.92);
+        z-index: 95;
+        pointer-events: auto;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        animation: respawnFlash 0.5s ease-out
       }
 
-      100% {
-        background: rgba(40, 0, 0, 0.92)
+      #respawn-overlay.active {
+        display: flex
       }
-    }
 
-    .respawn-reason-text {
-      font-family: monospace;
-      font-size: 1em;
-      color: #ff8888;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 6px
-    }
+      @keyframes respawnFlash {
+        0% {
+          background: rgba(220, 0, 0, 0.7)
+        }
 
-    .respawn-headline {
-      font-family: monospace;
-      font-size: 3.2em;
-      color: #ff2222;
-      text-shadow: 0 0 30px #f00, 0 0 60px rgba(255, 0, 0, 0.4);
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      margin-bottom: 20px
-    }
+        100% {
+          background: rgba(40, 0, 0, 0.92)
+        }
+      }
 
-    .lives-meter-row {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 10px
-    }
+      .respawn-reason-text {
+        font-family: monospace;
+        font-size: 1em;
+        color: #ff8888;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 6px
+      }
 
-    .lives-pip {
-      font-size: 2.2em;
-      transition: all 0.3s
-    }
+      .respawn-headline {
+        font-family: monospace;
+        font-size: 3.2em;
+        color: #ff2222;
+        text-shadow: 0 0 30px #f00, 0 0 60px rgba(255, 0, 0, 0.4);
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        margin-bottom: 20px
+      }
 
-    .lives-pip.active {
-      color: #ff4444;
-      text-shadow: 0 0 14px #f00
-    }
+      .lives-meter-row {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 10px
+      }
 
-    .lives-pip.lost {
-      color: rgba(80, 20, 20, 0.4)
-    }
+      .lives-pip {
+        font-size: 2.2em;
+        transition: all 0.3s
+      }
 
-    .respawn-turns-text {
-      font-family: monospace;
-      font-size: 1.1em;
-      color: #ffaaaa;
-      margin-bottom: 30px
-    }
+      .lives-pip.active {
+        color: #ff4444;
+        text-shadow: 0 0 14px #f00
+      }
 
-    .respawn-turns-text strong {
-      color: #ff4444
-    }
+      .lives-pip.lost {
+        color: rgba(80, 20, 20, 0.4)
+      }
 
-    .respawn-btn {
-      padding: 14px 48px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(200, 30, 30, 0.9), rgba(140, 10, 10, 0.95));
-      color: #fff;
-      border: 1px solid rgba(255, 80, 80, 0.5);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
-      pointer-events: auto;
-      transition: all 0.15s
-    }
+      .respawn-turns-text {
+        font-family: monospace;
+        font-size: 1.1em;
+        color: #ffaaaa;
+        margin-bottom: 30px
+      }
 
-    .respawn-btn:hover {
-      background: linear-gradient(180deg, rgba(255, 60, 60, 0.95), rgba(200, 20, 20, 0.98));
-      box-shadow: 0 0 35px rgba(255, 0, 0, 0.5)
-    }
+      .respawn-turns-text strong {
+        color: #ff4444
+      }
 
-    /* ═══════════════════════════════════════
+      .respawn-btn {
+        padding: 14px 48px;
+        font-family: monospace;
+        font-size: 1.05em;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        background: linear-gradient(180deg, rgba(200, 30, 30, 0.9), rgba(140, 10, 10, 0.95));
+        color: #fff;
+        border: 1px solid rgba(255, 80, 80, 0.5);
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
+        pointer-events: auto;
+        transition: all 0.15s
+      }
+
+      .respawn-btn:hover {
+        background: linear-gradient(180deg, rgba(255, 60, 60, 0.95), rgba(200, 20, 20, 0.98));
+        box-shadow: 0 0 35px rgba(255, 0, 0, 0.5)
+      }
+
+      /* ═══════════════════════════════════════
        WAVE CLEAR OVERLAY — blue flash
        ═══════════════════════════════════════ */
-    #waveclear-overlay {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 8, 24, 0.93);
-      z-index: 95;
-      pointer-events: auto;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      animation: waveclearFlash 0.5s ease-out
-    }
-
-    #waveclear-overlay.active {
-      display: flex
-    }
-
-    @keyframes waveclearFlash {
-      0% {
-        background: rgba(0, 60, 200, 0.75)
+      #waveclear-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 8, 24, 0.93);
+        z-index: 95;
+        pointer-events: auto;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        animation: waveclearFlash 0.5s ease-out
       }
 
-      100% {
-        background: rgba(0, 8, 24, 0.93)
+      #waveclear-overlay.active {
+        display: flex
       }
-    }
 
-    .waveclear-headline {
-      font-family: monospace;
-      font-size: 2.8em;
-      color: #44ddff;
-      text-shadow: 0 0 30px #0af, 0 0 60px rgba(0, 160, 255, 0.3);
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      margin-bottom: 8px
-    }
+      @keyframes waveclearFlash {
+        0% {
+          background: rgba(0, 60, 200, 0.75)
+        }
 
-    .waveclear-congrats {
-      font-family: monospace;
-      font-size: 1.15em;
-      color: #ffdd44;
-      letter-spacing: 4px;
-      margin-bottom: 16px
-    }
+        100% {
+          background: rgba(0, 8, 24, 0.93)
+        }
+      }
 
-    .waveclear-kills {
-      font-family: monospace;
-      font-size: 0.95em;
-      color: #88ccff;
-      letter-spacing: 2px;
-      margin-bottom: 36px
-    }
+      .waveclear-headline {
+        font-family: monospace;
+        font-size: 2.8em;
+        color: #44ddff;
+        text-shadow: 0 0 30px #0af, 0 0 60px rgba(0, 160, 255, 0.3);
+        letter-spacing: 8px;
+        text-transform: uppercase;
+        margin-bottom: 8px
+      }
 
-    .waveclear-btn {
-      padding: 14px 48px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(0, 100, 200, 0.9), rgba(0, 60, 140, 0.95));
-      color: #fff;
-      border: 1px solid rgba(0, 180, 255, 0.4);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0, 160, 255, 0.25);
-      pointer-events: auto;
-      transition: all 0.15s
-    }
+      .waveclear-congrats {
+        font-family: monospace;
+        font-size: 1.15em;
+        color: #ffdd44;
+        letter-spacing: 4px;
+        margin-bottom: 16px
+      }
 
-    .waveclear-btn:hover {
-      background: linear-gradient(180deg, rgba(0, 140, 255, 0.95), rgba(0, 80, 180, 0.98));
-      box-shadow: 0 0 35px rgba(0, 160, 255, 0.5)
-    }
+      .waveclear-kills {
+        font-family: monospace;
+        font-size: 0.95em;
+        color: #88ccff;
+        letter-spacing: 2px;
+        margin-bottom: 36px
+      }
 
-    /* ═══════════════════════════════════════
+      .waveclear-btn {
+        padding: 14px 48px;
+        font-family: monospace;
+        font-size: 1.05em;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        background: linear-gradient(180deg, rgba(0, 100, 200, 0.9), rgba(0, 60, 140, 0.95));
+        color: #fff;
+        border: 1px solid rgba(0, 180, 255, 0.4);
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 0 20px rgba(0, 160, 255, 0.25);
+        pointer-events: auto;
+        transition: all 0.15s
+      }
+
+      .waveclear-btn:hover {
+        background: linear-gradient(180deg, rgba(0, 140, 255, 0.95), rgba(0, 80, 180, 0.98));
+        box-shadow: 0 0 35px rgba(0, 160, 255, 0.5)
+      }
+
+      /* ═══════════════════════════════════════
        BAY DEBRIEF OVERLAY
        ═══════════════════════════════════════ */
-    #bay-debrief {
-      display: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 4, 12, 0.96);
-      z-index: 110;
-      pointer-events: auto;
-      overflow-y: auto;
-      font-family: monospace
-    }
-
-    #bay-debrief.active {
-      display: block
-    }
-
-    .bdr-container {
-      max-width: 740px;
-      margin: 0 auto;
-      padding: 24px 16px
-    }
-
-    .bdr-header {
-      text-align: center;
-      margin-bottom: 18px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.12)
-    }
-
-    #bdr-wave-title {
-      font-size: 1.9em;
-      color: #0ff;
-      letter-spacing: 6px;
-      text-shadow: 0 0 18px #0af;
-      text-transform: uppercase;
-      margin-bottom: 4px
-    }
-
-    #bdr-mission-name {
-      font-size: 0.9em;
-      color: #ffcc44;
-      letter-spacing: 3px;
-      text-transform: uppercase
-    }
-
-    #bdr-callsign-ack {
-      font-size: 0.82em;
-      color: #88ccee;
-      margin-top: 8px;
-      letter-spacing: 1px
-    }
-
-    #bdr-rankup {
-      display: none;
-      text-align: center;
-      background: linear-gradient(135deg, rgba(255, 200, 0, 0.12), rgba(255, 100, 0, 0.08));
-      border: 1px solid rgba(255, 200, 0, 0.4);
-      border-radius: 6px;
-      padding: 14px 24px;
-      margin-bottom: 16px;
-      box-shadow: 0 0 24px rgba(255, 200, 0, 0.12), inset 0 0 30px rgba(255, 180, 0, 0.04)
-    }
-
-    #bdr-rankup.visible {
-      display: block
-    }
-
-    .bdr-rankup-label {
-      font-size: 0.65em;
-      color: #ffcc44;
-      letter-spacing: 5px;
-      margin-bottom: 6px
-    }
-
-    .bdr-rankup-icon {
-      font-size: 2.4em;
-      margin-bottom: 6px
-    }
-
-    #bdr-rankup-name {
-      font-size: 1.5em;
-      color: #fff;
-      letter-spacing: 5px;
-      text-transform: uppercase
-    }
-
-    .bdr-main-cols {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-bottom: 14px
-    }
-
-    @media(max-width:560px) {
-      .bdr-main-cols {
-        grid-template-columns: 1fr
+      #bay-debrief {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 4, 12, 0.96);
+        z-index: 110;
+        pointer-events: auto;
+        overflow-y: auto;
+        font-family: monospace
       }
-    }
 
-    .bdr-card {
-      background: rgba(0, 14, 28, 0.8);
-      border: 1px solid rgba(0, 255, 255, 0.1);
-      border-radius: 6px;
-      padding: 14px
-    }
+      #bay-debrief.active {
+        display: block
+      }
 
-    .bdr-card-title {
-      font-size: 0.62em;
-      color: rgba(0, 255, 255, 0.45);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.08);
-      padding-bottom: 6px
-    }
+      .bdr-container {
+        max-width: 740px;
+        margin: 0 auto;
+        padding: 24px 16px
+      }
 
-    .bdr-stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 0;
-      font-size: 0.78em
-    }
+      .bdr-header {
+        text-align: center;
+        margin-bottom: 18px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.12)
+      }
 
-    .bdr-stat-label {
-      color: rgba(0, 255, 255, 0.55)
-    }
+      #bdr-wave-title {
+        font-size: 1.9em;
+        color: #0ff;
+        letter-spacing: 6px;
+        text-shadow: 0 0 18px #0af;
+        text-transform: uppercase;
+        margin-bottom: 4px
+      }
 
-    .bdr-stat-val {
-      color: #0ff;
-      font-weight: bold
-    }
+      #bdr-mission-name {
+        font-size: 0.9em;
+        color: #ffcc44;
+        letter-spacing: 3px;
+        text-transform: uppercase
+      }
 
-    .bdr-stat-val.green {
-      color: #00ff88
-    }
+      #bdr-callsign-ack {
+        font-size: 0.82em;
+        color: #88ccee;
+        margin-top: 8px;
+        letter-spacing: 1px
+      }
 
-    .bdr-stat-val.yellow {
-      color: #ffdd00
-    }
+      #bdr-rankup {
+        display: none;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(255, 200, 0, 0.12), rgba(255, 100, 0, 0.08));
+        border: 1px solid rgba(255, 200, 0, 0.4);
+        border-radius: 6px;
+        padding: 14px 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 0 24px rgba(255, 200, 0, 0.12), inset 0 0 30px rgba(255, 180, 0, 0.04)
+      }
 
-    .bdr-stat-val.red {
-      color: #ff4444
-    }
+      #bdr-rankup.visible {
+        display: block
+      }
 
-    .bdr-ship-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      font-size: 0.74em
-    }
+      .bdr-rankup-label {
+        font-size: 0.65em;
+        color: #ffcc44;
+        letter-spacing: 5px;
+        margin-bottom: 6px
+      }
 
-    .bdr-ship-label {
-      width: 38px;
-      color: rgba(0, 255, 255, 0.55);
-      text-align: right;
-      flex-shrink: 0
-    }
+      .bdr-rankup-icon {
+        font-size: 2.4em;
+        margin-bottom: 6px
+      }
 
-    .bdr-ship-bar-track {
-      flex: 1;
-      height: 5px;
-      background: rgba(0, 255, 255, 0.08);
-      border: 1px solid rgba(0, 255, 255, 0.12);
-      border-radius: 3px;
-      overflow: hidden
-    }
+      #bdr-rankup-name {
+        font-size: 1.5em;
+        color: #fff;
+        letter-spacing: 5px;
+        text-transform: uppercase
+      }
 
-    .bdr-ship-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.6s ease;
-      width: 0%
-    }
+      .bdr-main-cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px
+      }
 
-    .bdr-ship-bar-fill.hull {
-      background: linear-gradient(90deg, #00aa44, #00ff66)
-    }
+      @media(max-width:560px) {
+        .bdr-main-cols {
+          grid-template-columns: 1fr
+        }
+      }
 
-    .bdr-ship-bar-fill.shld {
-      background: linear-gradient(90deg, #0066ff, #00ffff)
-    }
+      .bdr-card {
+        background: rgba(0, 14, 28, 0.8);
+        border: 1px solid rgba(0, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 14px
+      }
 
-    .bdr-ship-bar-fill.fuel {
-      background: linear-gradient(90deg, #aa8800, #ffcc00)
-    }
+      .bdr-card-title {
+        font-size: 0.62em;
+        color: rgba(0, 255, 255, 0.45);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+        padding-bottom: 6px
+      }
 
-    .bdr-ship-bar-fill.torp {
-      background: linear-gradient(90deg, #8800aa, #ff44ff)
-    }
+      .bdr-stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+        font-size: 0.78em
+      }
 
-    .bdr-ship-val {
-      width: 36px;
-      color: #0ff;
-      text-align: right;
-      flex-shrink: 0
-    }
+      .bdr-stat-label {
+        color: rgba(0, 255, 255, 0.55)
+      }
 
-    .bdr-cr-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.72em;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(0, 255, 255, 0.08)
-    }
+      .bdr-stat-val {
+        color: #0ff;
+        font-weight: bold
+      }
 
-    .bdr-cr-row .label {
-      color: rgba(0, 255, 255, 0.45)
-    }
+      .bdr-stat-val.green {
+        color: #00ff88
+      }
 
-    #bdr-cr-balance {
-      color: #ffcc44;
-      font-weight: bold
-    }
+      .bdr-stat-val.yellow {
+        color: #ffdd00
+      }
 
-    .bdr-xp-section {
-      margin-bottom: 14px
-    }
+      .bdr-stat-val.red {
+        color: #ff4444
+      }
 
-    .bdr-xp-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.68em;
-      color: rgba(0, 255, 255, 0.45);
-      margin-bottom: 4px
-    }
+      .bdr-ship-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 0.74em
+      }
 
-    .bdr-xp-bar-track {
-      width: 100%;
-      height: 7px;
-      background: rgba(0, 255, 255, 0.08);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 4px;
-      overflow: hidden
-    }
+      .bdr-ship-label {
+        width: 38px;
+        color: rgba(0, 255, 255, 0.55);
+        text-align: right;
+        flex-shrink: 0
+      }
 
-    #bdr-xp-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #0088ff, #00ffff);
-      border-radius: 4px;
-      transition: width 0.8s ease
-    }
+      .bdr-ship-bar-track {
+        flex: 1;
+        height: 5px;
+        background: rgba(0, 255, 255, 0.08);
+        border: 1px solid rgba(0, 255, 255, 0.12);
+        border-radius: 3px;
+        overflow: hidden
+      }
 
-    .bdr-xp-earned-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      font-size: 0.68em
-    }
+      .bdr-ship-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.6s ease;
+        width: 0%
+      }
 
-    #bdr-xp-delta {
-      color: #88ccee
-    }
+      .bdr-ship-bar-fill.hull {
+        background: linear-gradient(90deg, #00aa44, #00ff66)
+      }
 
-    .bdr-earned-chips {
-      display: flex;
-      gap: 12px
-    }
+      .bdr-ship-bar-fill.shld {
+        background: linear-gradient(90deg, #0066ff, #00ffff)
+      }
 
-    #bdr-xp-earned {
-      color: #00ffcc
-    }
+      .bdr-ship-bar-fill.fuel {
+        background: linear-gradient(90deg, #aa8800, #ffcc00)
+      }
 
-    #bdr-cr-earned {
-      color: #ffcc44
-    }
+      .bdr-ship-bar-fill.torp {
+        background: linear-gradient(90deg, #8800aa, #ff44ff)
+      }
 
-    #bdr-bonus-row {
-      display: none;
-      font-size: 0.68em;
-      color: #00ff88;
-      padding: 3px 10px;
-      background: rgba(0, 80, 40, 0.18);
-      border: 1px solid rgba(0, 180, 80, 0.25);
-      border-radius: 3px;
-      margin-top: 5px;
-      text-align: center
-    }
+      .bdr-ship-val {
+        width: 36px;
+        color: #0ff;
+        text-align: right;
+        flex-shrink: 0
+      }
 
-    #bdr-unlocks-section {
-      display: none;
-      margin-bottom: 14px
-    }
+      .bdr-cr-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.72em;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(0, 255, 255, 0.08)
+      }
 
-    .bdr-unlock-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: rgba(0, 220, 80, 0.06);
-      border: 1px solid rgba(0, 220, 80, 0.22);
-      border-radius: 6px;
-      padding: 12px
-    }
+      .bdr-cr-row .label {
+        color: rgba(0, 255, 255, 0.45)
+      }
 
-    .bdr-unlock-icon {
-      font-size: 1.7em;
-      flex-shrink: 0
-    }
+      #bdr-cr-balance {
+        color: #ffcc44;
+        font-weight: bold
+      }
 
-    .bdr-unlock-text {
-      flex: 1
-    }
+      .bdr-xp-section {
+        margin-bottom: 14px
+      }
 
-    .bdr-unlock-name {
-      font-size: 0.88em;
-      color: #00ff88;
-      font-weight: bold;
-      margin-bottom: 2px
-    }
+      .bdr-xp-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.68em;
+        color: rgba(0, 255, 255, 0.45);
+        margin-bottom: 4px
+      }
 
-    .bdr-unlock-desc {
-      font-size: 0.68em;
-      color: #88aa88
-    }
+      .bdr-xp-bar-track {
+        width: 100%;
+        height: 7px;
+        background: rgba(0, 255, 255, 0.08);
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        border-radius: 4px;
+        overflow: hidden
+      }
 
-    .bdr-unlock-new {
-      font-size: 0.58em;
-      letter-spacing: 2px;
-      color: #fff;
-      background: #007733;
-      padding: 2px 8px;
-      border-radius: 3px;
-      flex-shrink: 0
-    }
+      #bdr-xp-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #0088ff, #00ffff);
+        border-radius: 4px;
+        transition: width 0.8s ease
+      }
 
-    .bdr-next-card {
-      background: rgba(0, 18, 36, 0.8);
-      border: 1px solid rgba(0, 255, 255, 0.15);
-      border-radius: 6px;
-      padding: 14px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 14px
-    }
+      .bdr-xp-earned-row {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 0.68em
+      }
 
-    .bdr-next-wave-badge {
-      text-align: center;
-      flex-shrink: 0;
-      min-width: 72px
-    }
+      #bdr-xp-delta {
+        color: #88ccee
+      }
 
-    .bdr-wave-num {
-      font-size: 2.2em;
-      color: #0ff;
-      line-height: 1;
-      text-shadow: 0 0 10px #0af
-    }
+      .bdr-earned-chips {
+        display: flex;
+        gap: 12px
+      }
 
-    .bdr-wave-label {
-      font-size: 0.58em;
-      color: rgba(0, 255, 255, 0.45);
-      letter-spacing: 2px
-    }
+      #bdr-xp-earned {
+        color: #00ffcc
+      }
 
-    .bdr-next-info {
-      flex: 1
-    }
+      #bdr-cr-earned {
+        color: #ffcc44
+      }
 
-    .bdr-next-title {
-      font-size: 0.85em;
-      color: #ffcc44;
-      margin-bottom: 4px;
-      letter-spacing: 1px
-    }
+      #bdr-bonus-row {
+        display: none;
+        font-size: 0.68em;
+        color: #00ff88;
+        padding: 3px 10px;
+        background: rgba(0, 80, 40, 0.18);
+        border: 1px solid rgba(0, 180, 80, 0.25);
+        border-radius: 3px;
+        margin-top: 5px;
+        text-align: center
+      }
 
-    .bdr-next-obj {
-      font-size: 0.7em;
-      color: #88aacc;
-      line-height: 1.4
-    }
+      #bdr-unlocks-section {
+        display: none;
+        margin-bottom: 14px
+      }
 
-    .bdr-shop-section {
-      margin-bottom: 14px
-    }
+      .bdr-unlock-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(0, 220, 80, 0.06);
+        border: 1px solid rgba(0, 220, 80, 0.22);
+        border-radius: 6px;
+        padding: 12px
+      }
 
-    .bdr-shop-balance {
-      font-size: 0.7em;
-      color: #ffcc44;
-      margin-bottom: 8px
-    }
+      .bdr-unlock-icon {
+        font-size: 1.7em;
+        flex-shrink: 0
+      }
 
-    .bdr-shop-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 10px;
-      cursor: pointer;
-      background: rgba(0, 10, 20, 0.7);
-      border: 1px solid rgba(0, 255, 255, 0.08);
-      border-radius: 4px;
-      margin-bottom: 4px;
-      transition: all 0.1s
-    }
+      .bdr-unlock-text {
+        flex: 1
+      }
 
-    .bdr-shop-item:hover {
-      background: rgba(0, 26, 50, 0.8);
-      border-color: rgba(0, 255, 255, 0.25)
-    }
+      .bdr-unlock-name {
+        font-size: 0.88em;
+        color: #00ff88;
+        font-weight: bold;
+        margin-bottom: 2px
+      }
 
-    .bdr-shop-item.cant-afford {
-      opacity: 0.38;
-      cursor: default
-    }
+      .bdr-unlock-desc {
+        font-size: 0.68em;
+        color: #88aa88
+      }
 
-    .bdr-shop-item-left {
-      flex: 1
-    }
+      .bdr-unlock-new {
+        font-size: 0.58em;
+        letter-spacing: 2px;
+        color: #fff;
+        background: #007733;
+        padding: 2px 8px;
+        border-radius: 3px;
+        flex-shrink: 0
+      }
 
-    .bdr-shop-item-name {
-      font-size: 0.78em;
-      color: #0ff;
-      margin-bottom: 2px
-    }
+      .bdr-next-card {
+        background: rgba(0, 18, 36, 0.8);
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 14px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 14px
+      }
 
-    .bdr-shop-item-desc {
-      font-size: 0.63em;
-      color: #445566
-    }
+      .bdr-next-wave-badge {
+        text-align: center;
+        flex-shrink: 0;
+        min-width: 72px
+      }
 
-    .bdr-shop-item-cost {
-      font-size: 0.78em;
-      color: #ffcc44;
-      font-weight: bold;
-      flex-shrink: 0;
-      margin-left: 10px
-    }
+      .bdr-wave-num {
+        font-size: 2.2em;
+        color: #0ff;
+        line-height: 1;
+        text-shadow: 0 0 10px #0af
+      }
 
-    #bdr-shop-empty {
-      font-size: 0.68em;
-      color: #334455;
-      text-align: center;
-      padding: 12px
-    }
+      .bdr-wave-label {
+        font-size: 0.58em;
+        color: rgba(0, 255, 255, 0.45);
+        letter-spacing: 2px
+      }
 
-    .bdr-footer {
-      text-align: center;
-      padding-top: 16px;
-      border-top: 1px solid rgba(0, 255, 255, 0.08)
-    }
+      .bdr-next-info {
+        flex: 1
+      }
 
-    .bdr-launch-btn {
-      padding: 14px 60px;
-      font-family: monospace;
-      font-size: 1.05em;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, rgba(0, 150, 40, 0.9), rgba(0, 90, 20, 0.95));
-      color: #fff;
-      border: 1px solid rgba(0, 240, 80, 0.35);
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0, 200, 60, 0.18);
-      transition: all 0.15s
-    }
+      .bdr-next-title {
+        font-size: 0.85em;
+        color: #ffcc44;
+        margin-bottom: 4px;
+        letter-spacing: 1px
+      }
 
-    .bdr-launch-btn:hover {
-      background: linear-gradient(180deg, rgba(0, 200, 60, 0.95), rgba(0, 130, 30, 0.98));
-      box-shadow: 0 0 32px rgba(0, 200, 60, 0.35)
-    }
+      .bdr-next-obj {
+        font-size: 0.7em;
+        color: #88aacc;
+        line-height: 1.4
+      }
 
-    /* ═══════════════════════════════════════
+      .bdr-shop-section {
+        margin-bottom: 14px
+      }
+
+      .bdr-shop-balance {
+        font-size: 0.7em;
+        color: #ffcc44;
+        margin-bottom: 8px
+      }
+
+      .bdr-shop-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        cursor: pointer;
+        background: rgba(0, 10, 20, 0.7);
+        border: 1px solid rgba(0, 255, 255, 0.08);
+        border-radius: 4px;
+        margin-bottom: 4px;
+        transition: all 0.1s
+      }
+
+      .bdr-shop-item:hover {
+        background: rgba(0, 26, 50, 0.8);
+        border-color: rgba(0, 255, 255, 0.25)
+      }
+
+      .bdr-shop-item.cant-afford {
+        opacity: 0.38;
+        cursor: default
+      }
+
+      .bdr-shop-item-left {
+        flex: 1
+      }
+
+      .bdr-shop-item-name {
+        font-size: 0.78em;
+        color: #0ff;
+        margin-bottom: 2px
+      }
+
+      .bdr-shop-item-desc {
+        font-size: 0.63em;
+        color: #445566
+      }
+
+      .bdr-shop-item-cost {
+        font-size: 0.78em;
+        color: #ffcc44;
+        font-weight: bold;
+        flex-shrink: 0;
+        margin-left: 10px
+      }
+
+      #bdr-shop-empty {
+        font-size: 0.68em;
+        color: #334455;
+        text-align: center;
+        padding: 12px
+      }
+
+      .bdr-footer {
+        text-align: center;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0, 255, 255, 0.08)
+      }
+
+      .bdr-launch-btn {
+        padding: 14px 60px;
+        font-family: monospace;
+        font-size: 1.05em;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        background: linear-gradient(180deg, rgba(0, 150, 40, 0.9), rgba(0, 90, 20, 0.95));
+        color: #fff;
+        border: 1px solid rgba(0, 240, 80, 0.35);
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 0 20px rgba(0, 200, 60, 0.18);
+        transition: all 0.15s
+      }
+
+      .bdr-launch-btn:hover {
+        background: linear-gradient(180deg, rgba(0, 200, 60, 0.95), rgba(0, 130, 30, 0.98));
+        box-shadow: 0 0 32px rgba(0, 200, 60, 0.35)
+      }
+
+      /* ═══════════════════════════════════════
        RESPONSIVE — phone collapse
        ═══════════════════════════════════════ */
-    @media(max-width:600px) {
-      #radar-overlay {
-        width: 121px;
-        height: 121px;
-        bottom: 10px;
-        left: 10px
+      @media(max-width:600px) {
+        #radar-overlay {
+          width: 121px;
+          height: 121px;
+          bottom: 10px;
+          left: 10px
+        }
       }
-    }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        RADAR OVERLAY — bottom-left
        ═══════════════════════════════════════ */
-    #radar-overlay {
-      position: absolute;
-      bottom: 16px;
-      left: 16px;
-      width: 178px;
-      height: 178px;
-      z-index: 18;
-      pointer-events: none;
-      display: none;
-      border: 1px solid rgba(0, 255, 255, 0.25);
-      border-radius: 50%;
-      overflow: hidden;
-      box-shadow: 0 0 12px rgba(0, 255, 255, 0.15), inset 0 0 8px rgba(0, 0, 0, 0.5)
-    }
+      #radar-overlay {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        width: 178px;
+        height: 178px;
+        z-index: 18;
+        pointer-events: none;
+        display: none;
+        border: 1px solid rgba(0, 255, 255, 0.25);
+        border-radius: 50%;
+        overflow: hidden;
+        box-shadow: 0 0 12px rgba(0, 255, 255, 0.15), inset 0 0 8px rgba(0, 0, 0, 0.5)
+      }
 
-    #radar-overlay canvas {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%
-    }
+      #radar-overlay canvas {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%
+      }
 
-    /* ═══════════════════════════════════════
+      /* ═══════════════════════════════════════
        GAMEPLAY HUD — top-right stats overlay
        ═══════════════════════════════════════ */
-    #gameplay-hud {
-      position: absolute;
-      top: 36px;
-      right: 12px;
-      z-index: 18;
-      pointer-events: none;
-      display: none;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      text-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
-      letter-spacing: 1px
-    }
+      #gameplay-hud {
+        position: absolute;
+        top: 36px;
+        right: 12px;
+        z-index: 18;
+        pointer-events: none;
+        display: none;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        text-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+        letter-spacing: 1px
+      }
 
-    #gameplay-hud .hud-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 2px
-    }
+      #gameplay-hud .hud-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 2px
+      }
 
-    #gameplay-hud .hud-label {
-      color: rgba(0, 255, 255, 0.6);
-      font-size: 10px;
-      width: 52px;
-      text-align: right
-    }
+      #gameplay-hud .hud-label {
+        color: rgba(0, 255, 255, 0.6);
+        font-size: 10px;
+        width: 52px;
+        text-align: right
+      }
 
-    #gameplay-hud .hud-val {
-      color: #0ff;
-      font-weight: bold;
-      min-width: 36px
-    }
+      #gameplay-hud .hud-val {
+        color: #0ff;
+        font-weight: bold;
+        min-width: 36px
+      }
 
-    #gameplay-hud .hud-bar-track {
-      width: 80px;
-      height: 6px;
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-radius: 1px;
-      overflow: hidden
-    }
+      #gameplay-hud .hud-bar-track {
+        width: 80px;
+        height: 6px;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid rgba(0, 255, 255, 0.2);
+        border-radius: 1px;
+        overflow: hidden
+      }
 
-    #gameplay-hud .hud-bar-fill {
-      height: 100%;
-      transition: width 0.15s ease;
-      border-radius: 1px
-    }
+      #gameplay-hud .hud-bar-fill {
+        height: 100%;
+        transition: width 0.15s ease;
+        border-radius: 1px
+      }
 
-    #gameplay-hud .hud-bar-fill.shield {
-      background: linear-gradient(90deg, #00aaff, #00ffff)
-    }
+      #gameplay-hud .hud-bar-fill.shield {
+        background: linear-gradient(90deg, #00aaff, #00ffff)
+      }
 
-    #gameplay-hud .hud-bar-fill.fuel {
-      background: linear-gradient(90deg, #ccaa00, #ffff00)
-    }
+      #gameplay-hud .hud-bar-fill.fuel {
+        background: linear-gradient(90deg, #ccaa00, #ffff00)
+      }
 
-    #gameplay-hud .hud-bar-fill.hull {
-      background: linear-gradient(90deg, #00aa44, #00ff66)
-    }
+      #gameplay-hud .hud-bar-fill.hull {
+        background: linear-gradient(90deg, #00aa44, #00ff66)
+      }
 
-    #gameplay-hud .hud-score-row {
-      margin-top: 6px;
-      padding-top: 4px;
-      border-top: 1px solid rgba(0, 255, 255, 0.15)
-    }
+      #gameplay-hud .hud-score-row {
+        margin-top: 6px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(0, 255, 255, 0.15)
+      }
 
-    #gameplay-hud .hud-val.warn {
-      color: #ff4444;
-      text-shadow: 0 0 8px #ff0000
-    }
+      #gameplay-hud .hud-val.warn {
+        color: #ff4444;
+        text-shadow: 0 0 8px #ff0000
+      }
 
-    #gameplay-hud .hud-val.caution {
-      color: #ffaa00;
-      text-shadow: 0 0 8px #ff8800
-    }
+      #gameplay-hud .hud-val.caution {
+        color: #ffaa00;
+        text-shadow: 0 0 8px #ff8800
+      }
 
-    /* Emergency Rescue Button */
-    #rescue-btn {
-      position: fixed;
-      bottom: 120px;
-      right: 30px;
-      padding: 16px 28px;
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #fff;
-      background: linear-gradient(180deg, rgba(180, 0, 0, 0.95), rgba(120, 0, 0, 0.98));
-      border: 2px solid rgba(255, 60, 60, 0.8);
-      border-radius: 8px;
-      cursor: pointer;
-      box-shadow: 0 0 30px rgba(255, 0, 0, 0.6), inset 0 0 15px rgba(255, 80, 80, 0.3);
-      text-shadow: 0 0 8px rgba(255, 100, 100, 0.9);
-      animation: rescuePulse 1.5s ease-in-out infinite;
-      z-index: 1000;
-      display: none;
-      user-select: none;
-    }
-
-    #rescue-btn:hover:not(.disabled) {
-      background: linear-gradient(180deg, rgba(220, 0, 0, 1), rgba(160, 0, 0, 1));
-      box-shadow: 0 0 40px rgba(255, 0, 0, 0.9), inset 0 0 20px rgba(255, 100, 100, 0.5);
-    }
-
-    #rescue-btn.disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-      animation: none;
-    }
-
-    #rescue-btn .rescue-uses {
-      display: block;
-      font-size: 11px;
-      margin-top: 4px;
-      color: #ffcccc;
-      letter-spacing: 1px;
-    }
-
-    @keyframes rescuePulse {
-
-      0%,
-      100% {
+      /* Emergency Rescue Button */
+      #rescue-btn {
+        position: fixed;
+        bottom: 120px;
+        right: 30px;
+        padding: 16px 28px;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #fff;
+        background: linear-gradient(180deg, rgba(180, 0, 0, 0.95), rgba(120, 0, 0, 0.98));
+        border: 2px solid rgba(255, 60, 60, 0.8);
+        border-radius: 8px;
+        cursor: pointer;
         box-shadow: 0 0 30px rgba(255, 0, 0, 0.6), inset 0 0 15px rgba(255, 80, 80, 0.3);
+        text-shadow: 0 0 8px rgba(255, 100, 100, 0.9);
+        animation: rescuePulse 1.5s ease-in-out infinite;
+        z-index: 1000;
+        display: none;
+        user-select: none;
       }
 
-      50% {
-        box-shadow: 0 0 50px rgba(255, 0, 0, 1), inset 0 0 25px rgba(255, 120, 120, 0.5);
+      #rescue-btn:hover:not(.disabled) {
+        background: linear-gradient(180deg, rgba(220, 0, 0, 1), rgba(160, 0, 0, 1));
+        box-shadow: 0 0 40px rgba(255, 0, 0, 0.9), inset 0 0 20px rgba(255, 100, 100, 0.5);
       }
-    }
 
-    /* Countermeasures Button */
-    #cm-deploy-btn {
-      position: fixed;
-      bottom: 230px;
-      right: 30px;
-      padding: 14px 24px;
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      color: #fff;
-      background: linear-gradient(180deg, rgba(0, 120, 180, 0.95), rgba(0, 80, 120, 0.98));
-      border: 2px solid rgba(60, 180, 255, 0.8);
-      border-radius: 8px;
-      cursor: pointer;
-      box-shadow: 0 0 25px rgba(0, 160, 255, 0.5), inset 0 0 12px rgba(100, 200, 255, 0.3);
-      text-shadow: 0 0 6px rgba(100, 200, 255, 0.9);
-      z-index: 1000;
-      display: none;
-      user-select: none;
-      transition: all 0.2s;
-    }
+      #rescue-btn.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        animation: none;
+      }
 
-    #cm-deploy-btn:hover:not(.disabled) {
-      background: linear-gradient(180deg, rgba(0, 160, 220, 1), rgba(0, 100, 160, 1));
-      box-shadow: 0 0 35px rgba(0, 200, 255, 0.8), inset 0 0 18px rgba(120, 220, 255, 0.5);
-    }
+      #rescue-btn .rescue-uses {
+        display: block;
+        font-size: 11px;
+        margin-top: 4px;
+        color: #ffcccc;
+        letter-spacing: 1px;
+      }
 
-    #cm-deploy-btn.disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
+      @keyframes rescuePulse {
 
-    /* Countermeasures Gauge */
-    #cm-gauge-container {
-      position: fixed;
-      bottom: 190px;
-      right: 30px;
-      width: 200px;
-      padding: 8px;
-      font-family: 'Courier New', monospace;
-      background: rgba(0, 10, 20, 0.85);
-      border: 1px solid rgba(0, 255, 255, 0.3);
-      border-radius: 6px;
-      box-shadow: 0 0 15px rgba(0, 160, 255, 0.3);
-      z-index: 1000;
-      display: none;
-    }
+        0%,
+        100% {
+          box-shadow: 0 0 30px rgba(255, 0, 0, 0.6), inset 0 0 15px rgba(255, 80, 80, 0.3);
+        }
 
-    #cm-gauge-label {
-      font-size: 10px;
-      color: #0ff;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-    }
+        50% {
+          box-shadow: 0 0 50px rgba(255, 0, 0, 1), inset 0 0 25px rgba(255, 120, 120, 0.5);
+        }
+      }
 
-    #cm-gauge-bar {
-      width: 100%;
-      height: 18px;
-      background: rgba(0, 20, 40, 0.9);
-      border: 1px solid rgba(0, 255, 255, 0.2);
-      border-radius: 3px;
-      overflow: hidden;
-      position: relative;
-    }
+      /* Countermeasures Button */
+      #cm-deploy-btn {
+        position: fixed;
+        bottom: 230px;
+        right: 30px;
+        padding: 14px 24px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 1.5px;
+        color: #fff;
+        background: linear-gradient(180deg, rgba(0, 120, 180, 0.95), rgba(0, 80, 120, 0.98));
+        border: 2px solid rgba(60, 180, 255, 0.8);
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 0 25px rgba(0, 160, 255, 0.5), inset 0 0 12px rgba(100, 200, 255, 0.3);
+        text-shadow: 0 0 6px rgba(100, 200, 255, 0.9);
+        z-index: 1000;
+        display: none;
+        user-select: none;
+        transition: all 0.2s;
+      }
 
-    #cm-gauge-fill {
-      height: 100%;
-      width: 100%;
-      background: linear-gradient(90deg, #00aa44, #00ff66);
-      transition: width 0.3s ease;
-    }
+      #cm-deploy-btn:hover:not(.disabled) {
+        background: linear-gradient(180deg, rgba(0, 160, 220, 1), rgba(0, 100, 160, 1));
+        box-shadow: 0 0 35px rgba(0, 200, 255, 0.8), inset 0 0 18px rgba(120, 220, 255, 0.5);
+      }
 
-    #cm-count {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 11px;
-      font-weight: bold;
-      color: #fff;
-      text-shadow: 0 0 4px #000, 1px 1px 2px #000;
-      z-index: 1;
-    }
+      #cm-deploy-btn.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
 
-    /* Threat Alert Messages */
-    #lock-alert {
-      position: fixed;
-      top: 60px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #fff;
-      background: rgba(180, 0, 0, 0.9);
-      border: 2px solid rgba(255, 60, 60, 0.9);
-      border-radius: 6px;
-      box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
-      text-shadow: 0 0 8px rgba(255, 100, 100, 0.9);
-      z-index: 2000;
-      display: none;
-    }
+      /* Countermeasures Gauge */
+      #cm-gauge-container {
+        position: fixed;
+        bottom: 190px;
+        right: 30px;
+        width: 200px;
+        padding: 8px;
+        font-family: 'Courier New', monospace;
+        background: rgba(0, 10, 20, 0.85);
+        border: 1px solid rgba(0, 255, 255, 0.3);
+        border-radius: 6px;
+        box-shadow: 0 0 15px rgba(0, 160, 255, 0.3);
+        z-index: 1000;
+        display: none;
+      }
 
-    #incoming-alert {
-      position: fixed;
-      top: 110px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #fff;
-      background: rgba(200, 100, 0, 0.9);
-      border: 2px solid rgba(255, 150, 60, 0.9);
-      border-radius: 6px;
-      box-shadow: 0 0 30px rgba(255, 120, 0, 0.8);
-      text-shadow: 0 0 8px rgba(255, 180, 100, 0.9);
-      z-index: 2000;
-      display: none;
-    }
+      #cm-gauge-label {
+        font-size: 10px;
+        color: #0ff;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+      }
 
-    /* ── Hidden utility ── */
-    .hidden {
-      display: none !important
-    }
+      #cm-gauge-bar {
+        width: 100%;
+        height: 18px;
+        background: rgba(0, 20, 40, 0.9);
+        border: 1px solid rgba(0, 255, 255, 0.2);
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      #cm-gauge-fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00aa44, #00ff66);
+        transition: width 0.3s ease;
+      }
+
+      #cm-count {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 11px;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 0 0 4px #000, 1px 1px 2px #000;
+        z-index: 1;
+      }
+
+      /* Threat Alert Messages */
+      #lock-alert {
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #fff;
+        background: rgba(180, 0, 0, 0.9);
+        border: 2px solid rgba(255, 60, 60, 0.9);
+        border-radius: 6px;
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+        text-shadow: 0 0 8px rgba(255, 100, 100, 0.9);
+        z-index: 2000;
+        display: none;
+      }
+
+      #incoming-alert {
+        position: fixed;
+        top: 110px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #fff;
+        background: rgba(200, 100, 0, 0.9);
+        border: 2px solid rgba(255, 150, 60, 0.9);
+        border-radius: 6px;
+        box-shadow: 0 0 30px rgba(255, 120, 0, 0.8);
+        text-shadow: 0 0 8px rgba(255, 180, 100, 0.9);
+        z-index: 2000;
+        display: none;
+      }
+
+      /* ── Hidden utility ── */
+      .hidden {
+        display: none !important
+      }
   </style>
 </head>
 
@@ -2185,7 +2217,10 @@
   <div id="console-buttons">
     <button class="console-btn" id="btn-pause" tabindex="1"
       onclick="if(window.Starfighter&&Starfighter.togglePause)Starfighter.togglePause()">&#10074;&#10074; PAUSE</button>
-    <button class="console-btn" id="btn-exit" tabindex="2"
+    <button class="console-btn" id="btn-save" tabindex="2"
+      style="background:linear-gradient(180deg,rgba(20,70,40,0.95),rgba(12,42,24,0.98));border-color:rgba(100,220,140,0.55);color:#aaffc6"
+      onclick="if(window.Starfighter&&Starfighter.saveGame)Starfighter.saveGame()">&#128190; SAVE GAME</button>
+    <button class="console-btn" id="btn-exit" tabindex="3"
       style="background:linear-gradient(180deg,rgba(80,55,20,0.95),rgba(50,30,10,0.98));border-color:rgba(200,150,60,0.5);color:#ffcc88"
       onclick="if(window.Starfighter&&Starfighter.exitGame)Starfighter.exitGame()">&#10162; LEAVE GAME</button>
     <!-- Hidden: btn-rtb kept for JS compatibility but never shown -->
@@ -2535,6 +2570,44 @@
     <div id="death-reason" style="font-size:0.5em;color:#aaa">The baseship was destroyed.</div>
     <div id="death-auto-msg" style="font-size:0.45em;color:#446688;margin-top:16px;letter-spacing:2px">RETURNING TO BASE
       IN <span id="death-countdown">8</span>s</div>
+  </div>
+
+  <!-- ═══ ALIEN BEE CUTSCENE OVERLAY — shown on all-ships-lost defeat ═══ -->
+  <div id="bee-cutscene"
+    style="display:none;position:fixed;inset:0;z-index:9500;background:#000;flex-direction:column;align-items:center;justify-content:center;font-family:'Courier New',monospace;text-align:center;overflow:hidden;">
+    <!-- Animated amber hex grid background -->
+    <canvas id="bee-hex-canvas"
+      style="position:absolute;inset:0;width:100%;height:100%;opacity:0.22;pointer-events:none;"></canvas>
+    <!-- Glowing bee sigil -->
+    <div id="bee-sigil"
+      style="font-size:7em;filter:drop-shadow(0 0 32px #ffaa00) drop-shadow(0 0 64px #ff6600);animation:beePulse 2.4s ease-in-out infinite;margin-bottom:8px;position:relative;z-index:1;">
+      🐝</div>
+    <!-- Threat title -->
+    <div id="bee-title"
+      style="font-size:1.55em;letter-spacing:6px;color:#ff8800;text-transform:uppercase;text-shadow:0 0 24px #ff6600,0 0 48px #ff3300;margin-bottom:20px;position:relative;z-index:1;opacity:0;transition:opacity 1.2s ease;">
+      THE AURORA IS THREATENED
+    </div>
+    <!-- Narrative text — typewriter reveal -->
+    <div id="bee-narrative"
+      style="max-width:640px;font-size:0.92em;line-height:1.85;color:#ffddaa;letter-spacing:1.5px;text-shadow:0 0 10px rgba(255,160,0,0.5);position:relative;z-index:1;min-height:110px;padding:0 24px;">
+    </div>
+    <!-- Directive line -->
+    <div id="bee-directive"
+      style="margin-top:22px;font-size:0.78em;color:#ffaa44;letter-spacing:2px;text-transform:uppercase;max-width:560px;line-height:1.7;position:relative;z-index:1;opacity:0;transition:opacity 1s ease 0.3s;padding:0 24px;border-top:1px solid rgba(255,130,0,0.3);padding-top:16px;">
+      You must learn the skills and find and earn the weapons<br>
+      to invade their hive ship and capture the Queen.<br>
+      <span style="color:#ffe066;">Save the Aurora and its people from being their worker bees.</span>
+    </div>
+    <!-- Try Again button -->
+    <button id="bee-try-again" onclick="window._sfTryAgain && window._sfTryAgain()"
+      style="display:none;margin-top:36px;padding:14px 48px;font-family:'Courier New',monospace;font-size:1em;font-weight:bold;letter-spacing:4px;color:#000;background:linear-gradient(135deg,#ffaa00,#ff6600);border:none;border-radius:6px;cursor:pointer;text-transform:uppercase;box-shadow:0 0 24px rgba(255,130,0,0.7);animation:beeBtnGlow 1.8s ease-in-out infinite;position:relative;z-index:1;">
+      ⚔ TRY AGAIN
+    </button>
+    <!-- Lobby link -->
+    <a href="/starfighter/lobby.html" id="bee-lobby-link"
+      style="display:none;margin-top:14px;font-size:0.7em;color:#886644;letter-spacing:2px;text-decoration:none;position:relative;z-index:1;">
+      ← RETURN TO BRIEFING ROOM
+    </a>
   </div>
 
   <!-- Elimination Screen (non-leader, all lives lost) -->

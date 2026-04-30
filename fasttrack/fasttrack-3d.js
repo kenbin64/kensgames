@@ -2154,6 +2154,9 @@ function createHexBilliardTable() {
 // INITIALIZATION
 // ════════════════════════════════════════════════════════════════
 async function init3D() {
+  if (window.KG_BOOTSTRAP_PROMISE) {
+    await window.KG_BOOTSTRAP_PROMISE;
+  }
   const container = document.getElementById('container');
 
   // Load settings from lobby config
@@ -2167,8 +2170,10 @@ async function init3D() {
   scene.background = new THREE.Color(0x0d0a07);
   scene.fog = new THREE.FogExp2(0x0d0a07, 0.0006);
 
-  // Camera
+  // Camera — vertical FOV widens automatically on narrow/portrait viewports
+  // so the whole board stays in frame on phones.
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 6000);
+  fitVerticalFovToAspect(camera);
   camera.position.set(0, 480, 380);
   camera.lookAt(0, TABLE_HEIGHT, 0);
 
@@ -2236,6 +2241,8 @@ async function init3D() {
 
   // Window resize
   window.addEventListener('resize', onWindowResize);
+  // Apply viewport/scissor sizing once immediately now that renderer/camera exist
+  onWindowResize();
 
   // Expose systems globally so game-core can access them
   window.ManifoldAudio = ManifoldAudio;
@@ -2260,22 +2267,139 @@ async function init3D() {
     window.FastTrackCore.setRenderer(renderBoard3D);
 
     // ── URL params take absolute priority over localStorage config ──
+    // ── X-Dimensional Session Bridge (from landing page) ──
+    let dimensionalConfig = null;
+    if (window.DIMENSIONAL_SESSION && window.DIMENSIONAL_SESSION.extract) {
+      const extracted = window.DIMENSIONAL_SESSION.extract();
+      if (extracted) {
+        dimensionalConfig = {
+          humanName: `Player-${extracted.modifiers.inviteCode?.slice(0, 4) || 'P1'}`,
+          humanAvatar: extracted.players.mode === 'ranked' ? '🎯' : (extracted.players.mode === 'multiplayer' ? '👥' : '🤖'),
+          aiDifficulty: extracted.players.difficulty, // 'easy' | 'medium' | 'hard'
+          _dimensionalX: extracted.sessionX,
+          _gameBoard: extracted.board
+        };
+        console.log('[DIMENSIONAL-FT] Initializing from x-dimensional session:', dimensionalConfig);
+      }
+    }
+
     // Params written by ai_setup.html (solo vs bots) and lobby.html (multiplayer):
     //   ?quickplay=1&name=kbingh&avatar=🍟&difficulty=normal&players=4
     const usp = new URLSearchParams(location.search);
-    const storedCfg = JSON.parse(localStorage.getItem('fasttrack-lobby') || '{}');
+    let storedCfg = {};
+    try {
+      storedCfg = JSON.parse(localStorage.getItem('fasttrack-lobby') || '{}') || {};
+    } catch (_) {
+      storedCfg = {};
+    }
+    const gameMode = usp.get('mode') || 'solo';
+    const inviteCode = (usp.get('code') || '').toUpperCase();
 
-    const playerCount = Math.max(2, Math.min(4,
-      parseInt(usp.get('players') || storedCfg.playerCount || '2', 10)
-    ));
-    const humanName = decodeURIComponent(usp.get('name') || storedCfg.humanName || 'You');
-    const humanAvatar = decodeURIComponent(usp.get('avatar') || storedCfg.humanAvatar || '🎮');
-    const aiDifficulty = usp.get('difficulty') || storedCfg.aiDifficulty || 'normal';
+    let sessionCache = null;
+    try {
+      const raw = sessionStorage.getItem('kg_session');
+      if (raw) sessionCache = JSON.parse(raw);
+    } catch (_) {
+      sessionCache = null;
+    }
 
-    window.FastTrackCore.initGame(playerCount, { humanName, humanAvatar, aiDifficulty });
+    const sessionPlayers = Array.isArray(sessionCache && sessionCache.players) ? sessionCache.players : [];
+    const sessionCode = String((sessionCache && sessionCache.session_code) || '').toUpperCase();
+    const sameInviteSession = !inviteCode || (sessionCode && inviteCode === sessionCode);
+    const hasRemoteHumans = sessionPlayers.filter(p => p && !p.is_ai).length >= 2;
+    const useSessionRoster = gameMode === 'private' && sameInviteSession && hasRemoteHumans;
+
+    const playerCount = useSessionRoster
+      ? Math.max(2, Math.min(4, sessionPlayers.length))
+      : Math.max(2, Math.min(4,
+        parseInt(usp.get('players') || storedCfg.playerCount || '2', 10)
+      ));
+    const humanName = dimensionalConfig?.humanName || decodeURIComponent(usp.get('name') || storedCfg.humanName || 'You');
+    const humanAvatar = dimensionalConfig?.humanAvatar || decodeURIComponent(usp.get('avatar') || storedCfg.humanAvatar || '🎮');
+    const aiDifficulty = dimensionalConfig?.aiDifficulty || usp.get('difficulty') || storedCfg.aiDifficulty || 'normal';
+
+    const initConfig = useSessionRoster
+      ? {
+        humanName,
+        humanAvatar,
+        aiDifficulty,
+        myUserId: sessionCache && sessionCache.my_user_id,
+        sessionPlayers,
+      }
+      : { humanName, humanAvatar, aiDifficulty };
+
+    // Merge dimensional config if present
+    if (dimensionalConfig) {
+      Object.assign(initConfig, dimensionalConfig);
+    }
+
+    const isDevObserver = usp.get('dev_observer') === '1';
+    if (isDevObserver) {
+      console.log('🛠️ DEV OBSERVER MODE: Forcing all AI players.');
+      initConfig.sessionPlayers = Array.from({ length: playerCount }, (_, i) => ({
+        is_ai: true,
+        username: `Observer Bot ${i + 1}`,
+        avatar: '🤖',
+        level: aiDifficulty
+      }));
+      if (CameraDirector && CameraDirector.mode !== 'manual') {
+        CameraDirector.mode = 'manual';
+      }
+
+      // --- DEV RECORDER ---
+      const recBtn = document.createElement('button');
+      recBtn.innerHTML = '🔴 REC';
+      recBtn.style.cssText = 'position:fixed; top:10px; right:10px; z-index:9999; padding:8px 16px; background:red; color:white; font-weight:bold; border:none; border-radius:4px; cursor:pointer;';
+      document.body.appendChild(recBtn);
+
+      let mediaRecorder;
+      let recordedChunks = [];
+      recBtn.onclick = () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          recBtn.innerHTML = '🔴 REC';
+          recBtn.style.background = 'red';
+        } else {
+          try {
+            const stream = renderer.domElement.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+            mediaRecorder.ondataavailable = e => {
+              if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = () => {
+              const blob = new Blob(recordedChunks, { type: 'video/webm' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `kg_dev_capture_${Date.now()}.webm`;
+              a.click();
+              URL.revokeObjectURL(url);
+              recordedChunks = [];
+            };
+            mediaRecorder.start();
+            recBtn.innerHTML = '⏹ STOP';
+            recBtn.style.background = '#666';
+          } catch (err) {
+            console.error('MediaRecorder error:', err);
+            alert('Failed to start recording. See console.');
+          }
+        }
+      };
+    }
+
+    window.FastTrackCore.initGame(playerCount, initConfig);
     window.FastTrackCore.updateUI();
     renderBoard3D();
-    console.log(`🎮 Game initialized: ${playerCount} players | human="${humanName}" ${humanAvatar} | bots=${aiDifficulty}`);
+    publishDimensionalGraph({
+      sessionId: sessionCache && sessionCache.session_id,
+      mode: gameMode,
+      code: sessionCode || inviteCode,
+    });
+    if (useSessionRoster) {
+      console.log(`🎮 Game initialized from invite session: ${playerCount} players | code=${sessionCode || inviteCode}`);
+    } else {
+      console.log(`🎮 Game initialized: ${playerCount} players | human="${humanName}" ${humanAvatar} | bots=${aiDifficulty}`);
+    }
   }
 
   // Start animation
@@ -3641,48 +3765,6 @@ function showPegNames(pegNameMap) {
     sprite.position.y = PEG_HEIGHT + 20;
     sprite.visible = true;
     peg.mesh.add(sprite);
-    peg.nameSprite = sprite;
-  }
-}
-
-function hidePegNames() {
-  pegRegistry.forEach(peg => {
-    if (peg.nameSprite) {
-      peg.nameSprite.visible = false;
-    }
-  });
-}
-
-// ════════════════════════════════════════════════════════════════
-// PEG CREATION - Tall Light Bright style with intense glow
-// ════════════════════════════════════════════════════════════════
-function createPeg(id, playerIndex, holeId, colorIndex = null) {
-  const colorIdx = colorIndex !== null ? colorIndex : playerIndex;
-  const color = RAINBOW_COLORS[colorIdx];
-  const hole = holeRegistry.get(holeId);
-
-  if (!hole) {
-    console.warn(`[createPeg] Hole ${holeId} not found`);
-    return null;
-  }
-
-  const pegGroup = new THREE.Group();
-
-  // ── OUTER SHELL — translucent colored glass ──
-  // 🜂 ManifoldGeometry.peg: x=angle, y=height, z=x·y stamped into manifoldZ attribute
-  // Savings: 10,240B Float32Array → 12B formula description per peg body
-  const bodyGeo = window.ManifoldGeometry
-    ? ManifoldGeometry.peg(PEG_TOP_RADIUS, PEG_BOTTOM_RADIUS, PEG_HEIGHT, 32)
-    : new THREE.CylinderGeometry(PEG_TOP_RADIUS, PEG_BOTTOM_RADIUS, PEG_HEIGHT, 32);
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.08,
-    metalness: 0.15,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: 0.35,
-    transparent: true,
-    opacity: 0.75,
-    envMapIntensity: 1.5
   });
 
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
@@ -4399,6 +4481,167 @@ function updateDustMotes(time) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// X-DIMENSIONAL GRAPH — embedded has-a / is-a runtime object
+// x = game (contains players, board, pegs, holes)
+// y = manifold/runtime signals
+// z = resolved state projection from x and y
+// ════════════════════════════════════════════════════════════════
+function buildDimensionalGameObject(ctx = {}) {
+  const core = window.FastTrackCore;
+  const st = core && core.state;
+  if (!st) return null;
+  const xdim = window.Manifold && window.Manifold.xdim;
+  if (!xdim) return null;
+
+  const players = Array.isArray(st.players.get('list')) ? st.players.get('list') : [];
+  const boardEntries = st.board && typeof st.board.keys === 'function'
+    ? st.board.keys().map((holeId) => ({ holeId, pegId: st.board.get(holeId) || null }))
+    : [];
+
+  const pegNodes = [];
+  const playerNodes = players.map((p) => {
+    const pegs = Array.isArray(p.pegs) ? p.pegs : [];
+    const pegRefs = pegs.map((pg) => {
+      const node = xdim.node({
+        id: pg.id,
+        isA: 'peg',
+        level: 'point',
+        hasA: {
+          position: xdim.node({
+            id: `${pg.id}:position`,
+            isA: 'position',
+            level: 'line',
+            attrs: { holeId: pg.holeId, holeType: pg.holeType },
+          }),
+        },
+        attrs: {
+          personality: pg.personality,
+          mood: pg.mood,
+        },
+      });
+      pegNodes.push(node);
+      return node;
+    });
+
+    return xdim.node({
+      id: p.userId || `player-${p.index}`,
+      isA: p.isBot ? 'bot-player' : 'human-player',
+      level: 'column',
+      hasA: {
+        profile: xdim.node({
+          id: `${p.userId || `player-${p.index}`}:profile`,
+          isA: 'profile',
+          level: 'line',
+          attrs: { name: p.name, avatar: p.avatar },
+        }),
+        seat: xdim.node({
+          id: `${p.userId || `player-${p.index}`}:seat`,
+          isA: 'seat',
+          level: 'line',
+          attrs: { index: p.index, boardPosition: p.boardPosition, color: p.color },
+        }),
+        pegs: pegRefs,
+      },
+    });
+  });
+
+  const holeNodes = boardEntries.map((h) => xdim.node({
+    id: h.holeId,
+    isA: 'hole',
+    level: 'point',
+    attrs: {
+      occupantPegId: h.pegId,
+    },
+  }));
+
+  const x = xdim.node({
+    id: ctx.sessionId || 'fasttrack-local',
+    isA: 'game',
+    level: 'whole(point)',
+    hasA: {
+      identity: xdim.node({
+        id: `${ctx.sessionId || 'fasttrack-local'}:identity`,
+        isA: 'identity',
+        level: 'void',
+        attrs: {
+          gameId: 'fasttrack',
+          mode: ctx.mode || 'solo',
+          code: ctx.code || '',
+        },
+      }),
+      players: playerNodes,
+      board: xdim.node({
+        id: `${ctx.sessionId || 'fasttrack-local'}:board`,
+        isA: 'board',
+        level: 'plane',
+        hasA: {
+          holes: holeNodes,
+          pegs: pegNodes,
+        },
+      }),
+    },
+  });
+
+  const y = {
+    runtime: {
+      phase: st.turn.get('phase') || 'draw',
+      currentPlayerIndex: st.players.get('current') || 0,
+      currentCard: st.deck.get('currentCard') || null,
+      manifoldTime: performance.now(),
+    },
+  };
+
+  const z = {
+    state: {
+      playerCount: playerNodes.length,
+      pegCount: pegNodes.length,
+      occupiedHoles: holeNodes.filter((h) => !!(h.hasA && h.hasA.occupantPegId)).length,
+      winner: st.meta.get('winner') || null,
+    },
+  };
+
+  // y modifies higher-dimensional x nodes at runtime; z resolves x·y outputs.
+  xdim.attachY(x, {
+    code: 'turn.phase->board',
+    targetId: `${ctx.sessionId || 'fasttrack-local'}:board`,
+    rule: 'phase-state-transition',
+    manifold: y.runtime,
+    value: z.state,
+  });
+  xdim.resolveZ(x);
+
+  return { x, y, z };
+}
+
+function publishDimensionalGraph(ctx = {}) {
+  const graph = buildDimensionalGameObject(ctx);
+  if (!graph) return null;
+  window.KGDimensionalGraph = graph;
+  window.KGGameObject = graph.x;
+  window.KGRuntimeY = graph.y;
+  window.KGStateZ = graph.z;
+
+  // Recursive object lookup by id for calling embedded nodes individually.
+  window.KGFindObjectById = function KGFindObjectById(targetId, node = graph.x) {
+    if (!node || typeof node !== 'object') return null;
+    if (node.id === targetId) return node;
+    for (const val of Object.values(node)) {
+      if (Array.isArray(val)) {
+        for (const child of val) {
+          const found = window.KGFindObjectById(targetId, child);
+          if (found) return found;
+        }
+      } else if (val && typeof val === 'object') {
+        const found = window.KGFindObjectById(targetId, val);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return graph;
+}
+
+// ════════════════════════════════════════════════════════════════
 // ANIMATION LOOP & UTILITIES
 // ════════════════════════════════════════════════════════════════
 let _animTime = 0;
@@ -4477,10 +4720,38 @@ function animate3D() {
   renderer.render(scene, camera);
 }
 
+// Keep the board fully visible regardless of viewport aspect by widening the
+// vertical FOV on narrow/portrait screens. Desktop landscape ratios stay at
+// the design FOV (45°); phones in portrait grow up to ~80°.
+function fitVerticalFovToAspect(cam) {
+  const aspect = cam.aspect || (window.innerWidth / window.innerHeight);
+  const desiredHFov = 50 * Math.PI / 180;
+  const minVFov = 2 * Math.atan(Math.tan(desiredHFov / 2) / Math.max(aspect, 0.35)) * 180 / Math.PI;
+  cam.fov = Math.max(45, Math.min(80, minVFov));
+}
+
 function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  if (!renderer || !camera) return;
+  const isMobile = window.innerWidth <= 600;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  // On mobile, inset the rendered viewport so the board appears in the gap
+  // between the player panel (top strip) and action panel (bottom strip).
+  let topH = 0, botH = 0;
+  if (isMobile) {
+    const topPanel = document.getElementById('panel-players');
+    const botPanel = document.getElementById('panel-action');
+    topH = topPanel ? Math.round(topPanel.getBoundingClientRect().height) : 55;
+    botH = botPanel ? Math.round(botPanel.getBoundingClientRect().height) : 75;
+  }
+  const viewH = Math.max(h - topH - botH, 100);
+  renderer.setSize(w, h);
+  renderer.setScissorTest(isMobile);
+  renderer.setViewport(0, botH, w, viewH);
+  renderer.setScissor(0, botH, w, viewH);
+  camera.aspect = w / viewH;
+  fitVerticalFovToAspect(camera);
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function setCameraView(mode) {
@@ -4514,13 +4785,16 @@ function clearHighlights() {
 function createGlowRing(holeId, color, isDestination) {
   const hole = holeRegistry.get(holeId);
   if (!hole) return null;
-  const radius = isDestination ? 14 : 10;
-  const ringGeo = new THREE.RingGeometry(radius - 3, radius, 24);
+
+  // Outer ring
+  const radius = isDestination ? 20 : 13;
+  const thickness = isDestination ? 5 : 4;
+  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 32);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
-    opacity: isDestination ? 0.8 : 0.35,
+    opacity: isDestination ? 1.0 : 0.6,
     side: THREE.DoubleSide,
     depthWrite: false,
     polygonOffset: true,
@@ -4528,12 +4802,37 @@ function createGlowRing(holeId, color, isDestination) {
     polygonOffsetUnits: -4
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.position.set(hole.position.x, hole.position.y + 4, hole.position.z);
+  ring.position.set(hole.position.x, hole.position.y + 5, hole.position.z);
   ring.renderOrder = 10;
   ring.userData.isDestination = isDestination;
   ring.userData.baseMat = ringMat;
   boardGroup.add(ring);
   highlightMeshes.push(ring);
+
+  // For destination holes: add a filled glow disc underneath for extra pop
+  if (isDestination) {
+    const discGeo = new THREE.CircleGeometry(radius - thickness, 32);
+    discGeo.rotateX(-Math.PI / 2);
+    const discMat = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3
+    });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.position.set(hole.position.x, hole.position.y + 4, hole.position.z);
+    disc.renderOrder = 9;
+    disc.userData.isDestination = true;
+    disc.userData.isDisc = true;
+    disc.userData.baseMat = discMat;
+    boardGroup.add(disc);
+    highlightMeshes.push(disc);
+  }
+
   return ring;
 }
 
@@ -4572,14 +4871,21 @@ function highlightMovePaths(moves) {
 
   // Pulsing animation
   function pulseHighlights() {
-    const t = performance.now() * 0.003;
+    const t = performance.now() * 0.0045;
     for (const mesh of highlightMeshes) {
-      const base = mesh.userData.isDestination ? 0.8 : 0.35;
-      const pulse = Math.sin(t * 2) * 0.25;
-      mesh.material.opacity = base + pulse;
       if (mesh.userData.isDestination) {
-        const scale = 1 + Math.sin(t * 1.5) * 0.08;
-        mesh.scale.set(scale, 1, scale);
+        if (mesh.userData.isDisc) {
+          // Disc pulses opacity only
+          mesh.material.opacity = 0.22 + Math.sin(t * 2.2) * 0.14;
+        } else {
+          // Ring pulses opacity + scale
+          mesh.material.opacity = 0.85 + Math.sin(t * 2.2) * 0.15;
+          const scale = 1 + Math.sin(t * 1.8) * 0.16;
+          mesh.scale.set(scale, 1, scale);
+        }
+      } else {
+        // Path holes: moderate pulse
+        mesh.material.opacity = 0.6 + Math.sin(t * 2.2) * 0.22;
       }
     }
     highlightAnimFrame = requestAnimationFrame(pulseHighlights);

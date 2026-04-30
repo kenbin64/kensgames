@@ -1547,7 +1547,8 @@
                         style="text-decoration:none;display:inline-flex;align-items:center">&#9654; PLAY NOW</a>
                     <a class="btn-ghost btn-play"
                         style="background:transparent;color:var(--neon-cyan);border:2px solid var(--neon-cyan);box-shadow:var(--glow-cyan);text-decoration:none;display:inline-flex;align-items:center"
-                        href="/fasttrack/">FASTTRACK &#9654;</a>
+                        href="/fasttrack/" onclick="event.preventDefault();goToGame('/fasttrack/');">FASTTRACK
+                        &#9654;</a>
                 </div>
                 <div class="hero-note">Free &nbsp;&#9632;&nbsp; Play with bots &nbsp;&#9632;&nbsp;
                     Play with friends via code or link &nbsp;&#9632;&nbsp; No signup</div>
@@ -2098,121 +2099,244 @@
     <script src="/gyroid.js"></script>
     <script src="/js/substrates/avatar_picker.js"></script>
     <script src="/js/substrates/player_profile.js"></script>
+        <script src="/js/substrates/manifold_ingestor.js"></script>
+        <script src="/js/substrates/portal_session_substrate.js"></script>
     <script>
-        // Floating 80s arcade symbols
-        const SYMBOLS = ['\u25b2', '\u25c6', '\u25a0', '\u25cf', '\u25b6', '\u25c0', '\u2605', '\u25c8', '\u2b21', '\u25bc', '\u25c9', '\u2b22'];
-        const container = document.getElementById('arcade-symbols');
-        for (let i = 0; i < 22; i++) {
-            const s = document.createElement('div');
-            s.className = 'sym';
-            s.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-            s.style.left = Math.random() * 100 + 'vw';
-            s.style.animationDuration = (18 + Math.random() * 28) + 's';
-            s.style.animationDelay = (Math.random() * 30) + 's';
-            s.style.fontSize = (16 + Math.random() * 30) + 'px';
-            s.style.color = ['#00FFFF', '#FF00FF', '#FFE800', '#00FF41'][Math.floor(Math.random() * 4)];
-            container.appendChild(s);
-        }
+        // Floating 80s arcade symbols — wrapped so any DOM hiccup never blocks
+        // KGPlay / goToGame from registering on window below.
+        try {
+            const SYMBOLS = ['\u25b2', '\u25c6', '\u25a0', '\u25cf', '\u25b6', '\u25c0', '\u2605', '\u25c8', '\u2b21', '\u25bc', '\u25c9', '\u2b22'];
+            const container = document.getElementById('arcade-symbols');
+            if (container) {
+                for (let i = 0; i < 22; i++) {
+                    const s = document.createElement('div');
+                    s.className = 'sym';
+                    s.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+                    s.style.left = Math.random() * 100 + 'vw';
+                    s.style.animationDuration = (18 + Math.random() * 28) + 's';
+                    s.style.animationDelay = (Math.random() * 30) + 's';
+                    s.style.fontSize = (16 + Math.random() * 30) + 'px';
+                    s.style.color = ['#00FFFF', '#FF00FF', '#FFE800', '#00FF41'][Math.floor(Math.random() * 4)];
+                    container.appendChild(s);
+                }
+            }
+        } catch (e) { console.warn('[arcade-symbols]', e); }
 
-        // ── Universal Play modal: profile gate + mode picker → redirect to game lobby ──
-        const KG_GAME_REGISTRY = {
-            '/fasttrack/': { gameId: 'fasttrack', gameName: 'FastTrack', lobbyUrl: '/fasttrack/lobby-simple.html' },
-            '/4DTicTacToe/': { gameId: '4dtictactoe', gameName: '4D TicTacToe', lobbyUrl: '/4DTicTacToe/' },
-            '/starfighter/': { gameId: 'starfighter', gameName: 'Alien Space Attack', lobbyUrl: '/starfighter/lobby.html' },
-            '/brickbreaker3d/': { gameId: 'brickbreaker3d', gameName: 'BrickBreaker 3D', lobbyUrl: '/brickbreaker3d/lobby.html' },
-        };
+        // ── KGPlay — unified play workflow for every Play button ─────────────
+        // Step 1 (portal): profile gate — name + avatar in one panel, only if missing.
+        // Step 2 (lobby):  KGMultiplayerPanel owns Solo-vs-AI / Invite-Friends,
+        //                  the 1–4 player roster (humans + bots), the host panel
+        //                  shown to the creator, and the invitee panel shown to
+        //                  guests who land via a share code.
+        // Persistence: localStorage (cross-session) + Manifold.write (in-session)
+        window.KGPlay = (function () {
+            const REGISTRY = {
+                fasttrack: { name: 'FastTrack', lobby: '/fasttrack/lobby-simple.html' },
+                '4dtictactoe': { name: '4D TicTacToe', lobby: '/4DTicTacToe/' },
+                starfighter: { name: 'Alien Space Attack', lobby: '/starfighter/lobby.html' },
+                brickbreaker3d: { name: 'BrickBreaker 3D', lobby: '/brickbreaker3d/lobby.html' },
+            };
+            const PATH_TO_KEY = {
+                '/fasttrack/': 'fasttrack',
+                '/4DTicTacToe/': '4dtictactoe',
+                '/starfighter/': 'starfighter',
+                '/brickbreaker3d/': 'brickbreaker3d',
+            };
+            const AVATARS = ['🚀', '👾', '🤖', '🛸', '⭐', '🌙', '🐉', '🦊', '🦅', '🦈', '🥷', '🧙', '🦸', '🎮', '🕹️', '👑', '⚡', '🔥', '🌌', '🪐'];
 
-        function ensurePlayModalDOM() {
-            if (document.getElementById('kg-play-modal')) return;
-            const style = document.createElement('style');
-            style.textContent = `
-                #kg-play-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
-                    background:rgba(2,2,12,0.88);backdrop-filter:blur(6px);font-family:'Orbitron',monospace;}
-                #kg-play-modal.open{display:flex;}
-                #kg-play-modal .kg-pm-inner{position:relative;max-width:520px;width:92%;
-                    background:rgba(4,4,20,0.96);border:2px solid #00FFFF;border-radius:8px;padding:28px;
-                    box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(122,60,255,0.18);color:#e8e8ff;}
-                #kg-play-modal h2{font-size:16px;letter-spacing:2px;color:#00FFFF;margin:0 0 6px;
-                    text-transform:uppercase;text-shadow:0 0 12px rgba(0,255,255,0.6);}
-                #kg-play-modal .kg-pm-sub{font-size:11px;color:#9aa;letter-spacing:2px;margin-bottom:20px;}
-                #kg-play-modal .kg-pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-                #kg-play-modal .kg-pm-btn{background:rgba(0,0,0,0.4);border:1.5px solid rgba(0,255,255,0.4);
-                    color:#fff;padding:28px 12px;border-radius:6px;text-align:center;cursor:pointer;
-                    font-family:inherit;transition:all 200ms ease;}
-                #kg-play-modal .kg-pm-btn:hover{border-color:#00FFFF;background:rgba(0,255,255,0.08);
-                    box-shadow:0 0 18px rgba(0,255,255,0.3);}
-                #kg-play-modal .kg-pm-icon{font-size:36px;display:block;margin-bottom:10px;}
-                #kg-play-modal .kg-pm-label{font-size:13px;letter-spacing:2px;color:#00FFFF;text-transform:uppercase;}
-                #kg-play-modal .kg-pm-desc{font-size:10px;color:#9aa;margin-top:6px;letter-spacing:1px;}
-                #kg-play-modal .kg-pm-close{position:absolute;top:-12px;right:-12px;
-                    background:#04041a;color:#00FFFF;border:1.5px solid #00FFFF;border-radius:50%;
-                    width:36px;height:36px;font-size:18px;cursor:pointer;font-family:inherit;
-                    box-shadow:0 0 12px rgba(0,255,255,0.5);}
-                #kg-play-modal .kg-pm-close:hover{background:#00FFFF;color:#04041a;}
-                #kg-play-modal .kg-pm-foot{margin-top:18px;padding-top:14px;border-top:1px solid rgba(0,255,255,0.15);
-                    font-size:10px;color:#9aa;letter-spacing:1px;text-align:center;}
-            `;
-            document.head.appendChild(style);
-            const modal = document.createElement('div');
-            modal.id = 'kg-play-modal';
-            modal.innerHTML = `<div class="kg-pm-inner">
-                <button class="kg-pm-close" aria-label="Close">✕</button>
-                <h2 id="kg-pm-title">Play</h2>
-                <div class="kg-pm-sub" id="kg-pm-sub">▼ Choose how to play · No signup required</div>
-                <div class="kg-pm-grid">
-                    <button class="kg-pm-btn" data-mode="solo">
-                        <span class="kg-pm-icon">🤖</span>
-                        <span class="kg-pm-label">Solo vs AI</span>
-                        <div class="kg-pm-desc">Practice against bots</div>
-                    </button>
-                    <button class="kg-pm-btn" data-mode="friend">
-                        <span class="kg-pm-icon">👥</span>
-                        <span class="kg-pm-label">Play a Friend</span>
-                        <div class="kg-pm-desc">Share a code or link</div>
-                    </button>
-                </div>
-                <div class="kg-pm-foot" id="kg-pm-foot">A name + avatar is required before playing.</div>
-            </div>`;
-            document.body.appendChild(modal);
-            modal.addEventListener('click', (e) => { if (e.target === modal) closePlayModal(); });
-            modal.querySelector('.kg-pm-close').addEventListener('click', closePlayModal);
-        }
+            function getName() { try { return (localStorage.getItem('display_name') || localStorage.getItem('username') || '').trim() || null; } catch { return null; } }
+            function getAvatar() { try { return JSON.parse(localStorage.getItem('kg_avatar') || 'null'); } catch { return null; } }
+            function hasProfile() { return !!(getName() && getAvatar()); }
 
-        function closePlayModal() {
-            const modal = document.getElementById('kg-play-modal');
-            if (modal) modal.classList.remove('open');
-        }
+            function saveProfile(name, emoji) {
+                const cleaned = String(name || '').trim().slice(0, 20);
+                const av = { id: 'emoji_' + emoji, emoji, name: emoji };
+                try {
+                    localStorage.setItem('display_name', cleaned);
+                    localStorage.setItem('username', cleaned);
+                    localStorage.setItem('kg_avatar', JSON.stringify(av));
+                } catch { /* ignore */ }
+                if (window.Manifold && typeof Manifold.write === 'function') {
+                    try { Manifold.write({ x: 1, y: 1, region: 'players.local' }, { name: cleaned, avatar: av, ts: Date.now() }); } catch { /* ignore */ }
+                }
+            }
 
-        function openPlayModal(def) {
-            ensurePlayModalDOM();
-            const modal = document.getElementById('kg-play-modal');
-            modal.querySelector('#kg-pm-title').textContent = def.gameName;
-            modal.querySelector('#kg-pm-sub').textContent = '▼ ' + def.gameName + ' · Choose how to play';
-            modal.classList.add('open');
-            modal.querySelectorAll('.kg-pm-btn').forEach(b => {
-                const fresh = b.cloneNode(true);
-                b.parentNode.replaceChild(fresh, b);
-                fresh.addEventListener('click', () => {
-                    const mode = fresh.getAttribute('data-mode');
-                    const go = () => {
-                        const url = new URL(def.lobbyUrl, location.origin);
-                        url.searchParams.set('mode', mode);
-                        window.location.href = url.pathname + url.search;
-                    };
-                    if (typeof KGPlayerProfile !== 'undefined' && KGPlayerProfile.ensure) {
-                        KGPlayerProfile.ensure(true, go);
-                    } else {
-                        go();
+            function injectStyles() {
+                if (document.getElementById('kg-play-styles')) return;
+                const style = document.createElement('style');
+                style.id = 'kg-play-styles';
+                style.textContent = `
+                    #kg-play-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+                        background:rgba(2,2,12,0.92);backdrop-filter:blur(6px);font-family:'Orbitron',monospace;
+                        padding:12px;overflow-y:auto;}
+                    #kg-play-overlay.open{display:flex;}
+                    .kg-play-card{position:relative;max-width:520px;width:100%;max-height:calc(100dvh - 24px);
+                        overflow-y:auto;background:rgba(4,4,20,0.97);border:2px solid #00FFFF;border-radius:8px;
+                        padding:18px 18px 16px;color:#e8e8ff;
+                        box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(153,0,255,0.22),inset 0 0 24px rgba(0,255,65,0.04);}
+                    .kg-play-card h2{font-size:15px;letter-spacing:2px;color:#00FFFF;margin:0 0 4px;
+                        text-transform:uppercase;text-shadow:0 0 12px rgba(0,255,255,0.6);}
+                    .kg-play-sub{font-size:10px;color:#9aa;letter-spacing:2px;margin-bottom:12px;}
+                    .kg-play-step{font-size:9px;color:#9900FF;letter-spacing:3px;margin-bottom:6px;
+                        text-transform:uppercase;text-shadow:0 0 8px rgba(153,0,255,0.5);}
+                    .kg-play-label{display:block;font-size:10px;color:#00FF41;letter-spacing:2px;
+                        margin:10px 0 5px;text-transform:uppercase;text-shadow:0 0 6px rgba(0,255,65,0.4);}
+                    .kg-play-input{width:100%;padding:10px 12px;background:rgba(0,255,255,0.06);
+                        border:1px solid rgba(0,255,255,0.25);border-radius:4px;color:#E0E0FF;font-size:14px;
+                        letter-spacing:1px;outline:none;font-family:inherit;}
+                    .kg-play-input:focus{border-color:#00FFFF;box-shadow:0 0 8px rgba(0,255,255,0.4);}
+                    .kg-play-avgrid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;margin-top:4px;}
+                    .kg-play-avbtn{font-size:20px;padding:5px 0;background:rgba(0,255,255,0.04);
+                        border:1.5px solid rgba(153,0,255,0.22);border-radius:4px;cursor:pointer;
+                        transition:all 150ms;color:#fff;font-family:inherit;line-height:1;}
+                    .kg-play-avbtn:hover{background:rgba(153,0,255,0.18);border-color:#9900FF;
+                        box-shadow:0 0 8px rgba(153,0,255,0.4);}
+                    .kg-play-avbtn.sel{background:rgba(0,255,255,0.22);border-color:#00FFFF;
+                        box-shadow:0 0 12px rgba(0,255,255,0.55);}
+                    .kg-play-confirm{width:100%;margin-top:14px;padding:13px;background:#00FF41;color:#04040C;
+                        border:none;border-radius:3px;font-family:inherit;font-size:13px;letter-spacing:2px;
+                        cursor:pointer;text-transform:uppercase;font-weight:900;
+                        box-shadow:0 0 16px rgba(0,255,65,0.6),0 0 32px rgba(0,255,65,0.25);}
+                    .kg-play-confirm:disabled{opacity:0.35;cursor:not-allowed;box-shadow:none;background:#333;color:#777;}
+                    .kg-play-close{position:absolute;top:8px;right:8px;background:transparent;color:#9900FF;
+                        border:1.5px solid #9900FF;border-radius:50%;width:30px;height:30px;font-size:15px;
+                        cursor:pointer;font-family:inherit;box-shadow:0 0 8px rgba(153,0,255,0.4);
+                        display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}
+                    .kg-play-close:hover{background:#9900FF;color:#04041a;}
+                    @media (max-width:520px){
+                        .kg-play-card{padding:14px 14px 12px;border-radius:6px;}
+                        .kg-play-card h2{font-size:14px;}
+                        .kg-play-avgrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;}
+                        .kg-play-avbtn{font-size:24px;padding:8px 0;}
+                        .kg-play-label{margin:8px 0 4px;}
                     }
-                });
-            });
-        }
+                    @media (max-height:520px){
+                        .kg-play-card{padding:10px 14px;}
+                        .kg-play-sub{display:none;}
+                        .kg-play-avgrid{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;}
+                        .kg-play-avbtn{font-size:18px;padding:3px 0;}
+                        .kg-play-confirm{padding:10px;margin-top:10px;}
+                    }
+                `;
+                document.head.appendChild(style);
+            }
 
+            function ensureOverlay() {
+                let el = document.getElementById('kg-play-overlay');
+                if (el) return el;
+                injectStyles();
+                el = document.createElement('div');
+                el.id = 'kg-play-overlay';
+                el.innerHTML = '<div class="kg-play-card" id="kg-play-card"></div>';
+                document.body.appendChild(el);
+                el.addEventListener('click', (e) => { if (e.target === el) close(); });
+                return el;
+            }
+
+            function close() {
+                const el = document.getElementById('kg-play-overlay');
+                if (el) el.classList.remove('open');
+            }
+
+            function renderProfileStep(def, onDone) {
+                const el = ensureOverlay();
+                const card = el.querySelector('#kg-play-card');
+                const existingName = getName() || '';
+                let pickedEmoji = (getAvatar() && getAvatar().emoji) || null;
+                // Build via DOM rather than innerHTML to keep input value safe.
+                card.textContent = '';
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'kg-play-close';
+                closeBtn.setAttribute('aria-label', 'Close');
+                closeBtn.textContent = '✕';
+                closeBtn.addEventListener('click', close);
+                const step = document.createElement('div');
+                step.className = 'kg-play-step';
+                step.textContent = '▸ Profile · ' + def.name;
+                const h2 = document.createElement('h2');
+                h2.textContent = 'Pick a name & avatar';
+                const sub = document.createElement('div');
+                sub.className = 'kg-play-sub';
+                sub.textContent = 'Stored on this device · No signup · Used in every game';
+                const nameLabel = document.createElement('label');
+                nameLabel.className = 'kg-play-label';
+                nameLabel.htmlFor = 'kg-play-name';
+                nameLabel.textContent = 'Display Name';
+                const nameInput = document.createElement('input');
+                nameInput.id = 'kg-play-name';
+                nameInput.className = 'kg-play-input';
+                nameInput.maxLength = 20;
+                nameInput.placeholder = 'Pilot, Ace, Nova…';
+                nameInput.value = existingName;
+                const avLabel = document.createElement('label');
+                avLabel.className = 'kg-play-label';
+                avLabel.textContent = 'Avatar';
+                const grid = document.createElement('div');
+                grid.className = 'kg-play-avgrid';
+                AVATARS.forEach(em => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'kg-play-avbtn' + (em === pickedEmoji ? ' sel' : '');
+                    b.textContent = em;
+                    b.addEventListener('click', () => {
+                        pickedEmoji = em;
+                        grid.querySelectorAll('.kg-play-avbtn').forEach(x => x.classList.remove('sel'));
+                        b.classList.add('sel');
+                        revalidate();
+                    });
+                    grid.appendChild(b);
+                });
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'kg-play-confirm';
+                saveBtn.textContent = 'Save & Play ▸';
+                saveBtn.disabled = true;
+                function revalidate() {
+                    saveBtn.disabled = !(nameInput.value.trim().length >= 2 && !!pickedEmoji);
+                }
+                nameInput.addEventListener('input', revalidate);
+                nameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !saveBtn.disabled) saveBtn.click();
+                });
+                saveBtn.addEventListener('click', () => {
+                    if (saveBtn.disabled) return;
+                    saveProfile(nameInput.value, pickedEmoji);
+                    onDone();
+                });
+                card.append(closeBtn, step, h2, sub, nameLabel, nameInput, avLabel, grid, saveBtn);
+                el.classList.add('open');
+                setTimeout(() => nameInput.focus(), 30);
+                revalidate();
+            }
+
+            function gotoLobby(def) {
+                window.location.href = def.lobby;
+            }
+
+            function start(pathOrKey) {
+                const key = PATH_TO_KEY[pathOrKey] || pathOrKey;
+                const def = REGISTRY[key];
+                if (!def) { window.location.href = pathOrKey; return; }
+                if (hasProfile()) {
+                    gotoLobby(def);
+                } else {
+                    renderProfileStep(def, () => gotoLobby(def));
+                }
+            }
+
+            return { start, close, hasProfile, getName, getAvatar, saveProfile, REGISTRY };
+        })();
+
+        // Backwards-compat shim for inline onclick="goToGame('/path/')" handlers.
         function goToGame(path) {
-            const def = KG_GAME_REGISTRY[path];
-            if (def) { openPlayModal(def); return; }
+            try {
+                if (window.KGPlay && typeof window.KGPlay.start === 'function') {
+                    window.KGPlay.start(path);
+                    return;
+                }
+            } catch (e) { console.error('[KGPlay]', e); }
             window.location.href = path;
         }
+        window.goToGame = goToGame;
 
         // Replace heavyweight PNG thumbnails with fast JSON atlases when available.
         (function applyAtlasesEarly() {

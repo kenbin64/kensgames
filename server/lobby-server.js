@@ -66,6 +66,21 @@ function bootGameCatalog() {
 const CATALOG = bootGameCatalog();
 const CATALOG_BY_ID = Object.fromEntries(CATALOG.map(g => [g.id, g]));
 
+const GAME_ROUTE_INDEX = {
+  fasttrack: { path: '/fasttrack/3d.html', lobby: '/fasttrack/lobby.html' },
+  starfighter: { path: '/starfighter/index.html', lobby: '/starfighter/lobby.html' },
+  brickbreaker3d: { path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html' },
+  brickbreaker: { path: '/brickbreaker3d/play.html', lobby: '/brickbreaker3d/lobby.html' },
+  '4dtictactoe': { path: '/4DTicTacToe/', lobby: '/4DTicTacToe/' },
+  tictactoe: { path: '/4DTicTacToe/', lobby: '/4DTicTacToe/' },
+  cubic3d: { path: '/cubic3d/', lobby: '/cubic3d/' },
+};
+
+function gameRoutes(gameId) {
+  const key = String(gameId || '').toLowerCase();
+  return GAME_ROUTE_INDEX[key] || { path: '/', lobby: '/' };
+}
+
 // ── In-memory caches projected from the seed log ───────────────────────────
 // These are CACHES of the log frontier, not authority. On restart they are
 // rebuilt from the log in O(N) where N = active sessions.
@@ -295,7 +310,18 @@ handlers.resolve_code = (ws, data) => {
   const code = String((data && data.code) || '').toUpperCase();
   const s = sessionByCode(code);
   if (!s) return send(ws, { type: 'resolve_code_result', found: false, code });
-  send(ws, { type: 'resolve_code_result', found: true, code, session: sanitize(s) });
+  const game = CATALOG_BY_ID[s.game_id] || {};
+  const routes = gameRoutes(s.game_id);
+  send(ws, {
+    type: 'resolve_code_result',
+    found: true,
+    code,
+    game_id: s.game_id,
+    game_name: game.name || s.game_name || s.game_id,
+    game_path: routes.path,
+    game_lobby_path: routes.lobby,
+    session: sanitize(s),
+  });
 };
 
 handlers.leave_session = (ws) => {
@@ -473,8 +499,47 @@ Object.keys(STUBS).forEach(k => { handlers[k] = (ws) => send(ws, STUBS[k]); });
 
 // ── HTTP + WebSocket transport ──────────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
+  // nginx proxies https://kensgames.com/ws/* → us. Strip the prefix so the
+  // same handler matches under both `/ws/api/...` and `/api/...` paths.
+  const rawUrl = req.url && req.url.startsWith('/ws/') ? req.url.slice(3) : req.url;
+  const reqUrl = new URL(rawUrl, `http://${req.headers.host || `localhost:${PORT}`}`);
+  const origin = req.headers.origin || '*';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-KG-Guest-Id',
+    'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
+  };
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, corsHeaders);
+    res.end();
+    return;
+  }
+
+  // Identity-First: derive the requester's stable user_id from the same
+  // kg_guest_id token the WS client uses, so REST and WS share one identity.
+  const playerIdFromRequest = (request) => {
+    const hdr = request.headers['x-kg-guest-id'];
+    if (!hdr || typeof hdr !== 'string') return null;
+    return stableGuestId(hdr);
+  };
+  const meId = playerIdFromRequest(req);
+
+  // Find the player object inside a session that matches the caller's identity.
+  const meIn = (session) => {
+    if (!meId || !session || !Array.isArray(session.players)) return null;
+    const p = session.players.find(pp => pp && pp.user_id === meId);
+    if (!p) return null;
+    return {
+      player_id: p.user_id, name: p.username, avatar_id: p.avatar_id,
+      is_host: !!p.is_host, is_ai: !!p.is_ai, ready: !!p.ready, slot: p.slot,
+    };
+  };
+
   if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
     res.end(JSON.stringify({
       status: 'ok',
       connections: connections.size,
@@ -484,8 +549,63 @@ const httpServer = http.createServer((req, res) => {
     }));
     return;
   }
+  if (reqUrl.pathname === '/api/session/bootstrap') {
+    const code = String(reqUrl.searchParams.get('code') || '').trim().toUpperCase();
+    const gameHint = String(reqUrl.searchParams.get('game') || '').trim().toLowerCase();
+    if (!code) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+      res.end(JSON.stringify({ error: 'Missing code' }));
+      return;
+    }
+
+    let found = null;
+    for (const s of liveSessions.values()) {
+      if (String(s.session_code || '').toUpperCase() !== code) continue;
+      if (gameHint && String(s.game_id || '').toLowerCase() !== gameHint) continue;
+      found = s;
+      break;
+    }
+
+    if (!found) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+      res.end(JSON.stringify({ found: false, code }));
+      return;
+    }
+
+    const routes = gameRoutes(found.game_id);
+    const sessionPayload = sanitize(found);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+    res.end(JSON.stringify({
+      found: true,
+      code,
+      session: sessionPayload,
+      me: meIn(sessionPayload),
+      game_path: routes.path,
+      game_lobby_path: routes.lobby,
+    }));
+    return;
+  }
+  if (reqUrl.pathname === '/api/players/me') {
+    let active = null;
+    if (meId) {
+      for (const s of liveSessions.values()) {
+        if (s.players.some(p => p && p.user_id === meId)) { active = s; break; }
+      }
+    }
+    const player = active ? meIn(sanitize(active)) : null;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+    res.end(JSON.stringify({
+      player_id: meId,
+      signed_in: false,
+      name: player ? player.name : null,
+      avatar_id: player ? player.avatar_id : null,
+      active_session_code: active ? active.session_code : null,
+      active_game_id: active ? active.game_id : null,
+    }));
+    return;
+  }
   if (req.url === '/manifold/frontier') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
     res.end(JSON.stringify({
       games: Proj.frontier(log, 'game').map(s => ({ id: s.id, meta: s.meta })),
       sessions: Proj.frontier(log, 'session').map(s => ({ id: s.id, meta: s.meta, code: Proj.codeFromSeed(s.seed) })),
@@ -493,8 +613,8 @@ const httpServer = http.createServer((req, res) => {
     }));
     return;
   }
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, or WebSocket upgrade' }));
+  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, or WebSocket upgrade' }));
 });
 
 const wss = new WebSocket.Server({ server: httpServer });

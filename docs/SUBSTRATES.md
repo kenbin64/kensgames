@@ -1,8 +1,22 @@
 # Substrates of the Manifold
 
 > Read this before adding any new "lattice", "field", or "surface" to the code.
+> Formal axiom reference: [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](X-DIMENSIONAL-AI-DIRECTIVE.md)
 
-This repo speaks the manifold dialect: `x` is identity, `y` is current state and what to do next, `z = xy` (or `z = xy²`) is the manifold surface that joins them. Apps and games are seeded with an `x` and bloom organically as `y` evolves.
+This repo speaks the manifold dialect:
+
+- **x** is identity — the seed, the observer, and always the point of reference. The AI is also an x.
+- **y** is the modifier set — attributes and nutrients extracted from the manifold m.
+- **z** is the manifested current state (bloom) — always derived, never stored independently.
+- **m** is the manifold substrate — the garden, a continuous queryable geometric field, not a database.
+- **r** is traversal resistance ($r \ge 1$). At $r = 1$ (unit crossing at the void), traversal has no resistance.
+
+State is never stored; it is extracted from the manifold at query time via a lens:
+
+$$z = x \cdot y \cdot m \quad \text{(gather — multiplication unites)}$$
+$$z = \frac{x}{y} \cdot m \quad \text{(explode — division decomposes into constituent parts)}$$
+
+Apps and games are seeded with an `x` and bloom organically as `y` evolves from m.
 
 This doc names the two TPMS surfaces in this repo, the role each one plays, and the rule that keeps them separate.
 
@@ -10,22 +24,25 @@ This doc names the two TPMS surfaces in this repo, the role each one plays, and 
 
 | Surface | Equation | Role | Defined in |
 |---|---|---|---|
-| **Gyroid** | `sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = 0` | **Substrate** — storage, indexing, joining | Governing Doc §3, §9 |
-| **Schwartz Diamond** | `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0` | **Auxiliary lens** — visual geometry, force fields, AI inflection timing | This repo only |
+| **Gyroid** | `sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = c` | **Substrate** — storage, indexing, joining; canonical m field | Governing Doc §3, §9 |
+| **Schwarz Diamond (D-class)** | `cos(x) + cos(y) + cos(z) = c` | **Auxiliary lens** — visual geometry, AI inflection, force fields | This repo only |
+| **Schwarz Diamond (full)** | `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0` | **Amplified lens** — 8-fold symmetry for boss geometry, phrasing, ANPC inflection | This repo only |
 
-The Gyroid is the canonical substrate — the single TPMS the engine is built on. The Schwartz Diamond is a derived field computed on read; it is never stored, never indexed, and never used as a key.
+The Gyroid is the canonical substrate — the single TPMS the engine is built on. The algebraic transforms (gather/explode families) applied to x, y, z, and m generate the geometric shapes that are the manifolds. The Schwarz Diamond surfaces are derived lenses computed on read; they are never stored, never indexed, and never used as keys.
 
-## How the two surfaces map to x / y / z
+The closest proximity reference for continuous periodic manifold structure is the Schwarz (Swartz) Diamond gyroid trigonometric family — see [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](X-DIMENSIONAL-AI-DIRECTIVE.md) Def 1.8.
 
-| Manifold term | Meaning | Where it lives |
-|---|---|---|
-| **x** (canvas / identity) | Each game's seed; each entity's first coordinate. The 5-game product spec is an x-side artifact. | `universe/`, `docs/KENSGAMES_5_GAME_SPEC.md`, `*.x.json`, `_xy[index*2]` in `js/manifold.js` |
-| **y** (state / next) | The dynamic coordinate. Current state and what the entity should do next. | `_xy[index*2 + 1]`, runtime updates |
-| **z = xy** (linear) | Primary manifold surface. Most queries and joins resolve here. | `js/manifold.js` `_z()` — canonical here is `z = xy²`; both are valid per spec |
-| **z = xy²** (quadratic) | Secondary, more expressive surface. Used when linear resolution is insufficient. | same |
-| **m = xyz** (manifold value) | Full multiplicative coupling — the entity's identity at this point. | `_m()` |
-| **Gyroid field** | Substrate. Indexer. Joiner. | `gyroid()` |
-| **Schwartz Diamond field** | Lens. Sampled for geometry, gradient, inflection. | `diamond()`, `diamondGrad()` |
+## How the surfaces and variables map together
+
+| Manifold term | Identity and role | Algebraic form | Where it lives |
+|---|---|---|---|
+| **x** (seed / observer) | Each game's seed; each entity's reference identity. x is always the observer. The AI is also an x. | anchor of all forms | `universe/`, `docs/KENSGAMES_5_GAME_SPEC.md`, `*.x.json`, `_xy[index*2]` in `js/manifold.js` |
+| **y** (modifier / nutrients) | The dynamic modifier set. Current state and what the entity does next. Discovered from m, never assumed. | $y = z/(x \cdot m)$ | `_xy[index*2 + 1]`, runtime updates |
+| **z** (bloom / output) | Manifested current state. Always derived, never independently stored. | $z = x \cdot y \cdot m$ (gather) or $z = (x/y) \cdot m$ (explode) | `js/manifold.js` `_z()` |
+| **m** (manifold / garden) | Full manifold coefficient. Context, weight, and intensity of extraction. | $m = z/(x \cdot y)$ | `_m()` |
+| **r** (resistance) | Traversal resistance $r \ge 1$. At $r = 1$, no resistance (void crossing). | $z = (x \cdot y / r) \cdot m$ | traversal logic |
+| **Gyroid field** | Canonical substrate. Indexer. Joiner. Gather-family geometry. | `sin(x)cos(y)+sin(y)cos(z)+sin(z)cos(x) = c` | `gyroid()` |
+| **Schwarz Diamond field** | Auxiliary lens. Sampled for geometry, gradient, AI inflection. Explode-family geometry. | `cos(x)cos(y)cos(z)−sin(x)sin(y)sin(z) = 0` | `diamond()`, `diamondGrad()` |
 
 ## Rules of use
 

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TTLRecall Dual Launch</title>
+  <style>
+    :root {
+      --bg: #040814;
+      --card: #0b1429;
+      --line: #1f325e;
+      --text: #e8f0ff;
+      --muted: #89a2d6;
+      --a: #22d3ee;
+      --b: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Manrope, system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% 10%, #0c1c3f 0%, transparent 40%), radial-gradient(circle at 85% 90%, #112b21 0%, transparent 35%), var(--bg);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+
+    .wrap {
+      width: min(980px, 92vw);
+    }
+
+    h1 {
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      margin: 0 0 .6rem;
+    }
+
+    p {
+      color: var(--muted);
+      margin: 0 0 2rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .01));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1.2rem;
+    }
+
+    .card h2 {
+      margin: .1rem 0 .5rem;
+      font-size: 1.2rem;
+    }
+
+    .tag {
+      font-size: .72rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--a);
+    }
+
+    .cta {
+      display: inline-block;
+      margin-top: 1rem;
+      text-decoration: none;
+      background: var(--a);
+      color: #06101f;
+      font-weight: 700;
+      padding: .68rem 1rem;
+      border-radius: 10px;
+    }
+
+    .cta.alt {
+      background: var(--b);
+    }
+
+    @media (max-width:760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap"
+    rel="stylesheet" />
+</head>
+
+<body>
+  <main class="wrap">
+    <h1>TTLRecall Speed Launch</h1>
+    <p>Two world-class immersive websites deployed together in one bundle.</p>
+    <section class="grid">
+      <article class="card">
+        <div class="tag">Site 01</div>
+        <h2>RealtyX Command</h2>
+        <p>High-complexity 3D real estate command interface with live market layers, filtering, and immersive depth.</p>
+        <a class="cta" href="/realtyx/">Open RealtyX</a>
+      </article>
+      <article class="card">
+        <div class="tag" style="color:var(--b)">Site 02</div>
+        <h2>FundWave Impact</h2>
+        <p>GoFundMe-scale campaign platform feel with donation simulation, trust rails, and 3D impact visualization.</p>
+        <a class="cta alt" href="/fundwave/">Open FundWave</a>
+      </article>
+    </section>
+  </main>
+</body>
+
+</html>

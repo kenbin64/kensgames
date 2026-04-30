@@ -98,8 +98,23 @@
     }
 
     const params = new URLSearchParams(location.search);
-    const code = (params.get('code') || '').trim().toUpperCase();
+    const pathGameMatch = location.pathname.match(/\/join=([^/?#]+)/i);
+    const gameHint = (params.get('game') || (pathGameMatch ? decodeURIComponent(pathGameMatch[1]) : '')).trim().toLowerCase();
+    const code = (params.get('code') || params.get('') || '').trim().toUpperCase();
     document.getElementById('code').textContent = code || '------';
+
+    function lobbyPathForGameId(gameId) {
+      const map = {
+        fasttrack: '/fasttrack/lobby.html',
+        starfighter: '/starfighter/lobby.html',
+        brickbreaker3d: '/brickbreaker3d/lobby.html',
+        brickbreaker: '/brickbreaker3d/lobby.html',
+        '4dtictactoe': '/4DTicTacToe/',
+        tictactoe: '/4DTicTacToe/',
+        cubic3d: '/cubic3d/',
+      };
+      return map[String(gameId || '').toLowerCase()] || '/';
+    }
 
     if (!code || code.length < 4) {
       const s = document.getElementById('status');
@@ -108,6 +123,29 @@
     } else {
       const ws = new WebSocket(wsUrl());
       const status = document.getElementById('status');
+      let done = false;
+
+      function redirectByHint(reasonText) {
+        const hintedPath = lobbyPathForGameId(gameHint);
+        if (!gameHint || !hintedPath || hintedPath === '/') return false;
+        done = true;
+        status.textContent = reasonText + ' Redirecting by game hint…';
+        status.classList.remove('err');
+        const url = new URL(hintedPath, location.origin);
+        url.searchParams.set('code', code);
+        url.searchParams.set('game', gameHint);
+        location.replace(url.toString());
+        return true;
+      }
+
+      // If realtime code resolution is slow/unavailable, do not strand the player.
+      const watchdog = setTimeout(() => {
+        if (done) return;
+        if (!redirectByHint('Code lookup timed out.')) {
+          status.textContent = 'Could not verify code in time. Try again.';
+          status.classList.add('err');
+        }
+      }, 3500);
 
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'resolve_code', code }));
@@ -116,10 +154,14 @@
       ws.onmessage = (e) => {
         let d; try { d = JSON.parse(e.data); } catch { return; }
         if (d.type === 'resolve_code_result') {
+          done = true;
+          clearTimeout(watchdog);
           ws.close();
           if (!d.found) {
-            status.textContent = 'No game found with that code.';
-            status.classList.add('err');
+            if (!redirectByHint('No active session found for that code.')) {
+              status.textContent = 'No game found with that code.';
+              status.classList.add('err');
+            }
             return;
           }
           status.textContent = 'Found game — redirecting…';
@@ -129,24 +171,43 @@
           const reportedPath = (d.game_lobby_path || d.game_path || '');
           const isFastTrack = (d.game_id === 'fasttrack') || (typeof reportedPath === 'string' && reportedPath.includes('/fasttrack/'));
 
+          const sessionGameId = d && d.session && d.session.game_id;
+          const fallbackPath = lobbyPathForGameId(d.game_id || sessionGameId || gameHint);
+
           const rawPath = isFastTrack
             ? '/fasttrack/join.html'
-            : (d.game_lobby_path || d.game_path || '/');
+            : (d.game_lobby_path || d.game_path || fallbackPath);
 
           const url = new URL(rawPath, location.origin);
           url.searchParams.set('code', code);
           location.replace(url.toString());
         }
         if (d.type === 'error') {
+          done = true;
+          clearTimeout(watchdog);
           ws.close();
-          status.textContent = d.message || 'Server error. Try again.';
-          status.classList.add('err');
+          if (!redirectByHint('Server could not resolve this code.')) {
+            status.textContent = d.message || 'Server error. Try again.';
+            status.classList.add('err');
+          }
         }
       };
 
       ws.onerror = () => {
-        status.textContent = 'Could not connect to server.';
-        status.classList.add('err');
+        clearTimeout(watchdog);
+        if (!redirectByHint('Could not connect to server.')) {
+          status.textContent = 'Could not connect to server.';
+          status.classList.add('err');
+        }
+      };
+
+      ws.onclose = () => {
+        if (done) return;
+        clearTimeout(watchdog);
+        if (!redirectByHint('Connection closed before code was resolved.')) {
+          status.textContent = 'Connection closed before code was resolved.';
+          status.classList.add('err');
+        }
       };
     }
   </script>

@@ -12,17 +12,12 @@
   "entry": "index.html",
   "lobby": "lobby.html",
   "substrates": {
-    "physics": "shared:PhysicsSubstrate",
-    "graphics": "shared:GraphicsSubstrate",
-    "audio": "shared:AudioSubstrate",
-    "game_logic": "shared:GameLogicSubstrate",
-    "multiplayer": "shared:MultiplayerSubstrate",
-    "persistence": "shared:PersistenceSubstrate",
-    "ai": "shared:AISubstrate",
-    "ui": "shared:UISubstrate",
-    "admin": "shared:AdminSubstrate"
+    "physics": "brickbreaker_manifold_substrate.js:PhysicsLens",
+    "graphics": "brickbreaker_manifold_substrate.js:GraphicsLens",
+    "audio": "brickbreaker_manifold_substrate.js:AudioLens",
+    "score": "brickbreaker_manifold_substrate.js:ScoreLens",
+    "game_state": "brickbreaker_manifold_substrate.js:GameStateLens"
   },
-  "_note_substrates": "Uses 9 shared substrates from BrickBreaker manifold refactor — zero code duplication",
   "manifold_bridge": {
     "entry_var": "window.__MANIFOLD__",
     "schema_version": "1.0",
@@ -66,13 +61,9 @@
     "type": "static"
   },
   "manifold_compatibility": {
-    "bridge_included": false,
-    "state_exposed": false,
-    "postmessage_protocol": false,
-    "todo": [
-      "Include js/manifold_bridge.js in index.html",
-      "Emit window.__MANIFOLD__ with level/score/lives from game.js",
-      "Wire postMessage events to ManifoldBridge.emit()"
-    ]
+    "bridge_included": true,
+    "state_exposed": true,
+    "postmessage_protocol": true,
+    "substrate": "brickbreaker_manifold_substrate.js"
   }
 }

@@ -164,7 +164,10 @@ Their command vessel — the **Hive-Moon** — is a single mobile bio-construct
 roughly the diameter of Luna. It hangs at the system's edge, visible from any
 viewport on any clear sightline. It does not approach. It does not need to.
 It dispatches drone wings, scout swarms, capital units, and the occasional
-queen-ship; what it loses, it grows back.
+queen-ship; what it loses, it grows back. huge housing surviving Zorgons ships and queen. is built of
+hardened honey walls of swchartz diamon gyroind big enough passages for human starfigher to navigate and hunt for queen along encoutering enemy Zorgons ships, powerups, and a chapmber large enough to devour the Aurora Prime and all enhbitance that keep humans alive for workers and the Prime funcitonal to keep humans alive. about 5th sorties if not held back the Zorgon hive consumers aurora so star fighter must navigate the labrynth gyroid to find the ship. Easier to find than the queen. Qeens chamber inaccessible till a sample of ship can be brouth to Aurora Prima and a isope devaloped that disolves walls of gyroind to create bigger passageways untill queen chamber revealeed. A race against time because hive is self healing but its the only way to find the queen. area aound queen is heavy gaurded with defensive wheopans.
+
+Final boss the queen. Very large alien bree whose stinger emits plazma, her abdomin and compound eyes are most vulnarable. mission is to not kill her but incapaisate and deliver a message from Aurora Prime scientits that an antidote has been created from sample that allows earth bees to live in their invironment thus the zorgons can return to their own planet and both thrive. Must incopacate queen in order to deliver the message. Once gets message she declairs war over and signs peace treaty. Game ends with forboding multidimental ship rising up that is common enemy to Zogons and Humans. Stay tune Zorgons and Humans Must fight together to survive multidimensional enemy. Comming soon.
 
 You will never reach the Hive-Moon. You will only ever fight the things it
 sends.

@@ -796,5 +796,187 @@
     @keyframes preSpin {
       to {
         transform: rotate(360deg);
+
+        /* ══════════════════════════════════════════════
+             MOBILE — convert side panels to compact top strip
+             so the 3D cube is fully visible on smartphones.
+             Mirrors the FastTrack mobile panel approach.
+             ══════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+
+          /* Nav stays at top */
+          .nav {
+            padding: 5px 12px;
+          }
+
+          .nav-links {
+            display: none;
+          }
+
+          /* Each player panel becomes a half-width strip below nav */
+          .player-panel {
+            position: fixed !important;
+            top: 34px !important;
+            /* just below compact nav */
+            bottom: auto !important;
+            transform: none !important;
+            width: 50% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            padding: 5px 8px !important;
+            gap: 6px !important;
+            border-radius: 0 !important;
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: 1px solid var(--gborder) !important;
+            z-index: 150 !important;
+            overflow: hidden !important;
+          }
+
+          .player-panel.p1-panel {
+            left: 0 !important;
+            right: auto !important;
+            border-left: 3px solid rgba(34, 85, 255, 0.7) !important;
+            border-right: 1px solid var(--gborder) !important;
+          }
+
+          .player-panel.p2-panel {
+            left: 50% !important;
+            right: 0 !important;
+            border-right: 3px solid rgba(255, 34, 0, 0.7) !important;
+          }
+
+          /* p3/p4 hidden on mobile (2-player mode) */
+          .player-panel.p3-panel,
+          .player-panel.p4-panel {
+            display: none !important;
+          }
+
+          /* Compact badge */
+          .panel-badge {
+            width: 26px !important;
+            height: 26px !important;
+            font-size: 12px !important;
+            flex-shrink: 0 !important;
+            border-width: 1px !important;
+          }
+
+          /* Name: one line, truncated */
+          .panel-name {
+            font-size: 9px !important;
+            letter-spacing: 1px !important;
+            flex: 1 !important;
+            text-align: left !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin-top: 0 !important;
+            min-width: 0 !important;
+          }
+
+          /* Score inline, compact */
+          .score-lbl {
+            display: none !important;
+          }
+
+          .panel-score {
+            font-size: 16px !important;
+            flex-shrink: 0 !important;
+          }
+
+          .p1-score {
+            text-shadow: 0 0 8px rgba(34, 85, 255, 0.5) !important;
+          }
+
+          .p2-score {
+            text-shadow: 0 0 8px rgba(255, 34, 0, 0.5) !important;
+          }
+
+          /* Hide all verbose panel content */
+          .panel-div,
+          .panel-stat,
+          .panel-log-lbl,
+          .panel-log,
+          .panel-mini,
+          .panel-mode {
+            display: none !important;
+          }
+
+          /* HUD sits just below the player strip (~34px nav + ~44px strip = ~78px) */
+          #hud-top {
+            top: 80px !important;
+            padding: 5px 16px !important;
+            min-width: 140px !important;
+          }
+
+          #turn-indicator {
+            font-size: 11px !important;
+          }
+
+          #scenario-tag {
+            font-size: 6px !important;
+          }
+
+          #turn-timer {
+            font-size: 8px !important;
+          }
+
+          /* Turn announce: smaller on mobile */
+          #turn-announce {
+            top: 130px !important;
+            font-size: 18px !important;
+            padding: 10px 20px !important;
+            letter-spacing: 3px !important;
+          }
+
+          /* Camera controls: hide on mobile (touch-orbit is enough) */
+          #cam-controls {
+            display: none !important;
+          }
+
+          /* Aim hint: hide — touch users don't need mouse instructions */
+          #aim-hint {
+            display: none !important;
+          }
+
+          /* Column grid: dock to bottom edge, full width, bigger touch targets */
+          #col-grid {
+            bottom: 0 !important;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 8px 6px 10px !important;
+            width: 100% !important;
+            transform: translateX(-50%) !important;
+          }
+
+          #cg-label {
+            font-size: 6px !important;
+          }
+
+          .drop-btn {
+            width: 36px !important;
+            height: 42px !important;
+          }
+
+          .drop-btn .da {
+            font-size: 15px !important;
+          }
+
+          .drop-btn .dl {
+            display: none !important;
+          }
+
+          /* Result overlay: full width on narrow screens */
+          #result-overlay {
+            min-width: 88vw !important;
+            padding: 20px 16px !important;
+          }
+
+          #result-title {
+            font-size: 2em !important;
+          }
+        }
       }
     }

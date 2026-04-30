@@ -65,6 +65,24 @@ const SFEnhance = (function () {
   const ASTEROID_BURST_SPEED = 90;   // m/s outward velocity given to shatter fragments
   const ASTEROID_BURST_DECAY = 0.6;  // per-second exponential decay of fragment velocity
   const ASTEROID_RING_H = 600;
+  const ASTEROID_ORBIT_OMEGA = 0.015; // rad/s belt sweep speed
+  const ASTEROID_IMPACT_MIN_SPEED = 18;
+  const ASTEROID_IMPACT_COOLDOWN_S = 0.28;
+  const ASTEROID_IMPACT_BLAST_K = 0.38;
+  const ASTEROID_SHIP_DMG_SIZE_K = 0.34;
+  const ASTEROID_SHIP_DMG_SPEED_K = 0.22;
+  const ASTEROID_SHIP_DMG_MIN = 8;
+  const ASTEROID_SHIP_DMG_MAX = 220;
+  const THREAT_ALARM_INTERVAL_S = 1.15;
+  const COUNTERMEASURE_RADIUS = 900;
+  const COUNTERMEASURE_COOLDOWN_S = 6.0;
+  const COUNTERMEASURE_FUEL_COST = 8;
+  const POWERUP_MAX = 8;
+  const POWERUP_PICKUP_R = 52;
+  const POWERUP_LIFETIME_S = 28;
+  const POWERUP_SPAWN_MIN_S = 5.5;
+  const POWERUP_SPAWN_MAX_S = 9.0;
+  const POWERUP_TYPES = ['shield', 'hull', 'fuel', 'torpedo'];
   const RADAR_SCALE = 2.0 * 0.618;
   const DIAG_INTERVAL_S = 3;
 
@@ -88,8 +106,12 @@ const SFEnhance = (function () {
   let _asteroidDrift = null;
   let _asteroidTexture = null;        // shared procedural rock map
   let _asteroidActive = 0;            // count of live (scale>0) slots, for diag
+  let _constellationsAdded = false;
   let _backdropGroup = null;
   let _planetMoons = [];
+  const _shipRockCooldown = new Map(); // `${shipId}:${slot}` -> gameTime seconds
+  const _powerups = [];                // floating collectible boosts
+  let _powerupSpawnTimer = 0;
   let _radarScaled = false;
   let _radarScene = null;             // captured from radar WebGLRenderer.render() call
   let _renderer = null;               // main WebGLRenderer (needed for PMREMGenerator)
@@ -105,6 +127,19 @@ const SFEnhance = (function () {
   let _settingName = 'earth-orbit';
   let _hudEl = null;
   let _hostileLastFrame = new Map();  // id → { type, lastDist } from previous tick (for kill detection)
+  let _friendlyShotLastPos = new Map(); // projectile id -> last world position for swept asteroid hits
+  let _asteroidPairTtl = new Map(); // "low:high" -> seconds remaining for pair collision cooldown
+  let _assistInputBound = false;
+  let _assistTargetIdx = -1;
+  let _assistRetargetTimer = 0;
+  let _assistTuningLevel = '';
+  let _assistCurrentWave = 1;
+  let _assistCurrentState = null;
+  let _threatHud = null;
+  let _threatSoundCd = 0;
+  let _countermeasureCd = 0;
+  let _emergencyBtn = null;
+  let _medicBayBanner = null;
   let _sortie = null;                 // { startTimeS, score, kills, asteroids, missionRef }
   let _career = { sorties: 0, bestSurvivalSec: 0, lifetimeScore: 0 };
 
@@ -132,8 +167,9 @@ const SFEnhance = (function () {
     proto.render = function (scene, camera) {
       if (!_radarScene && this.domElement && this.domElement.id === 'radar-canvas') {
         _radarScene = scene;
-      } else if (!_renderer && this.domElement && this.domElement.id !== 'radar-canvas') {
-        _renderer = this;
+      } else if (this.domElement && this.domElement.id !== 'radar-canvas') {
+        if (!_renderer) _renderer = this;
+        if (!_scene && scene) _scene = scene;
       }
       if (_radarScene && _renderer) proto.render = orig; // unhook once both captured
       return orig.apply(this, arguments);
@@ -239,6 +275,8 @@ const SFEnhance = (function () {
     if (!SF || !SF.getState) return;
     const state = SF.getState();
     if (!state || !state.entities) return;
+    _assistCurrentState = state;
+    _assistCurrentWave = state.wave || 1;
 
     // ── Camera-stability guard ──────────────────────────────────────────
     // The bundle's flight code at core.js multiplies player.quaternion
@@ -271,12 +309,13 @@ const SFEnhance = (function () {
       _missionsBoosted.add(m);
       _applyMissionSetting(m);
     }
+    _applyCombatAssistTuning(state);
     _trackSortie(m);
 
     // Walk entities: clamp spawns within band, follow laser bolts, gather hostile metrics
     const liveIds = new Set();
     const hostilesThisFrame = new Map();
-    const friendlyBolts = [];
+    const friendlyShots = [];
     const player = state.player;
     let hostileCount = 0;
     let nearestHostile = Infinity;
@@ -297,14 +336,26 @@ const SFEnhance = (function () {
         if (typeof e._orbitAngle !== 'number') e._orbitAngle = Math.random() * Math.PI * 2;
       }
 
-      if (e.type === 'laser') {
+      const projectileRadius = (e.type === 'laser') ? 18
+        : (e.type === 'machinegun') ? 10
+          : (e.type === 'plasma') ? 14
+            : (e.type === 'torpedo') ? 24
+              : 0;
+      if (projectileRadius > 0) {
         const b = _bolts.get(e.id);
         if (b) {
           b.group.position.copy(e.position);
           if (e.quaternion) b.group.quaternion.copy(e.quaternion);
         }
-        if ((e.owner === 'player' || e.owner === 'wingman') && e.position) {
-          friendlyBolts.push(e.position);
+        const friendly = (e.owner === 'player' || e.owner === 'wingman' || e.team === 'player' || e.faction === 'human');
+        if (friendly && e.position) {
+          const prev = _friendlyShotLastPos.get(e.id);
+          const x1 = e.position.x, y1 = e.position.y, z1 = e.position.z;
+          const x0 = prev ? prev.x : x1;
+          const y0 = prev ? prev.y : y1;
+          const z0 = prev ? prev.z : z1;
+          friendlyShots.push({ x0, y0, z0, x1, y1, z1, r: projectileRadius });
+          _friendlyShotLastPos.set(e.id, { x: x1, y: y1, z: z1 });
         }
         continue;
       }
@@ -341,11 +392,27 @@ const SFEnhance = (function () {
     }
     _hostileLastFrame = hostilesThisFrame;
 
-    // Friendly lasers blow up asteroids
-    if (_sortie && _asteroidMesh && friendlyBolts.length) _processAsteroidHits(friendlyBolts);
+    if (_scene && !_asteroidMesh) _spawnAsteroidField();
 
-    // Player ↔ asteroid collisions: shield absorbs first, then hull
-    if (player && _asteroidMesh && state.phase !== 'launching') _processPlayerAsteroidCollisions(player);
+    // Friendly fire (laser/gun/plasma/torpedo) can shatter asteroid cover.
+    if (_asteroidMesh && friendlyShots.length) _processAsteroidHits(friendlyShots);
+
+    // Physical asteroid interactions: rock-vs-rock and rock-vs-ship.
+    if (_asteroidMesh && state.phase !== 'launching') {
+      _processAsteroidAsteroidCollisions(state, dt);
+      _processShipAsteroidCollisions(state, dt);
+    }
+
+    _assistRetargetTimer += dt;
+    _threatSoundCd = Math.max(0, _threatSoundCd - dt);
+    _countermeasureCd = Math.max(0, _countermeasureCd - dt);
+    _assistAutoLock(state, dt);
+    _assistTorpedoGuidance(state, dt);
+    _assistEaseEnemyEvasion(state);
+    _updateThreatAndEmergencySystems(state, dt);
+
+    // Floating collectible boosts
+    _updatePowerups(dt, state);
 
     // Retire bolts whose entity is gone or marked for deletion
     _bolts.forEach((b, id) => {
@@ -368,6 +435,9 @@ const SFEnhance = (function () {
     if (_seenAt.size > liveIds.size + 64) {
       _seenAt.forEach((_, id) => { if (!liveIds.has(id)) _seenAt.delete(id); });
     }
+    if (_friendlyShotLastPos.size > liveIds.size + 64) {
+      _friendlyShotLastPos.forEach((_, id) => { if (!liveIds.has(id)) _friendlyShotLastPos.delete(id); });
+    }
 
     _updateMusicIntensity(hostileCount, nearestHostile);
     _updateHullResonance(hostileCount, nearestHostile);
@@ -379,6 +449,468 @@ const SFEnhance = (function () {
     }
   }
 
+  function _isHostileEntity(e) {
+    if (!e || e.markedForDeletion) return false;
+    return e.type === 'enemy' || e.type === 'interceptor' || e.type === 'bomber' ||
+      e.type === 'dreadnought' || e.type === 'alien-baseship' || e.type === 'predator' ||
+      e.type === 'youngling';
+  }
+
+  function _collectHostiles(state) {
+    const out = [];
+    if (!state || !state.entities) return out;
+    for (let i = 0; i < state.entities.length; i++) {
+      const e = state.entities[i];
+      if (_isHostileEntity(e)) out.push(e);
+    }
+    return out;
+  }
+
+  function _enemyDistanceSq(player, target) {
+    const dx = target.position.x - player.position.x;
+    const dy = target.position.y - player.position.y;
+    const dz = target.position.z - player.position.z;
+    return dx * dx + dy * dy + dz * dz;
+  }
+
+  function _findBestTargetInView(state, minDot, maxRange) {
+    if (!state || !state.player || !state.player.position || !state.player.quaternion) return null;
+    const hostiles = _collectHostiles(state);
+    if (!hostiles.length) return null;
+    const p = state.player;
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(p.quaternion);
+    let best = null;
+    let bestScore = -Infinity;
+    for (let i = 0; i < hostiles.length; i++) {
+      const e = hostiles[i];
+      const to = new THREE.Vector3().copy(e.position).sub(p.position);
+      const dist = to.length();
+      if (dist > maxRange || dist < 1) continue;
+      to.multiplyScalar(1 / dist);
+      const dot = fwd.dot(to);
+      if (dot < minDot) continue;
+      const score = dot * 10000 - dist;
+      if (score > bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  function _findNearestTarget(state, maxRange) {
+    if (!state || !state.player || !state.player.position) return null;
+    const hostiles = _collectHostiles(state);
+    if (!hostiles.length) return null;
+    const p = state.player;
+    const max2 = maxRange * maxRange;
+    let best = null;
+    let bestD2 = max2;
+    for (let i = 0; i < hostiles.length; i++) {
+      const e = hostiles[i];
+      const d2 = _enemyDistanceSq(p, e);
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  function _setPlayerLockTarget(state, target) {
+    if (!state || !state.player) return;
+    state.player.lockedTarget = target || null;
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) {
+      if (target) {
+        crosshair.classList.add('locked');
+        crosshair.classList.remove('tracking');
+      } else {
+        crosshair.classList.remove('locked');
+      }
+    }
+    if (target && window.SFAudio && SFAudio.playSound) SFAudio.playSound('lock_tone');
+  }
+
+  function _cycleLockTarget(state, dir) {
+    const hostiles = _collectHostiles(state);
+    if (!hostiles.length) {
+      _setPlayerLockTarget(state, null);
+      return;
+    }
+    const p = state.player;
+    hostiles.sort(function (a, b) {
+      return _enemyDistanceSq(p, a) - _enemyDistanceSq(p, b);
+    });
+    if (_assistTargetIdx < 0 || _assistTargetIdx >= hostiles.length) _assistTargetIdx = 0;
+    else _assistTargetIdx = (_assistTargetIdx + dir + hostiles.length) % hostiles.length;
+    _setPlayerLockTarget(state, hostiles[_assistTargetIdx]);
+  }
+
+  function _bindTargetAssistInput() {
+    if (_assistInputBound || typeof document === 'undefined') return;
+    _assistInputBound = true;
+    document.addEventListener('keydown', function (ev) {
+      const st = _assistCurrentState;
+      if (!st || !st.player || st.phase !== 'combat') return;
+      const key = (ev.key || '').toLowerCase();
+      if (key === 'tab') {
+        ev.preventDefault();
+        _cycleLockTarget(st, 1);
+        return;
+      }
+      if (key === 'q') {
+        ev.preventDefault();
+        _cycleLockTarget(st, -1);
+        return;
+      }
+      if (key === 'e') {
+        ev.preventDefault();
+        _cycleLockTarget(st, 1);
+        return;
+      }
+      if (key === 'g') {
+        ev.preventDefault();
+        _setPlayerLockTarget(st, _findNearestTarget(st, 8500));
+        return;
+      }
+      if (key === 'f') {
+        ev.preventDefault();
+        _setPlayerLockTarget(st, _findBestTargetInView(st, 0.90, 8500));
+        return;
+      }
+      if (key === '`' || key === 'escape') {
+        _setPlayerLockTarget(st, null);
+        return;
+      }
+      if (key === 'c') {
+        ev.preventDefault();
+        const incoming = [];
+        for (let i = 0; i < st.entities.length; i++) {
+          const e = st.entities[i];
+          if (!_isHostileProjectile(e) || !e.position) continue;
+          const dx = st.player.position.x - e.position.x;
+          const dy = st.player.position.y - e.position.y;
+          const dz = st.player.position.z - e.position.z;
+          const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          incoming.push({ entity: e, dist: d });
+        }
+        _fireCountermeasures(st, incoming);
+        return;
+      }
+      if (key === 'h') {
+        ev.preventDefault();
+        const medic = document.getElementById('btn-call-medic') || document.getElementById('mob-call-medic');
+        if (medic && !medic.disabled) medic.click();
+      }
+    }, true);
+    document.addEventListener('mousedown', function (ev) {
+      const st = _assistCurrentState;
+      if (!st || !st.player || st.phase !== 'combat') return;
+      if (ev.button === 1) {
+        ev.preventDefault();
+        _setPlayerLockTarget(st, _findBestTargetInView(st, 0.88, 8500));
+      }
+    }, true);
+  }
+
+  function _assistAutoLock(state, dt) {
+    if (!state || !state.player || state.phase !== 'combat') return;
+    const p = state.player;
+    if (p.lockedTarget && !p.lockedTarget.markedForDeletion) return;
+    if (_assistRetargetTimer < 0.16) return;
+    _assistRetargetTimer = 0;
+    const wave = state.wave || 1;
+    const dot = wave <= 3 ? 0.88 : wave <= 6 ? 0.92 : 0.95;
+    const range = wave <= 3 ? 9000 : 7000;
+    const target = _findBestTargetInView(state, dot, range) || _findNearestTarget(state, range);
+    if (target) _setPlayerLockTarget(state, target);
+  }
+
+  function _assistTorpedoGuidance(state, dt) {
+    if (!state || !state.entities || !state.player) return;
+    const wave = state.wave || 1;
+    const steer = wave <= 3 ? 5.6 : wave <= 6 ? 4.3 : 3.1;
+    for (let i = 0; i < state.entities.length; i++) {
+      const t = state.entities[i];
+      if (!t || t.markedForDeletion || t.type !== 'torpedo') continue;
+      const friendly = t.owner === 'player' || t.owner === 'wingman';
+      if (!friendly) continue;
+      if (!t.target || t.target.markedForDeletion || !_isHostileEntity(t.target)) {
+        t.target = state.player.lockedTarget && !state.player.lockedTarget.markedForDeletion
+          ? state.player.lockedTarget
+          : _findBestTargetInView(state, 0.72, 12000) || _findNearestTarget(state, 12000);
+      }
+      if (!t.target || t.target.markedForDeletion) continue;
+      const to = new THREE.Vector3().copy(t.target.position).sub(t.position);
+      const dist = to.length();
+      if (dist < 1) continue;
+      to.multiplyScalar(1 / dist);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), to);
+      t.quaternion.slerp(q, Math.min(1, dt * steer));
+      // Increase friendly torpedo hit envelope without making it guaranteed.
+      t.radius = Math.max(t.radius || 8, wave <= 3 ? 16 : 12);
+    }
+  }
+
+  function _assistEaseEnemyEvasion(state) {
+    if (!state || !state.entities) return;
+    const wave = state.wave || 1;
+    if (wave > 6) return;
+    const turnScale = wave <= 3 ? 0.72 : 0.84;
+    const jinkScale = wave <= 3 ? 0.52 : 0.72;
+    for (let i = 0; i < state.entities.length; i++) {
+      const e = state.entities[i];
+      if (!e || e.markedForDeletion || !_isHostileEntity(e)) continue;
+      const prof = e._aiProfile;
+      if (!prof) continue;
+      if (typeof prof.turnRate === 'number') prof.turnRate *= turnScale;
+      if (typeof prof.jinkDist === 'number') prof.jinkDist *= jinkScale;
+      if (Array.isArray(prof.traits) && wave <= 3) {
+        // Keep some movement, but remove hard lock-break behavior in low missions.
+        prof.traits = prof.traits.filter(function (t) { return t !== 'evade_locked'; });
+      }
+    }
+  }
+
+  function _assistSetDim(name, value) {
+    try {
+      if (window.SpaceManifold && typeof window.SpaceManifold.setDim === 'function') {
+        window.SpaceManifold.setDim(name, value);
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  function _applyCombatAssistTuning(state) {
+    if (!state) return;
+    const wave = state.wave || 1;
+    let level = 'high';
+    if (wave <= 3) level = 'low';
+    else if (wave <= 6) level = 'mid';
+    if (_assistTuningLevel === level) return;
+    _assistTuningLevel = level;
+
+    if (level === 'low') {
+      _assistSetDim('lives.max', 3);
+      _assistSetDim('targeting.acquireDot', 0.962);
+      _assistSetDim('targeting.refreshDot', 0.945);
+      _assistSetDim('targeting.breakDot', 0.70);
+      _assistSetDim('targeting.holdRange', 7600);
+      _assistSetDim('targeting.holdTime', 11.0);
+      _assistSetDim('targeting.shakeRate', 2.4);
+      _assistSetDim('weapon.laser.damage', 24);
+      _assistSetDim('weapon.laser.radius', 7);
+      _assistSetDim('weapon.torpedo.radius', 16);
+      _assistSetDim('weapon.torpedo.speed', 520);
+      _assistSetDim('weapon.torpedo.maxAge', 26);
+      _assistSetDim('enemy.turnRate', 1.4);
+      return;
+    }
+    if (level === 'mid') {
+      _assistSetDim('lives.max', 3);
+      _assistSetDim('targeting.acquireDot', 0.974);
+      _assistSetDim('targeting.refreshDot', 0.962);
+      _assistSetDim('targeting.breakDot', 0.78);
+      _assistSetDim('targeting.holdRange', 6500);
+      _assistSetDim('targeting.holdTime', 8.0);
+      _assistSetDim('targeting.shakeRate', 3.8);
+      _assistSetDim('weapon.laser.damage', 20);
+      _assistSetDim('weapon.laser.radius', 6);
+      _assistSetDim('weapon.torpedo.radius', 12);
+      _assistSetDim('weapon.torpedo.speed', 470);
+      _assistSetDim('weapon.torpedo.maxAge', 23);
+      _assistSetDim('enemy.turnRate', 1.7);
+      return;
+    }
+    _assistSetDim('lives.max', 3);
+    _assistSetDim('targeting.acquireDot', 0.986);
+    _assistSetDim('targeting.refreshDot', 0.978);
+    _assistSetDim('targeting.breakDot', 0.84);
+    _assistSetDim('targeting.holdRange', 5600);
+    _assistSetDim('targeting.holdTime', 6.0);
+    _assistSetDim('targeting.shakeRate', 5.8);
+    _assistSetDim('weapon.laser.damage', 17);
+    _assistSetDim('weapon.laser.radius', 5);
+    _assistSetDim('weapon.torpedo.radius', 10);
+    _assistSetDim('weapon.torpedo.speed', 430);
+    _assistSetDim('weapon.torpedo.maxAge', 21);
+    _assistSetDim('enemy.turnRate', 1.95);
+  }
+
+  function _ensureThreatUi() {
+    if (typeof document === 'undefined') return;
+    if (!_threatHud) {
+      const el = document.createElement('div');
+      el.id = 'sfenhance-threat-hud';
+      el.style.cssText = [
+        'position:fixed', 'top:72px', 'left:50%', 'transform:translateX(-50%)',
+        'z-index:9998', 'padding:8px 16px', 'border:1px solid rgba(255,90,90,0.75)',
+        'background:rgba(28,0,0,0.74)', 'color:#ffd3d3', 'font:12px/1.2 monospace',
+        'letter-spacing:1.2px', 'text-transform:uppercase', 'display:none',
+        'text-shadow:0 0 8px rgba(255,70,70,0.65)', 'pointer-events:none'
+      ].join(';');
+      document.body.appendChild(el);
+      _threatHud = el;
+    }
+    if (!_emergencyBtn) {
+      const btn = document.createElement('button');
+      btn.id = 'sfenhance-emergency-frigate';
+      btn.type = 'button';
+      btn.textContent = 'EMERGENCY FRIGATE';
+      btn.style.cssText = [
+        'position:fixed', 'right:18px', 'top:84px', 'z-index:9998',
+        'padding:8px 12px', 'font:11px/1 monospace', 'letter-spacing:1.2px',
+        'background:rgba(28,0,0,0.78)', 'color:#ffc9c9',
+        'border:1px solid rgba(255,90,90,0.7)', 'border-radius:3px',
+        'display:none', 'cursor:pointer'
+      ].join(';');
+      btn.addEventListener('click', function () {
+        const medic = document.getElementById('btn-call-medic') || document.getElementById('mob-call-medic');
+        if (medic && !medic.disabled) {
+          medic.click();
+          if (window.SFAudio && SFAudio.playSound) SFAudio.playSound('comm_beep');
+        } else if (window.SFAudio && SFAudio.playSound) {
+          SFAudio.playSound('warning');
+        }
+      });
+      document.body.appendChild(btn);
+      _emergencyBtn = btn;
+    }
+    if (!_medicBayBanner) {
+      const bay = document.createElement('div');
+      bay.id = 'sfenhance-medic-bay';
+      bay.style.cssText = [
+        'position:fixed', 'left:50%', 'bottom:108px', 'transform:translateX(-50%)',
+        'z-index:9998', 'padding:10px 16px', 'border:1px solid rgba(120,255,210,0.6)',
+        'background:rgba(0,24,26,0.76)', 'color:#ccfff4', 'font:12px/1.3 monospace',
+        'letter-spacing:1px', 'text-align:center', 'display:none',
+        'text-shadow:0 0 8px rgba(100,255,220,0.6)', 'pointer-events:none'
+      ].join(';');
+      bay.innerHTML = 'MEDICAL FRIGATE LAUNCH BAY<br><span style="font-size:10px;color:#8fffdc">REPAIR + PROVISIONING IN PROGRESS</span>';
+      document.body.appendChild(bay);
+      _medicBayBanner = bay;
+    }
+  }
+
+  function _isHostileProjectile(e) {
+    if (!e || e.markedForDeletion) return false;
+    if (e.type !== 'laser' && e.type !== 'machinegun' && e.type !== 'torpedo' && e.type !== 'plasma') return false;
+    if (e.owner === 'player' || e.owner === 'wingman') return false;
+    if (e.team === 'player' || e.faction === 'human') return false;
+    return true;
+  }
+
+  function _fireCountermeasures(state, incomingList) {
+    if (!state || !state.player || _countermeasureCd > 0) return;
+    const p = state.player;
+    if (typeof p.fuel === 'number' && p.fuel < COUNTERMEASURE_FUEL_COST) return;
+    let neutralized = 0;
+    for (let i = 0; i < incomingList.length; i++) {
+      const e = incomingList[i];
+      if (!e || e.markedForDeletion) continue;
+      if (e.dist > COUNTERMEASURE_RADIUS) continue;
+      e.markedForDeletion = true;
+      if (window.SpaceManifold && typeof window.SpaceManifold.remove === 'function') {
+        try { window.SpaceManifold.remove(e.id); } catch (_) { }
+      }
+      neutralized++;
+      if (window.SF3D && SF3D.spawnImpactEffect) SF3D.spawnImpactEffect(e.position, 0x88d0ff);
+    }
+    if (!neutralized) return;
+    if (typeof p.fuel === 'number') p.fuel = Math.max(0, p.fuel - COUNTERMEASURE_FUEL_COST);
+    _countermeasureCd = COUNTERMEASURE_COOLDOWN_S;
+    if (window.SFAudio && SFAudio.playSound) SFAudio.playSound('emp');
+  }
+
+  function _boostMedicDockProvisioning(state, dt) {
+    if (!state || !state.player) return;
+    if (state._supportCall !== 'medic' || state._supportPhase !== 'docking') {
+      if (_medicBayBanner) _medicBayBanner.style.display = 'none';
+      return;
+    }
+    if (_medicBayBanner) _medicBayBanner.style.display = 'block';
+    // Ensure medical-bay cutscene keeps player alive and leaves ship provisioned.
+    state.player.hull = Math.min(100, Math.max(state.player.hull, 14) + dt * 18);
+    state.player.shields = Math.min(100, state.player.shields + dt * 26);
+    if (typeof state.player.fuel === 'number') state.player.fuel = Math.min(100, state.player.fuel + dt * 20);
+    if (typeof state.player.torpedoes === 'number' && state.player.torpedoes < 4) {
+      state.player.torpedoes = Math.min(4, state.player.torpedoes + dt * 0.9);
+    }
+  }
+
+  function _updateThreatAndEmergencySystems(state, dt) {
+    if (!state || !state.player || !state.entities) return;
+    state.maxLives = 3;
+    if (typeof state.livesRemaining === 'number') state.livesRemaining = Math.min(3, state.livesRemaining);
+    _ensureThreatUi();
+    const combat = state.phase === 'combat';
+    if (!combat) {
+      if (_threatHud) _threatHud.style.display = 'none';
+      if (_emergencyBtn) _emergencyBtn.style.display = 'none';
+      if (_medicBayBanner) _medicBayBanner.style.display = 'none';
+      return;
+    }
+
+    const p = state.player;
+    const incoming = [];
+    let targeted = false;
+    let nearestIncoming = Infinity;
+
+    for (let i = 0; i < state.entities.length; i++) {
+      const e = state.entities[i];
+      if (!e || e.markedForDeletion || !e.position) continue;
+      if (_isHostileEntity(e) && (e.lockedTarget === p || e.target === p)) targeted = true;
+      if (!_isHostileProjectile(e)) continue;
+
+      const dx = p.position.x - e.position.x;
+      const dy = p.position.y - e.position.y;
+      const dz = p.position.z - e.position.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (!isFinite(dist) || dist > 2600) continue;
+      const v = e.velocity || { x: 0, y: 0, z: 0 };
+      const closing = (v.x * dx + v.y * dy + v.z * dz) / Math.max(1, dist);
+      if (closing <= 20) continue;
+      incoming.push({ entity: e, dist: dist });
+      if (dist < nearestIncoming) nearestIncoming = dist;
+    }
+
+    const severe = nearestIncoming < 700 || incoming.length >= 2;
+    const threatened = targeted || incoming.length > 0;
+    if (_threatHud) {
+      if (threatened) {
+        _threatHud.style.display = 'block';
+        _threatHud.style.borderColor = severe ? 'rgba(255,70,70,0.95)' : 'rgba(255,130,90,0.85)';
+        _threatHud.style.background = severe ? 'rgba(36,0,0,0.80)' : 'rgba(28,14,0,0.76)';
+        _threatHud.textContent = severe
+          ? 'MISSILE LOCK / INCOMING FIRE - EVADE + COUNTERMEASURE'
+          : 'TARGETED - TAKE EVASIVE ACTION';
+      } else {
+        _threatHud.style.display = 'none';
+      }
+    }
+
+    if (threatened && _threatSoundCd <= 0 && window.SFAudio && SFAudio.playSound) {
+      SFAudio.playSound(severe ? 'hull_alarm' : 'warning');
+      _threatSoundCd = THREAT_ALARM_INTERVAL_S;
+    }
+
+    if (severe && _countermeasureCd <= 0) _fireCountermeasures(state, incoming);
+
+    const shieldsDown = (typeof p.shields === 'number' && p.shields <= 12);
+    const hullLow = (typeof p.hull === 'number' && p.hull <= 55);
+    if (_emergencyBtn) {
+      const canShow = shieldsDown || hullLow;
+      _emergencyBtn.style.display = canShow ? 'block' : 'none';
+      if (canShow) {
+        const pulse = 0.55 + 0.45 * Math.sin(_gameTimeS * 7.5);
+        _emergencyBtn.style.opacity = String(0.5 + pulse * 0.5);
+        _emergencyBtn.style.boxShadow = '0 0 ' + Math.floor(8 + pulse * 16) + 'px rgba(255,70,70,0.65)';
+      }
+    }
+
+    _boostMedicDockProvisioning(state, dt);
+  }
+
   function _clampInBand(e, player, dx, dy, dz, d) {
     if (d <= SPAWN_FAR && d >= SPAWN_NEAR) return;
     const target = SPAWN_NEAR + Math.random() * (SPAWN_FAR - SPAWN_NEAR);
@@ -388,7 +920,7 @@ const SFEnhance = (function () {
 
   // ── Constellation overlay ─────────────────────────────────────────────
   function _addConstellations() {
-    if (!_scene) return;
+    if (!_scene || _constellationsAdded) return;
     const positions = new Float32Array(CONSTELLATION_N * 3);
     const colors = new Float32Array(CONSTELLATION_N * 3);
     const R = 18000; // well beyond combat band, on the celestial sphere
@@ -416,6 +948,7 @@ const SFEnhance = (function () {
     stars.renderOrder = -10;
     stars.frustumCulled = false;
     _scene.add(stars);
+    _constellationsAdded = true;
   }
 
   // ── Asteroid drift field ──────────────────────────────────────────────
@@ -1090,24 +1623,42 @@ const SFEnhance = (function () {
     }
   }
 
-  // ── Asteroid hits from friendly lasers ────────────────────────────────
-  // Per-tick brute-force scan: bolt count is small, slot count ≤ 600.
-  function _processAsteroidHits(boltPositions) {
+  // ── Asteroid hits from friendly projectiles ───────────────────────────
+  // Uses swept segment-vs-sphere checks so fast shots do not tunnel.
+  function _processAsteroidHits(shotSegments) {
     const drift = _asteroidDrift;
     const dummy = new THREE.Object3D();
     let dirty = false;
-    for (let bi = 0; bi < boltPositions.length; bi++) {
-      const p = boltPositions[bi];
+    for (let bi = 0; bi < shotSegments.length; bi++) {
+      const seg = shotSegments[bi];
+      const vx = seg.x1 - seg.x0;
+      const vy = seg.y1 - seg.y0;
+      const vz = seg.z1 - seg.z0;
+      const vv = vx * vx + vy * vy + vz * vz;
       for (let i = 0; i < ASTEROID_MAX; i++) {
         const o = i * ASTEROID_STRIDE;
         const s = drift[o + 12];
         if (s <= 0) continue;
-        const dx = drift[o] - p.x, dy = drift[o + 1] - p.y, dz = drift[o + 2] - p.z;
-        const r = s + 18;
-        if (dx * dx + dy * dy + dz * dz > r * r) continue;
+        const r = s + (seg.r || 18);
+        const cx = drift[o], cy = drift[o + 1], cz = drift[o + 2];
+
+        let d2;
+        if (vv <= 1e-9) {
+          const dx0 = cx - seg.x1, dy0 = cy - seg.y1, dz0 = cz - seg.z1;
+          d2 = dx0 * dx0 + dy0 * dy0 + dz0 * dz0;
+        } else {
+          const wx = cx - seg.x0, wy = cy - seg.y0, wz = cz - seg.z0;
+          const t = Math.max(0, Math.min(1, (wx * vx + wy * vy + wz * vz) / vv));
+          const qx = seg.x0 + vx * t, qy = seg.y0 + vy * t, qz = seg.z0 + vz * t;
+          const dx1 = cx - qx, dy1 = cy - qy, dz1 = cz - qz;
+          d2 = dx1 * dx1 + dy1 * dy1 + dz1 * dz1;
+        }
+        if (d2 > r * r) continue;
         const tier = drift[o + 13] | 0;
-        _sortie.score += SCORE_ASTEROID[tier] || 5;
-        _sortie.asteroids += 1;
+        if (_sortie) {
+          _sortie.score += SCORE_ASTEROID[tier] || 5;
+          _sortie.asteroids += 1;
+        }
         _shatterAsteroid(i, dummy);
         dirty = true;
         break;
@@ -1208,45 +1759,212 @@ const SFEnhance = (function () {
     }
   }
 
-  // ── Player ↔ asteroid collision damage ────────────────────────────────
-  // Larger rocks deliver more damage. Shield absorbs first, only the
-  // overflow bleeds into hull. Rock shatters on impact like a laser hit.
-  function _processPlayerAsteroidCollisions(player) {
-    const pp = player.position;
-    if (!pp) return;
+  // ── Ship ↔ asteroid collision damage ─────────────────────────────────
+  // Applies to player and active ships so asteroids are physically meaningful.
+  function _processShipAsteroidCollisions(state, dt) {
+    if (!state || !state.entities || !_asteroidDrift) return;
     const drift = _asteroidDrift;
-    const pr = (typeof player.radius === 'number' ? player.radius : 10);
     const dummy = new THREE.Object3D();
-    // Swept-segment narrow phase via Manifold.dim — prevents tunneling at
-    // high throttle when one frame's travel exceeds (pr + rockRadius).
-    const MD = (typeof Manifold !== 'undefined' && Manifold.dim) ? Manifold.dim : null;
-    const vel = player.velocity;
-    const dt = MD ? MD.dt() : (1 / 60);
-    const p1x = pp.x, p1y = pp.y, p1z = pp.z;
-    const p0x = vel ? p1x - vel.x * dt : p1x;
-    const p0y = vel ? p1y - vel.y * dt : p1y;
-    const p0z = vel ? p1z - (vel.z || 0) * dt : p1z;
     let dirty = false;
-    for (let i = 0; i < ASTEROID_MAX; i++) {
-      const o = i * ASTEROID_STRIDE;
-      const s = drift[o + 12];
-      if (s <= 0) continue;
-      const sx = drift[o], sy = drift[o + 1], sz = drift[o + 2];
-      let hit;
-      if (MD) {
-        hit = MD.intersectsSweptSphere(p0x, p0y, p0z, p1x, p1y, p1z, pr, sx, sy, sz, s);
-      } else {
+    for (let si = 0; si < state.entities.length; si++) {
+      const ship = state.entities[si];
+      if (!ship || ship.markedForDeletion || !ship.position) continue;
+      const t = ship.type;
+      if (t !== 'player' && t !== 'wingman' && t !== 'ally' && t !== 'enemy' && t !== 'interceptor' && t !== 'bomber' && t !== 'predator' && t !== 'dreadnought') continue;
+
+      const pp = ship.position;
+      const pr = (typeof ship.radius === 'number' ? ship.radius : 10);
+      const vel = ship.velocity;
+      const p1x = pp.x, p1y = pp.y, p1z = pp.z;
+      const p0x = vel ? p1x - (vel.x || 0) * dt : p1x;
+      const p0y = vel ? p1y - (vel.y || 0) * dt : p1y;
+      const p0z = vel ? p1z - (vel.z || 0) * dt : p1z;
+
+      for (let i = 0; i < ASTEROID_MAX; i++) {
+        const o = i * ASTEROID_STRIDE;
+        const s = drift[o + 12];
+        if (s <= 0) continue;
+
+        const cdKey = ship.id + ':' + i;
+        const until = _shipRockCooldown.get(cdKey) || 0;
+        if (until > _gameTimeS) continue;
+
+        const sx = drift[o], sy = drift[o + 1], sz = drift[o + 2];
         const dx = sx - p1x, dy = sy - p1y, dz = sz - p1z;
-        const r = s + pr;
-        hit = (dx * dx + dy * dy + dz * dz) < (r * r);
+        const rNow = s + pr;
+        const nowHit = (dx * dx + dy * dy + dz * dz) <= (rNow * rNow);
+
+        let hit = nowHit;
+        if (!hit) {
+          // Simple swept-sphere fallback to reduce tunneling.
+          const vx = p1x - p0x, vy = p1y - p0y, vz = p1z - p0z;
+          const wx = sx - p0x, wy = sy - p0y, wz = sz - p0z;
+          const vv = vx * vx + vy * vy + vz * vz;
+          if (vv > 1e-6) {
+            const tProj = Math.max(0, Math.min(1, (wx * vx + wy * vy + wz * vz) / vv));
+            const qx = p0x + vx * tProj, qy = p0y + vy * tProj, qz = p0z + vz * tProj;
+            const ex = sx - qx, ey = sy - qy, ez = sz - qz;
+            hit = (ex * ex + ey * ey + ez * ez) <= (rNow * rNow);
+          }
+        }
+        if (!hit) continue;
+
+        const svx = ship.velocity ? (ship.velocity.x || 0) : 0;
+        const svy = ship.velocity ? (ship.velocity.y || 0) : 0;
+        const svz = ship.velocity ? (ship.velocity.z || 0) : 0;
+        const av = _asteroidVelocity(drift, o);
+        const rvx = svx - av.x;
+        const rvy = svy - av.y;
+        const rvz = svz - av.z;
+        const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
+        const dmg = _impactDamageFromSizeAndSpeed(s, relSpeed);
+        _applyDamageToShip(ship, dmg);
+
+        const mag = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        if (ship.velocity) {
+          ship.velocity.x += (dx / mag) * -35;
+          ship.velocity.y += (dy / mag) * -35;
+          ship.velocity.z += (dz / mag) * -35;
+        }
+
+        _shatterAsteroid(i, dummy);
+        _shipRockCooldown.set(cdKey, _gameTimeS + 0.45);
+        dirty = true;
       }
-      if (!hit) continue;
-      const dmg = Math.max(8, Math.min(80, s * 0.55));
-      _applyShieldFirstDamage(player, dmg);
-      _shatterAsteroid(i, dummy);
-      dirty = true;
     }
     if (dirty) _asteroidMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // ── Asteroid ↔ asteroid collision damage ─────────────────────────────
+  // Big rocks do more damage; high closing speed increases shatter chance.
+  function _processAsteroidAsteroidCollisions(state, dt) {
+    if (!_asteroidDrift) return;
+    _decayAsteroidPairCooldowns(dt);
+    const drift = _asteroidDrift;
+    const dummy = new THREE.Object3D();
+    const active = [];
+    for (let i = 0; i < ASTEROID_MAX; i++) {
+      const o = i * ASTEROID_STRIDE;
+      if (drift[o + 12] > 0) active.push(i);
+    }
+    if (active.length < 2) return;
+
+    let dirty = false;
+    for (let ai = 0; ai < active.length - 1; ai++) {
+      const i = active[ai];
+      const oi = i * ASTEROID_STRIDE;
+      const si = drift[oi + 12];
+      if (si <= 0) continue;
+      const aix = drift[oi], aiy = drift[oi + 1], aiz = drift[oi + 2];
+      for (let bi = ai + 1; bi < active.length; bi++) {
+        const j = active[bi];
+        const oj = j * ASTEROID_STRIDE;
+        const sj = drift[oj + 12];
+        if (sj <= 0) continue;
+
+        const key = (i < j) ? (i + ':' + j) : (j + ':' + i);
+        if ((_asteroidPairTtl.get(key) || 0) > 0) continue;
+
+        const dx = drift[oj] - aix;
+        const dy = drift[oj + 1] - aiy;
+        const dz = drift[oj + 2] - aiz;
+        const rr = si + sj;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > rr * rr) continue;
+
+        const va = _asteroidVelocity(drift, oi);
+        const vb = _asteroidVelocity(drift, oj);
+        const rvx = va.x - vb.x;
+        const rvy = va.y - vb.y;
+        const rvz = va.z - vb.z;
+        const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
+        if (relSpeed < ASTEROID_IMPACT_MIN_SPEED) {
+          _asteroidPairTtl.set(key, ASTEROID_IMPACT_COOLDOWN_S * 0.5);
+          continue;
+        }
+
+        const sizeMean = (si + sj) * 0.5;
+        const impact = _impactDamageFromSizeAndSpeed(sizeMean, relSpeed);
+        const blastR = Math.max(80, rr * 0.95);
+        _applyAsteroidImpactBlastToShips(state, (aix + drift[oj]) * 0.5, (aiy + drift[oj + 1]) * 0.5, (aiz + drift[oj + 2]) * 0.5, blastR, impact * ASTEROID_IMPACT_BLAST_K);
+
+        // Resolve rock damage by shattering smaller first, then larger on hard impacts.
+        if (si <= sj || relSpeed > 46) {
+          _shatterAsteroid(i, dummy);
+          dirty = true;
+        }
+        if (sj < si || relSpeed > 62) {
+          _shatterAsteroid(j, dummy);
+          dirty = true;
+        }
+        _asteroidPairTtl.set(key, ASTEROID_IMPACT_COOLDOWN_S);
+      }
+    }
+    if (dirty) _asteroidMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  function _decayAsteroidPairCooldowns(dt) {
+    if (!_asteroidPairTtl.size) return;
+    _asteroidPairTtl.forEach(function (ttl, key) {
+      ttl -= dt;
+      if (ttl <= 0) _asteroidPairTtl.delete(key);
+      else _asteroidPairTtl.set(key, ttl);
+    });
+  }
+
+  function _asteroidVelocity(drift, o) {
+    // Velocity = fragment burst linear component + orbital tangential sweep.
+    const x = drift[o], z = drift[o + 2];
+    return {
+      x: (drift[o + 9] || 0) - ASTEROID_ORBIT_OMEGA * z,
+      y: (drift[o + 10] || 0),
+      z: (drift[o + 11] || 0) + ASTEROID_ORBIT_OMEGA * x,
+    };
+  }
+
+  function _impactDamageFromSizeAndSpeed(size, relSpeed) {
+    const d = size * ASTEROID_SHIP_DMG_SIZE_K + relSpeed * ASTEROID_SHIP_DMG_SPEED_K;
+    return Math.max(ASTEROID_SHIP_DMG_MIN, Math.min(ASTEROID_SHIP_DMG_MAX, d));
+  }
+
+  function _applyDamageToShip(ship, dmg) {
+    if (!ship || dmg <= 0 || ship.markedForDeletion) return;
+    if (ship.type === 'player') {
+      _applyShieldFirstDamage(ship, dmg);
+      return;
+    }
+    if (typeof ship.takeDamage === 'function') {
+      ship.takeDamage(dmg);
+      return;
+    }
+    let remaining = dmg;
+    if (typeof ship.shields === 'number' && ship.shields > 0) {
+      const absorbed = Math.min(ship.shields, remaining);
+      ship.shields -= absorbed;
+      remaining -= absorbed;
+    }
+    if (remaining > 0 && typeof ship.hull === 'number') {
+      ship.hull = Math.max(0, ship.hull - remaining);
+    }
+  }
+
+  function _applyAsteroidImpactBlastToShips(state, x, y, z, radius, damage) {
+    if (!state || !state.entities || damage <= 0) return;
+    const r2 = radius * radius;
+    for (let i = 0; i < state.entities.length; i++) {
+      const ship = state.entities[i];
+      if (!ship || ship.markedForDeletion || !ship.position) continue;
+      const t = ship.type;
+      if (t !== 'player' && t !== 'wingman' && t !== 'ally' && t !== 'enemy' && t !== 'interceptor' && t !== 'bomber' && t !== 'predator' && t !== 'dreadnought' && t !== 'alien-baseship' && t !== 'baseship') continue;
+      const dx = ship.position.x - x;
+      const dy = ship.position.y - y;
+      const dz = ship.position.z - z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > r2) continue;
+      const falloff = 1 - Math.sqrt(d2) / radius;
+      const applied = damage * falloff;
+      _applyDamageToShip(ship, applied);
+    }
   }
 
   // Shield-first damage model: shields drain to 0 before hull takes a single
@@ -1263,6 +1981,111 @@ const SFEnhance = (function () {
     }
     if (remaining > 0 && typeof player.hull === 'number') {
       player.hull = Math.max(0, player.hull - remaining);
+    }
+  }
+
+  function _createPowerupMesh(type) {
+    const g = new THREE.Group();
+    const color = type === 'shield' ? 0x33ccff : type === 'hull' ? 0xff7733 : type === 'fuel' ? 0x44ff88 : 0xffdd33;
+    const core = new THREE.Mesh(
+      new THREE.OctahedronGeometry(18, 0),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending })
+    );
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(24, 2.5, 8, 24),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending })
+    );
+    ring.rotation.x = Math.PI * 0.5;
+    g.add(core);
+    g.add(ring);
+    return g;
+  }
+
+  function _spawnPowerupNearPlayer(state) {
+    if (!_scene || !state || !state.player || !state.player.position) return;
+    if (_powerups.length >= POWERUP_MAX) return;
+    const p = state.player.position;
+    const ang = Math.random() * Math.PI * 2;
+    const r = 550 + Math.random() * 1300;
+    const y = p.y + (Math.random() - 0.5) * 350;
+    const type = POWERUP_TYPES[(Math.random() * POWERUP_TYPES.length) | 0];
+    const mesh = _createPowerupMesh(type);
+    mesh.position.set(p.x + Math.cos(ang) * r, y, p.z + Math.sin(ang) * r);
+    _scene.add(mesh);
+    _powerups.push({ type, mesh, age: 0, phase: Math.random() * Math.PI * 2, spin: 0.7 + Math.random() * 1.1, baseY: y });
+  }
+
+  function _applyPowerup(ship, type) {
+    if (!ship) return;
+    const getMax = (k, fb) => {
+      try {
+        return (window.SpaceManifold && window.SpaceManifold.dim && window.SpaceManifold.dim(k)) || fb;
+      } catch (_) {
+        return fb;
+      }
+    };
+    if (type === 'shield' && typeof ship.shields === 'number') {
+      const maxSh = getMax('player.shields', 100);
+      ship.shields = Math.min(maxSh, ship.shields + 35);
+    } else if (type === 'hull' && typeof ship.hull === 'number') {
+      const maxHull = getMax('player.hull', 100);
+      ship.hull = Math.min(maxHull, ship.hull + 24);
+    } else if (type === 'fuel' && typeof ship.fuel === 'number') {
+      const maxFuel = getMax('player.fuel', 100);
+      ship.fuel = Math.min(maxFuel, ship.fuel + 30);
+    } else if (type === 'torpedo' && typeof ship.torpedoes === 'number') {
+      ship.torpedoes = Math.min(12, ship.torpedoes + 1);
+    }
+  }
+
+  function _updatePowerups(dt, state) {
+    if (!_scene || !state || state.phase !== 'combat') return;
+
+    _powerupSpawnTimer -= dt;
+    if (_powerupSpawnTimer <= 0 && _powerups.length < POWERUP_MAX) {
+      _spawnPowerupNearPlayer(state);
+      _powerupSpawnTimer = POWERUP_SPAWN_MIN_S + Math.random() * (POWERUP_SPAWN_MAX_S - POWERUP_SPAWN_MIN_S);
+    }
+
+    const pickupShips = [];
+    for (let i = 0; i < state.entities.length; i++) {
+      const e = state.entities[i];
+      if (!e || e.markedForDeletion || !e.position) continue;
+      if (e.type === 'player' || e.type === 'wingman' || e.type === 'ally') pickupShips.push(e);
+    }
+
+    for (let i = _powerups.length - 1; i >= 0; i--) {
+      const p = _powerups[i];
+      p.age += dt;
+      p.phase += dt;
+      p.mesh.rotation.y += dt * p.spin;
+      p.mesh.rotation.x += dt * 0.35;
+      p.mesh.position.y = p.baseY + Math.sin(p.phase * 1.8) * 14;
+
+      let collected = false;
+      for (let si = 0; si < pickupShips.length; si++) {
+        const s = pickupShips[si];
+        const sr = (typeof s.radius === 'number' ? s.radius : 12);
+        const dx = p.mesh.position.x - s.position.x;
+        const dy = p.mesh.position.y - s.position.y;
+        const dz = p.mesh.position.z - s.position.z;
+        const rr = POWERUP_PICKUP_R + sr;
+        if ((dx * dx + dy * dy + dz * dz) > rr * rr) continue;
+        _applyPowerup(s, p.type);
+        if (window.SF3D && SF3D.spawnImpactEffect) SF3D.spawnImpactEffect(p.mesh.position, 0x88ffcc);
+        if (window.SFAudio && SFAudio.playSound) SFAudio.playSound('hud_power_up');
+        collected = true;
+        break;
+      }
+
+      if (collected || p.age > POWERUP_LIFETIME_S) {
+        _scene.remove(p.mesh);
+        p.mesh.traverse(obj => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) obj.material.dispose();
+        });
+        _powerups.splice(i, 1);
+      }
     }
   }
 
@@ -1310,6 +2133,7 @@ const SFEnhance = (function () {
     _loadCareer();
     _captureScene();
     _captureRadarScene();
+    _bindTargetAssistInput();
     _installLaserOverride();
     _scaleRadar();
     // Defer scene-attached features one tick so _scene is captured.

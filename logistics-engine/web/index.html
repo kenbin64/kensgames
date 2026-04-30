@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logical Logistics - Intelligent Fulfillment Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <canvas id="bg3d" aria-hidden="true"></canvas>
+
+  <!-- ── NAVIGATION ─────────────────────────────────────────────────── -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-brand" href="#top">
+        <span class="brand-mark">◈</span>
+        Logical<span class="brand-accent">Logistics</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Platform</a>
+        <a href="#operations">Control Tower</a>
+        <a href="#intelligence">Intelligence</a>
+      </div>
+      <div class="nav-actions">
+        <button class="btn-nav-ghost" id="seedHeroBtn">Load Demo</button>
+        <button class="btn-nav-cta"
+          onclick="document.getElementById('operations').scrollIntoView({behavior:'smooth'})">Launch →</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO ───────────────────────────────────────────────────────── -->
+  <section class="hero-section" id="top">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <div class="hero-eyebrow">
+          <span class="eyebrow-pulse"></span>
+          Intelligent Fulfillment Platform
+        </div>
+        <h1 class="hero-h1">
+          <span class="h1-line-a">The logistics engine</span>
+          <span class="h1-line-b">Fortune 500s</span>
+          <span class="h1-line-c">actually need.</span>
+        </h1>
+        <p class="hero-body">
+          One platform for inventory allocation, route optimization, and last-mile
+          orchestration. Built for operations teams that move fast and never miss a delivery window.
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary btn-hero"
+            onclick="document.getElementById('operations').scrollIntoView({behavior:'smooth'})">
+            Open Control Tower →
+          </button>
+          <button class="btn-ghost btn-hero" id="seedHeroBtn2">⟳ Load Demo Data</button>
+        </div>
+        <div class="trust-strip">
+          <span class="trust-tag">✓ Real-time ETA</span>
+          <span class="trust-tag">✓ AI route optimization</span>
+          <span class="trust-tag trust-formula">z = x · y</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-stage" id="heroStage">
+          <canvas id="hero3d" aria-label="3D logistics manifold visualization"></canvas>
+          <img class="hero-fallback" src="./assets/hero-logistics.svg" alt="Logistics visualization fallback" />
+          <div class="stage-label">MANIFOLD ACTIVE</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── METRICS BAR ────────────────────────────────────────────────── -->
+  <section class="metrics-bar">
+    <div class="metrics-inner">
+      <div class="metric-block">
+        <span class="metric-val" id="kpiShipments">—</span>
+        <span class="metric-lbl">Total Shipments</span>
+      </div>
+      <div class="metric-sep"></div>
+      <div class="metric-block">
+        <span class="metric-val" id="kpiActive">—</span>
+        <span class="metric-lbl">Active In-Flight</span>
+      </div>
+      <div class="metric-sep"></div>
+      <div class="metric-block">
+        <span class="metric-val" id="kpiOnTime">—</span>
+        <span class="metric-lbl">On-Time Rate</span>
+      </div>
+      <div class="metric-sep"></div>
+      <div class="metric-block">
+        <span class="metric-val" id="kpiAlerts">—</span>
+        <span class="metric-lbl">Inventory Alerts</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES BENTO ─────────────────────────────────────────────── -->
+  <section class="features-section" id="features">
+    <div class="section-wrap">
+      <div class="section-hdr">
+        <div class="section-eyebrow">Platform Intelligence</div>
+        <h2 class="section-h2">Every shipment.<br><span class="h2-accent">Perfectly orchestrated.</span></h2>
+        <p class="section-body">
+          From warehouse to doorstep, every step runs through a single decision engine that
+          learns, adapts, and scales without adding operational headcount.
+        </p>
+      </div>
+      <div class="bento-grid">
+        <div class="bento bento-hero">
+          <div class="bento-eyebrow">Core Algorithm</div>
+          <h3 class="bento-h3">Manifold Route<br>Intelligence</h3>
+          <p class="bento-body">Every route is a manifold surface. Distance × weight = workload. The engine minimizes
+            cost and maximizes speed simultaneously across the entire fleet.</p>
+          <div class="bento-formula">z = x · y</div>
+          <div class="bento-glow"></div>
+        </div>
+        <div class="bento">
+          <div class="bento-icon">◈</div>
+          <h3 class="bento-h3">Warehouse<br>Allocation</h3>
+          <p class="bento-body">Stock assigned to the nearest feasible warehouse automatically. Zero manual
+            intervention.</p>
+        </div>
+        <div class="bento">
+          <div class="bento-icon">⟳</div>
+          <h3 class="bento-h3">Real-Time<br>ETA</h3>
+          <p class="bento-body">SLA-aware ETAs computed per shipment, updated on every status transition.</p>
+        </div>
+        <div class="bento">
+          <div class="bento-icon">▣</div>
+          <h3 class="bento-h3">Inventory<br>Alerts</h3>
+          <p class="bento-body">Restock signals fire before stockouts occur. Zero manual monitoring required.</p>
+        </div>
+        <div class="bento bento-wide">
+          <div class="bento-icon">⬤</div>
+          <h3 class="bento-h3">Complete Event Timeline</h3>
+          <p class="bento-body">Every state transition — from allocation to delivery — is recorded and queryable. Full
+            audit trail for every shipment, always.</p>
+        </div>
+        <div class="bento">
+          <div class="bento-icon">⬡</div>
+          <h3 class="bento-h3">Vehicle<br>Dispatch</h3>
+          <p class="bento-body">Vehicles assigned by capacity and speed constraints. Optimal utilization at every run.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CONTROL TOWER ──────────────────────────────────────────────── -->
+  <section class="ops-section" id="operations">
+    <div class="section-wrap">
+      <div class="section-hdr">
+        <div class="section-eyebrow">Control Tower</div>
+        <h2 class="section-h2">Your operations,<br><span class="h2-accent">command-ready.</span></h2>
+      </div>
+      <div class="ops-layout">
+
+        <!-- LEFT: tabbed forms -->
+        <div class="ops-forms-col">
+          <div class="form-tab-strip">
+            <button class="ftab active" data-tab="warehouse">Warehouse</button>
+            <button class="ftab" data-tab="inventory">Inventory</button>
+            <button class="ftab" data-tab="vehicle">Vehicle</button>
+            <button class="ftab" data-tab="shipment">Shipment</button>
+          </div>
+
+          <div class="ftab-panel active" id="ftab-warehouse">
+            <form id="warehouseForm" class="ops-form">
+              <p class="form-caption">Register a warehouse node in the manifold network.</p>
+              <div class="field">
+                <label>Warehouse Name</label>
+                <input id="whName" placeholder="Chicago West Hub" required />
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Latitude</label>
+                  <input id="whLat" placeholder="41.8781" type="number" step="0.0001" required />
+                </div>
+                <div class="field">
+                  <label>Longitude</label>
+                  <input id="whLon" placeholder="-87.6298" type="number" step="0.0001" required />
+                </div>
+              </div>
+              <button type="submit" class="btn-primary btn-form">Create Warehouse →</button>
+            </form>
+          </div>
+
+          <div class="ftab-panel" id="ftab-inventory">
+            <form id="stockForm" class="ops-form">
+              <p class="form-caption">Stock SKUs into warehouse inventory.</p>
+              <div class="field">
+                <label>Warehouse</label>
+                <select id="stockWarehouse" required></select>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>SKU</label>
+                  <input id="stockSku" placeholder="SKU-001" required />
+                </div>
+                <div class="field">
+                  <label>Quantity</label>
+                  <input id="stockQty" placeholder="500" type="number" min="1" required />
+                </div>
+              </div>
+              <button type="submit" class="btn-primary btn-form">Stock Inventory →</button>
+            </form>
+          </div>
+
+          <div class="ftab-panel" id="ftab-vehicle">
+            <form id="vehicleForm" class="ops-form">
+              <p class="form-caption">Deploy a vehicle from a home warehouse.</p>
+              <div class="field">
+                <label>Vehicle Name</label>
+                <input id="vehName" placeholder="Falcon-7" required />
+              </div>
+              <div class="field">
+                <label>Home Warehouse</label>
+                <select id="vehWarehouse" required></select>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Capacity (kg)</label>
+                  <input id="vehCapacity" placeholder="800" type="number" min="1" required />
+                </div>
+                <div class="field">
+                  <label>Speed (km/h)</label>
+                  <input id="vehSpeed" placeholder="55" type="number" min="1" value="55" required />
+                </div>
+              </div>
+              <button type="submit" class="btn-primary btn-form">Deploy Vehicle →</button>
+            </form>
+          </div>
+
+          <div class="ftab-panel" id="ftab-shipment">
+            <form id="shipmentForm" class="ops-form">
+              <p class="form-caption">Create and dispatch a new shipment.</p>
+              <div class="field-row">
+                <div class="field">
+                  <label>Customer</label>
+                  <input id="shCustomer" placeholder="Acme Corp" required />
+                </div>
+                <div class="field">
+                  <label>Priority</label>
+                  <select id="shPriority">
+                    <option value="critical">Critical</option>
+                    <option value="express" selected>Express</option>
+                    <option value="standard">Standard</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Dest. Latitude</label>
+                  <input id="shLat" placeholder="34.0522" type="number" step="0.0001" required />
+                </div>
+                <div class="field">
+                  <label>Dest. Longitude</label>
+                  <input id="shLon" placeholder="-118.2437" type="number" step="0.0001" required />
+                </div>
+              </div>
+              <div class="field">
+                <label>Items (SKU:qty, SKU:qty)</label>
+                <input id="shItems" placeholder="SKU-001:5, SKU-002:2" required />
+              </div>
+              <div class="field">
+                <label>Weight (kg)</label>
+                <input id="shWeight" placeholder="42.5" type="number" min="0.1" step="0.1" required />
+              </div>
+              <button type="submit" class="btn-primary btn-form">Create Shipment →</button>
+            </form>
+          </div>
+
+          <div id="actionResult" class="result-toast">Ready for operations.</div>
+          <div class="quick-actions">
+            <button id="seedBtn" class="btn-ghost-sm">⟳ Seed Demo Data</button>
+            <button id="optimizeBtn" class="btn-cyan-sm">◈ Optimize Routes</button>
+          </div>
+        </div>
+
+        <!-- RIGHT: live board + insights -->
+        <div class="ops-board-col">
+          <div class="board-head">
+            <h3 class="board-h3">Live Shipment Board</h3>
+            <div class="live-chip"><span class="live-dot"></span>Live</div>
+          </div>
+          <div id="shipmentsBoard" class="shipment-board"></div>
+
+          <div class="insights-wrap" id="intelligence">
+            <div class="board-head">
+              <h3 class="board-h3">Dimensional Workload</h3>
+              <span class="formula-chip">z = x · y</span>
+            </div>
+            <div id="dimensionalTotal" class="workload-total">Total workload: 0</div>
+            <div id="dimensionalList" class="dim-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">Logical<span>Logistics</span></div>
+      <div class="footer-meta">
+        Powered by the ButterflyFX™ Dimensional Engine · z = x · y ·
+        <a href="/health" target="_blank">/health</a> ·
+        <a href="/kpis" target="_blank">/kpis</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/lib/three/three.min.js"></script>
+  <script src="./immersive.js"></script>
+  <script src="./web.js"></script>
+</body>
+
+</html>

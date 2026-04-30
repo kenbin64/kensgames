@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames — World Class Arcade Portal</title>
+  <meta name="description"
+    content="KensGames — Play FastTrack, BrickBreaker3D, StarFighter and 4D Tic-Tac-Toe. Solo against AI, multiplayer with friends, ranked matchmaking.">
+
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/images/logo/logo_thumbnail.png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+
+  <!-- X-Dimensional Session Bridge (loads before game redirect) -->
+  <script src="/js/dimensional-session-bridge.js" defer></script>
+  --neon-cyan: #00FFFF;
+  --neon-pink: #FF00FF;
+  --neon-yellow: #FFE800;
+  --neon-orange: #FF6600;
+  --neon-purple: #9900FF;
+  --neon-green: #00FF41;
+  --bg-dark: #04040C;
+  --bg-card: rgba(4, 4, 20, 0.94);
+  --text: #E0E0FF;
+  --text-muted: #8888AA;
+  --glow-cyan: 0 0 8px #00FFFF, 0 0 24px #00FFFF, 0 0 48px #00FFFF;
+  --glow-pink: 0 0 8px #FF00FF, 0 0 24px #FF00FF, 0 0 48px #FF00FF;
+  --glow-yellow: 0 0 8px #FFE800, 0 0 24px #FFE800, 0 0 48px #FFE800;
+  --glow-green: 0 0 8px #00FF41, 0 0 24px #00FF41;
+  --font-arcade: 'Orbitron', monospace;
+  }
+
+  * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  }
+
+  html,
+  body {
+  width: 100%;
+  overflow-x: hidden;
+  }
+
+  body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+  line-height: 1.6;
+  position: relative;
+  }
+
+  #gyroid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.15;
+  pointer-events: none;
+  }
+
+  #tron-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+  linear-gradient(rgba(0, 255, 255, 0.02) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(0, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 80px 80px;
+  }
+
+  .container {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+  }
+
+  /* ── HEADER ── */
+  header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 2px solid var(--neon-cyan);
+  box-shadow: inset 0 -20px 60px rgba(0, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  margin-bottom: 40px;
+  }
+
+  .logo {
+  font-family: var(--font-arcade);
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 2px;
+  }
+
+  .nav-buttons {
+  display: flex;
+  gap: 15px;
+  }
+
+  .nav-buttons button {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--neon-pink);
+  color: var(--neon-pink);
+  cursor: pointer;
+  font-family: var(--font-arcade);
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+  }
+
+  .nav-buttons button:hover {
+  background: rgba(255, 0, 255, 0.1);
+  box-shadow: var(--glow-pink);
+  }
+
+  /* ── HERO ── */
+  .hero {
+  text-align: center;
+  margin-bottom: 60px;
+  padding: 40px 20px;
+  border: 2px solid var(--neon-yellow);
+  background: linear-gradient(135deg, rgba(255, 232, 0, 0.05), rgba(255, 102, 0, 0.05));
+  box-shadow: 0 0 30px rgba(255, 232, 0, 0.2), inset 0 0 40px rgba(255, 232, 0, 0.05);
+  }
+
+  .hero h1 {
+  font-family: var(--font-arcade);
+  font-size: 48px;
+  margin-bottom: 10px;
+  color: var(--neon-yellow);
+  text-shadow: var(--glow-yellow);
+  letter-spacing: 3px;
+  }
+
+  .hero p {
+  font-size: 18px;
+  color: var(--text-muted);
+  max-width: 800px;
+  margin: 0 auto;
+  }
+
+  /* ── GAME GRID ── */
+  .games-section {
+  margin-bottom: 60px;
+  }
+
+  .section-title {
+  font-family: var(--font-arcade);
+  font-size: 24px;
+  color: var(--neon-green);
+  text-shadow: var(--glow-green);
+  margin-bottom: 30px;
+  letter-spacing: 2px;
+  }
+
+  .games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
+  margin-bottom: 50px;
+  }
+
+  .game-card {
+  background: var(--bg-card);
+  border: 2px solid var(--neon-cyan);
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  }
+
+  .game-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.05), transparent);
+  pointer-events: none;
+  }
+
+  .game-card:hover {
+  border-color: var(--neon-green);
+  box-shadow: var(--glow-green);
+  transform: translateY(-8px);
+  }
+
+  .game-card h2 {
+  font-family: var(--font-arcade);
+  font-size: 22px;
+  color: var(--neon-cyan);
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  }
+
+  .game-card .description {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 15px;
+  line-height: 1.6;
+  }
+
+  .game-card .stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--neon-yellow);
+  }
+
+  .game-card .stats span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  }
+
+  .game-card .actions {
+  display: flex;
+  gap: 10px;
+  }
+
+  .game-card button {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--neon-green);
+  cursor: pointer;
+  font-family: var(--font-arcade);
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+  }
+
+  .game-card button:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: var(--glow-green);
+  }
+
+  .game-card button.quick-join {
+  color: var(--neon-pink);
+  }
+
+  .game-card button.quick-join:hover {
+  background: rgba(255, 0, 255, 0.1);
+  box-shadow: var(--glow-pink);
+  }
+
+  /* ── SESSIONS SECTION ── */
+  .sessions-section {
+  background: rgba(0, 255, 255, 0.05);
+  border: 2px solid var(--neon-cyan);
+  padding: 30px;
+  margin-bottom: 60px;
+  }
+
+  .session-list {
+  display: grid;
+  gap: 15px;
+  }
+
+  .session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: rgba(4, 4, 20, 0.8);
+  border: 1px solid var(--neon-pink);
+  font-size: 14px;
+  }
+
+  .session-item .game-name {
+  color: var(--neon-pink);
+  font-weight: bold;
+  }
+
+  .session-item .players {
+  color: var(--neon-yellow);
+  }
+
+  .session-item .actions {
+  display: flex;
+  gap: 10px;
+  }
+
+  .session-item button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--neon-green);
+  color: var(--neon-green);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.3s;
+  }
+
+  .session-item button:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: var(--glow-green);
+  }
+
+  /* ── SETUP WIZARD MODAL ── */
+  .modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  }
+
+  .modal.active {
+  display: flex;
+  }
+
+  .modal-content {
+  background: var(--bg-card);
+  border: 2px solid var(--neon-cyan);
+  padding: 40px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: var(--glow-cyan);
+  }
+
+  .modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  color: var(--neon-pink);
+  font-size: 28px;
+  cursor: pointer;
+  }
+
+  .modal-close:hover {
+  color: var(--neon-yellow);
+  }
+
+  .wizard-section {
+  margin-bottom: 30px;
+  }
+
+  .wizard-section h3 {
+  font-family: var(--font-arcade);
+  font-size: 18px;
+  color: var(--neon-green);
+  margin-bottom: 15px;
+  letter-spacing: 1px;
+  }
+
+  .option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  }
+
+  .option {
+  padding: 15px;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid var(--neon-cyan);
+  cursor: pointer;
+  transition: all 0.3s;
+  }
+
+  .option:hover {
+  background: rgba(0, 255, 255, 0.15);
+  border-color: var(--neon-green);
+  }
+
+  .option input[type="radio"] {
+  margin-right: 10px;
+  }
+
+  .option label {
+  cursor: pointer;
+  flex: 1;
+  }
+
+  .wizard-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+  }
+
+  .wizard-actions button {
+  flex: 1;
+  padding: 15px;
+  border: 1px solid var(--neon-green);
+  background: rgba(0, 255, 65, 0.1);
+  color: var(--neon-green);
+  cursor: pointer;
+  font-family: var(--font-arcade);
+  font-size: 14px;
+  transition: all 0.3s;
+  }
+
+  .wizard-actions button:hover {
+  background: rgba(0, 255, 65, 0.2);
+  box-shadow: var(--glow-green);
+  }
+
+  .wizard-actions button.cancel {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  background: rgba(255, 0, 255, 0.1);
+  }
+
+  .wizard-actions button.cancel:hover {
+  background: rgba(255, 0, 255, 0.2);
+  box-shadow: var(--glow-pink);
+  }
+
+  /* ── INVITE SECTION ── */
+  .invite-section {
+  background: rgba(255, 232, 0, 0.05);
+  border: 1px solid var(--neon-yellow);
+  padding: 15px;
+  margin-top: 20px;
+  }
+
+  .invite-section p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  }
+
+  .invite-code {
+  display: flex;
+  gap: 10px;
+  }
+
+  .invite-code input {
+  flex: 1;
+  padding: 10px;
+  background: rgba(4, 4, 20, 0.8);
+  border: 1px solid var(--neon-yellow);
+  color: var(--neon-yellow);
+  font-family: monospace;
+  }
+
+  .invite-code button {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--neon-yellow);
+  color: var(--neon-yellow);
+  cursor: pointer;
+  transition: all 0.3s;
+  }
+
+  .invite-code button:hover {
+  background: rgba(255, 232, 0, 0.1);
+  box-shadow: var(--glow-yellow);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+  .games-grid {
+  grid-template-columns: 1fr;
+  }
+
+  .hero h1 {
+  font-size: 32px;
+  }
+
+  header {
+  flex-direction: column;
+  gap: 15px;
+  }
+  }
+  </style>
+</head>
+
+<body>
+  <canvas id="gyroid-bg"></canvas>
+  <div id="tron-grid"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo">KENSGAMES</div>
+      <div class="nav-buttons">
+        <button id="btn-my-sessions">My Sessions</button>
+        <button id="btn-sign-out">Sign Out</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h1>ARCADE PORTAL</h1>
+      <p>Play solo against AI, challenge friends, or climb the leaderboards. Choose your game.</p>
+    </section>
+
+    <section class="games-section">
+      <div class="section-title">AVAILABLE GAMES</div>
+      <div class="games-grid" id="games-grid">
+        <!-- Games loaded dynamically -->
+      </div>
+    </section>
+
+    <section class="sessions-section">
+      <div class="section-title">ACTIVE SESSIONS</div>
+      <div class="session-list" id="session-list">
+        <div style="text-align: center; color: var(--text-muted);">No active sessions. Start a game to begin.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Setup Wizard Modal -->
+  <div class="modal" id="setup-modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h2 id="wizard-game-title" style="color: var(--neon-green); margin-bottom: 20px;"></h2>
+
+      <div class="wizard-section">
+        <h3>Game Mode</h3>
+        <div class="option-group">
+          <div class="option">
+            <input type="radio" name="mode" value="solo" id="mode-solo" checked>
+            <label for="mode-solo">Solo vs AI (Practice)</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="mode" value="multiplayer" id="mode-multiplayer">
+            <label for="mode-multiplayer">Multiplayer (Friends)</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="mode" value="ranked" id="mode-ranked">
+            <label for="mode-ranked">Ranked Match (Matchmaking)</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="multiplayer-options" style="display: none;">
+        <div class="wizard-section">
+          <h3>Invite Friends</h3>
+          <div class="invite-section">
+            <p>Share a game code or invite URL with your friends:</p>
+            <div class="invite-code">
+              <input type="text" id="invite-code" readonly placeholder="Generating...">
+              <button onclick="copyInviteCode()">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="ai-options" style="display: block;">
+        <div class="wizard-section">
+          <h3>Difficulty</h3>
+          <div class="option-group">
+            <div class="option">
+              <input type="radio" name="difficulty" value="easy" id="diff-easy">
+              <label for="diff-easy">Easy</label>
+            </div>
+            <div class="option">
+              <input type="radio" name="difficulty" value="medium" id="diff-medium" checked>
+              <label for="diff-medium">Medium</label>
+            </div>
+            <div class="option">
+              <input type="radio" name="difficulty" value="hard" id="diff-hard">
+              <label for="diff-hard">Hard</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="cancel" onclick="closeModal()">Cancel</button>
+        <button onclick="startGame()">Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let games = [];
+    let currentGameId = null;
+    let sessions = [];
+
+    // Load game metadata
+    async function loadGames() {
+      const gameIds = ['fasttrack', 'starfighter', '4dconnect', 'brickbreaker3d'];
+      const gamePaths = [
+        'fasttrack/manifold.game.json',
+        'starfighter/manifold.game.json',
+        '4DTicTacToe/manifold.game.json',
+        'brickbreaker3d/manifold.game.json'
+      ];
+
+      for (let i = 0; i < gameIds.length; i++) {
+        try {
+          const response = await fetch(`/${gamePaths[i]}`);
+          const data = await response.json();
+          games.push({
+            id: gameIds[i],
+            name: data.name,
+            description: getGameDescription(gameIds[i]),
+            players: data.dimension?.x || 1,
+            duration: data.dimension?.y || 20,
+            entry: data.entry || 'index.html'
+          });
+        } catch (error) {
+          console.warn(`Failed to load ${gamePaths[i]}:`, error);
+        }
+      }
+
+      renderGames();
+      loadSessions();
+    }
+
+    function getGameDescription(gameId) {
+      const descriptions = {
+        'fasttrack': 'Fast-paced racing game with real-time multiplayer and strategic power-ups.',
+        'starfighter': 'Classic arcade space shooter with waves of enemies and boss battles.',
+        '4dconnect': 'Connect four in 4D space with gravity-based physics and advanced tactics.',
+        'brickbreaker3d': 'Brick-breaking action in 3D with power-ups and dynamic physics.'
+      };
+      return descriptions[gameId] || 'Classic arcade game';
+    }
+
+    function renderGames() {
+      const grid = document.getElementById('games-grid');
+      grid.innerHTML = games.map(game => `
+                <div class="game-card">
+                    <h2>${game.name}</h2>
+                    <p class="description">${game.description}</p>
+                    <div class="stats">
+                        <span>👥 Up to ${game.players} player(s)</span>
+                        <span>⏱ ~${game.duration} min</span>
+                    </div>
+                    <div class="actions">
+                        <button onclick="openWizard('${game.id}')">Play Now</button>
+                        <button class="quick-join" onclick="quickJoin('${game.id}')">Quick Join</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    function openWizard(gameId) {
+      currentGameId = gameId;
+      const game = games.find(g => g.id === gameId);
+      document.getElementById('wizard-game-title').textContent = game.name;
+      document.getElementById('setup-modal').classList.add('active');
+
+      // Reset form
+      document.getElementById('mode-solo').checked = true;
+      document.getElementById('diff-medium').checked = true;
+      updateModeOptions();
+      generateInviteCode();
+    }
+
+    function closeModal() {
+      document.getElementById('setup-modal').classList.remove('active');
+      currentGameId = null;
+    }
+
+    function updateModeOptions() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      document.getElementById('ai-options').style.display = mode === 'solo' ? 'block' : 'none';
+      document.getElementById('multiplayer-options').style.display = mode !== 'solo' ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('input[name="mode"]').forEach(el => {
+      el.addEventListener('change', updateModeOptions);
+    });
+
+    function generateInviteCode() {
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      document.getElementById('invite-code').value = code;
+      return code;
+    }
+
+    function copyInviteCode() {
+      const code = document.getElementById('invite-code');
+      code.select();
+      document.execCommand('copy');
+      alert('Invite code copied!');
+    }
+
+    function startGame() {
+      if (!currentGameId) return;
+
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const difficulty = document.querySelector('input[name="difficulty"]:checked')?.value || 'medium';
+      const inviteCode = document.getElementById('invite-code').value;
+      const gameData = games.find(g => g.id === currentGameId);
+
+      // x-dimensional session: dimensional stacking where each layer contains previous as points
+      // width(point on length) → holes(points on board) → board(point in game state)
+      // plane(point in volume) → board(point in game) → game(point in session)
+      // Each dimension creates a new x; volume creates whole new dimension (higher point)
+      const pegs = {
+        _x: 'pegs',
+        points: [0, 1, 2, 3, 4] // pegs are points ON holes (coordinates on hole axis)
+      };
+
+      const holes = {
+        _x: 'holes',
+        count: 1,
+        pegs: pegs // pegs are points IN holes layer
+      };
+
+      const board = {
+        _x: `board-${currentGameId}`,
+        holes: holes // holes are points IN board layer
+      };
+
+      const session = {
+        _x: Math.random().toString(36).substring(2, 8),
+        _schema: '1.0-dimensional',
+
+        // Dimensional stack: each layer contains previous as points, creates new x upward
+        game: {
+          _x: currentGameId,
+          name: gameData.name,
+          x: gameData.players,      // x dimension: player count
+          y: gameData.duration,      // y dimension: duration
+          z: gameData.players * gameData.duration, // z workload
+          players: {                 // players are points in game
+            _x: `player-${inviteCode}`,
+            count: 1,
+            mode,
+            difficulty
+          },
+          board: board               // board is a point in game state
+        },
+
+        modifiers: {
+          inviteCode,
+          startedAt: new Date().toLocaleTimeString(),
+          channel: mode === 'ranked' ? 'matchmaking' : 'direct'
+        }
+      };
+
+      sessions.push(session);
+      localStorage.setItem('kensgames_sessions', JSON.stringify(sessions));
+
+      const gameDir = currentGameId === '4dconnect' ? '4DTicTacToe' : currentGameId.charAt(0).toUpperCase() + currentGameId.slice(1);
+      const entryPath = `/${gameDir}/${gameData.entry}`;
+
+      // Pass x-dimensional session to game
+      window.KENSGAMES_SESSION = session;
+      window.location.href = entryPath;
+    }
+
+    function quickJoin(gameId) {
+      currentGameId = gameId;
+      const gameData = games.find(g => g.id === gameId);
+      const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+      // x-dimensional quick-join: dimensional stack with ranked mode
+      const pegs = {
+        _x: 'pegs',
+        points: [0, 1, 2, 3, 4]
+      };
+
+      const holes = {
+        _x: 'holes',
+        count: 1,
+        pegs: pegs
+      };
+
+      const board = {
+        _x: `board-${gameId}`,
+        holes: holes
+      };
+
+      const session = {
+        _x: Math.random().toString(36).substring(2, 8),
+        _schema: '1.0-dimensional',
+
+        game: {
+          _x: gameId,
+          name: gameData.name,
+          x: gameData.players,
+          y: gameData.duration,
+          z: gameData.players * gameData.duration,
+          players: {
+            _x: `player-${inviteCode}`,
+            count: 1,
+            mode: 'ranked',
+            difficulty: 'medium'
+          },
+          board: board
+        },
+
+        modifiers: {
+          inviteCode,
+          startedAt: new Date().toLocaleTimeString(),
+          channel: 'matchmaking'
+        }
+      };
+
+      sessions.push(session);
+      localStorage.setItem('kensgames_sessions', JSON.stringify(sessions));
+
+      const gameDir = gameId === '4dconnect' ? '4DTicTacToe' : gameId.charAt(0).toUpperCase() + gameId.slice(1);
+      window.KENSGAMES_SESSION = session;
+      window.location.href = `/${gameDir}/${gameData.entry}`;
+    }
+
+    function loadSessions() {
+      sessions = JSON.parse(localStorage.getItem('kensgames_sessions') || '[]');
+      renderSessions();
+    }
+
+    function renderSessions() {
+      const list = document.getElementById('session-list');
+      if (sessions.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: var(--text-muted);">No active sessions. Start a game to begin.</div>';
+        return;
+      }
+
+      list.innerHTML = sessions.map(session => {
+        const gameName = session.game?.name || 'Unknown Game';
+        const mode = session.game?.players?.mode || 'unknown';
+        const startTime = session.modifiers?.startedAt || 'N/A';
+        return `
+                    <div class="session-item">
+                        <div>
+                            <div class="game-name">${gameName}</div>
+                            <div class="players">Mode: ${mode} | Started: ${startTime}</div>
+                        </div>
+                        <div class="actions">
+                            <button onclick="resumeSession('${session._x}')">Resume</button>
+                            <button onclick="deleteSession('${session._x}')" style="border-color: var(--neon-pink); color: var(--neon-pink);">Delete</button>
+                        </div>
+                    </div>
+                `;
+      }).join('');
+    }
+
+    function resumeSession(sessionX) {
+      const session = sessions.find(s => s._x === sessionX);
+      if (!session) return;
+
+      const gameId = session.game?._x;
+      const gameData = games.find(g => g.id === gameId);
+      const gameDir = gameId === '4dconnect' ? '4DTicTacToe' : gameId.charAt(0).toUpperCase() + gameId.slice(1);
+      window.KENSGAMES_SESSION = session;
+      window.location.href = `/${gameDir}/${gameData.entry}`;
+    }
+
+    function deleteSession(sessionX) {
+      sessions = sessions.filter(s => s._x !== sessionX);
+      localStorage.setItem('kensgames_sessions', JSON.stringify(sessions));
+      renderSessions();
+    }
+
+    document.getElementById('btn-my-sessions').addEventListener('click', () => {
+      document.querySelector('.sessions-section').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('btn-sign-out').addEventListener('click', () => {
+      if (confirm('Sign out?')) {
+        localStorage.removeItem('kensgames_sessions');
+        window.location.href = '/';
+      }
+    });
+
+    // Initialize
+    loadGames();
+  </script>
+</body>
+
+</html>

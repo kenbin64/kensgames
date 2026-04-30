@@ -4,6 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // The marketing splash is now the portal home itself — anyone who lands
+        // on /fasttrack/ is here to play, so route straight to the lobby and
+        // forward any mode/code params the lobby will pick up.
+        (function () {
+            var search = window.location.search || '';
+            var bot = navigator.userAgent && /bot|crawl|spider|google|bing|yandex|baidu|duckduck|slurp/i.test(navigator.userAgent);
+            if (!bot) window.location.replace('/fasttrack/lobby-simple.html' + search);
+        })();
+    </script>
     <title>Fast Track — Free Online Board Game | Card & Peg Racing | Ken's Games</title>
     <meta name="description"
         content="Play Fast Track free online — a strategic card & peg racing board game for 2-4 players. Race around a stunning 3D board, take shortcuts, capture opponents. 7 themes, smart AI bots, multiplayer.">

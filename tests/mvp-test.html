@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames MVP Test Suite</title>
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --cyan: #00FFFF;
+      --green: #00FF41;
+      --pink: #FF00FF;
+      --bg: #04040C;
+      --text: #E0E0FF;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', monospace;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: var(--cyan);
+      margin-bottom: 30px;
+      font-family: 'Orbitron', monospace;
+      font-size: 32px;
+      text-shadow: 0 0 16px var(--cyan);
+      letter-spacing: 2px;
+    }
+
+    .test-group {
+      margin-bottom: 40px;
+      padding: 20px;
+      border: 1px solid var(--cyan);
+      background: rgba(0, 255, 255, 0.02);
+    }
+
+    .test-group h2 {
+      color: var(--green);
+      margin-bottom: 15px;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+
+    .test-item {
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(4, 4, 20, 0.8);
+      border-left: 3px solid transparent;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .test-item.pass {
+      border-left-color: var(--green);
+      color: var(--green);
+    }
+
+    .test-item.fail {
+      border-left-color: var(--pink);
+      color: var(--pink);
+    }
+
+    .summary {
+      margin-top: 40px;
+      padding: 20px;
+      border: 2px solid var(--green);
+      background: rgba(0, 255, 65, 0.05);
+      text-align: center;
+    }
+
+    .summary.ready {
+      color: var(--green);
+      text-shadow: 0 0 16px var(--green);
+      font-weight: bold;
+    }
+
+    .summary.warning {
+      color: var(--pink);
+      border-color: var(--pink);
+      background: rgba(255, 0, 255, 0.05);
+    }
+
+    .actions {
+      margin-top: 30px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: 1px solid var(--cyan);
+      background: rgba(0, 255, 255, 0.1);
+      color: var(--cyan);
+      cursor: pointer;
+      font-family: 'Orbitron', monospace;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: rgba(0, 255, 255, 0.2);
+      box-shadow: 0 0 16px var(--cyan);
+    }
+
+    button.primary {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(0, 255, 65, 0.1);
+    }
+
+    button.primary:hover {
+      background: rgba(0, 255, 65, 0.2);
+      box-shadow: 0 0 16px var(--green);
+    }
+
+    #test-output {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🎮 KensGames MVP Test Suite</h1>
+
+    <div class="test-group">
+      <h2>System Status</h2>
+      <div id="test-output"></div>
+    </div>
+
+    <div class="summary" id="summary">
+      Running tests...
+    </div>
+
+    <div class="actions">
+      <button onclick="location.href='/landing.html'">→ Go to Landing Page</button>
+      <button class="primary" onclick="location.reload()">↻ Re-run Tests</button>
+    </div>
+  </div>
+
+  <!-- Load bridge and tests -->
+  <script src="/js/dimensional-session-bridge.js"></script>
+  <script>
+    const output = document.getElementById('test-output');
+    let testsPassed = 0;
+    let testsFailed = 0;
+
+    function addTest(name, passed, details = '') {
+      const item = document.createElement('div');
+      item.className = `test-item ${passed ? 'pass' : 'fail'}`;
+      item.textContent = `${passed ? '✅' : '❌'} ${name}${details ? ` — ${details}` : ''}`;
+      output.appendChild(item);
+
+      if (passed) testsPassed++;
+      else testsFailed++;
+    }
+
+    async function runTests() {
+      try {
+        // Test 1: Game manifolds
+        addTest('Bridge loaded', typeof window.DIMENSIONAL_SESSION !== 'undefined');
+
+        const games = [
+          { id: 'fasttrack', x: 3, y: 45, z: 135, dir: 'fasttrack' },
+          { id: 'starfighter', x: 2, y: 30, z: 60, dir: 'starfighter' },
+          { id: '4dconnect', x: 2, y: 12, z: 24, dir: '4DTicTacToe' },
+          { id: 'brickbreaker3d', x: 2, y: 22, z: 44, dir: 'brickbreaker3d' }
+        ];
+
+        for (const game of games) {
+          try {
+            const res = await fetch(`/${game.dir}/manifold.game.json`);
+            const data = await res.json();
+            const z = data.dimension?.z;
+            const passed = z === game.z;
+            addTest(`${game.id}`, passed, passed ? `z=${z}✓` : `z=${z} (expected ${game.z})`);
+          } catch (e) {
+            addTest(`${game.id}`, false, 'manifest not found');
+          }
+        }
+
+        // Test 2: Session structure
+        const mockSession = {
+          _x: 'test-001',
+          _schema: '1.0-dimensional',
+          game: {
+            _x: 'fasttrack',
+            name: 'FastTrack',
+            x: 3,
+            y: 45,
+            z: 135,
+            players: { _x: 'p1', count: 1, mode: 'solo', difficulty: 'medium' },
+            board: { _x: 'board1', holes: { _x: 'h1' }, pegs: { _x: 'peg1' } }
+          },
+          modifiers: { inviteCode: 'TST1', startedAt: new Date().toLocaleTimeString() }
+        };
+
+        window.KENSGAMES_SESSION = mockSession;
+        const extracted = window.DIMENSIONAL_SESSION.extract();
+        addTest('Extract session', extracted && extracted.gameId === 'fasttrack');
+
+        const config = window.DIMENSIONAL_SESSION.toGameConfig();
+        addTest('Convert config', config && config.gameDimensions.z === 135);
+
+        // Test 3: Game entry points
+        for (const game of games) {
+          const entry = game.id === '4dconnect' ? '/4DTicTacToe/index.html' :
+            game.id === 'fasttrack' ? '/fasttrack/3d.html' :
+              game.id === 'brickbreaker3d' ? '/brickbreaker3d/play.html' :
+                '/starfighter/index.html';
+          try {
+            const res = await fetch(entry);
+            addTest(`${game.id} entry`, res.status === 200, `${entry} → ${res.status}`);
+          } catch (e) {
+            addTest(`${game.id} entry`, false, 'unreachable');
+          }
+        }
+
+        // Summary
+        const summary = document.getElementById('summary');
+        const total = testsPassed + testsFailed;
+        if (testsFailed === 0) {
+          summary.className = 'summary ready';
+          summary.innerHTML = `✅ <strong>All ${total} tests passed!</strong><br>MVP is ready for game verification.`;
+        } else {
+          summary.className = 'summary warning';
+          summary.innerHTML = `⚠️ <strong>${testsPassed}/${total} tests passed</strong><br>Please fix failures before proceeding.`;
+        }
+      } catch (err) {
+        console.error('Test error:', err);
+        document.getElementById('summary').innerHTML = `❌ Test suite error: ${err.message}`;
+      }
+    }
+
+    // Run on load
+    window.addEventListener('DOMContentLoaded', runTests);
+  </script>
+</body>
+
+</html>

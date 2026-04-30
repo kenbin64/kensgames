@@ -13,6 +13,9 @@
 ## Read First
 
 - [`README.md`](README.md): high-level portal and deployment summary
+- [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](docs/X-DIMENSIONAL-AI-DIRECTIVE.md): **formal axiomatic model** — Definitions, Axioms, Constraints, Corollaries for x/y/z/m programming. Read before touching manifold logic.
+- [`docs/UltimateAIDirective.md`](docs/UltimateAIDirective.md): general intelligence principles governing searching, retrieving, determining, presenting.
+- [`docs/SUBSTRATES.md`](docs/SUBSTRATES.md): Gyroid vs Schwarz Diamond roles, substrate rules, lens rules.
 - [`js/manifold.js`](js/manifold.js): unified manifold core used across the repo
 - [`js/manifold-core/manifold_surface.js`](js/manifold-core/manifold_surface.js): compatibility shim over the unified manifold
 - [`fasttrack/board_manifold.js`](fasttrack/board_manifold.js): FastTrack board geometry and rule encoding
@@ -45,6 +48,10 @@
 - Prefer extending existing game-specific manifold/substrate files over creating parallel abstractions.
 - GLB files are source references, not deployable runtime assets. Runtime geometry should be derived from manifold equations, seeds, or substrate parameters rather than loading GLBs directly.
 - Apply phi/Fibonacci-derived proportions and timing where practical, but treat performance and gameplay stability as hard constraints.
+- The manifold model is: **x** = identity/seed/observer, **y** = modifiers/nutrients (extracted from m, never assumed), **z** = manifested state/bloom (never stored independently — always derived), **m** = manifold garden (queryable field, not a database). See [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](docs/X-DIMENSIONAL-AI-DIRECTIVE.md).
+- Multiplication gathers (unite). Division explodes (decompose). Horizontal traversal = division-dominant. Vertical traversal = multiplication-dominant. Traversal resistance $r \ge 1$; $r = 1$ is the void crossing (no resistance).
+- Seven-layer dimensional ladder and Fibonacci scaling ($F_n = F_{n-1} + F_{n-2}$, levels $[1,1,2,3,5,8,13]$) govern layer magnitude and traversal step sizing.
+- The Gyroid is the canonical substrate. The Schwarz Diamond is an auxiliary lens only — never store, index, or route queries by it.
 
 ## Known Pitfalls
 

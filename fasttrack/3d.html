@@ -6,10 +6,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FastTrack 3D — Manifold Gaming</title>
   <script>
-    if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
-      window.location.replace('/fasttrack/');
-    }
+    // X-Dimensional Bootstrap: Fetch player identity and session state asynchronously
+    // before initializing the game.
+    window.KG_BOOTSTRAP_PROMISE = (async function () {
+      const usp = new URLSearchParams(location.search);
+      const code = usp.get('code');
+      const endpoint = code ? `/ws/api/session/bootstrap?code=${encodeURIComponent(code)}` : `/ws/api/players/me`;
+      try {
+        const res = await fetch(endpoint);
+        if (!res.ok) {
+          throw new Error(`Bootstrap failed: ${res.status}`);
+        }
+        const data = await res.json();
+        const me = data.me || data;
+        const myName = me && (me.username || me.name);
+        if (myName) {
+          localStorage.setItem('username', myName);
+          const myAvatar = me.avatar_id || me.avatar;
+          if (myAvatar) {
+            localStorage.setItem('kg_avatar', JSON.stringify({ id: myAvatar, emoji: myAvatar }));
+          }
+        }
+
+        // If still no identity, return to lobby
+        if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
+          window.location.replace('/fasttrack/lobby-simple.html' + location.search);
+          return new Promise(() => { }); // Block indefinitely
+        }
+
+        if (data.session) {
+          sessionStorage.setItem('kg_session', JSON.stringify(data.session));
+        }
+      } catch (err) {
+        console.warn('REST bootstrap failed', err);
+        sessionStorage.removeItem('kg_session');
+        if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
+          window.location.replace('/fasttrack/lobby-simple.html' + location.search);
+          return new Promise(() => { }); // Block indefinitely
+        }
+      }
+    })();
   </script>
+
+  <!-- X-Dimensional Session Bridge (loads before game init) -->
+  <script src="/js/dimensional-session-bridge.js"></script>
+
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
   <style>
     * {
@@ -23,6 +64,7 @@
       color: #fff;
       font-family: 'Orbitron', 'Segoe UI', sans-serif;
       overflow: hidden;
+      font-size: clamp(16px, 2.6vw, 19px);
     }
 
     #container {
@@ -216,15 +258,15 @@
     }
 
     #game-status {
-      color: #ffcc00;
+      color: #ffe033;
       font-weight: 700;
-      font-size: 0.8em;
+      font-size: 0.9em;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       padding-bottom: 6px;
       margin-bottom: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      text-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      text-shadow: 0 0 12px rgba(255, 220, 0, 0.6);
     }
 
     #player-list {
@@ -237,11 +279,11 @@
       display: flex;
       align-items: center;
       gap: 7px;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(255, 255, 255, 0.04);
       transition: all 0.3s ease;
-      font-size: 0.85em;
+      font-size: 1em;
       transform: perspective(600px) rotateY(0.5deg);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
@@ -268,15 +310,17 @@
 
     .player-name {
       flex: 1;
-      font-size: 0.9em;
+      font-size: 1em;
+      color: #e8eeff;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-shadow: 0 0 8px rgba(200, 220, 255, 0.3);
     }
 
     .player-pegs {
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 0.75em;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.82em;
       white-space: nowrap;
     }
 
@@ -315,8 +359,8 @@
     }
 
     #card-label {
-      font-size: 0.6em;
-      color: rgba(255, 255, 255, 0.35);
+      font-size: 0.75em;
+      color: rgba(255, 255, 255, 0.7);
       text-transform: uppercase;
       letter-spacing: 0.12em;
     }
@@ -369,24 +413,26 @@
     }
 
     #card-info {
-      color: rgba(255, 255, 255, 0.35);
-      font-size: 0.7em;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.85em;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
     }
 
     #draw-btn {
       width: 100%;
-      padding: 8px;
-      font-size: 0.9em;
-      background: linear-gradient(135deg, rgba(0, 180, 255, 0.8), rgba(0, 100, 200, 0.8));
-      border: 1px solid rgba(0, 180, 255, 0.3);
+      padding: 12px 8px;
+      font-size: 1.05em;
+      background: linear-gradient(135deg, rgba(0, 180, 255, 0.9), rgba(0, 100, 200, 0.9));
+      border: 1.5px solid rgba(0, 200, 255, 0.6);
       border-radius: 10px;
       cursor: pointer;
       color: #fff;
       font-weight: bold;
       transition: all 0.25s ease;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-      box-shadow: 0 4px 15px rgba(0, 100, 200, 0.3);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 18px rgba(0, 100, 200, 0.45);
       transform: perspective(400px) rotateX(2deg);
+      min-height: 44px;
     }
 
     #draw-btn:hover:not(:disabled) {
@@ -407,35 +453,58 @@
       margin-top: 8px;
     }
 
+    @keyframes hintPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 10px rgba(0, 255, 136, 0.45), 0 0 22px rgba(0, 255, 136, 0.2), inset 0 0 10px rgba(0, 255, 136, 0.08);
+        border-color: rgba(0, 255, 136, 0.55);
+      }
+
+      50% {
+        box-shadow: 0 0 22px rgba(0, 255, 136, 0.75), 0 0 40px rgba(0, 255, 136, 0.35), inset 0 0 18px rgba(0, 255, 136, 0.15);
+        border-color: rgba(0, 255, 136, 0.9);
+      }
+    }
+
     .hint {
-      padding: 8px 12px;
+      padding: 11px 14px;
       border-radius: 10px;
-      background: rgba(0, 255, 136, 0.08);
-      border: 1px solid rgba(0, 255, 136, 0.18);
-      font-size: 0.82em;
+      background: rgba(0, 255, 136, 0.14);
+      border: 2px solid rgba(0, 255, 136, 0.6);
+      font-size: 0.95em;
+      color: #e8fff5;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
-      text-shadow: 0 0 8px rgba(0, 255, 136, 0.2);
+      transition: background 0.2s ease, transform 0.2s ease;
+      text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
       letter-spacing: 0.02em;
-      line-height: 1.3;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      animation: hintPulse 1.6s ease-in-out infinite;
     }
 
     .hint:hover {
-      background: rgba(0, 255, 136, 0.18);
-      transform: translateX(4px) scale(1.02);
-      box-shadow: 0 2px 14px rgba(0, 255, 136, 0.2), inset 0 0 20px rgba(0, 255, 136, 0.05);
-      border-color: rgba(0, 255, 136, 0.35);
+      background: rgba(0, 255, 136, 0.28);
+      transform: translateX(5px) scale(1.03);
+      box-shadow: 0 0 28px rgba(0, 255, 136, 0.8), 0 4px 20px rgba(0, 255, 136, 0.4), inset 0 0 24px rgba(0, 255, 136, 0.12);
+      border-color: #00ff88;
+      color: #ffffff;
+      text-shadow: 0 0 14px rgba(0, 255, 136, 0.9);
+      animation: none;
     }
 
     /* ── Split Selector — interactive 7-card split UI ── */
     .split-header {
-      font-size: 0.72em;
-      color: rgba(255, 215, 0, 0.85);
+      font-size: 0.9em;
+      color: #ffe566;
       text-align: center;
-      padding: 4px 0;
+      padding: 6px 0;
       font-weight: 700;
       letter-spacing: 0.06em;
-      text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+      text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
     }
 
     .split-ratios {
@@ -447,17 +516,18 @@
     }
 
     .split-ratio-btn {
-      padding: 5px 10px;
+      padding: 8px 14px;
       border-radius: 8px;
       cursor: pointer;
-      background: rgba(255, 215, 0, 0.08);
-      border: 1px solid rgba(255, 215, 0, 0.2);
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.78em;
-      font-weight: 600;
+      background: rgba(255, 215, 0, 0.12);
+      border: 1.5px solid rgba(255, 215, 0, 0.4);
+      color: #fff8cc;
+      font-size: 0.95em;
+      font-weight: 700;
       transition: all 0.2s ease;
       font-family: 'Rajdhani', sans-serif;
-      text-shadow: 0 0 6px rgba(255, 215, 0, 0.2);
+      text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+      min-height: 40px;
     }
 
     .split-ratio-btn:hover {
@@ -486,13 +556,15 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 8px;
+      padding: 9px 10px;
       border-radius: 8px;
       cursor: pointer;
-      background: rgba(255, 165, 0, 0.06);
-      border: 1px solid rgba(255, 165, 0, 0.15);
-      font-size: 0.78em;
+      background: rgba(255, 165, 0, 0.10);
+      border: 1.5px solid rgba(255, 165, 0, 0.35);
+      font-size: 0.92em;
+      color: #ffe8b0;
       transition: all 0.2s ease;
+      min-height: 42px;
     }
 
     .split-pair:hover {
@@ -516,16 +588,16 @@
     }
 
     .split-back-btn {
-      font-size: 0.65em;
-      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.82em;
+      color: rgba(255, 255, 255, 0.7);
       cursor: pointer;
       text-align: center;
-      padding: 3px 0;
+      padding: 6px 0;
       transition: color 0.15s;
     }
 
     .split-back-btn:hover {
-      color: rgba(255, 255, 255, 0.8);
+      color: #fff;
     }
 
     /* ── Camera controls — bottom-right, tiny ── */
@@ -546,15 +618,16 @@
     }
 
     .cam-btn {
-      padding: 4px 8px;
-      font-size: 0.65em;
+      padding: 6px 11px;
+      font-size: 0.78em;
       border-radius: 5px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.75);
       cursor: pointer;
       transition: all 0.15s;
       font-family: 'Rajdhani', sans-serif;
+      min-height: 36px;
     }
 
     .cam-btn:hover {
@@ -670,11 +743,11 @@
       color: rgba(255, 255, 255, 0.85);
     }
 
-    /* ── Game log — collapsible, top-right ── */
+    /* ── Game log — collapsible, top-left ── */
     #panel-log {
       position: fixed;
       top: 12px;
-      right: 12px;
+      left: 12px;
       z-index: 50;
       border-radius: 10px;
       padding: 0;
@@ -682,7 +755,7 @@
       max-height: 24px;
       overflow: hidden;
       transition: all 0.35s ease;
-      transform: perspective(800px) rotateY(-1deg);
+      transform: perspective(800px) rotateY(1deg);
       cursor: pointer;
     }
 
@@ -756,12 +829,13 @@
         right: 0;
         max-width: 100%;
         border-radius: 0 0 12px 12px;
-        padding: 6px 10px;
+        padding: 5px 8px;
         transform: none;
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
+        overflow: hidden;
       }
 
       #panel-players:hover {
@@ -772,7 +846,14 @@
         border-bottom: none;
         margin: 0;
         padding: 0;
-        font-size: 0.7em;
+        font-size: 1.05em;
+        color: #ffe033;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
+        max-width: 90px;
+        font-size: 0.85em;
       }
 
       #player-list {
@@ -782,8 +863,14 @@
       }
 
       .player-row {
-        padding: 3px 6px;
-        font-size: 0.75em;
+        padding: 3px 7px;
+        font-size: 0.9em;
+        transform: none !important;
+      }
+
+      .player-name {
+        font-size: 0.9em;
+        color: #e8eeff;
       }
 
       .player-pegs {
@@ -800,7 +887,7 @@
         right: 0;
         width: 100%;
         border-radius: 12px 12px 0 0;
-        padding: 8px 12px;
+        padding: 5px 8px;
         transform: none;
         display: flex;
         flex-wrap: wrap;
@@ -820,7 +907,7 @@
       }
 
       #current-card {
-        font-size: 1.6em;
+        font-size: 1.9em;
         margin: 0;
       }
 
@@ -834,13 +921,23 @@
 
       #draw-btn {
         width: auto;
-        padding: 8px 16px;
+        padding: 9px 16px;
+        font-size: 0.95em;
         flex-shrink: 0;
         transform: none;
+        min-height: 42px;
       }
 
       #draw-btn:hover:not(:disabled) {
         transform: none;
+      }
+
+      .hint {
+        font-size: 1.05em;
+        padding: 12px 14px;
+        min-height: 48px;
+        color: #d0fff0;
+        border-color: rgba(0, 255, 136, 0.55);
       }
 
       #move-hints {
@@ -857,8 +954,23 @@
         bottom: 60px;
       }
 
+      .cam-btn {
+        font-size: 0.8em;
+        padding: 6px 10px;
+      }
+
       #panel-log {
-        width: 140px;
+        width: 160px;
+      }
+
+      #log-toggle,
+      #metrics-toggle {
+        font-size: 0.75em;
+      }
+
+      #game-log,
+      #metrics-body {
+        font-size: 0.8em;
       }
     }
 
@@ -989,6 +1101,52 @@
     #btn-close-settings:hover {
       background: rgba(255, 255, 255, 0.12);
       color: #fff;
+    }
+
+    /* ── Music toggle — always visible, top-right between Leave and Settings ── */
+    #btn-music-toggle {
+      position: fixed;
+      top: 12px;
+      right: 100px;
+      z-index: 50;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(8, 20, 30, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 180, 255, 0.28);
+      color: rgba(160, 220, 255, 0.80);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    #btn-music-toggle:hover {
+      background: rgba(0, 80, 120, 0.55);
+      color: #fff;
+      border-color: rgba(0, 220, 255, 0.6);
+      transform: scale(1.06);
+    }
+
+    #btn-music-toggle.muted {
+      border-color: rgba(255, 80, 80, 0.35);
+      color: rgba(255, 160, 160, 0.7);
+    }
+
+    @media (max-width: 600px) {
+      #btn-music-toggle {
+        top: 8px;
+        right: 90px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
     }
 
     /* ── Leave Game button — always visible, top-right next to gear ── */
@@ -1178,6 +1336,9 @@
     <div id="move-hints"></div>
   </div>
 
+  <!-- ── Music toggle — always visible, top-right ── -->
+  <button id="btn-music-toggle" onclick="toggleMusic()" title="Toggle Music" aria-label="Toggle Music">🎵</button>
+
   <!-- ── Leave Game — always visible, top-right next to gear ── -->
   <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
 
@@ -1270,6 +1431,39 @@
 
   <script>
     // ── Settings panel wiring ──
+    function toggleMusic() {
+      const btn = document.getElementById('btn-music-toggle');
+      if (typeof GameSettings === 'undefined') return;
+      const nowEnabled = !GameSettings.musicEnabled;
+      GameSettings.musicEnabled = nowEnabled;
+      GameSettings.save();
+      if (window.ManifoldAudio) {
+        if (!nowEnabled) {
+          ManifoldAudio.stopMusic();
+          ManifoldAudio.stopRagtimeAmbience && ManifoldAudio.stopRagtimeAmbience();
+        } else {
+          if (!ManifoldAudio.musicPlaying) ManifoldAudio.startMusic();
+          ManifoldAudio.startRagtimeAmbience && ManifoldAudio.startRagtimeAmbience();
+        }
+      }
+      btn.textContent = nowEnabled ? '🎵' : '🔇';
+      btn.classList.toggle('muted', !nowEnabled);
+      btn.title = nowEnabled ? 'Music On — click to mute' : 'Music Off — click to unmute';
+      // Keep the settings slider in sync
+      const slider = document.getElementById('vol-music');
+      if (slider) slider.value = nowEnabled ? Math.max(10, Number(slider.value) || 50) : 0;
+    }
+
+    // Sync music toggle button state once game + audio are ready
+    window.addEventListener('ft3d:ready', () => {
+      const btn = document.getElementById('btn-music-toggle');
+      if (!btn || typeof GameSettings === 'undefined') return;
+      const on = GameSettings.musicEnabled;
+      btn.textContent = on ? '🎵' : '🔇';
+      btn.classList.toggle('muted', !on);
+      btn.title = on ? 'Music On — click to mute' : 'Music Off — click to unmute';
+    });
+
     function toggleSettings() {
       document.getElementById('settings-overlay').classList.toggle('open');
     }
@@ -1320,12 +1514,12 @@
       // Skip confirm if game is already over (replay overlay already shown)
       const replayOpen = document.getElementById('replay-overlay').classList.contains('open');
       if (replayOpen || confirm('Leave this game?')) {
-        window.location.href = '/fasttrack/';
+        window.location.href = '/fasttrack/lobby-simple.html';
       }
     }
 
     function leaveFromReplay() {
-      window.location.href = '/fasttrack/';
+      window.location.href = '/fasttrack/lobby-simple.html';
     }
 
     function playAgain() {

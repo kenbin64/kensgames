@@ -68,6 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
         connectLobby();
     });
 });
+        // Derive card bloom via portal session substrate (z=x*y) once registry is loaded
+        if (window.PortalSessionSubstrate) {
+            (reg.games || []).forEach(g => {
+                try {
+                    const bloom = window.PortalSessionSubstrate.cardBloom(g);
+                    if (GAMES[g.id]) GAMES[g.id].bloom = bloom;
+                } catch (_) { }
+            });
+        }
 
 // ── AUTH ──────────────────────────────────────────────────────
 function showAuth(mode) {
@@ -386,6 +395,10 @@ function handleMessage(msg) {
             localStorage.setItem('arcade_user', JSON.stringify(currentUser));
             updateUI();
             hideAuth();
+            // Portal session substrate — derive session_strength via z=x*y
+            if (window.PortalSessionSubstrate) {
+                try { window.PortalSessionSubstrate.onSignIn(currentUser.username, currentUser.role); } catch (_) { }
+            }
             // If first time (no avatar chosen yet), prompt avatar picker
             if (!msg.user?.avatar_id && !localStorage.getItem('arcade_avatar')) {
                 setTimeout(() => showAvatarPicker(), 400);

@@ -4,6 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // The marketing splash is now the portal home itself — anyone who lands
+        // on /brickbreaker3d/ is here to play, so route straight to the lobby
+        // and forward any mode/code params the lobby will pick up. Crawlers
+        // still see the marketing markup so SEO isn't lost.
+        (function () {
+            var search = window.location.search || '';
+            var bot = navigator.userAgent && /bot|crawl|spider|google|bing|yandex|baidu|duckduck|slurp/i.test(navigator.userAgent);
+            if (!bot) window.location.replace('/brickbreaker3d/lobby.html' + search);
+        })();
+    </script>
     <title>BrickBreaker 3D — KensGames</title>
     <meta name="description"
         content="BrickBreaker 3D — classic arcade brick-breaking action in a glowing 3D arena. Play solo or challenge friends on KensGames.">
@@ -179,6 +190,9 @@
     <script src="/js/manifold-field.js"></script>
     <script src="/js/manifold-environment.js"></script>
     <script src="/js/manifold_bridge.js"></script>
+    <script src="/js/manifold.js"></script>
+    <script src="/js/substrates/manifold_ingestor.js"></script>
+    <script src="brickbreaker_manifold_substrate.js"></script>
     <script src="game.js"></script>
 </body>
 

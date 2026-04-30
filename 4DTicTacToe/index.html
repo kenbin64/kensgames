@@ -8,6 +8,9 @@
   <link rel="icon" href="/assets/images/logo/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
+
+  <!-- X-Dimensional Session Bridge -->
+  <script src="/js/dimensional-session-bridge.js"></script>
 </head>
 
 <body>
@@ -91,32 +94,9 @@
     <button class="cam-btn" id="btn-follow" onclick="toggleFollow()">FOLLOW</button>
     <button class="cam-btn" onclick="resetCam()">RESET</button>
   </div>
-  <div id="scenario-select" class="show">
-    <div class="ss-title">4D CONNECT</div>
-    <div class="ss-sub">CHOOSE YOUR CHALLENGE</div>
-    <div class="ss-grid" id="ss-grid"></div>
-    <div class="ss-row">
-      <button class="ss-vs-btn pvp-btn sel" id="pvp-btn" onclick="setVsMode('pvp')">&#9889; VS PLAYER</button>
-      <button class="ss-vs-btn ai-btn" id="ai-btn" onclick="setVsMode('ai')">VS AI</button>
-    </div>
-    <div class="ss-diff-row" id="np-row">
-      <span style="font-size:8px;color:var(--dim);letter-spacing:1px;align-self:center">PLAYERS:</span>
-      <button class="diff-btn" id="np-1" onclick="setNumPlayers(1)">1</button>
-      <button class="diff-btn sel" id="np-2" onclick="setNumPlayers(2)">2</button>
-      <button class="diff-btn" id="np-3" onclick="setNumPlayers(3)">3</button>
-      <button class="diff-btn" id="np-4" onclick="setNumPlayers(4)">4</button>
-    </div>
-    <div class="ss-diff-row" id="diff-row">
-      <span style="font-size:8px;color:var(--dim);letter-spacing:1px;align-self:center">AI:</span>
-      <button class="diff-btn sel" id="diff-easy" onclick="setDiff('easy')">EASY</button>
-      <button class="diff-btn" id="diff-med" onclick="setDiff('medium')">MEDIUM</button>
-      <button class="diff-btn" id="diff-hard" onclick="setDiff('hard')">HARD</button>
-    </div>
-    <button class="launch-btn" onclick="openMultiplayerPanel()">LAUNCH &#8594;</button>
-  </div>
   <div id="mp-panel-overlay"
-    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,8,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-    <div id="mp-panel-host" style="width:100%;max-width:520px;"></div>
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,8,0.85);backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;padding:12px;overflow:auto;">
+    <div id="mp-panel-host" style="width:100%;max-width:980px;margin:0 auto;"></div>
   </div>
   <div id="result-overlay">
     <div id="result-title"></div>
@@ -124,7 +104,7 @@
     <div id="result-tally"></div>
     <div class="r-btn-row">
       <button class="r-btn ok" onclick="rematch()">REMATCH</button>
-      <button class="r-btn alt" onclick="showScenarioSelect()">NEW SCENARIO</button>
+      <button class="r-btn alt" onclick="openMultiplayerPanel()">NEW MATCH</button>
     </div>
   </div>
   <div id="preloader">
@@ -139,11 +119,43 @@
   <script src="/js/substrates/avatar_picker.js"></script>
   <script src="/js/substrates/player_profile.js"></script>
   <script src="/js/multiplayer-client.js"></script>
-  <script src="/js/substrates/multiplayer_panel.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260429c"></script>
+  <script src="/js/substrates/game_setup.js?v=20260429a"></script>
   <script src="/lib/three/three.min.js"></script>
   <script src="/lib/three/GLTFLoader.js"></script>
-  <script src="manifold.js"></script>
-  <script src="game.js"></script>
+  <script src="manifold.js?v=20260429c"></script>
+  <script src="game.js?v=20260429c"></script>
+
+  <!-- ── Leave Game button ── -->
+  <style>
+    #btn-leave-game {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(8, 14, 28, 0.75);
+      border: 1.5px solid rgba(255, 80, 80, 0.45);
+      color: rgba(255, 160, 160, 0.85);
+      font-size: 17px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s;
+      line-height: 1;
+    }
+
+    #btn-leave-game:hover {
+      background: rgba(180, 20, 20, 0.55);
+      border-color: #ff5050;
+      color: #fff;
+    }
+  </style>
+  <button id="btn-leave-game" title="Leave Game" aria-label="Leave Game"
+    onclick="if(confirm('Leave this game?')) window.location.href='/';">&times;</button>
 </body>
 
 </html>

@@ -1,9 +1,9 @@
 /**
  * FastTrack Game - Responsive & 3D Immersive Enhancements
- * 
+ *
  * Device-adaptive layout, touch controls, and holodeck depth effects
  * Based on Dimensional Computing principles (φ, Fibonacci, 7-layers)
- * 
+ *
  * @version 2.0.0
  * @author ButterflyFX
  */
@@ -14,21 +14,21 @@
 :root {
     /* Golden Ratio Scale */
     --phi: 1.618033988749895;
-    
+
     /* Responsive spacing */
     --game-spacing: clamp(8px, 2vw, 20px);
     --panel-width: clamp(100px, 20vw, 180px);
     --button-size: clamp(36px, 8vw, 50px);
     --card-width: clamp(50px, 12vw, 80px);
     --card-height: clamp(70px, 16vw, 112px);
-    
+
     /* UI panel dimensions */
     --ui-panel-width: clamp(120px, 18vw, 180px);
     --info-panel-width: clamp(150px, 25vw, 250px);
-    
+
     /* Touch target sizes */
     --touch-target-min: 44px;
-    
+
     /* Z-index layers */
     --z-board: 1;
     --z-pegs: 10;
@@ -38,13 +38,13 @@
     --z-modals: 5000;
     --z-overlays: 8000;
     --z-loading: 10000;
-    
+
     /* Animation timings (Fibonacci) */
     --timing-fast: 89ms;
     --timing-normal: 144ms;
     --timing-smooth: 233ms;
     --timing-slow: 377ms;
-    
+
     /* Depth layers for parallax */
     --depth-bg: 0.1;
     --depth-board: 0.5;
@@ -61,7 +61,8 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html,
+body {
     overflow: hidden;
     touch-action: manipulation;
     -webkit-overflow-scrolling: touch;
@@ -71,7 +72,8 @@ html, body {
 
 body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #0a0604;   /* Billiard room dark */
+    background: #0a0604;
+    /* Billiard room dark */
     display: flex;
     flex-direction: column;
     height: 100dvh;
@@ -110,7 +112,10 @@ body {
     overflow-x: auto;
     scrollbar-width: none;
 }
-#game-top-bar .gtb-player-dots::-webkit-scrollbar { display: none; }
+
+#game-top-bar .gtb-player-dots::-webkit-scrollbar {
+    display: none;
+}
 
 /* Compact dot for each player in the top bar */
 .gtb-dot {
@@ -127,46 +132,52 @@ body {
     position: relative;
     transition: transform 0.2s, box-shadow 0.2s;
 }
+
 .gtb-dot.current {
     border-color: #d4af37;
     box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
     transform: scale(1.15);
 }
+
 .gtb-dot .gtb-peg-badge {
     position: absolute;
     bottom: -3px;
     right: -3px;
-    min-width: 14px;
-    height: 14px;
-    border-radius: 7px;
-    background: rgba(0,0,0,0.85);
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.85);
     color: #fff;
-    font-size: 8px;
+    font-size: 10px;
     font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 2px;
-    border: 1px solid rgba(255,255,255,0.3);
+    padding: 0 3px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
+
 .gtb-dot .gtb-tooltip {
     position: absolute;
     top: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(8,5,2,0.96);
-    border: 1px solid rgba(212,175,55,0.4);
+    background: rgba(8, 5, 2, 0.96);
+    border: 1px solid rgba(212, 175, 55, 0.4);
     border-radius: 8px;
-    padding: 5px 10px;
+    padding: 6px 12px;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: clamp(13px, 3.2vw, 15px);
     color: #f0e8d8;
     pointer-events: none;
     opacity: 0;
     z-index: 10010;
     transition: opacity 0.15s;
 }
-.gtb-dot:hover .gtb-tooltip { opacity: 1; }
+
+.gtb-dot:hover .gtb-tooltip {
+    opacity: 1;
+}
 
 /* Deck + drawn card section in the top bar */
 #gtb-deck-section {
@@ -175,6 +186,7 @@ body {
     gap: 8px;
     flex-shrink: 0;
 }
+
 #gtb-deck-btn {
     width: 38px;
     height: 52px;
@@ -192,23 +204,37 @@ body {
     flex-shrink: 0;
     position: relative;
 }
+
 #gtb-deck-btn::after {
     content: '';
     position: absolute;
-    top: -2px; left: -2px; right: 2px; bottom: 2px;
+    top: -2px;
+    left: -2px;
+    right: 2px;
+    bottom: 2px;
     background: linear-gradient(135deg, #3498db, #2471a3);
     border-radius: 5px;
-    border: 1px solid rgba(255,255,255,0.25);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     z-index: -1;
 }
+
 #gtb-deck-btn.draw-ready {
     animation: deckPulseTop 1.2s ease-in-out infinite;
     box-shadow: 0 0 18px rgba(255, 215, 0, 0.6);
 }
+
 @keyframes deckPulseTop {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.06);
+    }
 }
+
 #gtb-drawn-card {
     width: 38px;
     height: 52px;
@@ -223,18 +249,23 @@ body {
     color: #c0392b;
     flex-shrink: 0;
 }
+
 #gtb-drawn-card.empty {
-    background: rgba(255,255,255,0.07);
-    border: 2px dashed rgba(255,255,255,0.25);
-    color: rgba(255,255,255,0.25);
+    background: rgba(255, 255, 255, 0.07);
+    border: 2px dashed rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.25);
     font-size: 12px;
 }
-#gtb-drawn-card.black { color: #2c3e50; }
+
+#gtb-drawn-card.black {
+    color: #2c3e50;
+}
 
 /* The 3D canvas container */
 #container {
     flex: 1;
-    min-height: 0;           /* Crucial: allow flex child to shrink below content size */
+    min-height: 0;
+    /* Crucial: allow flex child to shrink below content size */
     width: 100%;
     position: relative;
     z-index: var(--z-board);
@@ -243,7 +274,8 @@ body {
 /* Bottom action bar — shows move buttons */
 #game-action-bar {
     flex-shrink: 0;
-    display: none;           /* Hidden until there are move choices to show */
+    display: none;
+    /* Hidden until there are move choices to show */
     flex-direction: column;
     gap: 0;
     background: rgba(8, 5, 2, 0.95);
@@ -257,9 +289,11 @@ body {
     overflow-y: auto;
     scrollbar-width: thin;
 }
+
 #game-action-bar.visible {
     display: flex;
 }
+
 #gab-title {
     color: rgba(240, 232, 216, 0.7);
     font-size: 11px;
@@ -268,12 +302,14 @@ body {
     margin-bottom: 6px;
     text-align: center;
 }
+
 #gab-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     justify-content: center;
 }
+
 .gab-btn {
     padding: 9px 14px;
     border-radius: 8px;
@@ -290,29 +326,45 @@ body {
     gap: 7px;
     min-height: 44px;
 }
-.gab-btn:hover, .gab-btn:focus {
+
+.gab-btn:hover,
+.gab-btn:focus {
     border-color: #d4af37;
     background: rgba(212, 175, 55, 0.15);
     transform: translateY(-1px);
 }
-.gab-btn:active { transform: translateY(0); }
+
+.gab-btn:active {
+    transform: translateY(0);
+}
+
 .gab-btn.recommended {
     border-color: #4ade80;
-    box-shadow: 0 0 8px rgba(74,222,128,0.3);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
 }
-.gab-btn .gab-icon { font-size: 16px; flex-shrink: 0; }
-.gab-btn .gab-label { flex: 1; line-height: 1.3; }
+
+.gab-btn .gab-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.gab-btn .gab-label {
+    flex: 1;
+    line-height: 1.3;
+}
+
 .gab-btn .gab-badge {
     font-size: 9px;
     padding: 2px 5px;
     border-radius: 4px;
-    background: rgba(212,175,55,0.3);
+    background: rgba(212, 175, 55, 0.3);
     color: #d4af37;
     white-space: nowrap;
     flex-shrink: 0;
 }
+
 .gab-btn.recommended .gab-badge {
-    background: rgba(74,222,128,0.3);
+    background: rgba(74, 222, 128, 0.3);
     color: #4ade80;
 }
 
@@ -322,14 +374,18 @@ body {
     background: rgba(40, 20, 5, 0.85);
     opacity: 0.85;
 }
-.gab-btn.ft-loss-move:hover, .gab-btn.ft-loss-move:focus {
+
+.gab-btn.ft-loss-move:hover,
+.gab-btn.ft-loss-move:focus {
     border-color: #ffa000;
     background: rgba(255, 160, 0, 0.12);
 }
+
 .gab-badge.ft-loss-badge {
     background: rgba(255, 160, 0, 0.3);
     color: #ffa000;
 }
+
 /* Divider between FT-preserving and FT-losing moves */
 .gab-ft-divider {
     text-align: center;
@@ -347,26 +403,33 @@ body {
     gap: 8px;
     padding: 0 4px;
 }
-#gab-split-container.visible { display: flex; }
+
+#gab-split-container.visible {
+    display: flex;
+}
+
 .gab-split-header {
     color: #d4af37;
     font-size: 12px;
     font-weight: 600;
     text-align: center;
 }
+
 .gab-split-step {
-    background: rgba(212,175,55,0.08);
-    border: 1px solid rgba(212,175,55,0.25);
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.25);
     border-radius: 8px;
     padding: 8px 10px;
 }
+
 .gab-split-step-title {
-    color: rgba(240,232,216,0.6);
+    color: rgba(240, 232, 216, 0.6);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.8px;
     margin-bottom: 5px;
 }
+
 .gab-split-step-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -402,7 +465,8 @@ body {
 
 @media (max-width: 768px) {
     #info {
-        display: none; /* Hide on mobile - free up space */
+        display: none;
+        /* Hide on mobile - free up space */
     }
 }
 
@@ -424,7 +488,7 @@ body {
         gap: 15px !important;
         flex-wrap: wrap !important;
     }
-    
+
     .player-panel {
         padding: 12px 18px !important;
         min-width: 140px;
@@ -439,7 +503,7 @@ body {
         gap: 10px !important;
         flex-wrap: wrap !important;
     }
-    
+
     .player-panel {
         padding: 8px 14px !important;
         min-width: 110px;
@@ -460,13 +524,13 @@ body {
         -ms-overflow-style: none !important;
         top: 60px !important;
         padding: 6px 8px !important;
-        background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%) !important;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 100%) !important;
     }
-    
+
     #player-panels::-webkit-scrollbar {
         display: none;
     }
-    
+
     .player-panel {
         padding: 5px 8px !important;
         min-width: 70px !important;
@@ -474,11 +538,11 @@ body {
         flex: 0 0 auto !important;
         font-size: 10px !important;
         border-radius: 8px !important;
-        background: rgba(0,0,0,0.6) !important;
+        background: rgba(0, 0, 0, 0.6) !important;
         backdrop-filter: blur(8px) !important;
         -webkit-backdrop-filter: blur(8px) !important;
     }
-    
+
     .player-panel .player-name {
         font-size: 10px !important;
         white-space: nowrap !important;
@@ -486,23 +550,23 @@ body {
         text-overflow: ellipsis !important;
         max-width: 70px !important;
     }
-    
+
     .player-panel .peg-indicator {
         width: 14px !important;
         height: 14px !important;
     }
-    
+
     .player-panel .peg-count,
     .player-panel .safe-count {
         font-size: 9px !important;
     }
-    
+
     /* Smaller AI badge on mobile */
     .ai-badge {
         font-size: 7px !important;
         padding: 1px 3px !important;
     }
-    
+
     /* Current turn panel stands out */
     .player-panel.current-turn {
         transform: scale(1.08) !important;
@@ -520,8 +584,15 @@ body {
 }
 
 @keyframes turnPulse {
-    0%, 100% { box-shadow: 0 0 20px 5px rgba(74, 222, 128, 0.4); }
-    50% { box-shadow: 0 0 30px 8px rgba(74, 222, 128, 0.7); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px 5px rgba(74, 222, 128, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 30px 8px rgba(74, 222, 128, 0.7);
+    }
 }
 
 /* ============================================
@@ -549,16 +620,18 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
+
     .game-card:hover,
     .card-container .card:hover {
         transform: translateY(-10px) rotateX(5deg) scale(1.1);
-        box-shadow: 
+        box-shadow:
             0 15px 30px rgba(0, 0, 0, 0.5),
             0 0 30px rgba(136, 85, 255, 0.4);
     }
 }
 
 @media (hover: none) {
+
     .game-card:active,
     .card-container .card:active {
         transform: scale(0.95);
@@ -658,16 +731,23 @@ body {
 
 @media (max-width: 768px) {
     #pause-btn {
-        bottom: 140px; /* Above rules button */
+        bottom: 140px;
+        /* Above rules button */
     }
+
     #rules-toggle-btn {
-        bottom: 80px; /* Above mobile UI dock */
+        bottom: 80px;
+        /* Above mobile UI dock */
     }
+
     #camera-toggle-btn {
-        bottom: 200px; /* Above pause button */
+        bottom: 200px;
+        /* Above pause button */
     }
+
     #exit-game-btn {
-        bottom: 260px; /* Above camera button */
+        bottom: 260px;
+        /* Above camera button */
     }
 }
 
@@ -737,12 +817,10 @@ body {
     width: 80%;
     height: 80%;
     transform: translate(-50%, -50%);
-    background: radial-gradient(
-        ellipse at center,
-        rgba(136, 85, 255, 0.15) 0%,
-        rgba(64, 255, 255, 0.05) 40%,
-        transparent 70%
-    );
+    background: radial-gradient(ellipse at center,
+            rgba(136, 85, 255, 0.15) 0%,
+            rgba(64, 255, 255, 0.05) 40%,
+            transparent 70%);
     pointer-events: none;
     z-index: -1;
 }
@@ -754,17 +832,17 @@ body {
     #player-panels {
         padding: 5px 10px !important;
     }
-    
+
     .player-panel {
         padding: 4px 8px !important;
         min-width: 70px !important;
     }
-    
+
     #card-container,
     .card-container {
         bottom: 60px !important;
     }
-    
+
     .card-container .card,
     .game-card {
         width: 40px;
@@ -776,11 +854,13 @@ body {
 /* ============================================
    HIGH DPI (Retina) ENHANCEMENTS
    ============================================ */
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+
     /* Sharper borders and shadows */
     .player-panel,
     .game-card {
-        box-shadow: 
+        box-shadow:
             0 0 0 0.5px rgba(255, 255, 255, 0.1),
             0 4px 20px rgba(0, 0, 0, 0.4);
     }
@@ -790,6 +870,7 @@ body {
    DARK MODE (System Preference)
    ============================================ */
 @media (prefers-color-scheme: dark) {
+
     /* Already dark, but enhance contrast */
     #info,
     .player-panel {
@@ -801,6 +882,7 @@ body {
    REDUCED MOTION
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -808,7 +890,7 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    
+
     .player-panel.current-turn {
         animation: none;
     }
@@ -827,13 +909,13 @@ body {
     align-items: center;
     gap: 12px;
     padding: 12px 20px 12px 16px;
-    background: linear-gradient(135deg, rgba(10,8,4,0.97) 0%, rgba(20,14,8,0.97) 100%);
-    border: 1.5px solid rgba(212,175,55,0.6);
+    background: linear-gradient(135deg, rgba(10, 8, 4, 0.97) 0%, rgba(20, 14, 8, 0.97) 100%);
+    border: 1.5px solid rgba(212, 175, 55, 0.6);
     border-radius: 12px;
     box-shadow:
-        0 4px 24px rgba(0,0,0,0.7),
-        0 0 0 1px rgba(212,175,55,0.15),
-        inset 0 1px 0 rgba(212,175,55,0.12);
+        0 4px 24px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(212, 175, 55, 0.15),
+        inset 0 1px 0 rgba(212, 175, 55, 0.12);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     pointer-events: auto;
@@ -841,36 +923,42 @@ body {
     transition: opacity 0.25s ease, transform 0.25s ease;
     white-space: nowrap;
 }
+
 #your-turn-popup.visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
+
 #your-turn-popup.fading {
     opacity: 0;
     transform: translateX(-50%) translateY(-8px);
     pointer-events: none;
 }
+
 .ytp-swatch {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     flex-shrink: 0;
     box-shadow: 0 0 8px currentColor;
 }
+
 .ytp-text {
     display: flex;
     flex-direction: column;
     gap: 1px;
 }
+
 .ytp-label {
     font-family: 'Segoe UI', system-ui, sans-serif;
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    color: rgba(212,175,55,0.8);
+    color: rgba(212, 175, 55, 0.8);
 }
+
 .ytp-name {
     font-family: 'Segoe UI', system-ui, sans-serif;
     font-size: 16px;
@@ -878,10 +966,11 @@ body {
     color: #f0e8d8;
     line-height: 1.2;
 }
+
 .ytp-dismiss {
     background: none;
     border: none;
-    color: rgba(240,232,216,0.45);
+    color: rgba(240, 232, 216, 0.45);
     font-size: 14px;
     cursor: pointer;
     padding: 2px 4px;
@@ -890,15 +979,17 @@ body {
     flex-shrink: 0;
     margin-left: 4px;
 }
+
 .ytp-dismiss:hover {
     color: #f0e8d8;
-    background: rgba(212,175,55,0.15);
+    background: rgba(212, 175, 55, 0.15);
 }
 
 /* ============================================
    PRINT STYLES
    ============================================ */
 @media print {
+
     #container,
     #info,
     #player-panels,

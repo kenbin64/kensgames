@@ -834,6 +834,37 @@
       if (state === 'menu' || state === 'gameover') startGame();
     });
   </script>
+
+  <!-- ── Leave Game button ── -->
+  <style>
+    #btn-leave-game {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(8, 14, 28, 0.75);
+      border: 1.5px solid rgba(255, 80, 80, 0.45);
+      color: rgba(255, 160, 160, 0.85);
+      font-size: 17px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s;
+      line-height: 1;
+    }
+
+    #btn-leave-game:hover {
+      background: rgba(180, 20, 20, 0.55);
+      border-color: #ff5050;
+      color: #fff;
+    }
+  </style>
+  <button id="btn-leave-game" title="Leave Game" aria-label="Leave Game"
+    onclick="if(confirm('Leave this game?')) window.location.href='/';">&times;</button>
 </body>
 
 </html>

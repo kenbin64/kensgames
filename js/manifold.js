@@ -1033,6 +1033,102 @@ const Manifold = (() => {
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
+  // X-DIMENSIONAL 7-LEVEL SCHEMA
+  // Universal object model across games:
+  //   x = embedded object graph (has-a / is-a)
+  //   y = modifiers/rules that transform higher-dimensional x nodes
+  //   z = resolved outputs from x·y rule application
+  // Levels are fixed and shared by every game.
+  // ══════════════════════════════════════════════════════════════════════════
+  const DIM7_LEVELS = Object.freeze([
+    'void',
+    'point',
+    'line',
+    'column',
+    'plane',
+    'volume',
+    'whole(point)',
+  ]);
+
+  const DIM7_INDEX = Object.freeze(
+    DIM7_LEVELS.reduce((acc, lvl, i) => {
+      acc[lvl] = i;
+      return acc;
+    }, {})
+  );
+
+  function _dim7LevelName(level) {
+    if (typeof level === 'string' && DIM7_INDEX[level] !== undefined) return level;
+    const idx = Math.max(0, Math.min(6, Number(level) || 0));
+    return DIM7_LEVELS[idx];
+  }
+
+  function _dim7LevelIndex(level) {
+    if (typeof level === 'number') return Math.max(0, Math.min(6, level));
+    return DIM7_INDEX[_dim7LevelName(level)];
+  }
+
+  function dim7Node(spec = {}) {
+    const levelName = _dim7LevelName(spec.level || 'point');
+    const levelIndex = _dim7LevelIndex(levelName);
+    return {
+      id: spec.id || `x-${Math.random().toString(36).slice(2, 10)}`,
+      isA: spec.isA || 'object',
+      hasA: spec.hasA && typeof spec.hasA === 'object' ? spec.hasA : {},
+      dim: {
+        level: levelName,
+        index: levelIndex,
+      },
+      attrs: spec.attrs && typeof spec.attrs === 'object' ? spec.attrs : {},
+      y: Array.isArray(spec.y) ? spec.y.slice() : [],
+      z: Array.isArray(spec.z) ? spec.z.slice() : [],
+    };
+  }
+
+  function dim7AttachY(sourceX, yRule) {
+    if (!sourceX || typeof sourceX !== 'object') return sourceX;
+    if (!Array.isArray(sourceX.y)) sourceX.y = [];
+    sourceX.y.push(Object.assign({
+      type: 'modifier',
+      code: 'y->x',
+      targetId: null,
+      manifold: null,
+      rule: null,
+      createdAt: Date.now(),
+    }, yRule || {}));
+    return sourceX;
+  }
+
+  function dim7ResolveZ(sourceX, resolver) {
+    if (!sourceX || typeof sourceX !== 'object') return [];
+    const ys = Array.isArray(sourceX.y) ? sourceX.y : [];
+    const out = ys.map((yRule, i) => {
+      if (typeof resolver === 'function') {
+        return resolver(sourceX, yRule, i);
+      }
+      return {
+        index: i,
+        fromX: sourceX.id,
+        toX: yRule && yRule.targetId ? yRule.targetId : null,
+        rule: yRule && yRule.rule ? yRule.rule : null,
+        manifold: yRule && yRule.manifold ? yRule.manifold : null,
+        value: yRule && yRule.value !== undefined ? yRule.value : null,
+      };
+    });
+    sourceX.z = out;
+    return out;
+  }
+
+  const XDimensional = {
+    levels: DIM7_LEVELS,
+    indexOf: _dim7LevelIndex,
+    levelOf: _dim7LevelName,
+    node: dim7Node,
+    attachY: dim7AttachY,
+    resolveZ: dim7ResolveZ,
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
   // PUBLIC API — same surface. 17.5x less memory.
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -1120,6 +1216,11 @@ const Manifold = (() => {
     // deterministic frame clock. Per docs/proposed_rules.md and
     // starfighter/docs/dimensinal_equation.md.
     dim: Dim,
+
+    // Universal 7-level recursive x-dimensional schema.
+    // x objects are embedded via has-a / is-a; y modifies higher-dimensional x;
+    // z stores resolved x·y outputs.
+    xdim: XDimensional,
 
     // Events
     on,
