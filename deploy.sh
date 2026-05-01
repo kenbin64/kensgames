@@ -8,6 +8,11 @@ echo "========================================"
 
 # Configuration
 REPO_PATH=$(pwd)
+if [ -d "$REPO_PATH/kensgames.com" ]; then
+    SRC_BASE="$REPO_PATH/kensgames.com"
+else
+    SRC_BASE="$REPO_PATH"
+fi
 DEPLOY_PATH="/var/www/kensgames.com"
 BACKUP_PATH="/var/www/backups/kensgames.com.backup"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -65,17 +70,17 @@ mkdir -p "$DEPLOY_PATH/login/google"
 mkdir -p "$DEPLOY_PATH/login/discord"
 
 # Copy portal pages
-cp "$REPO_PATH/kensgames.com/index.html" "$DEPLOY_PATH/"
-cp "$REPO_PATH/kensgames.com/lounge.html" "$DEPLOY_PATH/"
-cp "$REPO_PATH/kensgames.com/discover.html" "$DEPLOY_PATH/"
+cp "$SRC_BASE/index.html" "$DEPLOY_PATH/"
+cp "$SRC_BASE/lounge.html" "$DEPLOY_PATH/"
+cp "$SRC_BASE/discover.html" "$DEPLOY_PATH/"
 
 # Copy substrates
-cp "$REPO_PATH/kensgames.com/js/substrates/"*.js "$DEPLOY_PATH/js/substrates/"
+cp "$SRC_BASE/js/substrates/"*.js "$DEPLOY_PATH/js/substrates/"
 
 # Copy OAuth callbacks
-cp "$REPO_PATH/kensgames.com/login/facebook/callback.html" "$DEPLOY_PATH/login/facebook/"
-cp "$REPO_PATH/kensgames.com/login/google/callback.html" "$DEPLOY_PATH/login/google/"
-cp "$REPO_PATH/kensgames.com/login/discord/callback.html" "$DEPLOY_PATH/login/discord/"
+cp "$SRC_BASE/login/facebook/callback.html" "$DEPLOY_PATH/login/facebook/"
+cp "$SRC_BASE/login/google/callback.html" "$DEPLOY_PATH/login/google/"
+cp "$SRC_BASE/login/discord/callback.html" "$DEPLOY_PATH/login/discord/"
 
 echo -e "${GREEN}✓ Files deployed to $DEPLOY_PATH${NC}"
 
