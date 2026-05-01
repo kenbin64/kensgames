@@ -472,8 +472,8 @@
   <script src="/fasttrack/fasttrack-game.js?v=20260501"></script>
   <script src="/js/substrates/game_manager.js?v=20260501"></script>
   <script src="/js/multiplayer-client.js?v=20260501"></script>
-  <script src="/js/substrates/multiplayer_panel.js?v=20260501f"></script>
-  <script src="/js/substrates/game_setup.js?v=20260501"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260501h"></script>
+  <script src="/js/substrates/game_setup.js?v=20260501h"></script>
   <script>
     let username = localStorage.getItem('username') || localStorage.getItem('display_name') || '';
     const av = AvatarPicker.get();
@@ -497,34 +497,47 @@
       onLaunch: (summary) => {
         // Preferred path: build Player[] and inject into FastTrackGame,
         // then persist canonical runtime + legacy compatibility keys.
+        const isSameScreen = summary && summary.launchMode === 'same-screen';
         const runtime = KGGameSetup.persistFastTrackRuntime(summary, {
-          mode: summary && summary.hasRemoteHumans ? 'private' : 'solo',
+          mode: isSameScreen ? 'same-screen' : (summary && summary.hasRemoteHumans ? 'private' : 'solo'),
         });
 
         if (runtime) {
-          // Launch from the server-authenticated game_started payload only.
-          // The panel already triggered start_game and handed us the canonical roster.
           window.location.href = '/fasttrack/3d.html';
           return;
         }
 
-        // Fallback if manager/classes are unavailable.
+        // Fallback if manager/classes are unavailable — persist full roster manually.
+        const launchMode = summary && summary.launchMode;
         const code = summary && summary.code ? summary.code : null;
-        const hasRemoteHumans = !!(summary && summary.hasRemoteHumans);
+        const players = (summary && summary.players) || [];
+        const me = (summary && summary.me) || players[0] || {};
         const KG_Game = {
           x: 'fasttrack:' + Date.now(),
-          mode: (hasRemoteHumans && code) ? 'private' : 'solo',
-          code: (hasRemoteHumans && code) ? code : null,
+          mode: isSameScreen ? 'same-screen' : ((summary && summary.hasRemoteHumans && code) ? 'private' : 'solo'),
+          code: (summary && summary.hasRemoteHumans && code) ? code : null,
           playerCount: Math.max(2, Number(summary && summary.playerCount || 2)),
           aiDifficulty: 'normal',
         };
         const KG_Player = {
-          x: localStorage.getItem('username') || ('player:' + Date.now()),
-          name: localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player',
-          avatar: (av && av.emoji) || (AvatarPicker.get() && AvatarPicker.get().emoji) || '🎮',
+          x: (me && me.user_id) || localStorage.getItem('username') || ('player:' + Date.now()),
+          name: (me && me.username) || localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player',
+          avatar: (me && (me.avatar_id || me.avatar)) || (AvatarPicker.get() && AvatarPicker.get().emoji) || '🎮',
         };
         localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
         localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
+        // Persist full roster so the game can read all players.
+        if (players.length > 0) {
+          try {
+            sessionStorage.setItem('ft_session_players', JSON.stringify(players.map(p => ({
+              user_id: p.user_id,
+              username: p.username || p.name,
+              avatar: p.avatar_id || p.avatar || '👤',
+              is_ai: !!p.is_ai,
+              is_host: !!p.is_host,
+            }))));
+          } catch (_) {}
+        }
 
         window.location.href = '/fasttrack/3d.html';
       },

@@ -12,7 +12,12 @@
     const aiCount = players.filter((player) => player && player.is_ai).length;
     const remoteHumanCount = players.filter((player) => player && !player.is_ai && player.user_id !== myUserId).length;
     const humanCount = players.length - aiCount;
-    const launchMode = remoteHumanCount > 0 ? 'friend' : (aiCount > 0 ? 'ai' : 'solo');
+    // Respect explicit launchMode on the session (e.g. 'same-screen' for local co-op).
+    // Only fall back to the derived mode when none is provided.
+    const explicitMode = session && session.launchMode;
+    const launchMode = (explicitMode && typeof explicitMode === 'string')
+      ? explicitMode
+      : (remoteHumanCount > 0 ? 'friend' : (aiCount > 0 ? 'ai' : 'solo'));
 
     return {
       session,
@@ -107,16 +112,23 @@
     const onLaunch = opts && opts.onLaunch;
     const panelOpts = Object.assign({}, opts, {
       onLaunch(session) {
-        const summary = summarizeSession(session);
-        persistSession(session);
-        persistSetup(summary);
-        persistGenericRuntime(summary, {
-          gameId: opts && opts.gameId,
-          gameName: opts && opts.gameName,
-          mode: summary.launchMode === 'friend' ? 'private' : (summary.launchMode === 'ai' ? 'multi' : 'solo'),
-        });
-        if (typeof onLaunch === 'function') {
-          return onLaunch(summary);
+        try {
+          const summary = summarizeSession(session);
+          persistSession(session);
+          persistSetup(summary);
+          const modeMap = { friend: 'private', ai: 'multi', 'same-screen': 'same-screen' };
+          persistGenericRuntime(summary, {
+            gameId: opts && opts.gameId,
+            gameName: opts && opts.gameName,
+            mode: modeMap[summary.launchMode] || 'solo',
+          });
+          if (typeof onLaunch === 'function') {
+            return onLaunch(summary);
+          }
+        } catch (e) {
+          console.error('[KGGameSetup] onLaunch threw:', e);
+          // Allow the panel's own navGuard to handle navigation.
+          throw e;
         }
       },
     });

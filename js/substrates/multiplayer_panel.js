@@ -1051,51 +1051,7 @@
     }
   }
 
-  // Guest view: nothing for them to configure. Show who's here, wait for host.
-  function renderWait(session) {
-    const players = session.players || [];
-    const hostName = (players.find(p => p.is_host) || {}).username || 'Host';
-    const code = session.session_code || '----';
-    const link = session.session_code ? urlForCode(session.session_code) : '';
-    const playerList = players.map(p => {
-      const me = p.user_id === _myUserId ? ' (you)' : '';
-      const tag = p.is_host ? ' · host' : (p.is_ai ? ' · bot' : '');
-      return `<div class="player-row${p.user_id === _myUserId ? ' is-me' : ''}${p.is_host ? ' is-host' : ''}${p.is_ai ? ' is-ai' : ''}">
-        <div class="player-avatar">${esc(avatarGlyph(p))}</div>
-        <div class="player-name">${esc(p.username || 'Player')}${esc(tag)}${esc(me)}</div>
-      </div>`;
-    }).join('');
-
-    renderShell(`
-      <div class="invite-panel">
-        <div class="invite-title">Invited Guest Panel</div>
-        <div class="invite-meta">Host: ${esc(hostName)} · Session Code</div>
-        <div class="share-code-big" data-copy="${esc(code)}">${esc(code)}</div>
-        <div class="share-link-row">
-          <div class="share-link" data-copy="${esc(link)}">${esc(link)}</div>
-          <button class="btn-ghost copy-btn" data-copy="${esc(link)}">Copy Link</button>
-        </div>
-      </div>
-      ${playerList}
-      <div class="info-msg"><span class="spinner"></span>Waiting for ${esc(hostName)} to launch…</div>
-      <div class="nav-row">
-        <button class="btn-ghost btn-back" data-act="cancel">← Leave</button>
-      </div>
-    `, { stepTitle: 'You\u2019re In' });
-    _root.querySelectorAll('[data-copy]').forEach(b =>
-      b.addEventListener('click', () => copyToClipboard(b.getAttribute('data-copy'), b)));
-    _root.querySelector('[data-act="cancel"]').addEventListener('click', leaveAndReset);
-  }
-
-  // ── Flow: profile gate → connect → create / join ────────────────────
-  function requireProfileThen(cb) {
-    if (typeof KGPlayerProfile === 'undefined' || !KGPlayerProfile.ensure) {
-      console.warn('[KGMultiplayerPanel] KGPlayerProfile not loaded; proceeding without gate');
-      return cb();
-    }
-    KGPlayerProfile.ensure(true, cb);
-  }
-
+  // ── Flow: profile → connect → create / join ───────────────────────
   function getProfile() {
     const name = (typeof KGPlayerProfile !== 'undefined' && KGPlayerProfile.getName)
       ? KGPlayerProfile.getName() : (localStorage.getItem('display_name') || '');
@@ -1326,8 +1282,29 @@
     };
 
     try { root.KGSession = launchPayload; } catch { /* ignore */ }
-    try { _opts.onLaunch && _opts.onLaunch(launchPayload); }
-    catch (e) { console.error('[KGMultiplayerPanel] launchSameScreen threw:', e); }
+
+    // Watchdog: if onLaunch doesn't navigate within 3s, force it
+    const navGuard = setTimeout(() => {
+      if (_state === STATE.LAUNCHING) {
+        console.warn('[KGMultiplayerPanel] navGuard firing – forcing navigation');
+        window.location.href = _opts.gamePath || '/fasttrack/3d.html';
+      }
+    }, 3000);
+
+    try {
+      _opts.onLaunch && _opts.onLaunch(launchPayload);
+      clearTimeout(navGuard);
+      // onLaunch should navigate; if still here after a tick, force it
+      setTimeout(() => {
+        if (_state === STATE.LAUNCHING) {
+          window.location.href = _opts.gamePath || '/fasttrack/3d.html';
+        }
+      }, 100);
+    } catch (e) {
+      clearTimeout(navGuard);
+      console.error('[KGMultiplayerPanel] launchSameScreen threw:', e);
+      window.location.href = _opts.gamePath || '/fasttrack/3d.html';
+    }
   }
 
   function hostLaunch() {
