@@ -3458,9 +3458,7 @@ const SF3D = (function () {
     ally: [
       { path: 'assets/models/optimized/HumanFriendlStarFighter_lod2.glb', distance: 0 },
     ],
-    'alien-baseship': [
-      { path: 'assets/models/AlienMotherShip.glb', distance: 0 },
-    ],
+    'alien-baseship': [],  // procedural hive ship — built in game.js, no GLB
     predator: [
       { path: 'assets/models/AlienEnemyPreditorDrone.glb', distance: 0 },
     ],
@@ -5092,7 +5090,61 @@ const SF3D = (function () {
       mesh.userData.isBaseship = true;
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(60, 30, 300), m.hull));
     } else if (type === 'alien-baseship') {
-      mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(200, 1), m.alienCap));
+      // Ominous procedural hive carrier — no GLB needed
+      const S = 200; // base unit scale
+      const hullMat = new THREE.MeshStandardMaterial({ color: 0x110a02, emissive: 0xe08800, emissiveIntensity: 0.2, roughness: 0.85, metalness: 0.35 });
+      const cellMat = new THREE.MeshStandardMaterial({ color: 0x2d1803, emissive: 0xe08800, emissiveIntensity: 0.6, roughness: 0.7, metalness: 0.2 });
+      const coreMat = new THREE.MeshStandardMaterial({ color: 0x020602, emissive: 0x44ff22, emissiveIntensity: 1.6, roughness: 0.3, metalness: 0.8 });
+      // Central oblate body
+      const body = new THREE.Mesh(new THREE.SphereGeometry(S, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.72), hullMat);
+      body.scale.set(1.6, 1.0, 1.3);
+      body.frustumCulled = false;
+      mesh.add(body);
+      // Pulsing reactor core (stored for animation)
+      const core = new THREE.Mesh(new THREE.SphereGeometry(S * 0.22, 16, 16), coreMat);
+      core.frustumCulled = false;
+      mesh.add(core);
+      mesh.userData.hiveCore = core;
+      // Hex cell rings
+      function addHexRing(rad, y, count, sc) {
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2;
+          const cx = Math.cos(a) * rad * 1.55, cz = Math.sin(a) * rad * 1.25;
+          const h = new THREE.Mesh(new THREE.CylinderGeometry(sc, sc * 0.85, sc * 0.35, 6, 1), cellMat);
+          h.frustumCulled = false;
+          h.position.set(cx, y, cz);
+          h.lookAt(cx * 2, y, cz * 2); h.rotateX(Math.PI * 0.5);
+          mesh.add(h);
+        }
+      }
+      addHexRing(S * 0.82, S * 0.38, 10, S * 0.26);
+      addHexRing(S * 0.72, S * -0.18, 12, S * 0.22);
+      addHexRing(S * 0.40, S * 0.78, 6, S * 0.20);
+      // Thorax ridges
+      for (let r = 0; r < 5; r++) {
+        const a = (r / 5) * Math.PI * 2;
+        const ridge = new THREE.Mesh(new THREE.TorusGeometry(S * 0.28, S * 0.055, 6, 14, Math.PI * 0.7), hullMat);
+        ridge.frustumCulled = false;
+        ridge.position.set(Math.cos(a) * S * 1.1, S * -0.15, Math.sin(a) * S * 0.85);
+        ridge.rotation.set(Math.PI * 0.5, 0, a);
+        mesh.add(ridge);
+      }
+      // Underbelly spires
+      for (let s = 0; s < 8; s++) {
+        const a = (s / 8) * Math.PI * 2;
+        const spire = new THREE.Mesh(new THREE.ConeGeometry(S * 0.07, S * 0.55, 6, 1), hullMat);
+        spire.frustumCulled = false;
+        spire.position.set(Math.cos(a) * S * 0.65, S * -0.72, Math.sin(a) * S * 0.50);
+        spire.rotation.z = Math.PI;
+        mesh.add(spire);
+      }
+      const cSpire = new THREE.Mesh(new THREE.ConeGeometry(S * 0.10, S * 0.80, 6, 1), hullMat);
+      cSpire.frustumCulled = false; cSpire.position.set(0, S * -0.88, 0); cSpire.rotation.z = Math.PI;
+      mesh.add(cSpire);
+      // Glow light
+      const hiveLight = new THREE.PointLight(0x88ff22, 6, S * 18);
+      mesh.add(hiveLight);
+      mesh.userData.alienGlow = true;
     } else if (type === 'alien-base') {
       // Hive: massive glowing organic structure
       const hiveMat = new THREE.MeshBasicMaterial({ color: 0x880088, transparent: true, opacity: 0.8 });
@@ -5944,6 +5996,14 @@ const SF3D = (function () {
           const pulse = 0.7 + 0.3 * Math.sin(_frameTime * 0.003 + e.id * 1.7);
           glow.intensity = glow.intensity * 0.9 + (pulse * (ALIEN_GLOW_COLORS[e.type] ? ALIEN_GLOW_COLORS[e.type].pointIntensity : 2.5)) * 0.1;
         }
+      }
+
+      // Hive ship procedural core pulse
+      if (mesh.userData && mesh.userData.hiveCore) {
+        const p = 0.8 + 0.6 * Math.abs(Math.sin(_frameTime * 0.0018));
+        mesh.userData.hiveCore.material.emissiveIntensity = p;
+        const s = 1.0 + 0.15 * Math.abs(Math.sin(_frameTime * 0.0018));
+        mesh.userData.hiveCore.scale.setScalar(s);
       }
 
       // Torpedo: emit particle trail + animate engine glow

@@ -860,7 +860,107 @@
         loadGLB('assets/models/HumanSpaceBattleShip.glb', groups.resolute, 2.8);
         loadGLB('assets/models/HumanFriendlStarFighter.glb', groups.fighter, 0.9);
         loadGLBSwarm('assets/models/AlienEnemyFighter.glb', groups.enemies, 0.7, ENEMY_COUNT);
-        loadGLB('assets/models/AlienMotherShip.glb', groups.hive, 5.0);
+        // Procedural hive ship — no GLB needed, derived from geometry seed
+        (function buildHiveShip(group) {
+            const amber = new T.Color(0.9, 0.55, 0.0);
+            const dark = new T.Color(0.06, 0.04, 0.02);
+            const pulse = new T.Color(0.3, 0.8, 0.1);
+
+            const hullMat = new T.MeshStandardMaterial({
+                color: new T.Color(0.08, 0.06, 0.04),
+                emissive: amber, emissiveIntensity: 0.18,
+                roughness: 0.85, metalness: 0.35
+            });
+            const cellMat = new T.MeshStandardMaterial({
+                color: new T.Color(0.18, 0.10, 0.02),
+                emissive: amber, emissiveIntensity: 0.55,
+                roughness: 0.7, metalness: 0.2
+            });
+            const coreMat = new T.MeshStandardMaterial({
+                color: dark, emissive: pulse, emissiveIntensity: 1.4,
+                roughness: 0.3, metalness: 0.8
+            });
+
+            // Central body — oblate sphere
+            const body = new T.Mesh(new T.SphereGeometry(1.0, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.72), hullMat);
+            body.scale.set(1.6, 1.0, 1.3);
+            body.frustumCulled = false;
+            group.add(body);
+
+            // Pulsing reactor core
+            const core = new T.Mesh(new T.SphereGeometry(0.22, 16, 16), coreMat);
+            core.frustumCulled = false;
+            group.add(core);
+            group.userData.core = core;   // referenced in animation
+
+            // Hexagonal cell patches on the surface (two rings + top cap)
+            const HEX = 6;
+            function addHexRing(radius, y, count, scale) {
+                for (let i = 0; i < count; i++) {
+                    const angle = (i / count) * Math.PI * 2;
+                    const cx = Math.cos(angle) * radius * 1.55;
+                    const cz = Math.sin(angle) * radius * 1.25;
+                    const hex = new T.Mesh(
+                        new T.CylinderGeometry(scale, scale * 0.85, scale * 0.35, HEX, 1),
+                        cellMat
+                    );
+                    hex.frustumCulled = false;
+                    hex.position.set(cx, y, cz);
+                    // Face outward from hull centre
+                    hex.lookAt(cx * 2, y, cz * 2);
+                    hex.rotateX(Math.PI * 0.5);
+                    group.add(hex);
+                }
+            }
+            addHexRing(0.82, 0.38, 10, 0.26);
+            addHexRing(0.72, -0.18, 12, 0.22);
+            addHexRing(0.40, 0.78, 6, 0.20);
+
+            // Thick thorax ridges
+            for (let r = 0; r < 5; r++) {
+                const angle = (r / 5) * Math.PI * 2;
+                const ridge = new T.Mesh(
+                    new T.TorusGeometry(0.28, 0.055, 6, 14, Math.PI * 0.7),
+                    hullMat
+                );
+                ridge.frustumCulled = false;
+                ridge.position.set(Math.cos(angle) * 1.1, -0.15, Math.sin(angle) * 0.85);
+                ridge.rotation.set(Math.PI * 0.5, 0, angle);
+                group.add(ridge);
+            }
+
+            // Underbelly stalactite spires
+            const spireGeo = new T.ConeGeometry(0.07, 0.55, 6, 1);
+            for (let s = 0; s < 8; s++) {
+                const a = (s / 8) * Math.PI * 2;
+                const spire = new T.Mesh(spireGeo, hullMat);
+                spire.frustumCulled = false;
+                spire.position.set(Math.cos(a) * 0.65, -0.72, Math.sin(a) * 0.50);
+                spire.rotation.z = Math.PI;
+                group.add(spire);
+            }
+            // Centre spire
+            const cSpire = new T.Mesh(new T.ConeGeometry(0.10, 0.80, 6, 1), hullMat);
+            cSpire.frustumCulled = false;
+            cSpire.position.set(0, -0.88, 0);
+            cSpire.rotation.z = Math.PI;
+            group.add(cSpire);
+
+            // Outer sensor antenna ring
+            const antGeo = new T.CylinderGeometry(0.012, 0.012, 0.55, 4);
+            for (let a = 0; a < 6; a++) {
+                const ang = (a / 6) * Math.PI * 2;
+                const ant = new T.Mesh(antGeo, coreMat);
+                ant.frustumCulled = false;
+                ant.position.set(Math.cos(ang) * 1.62, 0.18, Math.sin(ang) * 1.24);
+                ant.rotation.set(Math.cos(ang) * 0.3, 0, -Math.sin(ang) * 0.3);
+                group.add(ant);
+            }
+
+            // Scale to match target size of ~5.0 units
+            group.scale.setScalar(1.0);
+            group.userData.loaded = true;
+        })(groups.hive);
         loadGLB('assets/models/HiveQueen_BossW10.glb', groups.queen, 2.9);
         loadGLB(encodeURI('assets/models/zorgonWarrior'), groups.warrior, 2.0);
 
@@ -928,6 +1028,13 @@
                 groups.hive.visible = true;
                 groups.hive.position.set(0, -0.2, 0);
                 groups.hive.rotation.set(0.05, age * 0.06, 0);
+                // Pulse reactor core brightness
+                if (groups.hive.userData.core) {
+                    const p = 0.8 + 0.6 * Math.abs(Math.sin(age * 1.8));
+                    groups.hive.userData.core.material.emissiveIntensity = p;
+                    const s = 1.0 + 0.15 * Math.abs(Math.sin(age * 1.8));
+                    groups.hive.userData.core.scale.setScalar(s);
+                }
                 if (groups.warrior.userData.loaded) {
                     groups.warrior.visible = true;
                     groups.warrior.position.set(-1.8, -0.9, 1.5);
@@ -953,6 +1060,12 @@
                     groups.hive.visible = true;
                     groups.hive.position.set(0.4, y, -1.2);
                     groups.hive.rotation.set(0.02, 0.4 + age * 0.02, 0);
+                    if (groups.hive.userData.core) {
+                        const p = 0.8 + 0.6 * Math.abs(Math.sin(age * 1.8));
+                        groups.hive.userData.core.material.emissiveIntensity = p;
+                        const s = 1.0 + 0.15 * Math.abs(Math.sin(age * 1.8));
+                        groups.hive.userData.core.scale.setScalar(s);
+                    }
                 }
                 if (groups.queen.userData.loaded) {
                     groups.queen.visible = true;
