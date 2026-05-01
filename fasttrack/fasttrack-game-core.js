@@ -400,6 +400,7 @@ function initGame(playerCount = 2, config = {}) {
   state.meta.set('winner', null);
   state.meta.set('seed', Math.floor(Math.random() * 0xFFFFFFFF));
   state.meta.set('myUserId', config.myUserId || null);
+  state.meta.set('gameMode', config.launchMode || 'solo');  // 'solo', 'private', 'same-screen'
 
   // Players — each gets 5 pegs: 4 in holding, 1 on home hole
   const players = [];
@@ -905,8 +906,11 @@ function calculateValidMoves() {
       }
     }
 
-    // ENTER BULLSEYE from FastTrack — always available while on FT (not just 1-move cards)
-    if (peg.onFasttrack && peg.holeId !== 'bullseye') {
+    // ENTER BULLSEYE from FastTrack — ONLY on a 1-move card (A, J, Q, K, JOKER)
+    // and ONLY when the peg is currently sitting on an ft-* hole.
+    // Traversing the fast track does NOT grant a free jump to bullseye; the peg
+    // must stop on an ft-* hole and then draw a 1-move card.
+    if (peg.onFasttrack && peg.holeId.startsWith('ft-') && rules.movement === 1) {
       const occ = state.board.get('bullseye');
       if (!occ || occ.playerIdx !== ci) {
         moves.push({ type: 'enterBullseye', pegIdx: pi, dest: 'bullseye', from: peg.holeId, path: ['bullseye'] });
@@ -951,7 +955,16 @@ function calculateValidMoves() {
       // Conditions: n >= 2, seq[n-2] is an FT hole, no own pegs blocking path
       // (penult must be free; FT-ring relax allows passing through own pegs on
       // earlier `ft-*` intermediates).
-      const _bullPath = (seq, n) => {
+      // _bullPath(seq, n, fromHole) — returns path to bullseye using n steps, or null.
+      // Two legal scenarios:
+      //   A) n=1 and the peg is already sitting on an ft-* hole (1-step direct jump).
+      //   B) n>=2 and the penultimate step (seq[n-2]) is an ft-* hole (clockwise arrival).
+      const _bullPath = (seq, n, fromHole) => {
+        if (n === 1) {
+          // Scenario A: direct 1-step jump from ft-* hole to bullseye
+          if (!fromHole || !fromHole.startsWith('ft-')) return null;
+          return ['bullseye'];
+        }
         if (n < 2 || seq.length < n) return null;
         const penult = seq[n - 2];
         if (!penult || !penult.startsWith('ft-')) return null;
@@ -1023,8 +1036,8 @@ function calculateValidMoves() {
 
             const aReachable = _rimReachable(seq1, a);
             const bReachable = _rimReachable(seq2, b);
-            const path1Bull = _bullPath(seq1, a);
-            const path2Bull = _bullPath(seq2, b);
+            const path1Bull = _bullPath(seq1, a, peg1.holeId);
+            const path2Bull = _bullPath(seq2, b, peg2.holeId);
             const bullOK = _bullFree();
 
             // VARIANT 1: STANDARD (rim/FT both halves)
@@ -1825,10 +1838,22 @@ function endTurn() {
   };
 
   const startBlink = () => {
-    // Show "Your turn" popup for human players
-    if (!players[next].isBot) {
-      showYourTurnPopup(players[next].name, players[next].color);
+    const gameMode = state.meta.get('gameMode') || 'solo';
+    const isSameScreen = gameMode === 'same-screen';
+
+    // Show turn indicator for:
+    // - All players in same-screen mode (so everyone knows whose turn it is)
+    // - Only non-bot players in other modes
+    const shouldShowIndicator = isSameScreen || !players[next].isBot;
+
+    if (shouldShowIndicator) {
+      const indicatorText = isSameScreen ? `${players[next].name}'s Turn` : players[next].name;
+      showYourTurnPopup(indicatorText, players[next].color);
+
+      // Auto-dismiss after 1.5-2 seconds
+      setTimeout(dismissYourTurnPopup, 1500);
     }
+
     if (window.blinkPlayerMarker) {
       window.blinkPlayerMarker(next, enableTurn);
     } else {

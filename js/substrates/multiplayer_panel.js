@@ -281,12 +281,45 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  const AVATAR_GLYPH_BY_ID = {
+    person_smile: '😊',
+    person_cool: '😎',
+    person_star: '🤩',
+    person_devil: '😈',
+    person_ninja: '🥷',
+    scifi_robot: '🤖',
+    robot: '🤖',
+    invader: '👾',
+    animal_fox: '🦊',
+    animal_tiger: '🐯',
+    hero: '🦸',
+    crown: '👑',
+    space_rocket: '🚀',
+    alien: '👽',
+    person_generic: '👤',
+  };
+
+  function isLikelyEmoji(text) {
+    if (!text) return false;
+    // Basic emoji-range check; avoids rendering leaked raw words like "cool".
+    return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(String(text));
+  }
+
   function avatarGlyph(p) {
     if (p.is_ai) return '🤖';
     if (!p.avatar_id) return '👤';
-    // Newer clients send the emoji glyph directly. Older may send "cat_emoji".
-    const i = p.avatar_id.indexOf('_');
-    return i >= 0 ? p.avatar_id.slice(i + 1) : p.avatar_id;
+    const raw = String(p.avatar_id || '').trim();
+    if (!raw) return '👤';
+    if (isLikelyEmoji(raw)) return raw;
+    if (AVATAR_GLYPH_BY_ID[raw]) return AVATAR_GLYPH_BY_ID[raw];
+    // Back-compat: some old payloads encode as "category_emoji".
+    const i = raw.indexOf('_');
+    if (i >= 0) {
+      const tail = raw.slice(i + 1);
+      if (isLikelyEmoji(tail)) return tail;
+      if (AVATAR_GLYPH_BY_ID[tail]) return AVATAR_GLYPH_BY_ID[tail];
+    }
+    return '👤';
   }
 
   function urlForCode(code) {
@@ -399,15 +432,31 @@
           <span class="mode-label">Play a Friend</span>
           <div class="mode-sub">Share a code or link</div>
         </button>
+        <button class="mode-btn" data-act="same-screen">
+          <span class="mode-icon">🎮</span>
+          <span class="mode-label">Multiplayer Same Screen</span>
+          <div class="mode-sub">Local co-op on one device</div>
+        </button>
       </div>
-      <div class="info-msg">A name + avatar is required before playing.</div>
     `, { stepTitle: 'Choose how to play' });
     _root.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => {
       const act = b.getAttribute('data-act');
       _mode = act;
       _step = (act === 'friend') ? STEP.SHARE : STEP.ROSTER;
-      saveProfileDraft();
-      connectAndCreate(act === 'friend');
+      // Collect name/avatar now if not yet set — deferred until user actually plays
+      if (!_profileNameDraft) {
+        renderNameStep({ guest: false });
+      } else if (!_profileAvatarDraft) {
+        renderAvatarStep({ guest: false });
+      } else {
+        saveProfileDraft();
+        // Same-screen mode: build roster locally without server
+        if (act === 'same-screen') {
+          buildLocalLobby();
+        } else {
+          connectAndCreate(act === 'friend');
+        }
+      }
     }));
   }
 
@@ -422,11 +471,11 @@
       <input class="name-field" id="kg-name-step" type="text" maxlength="18"
         placeholder="Your name..." value="${esc(_profileNameDraft || '')}" autocomplete="off" spellcheck="false">
       <div class="nav-row">
-        ${isGuest ? '<button class="btn-ghost btn-back" data-act="cancel">← Cancel</button>' : ''}
+        ${isGuest ? '<button class="btn-ghost btn-back" data-act="cancel">← Cancel</button>' : '<button class="btn-ghost btn-back" data-act="back">← Back</button>'}
         <button class="btn-cyan btn-next" id="kg-name-next" disabled>Next →</button>
       </div>
       <div class="info-msg">${isGuest ? `Invite code: ${esc(code || '...')}` : 'Step 1 of 3'}</div>
-    `, { stepTitle: isGuest ? 'Invited Guest Wizard · Name' : 'Setup · Player Name' });
+    `, { stepTitle: isGuest ? 'Invited Player Wizard · Name' : 'Setup · Player Name' });
 
     const nameEl = _root.querySelector('#kg-name-step');
     const nextBtn = _root.querySelector('#kg-name-next');
@@ -439,11 +488,14 @@
     nextBtn.addEventListener('click', () => renderAvatarStep(opts));
     const cancel = _root.querySelector('[data-act="cancel"]');
     if (cancel) cancel.addEventListener('click', leaveAndReset);
+    const back = _root.querySelector('[data-act="back"]');
+    if (back) back.addEventListener('click', () => renderModeChoice());
   }
 
   function renderAvatarStep(opts) {
     const isGuest = !!(opts && opts.guest);
-    const QUICK_AVS = ['😊', '😎', '🤩', '😈', '🤖', '👾', '🚀', '👽', '🦊', '🐯', '🥷', '🦸', '👑', '🎮', '🎯'];
+    // People with diverse skin tones first, then popular non-human picks
+    const QUICK_AVS = ['🧑🏻', '🧑🏼', '🧑🏽', '🧑🏾', '🧑🏿', '👩🏾', '👨🏼', '👩🏿', '👨🏾', '😊', '😎', '🤩', '😈', '🥷', '🤖', '👾', '🦊', '🐯', '🦸', '👑'];
     const buttons = QUICK_AVS.map(e =>
       `<button class="av-btn${_profileAvatarDraft === e ? ' selected' : ''}" data-av="${e}">${e}</button>`).join('');
     renderShell(`
@@ -458,7 +510,7 @@
         <button class="btn-cyan btn-next" id="kg-av-next" ${_profileAvatarDraft ? '' : 'disabled'}>Next →</button>
       </div>
       <div class="info-msg">${isGuest ? 'Step 2 of 3' : 'Step 2 of 3'}</div>
-    `, { stepTitle: isGuest ? 'Invited Guest Wizard · Avatar' : 'Setup · Avatar' });
+    `, { stepTitle: isGuest ? 'Invited Player Wizard · Avatar' : 'Setup · Avatar' });
 
     const preview = _root.querySelector('#kg-av-preview');
     const nextBtn = _root.querySelector('#kg-av-next');
@@ -488,6 +540,9 @@
       if (isGuest) {
         clearUrlCode();
         connectAndJoin(_pendingCode);
+      } else if (_mode) {
+        // Came here from mode selection — go straight to game
+        connectAndCreate(_mode === 'friend');
       } else {
         renderModeChoice();
       }
@@ -495,8 +550,8 @@
   }
 
   function renderChoose() {
-    if (!_profileNameDraft) return renderNameStep({ guest: false });
-    if (!_profileAvatarDraft) return renderAvatarStep({ guest: false });
+    // Always show mode cards first — name/avatar wizard runs only when the
+    // user actively picks a mode, so the landing screen has no form gates.
     return renderModeChoice();
   }
 
@@ -732,6 +787,9 @@
       `<div class="player-card-empty">○ Open</div>`
     ).join('');
 
+    const limitOptions = [2, 3, 4, 5, 6].map(n =>
+      `<option value="${n}" ${maxP === n ? 'selected' : ''}>${n}</option>`).join('');
+
     const footer = isHost ? `
       <div class="ai-controls">
         <button class="btn-purple" data-act="add-ai" ${canAddAi ? '' : 'disabled'}>+ Add Bot</button>
@@ -739,6 +797,12 @@
           ${['easy', 'medium', 'hard'].map(d =>
       `<button class="diff-btn ${_aiDifficulty === d ? 'active' : ''}" data-diff="${d}">${d}</button>`
     ).join('')}
+        </div>
+        <div class="limit-row" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#9aa;">
+          <span>Max players:</span>
+          <select class="limit-select" data-act="set-limit" style="background:#1a1a2e;color:#cff;border:1px solid rgba(0,255,255,0.3);border-radius:4px;padding:3px 8px;font-size:13px;">
+            ${limitOptions}
+          </select>
         </div>
       </div>
       <div class="lobby-footer">
@@ -779,6 +843,8 @@
         b.addEventListener('click', () => { _aiDifficulty = b.getAttribute('data-diff'); render(); }));
       const addAi = _root.querySelector('[data-act="add-ai"]');
       if (addAi) addAi.addEventListener('click', () => _mp.addBot(_aiDifficulty));
+      const limitSel = _root.querySelector('[data-act="set-limit"]');
+      if (limitSel) limitSel.addEventListener('change', () => _mp.setMaxPlayers(parseInt(limitSel.value, 10)));
       const backToShare = _root.querySelector('[data-act="back-to-share"]');
       if (backToShare) backToShare.addEventListener('click', () => { _step = STEP.SHARE; render(); });
       const launchBtn = _root.querySelector('[data-act="launch"]');
@@ -845,9 +911,9 @@
 
   function getProfile() {
     const name = (typeof KGPlayerProfile !== 'undefined' && KGPlayerProfile.getName)
-      ? KGPlayerProfile.getName() : (localStorage.getItem('display_name') || 'Guest');
+      ? KGPlayerProfile.getName() : (localStorage.getItem('display_name') || '');
     const av = (typeof AvatarPicker !== 'undefined' && AvatarPicker.get) ? AvatarPicker.get() : null;
-    return { name: name || 'Guest', avatarEmoji: av ? av.emoji : null };
+    return { name: name || '', avatarEmoji: av ? av.emoji : null };
   }
 
   function loadProfileDraft() {
@@ -932,6 +998,97 @@
       mp.joinByCode(code);
     };
     if (mp.userId) join(); else mp.on('authenticated', join);
+  }
+
+  function buildLocalLobby() {
+    // Same-screen mode: create a local session for the roster builder
+    // Users can add 1-4 players (mix of humans and AI bots)
+    _state = STATE.LOBBY;
+    const prof = getProfile();
+    const humanUserId = 'local-human-' + Date.now();
+
+    // Initialize _mp as a local mock object with session
+    _mp = {
+      session: {
+        session_id: 'local-session-' + Date.now(),
+        game_id: _opts.gameId,
+        host_id: humanUserId,
+        max_players: _opts.maxPlayers || 4,
+        players: [
+          {
+            user_id: humanUserId,
+            username: prof.name || 'Player',
+            avatar: prof.avatar || '🎮',
+            avatar_id: prof.avatar || '🎮',
+            is_ai: false,
+            is_host: true,
+            slot: 0,
+            ready: false,
+          }
+        ],
+        status: 'waiting',
+        settings: { lobby_accepted: true }
+      },
+      userId: humanUserId,
+      addBot: (difficulty) => {
+        if (!_mp.session) return;
+        const botCount = _mp.session.players.filter(p => p.is_ai).length;
+        if (_mp.session.players.length < _mp.session.max_players) {
+          _mp.session.players.push({
+            user_id: `local-ai-bot-${botCount}`,
+            username: `Bot ${botCount + 1}`,
+            avatar: '🤖',
+            avatar_id: '🤖',
+            is_ai: true,
+            is_host: false,
+            slot: _mp.session.players.length,
+            ready: true,
+          });
+        }
+      },
+      removeBot: (userId) => {
+        if (!_mp.session) return;
+        const idx = _mp.session.players.findIndex(p => p.user_id === userId);
+        if (idx >= 0) _mp.session.players.splice(idx, 1);
+      },
+      on: () => { },
+      off: () => { },
+      startGame: () => {
+        launchSameScreen();
+      }
+    };
+    _myUserId = humanUserId;
+    _state = STATE.LOBBY;
+    _step = STEP.ROSTER;
+    render();
+  }
+
+  function launchSameScreen() {
+    // Launch same-screen game without server
+    if (!_mp || !_mp.session) return;
+    _state = STATE.LAUNCHING;
+    render();
+
+    const players = _mp.session.players || [];
+    const humanUserId = _mp.userId;
+
+    const launchPayload = {
+      session_id: _mp.session.session_id,
+      session_code: null,
+      game_id: _opts.gameId,
+      host_id: humanUserId,
+      my_user_id: humanUserId,
+      is_host: true,
+      players: players,
+      mode: 'same-screen',
+      hasRemoteHumans: false,
+      playerCount: players.length,
+      launchMode: 'same-screen',
+    };
+
+    try { root.KGSession = launchPayload; } catch { /* ignore */ }
+    try { _opts.onLaunch && _opts.onLaunch(launchPayload); }
+    catch (e) { console.error('[KGMultiplayerPanel] launchSameScreen threw:', e); }
   }
 
   function hostLaunch() {

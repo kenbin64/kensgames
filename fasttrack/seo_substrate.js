@@ -36,8 +36,8 @@ const SEOSubstrate = (() => {
     const IDENTITY = Object.freeze({
         name: 'Fast Track',
         tagline: 'The Board Game Reimagined in 3D',
-        description: 'An online strategic card & peg racing board game for 2-4 players with 7 stunning 3D themes, smart AI opponents, and multiplayer support.',
-        shortDescription: '3D card & peg racing board game. 2-4 players, 7 themes, smart AI.',
+        description: 'An online strategic card & peg racing board game for 2-6 players with 7 stunning 3D themes, smart AI opponents, and multiplayer support.',
+        shortDescription: '3D card & peg racing board game. 2-6 players, 7 themes, smart AI.',
         url: 'https://kensgames.com/fasttrack/',
         image: 'https://kensgames.com/fasttrack/assets/images/og-preview.png',
         screenshot: 'https://kensgames.com/fasttrack/assets/images/screenshot-game.png',
@@ -144,7 +144,7 @@ const SEOSubstrate = (() => {
                 '@context': 'https://schema.org',
                 '@type': 'WebPage',
                 'name': 'Play Fast Track Online',
-                'description': 'Watch live AI demo or play Fast Track. 7 stunning 3D themes, 2-4 players.',
+                'description': 'Watch live AI demo or play Fast Track. 7 stunning 3D themes, 2-6 players.',
                 'url': IDENTITY.url + 'play.html',
                 'isPartOf': {
                     '@type': 'WebSite',

@@ -17,21 +17,29 @@
 const EPS = 1e-9;
 const approxEq = (a, b, eps = EPS) => Math.abs(a - b) < eps;
 
+function denomOrOne(v) {
+    const n = Number(v);
+    return Number.isFinite(n) && n !== 0 ? n : 1;
+}
+
 // ── Algebraic relation family ─────────────────────────────────────
 // Each relation is a predicate: given a tuple, returns true iff the
 // declared algebraic identity holds (within EPS).
 const RELATIONS = {
-    'z=xy':    (x, y, z) => approxEq(z, x * y),
-    'z=x/y':   (x, y, z) => y !== 0 && approxEq(z, x / y),
-    'z=xy^2':  (x, y, z) => approxEq(z, x * y * y),
-    'z=x/y^2': (x, y, z) => y !== 0 && approxEq(z, x / (y * y)),
-    'x=yz':    (x, y, z) => approxEq(x, y * z),
-    'x=y/z':   (x, y, z) => z !== 0 && approxEq(x, y / z),
-    'y=xz':    (x, y, z) => approxEq(y, x * z),
-    'y=x/z':   (x, y, z) => z !== 0 && approxEq(y, x / z),
+    'z=xy': (x, y, z) => approxEq(z, x * y),
+    'z=x/y': (x, y, z) => approxEq(z, x / denomOrOne(y)),
+    'z=xy^2': (x, y, z) => approxEq(z, x * y * y),
+    'z=x/y^2': (x, y, z) => {
+        const d = denomOrOne(y);
+        return approxEq(z, x / (d * d));
+    },
+    'x=yz': (x, y, z) => approxEq(x, y * z),
+    'x=y/z': (x, y, z) => approxEq(x, y / denomOrOne(z)),
+    'y=xz': (x, y, z) => approxEq(y, x * z),
+    'y=x/z': (x, y, z) => approxEq(y, x / denomOrOne(z)),
     // 4-dimensional extension. m is the fourth axis (e.g. temporal layer
     // or 4-dim board height). Relation holds iff m = x*y*z.
-    'm=xyz':   (x, y, z, m) => approxEq(m, x * y * z),
+    'm=xyz': (x, y, z, m) => approxEq(m, x * y * z),
 };
 
 // Inverse / consistency lemmas:
@@ -55,14 +63,14 @@ function invertZxy(x, y, z) {
 // Gyroid (Schoen, 1970): sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x)
 function gyroid(x, y, z) {
     return Math.sin(x) * Math.cos(y)
-         + Math.sin(y) * Math.cos(z)
-         + Math.sin(z) * Math.cos(x);
+        + Math.sin(y) * Math.cos(z)
+        + Math.sin(z) * Math.cos(x);
 }
 
 // Schwarz Diamond (Schwarz D, 1865): cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z)
 function schwarzDiamond(x, y, z) {
     return Math.cos(x) * Math.cos(y) * Math.cos(z)
-         - Math.sin(x) * Math.sin(y) * Math.sin(z);
+        - Math.sin(x) * Math.sin(y) * Math.sin(z);
 }
 
 // Schwarz Primitive (Schwarz P, 1865, first-harmonic): cos(x)+cos(y)+cos(z)

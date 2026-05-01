@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KensGames Dev Scenario Runner</title>
+  <style>
+    :root {
+      --bg-0: #0a1022;
+      --bg-1: #121a34;
+      --bg-2: #1a2550;
+      --ink: #e8f5ff;
+      --muted: #9ec0d8;
+      --accent: #38d3ff;
+      --accent-2: #89ff5a;
+      --warn: #ffcc52;
+      --danger: #ff6b7a;
+      --line: rgba(56, 211, 255, 0.28);
+      --panel: rgba(8, 15, 35, 0.8);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 5%, rgba(56, 211, 255, 0.2), transparent 40%),
+        radial-gradient(circle at 85% 12%, rgba(137, 255, 90, 0.15), transparent 38%),
+        linear-gradient(160deg, var(--bg-0), var(--bg-1) 55%, var(--bg-2));
+      min-height: 100vh;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      min-height: 100vh;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 16px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+    }
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .section {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 12px;
+    }
+
+    .section:first-child {
+      border-top: 0;
+    }
+
+    .title {
+      font-family: "Orbitron", "Segoe UI", sans-serif;
+      font-size: 12px;
+      letter-spacing: 1.8px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .row:last-child {
+      margin-bottom: 0;
+    }
+
+    .grow {
+      flex: 1;
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 70px;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font: inherit;
+      color: inherit;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(56, 211, 255, 0.24);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 150px;
+      max-height: 300px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(56, 211, 255, 0.2);
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.06);
+      transition: 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #19cfff, #5deaff);
+      color: #031424;
+      border-color: rgba(255, 255, 255, 0.2);
+      font-weight: 700;
+    }
+
+    .btn-good {
+      background: linear-gradient(135deg, #64ff71, #9dff83);
+      color: #062208;
+      border-color: rgba(255, 255, 255, 0.15);
+      font-weight: 700;
+    }
+
+    .btn-warn {
+      background: linear-gradient(135deg, #ffcf5e, #ffd87d);
+      color: #2f1a00;
+      font-weight: 700;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ff7f89, #ffb1aa);
+      color: #320b11;
+      font-weight: 700;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .status-ok {
+      color: var(--accent-2);
+      border-color: rgba(137, 255, 90, 0.35);
+    }
+
+    .status-warn {
+      color: var(--warn);
+      border-color: rgba(255, 204, 82, 0.35);
+    }
+
+    .status-bad {
+      color: var(--danger);
+      border-color: rgba(255, 107, 122, 0.45);
+    }
+
+    .log {
+      background: rgba(0, 0, 0, 0.32);
+      border: 1px solid rgba(56, 211, 255, 0.2);
+      border-radius: 10px;
+      height: 190px;
+      overflow: auto;
+      padding: 10px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+    }
+
+    .right {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+    }
+
+    .watch {
+      padding: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      max-height: 190px;
+      overflow: auto;
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    .watch-line {
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      color: #d5eeff;
+    }
+
+    .banner {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      background: rgba(255, 50, 70, 0.95);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 1120px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 60vh;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="prod-block" class="banner hidden">Dev Scenario Runner is localhost-only and disabled outside development.
+  </div>
+
+  <div class="app" id="app-shell">
+    <div class="left panel">
+      <div class="section">
+        <div class="title">Dev Runner</div>
+        <div class="row">
+          <span id="runnerStatus" class="pill status-warn">Connecting...</span>
+          <span id="watchStatus" class="pill">watch: off</span>
+        </div>
+        <div class="row">
+          <label class="grow" for="wsUrl">Control WS</label>
+          <input id="wsUrl" value="ws://127.0.0.1:8766" />
+        </div>
+        <div class="row">
+          <button id="btnConnect" class="btn-primary grow">Reconnect</button>
+          <button id="btnPing">Ping</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="title">Code Runner</div>
+        <div class="row">
+          <label for="codeAutoRun">Auto run</label>
+          <input id="codeAutoRun" type="checkbox" checked style="width:auto" />
+          <label for="codeAutoReload">Auto reload</label>
+          <input id="codeAutoReload" type="checkbox" checked style="width:auto" />
+        </div>
+        <textarea id="codeEditor">(() => {
+  const now = new Date().toISOString();
+  console.log('[dev-runner] tick', now);
+
+  const app = window;
+  const session = app.KGSession || null;
+  return {
+    now,
+    href: location.href,
+    hasKGSession: !!session,
+    players: session && Array.isArray(session.players) ? session.players.length : 0,
+  };
+})();</textarea>
+        <div class="row">
+          <button id="btnRunCode" class="btn-good grow">Run In Frame</button>
+          <button id="btnClearCodeLog">Clear</button>
+        </div>
+        <div id="codeLog" class="log"></div>
+      </div>
+
+      <div class="section">
+        <div class="title">Scenario Simulator</div>
+        <div class="row">
+          <label for="simGame">Game</label>
+          <select id="simGame">
+            <option value="fasttrack">FastTrack</option>
+            <option value="starfighter">Starfighter</option>
+            <option value="brickbreaker3d">BrickBreaker3D</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="simHumans">Humans</label>
+          <input id="simHumans" type="number" min="2" max="6" value="2" />
+        </div>
+        <div class="row">
+          <label for="simDuration">Duration s</label>
+          <input id="simDuration" type="number" min="5" max="1200" value="30" />
+        </div>
+        <div class="row">
+          <label for="simTick">Tick ms</label>
+          <input id="simTick" type="number" min="100" max="5000" value="900" />
+        </div>
+        <div class="row">
+          <label for="simActions">Actions/tick</label>
+          <input id="simActions" type="number" min="1" max="10" value="1" />
+        </div>
+        <div class="row">
+          <button id="btnRunScenario" class="btn-warn grow">Run Scenario</button>
+          <button id="btnStopScenario" class="btn-danger">Stop</button>
+        </div>
+        <div id="simLog" class="log"></div>
+      </div>
+
+      <div class="section">
+        <div class="title">Capture</div>
+        <div class="row">
+          <label for="recordSecs">Auto stop s</label>
+          <input id="recordSecs" type="number" min="0" max="3600" value="0" />
+        </div>
+        <div class="row">
+          <button id="btnRecordStart" class="btn-good grow">Start Recording</button>
+          <button id="btnRecordStop" class="btn-danger">Stop + Save</button>
+        </div>
+        <div id="recordLog" class="log"></div>
+      </div>
+    </div>
+
+    <div class="right panel">
+      <div class="toolbar">
+        <label for="targetApp">Target</label>
+        <select id="targetApp">
+          <option value="/fasttrack/lobby-simple.html">FastTrack Lobby</option>
+          <option value="/fasttrack/3d.html?dev_observer=1">FastTrack 3D</option>
+          <option value="/starfighter/lobby.html?dev_observer=1">Starfighter Lobby</option>
+          <option value="/starfighter/index.html?dev_observer=1">Starfighter Game</option>
+          <option value="/brickbreaker3d/lobby.html?dev_observer=1">BrickBreaker Lobby</option>
+          <option value="/brickbreaker3d/play.html?dev_observer=1">BrickBreaker Play</option>
+        </select>
+        <button id="btnLoad" class="btn-primary">Load</button>
+        <button id="btnReload">Reload</button>
+        <span id="fileChanged" class="pill">No file changes yet</span>
+      </div>
+      <iframe id="gameFrame" src="/fasttrack/lobby-simple.html"></iframe>
+      <div class="watch" id="watchPane"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+      const prodBlock = document.getElementById('prod-block');
+      const appShell = document.getElementById('app-shell');
+      if (!isLocal) {
+        prodBlock.classList.remove('hidden');
+        appShell.style.display = 'none';
+        return;
+      }
+
+      const els = {
+        wsUrl: document.getElementById('wsUrl'),
+        btnConnect: document.getElementById('btnConnect'),
+        btnPing: document.getElementById('btnPing'),
+        runnerStatus: document.getElementById('runnerStatus'),
+        watchStatus: document.getElementById('watchStatus'),
+        targetApp: document.getElementById('targetApp'),
+        btnLoad: document.getElementById('btnLoad'),
+        btnReload: document.getElementById('btnReload'),
+        gameFrame: document.getElementById('gameFrame'),
+        fileChanged: document.getElementById('fileChanged'),
+        codeEditor: document.getElementById('codeEditor'),
+        btnRunCode: document.getElementById('btnRunCode'),
+        btnClearCodeLog: document.getElementById('btnClearCodeLog'),
+        codeLog: document.getElementById('codeLog'),
+        codeAutoRun: document.getElementById('codeAutoRun'),
+        codeAutoReload: document.getElementById('codeAutoReload'),
+        simGame: document.getElementById('simGame'),
+        simHumans: document.getElementById('simHumans'),
+        simDuration: document.getElementById('simDuration'),
+        simTick: document.getElementById('simTick'),
+        simActions: document.getElementById('simActions'),
+        btnRunScenario: document.getElementById('btnRunScenario'),
+        btnStopScenario: document.getElementById('btnStopScenario'),
+        simLog: document.getElementById('simLog'),
+        btnRecordStart: document.getElementById('btnRecordStart'),
+        btnRecordStop: document.getElementById('btnRecordStop'),
+        recordSecs: document.getElementById('recordSecs'),
+        recordLog: document.getElementById('recordLog'),
+        watchPane: document.getElementById('watchPane'),
+      };
+
+      let ws = null;
+      let activeJobId = null;
+      let watchTimer = null;
+      let mediaRecorder = null;
+      let mediaChunks = [];
+      let recordStopTimer = null;
+
+      const watchExpressions = [
+        'location.href',
+        'document.title',
+        'window.KGSession ? JSON.stringify({ players: (KGSession.players||[]).length, code: KGSession.session_code || null }) : null',
+        'window.__MANIFOLD__ ? JSON.stringify(window.__MANIFOLD__.dimension || null) : null',
+        'window.KGMultiplayerPanel && window.KGMultiplayerPanel.session ? JSON.stringify({ players: window.KGMultiplayerPanel.session.players.length, code: window.KGMultiplayerPanel.session.session_code || null }) : null',
+      ];
+
+      function stamp() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function appendLog(el, text) {
+        const line = `[${stamp()}] ${text}`;
+        el.textContent += (el.textContent ? '\n' : '') + line;
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function setRunnerStatus(text, cls) {
+        els.runnerStatus.textContent = text;
+        els.runnerStatus.className = `pill ${cls || ''}`.trim();
+      }
+
+      function connectWs() {
+        if (ws) {
+          try { ws.close(); } catch (_) { }
+        }
+        const url = els.wsUrl.value.trim();
+        setRunnerStatus('Connecting...', 'status-warn');
+        ws = new WebSocket(url);
+
+        ws.addEventListener('open', () => {
+          setRunnerStatus('Runner connected', 'status-ok');
+          els.watchStatus.textContent = 'watch: live';
+          els.watchStatus.className = 'pill status-ok';
+        });
+
+        ws.addEventListener('close', () => {
+          setRunnerStatus('Runner disconnected', 'status-bad');
+          els.watchStatus.textContent = 'watch: off';
+          els.watchStatus.className = 'pill status-bad';
+        });
+
+        ws.addEventListener('error', () => {
+          setRunnerStatus('Runner error', 'status-bad');
+        });
+
+        ws.addEventListener('message', (ev) => {
+          let msg;
+          try { msg = JSON.parse(ev.data); } catch (_) { return; }
+          onRunnerMessage(msg);
+        });
+      }
+
+      function sendWs(data) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+        ws.send(JSON.stringify(data));
+        return true;
+      }
+
+      function onRunnerMessage(msg) {
+        if (!msg || !msg.type) return;
+
+        if (msg.type === 'hello') {
+          appendLog(els.simLog, `hello from runner (${msg.role || 'unknown'})`);
+          return;
+        }
+
+        if (msg.type === 'pong') {
+          appendLog(els.simLog, 'pong');
+          return;
+        }
+
+        if (msg.type === 'file_changed' || msg.type === 'reload') {
+          const file = msg.file || 'unknown';
+          els.fileChanged.textContent = `Changed: ${file}`;
+          if (els.codeAutoReload.checked) {
+            reloadFrame();
+          }
+          if (els.codeAutoRun.checked) {
+            setTimeout(runCodeInFrame, 120);
+          }
+          return;
+        }
+
+        if (msg.type === 'job_started') {
+          activeJobId = msg.jobId || null;
+          appendLog(els.simLog, `job started: ${activeJobId}`);
+          return;
+        }
+
+        if (msg.type === 'job_log') {
+          appendLog(els.simLog, `${msg.stream || 'log'}: ${String(msg.text || '').trimEnd()}`);
+          return;
+        }
+
+        if (msg.type === 'job_exit') {
+          appendLog(els.simLog, `job exit ${msg.jobId || ''} code=${msg.code}`);
+          if (activeJobId === msg.jobId) activeJobId = null;
+          return;
+        }
+
+        if (msg.type === 'job_error') {
+          appendLog(els.simLog, `job error: ${msg.message || 'unknown error'}`);
+          if (msg.jobId && activeJobId === msg.jobId) activeJobId = null;
+          return;
+        }
+      }
+
+      function loadFrame() {
+        const target = els.targetApp.value;
+        els.gameFrame.src = target;
+      }
+
+      function reloadFrame() {
+        els.gameFrame.src = els.gameFrame.src;
+      }
+
+      function runCodeInFrame() {
+        const frameWin = els.gameFrame.contentWindow;
+        if (!frameWin) {
+          appendLog(els.codeLog, 'frame not ready');
+          return;
+        }
+        const source = els.codeEditor.value;
+        try {
+          const wrapped = `(function(){\n${source}\n})()`;
+          const result = frameWin.eval(wrapped);
+          appendLog(els.codeLog, `result: ${JSON.stringify(result)}`);
+        } catch (err) {
+          appendLog(els.codeLog, `error: ${err && err.message ? err.message : String(err)}`);
+        }
+      }
+
+      function refreshWatchPane() {
+        const frameWin = els.gameFrame.contentWindow;
+        if (!frameWin) {
+          els.watchPane.textContent = 'frame not ready';
+          return;
+        }
+
+        const lines = [];
+        for (const expr of watchExpressions) {
+          try {
+            const value = frameWin.eval(expr);
+            lines.push({ expr, value: value == null ? 'null' : String(value) });
+          } catch (err) {
+            lines.push({ expr, value: `ERR: ${err && err.message ? err.message : String(err)}` });
+          }
+        }
+
+        els.watchPane.innerHTML = lines.map((line) => {
+          return `<div class="watch-line"><strong>${line.expr}</strong><br>${line.value.replace(/</g, '&lt;')}</div>`;
+        }).join('');
+      }
+
+      function startWatchLoop() {
+        if (watchTimer) clearInterval(watchTimer);
+        watchTimer = setInterval(refreshWatchPane, 500);
+      }
+
+      function runScenario() {
+        const ok = sendWs({
+          type: 'run_scenario',
+          game: els.simGame.value,
+          humans: parseInt(els.simHumans.value || '2', 10),
+          durationSec: parseInt(els.simDuration.value || '30', 10),
+          tickMs: parseInt(els.simTick.value || '900', 10),
+          actionsPerTick: parseInt(els.simActions.value || '1', 10),
+        });
+        if (!ok) appendLog(els.simLog, 'runner not connected');
+      }
+
+      function stopScenario() {
+        if (!activeJobId) {
+          appendLog(els.simLog, 'no active scenario job');
+          return;
+        }
+        sendWs({ type: 'stop_job', jobId: activeJobId });
+      }
+
+      function startRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          appendLog(els.recordLog, 'recording already active');
+          return;
+        }
+        const stream = els.gameFrame.captureStream ? els.gameFrame.captureStream(30) : null;
+        if (!stream) {
+          appendLog(els.recordLog, 'captureStream is not supported in this browser');
+          return;
+        }
+
+        mediaChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+        mediaRecorder.addEventListener('dataavailable', (ev) => {
+          if (ev.data && ev.data.size > 0) mediaChunks.push(ev.data);
+        });
+        mediaRecorder.addEventListener('stop', () => {
+          const blob = new Blob(mediaChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const stamp = new Date().toISOString().replace(/[.:]/g, '-');
+          a.href = url;
+          a.download = `dev-capture-${stamp}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+          appendLog(els.recordLog, `saved capture (${Math.round(blob.size / 1024)} KB)`);
+        });
+
+        mediaRecorder.start(1000);
+        appendLog(els.recordLog, 'recording started');
+
+        const autoStop = parseInt(els.recordSecs.value || '0', 10);
+        if (recordStopTimer) clearTimeout(recordStopTimer);
+        if (autoStop > 0) {
+          recordStopTimer = setTimeout(stopRecording, autoStop * 1000);
+        }
+      }
+
+      function stopRecording() {
+        if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+          appendLog(els.recordLog, 'recording is not active');
+          return;
+        }
+        mediaRecorder.stop();
+        appendLog(els.recordLog, 'recording stopped');
+      }
+
+      els.btnConnect.addEventListener('click', connectWs);
+      els.btnPing.addEventListener('click', () => sendWs({ type: 'ping' }));
+      els.btnLoad.addEventListener('click', loadFrame);
+      els.btnReload.addEventListener('click', reloadFrame);
+
+      els.btnRunCode.addEventListener('click', runCodeInFrame);
+      els.btnClearCodeLog.addEventListener('click', () => { els.codeLog.textContent = ''; });
+
+      els.btnRunScenario.addEventListener('click', runScenario);
+      els.btnStopScenario.addEventListener('click', stopScenario);
+
+      els.btnRecordStart.addEventListener('click', startRecording);
+      els.btnRecordStop.addEventListener('click', stopRecording);
+
+      els.gameFrame.addEventListener('load', () => {
+        appendLog(els.codeLog, `frame loaded: ${els.gameFrame.src}`);
+        if (els.codeAutoRun.checked) {
+          setTimeout(runCodeInFrame, 120);
+        }
+      });
+
+      startWatchLoop();
+      connectWs();
+    })();
+  </script>
+</body>
+
+</html>

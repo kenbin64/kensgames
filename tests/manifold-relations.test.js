@@ -37,6 +37,12 @@ test('z=xy^2 satisfied by (x=3, y=4, z=48)', () =>
 test('z=x/y^2 satisfied by (x=100, y=5, z=4)', () =>
     assert.ok(RELATIONS['z=x/y^2'](100, 5, 4)));
 
+test('z=x/y defaults denominator to 1 when y=0', () =>
+    assert.ok(RELATIONS['z=x/y'](10, 0, 10)));
+
+test('z=x/y^2 defaults denominator to 1 when y=0', () =>
+    assert.ok(RELATIONS['z=x/y^2'](10, 0, 10)));
+
 test('x=yz   satisfied by (x=24, y=2, z=12)', () =>
     assert.ok(RELATIONS['x=yz'](24, 2, 12)));
 
@@ -48,6 +54,11 @@ test('y=xz   satisfied by (x=2, y=24, z=12)', () =>
 
 test('y=x/z  satisfied by (x=24, y=2, z=12)', () =>
     assert.ok(RELATIONS['y=x/z'](24, 2, 12)));
+
+test('x=y/z and y=x/z default denominator to 1 when z=0', () => {
+    assert.ok(RELATIONS['x=y/z'](24, 24, 0));
+    assert.ok(RELATIONS['y=x/z'](24, 24, 0));
+});
 
 test('m=xyz  satisfied by (x=2, y=3, z=4, m=24)', () =>
     assert.ok(RELATIONS['m=xyz'](2, 3, 4, 24)));

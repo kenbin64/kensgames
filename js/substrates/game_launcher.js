@@ -52,6 +52,48 @@ const GameLauncher = (() => {
         _gameFrame = createGameFrame();
       }
 
+      // Object-first launch handoff (cross-game). Query params remain as fallback.
+      if (window.KGGameManager && typeof window.KGGameManager.createGenericRuntimeFromSummary === 'function') {
+        const profileName = config.playerName || localStorage.getItem('display_name') || localStorage.getItem('username') || 'Player';
+        let avatarEmoji = '🎮';
+        let avatarId = config.avatarId || null;
+        try {
+          const rawAvatar = localStorage.getItem('kg_avatar');
+          if (rawAvatar) {
+            const parsedAvatar = JSON.parse(rawAvatar);
+            avatarEmoji = parsedAvatar.emoji || avatarEmoji;
+            avatarId = avatarId || parsedAvatar.id || null;
+          }
+        } catch (_) { }
+
+        const genericRuntime = window.KGGameManager.createGenericRuntimeFromSummary({
+          playerCount: Number(config.playerCount || (config.aiBots ? (Number(config.aiBots) + 1) : 1)),
+          launchMode: config.mode || 'solo',
+          code: config.code || '',
+          players: [{
+            user_id: String(Date.now()),
+            username: profileName,
+            avatar: avatarEmoji,
+            avatar_id: avatarId,
+            is_host: true,
+            is_ai: false,
+          }],
+        }, {
+          gameId,
+          gameName: game.title || game.name || gameId,
+          mode: config.mode || 'solo',
+          code: config.code || '',
+          playerName: profileName,
+          avatar: avatarEmoji,
+          avatarId,
+          settings: config.settings || {},
+        });
+
+        if (genericRuntime && genericRuntime.ok && typeof window.KGGameManager.persistGenericRuntime === 'function') {
+          window.KGGameManager.persistGenericRuntime(genericRuntime);
+        }
+      }
+
       // Load game with config
       const url = new URL(game.entryPoint, window.location.origin);
 

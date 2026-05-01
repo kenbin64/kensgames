@@ -41,6 +41,7 @@ class KGMultiplayer {
     this._reconnectTimer = null;
     this._seq = 0;
     this._stateInterval = null;
+    this.gameUuid = null;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -54,7 +55,7 @@ class KGMultiplayer {
 
   connect(auth) {
     if (this.ws && this.ws.readyState <= 1) return;
-    this.username = (auth && auth.username) || localStorage.getItem('username') || 'Guest';
+    this.username = (auth && auth.username) || localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player';
 
     // Stable per-browser guest id, persisted in localStorage so the same browser
     // keeps the same identity across reloads/games (no accounts).
@@ -75,6 +76,7 @@ class KGMultiplayer {
 
     this.ws.onopen = () => {
       this.connected = true;
+      this._hideReconnectOverlay();
       this._send({
         type: 'guest_login',
         token: guestId,
@@ -95,6 +97,7 @@ class KGMultiplayer {
     this.ws.onclose = () => {
       this.connected = false;
       this.gameStarted = false;
+      this._showReconnectOverlay('Connection lost. Reconnecting...');
       this._emit('disconnected');
       // Auto-reconnect if was in a game
       if (this.session) {
@@ -104,6 +107,7 @@ class KGMultiplayer {
 
     this.ws.onerror = () => {
       console.error('[KGMultiplayer] WebSocket error');
+      this._showReconnectOverlay('Connection unstable. Reconnecting...');
     };
   }
 
@@ -144,6 +148,51 @@ class KGMultiplayer {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }
+  }
+
+  _showReconnectOverlay(message) {
+    if (typeof document === 'undefined') return;
+    let overlay = document.getElementById('kgmp-reconnect-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'kgmp-reconnect-overlay';
+      overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:99996',
+        'background:rgba(6,10,20,0.65)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'pointer-events:none',
+      ].join(';');
+      overlay.innerHTML = [
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:#dce5ff;">',
+        '<div style="width:36px;height:36px;border:4px solid rgba(220,229,255,0.2);border-top-color:#8ac4ff;border-radius:50%;animation:kgmpSpin 0.85s linear infinite"></div>',
+        '<div id="kgmp-reconnect-text" style="font-family:sans-serif;font-size:clamp(14px,3.6vw,18px);font-weight:600;text-align:center;"></div>',
+        '</div>'
+      ].join('');
+      const style = document.createElement('style');
+      style.id = 'kgmp-reconnect-style';
+      style.textContent = '@keyframes kgmpSpin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(style);
+      document.body.appendChild(overlay);
+    }
+    const txt = document.getElementById('kgmp-reconnect-text');
+    if (txt) txt.textContent = message || 'Reconnecting...';
+    overlay.style.display = 'flex';
+  }
+
+  _hideReconnectOverlay() {
+    if (typeof document === 'undefined') return;
+    const overlay = document.getElementById('kgmp-reconnect-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  _ackPmFrame(data) {
+    if (!data || typeof data._pm_seq !== 'number') return;
+    this._send({
+      type: 'game_action_ack',
+      session_id: (this.session && this.session.session_id) || data._pm_session,
+      seq: data._pm_seq,
+      game_uuid: this.gameUuid || (this.session && this.session.game_uuid) || null,
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -207,6 +256,17 @@ class KGMultiplayer {
   /** Host accepts the group once everyone is ready */
   acceptLobby() { this._send({ type: 'accept_lobby' }); }
 
+  /** Update session settings (host only) */
+  updateSettings(settings) {
+    this._send({ type: 'update_session_settings', settings });
+  }
+
+  /** Set max player limit for this session (host only, 2-6) */
+  setMaxPlayers(n) {
+    const clamped = Math.max(2, Math.min(6, parseInt(n, 10) || 6));
+    this._send({ type: 'update_session_settings', settings: {}, max_players: clamped });
+  }
+
   /** Start the game (host only) */
   startGame() { this._send({ type: 'start_game' }); }
 
@@ -222,8 +282,18 @@ class KGMultiplayer {
     this._send({ type: 'remove_ai_player', player_id: playerId });
   }
 
-  /** Send a chat message */
-  chat(message) { this._send({ type: 'chat', message }); }
+  /**
+   * Send a chat payload.
+   * - chat('hello') keeps legacy behavior.
+   * - chat({ message: 'hello', emoji_reaction: {...} }) allows rich metadata.
+   */
+  chat(messageOrPayload) {
+    if (messageOrPayload && typeof messageOrPayload === 'object') {
+      this._send(Object.assign({ type: 'chat' }, messageOrPayload));
+      return;
+    }
+    this._send({ type: 'chat', message: messageOrPayload });
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // GAME STATE SYNC
@@ -326,10 +396,12 @@ class KGMultiplayer {
 
       case 'game_started':
         this.gameStarted = true;
+        this.gameUuid = data && data.session && data.session.game_uuid ? data.session.game_uuid : this.gameUuid;
         this._emit('game_started', data);
         break;
 
       case 'player_state':
+        this._ackPmFrame(data);
         if (data.user_id !== this.userId) {
           this.remotePlayers.set(data.user_id, {
             userId: data.user_id,
@@ -342,11 +414,37 @@ class KGMultiplayer {
         break;
 
       case 'game_action':
+        this._ackPmFrame(data);
         this._emit('game_action', data);
         break;
 
       case 'game_state':
+        this._ackPmFrame(data);
         this._emit('game_state', data);
+        break;
+
+      case 'pm_game_ready':
+        this.gameUuid = data.game_uuid || this.gameUuid;
+        this._hideReconnectOverlay();
+        this._emit('pm_game_ready', data);
+        break;
+
+      case 'pm_resync':
+        this._showReconnectOverlay('Resyncing game state...');
+        this._emit('pm_resync', data);
+        break;
+
+      case 'pm_heal_ok':
+        this._hideReconnectOverlay();
+        this._emit('pm_heal_ok', data);
+        break;
+
+      case 'player_replaced_with_bot':
+        if (data.players && this.session) {
+          this.session.players = data.players;
+          this.session.player_count = data.players.length;
+        }
+        this._emit('player_replaced_with_bot', data);
         break;
 
       case 'game_over':

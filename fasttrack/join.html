@@ -240,6 +240,10 @@
             cursor: pointer;
         }
     </style>
+    <script src="/js/substrates/game.js?v=20260501"></script>
+    <script src="/js/substrates/player.js?v=20260501"></script>
+    <script src="/fasttrack/fasttrack-game.js?v=20260501"></script>
+    <script src="/js/substrates/game_manager.js?v=20260501"></script>
     <script src="/js/analytics.js"></script>
 </head>
 
@@ -439,6 +443,97 @@
         let receivedAnyMessage = false;
         let authTimeoutHandle = null;
         let noResponseTimeoutHandle = null;
+
+        const AVATAR_EMOJIS = {
+            person_smile: '😊',
+            person_cool: '😎',
+            animal_lion: '🦁',
+            animal_fox: '🦊',
+            space_rocket: '🚀',
+            fantasy_dragon: '🐲',
+            scifi_robot: '🤖',
+            sport_soccer: '⚽',
+            robot: '🤖'
+        };
+
+        function persistLaunchObjects(launchSession, opts = {}) {
+            const players = Array.isArray(launchSession?.players) ? launchSession.players : [];
+            const code = String(launchSession?.session_code || gameCode || '').toUpperCase();
+            const me = players.find(p => p.user_id === myUserId) || {};
+            const displayName = me.username || myUsername || 'Player';
+            const avatarId = me.avatar_id || selectedAvatar || 'person_smile';
+            const avatarEmoji = AVATAR_EMOJIS[avatarId] || '👤';
+
+            if (window.KGGameManager && typeof window.KGGameManager.createFastTrackRuntimeFromSession === 'function') {
+                const runtime = window.KGGameManager.createFastTrackRuntimeFromSession(launchSession, {
+                    mode: 'private',
+                    myUserId,
+                    lateJoin: !!opts.lateJoin,
+                });
+                if (runtime && runtime.ok) {
+                    window.KGGameManager.persistRuntime(runtime);
+                    localStorage.setItem('fasttrack-player-name', displayName);
+                    localStorage.setItem('fasttrack-player-avatar', avatarEmoji);
+                    localStorage.setItem('fasttrack-lobby-gamecode', code);
+                    window.location.href = '3d.html';
+                    return;
+                }
+            }
+
+            const gameY = [
+                { id: 'mode_private', value: 1.2 },
+                { id: 'player_count', value: Math.max(1, players.length || 1) },
+                { id: 'late_join', value: opts.lateJoin ? 1.15 : 1 }
+            ];
+            const gameZ = (window.ManifoldBridge && typeof window.ManifoldBridge.solveZ === 'function')
+                ? window.ManifoldBridge.solveZ(1, gameY)
+                : gameY.reduce((acc, m) => acc * Number(m.value || 1), 1);
+
+            const playerY = [
+                { id: 'avatar_affinity', value: 1.05 },
+                { id: 'session_presence', value: 1.1 }
+            ];
+            const playerZ = (window.ManifoldBridge && typeof window.ManifoldBridge.solveZ === 'function')
+                ? window.ManifoldBridge.solveZ(1, playerY)
+                : playerY.reduce((acc, m) => acc * Number(m.value || 1), 1);
+
+            const KG_Game = {
+                x: launchSession?.session_id || `session_${Date.now()}`,
+                mode: 'private',
+                code,
+                playerCount: Math.max(2, Math.min(6, players.length || 2)),
+                settings: launchSession?.settings || {},
+                launchedAt: Date.now(),
+                lateJoin: !!opts.lateJoin,
+                y: gameY,
+                z: gameZ,
+                attrs: {
+                    host_id: launchSession?.host_id || null,
+                    game_id: launchSession?.game_id || 'fasttrack'
+                }
+            };
+
+            const KG_Player = {
+                x: myUserId || `user_${Date.now()}`,
+                user_id: myUserId || '',
+                name: displayName,
+                username: displayName,
+                avatar: avatarEmoji,
+                avatarObj: {
+                    id: avatarId,
+                    glyph: avatarEmoji
+                },
+                y: playerY,
+                z: playerZ
+            };
+
+            localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
+            localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
+            localStorage.setItem('fasttrack-player-name', displayName);
+            localStorage.setItem('fasttrack-player-avatar', avatarEmoji);
+            localStorage.setItem('fasttrack-lobby-gamecode', code);
+            window.location.href = '3d.html';
+        }
 
         // Check URL for code
         const params = new URLSearchParams(window.location.search);
@@ -773,12 +868,7 @@
                     document.getElementById('pending-message').textContent = 'Approved! Entering game...';
                     document.getElementById('pending-submessage').textContent = '';
                     setTimeout(() => {
-                        const p = new URLSearchParams({
-                            session: data.session.session_id,
-                            multiplayer: 'true',
-                            late_join: 'true'
-                        });
-                        window.location.href = `3d.html?${p.toString()}`;
+                        persistLaunchObjects(data.session, { lateJoin: true });
                     }, 600);
                     break;
 
@@ -879,11 +969,8 @@
                         user: { name: myUsername, user_id: myUserId, avatar_id: selectedAvatar },
                         wsUrl: LOBBY_WS_URL
                     }));
-                    // Redirect with the same params the host uses so fasttrack-3d.js
-                    // uses server-bootstrap + session cache for both players
                     setTimeout(() => {
-                        const p = new URLSearchParams({ mode: 'private', code: launchCode });
-                        window.location.href = `3d.html?${p.toString()}`;
+                        persistLaunchObjects(launchSession);
                     }, 800);
                     break;
                 }

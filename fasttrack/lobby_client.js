@@ -393,6 +393,27 @@ function onGameStarted(data) {
     const me = session.players?.find(p => p.user_id === myUserId) || session.players?.[0];
     const myEmoji = AVATAR_EMOJIS[me?.avatar_id] || '👤';
 
+    // Preferred path: canonical game manager runtime package.
+    if (window.KGGameManager && typeof window.KGGameManager.createFastTrackRuntimeFromSession === 'function') {
+        const runtime = window.KGGameManager.createFastTrackRuntimeFromSession(session, {
+            mode: 'private',
+            myUserId,
+            lateJoin: false,
+        });
+        if (runtime && runtime.ok) {
+            window.KGGameManager.persistRuntime(runtime);
+            try {
+                const code = String(session?.session_code || '').toUpperCase();
+                const displayName = me?.username || state.user?.username || 'Player';
+                localStorage.setItem('fasttrack-player-name', displayName);
+                localStorage.setItem('fasttrack-player-avatar', myEmoji);
+                localStorage.setItem('fasttrack-lobby-gamecode', code);
+            } catch (_) { }
+            window.location.href = '3d.html';
+            return;
+        }
+    }
+
     // Stash full session roster in sessionStorage so board can name every slot correctly
     // (avoiding URL length limits)
     const roster = (session.players || []).map(p => ({
@@ -418,17 +439,75 @@ function onGameStarted(data) {
         if (session.host_id) sessionStorage.setItem('ft_host_user_id', String(session.host_id));
     } catch (e) { /* sessionStorage unavailable – board will fall back to URL name */ }
 
-    // Redirect to game board with full player info in URL
-    const params = new URLSearchParams({
-        session: session.session_id,
-        multiplayer: 'true',
-        wsUrl: LOBBY_CONFIG.wsUrl,
-        name: me?.username || state.user?.username || 'Player',
-        avatar: myEmoji,
-        players: String(session.players?.length || 2),
-    });
+    // Canonical object handoff for the board bootstrap.
+    const code = String(session?.session_code || '').toUpperCase();
+    const displayName = me?.username || state.user?.username || 'Player';
+    const avatarId = me?.avatar_id || state.user?.avatar_id || 'person_smile';
+    const gameY = [
+        { id: 'mode_private', value: 1.2 },
+        { id: 'player_count', value: Math.max(1, session.players?.length || 1) },
+        { id: 'turn_timer', value: session.settings?.turn_timer ? 1.1 : 1 }
+    ];
+    const gameZ = (window.ManifoldBridge && typeof window.ManifoldBridge.solveZ === 'function')
+        ? window.ManifoldBridge.solveZ(1, gameY)
+        : gameY.reduce((acc, m) => acc * Number(m.value || 1), 1);
+    const playerY = [
+        { id: 'avatar_affinity', value: 1.05 },
+        { id: 'session_presence', value: 1.1 }
+    ];
+    const playerZ = (window.ManifoldBridge && typeof window.ManifoldBridge.solveZ === 'function')
+        ? window.ManifoldBridge.solveZ(1, playerY)
+        : playerY.reduce((acc, m) => acc * Number(m.value || 1), 1);
 
-    window.location.href = `3d.html?${params.toString()}`;
+    const KG_Game = {
+        x: session?.session_id || `session_${Date.now()}`,
+        mode: 'private',
+        code,
+        playerCount: Math.max(2, Math.min(6, session.players?.length || 2)),
+        settings: session?.settings || {},
+        launchedAt: Date.now(),
+        y: gameY,
+        z: gameZ,
+        attrs: {
+            host_id: session?.host_id || null,
+            game_id: session?.game_id || 'fasttrack'
+        }
+    };
+    const KG_Player = {
+        x: myUserId || `user_${Date.now()}`,
+        user_id: myUserId || '',
+        name: displayName,
+        username: displayName,
+        avatar: myEmoji,
+        avatarObj: {
+            id: avatarId,
+            glyph: myEmoji
+        },
+        y: playerY,
+        z: playerZ
+    };
+
+    try {
+        localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
+        localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
+        localStorage.setItem('fasttrack-player-name', displayName);
+        localStorage.setItem('fasttrack-player-avatar', myEmoji);
+        localStorage.setItem('fasttrack-lobby-gamecode', code);
+
+        sessionStorage.setItem('kg_session', JSON.stringify({
+            session_id: session?.session_id,
+            session_code: code,
+            game_id: session?.game_id,
+            host_id: session?.host_id,
+            my_user_id: myUserId,
+            is_host: !!(me?.is_host || session?.host_id === myUserId),
+            players: session?.players || []
+        }));
+    } catch (e) {
+        console.warn('Failed to persist launch objects', e);
+    }
+
+    window.location.href = '3d.html';
 }
 
 function onLobbyUpdate(data) {
@@ -771,7 +850,7 @@ function showCreatePrivateGame() {
     document.getElementById('wiz-allow-ai').checked = true;
     document.getElementById('wiz-turn-timer').checked = true;
     document.getElementById('wiz-late-arrivals').checked = true;
-    document.getElementById('wiz-max-players').value = '4';
+    document.getElementById('wiz-max-players').value = '6';
 
     // Show wizard
     updateWizardSteps();
@@ -782,7 +861,7 @@ function showCreatePrivateGame() {
         type: 'create_session',
         game_id: 'fasttrack',
         private: true,
-        max_players: 4,
+        max_players: 6,
         settings: {
             initial_bots: 0,
             allow_bots: true,
@@ -980,9 +1059,9 @@ function createPublicGameWithSettings(event) {
 
     const playerCount = parseInt(document.getElementById('public-player-count').value);
 
-    // Validate public game limits (3-4 players only)
-    if (playerCount < 3 || playerCount > 4) {
-        showToast('Public games must have 3-4 players', 'error');
+    // Validate public game limits (3-6 players)
+    if (playerCount < 3 || playerCount > 6) {
+        showToast('Public games must have 3-6 players', 'error');
         return;
     }
 
@@ -1003,7 +1082,7 @@ function createPublicGameWithSettings(event) {
             warning_seconds: 60, // 1 minute warning
             auto_replace_timeout: 60, // 1 minute after warning to replace
             min_players: 3,
-            max_players: 4
+            max_players: 6
         }
     });
 }
@@ -1254,14 +1333,14 @@ function addAIPlayer() {
     }
 
     // Check bot limits for private games
-    if (session.is_private && aiCount >= 3) {
-        showToast('Maximum 3 bots allowed', 'error');
+    if (session.is_private && aiCount >= 5) {
+        showToast('Maximum 5 bots allowed', 'error');
         return;
     }
 
-    // Private games with bots limited to 4 players total
-    if (session.is_private && (totalPlayers + 1) > 4) {
-        showToast('Games with bots limited to 4 total players', 'error');
+    // Private games with bots limited to 6 players total
+    if (session.is_private && (totalPlayers + 1) > 6) {
+        showToast('Games with bots limited to 6 total players', 'error');
         return;
     }
 

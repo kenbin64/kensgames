@@ -14,35 +14,96 @@ const AvatarPicker = (() => {
     const KEY = 'kg_avatar';
 
     const CATS = [
-        { id:'faces',  label:'Faces',   emojis:[
-            ['😊','Smiling'],['😎','Cool'],['🤩','Star'],['🥳','Party'],['😤','Determined'],
-            ['🤔','Thinker'],['🤓','Nerd'],['😏','Slick'],['😈','Villain'],['👾','Alien Blob'],
-            ['🤖','Robot'],['💀','Skull'],['🎭','Drama'],['👻','Ghost'],['🎃','Jack-O'],
-        ]},
-        { id:'animals', label:'Animals', emojis:[
-            ['🐺','Wolf'],['🦊','Fox'],['🐯','Tiger'],['🦁','Lion'],['🐲','Dragon'],
-            ['🦅','Eagle'],['🦉','Owl'],['🦈','Shark'],['🐬','Dolphin'],['🦋','Butterfly'],
-            ['🐸','Frog'],['🦎','Lizard'],['🐙','Octopus'],['🦑','Squid'],['🦂','Scorpion'],
-        ]},
-        { id:'space',   label:'Space',   emojis:[
-            ['🚀','Rocket'],['👽','Alien'],['🛸','UFO'],['⭐','Star'],['🌙','Moon'],
-            ['☄️','Comet'],['🌌','Galaxy'],['🛰️','Satellite'],['🔭','Observer'],['💫','Shooting Star'],
-            ['🌠','Wish'],['🪐','Planet'],['🌑','Dark Moon'],['⚡','Lightning'],['🌟','Bright Star'],
-        ]},
-        { id:'warriors',label:'Warriors',emojis:[
-            ['🧙','Wizard'],['🧝','Elf'],['🧛','Vampire'],['🧟','Zombie'],['🥷','Ninja'],
-            ['🤺','Fencer'],['🧜','Mermaid'],['🦸','Hero'],['🦹','Villain'],['🧚','Fairy'],
-            ['👑','King'],['🎯','Archer'],['⚔️','Swords'],['🛡️','Shield'],['🏹','Bow'],
-        ]},
-        { id:'retro',   label:'Retro',   emojis:[
-            ['🎮','Controller'],['🕹️','Joystick'],['👾','Invader'],['🎲','Dice'],['🃏','Joker'],
-            ['♟️','Chess'],['🎯','Target'],['🏆','Trophy'],['🎰','Slots'],['🎳','Bowling'],
-            ['🎪','Carnival'],['🃏','Wild Card'],['🎱','8-Ball'],['🎭','Masks'],['🎨','Artist'],
-        ]},
+        {
+            id: 'people', label: 'People', emojis: [
+                // Skin-tone diversity — person (neutral gender), all 5 tones
+                ['🧑🏻', 'Person Light'], ['🧑🏼', 'Person Med-Light'], ['🧑🏽', 'Person Medium'], ['🧑🏾', 'Person Med-Dark'], ['🧑🏿', 'Person Dark'],
+                // Man, all 5 tones
+                ['👨🏻', 'Man Light'], ['👨🏼', 'Man Med-Light'], ['👨🏽', 'Man Medium'], ['👨🏾', 'Man Med-Dark'], ['👨🏿', 'Man Dark'],
+                // Woman, all 5 tones
+                ['👩🏻', 'Woman Light'], ['👩🏼', 'Woman Med-Light'], ['👩🏽', 'Woman Medium'], ['👩🏾', 'Woman Med-Dark'], ['👩🏿', 'Woman Dark'],
+                // Boy, 3 representative tones
+                ['👦🏻', 'Boy Light'], ['👦🏽', 'Boy Medium'], ['👦🏿', 'Boy Dark'],
+                // Girl, 3 representative tones
+                ['👧🏻', 'Girl Light'], ['👧🏽', 'Girl Medium'], ['👧🏿', 'Girl Dark'],
+                // Elder, 3 representative tones
+                ['🧓🏻', 'Elder Light'], ['🧓🏽', 'Elder Medium'], ['🧓🏿', 'Elder Dark'],
+                // Roles (tone-neutral)
+                ['🧑‍💻', 'Coder'], ['🧑‍🎤', 'Rockstar'], ['🧑‍🎨', 'Artist'], ['🧑‍🚀', 'Astronaut'], ['🧑‍🏫', 'Teacher'],
+            ]
+        },
+        {
+            id: 'faces', label: 'Faces', emojis: [
+                ['😊', 'Smiling'], ['😎', 'Cool'], ['🤩', 'Star'], ['🥳', 'Party'], ['😤', 'Determined'],
+                ['🤔', 'Thinker'], ['🤓', 'Nerd'], ['😏', 'Slick'], ['😈', 'Villain'], ['👾', 'Alien Blob'],
+                ['🤖', 'Robot'], ['💀', 'Skull'], ['🎭', 'Drama'], ['👻', 'Ghost'], ['🎃', 'Jack-O'],
+                ['🥸', 'Disguise'], ['🤠', 'Cowboy'], ['🥶', 'Frozen'], ['🤯', 'Mind Blown'], ['😤', 'Fierce'],
+            ]
+        },
+        {
+            id: 'animals', label: 'Animals', emojis: [
+                ['🐺', 'Wolf'], ['🦊', 'Fox'], ['🐯', 'Tiger'], ['🦁', 'Lion'], ['🐲', 'Dragon'],
+                ['🦅', 'Eagle'], ['🦉', 'Owl'], ['🦈', 'Shark'], ['🐬', 'Dolphin'], ['🦋', 'Butterfly'],
+                ['🐸', 'Frog'], ['🦎', 'Lizard'], ['🐙', 'Octopus'], ['🦑', 'Squid'], ['🦂', 'Scorpion'],
+                ['🐻', 'Bear'], ['🦊', 'Fox'], ['🐼', 'Panda'], ['🦜', 'Parrot'], ['🦖', 'Dino'],
+            ]
+        },
+        {
+            id: 'space', label: 'Space', emojis: [
+                ['🚀', 'Rocket'], ['👽', 'Alien'], ['🛸', 'UFO'], ['⭐', 'Star'], ['🌙', 'Moon'],
+                ['☄️', 'Comet'], ['🌌', 'Galaxy'], ['🛰️', 'Satellite'], ['🔭', 'Observer'], ['💫', 'Shooting Star'],
+                ['🌠', 'Wish'], ['🪐', 'Planet'], ['🌑', 'Dark Moon'], ['⚡', 'Lightning'], ['🌟', 'Bright Star'],
+            ]
+        },
+        {
+            id: 'warriors', label: 'Warriors', emojis: [
+                ['🧙', 'Wizard'], ['🧝', 'Elf'], ['🧛', 'Vampire'], ['🧟', 'Zombie'], ['🥷', 'Ninja'],
+                ['🤺', 'Fencer'], ['🧜', 'Mermaid'], ['🦸', 'Hero'], ['🦹', 'Villain'], ['🧚', 'Fairy'],
+                ['👑', 'Crown'], ['🎯', 'Archer'], ['⚔️', 'Swords'], ['🛡️', 'Shield'], ['🏹', 'Bow'],
+            ]
+        },
+        {
+            id: 'retro', label: 'Retro', emojis: [
+                ['🎮', 'Controller'], ['🕹️', 'Joystick'], ['👾', 'Invader'], ['🎲', 'Dice'], ['🃏', 'Joker'],
+                ['♟️', 'Chess'], ['🎯', 'Target'], ['🏆', 'Trophy'], ['🎰', 'Slots'], ['🎳', 'Bowling'],
+                ['🎪', 'Carnival'], ['🎱', '8-Ball'], ['🎭', 'Masks'], ['🎨', 'Artist'], ['🧩', 'Puzzle'],
+            ]
+        },
     ];
 
+    function findByIdOrName(id, name) {
+        for (const cat of CATS) {
+            for (const [emoji, label] of cat.emojis) {
+                if (`${cat.id}_${emoji}` === id) return { id: `${cat.id}_${emoji}`, emoji, name: label };
+                if (name && String(name).toLowerCase() === String(label).toLowerCase()) {
+                    return { id: `${cat.id}_${emoji}`, emoji, name: label };
+                }
+            }
+        }
+        return null;
+    }
+
     function get() {
-        try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
+        let raw = null;
+        try { raw = JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
+        if (!raw || typeof raw !== 'object') return null;
+
+        const id = raw.id ? String(raw.id) : '';
+        const emoji = raw.emoji ? String(raw.emoji) : '';
+        const name = raw.name ? String(raw.name) : '';
+
+        // A valid emoji avatar should not be plain alphabetic text.
+        const looksLikeWord = emoji && /^[A-Za-z\s\-]+$/.test(emoji);
+        if (!emoji || looksLikeWord) {
+            const fixed = findByIdOrName(id, name || emoji);
+            if (fixed) {
+                try { localStorage.setItem(KEY, JSON.stringify(fixed)); } catch { /* ignore */ }
+                return fixed;
+            }
+            return null;
+        }
+
+        return { id: id || `custom_${emoji}`, emoji, name: name || emoji };
     }
     function has() { return !!get(); }
     function save(avatar) { localStorage.setItem(KEY, JSON.stringify(avatar)); }
@@ -76,27 +137,37 @@ const AvatarPicker = (() => {
     function renderCats(activeId) {
         const el = document.getElementById('av-cats');
         el.innerHTML = CATS.map(c => `
-            <button onclick="AvatarPicker._cat('${c.id}')"
+            <button data-cat="${c.id}"
                 style="font-family:'Orbitron',monospace;font-size:9px;letter-spacing:1px;padding:6px 12px;
-                border:1px solid ${activeId===c.id?'#00FFFF':'#334466'};border-radius:2px;
-                background:${activeId===c.id?'rgba(0,255,255,.15)':'transparent'};
-                color:${activeId===c.id?'#00FFFF':'#8888AA'};cursor:pointer;text-transform:uppercase;">
+                border:1px solid ${activeId === c.id ? '#00FFFF' : '#334466'};border-radius:2px;
+                background:${activeId === c.id ? 'rgba(0,255,255,.15)' : 'transparent'};
+                color:${activeId === c.id ? '#00FFFF' : '#8888AA'};cursor:pointer;text-transform:uppercase;">
                 ${c.label}</button>`).join('');
+        // Use event delegation — no inline onclick so category ids stay clean
+        el.querySelectorAll('button[data-cat]').forEach(btn => {
+            btn.addEventListener('click', () => AvatarPicker._cat(btn.getAttribute('data-cat')));
+        });
         renderGrid(activeId);
     }
 
     function renderGrid(catId) {
         const cat = CATS.find(c => c.id === catId);
         const el = document.getElementById('av-grid');
-        el.innerHTML = cat.emojis.map(([e, n]) => `
-            <button onclick="AvatarPicker._pick('${catId}','${e}','${n}')"
-                title="${n}"
+        // Emoji goes in DOM text content (not HTML attribute) to preserve
+        // variation selectors (U+FE0F) and ZWJ sequences perfectly.
+        el.innerHTML = cat.emojis.map((pair, i) => `
+            <button data-idx="${i}" title="${pair[1]}"
                 style="font-size:28px;padding:10px;background:rgba(0,255,255,.04);
                 border:1px solid rgba(0,255,255,.15);border-radius:4px;cursor:pointer;
                 transition:all .15s;"
                 onmouseover="this.style.background='rgba(0,255,255,.15)';this.style.borderColor='#00FFFF'"
-                onmouseout="this.style.background='rgba(0,255,255,.04)';this.style.borderColor='rgba(0,255,255,.15)'">
-                ${e}</button>`).join('');
+                onmouseout="this.style.background='rgba(0,255,255,.04)';this.style.borderColor='rgba(0,255,255,.15)'">${pair[0]}</button>`).join('');
+        // Attach click handlers after render so emoji identity is read from the array, not the attribute
+        el.querySelectorAll('button[data-idx]').forEach(btn => {
+            const idx = parseInt(btn.getAttribute('data-idx'), 10);
+            const [e, n] = cat.emojis[idx];
+            btn.addEventListener('click', () => AvatarPicker._pick(catId, e, n));
+        });
     }
 
     let _selected = null, _onSelect = null, _required = false;

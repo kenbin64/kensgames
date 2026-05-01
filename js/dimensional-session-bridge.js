@@ -25,6 +25,54 @@
 (function initDimensionalBridge() {
   window.DIMENSIONAL_SESSION = window.DIMENSIONAL_SESSION || {};
 
+  function toManifoldY(session) {
+    const game = session && session.game ? session.game : {};
+    const players = game.players || {};
+    const modifiers = session && session.modifiers ? session.modifiers : {};
+    const y = [];
+
+    y.push({ id: 'mode', value: players.mode === 'multiplayer' ? 1.2 : (players.mode === 'ranked' ? 1.35 : 1) });
+    y.push({ id: 'difficulty', value: players.difficulty === 'hard' ? 1.25 : (players.difficulty === 'easy' ? 0.85 : 1) });
+    y.push({ id: 'playerCount', value: Math.max(1, Number(players.count || game.x || 1)) });
+
+    if (modifiers.inviteCode) y.push({ id: 'inviteCode', value: 1.1 });
+    if (modifiers.channel) y.push({ id: 'channel', value: 1.05 });
+
+    return y;
+  }
+
+  function composeSessionWhole(session) {
+    const xRef = session && session._x ? session._x : `session_${Date.now()}`;
+    const attrs = {
+      game: session && session.game ? session.game : {},
+      modifiers: session && session.modifiers ? session.modifiers : {},
+    };
+    const y = toManifoldY(session);
+
+    if (window.ManifoldBridge && typeof window.ManifoldBridge.composeEntity === 'function') {
+      return window.ManifoldBridge.composeEntity({
+        type: 'session',
+        xRef,
+        xScalar: 1,
+        y,
+        attrs,
+      });
+    }
+
+    const z = y.reduce((acc, item) => acc * Number(item.value || 1), 1);
+    return {
+      type: 'session',
+      x: { ref: xRef, scalar: 1 },
+      y,
+      z,
+      attrs,
+      whole: { id: xRef, type: 'session', z },
+      axiom: 'z=xy',
+      schema: '1.1-dimensional',
+      createdAt: Date.now(),
+    };
+  }
+
   /**
    * Extract x-dimensional session from window.KENSGAMES_SESSION
    * Returns normalized game config or null if not present
@@ -35,6 +83,9 @@
       return null;
     }
 
+    const whole = composeSessionWhole(session);
+    const solvedZ = Number(whole && whole.z) || Number(session.game.z) || 1;
+
     return {
       sessionX: session._x,
       gameId: session.game._x,
@@ -42,7 +93,7 @@
       gameDimensions: {
         x: session.game.x,     // player count
         y: session.game.y,     // duration
-        z: session.game.z      // workload
+        z: solvedZ             // workload solved from manifold modifiers
       },
       players: {
         count: session.game.players?.count || 1,
@@ -53,7 +104,8 @@
         holes: session.game.board?.holes,
         pegs: session.game.board?.pegs
       },
-      modifiers: session.modifiers || {}
+      modifiers: session.modifiers || {},
+      dimensionalWhole: whole
     };
   };
 
@@ -76,7 +128,8 @@
       mode: players.mode,                 // 'solo' | 'multiplayer' | 'ranked'
       inviteCode: modifiers.inviteCode,
       sessionX: extracted.sessionX,
-      gameBoard: extracted.board
+      gameBoard: extracted.board,
+      dimensionalWhole: extracted.dimensionalWhole
     };
   };
 
@@ -87,6 +140,7 @@
     const session = window.KENSGAMES_SESSION;
     if (session) {
       sessionStorage.setItem('kg_session_dimensional', JSON.stringify(session));
+      sessionStorage.setItem('kg_session_dimensional_whole', JSON.stringify(composeSessionWhole(session)));
     }
   };
 

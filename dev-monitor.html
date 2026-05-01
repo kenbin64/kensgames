@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KG Dev Monitor</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #0f0; font-family: monospace; overflow: hidden; }
+    #header { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #111; border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 10px; z-index: 1000; font-size: 14px; }
+    #status { margin-left: 15px; color: #888; }
+    #status.connected { color: #0f0; }
+    #status.reloading { color: #f90; }
+    #status.error { color: #f00; }
+    iframe { position: absolute; top: 30px; left: 0; width: 100%; height: calc(100% - 30px); border: none; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <strong>KensGames Live Monitor</strong>
+    <span id="status">Connecting to WS...</span>
+    <select id="app-selector" style="margin-left: 20px; background: #222; color: #fff; border: 1px solid #444; padding: 2px;">
+      <option value="/fasttrack/3d.html?dev_observer=1">FastTrack (Auto)</option>
+      <option value="/starfighter/index.html?dev_observer=1">Starfighter</option>
+      <option value="/brickbreaker3d/play.html">BrickBreaker3D</option>
+    </select>
+  </div>
+  <iframe id="game-frame" src="/fasttrack/3d.html?dev_observer=1"></iframe>
+
+  <script>
+    const frame = document.getElementById('game-frame');
+    const status = document.getElementById('status');
+    const selector = document.getElementById('app-selector');
+
+    selector.addEventListener('change', () => {
+      frame.src = selector.value;
+    });
+
+    function connect() {
+      const ws = new WebSocket('ws://localhost:8766');
+      ws.onopen = () => {
+        status.textContent = '● Watching for changes';
+        status.className = 'connected';
+      };
+      ws.onmessage = (msg) => {
+        if (msg.data === 'reload') {
+          status.textContent = '⟳ Reloading...';
+          status.className = 'reloading';
+          frame.src = frame.src; // Reload iframe
+          setTimeout(() => {
+            if (ws.readyState === 1) {
+              status.textContent = '● Watching for changes';
+              status.className = 'connected';
+            }
+          }, 1000);
+        }
+      };
+      ws.onclose = () => {
+        status.textContent = '○ Disconnected. Retrying...';
+        status.className = 'error';
+        setTimeout(connect, 3000);
+      };
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+    connect();
+  </script>
+</body>
+</html>

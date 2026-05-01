@@ -62,6 +62,39 @@
     }
   }
 
+  function buildFastTrackRuntime(summary, opts) {
+    const manager = root.KGGameManager;
+    if (!manager || typeof manager.createFastTrackRuntimeFromSession !== 'function') {
+      return null;
+    }
+    const session = summary && summary.session ? summary.session : null;
+    if (!session) return null;
+    const options = Object.assign({
+      mode: summary && summary.launchMode === 'friend' ? 'private' : 'solo',
+      myUserId: session.my_user_id,
+    }, opts || {});
+    const runtime = manager.createFastTrackRuntimeFromSession(session, options);
+    return runtime && runtime.ok ? runtime : null;
+  }
+
+  function persistFastTrackRuntime(summary, opts) {
+    const runtime = buildFastTrackRuntime(summary, opts);
+    if (!runtime) return null;
+    root.KGGameManager.persistRuntime(runtime, opts || {});
+    return runtime;
+  }
+
+  function persistGenericRuntime(summary, opts) {
+    const manager = root.KGGameManager;
+    if (!manager || typeof manager.createGenericRuntimeFromSummary !== 'function' || typeof manager.persistGenericRuntime !== 'function') {
+      return null;
+    }
+    const runtime = manager.createGenericRuntimeFromSummary(summary, opts || {});
+    if (!runtime || !runtime.ok) return null;
+    manager.persistGenericRuntime(runtime, opts || {});
+    return runtime;
+  }
+
   function mount(target, opts) {
     if (!root.KGMultiplayerPanel || typeof root.KGMultiplayerPanel.mount !== 'function') {
       throw new Error('KGMultiplayerPanel is required before KGGameSetup.mount()');
@@ -72,6 +105,11 @@
         const summary = summarizeSession(session);
         persistSession(session);
         persistSetup(summary);
+        persistGenericRuntime(summary, {
+          gameId: opts && opts.gameId,
+          gameName: opts && opts.gameName,
+          mode: summary.launchMode === 'friend' ? 'private' : (summary.launchMode === 'ai' ? 'multi' : 'solo'),
+        });
         if (typeof onLaunch === 'function') {
           return onLaunch(summary);
         }
@@ -84,6 +122,9 @@
     summarizeSession,
     persistSession,
     persistSetup,
+    buildFastTrackRuntime,
+    persistFastTrackRuntime,
+    persistGenericRuntime,
     mount,
   };
 }(window));

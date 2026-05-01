@@ -9,12 +9,35 @@
     (function () {
       try {
         const p = new URLSearchParams(window.location.search);
+        let kgGame = null;
+        let kgPlayer = null;
+        try { kgGame = JSON.parse(localStorage.getItem('KG_Game') || 'null'); } catch (_) { }
+        try { kgPlayer = JSON.parse(localStorage.getItem('KG_Player') || 'null'); } catch (_) { }
+
+        const gameId = String((kgGame && kgGame.attrs && kgGame.attrs.game_id) || (kgGame && kgGame.game_id) || '');
+        const hasObjectLaunch = !!(kgGame && gameId === 'starfighter');
+
+        // Compatibility bridge: if this launch came from object handoff,
+        // keep URL params in sync for legacy code that still parses search params.
+        if (hasObjectLaunch && !p.has('mode') && kgGame.mode) {
+          p.set('mode', String(kgGame.mode));
+          if (kgGame.code) p.set('code', String(kgGame.code));
+          if (kgGame.playerCount) p.set('players', String(kgGame.playerCount));
+          const next = window.location.pathname + '?' + p.toString() + window.location.hash;
+          window.history.replaceState(null, '', next);
+        }
+
+        if (hasObjectLaunch) {
+          window.KG_Game = kgGame;
+          window.KG_Player = kgPlayer;
+        }
+
         // Check for x-dimensional session or query params
         const hasDimensionalSession = typeof window.KENSGAMES_SESSION !== 'undefined';
-        const isPlay = hasDimensionalSession || p.has('mode') || p.has('code') || p.has('session');
+        const isPlay = hasDimensionalSession || hasObjectLaunch || p.has('mode') || p.has('code') || p.has('session');
         if (!isPlay) {
           // Treat /starfighter/ as the landing; gameplay lives behind explicit modes/codes.
-          window.location.replace('/starfighter/lobby.html');
+          window.location.replace('/starfighter/lobby.html?v=20260501');
           return;
         }
 
@@ -2604,7 +2627,7 @@
       ⚔ TRY AGAIN
     </button>
     <!-- Lobby link -->
-    <a href="/starfighter/lobby.html" id="bee-lobby-link"
+    <a href="/starfighter/lobby.html?v=20260501" id="bee-lobby-link"
       style="display:none;margin-top:14px;font-size:0.7em;color:#886644;letter-spacing:2px;text-decoration:none;position:relative;z-index:1;">
       ← RETURN TO BRIEFING ROOM
     </a>
@@ -2850,8 +2873,8 @@
   </div>
 
   <!-- Three.js (global THREE + GLTFLoader) — required by bundle.js, intro.js, enhance.js -->
-  <script src="/lib/three/three.min.js"></script>
-  <script src="/lib/three/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <!-- Unified Manifold core + bridge — bundle.js's SpaceManifold delegates to window.Manifold -->
   <script src="/js/manifold.js"></script>
   <script src="/js/manifold_bridge.js"></script>

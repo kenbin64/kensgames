@@ -171,17 +171,30 @@
   </div>
   <div id="info">SPACE: Pause | ESC: Menu | MOUSE: Paddle | RIGHT-CLICK: Rotate | SCROLL: Zoom</div>
 
-  <script src="../../lib/three/three.min.js"></script>
-  <script src="../../lib/three/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="game.js"></script>
   <script>
     // Auto-launch from lobby intent: ?mode=solo | multi&players=N | private&code=X&players=N
     (function autoLaunchFromLobby() {
       try {
         const params = new URLSearchParams(location.search);
-        const mode = params.get('mode');
+        let mode = params.get('mode');
+        let playersFromObject = 0;
+
+        // Object handoff support (preferred).
+        if (!mode) {
+          let kgGame = null;
+          try { kgGame = JSON.parse(localStorage.getItem('KG_Game') || 'null'); } catch (_) { }
+          const gameId = String((kgGame && kgGame.attrs && kgGame.attrs.game_id) || (kgGame && kgGame.game_id) || '');
+          if (kgGame && gameId === 'brickbreaker3d') {
+            mode = String(kgGame.mode || 'solo');
+            playersFromObject = Math.max(2, Math.min(4, parseInt(kgGame.playerCount || '0', 10) || 0));
+          }
+        }
+
         if (!mode) return;
-        const players = Math.max(2, Math.min(4, parseInt(params.get('players') || '0', 10) || 0));
+        const players = playersFromObject || Math.max(2, Math.min(4, parseInt(params.get('players') || '0', 10) || 0));
         const start = () => {
           if (typeof startGame !== 'function') return false;
           if (mode === 'solo') startGame('easy');

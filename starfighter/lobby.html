@@ -25,6 +25,11 @@
       height: 100%;
       opacity: 0.22;
       pointer-events: none;
+      /* Prevent the canvas from contributing intrinsic size to the flex layout */
+      flex-shrink: 0;
+      flex-basis: 0;
+      max-height: 0;
+      overflow: hidden;
     }
 
     body {
@@ -503,7 +508,6 @@
 </head>
 
 <body>
-  <canvas id="gyroid-bg"></canvas>
   <div id="tron-grid"></div>
   <div id="scanlines"></div>
   <nav class="arc-nav">
@@ -583,12 +587,12 @@
 
   </div>
 
-  <script src="/gyroid.js"></script>
   <script src="/js/substrates/avatar_picker.js"></script>
   <script src="/js/substrates/player_profile.js"></script>
+  <script src="/js/substrates/game_manager.js?v=20260501"></script>
   <script src="/js/multiplayer-client.js"></script>
-  <script src="/js/substrates/multiplayer_panel.js"></script>
-  <script src="/js/substrates/game_setup.js"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260430"></script>
+  <script src="/js/substrates/game_setup.js?v=20260430"></script>
   <script>
     let username = localStorage.getItem('username') || 'Pilot';
     const av = AvatarPicker.get();
@@ -617,23 +621,63 @@
       });
     }
 
-    // Unified multiplayer panel: profile gate → mode chooser → roster build → launch.
-    // On launch: stash resolved session for game-side reader (phase 2) and hand off via
-    // the existing in-game URL contract so gameplay continues to work today.
-    KGGameSetup.mount('#mp-panel-host', {
-      gameId: 'starfighter',
-      gameName: 'Alien Space Attack',
-      minPlayers: 2,
-      maxPlayers: 6,
-      gamePath: '/starfighter/index.html',
-      onLaunch: ({ code, hasRemoteHumans }) => {
-        if (hasRemoteHumans) {
-          window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
-        } else {
-          window.location.href = '/starfighter/index.html?mode=solo';
+    function loadScriptOnce(src, testFn) {
+      return new Promise((resolve, reject) => {
+        if (testFn()) {
+          resolve();
+          return;
         }
-      },
-    });
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => (testFn() ? resolve() : reject(new Error('Loaded but symbol missing: ' + src)));
+        s.onerror = () => reject(new Error('Failed to load script: ' + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    function mountGameSetup() {
+      // Unified multiplayer panel: profile gate → mode chooser → roster build → launch.
+      // On launch: stash resolved session for game-side reader (phase 2) and hand off via
+      // the existing in-game URL contract so gameplay continues to work today.
+      KGGameSetup.mount('#mp-panel-host', {
+        gameId: 'starfighter',
+        gameName: 'Alien Space Attack',
+        minPlayers: 2,
+        maxPlayers: 6,
+        gamePath: '/starfighter/index.html',
+        onLaunch: (summary) => {
+          const mode = summary && summary.hasRemoteHumans ? 'private' : 'solo';
+          if (window.KGGameSetup && typeof window.KGGameSetup.persistGenericRuntime === 'function') {
+            window.KGGameSetup.persistGenericRuntime(summary, {
+              gameId: 'starfighter',
+              gameName: 'Alien Space Attack',
+              mode,
+            });
+            window.location.href = '/starfighter/index.html';
+            return;
+          }
+
+          const code = summary && summary.code ? summary.code : '';
+          if (mode === 'private') {
+            window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
+          } else {
+            window.location.href = '/starfighter/index.html?mode=solo';
+          }
+        },
+      });
+    }
+
+    Promise.resolve()
+      .then(() => loadScriptOnce('/js/substrates/multiplayer_panel.js?v=20260430', () => !!window.KGMultiplayerPanel))
+      .then(() => loadScriptOnce('/js/substrates/game_setup.js?v=20260430', () => !!window.KGGameSetup))
+      .then(() => mountGameSetup())
+      .catch((err) => {
+        console.error(err);
+        const host = document.querySelector('#mp-panel-host');
+        if (host) {
+          host.innerHTML = '<div class="empty">Game setup failed to load. Refresh and try again.</div>';
+        }
+      });
   </script>
 </body>
 

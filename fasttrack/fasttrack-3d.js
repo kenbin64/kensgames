@@ -162,6 +162,7 @@ const GameSettings = {
   cameraMode: 'manual',  // 'manual' (default) or 'auto'
   musicEnabled: false,
   soundEnabled: true,
+  showPegNames: true,
 
   load() {
     try {
@@ -171,6 +172,7 @@ const GameSettings = {
         this.cameraMode = s.cameraMode || 'manual';
         this.musicEnabled = s.musicEnabled ?? false;
         this.soundEnabled = s.soundEnabled ?? true;
+        this.showPegNames = s.showPegNames ?? false;
       }
     } catch (e) { }
   },
@@ -179,7 +181,8 @@ const GameSettings = {
     localStorage.setItem('fasttrack-settings', JSON.stringify({
       cameraMode: this.cameraMode,
       musicEnabled: this.musicEnabled,
-      soundEnabled: this.soundEnabled
+      soundEnabled: this.soundEnabled,
+      showPegNames: this.showPegNames
     }));
   }
 };
@@ -1040,9 +1043,9 @@ function createBilliardRoom() {
     };
 
     // ── "FAST" in cyan ──
-    neonText('FAST', 256, 80, 72, '#00ffff', '#00aaff');
+    neonText('FAST', 256, 80, 45, '#00ffff', '#00aaff');
     // ── "TRACK" in green ──
-    neonText('TRACK', 256, 160, 72, '#39ff14', '#22cc00');
+    neonText('TRACK', 256, 160, 45, '#39ff14', '#22cc00');
 
     // Decorative neon lines (top and bottom borders)
     nx.save();
@@ -1176,7 +1179,7 @@ function createBilliardRoom() {
     }
 
     // Number ring (outside the doubles)
-    dc.font = 'bold 22px Arial'; dc.textAlign = 'center'; dc.textBaseline = 'middle';
+    dc.font = 'bold 14px Arial'; dc.textAlign = 'center'; dc.textBaseline = 'middle';
     dc.fillStyle = '#ffffff';
     for (let s = 0; s < 20; s++) {
       const a = s * segAngle - Math.PI / 2;
@@ -2283,17 +2286,27 @@ async function init3D() {
       }
     }
 
-    // Params written by ai_setup.html (solo vs bots) and lobby.html (multiplayer):
-    //   ?quickplay=1&name=kbingh&avatar=🍟&difficulty=normal&players=4
-    const usp = new URLSearchParams(location.search);
+    // ── X-Dimensional config resolution ──────────────────────────────────
+    // KG_Game  { x, mode, code?, playerCount, aiDifficulty }  — game identity
+    // KG_Player{ x, name, avatar }                            — player identity
+    //
+    // Either can be resolved directly by its x without traversing the other.
+    // URL params are accepted as a legacy fallback for direct links / dev testing.
+    const kgGame = window.KG_Game || null;
+    const kgPlayer = window.KG_Player || null;
+
+    // Also read the legacy flat config key for any older callers
     let storedCfg = {};
     try {
       storedCfg = JSON.parse(localStorage.getItem('fasttrack-lobby') || '{}') || {};
-    } catch (_) {
-      storedCfg = {};
-    }
-    const gameMode = usp.get('mode') || 'solo';
-    const inviteCode = (usp.get('code') || '').toUpperCase();
+    } catch (_) { storedCfg = {}; }
+
+    // URL params — legacy fallback only
+    const usp = new URLSearchParams(location.search);
+
+    const gameMode = (kgGame?.mode) || usp.get('mode') || storedCfg.mode || 'solo';
+    const inviteCode = ((kgGame?.code) || usp.get('code') || storedCfg.code || '').toUpperCase();
+    const playerCount_raw = (kgGame?.playerCount) || usp.get('players') || storedCfg.playerCount || '2';
 
     let sessionCache = null;
     try {
@@ -2303,28 +2316,47 @@ async function init3D() {
       sessionCache = null;
     }
 
+    let runtimeCache = null;
+    try {
+      const rawRuntime = sessionStorage.getItem('kg_fasttrack_runtime');
+      if (rawRuntime) runtimeCache = JSON.parse(rawRuntime);
+    } catch (_) {
+      runtimeCache = null;
+    }
+
+    const runtimePlayers = Array.isArray(runtimeCache && runtimeCache.players) ? runtimeCache.players : [];
+    const runtimeCode = String((runtimeCache && runtimeCache.game && runtimeCache.game.code) || '').toUpperCase();
+
     const sessionPlayers = Array.isArray(sessionCache && sessionCache.players) ? sessionCache.players : [];
     const sessionCode = String((sessionCache && sessionCache.session_code) || '').toUpperCase();
-    const sameInviteSession = !inviteCode || (sessionCode && inviteCode === sessionCode);
+    const sameInviteSession = !inviteCode || ((sessionCode && inviteCode === sessionCode) || (runtimeCode && inviteCode === runtimeCode));
+    const runtimeHasRoster = runtimePlayers.length >= 2;
     const hasRemoteHumans = sessionPlayers.filter(p => p && !p.is_ai).length >= 2;
-    const useSessionRoster = gameMode === 'private' && sameInviteSession && hasRemoteHumans;
+    const useRuntimeRoster = gameMode === 'private' && sameInviteSession && runtimeHasRoster;
+    const useSessionRoster = !useRuntimeRoster && gameMode === 'private' && sameInviteSession && hasRemoteHumans;
+    const rosterPlayers = useRuntimeRoster ? runtimePlayers : sessionPlayers;
 
-    const playerCount = useSessionRoster
-      ? Math.max(2, Math.min(4, sessionPlayers.length))
-      : Math.max(2, Math.min(4,
-        parseInt(usp.get('players') || storedCfg.playerCount || '2', 10)
-      ));
-    const humanName = dimensionalConfig?.humanName || decodeURIComponent(usp.get('name') || storedCfg.humanName || 'You');
-    const humanAvatar = dimensionalConfig?.humanAvatar || decodeURIComponent(usp.get('avatar') || storedCfg.humanAvatar || '🎮');
-    const aiDifficulty = dimensionalConfig?.aiDifficulty || usp.get('difficulty') || storedCfg.aiDifficulty || 'normal';
+    const playerCount = (useRuntimeRoster || useSessionRoster)
+      ? Math.max(2, Math.min(6, rosterPlayers.length))
+      : Math.max(2, Math.min(6, parseInt(playerCount_raw, 10)));
+    const humanName = dimensionalConfig?.humanName || kgPlayer?.name || decodeURIComponent(storedCfg.humanName || 'You');
+    const humanAvatar = dimensionalConfig?.humanAvatar || kgPlayer?.avatar || decodeURIComponent(storedCfg.humanAvatar || '🎮');
+    const aiDifficulty = dimensionalConfig?.aiDifficulty || kgGame?.aiDifficulty || storedCfg.aiDifficulty || 'normal';
 
-    const initConfig = useSessionRoster
+    const initConfig = (useRuntimeRoster || useSessionRoster)
       ? {
         humanName,
         humanAvatar,
         aiDifficulty,
-        myUserId: sessionCache && sessionCache.my_user_id,
-        sessionPlayers,
+        myUserId: (sessionCache && sessionCache.my_user_id) || (runtimeCache && runtimeCache.session && runtimeCache.session.my_user_id),
+        sessionPlayers: rosterPlayers.map((p) => ({
+          user_id: p.user_id || p.id,
+          username: p.username || p.name || 'Player',
+          avatar: p.avatar || (p.avatarObj && (p.avatarObj.glyph || p.avatarObj.emoji)) || '👤',
+          avatar_id: p.avatar_id || (p.avatarObj && p.avatarObj.id) || null,
+          is_ai: !!(p.is_ai || p.isAI || p.is_bot),
+          is_host: !!p.is_host,
+        })),
       }
       : { humanName, humanAvatar, aiDifficulty };
 
@@ -2333,7 +2365,7 @@ async function init3D() {
       Object.assign(initConfig, dimensionalConfig);
     }
 
-    const isDevObserver = usp.get('dev_observer') === '1';
+    const isDevObserver = usp.get('dev_observer') === '1' || kgGame?.devObserver === true;
     if (isDevObserver) {
       console.log('🛠️ DEV OBSERVER MODE: Forcing all AI players.');
       initConfig.sessionPlayers = Array.from({ length: playerCount }, (_, i) => ({
@@ -2475,7 +2507,7 @@ function _buildArtOverlay() {
     #ago-close {
       position: absolute; top: 12px; right: 14px;
       background: none; border: none;
-      color: rgba(255,255,255,0.45); font-size: 20px;
+      color: rgba(255,255,255,0.45); font-size: 12px;
       cursor: pointer; line-height: 1;
       transition: color 0.2s;
     }
@@ -2493,14 +2525,14 @@ function _buildArtOverlay() {
     }
     #ago-title {
       margin: 0 0 6px;
-      font-size: clamp(18px, 2.4vw, 28px);
+      font-size: clamp(11px, 1.48vw, 17px);
       font-family: Georgia, serif;
       color: #ffe8b0;
       letter-spacing: 0.04em;
     }
     #ago-details {
       margin: 0 0 16px;
-      font-size: clamp(12px, 1.4vw, 16px);
+      font-size: clamp(7px, 0.87vw, 10px);
       color: rgba(240,232,216,0.7);
       font-style: italic;
     }
@@ -2509,7 +2541,7 @@ function _buildArtOverlay() {
       background: linear-gradient(135deg, #8B1a00, #cc4400);
       color: #fff;
       border: none; border-radius: 4px;
-      font-size: clamp(13px, 1.5vw, 17px);
+      font-size: clamp(8px, 0.93vw, 11px);
       font-weight: 600;
       cursor: pointer;
       letter-spacing: 0.03em;
@@ -3517,7 +3549,7 @@ function createBullseye() {
   // Helper: draw text along a circular arc
   function drawArcText(ctx, text, ctrX, ctrY, radius, centerAngle, charSpacing, topSide) {
     ctx.save();
-    ctx.font = 'bold 36px "Georgia", serif';
+    ctx.font = 'bold 22px "Georgia", serif';
     ctx.fillStyle = '#ffd700';
     ctx.strokeStyle = '#8B6914';
     ctx.lineWidth = 2;
@@ -3599,7 +3631,7 @@ function createPlayerMarkerSprite(name, color, avatar) {
 
   // Measure text to size the pill
   const displayText = `${avatar || '🎮'} ${name}`;
-  ctx.font = 'bold 20px Arial';
+  ctx.font = 'bold 12px Arial';
   const tw = ctx.measureText(displayText).width;
   const pillW = Math.min(tw + 28, 248);
   const cx = canvas.width / 2;
@@ -3635,7 +3667,7 @@ function createPlayerMarkerSprite(name, color, avatar) {
     depthTest: false
   });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(50, 16, 1);
+  sprite.scale.set(31, 10, 1);
   sprite.renderOrder = 100;
   return sprite;
 }
@@ -3697,34 +3729,36 @@ function blinkPlayerMarker(playerIdx, onDone) {
 function createPegNameSprite(name) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
-  canvas.height = 64;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d');
 
   // Measure text to size the pill
-  ctx.font = 'bold 24px Arial';
+  ctx.font = '700 20pt Arial';
   const tw = ctx.measureText(name).width;
-  const pillW = Math.min(tw + 24, 250);
+  const pillW = Math.min(tw + 32, 248);
+  const pillH = 80;
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-  const r = 16;
+  const r = 20;
 
-  // Rounded-rect pill background
+  // Square rounded-rect background
   ctx.beginPath();
-  ctx.moveTo(cx - pillW / 2 + r, cy - r);
-  ctx.lineTo(cx + pillW / 2 - r, cy - r);
-  ctx.arcTo(cx + pillW / 2, cy - r, cx + pillW / 2, cy, r);
-  ctx.arcTo(cx + pillW / 2, cy + r, cx + pillW / 2 - r, cy + r, r);
-  ctx.lineTo(cx - pillW / 2 + r, cy + r);
-  ctx.arcTo(cx - pillW / 2, cy + r, cx - pillW / 2, cy, r);
-  ctx.arcTo(cx - pillW / 2, cy - r, cx - pillW / 2 + r, cy - r, r);
+  ctx.moveTo(cx - pillW / 2 + r, cy - pillH / 2);
+  ctx.lineTo(cx + pillW / 2 - r, cy - pillH / 2);
+  ctx.arcTo(cx + pillW / 2, cy - pillH / 2, cx + pillW / 2, cy - pillH / 2 + r, r);
+  ctx.arcTo(cx + pillW / 2, cy + pillH / 2, cx + pillW / 2 - r, cy + pillH / 2, r);
+  ctx.lineTo(cx - pillW / 2 + r, cy + pillH / 2);
+  ctx.arcTo(cx - pillW / 2, cy + pillH / 2, cx - pillW / 2, cy + pillH / 2 - r, r);
+  ctx.arcTo(cx - pillW / 2, cy - pillH / 2, cx - pillW / 2 + r, cy - pillH / 2, r);
   ctx.closePath();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
   ctx.fill();
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
 
   // Name text
+  ctx.font = '700 20pt Arial';
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -3734,11 +3768,12 @@ function createPegNameSprite(name) {
   const spriteMat = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
-    depthTest: false
+    depthTest: false,
+    sizeAttenuation: true,
   });
   const sprite = new THREE.Sprite(spriteMat);
-  // Wider than tall to match pill shape (256:64 = 4:1 canvas, scale accordingly)
-  sprite.scale.set(40, 10, 1);
+  // Square world-space tooltip, attenuates with distance.
+  sprite.scale.set(72, 72, 1);
   sprite.renderOrder = 100;
   return sprite;
 }
@@ -3765,6 +3800,47 @@ function showPegNames(pegNameMap) {
     sprite.position.y = PEG_HEIGHT + 20;
     sprite.visible = true;
     peg.mesh.add(sprite);
+    peg.nameSprite = sprite;
+  }
+}
+
+function hidePegNames() {
+  pegRegistry.forEach(peg => {
+    if (peg.nameSprite) {
+      peg.nameSprite.visible = false;
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// PEG CREATION - Tall Light Bright style with intense glow
+// ════════════════════════════════════════════════════════════════
+function createPeg(id, playerIndex, holeId, colorIndex = null) {
+  const colorIdx = colorIndex !== null ? colorIndex : playerIndex;
+  const color = RAINBOW_COLORS[colorIdx];
+  const hole = holeRegistry.get(holeId);
+
+  if (!hole) {
+    console.warn(`[createPeg] Hole ${holeId} not found`);
+    return null;
+  }
+
+  const pegGroup = new THREE.Group();
+
+  // ── OUTER SHELL — translucent colored glass ──
+  // 🜂 ManifoldGeometry.peg: x=angle, y=height, z=x·y stamped into manifoldZ attribute
+  const bodyGeo = window.ManifoldGeometry
+    ? ManifoldGeometry.peg(PEG_TOP_RADIUS, PEG_BOTTOM_RADIUS, PEG_HEIGHT, 32)
+    : new THREE.CylinderGeometry(PEG_TOP_RADIUS, PEG_BOTTOM_RADIUS, PEG_HEIGHT, 32);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.08,
+    metalness: 0.15,
+    emissive: new THREE.Color(color),
+    emissiveIntensity: 0.35,
+    transparent: true,
+    opacity: 0.75,
+    envMapIntensity: 1.5
   });
 
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
@@ -4365,16 +4441,20 @@ function renderBoard3D() {
     }
   });
 
-  // ── Always show peg name sprites for all on-board pegs ──
-  const pegNameMap = {};
-  players.forEach(player => {
-    for (const peg of player.pegs) {
-      if (peg.holeId !== 'holding') {
-        pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
+  // Optional peg labels (off by default to avoid occluding the board).
+  if (GameSettings.showPegNames) {
+    const pegNameMap = {};
+    players.forEach(player => {
+      for (const peg of player.pegs) {
+        if (peg.holeId !== 'holding') {
+          pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
+        }
       }
-    }
-  });
-  showPegNames(pegNameMap);
+    });
+    showPegNames(pegNameMap);
+  } else {
+    hidePegNames();
+  }
 
   // Lower animation barrier — if no anims were started, this fires _onAnimsDone immediately
   _lowerBarrier();
@@ -4940,6 +5020,19 @@ window.hidePegNames = hidePegNames;
 window.updatePlayerMarkers = updatePlayerMarkers;
 window.blinkPlayerMarker = blinkPlayerMarker;
 
+async function startInit3D() {
+  try {
+    await init3D();
+  } catch (err) {
+    console.error('❌ FastTrack 3D init failed:', err);
+    window.dispatchEvent(new CustomEvent('ft3d:error', {
+      detail: {
+        message: err && err.message ? err.message : String(err)
+      }
+    }));
+  }
+}
+
 // Auto-initialize when DOM ready
-document.addEventListener('DOMContentLoaded', init3D);
+document.addEventListener('DOMContentLoaded', startInit3D);
 

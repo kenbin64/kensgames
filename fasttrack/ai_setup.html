@@ -909,14 +909,41 @@
             localStorage.setItem('fasttrack_sfx', sfxOn ? 'on' : 'off');
             localStorage.setItem('fasttrack_camera', cameraAuto ? 'auto' : 'manual');
 
-            var params = new URLSearchParams({
-                quickplay: '1',
+            var KG_Game = {
+                x: 'fasttrack:' + Date.now(),
+                mode: 'solo',
+                code: null,
+                playerCount: Math.max(2, Math.min(6, parseInt(selectedPlayers, 10) || 2)),
+                aiDifficulty: selectedDifficulty,
+                attrs: {
+                    game_id: 'fasttrack'
+                }
+            };
+
+            var KG_Player = {
+                x: playerName,
+                user_id: playerName,
                 name: playerName,
+                username: playerName,
                 avatar: selectedAvatar,
-                difficulty: selectedDifficulty,
-                players: selectedPlayers
-            });
-            window.location.href = '3d.html?' + params.toString();
+                avatarObj: {
+                    id: selectedAvatar,
+                    glyph: selectedAvatar
+                }
+            };
+
+            localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
+            localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
+            localStorage.setItem('fasttrack-lobby', JSON.stringify({
+                mode: KG_Game.mode,
+                code: null,
+                humanName: KG_Player.name,
+                humanAvatar: KG_Player.avatar,
+                aiDifficulty: KG_Game.aiDifficulty,
+                playerCount: String(KG_Game.playerCount),
+            }));
+
+            window.location.href = '3d.html';
         }
 
         // ═══ INIT ═══
