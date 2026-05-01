@@ -1145,9 +1145,16 @@ function cutLabel(dest) {
   return victim ? ` — send ${victim.name}'s peg home` : '';
 }
 
+function setOptionsPanelVisible(visible) {
+  const panel = document.getElementById('panel-options');
+  if (!panel) return;
+  panel.style.display = visible ? 'block' : 'none';
+}
+
 function showMoveHints() {
   const hintsDiv = document.getElementById('move-hints');
   if (!hintsDiv) return;
+  setOptionsPanelVisible(true);
   const vm = state.turn.get('validMoves') || [];
   if (vm.length === 0) {
     hintsDiv.innerHTML = '<div class="hint" style="opacity:0.5;">No moves available — passing turn</div>';
@@ -1438,6 +1445,7 @@ function executeMove(moveIdx) {
   // Also clear the hint buttons from the UI right away
   const hintsEl = document.getElementById('move-hints');
   if (hintsEl) hintsEl.innerHTML = '';
+  setOptionsPanelVisible(false);
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const player = players[ci];
@@ -1828,6 +1836,7 @@ function endTurn() {
   if (infoEl) infoEl.textContent = 'Draw a card';
   const hintsDiv = document.getElementById('move-hints');
   if (hintsDiv) hintsDiv.innerHTML = '';
+  setOptionsPanelVisible(false);
   updateUI();
 
   // Gate: wait for camera to settle, THEN blink avatar 3 times, THEN enable turn
@@ -2092,6 +2101,7 @@ function updateUI() {
         <div class="player-row ${i === ci ? 'active' : ''}">
           <div class="player-color" style="background: ${p.color};"></div>
           <span class="player-name">${p.name}</span>
+          ${i === ci ? '<span class="turn-chip">TURN</span>' : ''}
           <span class="player-pegs">${onBoard}/${PEGS_PER_PLAYER} (🏠${inSafe})</span>
         </div>`;
     }).join('');
@@ -2106,7 +2116,7 @@ function updateUI() {
   if (gs) {
     const cp = players[ci];
     // Always show the player's actual name — reflects URL ?name= param
-    gs.textContent = `${cp.name}'s turn`;
+    gs.textContent = `▶ ${cp.name.toUpperCase()} TURN`;
   }
 
   // Refresh manifold metrics panel

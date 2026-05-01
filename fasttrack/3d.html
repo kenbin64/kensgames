@@ -361,6 +361,38 @@
       border-left: 2px solid rgba(0, 180, 255, 0.7);
       box-shadow: inset 0 0 12px rgba(0, 180, 255, 0.06), 0 2px 8px rgba(0, 180, 255, 0.15);
       transform: perspective(600px) rotateY(0deg) translateX(3px) scale(1.02);
+      outline: 2px solid rgba(255, 224, 51, 0.9);
+      box-shadow: inset 0 0 16px rgba(0, 180, 255, 0.22), 0 0 14px rgba(255, 224, 51, 0.75), 0 2px 8px rgba(0, 180, 255, 0.2);
+      animation: playerTurnPulse 1.15s ease-in-out infinite;
+    }
+
+    @keyframes playerTurnPulse {
+
+      0%,
+      100% {
+        box-shadow: inset 0 0 16px rgba(0, 180, 255, 0.18), 0 0 8px rgba(255, 224, 51, 0.45), 0 2px 8px rgba(0, 180, 255, 0.18);
+      }
+
+      50% {
+        box-shadow: inset 0 0 24px rgba(0, 180, 255, 0.28), 0 0 18px rgba(255, 224, 51, 0.95), 0 2px 12px rgba(0, 180, 255, 0.28);
+      }
+    }
+
+    .turn-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.68em;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #111;
+      background: linear-gradient(135deg, #ffe033, #ffc400);
+      box-shadow: 0 0 8px rgba(255, 224, 51, 0.75);
+      margin-left: 4px;
+      flex-shrink: 0;
     }
 
     .player-color {
@@ -392,12 +424,32 @@
       position: fixed;
       bottom: 12px;
       left: 12px;
-      z-index: 30;
+      z-index: 55;
       border-radius: 14px;
       padding: 12px 14px;
       font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       transform: perspective(800px) rotateY(1.5deg) rotateX(0.5deg);
       width: 200px;
+    }
+
+    /* Dedicated options panel so move choices never cover the selected card. */
+    #panel-options {
+      position: fixed;
+      bottom: 12px;
+      left: 226px;
+      z-index: 70;
+      display: none;
+      border-radius: 14px;
+      padding: 12px;
+      width: min(420px, calc(100vw - 252px));
+      max-height: 46vh;
+      overflow: auto;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      transform: perspective(800px) rotateY(0.6deg) rotateX(0.25deg);
+    }
+
+    #panel-options:hover {
+      transform: perspective(800px) rotateY(0deg) rotateX(0deg);
     }
 
     #panel-action:hover {
@@ -513,7 +565,7 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      margin-top: 8px;
+      margin-top: 0;
     }
 
     @keyframes hintPulse {
@@ -947,8 +999,8 @@
       #panel-action {
         bottom: 0;
         left: 0;
-        right: 0;
-        width: 100%;
+        right: auto;
+        width: auto;
         border-radius: 12px 12px 0 0;
         padding: 5px 8px;
         transform: none;
@@ -956,6 +1008,17 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
+      }
+
+      #panel-options {
+        left: 0;
+        right: 0;
+        bottom: 58px;
+        width: 100%;
+        max-height: 32vh;
+        border-radius: 12px 12px 0 0;
+        padding: 8px;
+        transform: none;
       }
 
       #panel-action:hover {
@@ -979,7 +1042,9 @@
       }
 
       #card-info {
-        display: none;
+        display: block;
+        font-size: 0.78em;
+        line-height: 1.2;
       }
 
       #draw-btn {
@@ -1633,6 +1698,10 @@
       <div id="card-info">Draw a card</div>
     </div>
     <button id="draw-btn" onclick="drawCard()">🃏 Draw</button>
+  </div>
+
+  <!-- ── Move options panel — separate so choices never hide selected card ── -->
+  <div id="panel-options" class="glass-panel">
     <div id="move-hints"></div>
   </div>
 
@@ -1732,7 +1801,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260501"></script>
+  <script src="fasttrack-game-core.js?v=20260501j"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
