@@ -659,6 +659,13 @@
       box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
     }
 
+    .split-ratio-btn:disabled {
+      opacity: 0.32;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
     .split-pairs {
       display: flex;
       flex-direction: column;
@@ -1801,7 +1808,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260501j"></script>
+  <script src="fasttrack-game-core.js?v=20260501k"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer

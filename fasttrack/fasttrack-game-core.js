@@ -598,7 +598,8 @@ function drawCard() {
   state.deck.set('cards', deck);
   state.deck.set('currentCard', card);
   state.turn.set('phase', 'move');
-  _splitSelectedRatio = null; // Reset split selector on new card
+  _splitPegIdx = null;
+  _splitStepChoice = null;
 
   const cardEl = document.getElementById('current-card');
   if (cardEl) cardEl.textContent = card.display;
@@ -1228,7 +1229,11 @@ function showMoveHints() {
 
       case 'enterFastTrack':
         icon = '⚡';
-        label = `${dotName} enters FastTrack`;
+        if (peg && peg.onFasttrack) {
+          label = `${dotName} traverses FastTrack`;
+        } else {
+          label = `${dotName} enters FastTrack`;
+        }
         break;
 
       case 'exitFastTrack': {
@@ -1282,67 +1287,108 @@ function showMoveHints() {
 // ═══════════════════════════════════════════════════════════════════════════
 // SPLIT SELECTOR — two-step interactive 7-split UI
 // ═══════════════════════════════════════════════════════════════════════════
-let _splitSelectedRatio = null;
+let _splitPegIdx = null;
+let _splitStepChoice = null;
+
+function splitPegLabel(player, pegIdx) {
+  const peg = player && player.pegs ? player.pegs[pegIdx] : null;
+  const nickname = peg && peg.nickname ? peg.nickname : `Peg ${Number(pegIdx) + 1}`;
+  return `${nickname} (Peg ${Number(pegIdx) + 1})`;
+}
+
+function splitMoveMatchesChoice(move, pegIdx, stepChoice) {
+  if (!move || move.type !== 'split') return false;
+  const p = Number(pegIdx);
+  const s = Number(stepChoice);
+  return (move.pegIdx === p && move.steps === s) || (move.peg2Idx === p && move.steps2 === s);
+}
 
 function renderSplitSelector(splitMoves, allMoves) {
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const player = players[ci];
 
-  // Group splits by ratio (a+b)
-  const ratioMap = new Map(); // "a+b" → [moveIndices]
+  // Build peg -> first-step options from legal split moves.
+  const pegMap = new Map(); // pegIdx -> Set<steps>
   for (const m of splitMoves) {
-    const key = `${m.steps}+${m.steps2}`;
-    if (!ratioMap.has(key)) ratioMap.set(key, []);
-    ratioMap.get(key).push(allMoves.indexOf(m));
+    if (!pegMap.has(m.pegIdx)) pegMap.set(m.pegIdx, new Set());
+    if (!pegMap.has(m.peg2Idx)) pegMap.set(m.peg2Idx, new Set());
+    pegMap.get(m.pegIdx).add(m.steps);
+    pegMap.get(m.peg2Idx).add(m.steps2);
   }
 
-  // Deduplicate symmetric ratios for display (show 1+6 and 6+1 separately since different pegs move different amounts)
-  const ratios = Array.from(ratioMap.keys());
+  const pegOptions = Array.from(pegMap.keys()).sort((a, b) => a - b);
+  if (!pegOptions.includes(_splitPegIdx)) {
+    _splitPegIdx = pegOptions.length ? pegOptions[0] : null;
+    _splitStepChoice = null;
+  }
 
-  let html = '<div class="split-header">✂️ SPLIT 7</div>';
+  const stepOptions = _splitPegIdx != null && pegMap.get(_splitPegIdx)
+    ? Array.from(pegMap.get(_splitPegIdx)).sort((a, b) => a - b)
+    : [];
+  if (!stepOptions.includes(_splitStepChoice)) {
+    _splitStepChoice = null;
+  }
 
-  // Step 1: Ratio buttons
+  const candidateIndices = (_splitPegIdx != null && _splitStepChoice != null)
+    ? splitMoves
+      .map((m) => allMoves.indexOf(m))
+      .filter((idx) => idx >= 0 && splitMoveMatchesChoice(allMoves[idx], _splitPegIdx, _splitStepChoice))
+    : [];
+
+  let html = '<div class="split-header">✂️ Split 7 · Pick Peg + First Steps</div>';
+  html += '<div style="font-size:0.82em;color:rgba(255,255,255,0.75);text-align:center;padding:2px 0 8px;">Card 7 is active. Choose one peg and its first move; the remaining steps complete to 7 automatically.</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:8px;padding:4px 2px 8px;">';
+
+  html += '<label style="font-size:0.82em;color:#9fdcff;">Eligible Peg</label>';
+  html += '<select onchange="selectSplitPeg(this.value)" style="padding:9px;border-radius:8px;background:rgba(8,20,34,0.92);color:#e8f6ff;border:1px solid rgba(80,180,255,0.35);">';
+  for (const pegIdx of pegOptions) {
+    const selected = pegIdx === _splitPegIdx ? ' selected' : '';
+    html += `<option value="${pegIdx}"${selected}>${splitPegLabel(player, pegIdx)}</option>`;
+  }
+  html += '</select>';
+
+  html += '<label style="font-size:0.82em;color:#9fdcff;">First Move Steps (1-7)</label>';
   html += '<div class="split-ratios">';
-  for (const r of ratios) {
-    const [a, b] = r.split('+');
-    const selected = _splitSelectedRatio === r ? ' selected' : '';
-    html += `<div class="split-ratio-btn${selected}" onclick="selectSplitRatio('${r}')">${a} + ${b}</div>`;
+  for (let n = 1; n <= 7; n++) {
+    const legal = stepOptions.includes(n);
+    const selected = n === _splitStepChoice;
+    html += `<button class="split-ratio-btn${selected ? ' selected' : ''}" ${legal ? '' : 'disabled'} `
+      + `onmouseenter="previewSplitChoice(${_splitPegIdx != null ? _splitPegIdx : -1}, ${n})" `
+      + `onmouseleave="clearSplitPreview()" `
+      + `onclick="selectSplitSteps(${n})">${n}</button>`;
   }
   html += '</div>';
 
-  // Step 2: If a ratio is selected, show peg pairs
-  if (_splitSelectedRatio && ratioMap.has(_splitSelectedRatio)) {
-    const indices = ratioMap.get(_splitSelectedRatio);
-    const [selA, selB] = _splitSelectedRatio.split('+').map(Number);
-
-    html += '<div class="split-pairs">';
-    for (const idx of indices) {
-      const m = allMoves[idx];
-      const peg1 = player.pegs[m.pegIdx];
-      const peg2 = player.pegs[m.peg2Idx];
-      const name1 = peg1.nickname || `Peg ${m.pegIdx + 1}`;
-      const name2 = peg2.nickname || `Peg ${m.peg2Idx + 1}`;
-      const cut1 = cutLabel(m.dest);
-      const cut2 = cutLabel(m.dest2);
-      const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${player.color};margin-right:4px;vertical-align:middle;box-shadow:0 0 3px ${player.color}"></span>`;
-
-      // Describe destinations briefly
-      const dest1Desc = describeHole(m.dest);
-      const dest2Desc = describeHole(m.dest2);
-
-      html += `<div class="split-pair" onclick="executeMove(${idx})" `
-        + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${idx})" `
-        + `onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">`;
-      html += `${dot}<span>${name1} → ${dest1Desc}${cut1}</span>`;
-      html += `<span class="split-arrow">│</span>`;
-      html += `${dot}<span>${name2} → ${dest2Desc}${cut2}</span>`;
-      html += `</div>`;
+  if (_splitPegIdx != null && _splitStepChoice != null) {
+    if (candidateIndices.length === 1) {
+      const chosen = allMoves[candidateIndices[0]];
+      const primaryLabel = splitPegLabel(player, _splitPegIdx);
+      const otherPegIdx = chosen.pegIdx === _splitPegIdx ? chosen.peg2Idx : chosen.pegIdx;
+      const otherSteps = chosen.pegIdx === _splitPegIdx ? chosen.steps2 : chosen.steps;
+      html += `<div style="font-size:0.82em;color:#b7ffd6;">${primaryLabel} moves ${_splitStepChoice}. Then ${splitPegLabel(player, otherPegIdx)} moves ${otherSteps}.</div>`;
+      html += `<button class="hint" style="margin-top:4px;" onclick="executeMove(${candidateIndices[0]})" `
+        + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${candidateIndices[0]})" `
+        + `onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">✅ Execute Split 7</button>`;
+    } else if (candidateIndices.length > 1) {
+      html += '<div style="font-size:0.82em;color:#ffd7a8;">Multiple legal completions found. Pick the completion path:</div>';
+      html += '<div class="split-pairs">';
+      for (const idx of candidateIndices) {
+        const m = allMoves[idx];
+        const peg1 = splitPegLabel(player, m.pegIdx);
+        const peg2 = splitPegLabel(player, m.peg2Idx);
+        html += `<div class="split-pair" onclick="executeMove(${idx})" `
+          + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${idx})" `
+          + `onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">`
+          + `<span>${peg1} ${m.steps} + ${peg2} ${m.steps2}</span></div>`;
+      }
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:0.82em;color:#ffb5b5;">No legal split with this peg/step selection.</div>';
     }
-    html += '</div>';
-    html += `<div class="split-back-btn" onclick="selectSplitRatio(null)">↩ back to ratios</div>`;
   }
 
+  html += '</div>';
   return html;
 }
 
@@ -1357,11 +1403,38 @@ function describeHole(holeId) {
   return holeId;
 }
 
-function selectSplitRatio(ratio) {
-  _splitSelectedRatio = ratio;
+function selectSplitPeg(pegIdx) {
+  const parsed = Number(pegIdx);
+  _splitPegIdx = Number.isFinite(parsed) ? parsed : null;
+  _splitStepChoice = null;
+  showMoveHints();
+}
+
+function selectSplitSteps(step) {
+  const parsed = Number(step);
+  _splitStepChoice = Number.isFinite(parsed) ? parsed : null;
   showMoveHints(); // Re-render with selection
 }
-window.selectSplitRatio = selectSplitRatio;
+
+function previewSplitChoice(pegIdx, step) {
+  const vm = state.turn.get('validMoves') || [];
+  const matching = vm
+    .map((m, idx) => ({ m, idx }))
+    .filter(({ m }) => splitMoveMatchesChoice(m, pegIdx, step))
+    .map(({ idx }) => vm[idx]);
+  if (matching.length === 0) return;
+  if (window.highlightMovePaths) window.highlightMovePaths(matching);
+}
+
+function clearSplitPreview() {
+  const vm = state.turn.get('validMoves') || [];
+  if (window.highlightMovePaths) window.highlightMovePaths(vm);
+}
+
+window.selectSplitPeg = selectSplitPeg;
+window.selectSplitSteps = selectSplitSteps;
+window.previewSplitChoice = previewSplitChoice;
+window.clearSplitPreview = clearSplitPreview;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MOVE EXECUTION
