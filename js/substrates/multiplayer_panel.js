@@ -1137,9 +1137,38 @@
       const session = (data && data.session) || (_mp && _mp.session);
       const activeUserId = _myUserId || (_mp && _mp.userId) || null;
       const launchPayload = cloneLaunchSession(session, activeUserId);
+      const launchFailSafe = setTimeout(() => {
+        if (_state === STATE.LAUNCHING) {
+          _error = 'Launch handoff did not complete. Please try Launch again.';
+          _state = STATE.LOBBY;
+          render();
+        }
+      }, 4500);
       try { root.KGSession = launchPayload; } catch { /* ignore */ }
-      try { _opts.onLaunch && _opts.onLaunch(launchPayload); }
-      catch (e) { console.error('[KGMultiplayerPanel] onLaunch threw:', e); }
+      try {
+        const launchResult = _opts.onLaunch && _opts.onLaunch(launchPayload);
+        if (launchResult && typeof launchResult.then === 'function') {
+          launchResult.catch((e) => {
+            if (_state === STATE.LAUNCHING) {
+              _error = 'Launch failed. Please try again.';
+              _state = STATE.LOBBY;
+              render();
+            }
+            console.error('[KGMultiplayerPanel] onLaunch rejected:', e);
+          });
+        }
+      }
+      catch (e) {
+        if (_state === STATE.LAUNCHING) {
+          _error = 'Launch failed. Please try again.';
+          _state = STATE.LOBBY;
+          render();
+        }
+        console.error('[KGMultiplayerPanel] onLaunch threw:', e);
+      }
+      finally {
+        if (_state !== STATE.LAUNCHING) clearTimeout(launchFailSafe);
+      }
     });
     _mp.on('error', (msg) => { _error = msg || 'Server error'; _state = STATE.ERROR; render(); });
     _mp.on('disconnected', () => {
