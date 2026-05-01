@@ -71,6 +71,10 @@ class KGMultiplayer {
       const av = JSON.parse(localStorage.getItem('kg_avatar'));
       avatarId = av && av.id ? av.id : null;
     } catch { /* ignore */ }
+    const reservedBotAvatar = new Set(['🤖', 'robot', 'scifi_robot', 'custom_🤖', 'faces_🤖']);
+    if (avatarId && reservedBotAvatar.has(String(avatarId).trim())) {
+      avatarId = 'person_smile';
+    }
 
     this.ws = new WebSocket(this.wsUrl());
 

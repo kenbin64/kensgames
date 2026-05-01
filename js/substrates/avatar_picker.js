@@ -12,6 +12,7 @@
 
 const AvatarPicker = (() => {
     const KEY = 'kg_avatar';
+    const RESERVED_BOT_AVATAR_TOKENS = new Set(['🤖', 'robot', 'scifi_robot', 'custom_🤖', 'faces_🤖']);
 
     const CATS = [
         {
@@ -36,7 +37,7 @@ const AvatarPicker = (() => {
             id: 'faces', label: 'Faces', emojis: [
                 ['😊', 'Smiling'], ['😎', 'Cool'], ['🤩', 'Star'], ['🥳', 'Party'], ['😤', 'Determined'],
                 ['🤔', 'Thinker'], ['🤓', 'Nerd'], ['😏', 'Slick'], ['😈', 'Villain'], ['👾', 'Alien Blob'],
-                ['🤖', 'Robot'], ['💀', 'Skull'], ['🎭', 'Drama'], ['👻', 'Ghost'], ['🎃', 'Jack-O'],
+                ['💀', 'Skull'], ['🎭', 'Drama'], ['👻', 'Ghost'], ['🎃', 'Jack-O'],
                 ['🥸', 'Disguise'], ['🤠', 'Cowboy'], ['🥶', 'Frozen'], ['🤯', 'Mind Blown'], ['😤', 'Fierce'],
             ]
         },
@@ -91,6 +92,12 @@ const AvatarPicker = (() => {
         const id = raw.id ? String(raw.id) : '';
         const emoji = raw.emoji ? String(raw.emoji) : '';
         const name = raw.name ? String(raw.name) : '';
+
+        if (RESERVED_BOT_AVATAR_TOKENS.has(id) || RESERVED_BOT_AVATAR_TOKENS.has(emoji)) {
+            const fallback = { id: 'faces_😊', emoji: '😊', name: 'Smiling' };
+            try { localStorage.setItem(KEY, JSON.stringify(fallback)); } catch { /* ignore */ }
+            return fallback;
+        }
 
         // A valid emoji avatar should not be plain alphabetic text.
         const looksLikeWord = emoji && /^[A-Za-z\s\-]+$/.test(emoji);

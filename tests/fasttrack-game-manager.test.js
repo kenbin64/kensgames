@@ -27,6 +27,7 @@ function sampleSession() {
     session_id: 's_123',
     session_code: 'ABCD12',
     game_id: 'fasttrack',
+    game_uuid: 'g_abc_001',
     host_id: 'u1',
     my_user_id: 'u1',
     is_host: true,
@@ -52,6 +53,8 @@ test('createFastTrackRuntimeFromSession builds Player[] and injects into FastTra
   assert.equal(runtime.game.players.length, 3);
   assert.equal(runtime.payload.schema, 'kg.fasttrack.runtime/1');
   assert.equal(runtime.payload.game.code, 'ABCD12');
+  assert.equal(runtime.payload.game.game_uuid, 'g_abc_001');
+  assert.equal(runtime.payload.session.game_uuid, 'g_abc_001');
   assert.equal(runtime.payload.me.user_id, 'u1');
 });
 

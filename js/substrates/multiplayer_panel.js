@@ -53,6 +53,7 @@
   let _launchingNow = false;
   let _profileNameDraft = '';
   let _profileAvatarDraft = null;
+  let _localEditPlayerId = null;
 
   // ── CSS (injected once) ─────────────────────────────────────────────
   // Canonical KensGames Tron palette: cyan (primary), green (go), purple (AI/accent).
@@ -91,7 +92,7 @@
   transform:scale(1.25);}
 .kg-mp .step{animation:kgFade 240ms ease;}
 @keyframes kgFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-.kg-mp .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.kg-mp .mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
 .kg-mp .mode-btn{background:rgba(0,0,0,0.4);border:1.5px solid rgba(0,255,255,0.4);
   color:#fff;padding:32px 14px;border-radius:8px;text-align:center;cursor:pointer;
   transition:all 200ms ease;font-family:inherit;}
@@ -299,10 +300,47 @@
     person_generic: '👤',
   };
 
+  function isReservedBotAvatar(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    return raw === '🤖' || raw === 'robot' || raw === 'scifi_robot' || raw === 'custom_🤖' || raw === 'faces_🤖';
+  }
+
   function isLikelyEmoji(text) {
     if (!text) return false;
     // Basic emoji-range check; avoids rendering leaked raw words like "cool".
     return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(String(text));
+  }
+
+  const LOCAL_HUMAN_AVATARS = ['🎮', '🧩', '🚀', '🦊', '🐯', '🦸', '👑', '🎲', '⚡', '🌟'];
+
+  function nextLocalHumanAvatar(players) {
+    const used = new Set((players || []).map(p => String((p && p.avatar_id) || '')));
+    for (const av of LOCAL_HUMAN_AVATARS) {
+      if (!used.has(av)) return av;
+    }
+    return '🎮';
+  }
+
+  function sanitizeLocalPlayerName(raw, fallback) {
+    const cleaned = String(raw || '').trim().replace(/\s+/g, ' ').slice(0, 18);
+    if (cleaned.length >= 1) return cleaned;
+    return String(fallback || 'Player').slice(0, 18);
+  }
+
+  function normalizeLocalHumanAvatar(value, players, playerId) {
+    const raw = String(value || '').trim();
+    if (!raw || isReservedBotAvatar(raw)) {
+      const others = (players || []).filter(p => p && p.user_id !== playerId);
+      return nextLocalHumanAvatar(others);
+    }
+    return raw;
+  }
+
+  function editLocalHuman(playerId) {
+    if (_mode !== 'same-screen' || !_mp || !_mp.session) return;
+    _localEditPlayerId = playerId;
+    render();
   }
 
   function avatarGlyph(p) {
@@ -310,6 +348,7 @@
     if (!p.avatar_id) return '👤';
     const raw = String(p.avatar_id || '').trim();
     if (!raw) return '👤';
+    if (isReservedBotAvatar(raw)) return '👤';
     if (isLikelyEmoji(raw)) return raw;
     if (AVATAR_GLYPH_BY_ID[raw]) return AVATAR_GLYPH_BY_ID[raw];
     // Back-compat: some old payloads encode as "category_emoji".
@@ -360,6 +399,47 @@
   // One readiness rule for both display and launch gating.
   function isPlayerReady(p) {
     return !!(p && (p.ready || p.is_ai || p.is_host));
+  }
+
+  function rosterSignature(players) {
+    return (players || [])
+      .map(p => {
+        const id = String((p && p.user_id) || '');
+        const slot = Number.isFinite(p && p.slot) ? p.slot : 999;
+        const host = p && p.is_host ? 'H' : 'P';
+        const ai = p && p.is_ai ? 'A' : 'U';
+        return `${slot}:${id}:${host}:${ai}`;
+      })
+      .sort()
+      .join('|');
+  }
+
+  function cloneLaunchSession(session, activeUserId) {
+    const src = session || {};
+    const players = Array.isArray(src.players)
+      ? src.players.map(p => ({
+        user_id: p && p.user_id,
+        username: p && p.username,
+        avatar_id: p && p.avatar_id,
+        is_host: !!(p && p.is_host),
+        is_ai: !!(p && p.is_ai),
+        slot: Number.isFinite(p && p.slot) ? p.slot : null,
+        ready: !!(p && p.ready),
+      }))
+      : [];
+    return {
+      session_id: src.session_id || null,
+      session_code: src.session_code || null,
+      game_id: src.game_id || null,
+      game_uuid: src.game_uuid || null,
+      host_id: src.host_id || null,
+      my_user_id: activeUserId || null,
+      is_host: !!(src.host_id && activeUserId && src.host_id === activeUserId),
+      settings: src.settings && typeof src.settings === 'object' ? Object.assign({}, src.settings) : {},
+      players,
+      roster_signature: rosterSignature(players),
+      client: _mp,
+    };
   }
 
   async function copyToClipboard(text, btn) {
@@ -420,6 +500,13 @@
   }
 
   function renderModeChoice() {
+    const sameScreenButton = (_opts && _opts.supportsSameScreen) ? `
+        <button class="mode-btn" data-act="same-screen">
+          <span class="mode-icon">🎮</span>
+          <span class="mode-label">Multiplayer Same Screen</span>
+          <div class="mode-sub">Local co-op on one device</div>
+        </button>
+      ` : '';
     renderShell(`
       <div class="mode-grid">
         <button class="mode-btn" data-act="solo">
@@ -432,11 +519,7 @@
           <span class="mode-label">Play a Friend</span>
           <div class="mode-sub">Share a code or link</div>
         </button>
-        <button class="mode-btn" data-act="same-screen">
-          <span class="mode-icon">🎮</span>
-          <span class="mode-label">Multiplayer Same Screen</span>
-          <div class="mode-sub">Local co-op on one device</div>
-        </button>
+        ${sameScreenButton}
       </div>
     `, { stepTitle: 'Choose how to play' });
     _root.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => {
@@ -495,7 +578,7 @@
   function renderAvatarStep(opts) {
     const isGuest = !!(opts && opts.guest);
     // People with diverse skin tones first, then popular non-human picks
-    const QUICK_AVS = ['🧑🏻', '🧑🏼', '🧑🏽', '🧑🏾', '🧑🏿', '👩🏾', '👨🏼', '👩🏿', '👨🏾', '😊', '😎', '🤩', '😈', '🥷', '🤖', '👾', '🦊', '🐯', '🦸', '👑'];
+    const QUICK_AVS = ['🧑🏻', '🧑🏼', '🧑🏽', '🧑🏾', '🧑🏿', '👩🏾', '👨🏼', '👩🏿', '👨🏾', '😊', '😎', '🤩', '😈', '🥷', '👾', '🦊', '🐯', '🦸', '👑'];
     const buttons = QUICK_AVS.map(e =>
       `<button class="av-btn${_profileAvatarDraft === e ? ' selected' : ''}" data-av="${e}">${e}</button>`).join('');
     renderShell(`
@@ -540,6 +623,8 @@
       if (isGuest) {
         clearUrlCode();
         connectAndJoin(_pendingCode);
+      } else if (_mode === 'same-screen') {
+        buildLocalLobby();
       } else if (_mode) {
         // Came here from mode selection — go straight to game
         connectAndCreate(_mode === 'friend');
@@ -579,6 +664,9 @@
       return renderShell(
         `<div class="info-msg"><span class="spinner"></span>Connecting to lobby…</div>`);
     }
+    if (_mode === 'same-screen' && _localEditPlayerId) {
+      return renderLocalPlayerEditor(session, _localEditPlayerId);
+    }
     const isHost = session.host_id === _myUserId;
     // Guest view: horizontal card lobby with waiting footer.
     if (!isHost) return renderLobbyCards(session, false);
@@ -588,6 +676,84 @@
     // Solo: original roster + launch confirmation flow.
     if (_step === STEP.LAUNCH) return renderLaunchStep(session);
     return renderRoster(session);
+  }
+
+  function renderLocalPlayerEditor(session, playerId) {
+    const players = Array.isArray(session && session.players) ? session.players : [];
+    const player = players.find(p => p && p.user_id === playerId && !p.is_ai);
+    if (!player) {
+      _localEditPlayerId = null;
+      return renderRoster(session);
+    }
+
+    const currentName = String(player.username || '').trim() || 'Player';
+    const currentAvatar = normalizeLocalHumanAvatar(player.avatar_id || player.avatar, players, player.user_id);
+    const quickAvatars = LOCAL_HUMAN_AVATARS.filter(av => !isReservedBotAvatar(av));
+    const avatarButtons = quickAvatars.map(e =>
+      `<button class="av-btn${currentAvatar === e ? ' selected' : ''}" data-av="${e}">${e}</button>`).join('');
+
+    renderShell(`
+      <div class="guest-welcome">
+        <div class="welcome-emoji" id="kg-local-av-preview">${esc(currentAvatar)}</div>
+        <div class="welcome-sub">Customize this local player.</div>
+      </div>
+      <input class="name-field" id="kg-local-name" type="text" maxlength="18"
+        placeholder="Player name..." value="${esc(currentName)}" autocomplete="off" spellcheck="false">
+      <div class="avatar-quick">${avatarButtons}</div>
+      <div class="av-more" id="kg-local-av-more">+ More avatars</div>
+      <div class="nav-row">
+        <button class="btn-ghost btn-back" data-act="cancel-edit">← Back</button>
+        <button class="btn-cyan btn-next" id="kg-local-save">Save Player</button>
+      </div>
+    `, { stepTitle: 'Edit Local Player' });
+
+    const nameEl = _root.querySelector('#kg-local-name');
+    const preview = _root.querySelector('#kg-local-av-preview');
+    let selectedAvatar = currentAvatar;
+
+    _root.querySelectorAll('.av-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        _root.querySelectorAll('.av-btn').forEach(x => x.classList.remove('selected'));
+        b.classList.add('selected');
+        selectedAvatar = b.getAttribute('data-av') || selectedAvatar;
+        if (preview) preview.textContent = selectedAvatar;
+      });
+    });
+
+    const moreBtn = _root.querySelector('#kg-local-av-more');
+    if (moreBtn) {
+      moreBtn.addEventListener('click', () => {
+        if (typeof AvatarPicker !== 'undefined' && AvatarPicker.show) {
+          AvatarPicker.show(av => {
+            const chosen = av && av.emoji ? av.emoji : selectedAvatar;
+            selectedAvatar = normalizeLocalHumanAvatar(chosen, players, player.user_id);
+            if (preview) preview.textContent = selectedAvatar;
+            _root.querySelectorAll('.av-btn').forEach(x =>
+              x.classList.toggle('selected', x.getAttribute('data-av') === selectedAvatar));
+          }, false);
+        }
+      });
+    }
+
+    const saveBtn = _root.querySelector('#kg-local-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        player.username = sanitizeLocalPlayerName(nameEl && nameEl.value, currentName);
+        const avatar = normalizeLocalHumanAvatar(selectedAvatar, players, player.user_id);
+        player.avatar = avatar;
+        player.avatar_id = avatar;
+        _localEditPlayerId = null;
+        render();
+      });
+    }
+
+    const cancelBtn = _root.querySelector('[data-act="cancel-edit"]');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        _localEditPlayerId = null;
+        render();
+      });
+    }
   }
 
   // Step 1 (friend host only): just the share code/link. Nothing else competes
@@ -632,6 +798,7 @@
     const maxP = session.max_players || _opts.maxPlayers || 4;
     const count = players.length;
     const canAddAi = isHost && count < maxP;
+    const canAddLocalHuman = isHost && _mode === 'same-screen' && count < maxP;
     const allReady = count >= minP && players.every(isPlayerReady);
 
     const playerRows = players.map(p => {
@@ -646,12 +813,17 @@
       const status = isPlayerReady(p)
         ? '<span class="player-status ready">✔ Ready</span>'
         : '<span class="player-status waiting">○ Waiting</span>';
-      const removeBtn = (isHost && p.is_ai)
-        ? `<button class="link-btn" data-remove-ai="${esc(p.user_id)}" title="Remove">✕</button>` : '';
+      const canRemoveAi = isHost && p.is_ai;
+      const canEditLocalHuman = isHost && _mode === 'same-screen' && !p.is_ai;
+      const canRemoveLocalHuman = isHost && _mode === 'same-screen' && !p.is_ai && !p.is_host;
+      const editBtn = canEditLocalHuman
+        ? `<button class="link-btn" data-edit-player="${esc(p.user_id)}" title="Edit name/avatar">Edit</button>` : '';
+      const removeBtn = (canRemoveAi || canRemoveLocalHuman)
+        ? `<button class="link-btn" data-remove-player="${esc(p.user_id)}" title="Remove">✕</button>` : '';
       return `<div class="${cls.join(' ')}">
         <div class="player-avatar">${esc(avatarGlyph(p))}</div>
         <div class="player-name">${esc(p.username || 'Player')}</div>
-        ${tags.join('')}${status}${removeBtn}
+        ${tags.join('')}${status}${editBtn}${removeBtn}
       </div>`;
     }).join('');
 
@@ -664,10 +836,13 @@
 
     const aiControls = `
       <div class="ai-controls">
+        ${_mode === 'same-screen'
+        ? `<button class="btn-cyan" data-act="add-local-human" ${canAddLocalHuman ? '' : 'disabled'}>+ Add Local Player</button>`
+        : ''}
         <button class="btn-purple" data-act="add-ai" ${canAddAi ? '' : 'disabled'}>+ Add Bot</button>
         <div class="ai-difficulty">
           ${['easy', 'medium', 'hard'].map(d =>
-      `<button class="diff-btn ${_aiDifficulty === d ? 'active' : ''}" data-diff="${d}">${d}</button>`).join('')}
+          `<button class="diff-btn ${_aiDifficulty === d ? 'active' : ''}" data-diff="${d}">${d}</button>`).join('')}
         </div>
       </div>`;
 
@@ -692,10 +867,22 @@
 
     _root.querySelectorAll('[data-diff]').forEach(b =>
       b.addEventListener('click', () => { _aiDifficulty = b.getAttribute('data-diff'); render(); }));
+    const addLocalHuman = _root.querySelector('[data-act="add-local-human"]');
+    if (addLocalHuman) addLocalHuman.addEventListener('click', () => {
+      if (!_mp.addLocalPlayer) return;
+      const playerId = _mp.addLocalPlayer();
+      if (playerId) editLocalHuman(playerId);
+    });
     const addAi = _root.querySelector('[data-act="add-ai"]');
     if (addAi) addAi.addEventListener('click', () => _mp.addBot(_aiDifficulty));
-    _root.querySelectorAll('[data-remove-ai]').forEach(b =>
-      b.addEventListener('click', () => _mp.removeBot(b.getAttribute('data-remove-ai'))));
+    _root.querySelectorAll('[data-edit-player]').forEach(b =>
+      b.addEventListener('click', () => editLocalHuman(b.getAttribute('data-edit-player'))));
+    _root.querySelectorAll('[data-remove-player]').forEach(b =>
+      b.addEventListener('click', () => {
+        const id = b.getAttribute('data-remove-player');
+        if (_mp.removePlayer) _mp.removePlayer(id);
+        else if (_mp.removeBot) _mp.removeBot(id);
+      }));
     const next = _root.querySelector('[data-act="to-launch"]');
     if (next) next.addEventListener('click', () => { _step = STEP.LAUNCH; render(); });
     const back = _root.querySelector('[data-act="back"]');
@@ -949,11 +1136,7 @@
       _state = STATE.LAUNCHING; render();
       const session = (data && data.session) || (_mp && _mp.session);
       const activeUserId = _myUserId || (_mp && _mp.userId) || null;
-      const launchPayload = Object.assign({}, session, {
-        my_user_id: activeUserId,
-        is_host: session ? session.host_id === activeUserId : false,
-        client: _mp,
-      });
+      const launchPayload = cloneLaunchSession(session, activeUserId);
       try { root.KGSession = launchPayload; } catch { /* ignore */ }
       try { _opts.onLaunch && _opts.onLaunch(launchPayload); }
       catch (e) { console.error('[KGMultiplayerPanel] onLaunch threw:', e); }
@@ -1006,6 +1189,7 @@
     _state = STATE.LOBBY;
     const prof = getProfile();
     const humanUserId = 'local-human-' + Date.now();
+    const hostAvatar = prof.avatarEmoji || '🎮';
 
     // Initialize _mp as a local mock object with session
     _mp = {
@@ -1018,8 +1202,8 @@
           {
             user_id: humanUserId,
             username: prof.name || 'Player',
-            avatar: prof.avatar || '🎮',
-            avatar_id: prof.avatar || '🎮',
+            avatar: hostAvatar,
+            avatar_id: hostAvatar,
             is_ai: false,
             is_host: true,
             slot: 0,
@@ -1044,12 +1228,38 @@
             slot: _mp.session.players.length,
             ready: true,
           });
+          render();
         }
       },
-      removeBot: (userId) => {
+      addLocalPlayer: () => {
+        if (!_mp.session) return;
+        if (_mp.session.players.length >= _mp.session.max_players) return null;
+        const humans = _mp.session.players.filter(p => !p.is_ai);
+        const nextNum = humans.length + 1;
+        const playerId = `local-human-${Date.now()}-${nextNum}`;
+        const avatar = nextLocalHumanAvatar(_mp.session.players);
+        _mp.session.players.push({
+          user_id: playerId,
+          username: `Player ${nextNum}`,
+          avatar,
+          avatar_id: avatar,
+          is_ai: false,
+          is_host: false,
+          slot: _mp.session.players.length,
+          ready: true,
+        });
+        render();
+        return playerId;
+      },
+      removePlayer: (userId) => {
         if (!_mp.session) return;
         const idx = _mp.session.players.findIndex(p => p.user_id === userId);
-        if (idx >= 0) _mp.session.players.splice(idx, 1);
+        if (idx <= 0) return;
+        _mp.session.players.splice(idx, 1);
+        render();
+      },
+      removeBot: (userId) => {
+        if (_mp && _mp.removePlayer) _mp.removePlayer(userId);
       },
       on: () => { },
       off: () => { },
@@ -1094,6 +1304,13 @@
   function hostLaunch() {
     if (!_mp || !_mp.session || _launchingNow) return;
     _launchingNow = true;
+
+    // Same-device/local mode has no server handshake.
+    if (_mode === 'same-screen' || typeof _mp.acceptLobby !== 'function') {
+      try { _mp.startGame && _mp.startGame(); }
+      finally { _launchingNow = false; }
+      return;
+    }
 
     const clearLaunchState = () => {
       _launchingNow = false;
@@ -1146,6 +1363,7 @@
     try { _mp && _mp.leave(); } catch { /* ignore */ }
     try { _mp && _mp.disconnect(); } catch { /* ignore */ }
     _mp = null; _myUserId = null; _mode = null; _step = null; _state = STATE.CHOOSE;
+    _localEditPlayerId = null;
     _launchingNow = false;
     clearUrlCode();
     render();
@@ -1166,6 +1384,7 @@
       _myUserId = null;
       _step = null;
       _pendingCode = null;
+      _localEditPlayerId = null;
 
       injectBootstrap();
       injectCSS();
@@ -1209,7 +1428,7 @@
     },
     unmount() {
       try { _mp && _mp.leave(); _mp && _mp.disconnect(); } catch { /* ignore */ }
-      _mp = null; _myUserId = null;
+      _mp = null; _myUserId = null; _localEditPlayerId = null;
       if (_root) _root.innerHTML = '';
       _root = null; _opts = null;
     },

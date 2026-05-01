@@ -25,6 +25,8 @@
       hasRemoteHumans: remoteHumanCount > 0,
       isHost: !!(session && session.is_host),
       code: session && session.session_code ? session.session_code : '',
+      gameUuid: session && session.game_uuid ? session.game_uuid : null,
+      rosterSignature: session && session.roster_signature ? session.roster_signature : null,
       launchMode,
     };
   }
@@ -36,9 +38,12 @@
         session_id: session.session_id,
         session_code: session.session_code,
         game_id: session.game_id,
+        game_uuid: session.game_uuid || null,
         host_id: session.host_id,
         my_user_id: session.my_user_id,
         is_host: session.is_host,
+        settings: session.settings || {},
+        roster_signature: session.roster_signature || null,
         players: session.players,
       }));
     } catch (_) {

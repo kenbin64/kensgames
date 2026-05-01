@@ -60,6 +60,9 @@ const TURBULENCE_WALL_ADD = 0.010;
 const PADDLE_LAUNCH_EASY = 0.34;
 const PADDLE_LAUNCH_HARD = 0.42;
 const PADDLE_LAUNCH_MULTI = 0.38;
+const FINAL_LAYER_INDEX = 0;
+const FINAL_LAYER_SPEED_MULT = 1.618; // speed up by 61.8% once per ball
+const PADDLE_SHRINK_FACTOR = 0.618;
 
 function fib1to4(n) {
     // Fibonacci starting at F1=1, F2=1
@@ -90,6 +93,15 @@ function nudgeVelocity(ball, amount) {
     ball.velocity.z += (Math.random() - 0.5) * amount;
 }
 
+function setPaddlePenalty(playerIdx, isShrunk) {
+    const paddle = paddles[playerIdx];
+    if (!paddle) return;
+    const ratio = isShrunk ? PADDLE_SHRINK_FACTOR : 1;
+    paddle.paddleRadius = paddle.baseRadius * ratio;
+    paddle.scale.x = ratio;
+    paddle.scale.z = ratio;
+}
+
 function estimateTimeToY(ball, targetY) {
     // Solve: y(t) = y0 + vy*t - 0.5*g*t^2 = targetY
     // => 0.5*g*t^2 - vy*t + (targetY - y0) = 0
@@ -110,15 +122,7 @@ function estimateTimeToY(ball, targetY) {
     return Number.isFinite(t) && t > 0 ? t : 0;
 }
 
-// Golden ratio speed boosts per brick layer (bottom→top = mild→intense)
-// Layer 3 (green): φ^0.25 ≈ 1.12, Layer 2 (yellow): φ^0.5 ≈ 1.27
-// Layer 1 (orange): φ^0.75 ≈ 1.44, Layer 0 (red): φ^1 ≈ 1.618
-const LAYER_BOOST = [
-    Math.pow(PHI, 1.0),   // red:    ×1.618
-    Math.pow(PHI, 0.75),  // orange: ×1.44
-    Math.pow(PHI, 0.5),   // yellow: ×1.27
-    Math.pow(PHI, 0.25)   // green:  ×1.12
-];
+// Legacy per-layer boosts replaced by final-layer one-time boost (see brick collision logic).
 
 // Dynamic arena dimensions — wider with more paddles, height stays fixed
 let ARENA_HEIGHT = 50;  // always 50 tall
@@ -578,15 +582,22 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     const vz = Math.cos(angle) * baseSpeed * 0.4;
     b.velocity = new THREE.Vector3(vx, baseSpeed, vz);
 
-    // Spawn near owner's paddle position (or center for solo)
-    if (isMulti) {
-        const startPositions = [[0, 0], [-10, -10], [10, 10], [-10, 10]];
-        const sp = startPositions[ownerIdx] || [0, 0];
-        b.position.set(sp[0] + (Math.random() - 0.5) * 4, -10, sp[1] + (Math.random() - 0.5) * 4);
-    } else {
-        const offset = new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
-        b.position.set(0, -10, 0).add(offset);
-    }
+    // Serve point: always random X/Z just under the bottom brick layer.
+    const gap = 0.15;
+    const brickH = 1.0;
+    const brickW = PHI * 3;
+    const gridSpacing = brickW + gap;
+    const layerStride = brickH + gap;
+    const ceilingGap = PHI * PHI * PHI;
+    const topLayerY = HALF_H - ceilingGap - brickH / 2;
+    const bottomLayerY = topLayerY - 3 * layerStride;
+    const serveY = bottomLayerY - (brickH * 0.5 + BALL_RADIUS + 0.25);
+
+    const numAcross = Math.max(1, Math.floor(ARENA_WIDTH / gridSpacing));
+    const offset = (numAcross - 1) * gridSpacing / 2;
+    const randX = (Math.random() * 2 - 1) * Math.max(1, offset);
+    const randZ = (Math.random() * 2 - 1) * Math.max(1, offset);
+    b.position.set(randX, serveY, randZ);
 
     // belongsTo: visual/scoring "current color" owner; -1 means neutral/unclaimed
     b.belongsTo = isMulti ? -1 : -1;
@@ -599,11 +610,8 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     b.baseSpeed = baseSpeed;
     b.spawnBaseSpeed = baseSpeed; // baseline for non-multiplicative layer boosts
     b.turbulence = 0;
-    // Bricks are built top-down: layer 0 is highest (closest to ceiling), last index is lowest.
-    // Track the *highest* layer reached so far as the smallest layer index hit.
-    b.highestLayerReached = (Array.isArray(LAYER_BOOST) && LAYER_BOOST.length)
-        ? (LAYER_BOOST.length - 1)
-        : 3;
+    b.finalLayerSpeedApplied = false;
+    b.ceilingPenaltyApplied = false;
     b.spin = new THREE.Vector3(0, 0, 0); // angular velocity (spin axis × magnitude)
     scene.add(b);
     balls.push(b);
@@ -994,12 +1002,11 @@ function animate() {
             nudgeVelocity(b, WALL_DEFLECT);
 
             // Reduce the paddle of whoever last touched this ball by golden ratio (.618)
-            // ONLY the first time a paddle gets hit by this penalty
+            // only once for this specific ball life.
             const owner = paddles[b.lastTouchedBy];
-            if (owner && !owner.ceilingPenaltyApplied) {
-                owner.paddleRadius = owner.baseRadius * 0.618;
-                owner.scale.multiplyScalar(0.618);
-                owner.ceilingPenaltyApplied = true;
+            if (owner && !b.ceilingPenaltyApplied) {
+                setPaddlePenalty(b.lastTouchedBy, true);
+                b.ceilingPenaltyApplied = true;
             }
 
             clampBallEnergyAndSpeed(b);
@@ -1110,6 +1117,8 @@ function animate() {
                                 }
                             });
                         } else {
+                            // New life: restore owner's paddle to normal size.
+                            setPaddlePenalty(liable, false);
                             // Respawn a fresh neutral ball liable to that player
                             spawnBall(liable, SPEED_MULTI, true);
                         }
@@ -1136,6 +1145,8 @@ function animate() {
                     if (players[0].lives <= 0) {
                         endGame('Game Over');
                     } else {
+                        // New life: restore paddle to normal; next ceiling hit can shrink again.
+                        setPaddlePenalty(0, false);
                         // Respawn a new ball
                         const spd = gameMode === 'easy' ? SPEED_EASY : SPEED_HARD;
                         spawnBall(0, spd, false);
@@ -1218,16 +1229,10 @@ function animate() {
                 b.turbulence = Math.min(TURBULENCE_MAX, (b.turbulence || 0) + TURBULENCE_BRICK_ADD);
                 nudgeVelocity(b, BRICK_DEFLECT);
 
-                // Layer boost (non-multiplicative): only when reaching a higher brick layer for the first time.
-                // Higher bricks are smaller layer indices (layer 0 is highest).
-                const prevHighest = (typeof b.highestLayerReached === 'number') ? b.highestLayerReached : (LAYER_BOOST.length - 1);
-                if (typeof brick.layer === 'number' && brick.layer < prevHighest) {
-                    b.highestLayerReached = brick.layer;
-                    const boost = LAYER_BOOST[brick.layer] || 1;
-                    const layerFactor = 1 + (boost - 1) * 0.35;
-                    const baseline = (typeof b.spawnBaseSpeed === 'number') ? b.spawnBaseSpeed : b.baseSpeed;
-                    const target = Math.min(MAX_BALL_SPEED, baseline * layerFactor);
-                    b.baseSpeed = Math.max(b.baseSpeed, target);
+                // Final-layer boost: speed up exactly once per ball when it hits the last layer.
+                if (!b.finalLayerSpeedApplied && brick.layer === FINAL_LAYER_INDEX) {
+                    b.baseSpeed = Math.min(MAX_BALL_SPEED, b.baseSpeed * FINAL_LAYER_SPEED_MULT);
+                    b.finalLayerSpeedApplied = true;
                 }
 
                 // Never allow energy to fall below the safe minimum

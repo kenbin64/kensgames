@@ -27,7 +27,18 @@ const { loadJSON } = require('./_helpers');
 const MANIFEST = loadJSON('fasttrack/manifold.game.json');
 
 function loadCore() {
-    return loadInBrowserContext('fasttrack/fasttrack-game-core.js');
+    return loadInBrowserContext('fasttrack/fasttrack-game-core.js', {
+        extras: {
+            context: {
+                requestAnimationFrame: () => 1,
+                cancelAnimationFrame: () => { },
+            },
+            window: {
+                requestAnimationFrame: () => 1,
+                cancelAnimationFrame: () => { },
+            },
+        },
+    });
 }
 
 // ── Module loads under shim ────────────────────────────────────────
@@ -67,7 +78,7 @@ test('fasttrack: RepresentationTable is a deterministic substrate observer', () 
 test('fasttrack: state holds every declared substrate matrix as a RepresentationTable', () => {
     const { run } = loadCore();
     const expected = ['players', 'board', 'deck', 'turn', 'movement',
-                      'safeZone', 'meta', 'cards', 'holes', 'pegs', 'art'];
+        'safeZone', 'meta', 'cards', 'holes', 'pegs', 'art'];
     for (const k of expected) {
         const isRT = run(`state.${k} instanceof RepresentationTable`);
         assert.equal(isRT, true, `state.${k} is not a RepresentationTable`);
@@ -78,7 +89,7 @@ test('fasttrack: state.* matrices start empty (no leaked default state)', () => 
     const { run } = loadCore();
     // Tables that should have no entries at module load (before initGame).
     for (const k of ['players', 'board', 'deck', 'turn', 'movement',
-                     'safeZone', 'meta', 'cards', 'holes', 'pegs', 'art']) {
+        'safeZone', 'meta', 'cards', 'holes', 'pegs', 'art']) {
         assert.equal(run(`state.${k}.size`), 0,
             `state.${k} is non-empty at module load (size=${run(`state.${k}.size`)})`);
     }
@@ -134,4 +145,89 @@ test('fasttrack: getBalancedBoardPosition is a pure observer', () => {
             assert.equal(typeof v1, 'number');
         }
     }
+});
+
+test('fasttrack: FastTrack traversal stops at the player\'s own ft hole', () => {
+    const { run } = loadCore();
+    run(`
+        initGame(2, { launchMode: 'solo' });
+        const players = state.players.get('list');
+        for (const pl of players) {
+            for (const peg of pl.pegs) {
+                if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                peg.holeId = 'holding';
+                peg.holeType = 'holding';
+                peg.onFasttrack = false;
+                peg.mustExitFasttrack = false;
+            }
+        }
+        const player = players[0];
+        const bp = player.boardPosition;
+        const peg = player.pegs[0];
+        placePeg(peg, 'ft-' + ((bp + 5) % 6), 0);
+        peg.onFasttrack = true;
+        state.deck.set('currentCard', { value: '3' });
+        calculateValidMoves();
+        globalThis.__ftOwnBoundary = {
+            bp,
+            moves: (state.turn.get('validMoves') || []).map(m => ({
+                type: m.type,
+                dest: m.dest,
+                path: Array.isArray(m.path) ? m.path.slice() : []
+            }))
+        };
+    `);
+
+    const result = run('__ftOwnBoundary');
+    const ownFt = `ft-${result.bp}`;
+
+    assert.ok(result.moves.some(m => m.type === 'exitFastTrack' && m.dest === ownFt));
+    assert.ok(!result.moves.some(m => Array.isArray(m.path) && m.path.includes(ownFt) && m.path[m.path.length - 1] !== ownFt),
+        'FastTrack path continued beyond the player\'s own ft hole');
+});
+
+test('fasttrack: FastTrack traversal stops before bypassing an own peg on regular track', () => {
+    const { run } = loadCore();
+    run(`
+        initGame(2, { launchMode: 'solo' });
+        const players = state.players.get('list');
+        for (const pl of players) {
+            for (const peg of pl.pegs) {
+                if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                peg.holeId = 'holding';
+                peg.holeType = 'holding';
+                peg.onFasttrack = false;
+                peg.mustExitFasttrack = false;
+            }
+        }
+        const player = players[0];
+        const bp = player.boardPosition;
+        const startFt = (bp + 2) % 6;
+        const lastSafeFt = (bp + 3) % 6;
+        const blockedFt = (bp + 4) % 6;
+        const mover = player.pegs[0];
+        const blocker = player.pegs[1];
+        placePeg(mover, 'ft-' + startFt, 0);
+        mover.onFasttrack = true;
+        placePeg(blocker, 'outer-' + lastSafeFt + '-1', 0);
+        state.deck.set('currentCard', { value: '3' });
+        calculateValidMoves();
+        globalThis.__ftBypassBoundary = {
+            lastSafeFt,
+            blockedFt,
+            moves: (state.turn.get('validMoves') || []).map(m => ({
+                type: m.type,
+                dest: m.dest,
+                path: Array.isArray(m.path) ? m.path.slice() : []
+            }))
+        };
+    `);
+
+    const result = run('__ftBypassBoundary');
+    const allowedExit = `ft-${result.lastSafeFt}`;
+    const blockedFt = `ft-${result.blockedFt}`;
+
+    assert.ok(result.moves.some(m => m.type === 'exitFastTrack' && m.dest === allowedExit));
+    assert.ok(!result.moves.some(m => m.dest === blockedFt || (Array.isArray(m.path) && m.path.includes(blockedFt))),
+        'FastTrack path bypassed a same-color peg on the regular track');
 });

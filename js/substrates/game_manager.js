@@ -75,10 +75,12 @@
       session_id: sessionObj.session_id || null,
       session_code: sessionObj.session_code || '',
       game_id: sessionObj.game_id || 'fasttrack',
+      game_uuid: sessionObj.game_uuid || null,
       host_id: sessionObj.host_id || null,
       my_user_id: options.myUserId || sessionObj.my_user_id || null,
       is_host: !!(sessionObj.is_host),
       settings: sessionObj.settings || {},
+      roster_signature: sessionObj.roster_signature || null,
       players: roster,
     });
     game.injectPlayers(players);
@@ -101,6 +103,7 @@
       game: {
         id: game.id,
         name: game.name,
+        game_uuid: sessionObj.game_uuid || null,
         mode: options.mode || 'private',
         code: String(sessionObj.session_code || '').toUpperCase(),
         player_count: players.length,
@@ -128,10 +131,12 @@
         session_id: sessionObj.session_id || null,
         session_code: String(sessionObj.session_code || '').toUpperCase(),
         game_id: sessionObj.game_id || 'fasttrack',
+        game_uuid: sessionObj.game_uuid || null,
         host_id: sessionObj.host_id || null,
         my_user_id: options.myUserId || sessionObj.my_user_id || (me && me.user_id) || null,
         is_host: !!(sessionObj.is_host || (me && me.is_host)),
         settings: sessionObj.settings || {},
+        roster_signature: sessionObj.roster_signature || null,
       },
     };
 

@@ -15,6 +15,7 @@ window.openMultiplayerPanel = window.openMultiplayerPanel || function () {
     KGGameSetup.mount(host, {
       gameId: '4dtictactoe',
       gameName: '4D Connect',
+      supportsSameScreen: true,
       minPlayers: 2,
       maxPlayers: 4,
       inviteCode,
@@ -789,7 +790,7 @@ function syncGhostToCursor() {
   moveGhostFromClient(lastMouseX, lastMouseY);
 }
 
-function spawnPhysBall(x, y, z, p, predicted) {
+function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
   if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
   const mesh = new THREE.Mesh(BGEO, makeFallingBallMat(p));
   mesh.renderOrder = 5;
@@ -827,7 +828,7 @@ function spawnPhysBall(x, y, z, p, predicted) {
   boardGroup.localToWorld(_spawnLocal);
   mesh.position.copy(_spawnLocal); halo.position.copy(mesh.position);
   scene.add(mesh); scene.add(halo);
-  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null };
+  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null, dropColumn: dropColumn || null };
   return true;
 }
 // Snap the cube's rotation to the nearest cube symmetry so that one local axis aligns to world-up.
@@ -889,6 +890,50 @@ function predictLanding(latA, latB, faceIdx) {
   }
   return null;
 }
+
+function columnCells(dropColumn) {
+  if (!dropColumn) return [];
+  const { latA, latB, faceIdx } = dropColumn;
+  const ax = (faceIdx >> 1);
+  const sign = (faceIdx % 2 === 0) ? +1 : -1;
+  const start = sign === 1 ? 0 : G - 1;
+  const end = sign === 1 ? G : -1;
+  const step = sign;
+  const cells = [];
+  for (let k = start; k !== end; k += step) {
+    if (ax === 0) cells.push([k, latA, latB]);
+    else if (ax === 1) cells.push([latA, k, latB]);
+    else cells.push([latA, latB, k]);
+  }
+  return cells;
+}
+
+function nearestFreeNodeInColumn(dropColumn, x, y, z, yLimit) {
+  if (!dropColumn) return null;
+  const cap = yLimit != null ? yLimit : Infinity;
+  let best = null, bestD = Infinity;
+  const cells = columnCells(dropColumn);
+  for (let i = 0; i < cells.length; i++) {
+    const [gx, gy, gz] = cells[i];
+    if (BM.getCell(gx, gy, gz)) continue;
+    const wp = nodePos(gx, gy, gz);
+    boardGroup.localToWorld(wp);
+    if (wp.y > cap) continue;
+    const dx = x - wp.x, dy = y - wp.y, dz = z - wp.z;
+    const d = dx * dx + dy * dy + dz * dz;
+    if (d < bestD) {
+      bestD = d;
+      best = { gx, gy, gz, p: wp };
+    }
+  }
+  return best;
+}
+
+function nearestFreeCellInColumn(dropColumn, x, y, z, yLimit) {
+  const node = nearestFreeNodeInColumn(dropColumn, x, y, z, yLimit);
+  return node ? [node.gx, node.gy, node.gz] : null;
+}
+
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
   if (!KGSync.canActLocally()) return;
@@ -915,7 +960,7 @@ function releaseBall() {
   // the ball bounced through the saddle. If the column is somehow already full (shouldn't
   // happen given the column UI), fall back to the post-hoc nearest-cell search at settle time.
   const predicted = predictLanding(col.latA, col.latB, col.faceIdx);
-  spawnPhysBall(spawnW.x, _aimYWorld, spawnW.z, p, predicted);
+  spawnPhysBall(spawnW.x, _aimYWorld, spawnW.z, p, predicted, col);
   Audio4D.onRelease();
   if (camFollow) { camLookT.set(spawnW.x, 3, spawnW.z); camPosT.set(spawnW.x * 0.5 + 6, _aimYWorld + 4, spawnW.z * 0.5 + 12); }
 }
@@ -1286,12 +1331,11 @@ function physSubstep(dt) {
   const ATTRACT_GATE = SETTLE_V * 3;            // start nudging once below ~3x settle speed
   const ATTRACT_MAX = 26;                       // m/s^2 at zero speed; gentle compared to GRAV (-62)
   if (speed2 < ATTRACT_GATE * ATTRACT_GATE) {
-    const predTgt = predictedWorldTarget(physBall.predicted);
-    const tgt = predTgt || nearestFreeNode(physBall.x, physBall.y, physBall.z, physBall.y + BALL_R * 0.5);
+    const tgt = nearestFreeNodeInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z);
     if (tgt) {
-      const tx = predTgt ? predTgt.x : tgt.p.x;
-      const ty = predTgt ? predTgt.y : tgt.p.y;
-      const tz = predTgt ? predTgt.z : tgt.p.z;
+      const tx = tgt.p.x;
+      const ty = tgt.p.y;
+      const tz = tgt.p.z;
       const dx = tx - physBall.x, dy = ty - physBall.y, dz = tz - physBall.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (d > 1e-3) {
@@ -1355,28 +1399,10 @@ let snapAnim = null;
 const _snapTmp = new THREE.Vector3();
 function onBallSettled() {
   const p = physBall.p;
-  // Cell selection respects gravity: prefer the closest free cell at-or-below the ball's rest
-  // height (so the snap reads as a settle/roll, never as floating upward). If no such cell
-  // exists -- e.g. the ball wedged near the top of an otherwise-empty column -- fall back to
-  // the predicted column landing computed at release; that target is always the lowest free
-  // cell in the chosen column and is therefore both deterministic and physically plausible.
-  const yLimit = physBall.y + BALL_R * 0.5;
-  let cell = null;
-  const predTgt = predictedWorldTarget(physBall.predicted);
-  if (predTgt && physBall.predicted) {
-    // If the ball settled near its release-predicted chamber, keep that chamber to avoid
-    // long sideways snap jumps into a different free cavity.
-    const dx = predTgt.x - physBall.x, dy = predTgt.y - physBall.y, dz = predTgt.z - physBall.z;
-    const maxSnap = SADDLE_CELL * 1.45;
-    if ((dx * dx + dy * dy + dz * dz) <= (maxSnap * maxSnap)) {
-      cell = physBall.predicted;
-    }
-  }
-  if (!cell) cell = nearestFreeCell(physBall.x, physBall.y, physBall.z, yLimit);
-  if (!cell && physBall.predicted && !BM.getCell(physBall.predicted[0], physBall.predicted[1], physBall.predicted[2])) {
-    cell = physBall.predicted;
-  }
-  if (!cell) cell = nearestFreeCell(physBall.x, physBall.y, physBall.z);
+  // Cell selection stays inside the original release column. The final chamber is chosen
+  // from where the ball actually stopped, preserving gyroid meander while preventing lateral
+  // reassignment to other columns.
+  const cell = nearestFreeCellInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z);
   Audio4D.onSettle();
   boardGlow.intensity = 0;
   if (!cell) {
@@ -1553,6 +1579,7 @@ function openMultiplayerPanel() {
   KGGameSetup.mount(host, {
     gameId: '4dtictactoe',
     gameName: '4D Connect',
+    supportsSameScreen: true,
     minPlayers: 2,
     maxPlayers: 4,
     inviteCode,

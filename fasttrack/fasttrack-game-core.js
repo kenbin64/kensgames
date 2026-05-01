@@ -313,6 +313,29 @@ function getHoleType(holeId) {
   return 'holding';
 }
 
+function getFastTrackBypassSegment(ftIdx) {
+  const segment = [];
+  for (let h = 4; h >= 1; h--) segment.push(`side-left-${ftIdx}-${h}`);
+  for (let h = 0; h < 4; h++) segment.push(`outer-${ftIdx}-${h}`);
+  segment.push(`home-${ftIdx}`);
+  for (let h = 1; h <= 4; h++) segment.push(`side-right-${ftIdx}-${h}`);
+  return segment;
+}
+
+function hasOwnPegOnHole(player, holeId, excludePegId = null) {
+  if (!player || !Array.isArray(player.pegs)) return false;
+  if (!holeId || holeId === 'bullseye') return false;
+  return player.pegs.some(peg => peg && peg.id !== excludePegId && peg.holeId === holeId);
+}
+
+function canAdvanceFastTrackStep(player, fromFtIdx, toFtIdx, movingPeg) {
+  if (hasOwnPegOnHole(player, `ft-${toFtIdx}`, movingPeg && movingPeg.id)) {
+    return false;
+  }
+  const skippedRegularSegment = getFastTrackBypassSegment(fromFtIdx);
+  return !skippedRegularSegment.some(holeId => hasOwnPegOnHole(player, holeId, movingPeg && movingPeg.id));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 🜂 MANIFOLD BUS HELPERS
 // All game events flow through these two helpers into the substrate lenses.
@@ -639,20 +662,13 @@ function getTrackSequence(peg, player, direction) {
   // FastTrack forward (inner ring)
   if (type === 'fasttrack' && peg.onFasttrack) {
     const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
+    let currentFt = ftIdx;
     for (let i = 1; i <= 6; i++) {
       const next = (ftIdx + i) % 6;
+      if (!canAdvanceFastTrackStep(player, currentFt, next, peg)) break;
       seq.push(`ft-${next}`);
-      if (next === bp) {
-        for (let h = 4; h >= 1; h--) seq.push(`side-left-${bp}-${h}`);
-        for (let h = 0; h <= 2; h++) seq.push(`outer-${bp}-${h}`);
-        if (!safeZoneFull) {
-          for (let h = 1; h <= SAFE_ZONE_SIZE; h++) seq.push(`safe-${bp}-${h}`);
-        } else {
-          seq.push(`outer-${bp}-3`);
-          seq.push(`home-${bp}`);
-        }
-        break;
-      }
+      currentFt = next;
+      if (next === bp) break;
     }
     return seq;
   }
@@ -838,20 +854,15 @@ function calculateValidMoves() {
       }
 
       // ── FT EXIT OPTIONS ──
-      // rules.json :: FT_NO_PASS_OWN_FT  (z=32) — superseded for ft-* by relax;
-      //               concrete enforcement: cannot LAND on own ft-* hole.
-      // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are
-      //               passable; only suppress exit AT that hole (continue scan).
-      // rules.json :: FT_RING_CLOCKWISE  (z=24) — exits scan clockwise only.
+      // A peg on FastTrack can exit only at legal ft-* checkpoints reachable
+      // before it would violate the no-pass-own-peg rule. Reaching your own
+      // ft-{bp} hole is a forced exit boundary.
       if (peg.onFasttrack && dir === 'clockwise') {
         const maxExitStep = Math.min(steps, trackSeq.length);
         for (let s = 0; s < maxExitStep; s++) {
           const h = trackSeq[s];
           const occ = state.board.get(h);
-          if (occ && occ.playerIdx === ci) {
-            if (!h.startsWith('ft-')) break;
-            continue;
-          }
+          if (occ && occ.playerIdx === ci) break;
           if (h.startsWith('ft-')) {
             moves.push({
               type: 'exitFastTrack', pegIdx: pi, dest: h,
@@ -862,28 +873,20 @@ function calculateValidMoves() {
         }
       }
 
-      // ── FT RING TRAVERSAL (peg ON ft-*, not yet in FT mode) ──
-      // rules.json :: FT_RING_CLOCKWISE  (z=24) — clockwise traversal only.
-      // rules.json :: FT_NO_BACKWARD_ENTRY (z=16) — `!rules.noFastTrack`.
-      // rules.json :: FT_NO_PASS_OWN_FT  (z=32) — must exit at own ft-{bp}.
+      // ── FT RING TRAVERSAL (peg sitting on an ft-* hole, not in FT mode) ──
+      // Clockwise only. The path stops at the first forced exit boundary:
+      // either the player's own ft-{bp} hole or the last safe ft hole before
+      // bypassing one of that player's own pegs on the regular track.
       if (dir === 'clockwise' && getHoleType(peg.holeId) === 'fasttrack' && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
         const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
         const ftSeq = [];
+        let currentFt = ftIdx;
         for (let fi = 1; fi <= 6; fi++) {
           const next = (ftIdx + fi) % 6;
+          if (!canAdvanceFastTrackStep(player, currentFt, next, peg)) break;
           ftSeq.push(`ft-${next}`);
-          if (next === bp) {
-            for (let h = 4; h >= 1; h--) ftSeq.push(`side-left-${bp}-${h}`);
-            for (let h = 0; h <= 2; h++) ftSeq.push(`outer-${bp}-${h}`);
-            const inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-            if (inSafe < SAFE_ZONE_SIZE) {
-              for (let h = 1; h <= SAFE_ZONE_SIZE; h++) ftSeq.push(`safe-${bp}-${h}`);
-            } else {
-              ftSeq.push(`outer-${bp}-3`);
-              ftSeq.push(`home-${bp}`);
-            }
-            break;
-          }
+          currentFt = next;
+          if (next === bp) break;
         }
         if (ftSeq.length >= steps) {
           const ftDest = ftSeq[steps - 1];

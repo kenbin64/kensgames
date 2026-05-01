@@ -472,7 +472,7 @@
   <script src="/fasttrack/fasttrack-game.js?v=20260501"></script>
   <script src="/js/substrates/game_manager.js?v=20260501"></script>
   <script src="/js/multiplayer-client.js?v=20260501"></script>
-  <script src="/js/substrates/multiplayer_panel.js?v=20260501"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260501d"></script>
   <script src="/js/substrates/game_setup.js?v=20260501"></script>
   <script>
     let username = localStorage.getItem('username') || localStorage.getItem('display_name') || '';
@@ -490,6 +490,7 @@
     KGGameSetup.mount('#mp-panel-host', {
       gameId: 'fasttrack',
       gameName: 'FastTrack',
+      supportsSameScreen: true,
       minPlayers: 2,
       maxPlayers: 6,
       gamePath: '/fasttrack/3d.html',
@@ -501,10 +502,8 @@
         });
 
         if (runtime) {
-          // Send start_game signal to multiplayer server so all players launch together
-          if (summary && summary.hasRemoteHumans && window.KGMultiplayerPanel && window.KGMultiplayerPanel.mp && typeof window.KGMultiplayerPanel.mp.startGame === 'function') {
-            window.KGMultiplayerPanel.mp.startGame();
-          }
+          // Launch from the server-authenticated game_started payload only.
+          // The panel already triggered start_game and handed us the canonical roster.
           window.location.href = '/fasttrack/3d.html';
           return;
         }
@@ -526,11 +525,6 @@
         };
         localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
         localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
-
-        // Send start_game signal to multiplayer server so all players launch together
-        if (hasRemoteHumans && window.KGMultiplayerPanel && window.KGMultiplayerPanel.mp && typeof window.KGMultiplayerPanel.mp.startGame === 'function') {
-          window.KGMultiplayerPanel.mp.startGame();
-        }
 
         window.location.href = '/fasttrack/3d.html';
       },
