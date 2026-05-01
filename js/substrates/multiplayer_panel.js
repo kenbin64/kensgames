@@ -1327,8 +1327,10 @@
       _mp.startGame();
       // If game_started never arrives, release lock and show state again.
       fallbackTimer = setTimeout(() => {
-        if (_state !== STATE.LAUNCHING) {
+        if (_state === STATE.LAUNCHING) {
           _launchingNow = false;
+          _state = STATE.LOBBY;
+          _error = 'Launch timed out. Please try again.';
           render();
         }
       }, 2400);
@@ -1355,7 +1357,7 @@
     kickTimer = setTimeout(() => {
       const accepted = !!(_mp && _mp.session && _mp.session.settings && _mp.session.settings.lobby_accepted);
       if (accepted) tryStart();
-      else _mp && _mp.startGame();
+      else tryStart();
     }, 320);
   }
 
