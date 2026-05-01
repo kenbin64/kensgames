@@ -13,7 +13,7 @@ if [ -d "$REPO_PATH/kensgames.com" ]; then
 else
     SRC_BASE="$REPO_PATH"
 fi
-DEPLOY_PATH="/var/www/kensgames.com"
+DEPLOY_PATH="/var/www/kensgames.com/public"
 BACKUP_PATH="/var/www/backups/kensgames.com.backup"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -64,23 +64,23 @@ fi
 echo -e "${YELLOW}[3/5] Deploying files...${NC}"
 
 # Create deployment directory if it doesn't exist
-mkdir -p "$DEPLOY_PATH/js/substrates"
-mkdir -p "$DEPLOY_PATH/login/facebook"
-mkdir -p "$DEPLOY_PATH/login/google"
-mkdir -p "$DEPLOY_PATH/login/discord"
+mkdir -p "$DEPLOY_PATH"
 
-# Copy portal pages
-cp "$SRC_BASE/index.html" "$DEPLOY_PATH/"
-cp "$SRC_BASE/lounge.html" "$DEPLOY_PATH/"
-cp "$SRC_BASE/discover.html" "$DEPLOY_PATH/"
-
-# Copy substrates
-cp "$SRC_BASE/js/substrates/"*.js "$DEPLOY_PATH/js/substrates/"
-
-# Copy OAuth callbacks
-cp "$SRC_BASE/login/facebook/callback.html" "$DEPLOY_PATH/login/facebook/"
-cp "$SRC_BASE/login/google/callback.html" "$DEPLOY_PATH/login/google/"
-cp "$SRC_BASE/login/discord/callback.html" "$DEPLOY_PATH/login/discord/"
+# Sync full static site (all games + shared JS/CSS/assets)
+rsync -a \
+    --exclude '.git/' \
+    --exclude '.github/' \
+    --exclude '.vscode/' \
+    --exclude 'node_modules/' \
+    --exclude 'venv/' \
+    --exclude '__pycache__/' \
+    --exclude '*.pyc' \
+    --exclude 'memories/' \
+    --exclude 'engine/' \
+    --exclude 'server/' \
+    --exclude 'state/' \
+    --exclude 'tests/' \
+    "$SRC_BASE/" "$DEPLOY_PATH/"
 
 echo -e "${GREEN}✓ Files deployed to $DEPLOY_PATH${NC}"
 
@@ -154,6 +154,7 @@ REQUIRED_FILES=(
     "index.html"
     "lounge.html"
     "discover.html"
+    "fasttrack/lobby-simple.html"
     "js/substrates/leaderboard_substrate.js"
     "login/facebook/callback.html"
 )
