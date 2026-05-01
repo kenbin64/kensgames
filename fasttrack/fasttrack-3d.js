@@ -2334,20 +2334,36 @@ async function init3D() {
     const hasRemoteHumans = sessionPlayers.filter(p => p && !p.is_ai).length >= 2;
     const useRuntimeRoster = gameMode === 'private' && sameInviteSession && runtimeHasRoster;
     const useSessionRoster = !useRuntimeRoster && gameMode === 'private' && sameInviteSession && hasRemoteHumans;
-    const rosterPlayers = useRuntimeRoster ? runtimePlayers : sessionPlayers;
 
-    const playerCount = (useRuntimeRoster || useSessionRoster)
+    // Same-screen: read full roster from runtime or ft_session_players
+    let sameScreenPlayers = [];
+    if (gameMode === 'same-screen') {
+      if (runtimeHasRoster) {
+        sameScreenPlayers = runtimePlayers;
+      } else {
+        try {
+          const raw = sessionStorage.getItem('ft_session_players');
+          if (raw) sameScreenPlayers = JSON.parse(raw) || [];
+        } catch (_) { sameScreenPlayers = []; }
+      }
+    }
+    const useSameScreenRoster = gameMode === 'same-screen' && sameScreenPlayers.length >= 2;
+
+    const rosterPlayers = useRuntimeRoster ? runtimePlayers : (useSameScreenRoster ? sameScreenPlayers : sessionPlayers);
+
+    const playerCount = (useRuntimeRoster || useSessionRoster || useSameScreenRoster)
       ? Math.max(2, Math.min(6, rosterPlayers.length))
       : Math.max(2, Math.min(6, parseInt(playerCount_raw, 10)));
     const humanName = dimensionalConfig?.humanName || kgPlayer?.name || decodeURIComponent(storedCfg.humanName || 'You');
     const humanAvatar = dimensionalConfig?.humanAvatar || kgPlayer?.avatar || decodeURIComponent(storedCfg.humanAvatar || '🎮');
     const aiDifficulty = dimensionalConfig?.aiDifficulty || kgGame?.aiDifficulty || storedCfg.aiDifficulty || 'normal';
 
-    const initConfig = (useRuntimeRoster || useSessionRoster)
+    const initConfig = (useRuntimeRoster || useSessionRoster || useSameScreenRoster)
       ? {
         humanName,
         humanAvatar,
         aiDifficulty,
+        launchMode: gameMode,
         myUserId: (sessionCache && sessionCache.my_user_id) || (runtimeCache && runtimeCache.session && runtimeCache.session.my_user_id),
         sessionPlayers: rosterPlayers.map((p) => ({
           user_id: p.user_id || p.id,
@@ -2358,7 +2374,7 @@ async function init3D() {
           is_host: !!p.is_host,
         })),
       }
-      : { humanName, humanAvatar, aiDifficulty };
+      : { humanName, humanAvatar, aiDifficulty, launchMode: gameMode };
 
     // Merge dimensional config if present
     if (dimensionalConfig) {
