@@ -144,10 +144,27 @@ else
 fi
 
 # =========================================
+# RESTART NODE SERVICES
+# =========================================
+
+echo -e "${YELLOW}[5/6] Restarting Node.js services...${NC}"
+
+# Restart lobby/auth servers so they reload manifests and latest code.
+if command -v pm2 &>/dev/null; then
+    for pm2name in kensgames-lobby kensgames-auth kensgames-server fasttrack-lobby; do
+        if pm2 describe "$pm2name" &>/dev/null; then
+            pm2 restart "$pm2name" && echo -e "${GREEN}✓ PM2 process '$pm2name' restarted${NC}"
+        fi
+    done
+else
+    echo -e "${YELLOW}⚠ pm2 not found — skipping server restart${NC}"
+fi
+
+# =========================================
 # VERIFY DEPLOYMENT
 # =========================================
 
-echo -e "${YELLOW}[5/5] Verifying deployment...${NC}"
+echo -e "${YELLOW}[6/6] Verifying deployment...${NC}"
 
 # Check key files exist
 REQUIRED_FILES=(

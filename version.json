@@ -1,7 +1,7 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "release_channel": "production",
   "delta_level": "delta-2",
   "build_utc": "2026-05-02T15:31:48Z",

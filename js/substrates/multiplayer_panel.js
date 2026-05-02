@@ -1440,6 +1440,9 @@
       if (code) {
         _mode = 'guest';
         _pendingCode = code;
+        // Guest must enter their own name — never inherit the host's localStorage name.
+        _profileNameDraft = '';
+        _profileAvatarDraft = null;
         renderGuestWelcome(code);
       } else if (autoMode === 'solo' || autoMode === 'friend') {
         _mode = autoMode;
