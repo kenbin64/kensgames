@@ -611,6 +611,36 @@
       animation: none;
     }
 
+    .hint-group {
+      background: rgba(64, 146, 255, 0.16);
+      border-color: rgba(95, 170, 255, 0.62);
+      color: #e2f0ff;
+      text-shadow: 0 0 8px rgba(110, 190, 255, 0.55);
+    }
+
+    .hint-group.expanded {
+      border-color: rgba(255, 224, 51, 0.9);
+      box-shadow: 0 0 22px rgba(255, 224, 51, 0.38);
+      color: #fff7cf;
+    }
+
+    .hint-sublist {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 4px 0 6px 12px;
+      padding-left: 8px;
+      border-left: 2px solid rgba(90, 178, 255, 0.35);
+    }
+
+    .hint-sub {
+      background: rgba(0, 255, 136, 0.09);
+      border-color: rgba(0, 255, 136, 0.4);
+      font-size: 0.88em;
+      min-height: 40px;
+      padding: 8px 11px;
+    }
+
     /* ── Split Selector — interactive 7-card split UI ── */
     .split-header {
       font-size: 0.9em;
@@ -1808,7 +1838,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260501k"></script>
+  <script src="fasttrack-game-core.js?v=20260501l"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer

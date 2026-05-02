@@ -1152,6 +1152,31 @@ function setOptionsPanelVisible(visible) {
   panel.style.display = visible ? 'block' : 'none';
 }
 
+let _expandedHintGroup = null;
+let _hintGroups = {};
+
+function previewHintGroup(groupKey) {
+  const vm = state.turn.get('validMoves') || [];
+  const indices = _hintGroups[groupKey] || [];
+  if (!indices.length) return;
+  const moves = indices.map(i => vm[i]).filter(Boolean);
+  if (moves.length && window.highlightMovePaths) window.highlightMovePaths(moves);
+}
+
+function clearHintPreview() {
+  const vm = state.turn.get('validMoves') || [];
+  if (window.highlightMovePaths) window.highlightMovePaths(vm);
+}
+
+function toggleHintGroup(groupKey) {
+  _expandedHintGroup = (_expandedHintGroup === groupKey) ? null : groupKey;
+  showMoveHints();
+}
+
+window.previewHintGroup = previewHintGroup;
+window.clearHintPreview = clearHintPreview;
+window.toggleHintGroup = toggleHintGroup;
+
 function showMoveHints() {
   const hintsDiv = document.getElementById('move-hints');
   if (!hintsDiv) return;
@@ -1185,8 +1210,11 @@ function showMoveHints() {
   regularMoves.forEach((m, _) => {
     const i = vm.indexOf(m);
     let icon = '', label = '';
+    let short = '';
     const pegName = curPlayer.pegs[m.pegIdx]?.nickname || `Peg ${m.pegIdx + 1}`;
+    const shortPeg = `P${m.pegIdx + 1}`;
     const dotName = `${playerDot}${pegName}`;
+    const peg = curPlayer.pegs[m.pegIdx];
     const cut = cutLabel(m.dest);
 
     switch (m.type) {
@@ -1194,7 +1222,8 @@ function showMoveHints() {
         if (buttons.some(b => b.isEnter)) return;
         icon = '🏠';
         label = `${playerDot}Bring a peg onto the board${cut}`;
-        buttons.push({ idx: i, icon, label, isEnter: true });
+        short = `${shortPeg} enter`;
+        buttons.push({ idx: i, icon, label, short, pegIdx: m.pegIdx, isEnter: true });
         return;
 
       case 'move': {
@@ -1203,25 +1232,29 @@ function showMoveHints() {
         if (dest.startsWith('safe-')) {
           icon = '🛡️';
           label = `${dotName} into safe zone`;
+          short = `${shortPeg} -> safe`;
         } else if (dest.startsWith('ft-')) {
-          const peg = curPlayer.pegs[m.pegIdx];
           icon = '⚡';
           if (peg && peg.onFasttrack) {
             label = `${dotName} traverse FastTrack ${s} space${s > 1 ? 's' : ''}`;
+            short = `${shortPeg} FT +${s}`;
           } else {
             const who = ownerName(dest);
             label = `${dotName} → ${who}'s FastTrack hole`;
+            short = `${shortPeg} enter FT`;
           }
         } else if (dest.startsWith('home-')) {
           const who = ownerName(dest);
           icon = '🏠';
           label = `${dotName} → ${who}'s home`;
+          short = `${shortPeg} -> home`;
         } else {
           const card = state.deck.get('currentCard');
           const cardRules = card ? CARDS[card.value] : null;
           const isBackward = cardRules && cardRules.direction === 'backward';
           icon = s <= 3 ? '👣' : '🏃';
           label = `${dotName} ${isBackward ? 'backward' : 'forward'} ${s} space${s > 1 ? 's' : ''}`;
+          short = `${shortPeg} ${isBackward ? '-' : '+'}${s}`;
         }
         if (cut) label += cut;
         break;
@@ -1231,8 +1264,10 @@ function showMoveHints() {
         icon = '⚡';
         if (peg && peg.onFasttrack) {
           label = `${dotName} traverses FastTrack`;
+          short = `${shortPeg} FT traverse`;
         } else {
           label = `${dotName} enters FastTrack`;
+          short = `${shortPeg} FT enter`;
         }
         break;
 
@@ -1240,20 +1275,23 @@ function showMoveHints() {
         const who = ownerName(m.dest);
         icon = '🚪';
         label = `${dotName} exits FastTrack at ${who}'s hole`;
+        short = `${shortPeg} FT exit`;
         break;
       }
 
       case 'enterBullseye':
         icon = '🎯';
         label = `${dotName} → center bullseye`;
+        short = `${shortPeg} -> bullseye`;
         break;
 
       case 'exitBullseye':
         icon = '🚀';
         label = `${dotName} exits bullseye`;
+        short = `${shortPeg} bullseye exit`;
         break;
     }
-    buttons.push({ idx: i, type: m.type, icon, label, dest: m.dest });
+    buttons.push({ idx: i, type: m.type, icon, label, short, dest: m.dest, pegIdx: m.pegIdx });
   });
 
   // Deduplicate — when multiple buttons share the same destination hole AND type, keep only the first
@@ -1269,10 +1307,48 @@ function showMoveHints() {
 
   let html = '';
 
-  // Regular move hints
-  html += dedupedButtons.map(b =>
-    `<div class="hint" onclick="executeMove(${b.idx})" onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${b.idx})" onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">${b.icon} ${b.label}</div>`
-  ).join('');
+  // Group regular moves by peg to reduce clutter while preserving hover previews.
+  _hintGroups = {};
+  const grouped = new Map();
+  dedupedButtons.forEach((b) => {
+    const key = Number.isFinite(b.pegIdx) ? `peg-${b.pegIdx}` : `misc-${b.type || 'move'}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(b);
+  });
+
+  grouped.forEach((groupButtons, key) => {
+    _hintGroups[key] = groupButtons.map(b => b.idx);
+    const first = groupButtons[0];
+    const pegLabel = Number.isFinite(first.pegIdx)
+      ? splitPegLabel(curPlayer, first.pegIdx)
+      : 'Move options';
+
+    if (groupButtons.length === 1) {
+      const only = groupButtons[0];
+      html += `<div class="hint" title="${only.label}" onclick="executeMove(${only.idx})" `
+        + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${only.idx})" `
+        + `onmouseleave="clearHintPreview()">${only.icon} ${only.short || only.label}</div>`;
+      return;
+    }
+
+    const expanded = _expandedHintGroup === key;
+    html += `<div class="hint hint-group ${expanded ? 'expanded' : ''}" `
+      + `onclick="toggleHintGroup('${key}')" `
+      + `onmouseenter="previewHintGroup('${key}')" `
+      + `onmouseleave="clearHintPreview()">`
+      + `🧭 ${pegLabel} · ${groupButtons.length} options ${expanded ? '▾' : '▸'}`
+      + `</div>`;
+
+    if (expanded) {
+      html += '<div class="hint-sublist">';
+      groupButtons.forEach((b) => {
+        html += `<div class="hint hint-sub" title="${b.label}" onclick="executeMove(${b.idx})" `
+          + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${b.idx})" `
+          + `onmouseleave="clearHintPreview()">${b.icon} ${b.short || b.label}</div>`;
+      });
+      html += '</div>';
+    }
+  });
 
   // Split selector UI (if splits are available)
   if (splitMoves.length > 0) {
