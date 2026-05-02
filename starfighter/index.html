@@ -2291,6 +2291,8 @@
     </div>
     <!-- Minimal action buttons (top-right corner) -->
     <div id="mob-btn-group">
+      <button id="mob-fire" class="mob-btn" style="background:rgba(120,10,10,0.86);color:#ff8080">FIRE</button>
+      <button id="mob-tilt" class="mob-btn" style="background:rgba(10,40,120,0.86);color:#88b8ff">TILT</button>
       <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
       <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
       <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
@@ -2302,9 +2304,108 @@
     </div>
     <!-- Hint overlay (shown briefly on first load) -->
     <div id="mob-hint" class="mob-hint">
-      TAP SCREEN = LASERS &nbsp;|&nbsp; TAP ✛ = TORPEDO &nbsp;|&nbsp; SPHERE = STEER + THRUST
+      HOLD FIRE = LASERS &nbsp;|&nbsp; TILT = STEER &nbsp;|&nbsp; TAP ✛ = TORPEDO
     </div>
   </div>
+
+  <style>
+    #orientation-guard-sf {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.92);
+      backdrop-filter: blur(8px);
+    }
+
+    #orientation-guard-sf .og-card {
+      width: min(90vw, 430px);
+      border: 1px solid rgba(0, 255, 255, 0.45);
+      border-radius: 12px;
+      background: rgba(0, 20, 35, 0.95);
+      text-align: center;
+      padding: 18px;
+      box-shadow: 0 0 28px rgba(0, 255, 255, 0.2);
+      color: #bcefff;
+      font-family: 'Courier New', monospace;
+    }
+
+    #orientation-guard-sf .og-title {
+      color: #00ffff;
+      font-size: 16px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    #orientation-guard-sf .og-copy {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #9fd8ea;
+      margin-bottom: 12px;
+    }
+
+    #orientation-guard-sf .og-btn {
+      border: 1px solid rgba(0, 255, 255, 0.55);
+      border-radius: 8px;
+      background: rgba(0, 90, 120, 0.35);
+      color: #b8f9ff;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 1px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+  </style>
+  <div id="orientation-guard-sf" aria-live="polite">
+    <div class="og-card">
+      <div class="og-title">ROTATE TO LANDSCAPE</div>
+      <div class="og-copy">Starfighter requires horizontal view so the full flight area and HUD stay inside the screen.
+      </div>
+      <button id="orientation-guard-sf-btn" type="button" class="og-btn">ENTER LANDSCAPE</button>
+    </div>
+  </div>
+  <script>
+    (function enforceLandscapeSF() {
+      const guard = document.getElementById('orientation-guard-sf');
+      const btn = document.getElementById('orientation-guard-sf-btn');
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+
+      async function tryLockLandscape() {
+        try {
+          if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (_) { }
+        try {
+          if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+        } catch (_) { }
+      }
+
+      function updateGuard() {
+        if (!isMobile) {
+          guard.style.display = 'none';
+          return;
+        }
+        const portrait = window.innerHeight > window.innerWidth;
+        guard.style.display = portrait ? 'flex' : 'none';
+        if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(portrait);
+      }
+
+      btn.addEventListener('click', async () => {
+        await tryLockLandscape();
+        updateGuard();
+      });
+
+      window.addEventListener('orientationchange', updateGuard);
+      window.addEventListener('resize', updateGuard);
+      document.addEventListener('fullscreenchange', updateGuard);
+      updateGuard();
+    })();
+  </script>
 
   <!-- ═══ MISSION BRIEFING PANEL ═══ -->
   <div id="mission-panel">

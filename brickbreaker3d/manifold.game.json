@@ -60,6 +60,7 @@
     "target": "/var/www/kensgames.com/brickbreaker3d/",
     "type": "static"
   },
+  "rules": "brickbreaker3d.rules.json",
   "manifold_compatibility": {
     "bridge_included": true,
     "state_exposed": true,

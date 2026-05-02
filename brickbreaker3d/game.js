@@ -31,6 +31,14 @@ let BALL_RADIUS = 1;
 let PADDLE_RADIUS = 4.5;
 let PADDLE_THICKNESS = 0.85;
 const PADDLE_BEVEL = 0.94; // top radius ratio to create a subtle bevel
+const MOBILE_INPUT = {
+    enabled: (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''))
+        || (typeof window !== 'undefined' && 'ontouchstart' in window && window.innerWidth < 1024),
+    touchActive: false,
+    touchNormX: 0,
+    tiltEnabled: false,
+    tiltNormX: 0,
+};
 
 // Ball speeds (PHI-scaled — golden-ratio kick over the previous baseline so
 // rallies feel snappier without breaking paddle reaction time).
@@ -141,6 +149,20 @@ function setArenaSize(numPlayers) {
     PADDLE_BOUND = HALF_W - 5;
 }
 
+function fitCameraToArena() {
+    if (!camera || !controls) return;
+    const aspect = Math.max(0.6, window.innerWidth / Math.max(1, window.innerHeight));
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+    const halfW = HALF_W + 6;
+    const halfH = HALF_H + 6;
+    const distByW = halfW / Math.tan(hFov / 2);
+    const distByH = halfH / Math.tan(vFov / 2);
+    const dist = Math.max(distByW, distByH, 48);
+    camera.position.set(0, -2, dist);
+    controls.target.set(0, -3, 0);
+}
+
 // Arena meshes that get rebuilt per game
 let arenaObjects = [];
 
@@ -225,6 +247,94 @@ function initScene() {
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('resize', onWindowResize);
+    if (MOBILE_INPUT.enabled) initMobileControls();
+}
+
+function initMobileControls() {
+    if (document.getElementById('bb-mobile-controls')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'bb-mobile-controls';
+    wrap.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:120;display:flex;gap:10px;align-items:center;';
+    const tiltBtn = document.createElement('button');
+    tiltBtn.id = 'bb-tilt-btn';
+    tiltBtn.textContent = 'TILT';
+    tiltBtn.style.cssText = 'height:44px;padding:0 14px;border:1px solid rgba(0,255,204,.55);background:rgba(4,20,34,.82);color:#00ffcc;border-radius:10px;font:700 12px Rajdhani,sans-serif;';
+    const pad = document.createElement('div');
+    pad.id = 'bb-touch-pad';
+    pad.style.cssText = 'position:relative;flex:1;height:44px;border:1px solid rgba(0,255,204,.35);background:rgba(4,20,34,.66);border-radius:10px;overflow:hidden;';
+    const thumb = document.createElement('div');
+    thumb.id = 'bb-touch-thumb';
+    thumb.style.cssText = 'position:absolute;top:4px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:18px;background:rgba(0,255,204,.28);border:1px solid rgba(0,255,204,.8);';
+    pad.appendChild(thumb);
+    wrap.appendChild(tiltBtn);
+    wrap.appendChild(pad);
+    document.body.appendChild(wrap);
+
+    const setThumb = (norm) => {
+        const w = pad.clientWidth - 40;
+        thumb.style.left = `${20 + ((norm + 1) * 0.5 * w)}px`;
+    };
+    setThumb(0);
+
+    const updateTouchNorm = (clientX) => {
+        const r = pad.getBoundingClientRect();
+        const t = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+        MOBILE_INPUT.touchNormX = t * 2 - 1;
+        setThumb(MOBILE_INPUT.touchNormX);
+    };
+
+    pad.addEventListener('touchstart', (e) => {
+        MOBILE_INPUT.touchActive = true;
+        updateTouchNorm(e.touches[0].clientX);
+    }, { passive: true });
+    pad.addEventListener('touchmove', (e) => {
+        if (!MOBILE_INPUT.touchActive) return;
+        updateTouchNorm(e.touches[0].clientX);
+    }, { passive: true });
+    const releaseTouch = () => {
+        MOBILE_INPUT.touchActive = false;
+        MOBILE_INPUT.touchNormX = 0;
+        setThumb(0);
+    };
+    pad.addEventListener('touchend', releaseTouch, { passive: true });
+    pad.addEventListener('touchcancel', releaseTouch, { passive: true });
+
+    const onTilt = (ev) => {
+        if (!MOBILE_INPUT.tiltEnabled || typeof ev.gamma !== 'number') return;
+        MOBILE_INPUT.tiltNormX = Math.max(-1, Math.min(1, ev.gamma / 30));
+    };
+
+    tiltBtn.addEventListener('click', async () => {
+        if (!MOBILE_INPUT.tiltEnabled) {
+            try {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const perm = await DeviceOrientationEvent.requestPermission();
+                    if (perm !== 'granted') return;
+                }
+                window.addEventListener('deviceorientation', onTilt, true);
+                MOBILE_INPUT.tiltEnabled = true;
+                tiltBtn.textContent = 'TILT ON';
+            } catch (_) {
+                MOBILE_INPUT.tiltEnabled = false;
+            }
+            return;
+        }
+        MOBILE_INPUT.tiltEnabled = false;
+        MOBILE_INPUT.tiltNormX = 0;
+        window.removeEventListener('deviceorientation', onTilt, true);
+        tiltBtn.textContent = 'TILT';
+    });
+}
+
+function applyMobilePaddleControl() {
+    if (!MOBILE_INPUT.enabled || !gameActive || gamePaused || paddles.length === 0 || !players[0] || !players[0].alive) return;
+    let n = null;
+    if (MOBILE_INPUT.touchActive) n = MOBILE_INPUT.touchNormX;
+    else if (MOBILE_INPUT.tiltEnabled) n = MOBILE_INPUT.tiltNormX;
+    if (n === null) return;
+    const p = paddles[0];
+    const tx = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, n * PADDLE_BOUND));
+    movePaddleTo(0, tx, p.position.z);
 }
 
 function initReflections() {
@@ -316,9 +426,8 @@ function buildArena(numPlayers) {
 
     setArenaSize(numPlayers);
 
-    // Update camera to see full arena
-    camera.position.set(0, -2, ARENA_WIDTH * 1.6);
-    controls.target.set(0, -3, 0);
+    // Update camera to keep the whole arena in frame.
+    fitCameraToArena();
 
     // Retune shadow volume for the new arena size
     scene.traverse(obj => {
@@ -647,6 +756,7 @@ function onWindowResize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    fitCameraToArena();
 }
 
 function startGame(mode) {
@@ -892,6 +1002,8 @@ function animate() {
     updateWallImpacts(_dt);
 
     const isMulti = gameMode.startsWith('multi');
+
+    applyMobilePaddleControl();
 
     if (isMulti) updateAIPaddles();
 

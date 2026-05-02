@@ -796,187 +796,344 @@
     @keyframes preSpin {
       to {
         transform: rotate(360deg);
+      }
+    }
 
-        /* ══════════════════════════════════════════════
-             MOBILE — convert side panels to compact top strip
-             so the 3D cube is fully visible on smartphones.
-             Mirrors the FastTrack mobile panel approach.
-             ══════════════════════════════════════════════ */
-        @media (max-width: 768px) {
+    #mobile-player-strip {
+      display: none;
+    }
 
-          /* Nav stays at top */
-          .nav {
-            padding: 5px 12px;
-          }
+    /* ══════════════════════════════════════════════════════════════
+       MOBILE PLAYER STRIP — collapsible bottom bar, all 4 players
+       Replaces the full side-panels so the 3D cube is fully visible.
+       ══════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
 
-          .nav-links {
-            display: none;
-          }
+      .nav {
+        padding: 5px 12px;
+      }
 
-          /* Each player panel becomes a half-width strip below nav */
-          .player-panel {
-            position: fixed !important;
-            top: 34px !important;
-            /* just below compact nav */
-            bottom: auto !important;
-            transform: none !important;
-            width: 50% !important;
-            height: auto !important;
-            min-height: 0 !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            padding: 5px 8px !important;
-            gap: 6px !important;
-            border-radius: 0 !important;
-            border-top: none !important;
-            border-left: none !important;
-            border-right: none !important;
-            border-bottom: 1px solid var(--gborder) !important;
-            z-index: 150 !important;
-            overflow: hidden !important;
-          }
+      .nav-links {
+        display: none;
+      }
 
-          .player-panel.p1-panel {
-            left: 0 !important;
-            right: auto !important;
-            border-left: 3px solid rgba(34, 85, 255, 0.7) !important;
-            border-right: 1px solid var(--gborder) !important;
-          }
+      /* ── Hide the full desktop side-panels completely ── */
+      .player-panel {
+        display: none !important;
+      }
 
-          .player-panel.p2-panel {
-            left: 50% !important;
-            right: 0 !important;
-            border-right: 3px solid rgba(255, 34, 0, 0.7) !important;
-          }
+      /* ── Compact player strip (injected by JS, fixed at bottom) ── */
+      #mobile-player-strip {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 160;
+        background: rgba(0, 0, 10, 0.92);
+        backdrop-filter: blur(14px);
+        border-top: 1px solid var(--gborder);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      }
 
-          /* p3/p4 hidden on mobile (2-player mode) */
-          .player-panel.p3-panel,
-          .player-panel.p4-panel {
-            display: none !important;
-          }
+      #mobile-player-strip.collapsed {
+        transform: translateY(calc(100% - 28px));
+      }
 
-          /* Compact badge */
-          .panel-badge {
-            width: 26px !important;
-            height: 26px !important;
-            font-size: 12px !important;
-            flex-shrink: 0 !important;
-            border-width: 1px !important;
-          }
+      /* Toggle tab at the top of the strip */
+      #mobile-strip-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        height: 28px;
+        background: rgba(0, 160, 220, 0.07);
+        border: none;
+        border-bottom: 1px solid var(--gborder);
+        color: var(--cyan);
+        font-family: 'Orbitron', monospace;
+        font-size: 7px;
+        letter-spacing: 2px;
+        cursor: pointer;
+        padding: 0;
+        transition: background 0.15s;
+      }
 
-          /* Name: one line, truncated */
-          .panel-name {
-            font-size: 9px !important;
-            letter-spacing: 1px !important;
-            flex: 1 !important;
-            text-align: left !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            margin-top: 0 !important;
-            min-width: 0 !important;
-          }
+      #mobile-strip-toggle:hover,
+      #mobile-strip-toggle:active {
+        background: rgba(0, 180, 255, 0.14);
+      }
 
-          /* Score inline, compact */
-          .score-lbl {
-            display: none !important;
-          }
+      #mobile-strip-toggle .strip-arrow {
+        font-size: 10px;
+        transition: transform 0.25s;
+      }
 
-          .panel-score {
-            font-size: 16px !important;
-            flex-shrink: 0 !important;
-          }
+      #mobile-player-strip.collapsed #mobile-strip-toggle .strip-arrow {
+        transform: rotate(180deg);
+      }
 
-          .p1-score {
-            text-shadow: 0 0 8px rgba(34, 85, 255, 0.5) !important;
-          }
+      /* Row of player chips */
+      #mobile-strip-chips {
+        display: flex;
+        align-items: center;
+        padding: 6px 8px 8px;
+        gap: 6px;
+      }
 
-          .p2-score {
-            text-shadow: 0 0 8px rgba(255, 34, 0, 0.5) !important;
-          }
+      /* Individual chip: badge + name + wins */
+      .mob-chip {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 5px 4px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--gborder);
+        transition: border-color 0.3s, background 0.3s;
+        min-width: 0;
+      }
 
-          /* Hide all verbose panel content */
-          .panel-div,
-          .panel-stat,
-          .panel-log-lbl,
-          .panel-log,
-          .panel-mini,
-          .panel-mode {
-            display: none !important;
-          }
+      .mob-chip.active-chip {
+        background: rgba(255, 255, 255, 0.07);
+      }
 
-          /* HUD sits just below the player strip (~34px nav + ~44px strip = ~78px) */
-          #hud-top {
-            top: 80px !important;
-            padding: 5px 16px !important;
-            min-width: 140px !important;
-          }
+      .mob-chip.p1-chip {
+        border-color: rgba(34, 85, 255, 0.3);
+      }
 
-          #turn-indicator {
-            font-size: 11px !important;
-          }
+      .mob-chip.p1-chip.active-chip {
+        border-color: var(--p1);
+        box-shadow: 0 0 10px rgba(34, 85, 255, 0.25);
+      }
 
-          #scenario-tag {
-            font-size: 6px !important;
-          }
+      .mob-chip.p2-chip {
+        border-color: rgba(255, 34, 0, 0.3);
+      }
 
-          #turn-timer {
-            font-size: 8px !important;
-          }
+      .mob-chip.p2-chip.active-chip {
+        border-color: var(--p2);
+        box-shadow: 0 0 10px rgba(255, 34, 0, 0.25);
+      }
 
-          /* Turn announce: smaller on mobile */
-          #turn-announce {
-            top: 130px !important;
-            font-size: 18px !important;
-            padding: 10px 20px !important;
-            letter-spacing: 3px !important;
-          }
+      .mob-chip.p3-chip {
+        border-color: rgba(0, 200, 120, 0.3);
+      }
 
-          /* Camera controls: hide on mobile (touch-orbit is enough) */
-          #cam-controls {
-            display: none !important;
-          }
+      .mob-chip.p3-chip.active-chip {
+        border-color: #00c878;
+        box-shadow: 0 0 10px rgba(0, 200, 120, 0.25);
+      }
 
-          /* Aim hint: hide — touch users don't need mouse instructions */
-          #aim-hint {
-            display: none !important;
-          }
+      .mob-chip.p4-chip {
+        border-color: rgba(220, 160, 0, 0.3);
+      }
 
-          /* Column grid: dock to bottom edge, full width, bigger touch targets */
-          #col-grid {
-            bottom: 0 !important;
-            border-radius: 12px 12px 0 0 !important;
-            padding: 8px 6px 10px !important;
-            width: 100% !important;
-            transform: translateX(-50%) !important;
-          }
+      .mob-chip.p4-chip.active-chip {
+        border-color: var(--gold);
+        box-shadow: 0 0 10px rgba(220, 160, 0, 0.25);
+      }
 
-          #cg-label {
-            font-size: 6px !important;
-          }
+      .mob-badge {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 900;
+        border: 1.5px solid;
+        flex-shrink: 0;
+      }
 
-          .drop-btn {
-            width: 36px !important;
-            height: 42px !important;
-          }
+      .mob-badge.p1-badge {
+        background: radial-gradient(circle, #1144cc 0%, #000820 100%);
+        border-color: var(--p1);
+        color: var(--p1);
+      }
 
-          .drop-btn .da {
-            font-size: 15px !important;
-          }
+      .mob-badge.p2-badge {
+        background: radial-gradient(circle, #bb2200 0%, #180000 100%);
+        border-color: var(--p2);
+        color: var(--p2);
+      }
 
-          .drop-btn .dl {
-            display: none !important;
-          }
+      .mob-badge.p3-badge {
+        background: radial-gradient(circle, #006644 0%, #000e08 100%);
+        border-color: #00c878;
+        color: #00c878;
+      }
 
-          /* Result overlay: full width on narrow screens */
-          #result-overlay {
-            min-width: 88vw !important;
-            padding: 20px 16px !important;
-          }
+      .mob-badge.p4-badge {
+        background: radial-gradient(circle, #886600 0%, #100c00 100%);
+        border-color: var(--gold);
+        color: var(--gold);
+      }
 
-          #result-title {
-            font-size: 2em !important;
-          }
-        }
+      .mob-name {
+        font-family: 'Orbitron', monospace;
+        font-size: 7px;
+        letter-spacing: 1px;
+        color: #d0e4ff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        text-align: center;
+      }
+
+      .mob-score {
+        font-family: 'Orbitron', monospace;
+        font-size: 8px;
+        color: var(--dim);
+        line-height: 1;
+      }
+
+      /* Win pips: 4 circles, filled = win earned */
+      .mob-wins {
+        display: flex;
+        gap: 3px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .mob-pip {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        border: 1px solid;
+        transition: background 0.2s;
+      }
+
+      .mob-chip.p1-chip .mob-pip {
+        border-color: rgba(34, 85, 255, 0.6);
+      }
+
+      .mob-chip.p1-chip .mob-pip.filled {
+        background: var(--p1);
+        border-color: var(--p1);
+      }
+
+      .mob-chip.p2-chip .mob-pip {
+        border-color: rgba(255, 34, 0, 0.6);
+      }
+
+      .mob-chip.p2-chip .mob-pip.filled {
+        background: var(--p2);
+        border-color: var(--p2);
+      }
+
+      .mob-chip.p3-chip .mob-pip {
+        border-color: rgba(0, 200, 120, 0.6);
+      }
+
+      .mob-chip.p3-chip .mob-pip.filled {
+        background: #00c878;
+        border-color: #00c878;
+      }
+
+      .mob-chip.p4-chip .mob-pip {
+        border-color: rgba(220, 160, 0, 0.6);
+      }
+
+      .mob-chip.p4-chip .mob-pip.filled {
+        background: var(--gold);
+        border-color: var(--gold);
+      }
+
+      /* Pulse ring on active chip badge */
+      .mob-badge.pulse::after {
+        content: '';
+        position: absolute;
+        inset: -5px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        animation: badge-ring 1.5s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      .mob-badge {
+        position: relative;
+      }
+
+      /* ── HUD adjustments: sits just above the strip ── */
+      #hud-top {
+        top: 44px !important;
+        padding: 5px 16px !important;
+        min-width: 140px !important;
+      }
+
+      #turn-indicator {
+        font-size: 11px !important;
+      }
+
+      #scenario-tag {
+        font-size: 6px !important;
+      }
+
+      #turn-timer {
+        font-size: 8px !important;
+      }
+
+      #turn-announce {
+        top: 110px !important;
+        font-size: 18px !important;
+        padding: 10px 20px !important;
+        letter-spacing: 3px !important;
+      }
+
+      /* Camera controls: hide on mobile */
+      #cam-controls {
+        display: none !important;
+      }
+
+      /* Aim hint: hide on mobile */
+      #aim-hint {
+        display: none !important;
+      }
+
+      /* Column grid: full width, docked just above the strip */
+      #col-grid {
+        bottom: 86px !important;
+        border-radius: 12px !important;
+        padding: 8px 6px 8px !important;
+        width: auto !important;
+        max-width: 96vw !important;
+        transform: translateX(-50%) !important;
+      }
+
+      #mobile-player-strip.collapsed~* #col-grid,
+      body.strip-collapsed #col-grid {
+        bottom: 36px !important;
+      }
+
+      #cg-label {
+        font-size: 6px !important;
+      }
+
+      .drop-btn {
+        width: 36px !important;
+        height: 42px !important;
+      }
+
+      .drop-btn .da {
+        font-size: 15px !important;
+      }
+
+      .drop-btn .dl {
+        display: none !important;
+      }
+
+      /* Result overlay: full width */
+      #result-overlay {
+        min-width: 88vw !important;
+        padding: 20px 16px !important;
+      }
+
+      #result-title {
+        font-size: 2em !important;
       }
     }

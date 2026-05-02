@@ -147,6 +147,54 @@
       z-index: 100;
       text-shadow: 0 0 5px #39ff14;
     }
+
+    #orientation-guard-bb {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(4, 8, 20, 0.94);
+      backdrop-filter: blur(8px);
+    }
+
+    #orientation-guard-bb .og-card {
+      width: min(92vw, 430px);
+      border: 1px solid rgba(0, 255, 204, 0.45);
+      border-radius: 12px;
+      background: rgba(6, 18, 30, 0.96);
+      text-align: center;
+      padding: 18px;
+      box-shadow: 0 0 28px rgba(0, 255, 204, 0.25);
+    }
+
+    #orientation-guard-bb .og-title {
+      color: #00ffcc;
+      font-size: 16px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    #orientation-guard-bb .og-copy {
+      color: #b7ece2;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    #orientation-guard-bb .og-btn {
+      border: 1px solid rgba(0, 255, 204, 0.6);
+      background: rgba(0, 95, 78, 0.4);
+      color: #c8fff3;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -160,6 +208,13 @@
   </div>
 
   <div id="hud"></div>
+  <div id="orientation-guard-bb" aria-live="polite">
+    <div class="og-card">
+      <div class="og-title">ROTATE TO LANDSCAPE</div>
+      <div class="og-copy">BrickBreaker 3D keeps the full arena in view during horizontal play.</div>
+      <button id="orientation-guard-bb-btn" class="og-btn" type="button">ENTER LANDSCAPE</button>
+    </div>
+  </div>
   <div id="menu">
     <h1>BRICKBREAKER3D</h1>
     <div class="subtitle">🌀 MANIFOLD AUDIO EDITION</div>
@@ -174,6 +229,43 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="game.js"></script>
+  <script>
+    (function enforceLandscapeBB() {
+      const guard = document.getElementById('orientation-guard-bb');
+      const btn = document.getElementById('orientation-guard-bb-btn');
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+
+      async function tryLockLandscape() {
+        try {
+          if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (_) { }
+        try {
+          if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+        } catch (_) { }
+      }
+
+      function updateGuard() {
+        if (!isMobile) {
+          guard.style.display = 'none';
+          return;
+        }
+        const portrait = window.innerHeight > window.innerWidth;
+        guard.style.display = portrait ? 'flex' : 'none';
+      }
+
+      btn.addEventListener('click', async () => {
+        await tryLockLandscape();
+        updateGuard();
+      });
+
+      window.addEventListener('orientationchange', updateGuard);
+      window.addEventListener('resize', updateGuard);
+      document.addEventListener('fullscreenchange', updateGuard);
+      updateGuard();
+    })();
+  </script>
   <script>
     // Auto-launch from lobby intent: ?mode=solo | multi&players=N | private&code=X&players=N
     (function autoLaunchFromLobby() {

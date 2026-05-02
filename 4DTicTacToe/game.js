@@ -40,9 +40,14 @@ const P1 = BM.P1, P2 = BM.P2, P3 = BM.P3, P4 = BM.P4;
 // Defaults; overwritten from manifold.game.json:params at bootstrap (see manifest fetch below).
 let GRID_FOR_PLAYERS = { 1: 3, 2: 4, 3: 5, 4: 5 };
 function gridForPlayers(n) { return GRID_FOR_PLAYERS[n] || 4; }
+const WIN_TARGET = 4;
 let numPlayers = 2;
 const dirsOf = sc => (sc && sc.modes === 'diag') ? BM.DIAG_DIRS : BM.DIRS;
 let SCENARIOS = [], PLAYERS = [];
+const PLAYER_META = Array.from({ length: 4 }, (_, i) => ({
+  name: `PLAYER ${i + 1}`,
+  avatar: String(i + 1),
+}));
 let selectedScenario = null, currentScenario = null;
 let vsMode = 'pvp', aiDiff = 'easy';
 let currentPlayer = P1, isGameOver = false, isDropping = false;
@@ -934,6 +939,37 @@ function nearestFreeCellInColumn(dropColumn, x, y, z, yLimit) {
   return node ? [node.gx, node.gy, node.gz] : null;
 }
 
+function segmentIndexFromLocal(v) {
+  const idx = Math.floor((v + GY_HALF) / SADDLE_CELL);
+  return Math.max(0, Math.min(G - 1, idx));
+}
+
+function settledSegmentFromWorld(x, y, z) {
+  const local = new THREE.Vector3(x, y, z);
+  boardGroup.worldToLocal(local);
+  return {
+    gx: segmentIndexFromLocal(local.x),
+    gy: segmentIndexFromLocal(local.y),
+    gz: segmentIndexFromLocal(local.z),
+  };
+}
+
+function resolveSettledSegmentCell(x, y, z) {
+  const seed = settledSegmentFromWorld(x, y, z);
+  // Strict mode: only accept the exact segment — no adjacency fallback.
+  if (!BM.getCell(seed.gx, seed.gy, seed.gz)) return [seed.gx, seed.gy, seed.gz];
+  return null;
+}
+
+function settledSegmentTargetNode(x, y, z) {
+  const cell = resolveSettledSegmentCell(x, y, z);
+  if (!cell) return null;
+  const [gx, gy, gz] = cell;
+  const wp = nodePos(gx, gy, gz);
+  boardGroup.localToWorld(wp);
+  return { gx, gy, gz, p: wp };
+}
+
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
   if (!KGSync.canActLocally()) return;
@@ -1105,6 +1141,51 @@ function announceTurn(p) {
   if (_turnAnnounceHide) clearTimeout(_turnAnnounceHide);
   _turnAnnounceHide = setTimeout(() => el.classList.remove('show'), 1400);
 }
+function avatarFor(player, slot) {
+  if (player && typeof player.avatar === 'string' && player.avatar.trim()) return player.avatar.trim();
+  if (player && typeof player.avatar_emoji === 'string' && player.avatar_emoji.trim()) return player.avatar_emoji.trim();
+  if (player && typeof player.avatar_id === 'number') return String.fromCodePoint(0x1F600 + (Math.abs(player.avatar_id) % 80));
+  return String(slot);
+}
+function setPlayerIdentity(slot, name, avatar) {
+  const safeName = (name || `PLAYER ${slot}`).toUpperCase();
+  const safeAvatar = (avatar || String(slot)).trim().slice(0, 2);
+  PLAYER_META[slot - 1] = { name: safeName, avatar: safeAvatar };
+  const nameEl = document.getElementById(`name-p${slot}`);
+  if (nameEl) nameEl.textContent = safeName;
+  const mobName = document.getElementById(`mob-name-p${slot}`);
+  if (mobName) mobName.textContent = safeName;
+  const mobAvatar = document.getElementById(`mob-avatar-p${slot}`);
+  if (mobAvatar) mobAvatar.textContent = safeAvatar;
+}
+function initMobilePlayerStrip() {
+  const strip = document.getElementById('mobile-player-strip');
+  const toggle = document.getElementById('mobile-strip-toggle');
+  if (!strip || !toggle || toggle.dataset.bound === '1') return;
+  toggle.dataset.bound = '1';
+  toggle.addEventListener('click', () => {
+    const collapsed = strip.classList.toggle('collapsed');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    document.body.classList.toggle('strip-collapsed', collapsed);
+  });
+  document.body.classList.add('strip-collapsed');
+}
+function renderMobilePlayers() {
+  for (let p = 1; p <= 4; p++) {
+    const chip = document.getElementById(`mob-chip-p${p}`);
+    if (!chip) continue;
+    chip.style.display = (p <= numPlayers) ? '' : 'none';
+    const score = TS.score(p);
+    const scoreEl = document.getElementById(`mob-score-p${p}`);
+    if (scoreEl) scoreEl.textContent = `${Math.min(score, WIN_TARGET)}/${WIN_TARGET}`;
+    const winsEl = document.getElementById(`mob-wins-p${p}`);
+    if (winsEl) {
+      winsEl.innerHTML = Array.from({ length: WIN_TARGET }, (_, i) =>
+        `<span class="mob-pip${i < score ? ' filled' : ''}"></span>`
+      ).join('');
+    }
+  }
+}
 function updateHUD() {
   const name = document.getElementById('name-p' + currentPlayer);
   const ti = document.getElementById('turn-indicator');
@@ -1113,6 +1194,8 @@ function updateHUD() {
     const isMe = p === currentPlayer, active = p <= numPlayers;
     const panel = document.getElementById('panel-p' + p); if (panel) panel.classList.toggle('active', isMe && active);
     const badge = document.getElementById('badge-p' + p); if (badge) badge.classList.toggle('pulse', isMe && active);
+    const mobChip = document.getElementById('mob-chip-p' + p); if (mobChip) mobChip.classList.toggle('active-chip', isMe && active);
+    const mobBadge = document.getElementById('mob-avatar-p' + p); if (mobBadge) mobBadge.classList.toggle('pulse', isMe && active);
     const nameEl = document.getElementById('name-p' + p);
     if (nameEl) nameEl.style.color = (isMe && active) ? PLAYER_HEX[p - 1] : '#e0eaff';
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -1128,7 +1211,13 @@ function updateHUD() {
   }
 }
 function renderLogs() { for (let p = 1; p <= numPlayers; p++) { const el = document.getElementById(`log-p${p}`); if (el) el.innerHTML = TS.log(p).map(m => `<div class="log-entry">${m}</div>`).join(''); } }
-function renderScores() { for (let p = 1; p <= 4; p++) { const el = document.getElementById(`score-p${p}`); if (el) el.textContent = TS.score(p); } }
+function renderScores() {
+  for (let p = 1; p <= 4; p++) {
+    const el = document.getElementById(`score-p${p}`);
+    if (el) el.textContent = TS.score(p);
+  }
+  renderMobilePlayers();
+}
 function showResult(title, sub, tally, color) { document.getElementById('result-title').textContent = title; document.getElementById('result-title').style.color = color; document.getElementById('result-line').textContent = sub; document.getElementById('result-tally').textContent = tally; document.getElementById('result-overlay').classList.add('show'); }
 // (legacy buildColUI / refreshColBtns now defined as no-ops below)
 function startTurnTimer() { if (!currentScenario.timer) return; clearTurnTimer(); timerLeft = currentScenario.timer; const el = document.getElementById('turn-timer'); el.style.color = 'var(--cyan)'; el.textContent = timerLeft + 's'; turnTimer = setInterval(() => { timerLeft--; el.textContent = timerLeft + 's'; if (timerLeft <= 3) el.style.color = '#ff4444'; if (timerLeft <= 0) { clearTurnTimer(); const avail = BM.openColumns(); if (avail.length) { const [gx, gz] = TRNG.pick(avail); dropBall(gx, gz); } } }, 1000); }
@@ -1331,7 +1420,7 @@ function physSubstep(dt) {
   const ATTRACT_GATE = SETTLE_V * 3;            // start nudging once below ~3x settle speed
   const ATTRACT_MAX = 26;                       // m/s^2 at zero speed; gentle compared to GRAV (-62)
   if (speed2 < ATTRACT_GATE * ATTRACT_GATE) {
-    const tgt = nearestFreeNodeInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z);
+    const tgt = settledSegmentTargetNode(physBall.x, physBall.y, physBall.z);
     if (tgt) {
       const tx = tgt.p.x;
       const ty = tgt.p.y;
@@ -1399,10 +1488,9 @@ let snapAnim = null;
 const _snapTmp = new THREE.Vector3();
 function onBallSettled() {
   const p = physBall.p;
-  // Cell selection stays inside the original release column. The final chamber is chosen
-  // from where the ball actually stopped, preserving gyroid meander while preventing lateral
-  // reassignment to other columns.
-  const cell = nearestFreeCellInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z);
+  // Deterministic chamber attach: segment the cube into chamber cells and map the settle point
+  // directly to that segment. If occupied, only face-adjacent chambers are considered.
+  const cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
   Audio4D.onSettle();
   boardGlow.intensity = 0;
   if (!cell) {
@@ -1556,6 +1644,7 @@ function setNumPlayers(n) {
     const panel = document.getElementById('panel-p' + i);
     if (panel) panel.style.display = (i <= numPlayers) ? '' : 'none';
   }
+  renderMobilePlayers();
 }
 function showScenarioSelect() {
   document.getElementById('result-overlay').classList.remove('show');
@@ -1584,11 +1673,12 @@ function openMultiplayerPanel() {
     maxPlayers: 4,
     inviteCode,
     onLaunch: ({ session, players, playerCount, launchMode }) => {
+      PLAYERS = Array.isArray(players) ? players : [];
       numPlayers = Math.max(1, Math.min(4, playerCount));
       vsMode = launchMode === 'ai' ? 'ai' : 'pvp';
       for (let i = 0; i < numPlayers; i++) {
-        const el = document.getElementById('name-p' + (i + 1));
-        if (el) el.textContent = (players[i].username || ('PLAYER ' + (i + 1))).toUpperCase();
+        const pl = PLAYERS[i] || null;
+        setPlayerIdentity(i + 1, (pl && pl.username) || ('PLAYER ' + (i + 1)), avatarFor(pl, i + 1));
       }
       KGSync.init(session);
       try { KGMultiplayerPanel.unmount(); } catch { /* ignore */ }
@@ -1612,7 +1702,7 @@ function startGame() {
   Audio4D.startMusic();
 }
 function rematch() { document.getElementById('result-overlay').classList.remove('show'); resetGame(false); Audio4D.startMusic(); }
-function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); snapAnim = null; _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') document.getElementById('name-p2').textContent = 'AI OPPONENT'; maybeSpawnTurnBall(); }
+function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); snapAnim = null; _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') setPlayerIdentity(2, 'AI OPPONENT', 'AI'); maybeSpawnTurnBall(); }
 let lastT = 0;
 function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); stepSnapAnim(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); renderer.render(scene, camera); }
 window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
@@ -1623,6 +1713,9 @@ function finishPreload() { const pre = document.getElementById('preloader'); pre
 camera.position.copy(CAM_PRESETS.A.pos); camera.lookAt(CAM_PRESETS.A.target);
 camPos.copy(CAM_PRESETS.A.pos); camPosT.copy(CAM_PRESETS.A.pos);
 requestAnimationFrame(animate);
+for (let p = 1; p <= 4; p++) setPlayerIdentity(p, `PLAYER ${p}`, String(p));
+initMobilePlayerStrip();
+renderMobilePlayers();
 let __MANIFEST__ = null;
 const manifestReady = fetch('./manifold.game.json').then(r => r.json()).then(cfg => {
   __MANIFEST__ = cfg;

@@ -12,6 +12,12 @@ const SFInput = (function () {
 
     // ── Mobile / Touch state ──
     let isMobile = false;
+    let gyroEnabled = false;
+    let gyroSupported = false;
+    let gyroZeroBeta = 0;
+    let gyroZeroGamma = 0;
+    let gyroPitch = 0;
+    let gyroYaw = 0;
 
     // Nav sphere state (center thumb control)
     let navActive = false;
@@ -203,10 +209,65 @@ const SFInput = (function () {
         }, { passive: true });
 
         // ── Remaining action buttons (lock, boost, afterburner, RTB) ──
+        _bindTouchHold('mob-fire', 'fireHeld');
+        _bindGyroButton();
         _bindTouchBtn('mob-lock', () => { if (window.Starfighter) window.Starfighter.tryLockOnTarget(); });
         _bindTouchBtn('mob-boost', () => { if (player) player.activateBoost(); });
         _bindTouchHold('mob-afterburner', 'afterburnerHeld');
         _bindTouchBtn('mob-rtb', () => { if (window.Starfighter && Starfighter.emergencyRTB) Starfighter.emergencyRTB(); });
+    }
+
+    function _bindGyroButton() {
+        const btn = document.getElementById('mob-tilt');
+        if (!btn) return;
+        const setBtn = (on) => {
+            btn.classList.toggle('active', !!on);
+            btn.textContent = on ? 'TILT ON' : 'TILT';
+        };
+        setBtn(false);
+        btn.addEventListener('touchstart', async (e) => {
+            e.preventDefault();
+            const enabled = await _toggleGyro();
+            setBtn(enabled);
+        }, { passive: false });
+    }
+
+    function _onDeviceOrientation(ev) {
+        if (!gyroEnabled) return;
+        if (typeof ev.beta !== 'number' || typeof ev.gamma !== 'number') return;
+        const relPitch = (ev.beta - gyroZeroBeta);
+        const relYaw = (ev.gamma - gyroZeroGamma);
+        gyroPitch = Math.max(-1, Math.min(1, relPitch / 28));
+        gyroYaw = Math.max(-1, Math.min(1, relYaw / 26));
+    }
+
+    async function _toggleGyro() {
+        try {
+            if (!gyroEnabled) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const perm = await DeviceOrientationEvent.requestPermission();
+                    if (perm !== 'granted') return false;
+                }
+                window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+                gyroSupported = true;
+                gyroEnabled = true;
+                gyroZeroBeta = 0;
+                gyroZeroGamma = 0;
+                gyroPitch = 0;
+                gyroYaw = 0;
+                return true;
+            }
+            gyroEnabled = false;
+            window.removeEventListener('deviceorientation', _onDeviceOrientation, true);
+            gyroPitch = 0;
+            gyroYaw = 0;
+            return false;
+        } catch (err) {
+            console.warn('[SFInput] Gyro unavailable', err);
+            gyroSupported = false;
+            gyroEnabled = false;
+            return false;
+        }
     }
 
     // ── Nav Sphere handlers ──
@@ -300,6 +361,11 @@ const SFInput = (function () {
             if (Math.abs(navDy) > 0.05) player.pitch -= navDy * dt * 2.5;
             lastInputDevice = 'touch';
         }
+        if (isMobile && gyroEnabled && !navActive) {
+            if (Math.abs(gyroYaw) > 0.03) player.yaw -= gyroYaw * dt * 2.4;
+            if (Math.abs(gyroPitch) > 0.03) player.pitch -= gyroPitch * dt * 2.4;
+            lastInputDevice = 'touch';
+        }
         if (isMobile) {
             // Thrust while touching sphere, backs off when released
             if (navThrust) {
@@ -307,6 +373,10 @@ const SFInput = (function () {
             } else {
                 player.throttle = Math.max(0, player.throttle - dt * 0.4);
             }
+        }
+        if (touchBtns['fireHeld']) {
+            window.Starfighter.firePrimary();
+            lastInputDevice = 'touch';
         }
 
         // Roll (Q/E) — GDD §4.1: 120°/s
