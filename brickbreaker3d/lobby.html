@@ -238,9 +238,17 @@
     <div id="mp-panel-host" style="width:100%;max-width:560px;margin:0 auto 24px;"></div>
   </div>
 
+  <!-- Lightweight profile gate: prompts for name + avatar on first visit. -->
+  <div id="kg-player" data-profile-required="true" hidden></div>
+
   <script src="/js/substrates/avatar_picker.js"></script>
   <script src="/js/substrates/player_profile.js"></script>
   <script src="/js/substrates/game_manager.js?v=20260501"></script>
+  <script>
+    if (window.KGGameManager && typeof window.KGGameManager.loadRules === 'function') {
+      window.KGGameManager.loadRules('brickbreaker3d').catch(() => { });
+    }
+  </script>
   <script src="/js/multiplayer-client.js"></script>
   <script src="/js/substrates/multiplayer_panel.js?v=20260430"></script>
   <script src="/js/substrates/game_setup.js?v=20260430"></script>

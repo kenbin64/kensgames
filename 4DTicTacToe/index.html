@@ -79,6 +79,40 @@
     <canvas class="panel-mini" id="mini-p4" width="180" height="180"></canvas>
     <div class="panel-mode" id="mode-p4">CLASSIC</div>
   </div>
+
+  <div id="mobile-player-strip" class="collapsed" aria-label="Player Summary">
+    <button id="mobile-strip-toggle" type="button" aria-expanded="false" aria-controls="mobile-strip-chips">
+      <span class="strip-arrow">▾</span>
+      <span>PLAYERS</span>
+    </button>
+    <div id="mobile-strip-chips">
+      <div class="mob-chip p1-chip active-chip" id="mob-chip-p1">
+        <div class="mob-badge p1-badge" id="mob-avatar-p1">1</div>
+        <div class="mob-name" id="mob-name-p1">PLAYER 1</div>
+        <div class="mob-score" id="mob-score-p1">0/4</div>
+        <div class="mob-wins" id="mob-wins-p1"></div>
+      </div>
+      <div class="mob-chip p2-chip" id="mob-chip-p2">
+        <div class="mob-badge p2-badge" id="mob-avatar-p2">2</div>
+        <div class="mob-name" id="mob-name-p2">PLAYER 2</div>
+        <div class="mob-score" id="mob-score-p2">0/4</div>
+        <div class="mob-wins" id="mob-wins-p2"></div>
+      </div>
+      <div class="mob-chip p3-chip" id="mob-chip-p3" style="display:none">
+        <div class="mob-badge p3-badge" id="mob-avatar-p3">3</div>
+        <div class="mob-name" id="mob-name-p3">PLAYER 3</div>
+        <div class="mob-score" id="mob-score-p3">0/4</div>
+        <div class="mob-wins" id="mob-wins-p3"></div>
+      </div>
+      <div class="mob-chip p4-chip" id="mob-chip-p4" style="display:none">
+        <div class="mob-badge p4-badge" id="mob-avatar-p4">4</div>
+        <div class="mob-name" id="mob-name-p4">PLAYER 4</div>
+        <div class="mob-score" id="mob-score-p4">0/4</div>
+        <div class="mob-wins" id="mob-wins-p4"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="hud-top">
     <div id="scenario-tag">CLASSIC 4D</div>
     <div id="turn-indicator" style="color:var(--p1)">&#9899; PLAYER 1</div>
@@ -115,12 +149,22 @@
       <div class="pre-bar" id="pre-bar"></div>
     </div>
   </div>
+  <!-- Lightweight profile gate: prompts for name + avatar on first visit. -->
+  <div id="kg-player" data-profile-required="true" hidden></div>
+
   <script src="/js/manifold_bridge.js"></script>
   <script src="/js/substrates/avatar_picker.js"></script>
   <script src="/js/substrates/player_profile.js"></script>
   <script src="/js/multiplayer-client.js"></script>
   <script src="/js/substrates/multiplayer_panel.js?v=20260501c"></script>
+  <script src="/js/substrates/game_manager.js?v=20260501"></script>
   <script src="/js/substrates/game_setup.js?v=20260429a"></script>
+  <script>
+    // Warm the rules cache so the manager can enforce gameplay rules later.
+    if (window.KGGameManager && typeof window.KGGameManager.loadRules === 'function') {
+      window.KGGameManager.loadRules('4dtictactoe').catch(() => { /* offline-safe */ });
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="manifold.js?v=20260429c"></script>
@@ -156,6 +200,102 @@
   </style>
   <button id="btn-leave-game" title="Leave Game" aria-label="Leave Game"
     onclick="if(confirm('Leave this game?')) window.location.href='/';">&times;</button>
+
+  <style>
+    #orientation-guard-4d {
+      position: fixed;
+      inset: 0;
+      z-index: 20000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 12, 0.94);
+      backdrop-filter: blur(6px);
+      text-align: center;
+    }
+
+    #orientation-guard-4d .og-card {
+      width: min(92vw, 420px);
+      border: 1px solid rgba(0, 200, 255, 0.45);
+      border-radius: 14px;
+      background: rgba(10, 20, 40, 0.92);
+      box-shadow: 0 0 30px rgba(0, 180, 255, 0.25);
+      padding: 18px;
+      color: #d6ecff;
+      font-family: 'Orbitron', monospace;
+    }
+
+    #orientation-guard-4d .og-title {
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: #7fd9ff;
+      margin-bottom: 8px;
+    }
+
+    #orientation-guard-4d .og-copy {
+      font-size: 11px;
+      line-height: 1.5;
+      color: #b8d5f0;
+      margin-bottom: 12px;
+    }
+
+    #orientation-guard-4d .og-btn {
+      border: 1px solid rgba(0, 210, 255, 0.6);
+      background: rgba(0, 110, 150, 0.32);
+      color: #9be8ff;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 1.4px;
+      cursor: pointer;
+    }
+  </style>
+  <div id="orientation-guard-4d" aria-live="polite">
+    <div class="og-card">
+      <div class="og-title">ROTATE TO LANDSCAPE</div>
+      <div class="og-copy">4D Connect is designed for horizontal play so the full cube stays inside view.</div>
+      <button id="orientation-guard-4d-btn" class="og-btn" type="button">ENTER LANDSCAPE</button>
+    </div>
+  </div>
+  <script>
+    (function enforceLandscape4D() {
+      const guard = document.getElementById('orientation-guard-4d');
+      const btn = document.getElementById('orientation-guard-4d-btn');
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+
+      async function tryLockLandscape() {
+        try {
+          if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (_) { }
+        try {
+          if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+        } catch (_) { }
+      }
+
+      function updateGuard() {
+        if (!isMobile) {
+          guard.style.display = 'none';
+          return;
+        }
+        const portrait = window.innerHeight > window.innerWidth;
+        guard.style.display = portrait ? 'flex' : 'none';
+      }
+
+      btn.addEventListener('click', async () => {
+        await tryLockLandscape();
+        updateGuard();
+      });
+
+      window.addEventListener('orientationchange', updateGuard);
+      window.addEventListener('resize', updateGuard);
+      document.addEventListener('fullscreenchange', updateGuard);
+      updateGuard();
+    })();
+  </script>
 </body>
 
 </html>
