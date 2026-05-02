@@ -557,7 +557,7 @@
 
         .console-screen {
             position: relative;
-            height: 170px;
+            height: 120px;
             background: rgba(0, 0, 0, 0.4);
             border-top: 1px solid rgba(255, 0, 255, 0.08);
             border-bottom: 1px solid rgba(0, 255, 255, 0.08);
@@ -1409,9 +1409,18 @@
                 grid-template-columns: 1fr 1fr;
                 gap: 30px;
             }
+
+            .arcade-wall {
+                grid-template-columns: 1fr 1fr;
+                gap: 14px;
+            }
         }
 
         @media (max-width: 640px) {
+            .arcade-wall {
+                grid-template-columns: 1fr;
+            }
+
             header {
                 padding: 10px 16px;
             }
@@ -1567,14 +1576,7 @@
                             fetchpriority="high" />
                     </div>
                     <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                                src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.png"
-                                src="/assets/images/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
+                        <div class="mini"></div>
                         <button class="go" onclick="goToGame('/fasttrack/')">PLAY &#9654;</button>
                     </div>
                 </div>
@@ -1608,15 +1610,25 @@
                             decoding="async" fetchpriority="low" />
                     </div>
                     <div class="console-foot">
-                        <div class="mini">
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.png"
-                                src="/assets/images/fasttrack_lobby.png" alt="FastTrack" loading="lazy" decoding="async"
-                                fetchpriority="low" />
-                            <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                                src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
-                                decoding="async" fetchpriority="low" />
-                        </div>
+                        <div class="mini"></div>
                         <button class="go" onclick="goToGame('/starfighter/')">PLAY &#9654;</button>
+                    </div>
+                </div>
+
+                <div class="console" role="group" aria-label="BrickBreaker 3D console"
+                    style="border-color: rgba(153,0,255,0.28)">
+                    <div class="console-head">
+                        <div class="console-title">BrickBreaker 3D</div>
+                        <div class="console-tag">solo &amp; multiplayer</div>
+                    </div>
+                    <div class="console-screen">
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
+                            src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
+                            decoding="async" fetchpriority="low" />
+                    </div>
+                    <div class="console-foot">
+                        <div class="mini"></div>
+                        <button class="go" onclick="goToGame('/brickbreaker3d/')">PLAY &#9654;</button>
                     </div>
                 </div>
             </div>
