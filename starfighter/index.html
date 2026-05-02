@@ -390,13 +390,13 @@
         pointer-events: none;
       }
 
-      /* Action button group — top-right, compact */
+      /* Action button group — anchored low-right to keep center sightline clear */
       #mob-btn-group {
         position: absolute;
         right: 10px;
-        top: 60px;
-        display: flex;
-        flex-direction: column;
+        bottom: 20px;
+        display: grid;
+        grid-template-columns: repeat(2, 52px);
         gap: 8px;
         pointer-events: auto;
       }
@@ -426,6 +426,21 @@
         background: rgba(0, 255, 255, 0.2);
         border-color: #0ff;
         box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+      }
+
+      @media(max-width:600px) {
+        #mob-btn-group {
+          right: 8px;
+          bottom: 14px;
+          grid-template-columns: repeat(2, 46px);
+          gap: 6px;
+        }
+
+        .mob-btn {
+          width: 46px;
+          height: 46px;
+          font-size: 8px;
+        }
       }
 
       .mob-btn:focus-visible {

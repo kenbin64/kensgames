@@ -1037,7 +1037,8 @@
         bottom: 0;
         left: 0;
         right: auto;
-        width: auto;
+        width: 148px;
+        max-width: 42vw;
         border-radius: 12px 12px 0 0;
         padding: 5px 8px;
         transform: none;
@@ -1045,17 +1046,19 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
+        z-index: 90;
       }
 
       #panel-options {
-        left: 0;
-        right: 0;
-        bottom: 58px;
-        width: 100%;
+        left: 154px;
+        right: 6px;
+        bottom: 0;
+        width: auto;
         max-height: 32vh;
         border-radius: 12px 12px 0 0;
         padding: 8px;
         transform: none;
+        z-index: 85;
       }
 
       #panel-action:hover {
@@ -1838,7 +1841,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260501l"></script>
+  <script src="fasttrack-game-core.js?v=20260502a"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer

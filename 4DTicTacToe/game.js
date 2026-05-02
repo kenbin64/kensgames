@@ -1159,16 +1159,11 @@ function setPlayerIdentity(slot, name, avatar) {
   if (mobAvatar) mobAvatar.textContent = safeAvatar;
 }
 function initMobilePlayerStrip() {
+  // Strip is a fixed 44px always-visible bar — no toggle or collapse needed.
   const strip = document.getElementById('mobile-player-strip');
-  const toggle = document.getElementById('mobile-strip-toggle');
-  if (!strip || !toggle || toggle.dataset.bound === '1') return;
-  toggle.dataset.bound = '1';
-  toggle.addEventListener('click', () => {
-    const collapsed = strip.classList.toggle('collapsed');
-    toggle.setAttribute('aria-expanded', String(!collapsed));
-    document.body.classList.toggle('strip-collapsed', collapsed);
-  });
-  document.body.classList.add('strip-collapsed');
+  if (!strip) return;
+  strip.classList.remove('collapsed');
+  document.body.classList.remove('strip-collapsed');
 }
 function renderMobilePlayers() {
   for (let p = 1; p <= 4; p++) {
@@ -1177,13 +1172,9 @@ function renderMobilePlayers() {
     chip.style.display = (p <= numPlayers) ? '' : 'none';
     const score = TS.score(p);
     const scoreEl = document.getElementById(`mob-score-p${p}`);
-    if (scoreEl) scoreEl.textContent = `${Math.min(score, WIN_TARGET)}/${WIN_TARGET}`;
+    if (scoreEl) scoreEl.textContent = score > 0 ? `${score}W` : '';
     const winsEl = document.getElementById(`mob-wins-p${p}`);
-    if (winsEl) {
-      winsEl.innerHTML = Array.from({ length: WIN_TARGET }, (_, i) =>
-        `<span class="mob-pip${i < score ? ' filled' : ''}"></span>`
-      ).join('');
-    }
+    if (winsEl) winsEl.innerHTML = ''; // pips hidden; wins shown as count above
   }
 }
 function updateHUD() {

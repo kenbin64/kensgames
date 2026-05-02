@@ -58,22 +58,30 @@ class KGMultiplayer {
   connect(auth) {
     if (this.ws && this.ws.readyState <= 1) return;
     this._manualDisconnect = false;
-    this.username = (auth && auth.username) || localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player';
+    this.username = (auth && auth.username) || localStorage.getItem('display_name') || localStorage.getItem('username') || 'Player';
+
+    const freshGuestIdentity = !!(auth && auth.freshGuestIdentity);
 
     // Stable per-browser guest id, persisted in localStorage so the same browser
     // keeps the same identity across reloads/games (no accounts).
     let guestId = null;
-    try { guestId = localStorage.getItem('kg_guest_id'); } catch { /* ignore */ }
+    if (!freshGuestIdentity) {
+      try { guestId = localStorage.getItem('kg_guest_id'); } catch { /* ignore */ }
+    }
     if (!guestId) {
       guestId = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      try { localStorage.setItem('kg_guest_id', guestId); } catch { /* ignore */ }
+      if (!freshGuestIdentity) {
+        try { localStorage.setItem('kg_guest_id', guestId); } catch { /* ignore */ }
+      }
     }
 
-    let avatarId = null;
-    try {
-      const av = JSON.parse(localStorage.getItem('kg_avatar'));
-      avatarId = av && av.id ? av.id : null;
-    } catch { /* ignore */ }
+    let avatarId = (auth && (auth.avatar_id || auth.avatarId)) || null;
+    if (!avatarId) {
+      try {
+        const av = JSON.parse(localStorage.getItem('kg_avatar'));
+        avatarId = av && av.id ? av.id : null;
+      } catch { /* ignore */ }
+    }
     const reservedBotAvatar = new Set(['🤖', 'robot', 'scifi_robot', 'custom_🤖', 'faces_🤖']);
     if (avatarId && reservedBotAvatar.has(String(avatarId).trim())) {
       avatarId = 'person_smile';
@@ -243,6 +251,19 @@ class KGMultiplayer {
   /** Join by 6-char invite code */
   joinByCode(code) {
     this._send({ type: 'join_by_code', code: code.toUpperCase().trim() });
+  }
+
+  /** Update local profile on active socket before joining/creating session. */
+  updateProfile(profile) {
+    const name = profile && profile.username ? String(profile.username).trim() : '';
+    const avatarId = profile && (profile.avatar_id || profile.avatarId) ? String(profile.avatar_id || profile.avatarId).trim() : '';
+    if (!name && !avatarId) return;
+    if (name) this.username = name;
+    this._send({
+      type: 'update_profile',
+      username: name || undefined,
+      avatar_id: avatarId || undefined,
+    });
   }
 
   /** Join by session ID */

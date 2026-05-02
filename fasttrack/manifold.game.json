@@ -9,6 +9,7 @@
     "z": 135,
     "_note": "z = x*y = 3 players avg * 45 min avg = 135"
   },
+  "maxPlayers": 6,
   "entry": "index.html",
   "lobby": "lobby.html",
   "join": "join.html",

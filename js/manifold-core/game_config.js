@@ -120,7 +120,7 @@ const GameConfig = (() => {
 
     'fasttrack-multiplayer': {
       title: 'FastTrack v2.1.0',
-      description: 'Strategic board game with 1-4 players',
+      description: 'Strategic board game with 2-6 players',
       baseDimensions: ['playerCount', 'playtime'],
       additionalDimensions: ['skillLevel'],
       substrates: ['gamelogic', 'ui', 'persistence', 'multiplayer', 'ai'],
@@ -129,7 +129,7 @@ const GameConfig = (() => {
         hasMultiplayer: true,
         hasAI: true,
         requiresLogin: false,
-        maxPlayers: 4
+        maxPlayers: 6
       }
     }
   };

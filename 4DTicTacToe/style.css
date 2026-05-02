@@ -804,8 +804,18 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
-       MOBILE PLAYER STRIP — collapsible bottom bar, all 4 players
-       Replaces the full side-panels so the 3D cube is fully visible.
+       SIDE PANELS — hidden on all tablet/phone sizes so they never
+       cover the 3D cube at any viewport width.
+       ══════════════════════════════════════════════════════════════ */
+    @media (max-width: 1024px) {
+      .player-panel {
+        display: none !important;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       MOBILE PLAYER STRIP — fixed 44px bar, always visible.
+       Shows avatar + name + wins per player. Never covers the cube.
        ══════════════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
 
@@ -817,87 +827,64 @@
         display: none;
       }
 
-      /* ── Hide the full desktop side-panels completely ── */
-      .player-panel {
-        display: none !important;
-      }
-
-      /* ── Compact player strip (injected by JS, fixed at bottom) ── */
+      /* ── Always-visible compact strip, fixed height, no expand ── */
       #mobile-player-strip {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         z-index: 160;
+        height: 44px;
         background: rgba(0, 0, 10, 0.92);
         backdrop-filter: blur(14px);
         border-top: 1px solid var(--gborder);
-        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        /* No transition — no collapse animation needed */
+        transform: none !important;
       }
 
+      /* Collapsed class has no effect — strip is always shown */
       #mobile-player-strip.collapsed {
-        transform: translateY(calc(100% - 28px));
+        transform: none !important;
       }
 
-      /* Toggle tab at the top of the strip */
+      /* Toggle hidden — no expand/collapse on mobile */
       #mobile-strip-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        width: 100%;
-        height: 28px;
-        background: rgba(0, 160, 220, 0.07);
-        border: none;
-        border-bottom: 1px solid var(--gborder);
-        color: var(--cyan);
-        font-family: 'Orbitron', monospace;
-        font-size: 7px;
-        letter-spacing: 2px;
-        cursor: pointer;
-        padding: 0;
-        transition: background 0.15s;
+        display: none !important;
       }
 
-      #mobile-strip-toggle:hover,
-      #mobile-strip-toggle:active {
-        background: rgba(0, 180, 255, 0.14);
-      }
-
-      #mobile-strip-toggle .strip-arrow {
-        font-size: 10px;
-        transition: transform 0.25s;
-      }
-
-      #mobile-player-strip.collapsed #mobile-strip-toggle .strip-arrow {
-        transform: rotate(180deg);
-      }
-
-      /* Row of player chips */
+      /* Horizontal chips row fills the 44px bar */
       #mobile-strip-chips {
         display: flex;
         align-items: center;
-        padding: 6px 8px 8px;
-        gap: 6px;
+        padding: 4px 6px;
+        gap: 4px;
+        height: 44px;
+        overflow: hidden;
       }
 
-      /* Individual chip: badge + name + wins */
+      /* Horizontal chip: [badge] [name] [wins] — compact single row */
       .mob-chip {
         flex: 1;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        gap: 3px;
-        padding: 5px 4px;
+        gap: 5px;
+        padding: 3px 7px;
+        height: 36px;
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid var(--gborder);
         transition: border-color 0.3s, background 0.3s;
         min-width: 0;
+        overflow: hidden;
       }
 
       .mob-chip.active-chip {
-        background: rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.09);
+      }
+
+      .mob-chip.p1-chip {
+        border-color: rgba(34, 85, 255, 0.3);
       }
 
       .mob-chip.p1-chip {
@@ -906,7 +893,7 @@
 
       .mob-chip.p1-chip.active-chip {
         border-color: var(--p1);
-        box-shadow: 0 0 10px rgba(34, 85, 255, 0.25);
+        box-shadow: 0 0 8px rgba(34, 85, 255, 0.3);
       }
 
       .mob-chip.p2-chip {
@@ -915,7 +902,7 @@
 
       .mob-chip.p2-chip.active-chip {
         border-color: var(--p2);
-        box-shadow: 0 0 10px rgba(255, 34, 0, 0.25);
+        box-shadow: 0 0 8px rgba(255, 34, 0, 0.3);
       }
 
       .mob-chip.p3-chip {
@@ -924,7 +911,7 @@
 
       .mob-chip.p3-chip.active-chip {
         border-color: #00c878;
-        box-shadow: 0 0 10px rgba(0, 200, 120, 0.25);
+        box-shadow: 0 0 8px rgba(0, 200, 120, 0.3);
       }
 
       .mob-chip.p4-chip {
@@ -933,17 +920,19 @@
 
       .mob-chip.p4-chip.active-chip {
         border-color: var(--gold);
-        box-shadow: 0 0 10px rgba(220, 160, 0, 0.25);
+        box-shadow: 0 0 8px rgba(220, 160, 0, 0.3);
       }
 
+      /* Badge: small circle with avatar emoji/number */
       .mob-badge {
-        width: 26px;
-        height: 26px;
+        position: relative;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 900;
         border: 1.5px solid;
         flex-shrink: 0;
@@ -973,90 +962,43 @@
         color: var(--gold);
       }
 
+      /* Name: truncated, fills available space */
       .mob-name {
         font-family: 'Orbitron', monospace;
-        font-size: 7px;
-        letter-spacing: 1px;
+        font-size: 8px;
+        letter-spacing: 0.5px;
         color: #d0e4ff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 100%;
-        text-align: center;
+        flex: 1;
+        min-width: 0;
       }
 
+      /* Win count: "2W" label, flush right */
       .mob-score {
         font-family: 'Orbitron', monospace;
-        font-size: 8px;
-        color: var(--dim);
-        line-height: 1;
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--gold);
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
-      /* Win pips: 4 circles, filled = win earned */
+      /* Win pips hidden — wins shown as count in mob-score */
       .mob-wins {
-        display: flex;
-        gap: 3px;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .mob-pip {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        border: 1px solid;
-        transition: background 0.2s;
-      }
-
-      .mob-chip.p1-chip .mob-pip {
-        border-color: rgba(34, 85, 255, 0.6);
-      }
-
-      .mob-chip.p1-chip .mob-pip.filled {
-        background: var(--p1);
-        border-color: var(--p1);
-      }
-
-      .mob-chip.p2-chip .mob-pip {
-        border-color: rgba(255, 34, 0, 0.6);
-      }
-
-      .mob-chip.p2-chip .mob-pip.filled {
-        background: var(--p2);
-        border-color: var(--p2);
-      }
-
-      .mob-chip.p3-chip .mob-pip {
-        border-color: rgba(0, 200, 120, 0.6);
-      }
-
-      .mob-chip.p3-chip .mob-pip.filled {
-        background: #00c878;
-        border-color: #00c878;
-      }
-
-      .mob-chip.p4-chip .mob-pip {
-        border-color: rgba(220, 160, 0, 0.6);
-      }
-
-      .mob-chip.p4-chip .mob-pip.filled {
-        background: var(--gold);
-        border-color: var(--gold);
+        display: none;
       }
 
       /* Pulse ring on active chip badge */
       .mob-badge.pulse::after {
         content: '';
         position: absolute;
-        inset: -5px;
+        inset: -4px;
         border-radius: 50%;
         border: 1.5px solid currentColor;
         animation: badge-ring 1.5s ease-in-out infinite;
         pointer-events: none;
-      }
-
-      .mob-badge {
-        position: relative;
       }
 
       /* ── HUD adjustments: sits just above the strip ── */
@@ -1095,9 +1037,9 @@
         display: none !important;
       }
 
-      /* Column grid: full width, docked just above the strip */
+      /* Column grid: full width, docked just above the 44px player strip */
       #col-grid {
-        bottom: 86px !important;
+        bottom: 52px !important;
         border-radius: 12px !important;
         padding: 8px 6px 8px !important;
         width: auto !important;
@@ -1105,9 +1047,10 @@
         transform: translateX(-50%) !important;
       }
 
+      /* No collapse state — strip is always 44px, col-grid always at 52px */
       #mobile-player-strip.collapsed~* #col-grid,
       body.strip-collapsed #col-grid {
-        bottom: 36px !important;
+        bottom: 52px !important;
       }
 
       #cg-label {

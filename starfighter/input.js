@@ -29,6 +29,7 @@ const SFInput = (function () {
     const NAV_DEAD = 8;                 // pixel dead zone (center = thrust zone)
 
     let modeBadgeEl = null;
+    let mobilePhase = 'loading';
 
     // Touch action button tracking
     const touchBtns = {};               // id → held state
@@ -220,6 +221,36 @@ const SFInput = (function () {
         _bindTouchBtn('mob-boost', () => { if (player) player.activateBoost(); });
         _bindTouchHold('mob-afterburner', 'afterburnerHeld');
         _bindTouchBtn('mob-rtb', () => { if (window.Starfighter && Starfighter.emergencyRTB) Starfighter.emergencyRTB(); });
+
+        // Sync touch HUD visibility with current game phase as soon as controls mount.
+        setMobilePhase(mobilePhase);
+    }
+
+    function setMobilePhase(phase) {
+        mobilePhase = phase || '';
+        if (!isMobile) return;
+
+        const inCombat = mobilePhase === 'combat';
+        const btnGroup = document.getElementById('mob-btn-group');
+        const navSphere = document.getElementById('mob-nav-sphere');
+
+        if (btnGroup) btnGroup.style.display = inCombat ? 'grid' : 'none';
+        if (navSphere) navSphere.style.display = inCombat ? 'block' : 'none';
+
+        if (!inCombat) {
+            navActive = false;
+            navTouchId = null;
+            navDx = 0;
+            navDy = 0;
+            navThrust = false;
+            _navUpdateVisual(0, 0);
+
+            if (player) {
+                player.afterburnerActive = false;
+            }
+            touchBtns.fireHeld = false;
+            touchBtns.afterburnerHeld = false;
+        }
     }
 
     function _bindGyroButton() {
@@ -782,7 +813,7 @@ const SFInput = (function () {
         if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(false);
     }
 
-    return { init, update, getLaunchTriggered, checkLaunch, isKeyDown, updateLivePanel, togglePanel, enterImmersive, isMobile: () => isMobile };
+    return { init, update, getLaunchTriggered, checkLaunch, isKeyDown, updateLivePanel, togglePanel, enterImmersive, setMobilePhase, isMobile: () => isMobile };
 })();
 
 window.SFInput = SFInput;

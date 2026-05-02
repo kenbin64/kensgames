@@ -19,7 +19,7 @@ const GameRegistryManifold = (() => {
       id: 'fasttrack-v2.1.0',
       title: 'FastTrack',
       subtitle: 'v2.1.0 - Official',
-      description: 'A strategic billiards-inspired board game for 1-4 players. Move your pegs around the track, capture opponents, and race to victory.',
+      description: 'A strategic billiards-inspired board game for 2-6 players. Move your pegs around the track, capture opponents, and race to victory.'
       genre: ['board', 'strategy', 'multiplayer'],
       author: 'Ken\'s Games Team',
       version: '2.1.0',
@@ -44,7 +44,7 @@ const GameRegistryManifold = (() => {
         multiplayer: {
           enabled: true,
           minPlayers: 2,
-          maxPlayers: 4,
+          maxPlayers: 6,
           requiresLogin: true,
           description: 'Play with friends online'
         }
@@ -79,7 +79,7 @@ const GameRegistryManifold = (() => {
 
       modes: {
         singlePlayer: { enabled: true, aiOptions: [0, 1, 2, 3] },
-        multiplayer: { enabled: true, minPlayers: 2, maxPlayers: 4, requiresLogin: true }
+        multiplayer: { enabled: true, minPlayers: 2, maxPlayers: 6, requiresLogin: true }
       },
 
       requiresLogin: false,

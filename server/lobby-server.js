@@ -132,7 +132,11 @@ function bootGameCatalog() {
       const mp = path.join(REPO_ROOT, g.id, 'manifold.game.json');
       const mg = JSON.parse(fs.readFileSync(mp, 'utf8'));
       g.dimension = mg.dimension || { x: 1, y: 1, z: 1 };
-      g.maxPlayers = mg.dimension && mg.dimension.x;
+      // maxPlayers is a gameplay cap and should not default to dimension.x (which is often an average).
+      const manifestMax = Number(mg.maxPlayers || mg.max_players || 0);
+      g.maxPlayers = Number.isFinite(manifestMax) && manifestMax >= 2
+        ? Math.min(6, Math.floor(manifestMax))
+        : undefined;
     } catch (e) { g.dimension = { x: 1, y: 1, z: 1 }; }
   });
   // Fallback minimal catalog for known games not in the manifest.

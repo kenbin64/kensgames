@@ -8473,6 +8473,11 @@ const Starfighter = (function () {
     },
   };
 
+  function _setPhase(nextPhase) {
+    state.phase = nextPhase;
+    if (window.SFInput && SFInput.setMobilePhase) SFInput.setMobilePhase(nextPhase);
+  }
+
   // ── Kill Feed ──
   function _addKillFeedEntry(text, color) {
     state.killFeed.push({ text, color: color || '#0ff', time: performance.now() });
@@ -9145,7 +9150,7 @@ const Starfighter = (function () {
     state.entities.push(state.player);
     if (window.SFInput) SFInput.init(state.player);
 
-    state.phase = 'bay-ready';
+    _setPhase('bay-ready');
     state.launchTimer = 0;
     state._launchAudioPlayed = false;
     state._launchBlastPlayed = false;
@@ -10424,7 +10429,7 @@ const Starfighter = (function () {
 
     state.baseship = new Baseship();
     state.entities.push(state.player, state.baseship);
-    state.phase = 'loading';
+    _setPhase('loading');
     state.launchTimer = 0;
     state.arenaRadius = dim('arena.radius');
 
@@ -10508,7 +10513,7 @@ const Starfighter = (function () {
   function _startGame() {
     state.running = true;
     state.paused = false;
-    state.phase = 'bay-ready';  // Wait for player to push red launch button
+    _setPhase('bay-ready');  // Wait for player to push red launch button
     state._launchAudioPlayed = false;
     state._launchBlastPlayed = false;
     state._paBriefingDone = false;
@@ -10605,7 +10610,7 @@ const Starfighter = (function () {
 
   // ── Tutorial System: guided walkthrough with announcer + practice mode ──
   function _startTutorial() {
-    state.phase = 'tutorial';
+    _setPhase('tutorial');
     state._tutorialStep = 0;
     state._tutorialPractice = false;
 
@@ -10785,7 +10790,7 @@ const Starfighter = (function () {
 
   // ── Practice Mode: free flight, no enemies, no damage ──
   function _startPracticeMode() {
-    state.phase = 'combat'; // Use combat phase for full controls
+    _setPhase('combat'); // Use combat phase for full controls
     state._practiceMode = true;
 
     // Spawn player safely
@@ -10805,6 +10810,7 @@ const Starfighter = (function () {
     document.getElementById('crosshair').style.display = 'block';
     document.getElementById('gameplay-hud').style.display = 'block';
     document.getElementById('radar-overlay').style.display = 'block';
+    initRadar();
     if (window.SF3D) {
       SF3D.setLaunchPhase(false);
       SF3D.showCockpit(true);
@@ -11065,7 +11071,7 @@ const Starfighter = (function () {
     // Remove practice targets
     state.entities = state.entities.filter(e => !e._practiceTarget);
     // Reset player to bay for proper launch
-    state.phase = 'bay-ready';
+    _setPhase('bay-ready');
     if (window.SF3D) SF3D.setLaunchPhase(true);
     document.getElementById('gameplay-hud').style.display = 'none';
     document.getElementById('radar-overlay').style.display = 'none';
@@ -11097,7 +11103,7 @@ const Starfighter = (function () {
   function _beginLaunchSequence() {
     const fullBriefing = !state._briefingShownOnce;
 
-    state.phase = 'launching';
+    _setPhase('launching');
     state.launchTimer = 0;
     // Shorter launch — get to the action fast
     state.launchDuration = fullBriefing ? 11.0 : 8.0;
@@ -11152,7 +11158,7 @@ const Starfighter = (function () {
 
   function completeLaunch() {
     // ── Cutscene ends: hand off to combat as a separate entity ──
-    state.phase = 'combat';
+    _setPhase('combat');
     if (!state.missionStats.startTime) state.missionStats.startTime = performance.now();
     state._replacementVariant = '';
     state._replacementBriefing = '';
@@ -11212,6 +11218,7 @@ const Starfighter = (function () {
     document.getElementById('crosshair').style.display = 'block';
     document.getElementById('gameplay-hud').style.display = 'block';
     document.getElementById('radar-overlay').style.display = 'block';
+    initRadar();
     if (window.SF3D) {
       SF3D.setLaunchPhase(false); // End launch phase - show baseship
       SF3D.removeLaunchBay();
@@ -11243,7 +11250,7 @@ const Starfighter = (function () {
   }
 
   function completeLanding() {
-    state.phase = 'docking';
+    _setPhase('docking');
     const prevWave = state.wave;
     // Hide training skip button (wave 1 has ended)
     const trainSkip = document.getElementById('training-skip-btn');
@@ -11365,7 +11372,7 @@ const Starfighter = (function () {
       state.player.pitch = 0;
       state.player.yaw = 0;
       state.player.roll = 0;
-      state.phase = 'bay-ready';  // Wait for player to push launch button again
+      _setPhase('bay-ready');  // Wait for player to push launch button again
       if (window.SFMusic) SFMusic.setSection('launch-bay');
       state.launchTimer = 0;
       state._launchAudioPlayed = false;
@@ -12107,7 +12114,7 @@ const Starfighter = (function () {
       if (window.SFInput) SFInput.init(state.player);
 
       // Reset to launch bay
-      state.phase = 'bay-ready';
+      _setPhase('bay-ready');
       state.launchTimer = 0;
       state._launchAudioPlayed = false;
       state._launchBlastPlayed = false;
@@ -12339,7 +12346,7 @@ const Starfighter = (function () {
 
           // Auto-dock when close enough or timer expires
           if (distToBase < 400 || state.autopilotTimer >= 15.0) {
-            state.phase = 'landing';
+            _setPhase('landing');
             state.landingTimer = 0;
             state.autopilotActive = false;
             cdEl.style.display = 'none';
@@ -12365,7 +12372,7 @@ const Starfighter = (function () {
             landPrompt.style.color = '#00ff00';
 
             if (window.SFInput && SFInput.isKeyDown('Space')) {
-              state.phase = 'landing';
+              _setPhase('landing');
               state.landingTimer = 0;
               landPrompt.style.display = 'none';
               SFAnnouncer.onDock();
@@ -13641,7 +13648,7 @@ const Starfighter = (function () {
 
     // Post-sortie handoff: medical detour finished (or aborted) — engage landing autopilot
     if (handoffToLanding && state.phase === 'combat') {
-      state.phase = 'land-approach';
+      _setPhase('land-approach');
       state.autopilotActive = true;
       state.autopilotTimer = 0;
       SFAnnouncer.onAutopilotEngage();
@@ -13916,7 +13923,7 @@ const Starfighter = (function () {
     if (state._emergencyRTB) return; // already active
 
     state._emergencyRTB = true;
-    state.phase = 'land-approach';
+    _setPhase('land-approach');
     state.autopilotActive = true;
     state.autopilotTimer = 0;
     SFAnnouncer.onEmergencyRTB();
@@ -13946,7 +13953,7 @@ const Starfighter = (function () {
     if (window.SFAnnouncer) SFAnnouncer.onWaveClear();
     addComm(_crew('deck'), `${_cs()}, training exercise complete. RTB for debrief.`, 'base');
     // Trigger land-approach with autopilot
-    state.phase = 'land-approach';
+    _setPhase('land-approach');
     state.autopilotActive = true;
     state.autopilotTimer = 0;
     const cdEl = document.getElementById('countdown-display');
@@ -13961,7 +13968,7 @@ const Starfighter = (function () {
   // ── Request Dock — manual redock, player flies themselves ──
   function _requestDock() {
     if (state.phase !== 'combat') return;
-    state.phase = 'land-approach';
+    _setPhase('land-approach');
     state.autopilotActive = false;
     state.autopilotTimer = 0;
     SFAnnouncer.onDockRequest();
@@ -14873,7 +14880,27 @@ const Starfighter = (function () {
 
   function initRadar() {
     const canvas = document.getElementById('radar-canvas');
-    if (!canvas) return;
+    if (!canvas) {
+      radarScene = null;
+      radarCamera = null;
+      radarRenderer = null;
+      return;
+    }
+
+    if (radarScene && radarCamera && radarRenderer) return;
+
+    if (!canvas.dataset.sfRadarCtxBound) {
+      canvas.addEventListener('webglcontextlost', (ev) => {
+        ev.preventDefault();
+        radarRenderer = null;
+      });
+      canvas.addEventListener('webglcontextrestored', () => {
+        radarScene = null;
+        radarCamera = null;
+        radarRenderer = null;
+      });
+      canvas.dataset.sfRadarCtxBound = '1';
+    }
 
     radarScene = new THREE.Scene();
 
@@ -14882,7 +14909,15 @@ const Starfighter = (function () {
     radarCamera.position.set(0, 1.6, 2.4);
     radarCamera.lookAt(0, -0.1, 0);
 
-    radarRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    try {
+      radarRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    } catch (err) {
+      console.warn('[RADAR] Renderer init failed', err);
+      radarScene = null;
+      radarCamera = null;
+      radarRenderer = null;
+      return;
+    }
     radarRenderer.setSize(324, 324, false);
     radarRenderer.setClearColor(0x000000, 0.3);
 
@@ -15200,9 +15235,9 @@ const Starfighter = (function () {
   }
 
   function updateRadar() {
-    if (!radarScene || !radarRenderer) {
+    if (!radarScene || !radarRenderer || !radarCamera || !radarSphere) {
       initRadar();
-      if (!radarScene) return;
+      if (!radarScene || !radarRenderer || !radarCamera || !radarSphere) return;
     }
 
     const pPos = state.player.position;
@@ -15507,6 +15542,14 @@ const Starfighter = (function () {
         blip.scale.multiplyScalar(1.2);
       }
     });
+
+    if (radarRenderer.getContext) {
+      const gl = radarRenderer.getContext();
+      if (gl && gl.isContextLost && gl.isContextLost()) {
+        radarRenderer = null;
+        return;
+      }
+    }
 
     radarRenderer.render(radarScene, radarCamera);
 

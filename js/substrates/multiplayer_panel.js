@@ -58,11 +58,12 @@
   // ── CSS (injected once) ─────────────────────────────────────────────
   // Canonical KensGames Tron palette: cyan (primary), green (go), purple (AI/accent).
   const CSS = `
-.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;}
-.kg-mp.kg-mp-vh{max-height:calc(100vh - 24px);margin:12px auto;}
+.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;height:min(96dvh,96vh);}
+.kg-mp.kg-mp-vh{height:min(96dvh,96vh);margin:2dvh auto;}
 .kg-mp-card{background:rgba(4,4,20,0.94);border:2px solid #00FFFF;
   box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(153,0,255,0.20);
-  border-radius:10px;padding:24px 24px 20px;max-height:calc(100vh - 24px);overflow:auto;}
+  border-radius:10px;padding:18px 20px 14px;height:100%;display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;}
 .kg-mp h2{font-size:15px;letter-spacing:3px;color:#00FFFF;
   text-shadow:0 0 12px rgba(0,255,255,0.6);margin:0 0 4px;text-transform:uppercase;text-align:center;}
 .kg-mp .game-name{font-size:10px;color:#8aa;letter-spacing:2px;margin-bottom:18px;text-align:center;text-transform:uppercase;}
@@ -90,7 +91,7 @@
 .kg-mp .progress .dot.done{background:#9900FF;border-color:#9900FF;box-shadow:0 0 6px rgba(153,0,255,0.6);}
 .kg-mp .progress .dot.active{background:#00FF41;border-color:#00FF41;box-shadow:0 0 10px rgba(0,255,65,0.8);
   transform:scale(1.25);}
-.kg-mp .step{animation:kgFade 240ms ease;}
+.kg-mp .step{animation:kgFade 240ms ease;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 @keyframes kgFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .kg-mp .mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
 .kg-mp .mode-btn{background:rgba(0,0,0,0.4);border:1.5px solid rgba(0,255,255,0.4);
@@ -107,7 +108,7 @@
 .kg-mp .mode-btn .mode-label{font-size:13px;letter-spacing:2px;color:#00FFFF;font-weight:700;}
 .kg-mp .mode-btn .mode-sub{font-size:10px;color:#9aa;margin-top:8px;letter-spacing:1px;line-height:1.5;}
 .kg-mp .share-box{background:rgba(0,0,0,0.55);border:1.5px dashed rgba(153,0,255,0.55);
-  padding:22px 18px;border-radius:8px;margin-bottom:14px;text-align:center;
+  padding:14px 14px;border-radius:8px;margin-bottom:10px;text-align:center;
   box-shadow:inset 0 0 24px rgba(153,0,255,0.06);}
 .kg-mp .share-code-big{font-family:'Orbitron',monospace;font-size:42px;font-weight:900;
   letter-spacing:10px;color:#00FFFF;text-shadow:0 0 14px rgba(0,255,255,0.7),0 0 28px rgba(0,255,255,0.4);
@@ -125,7 +126,7 @@
 .kg-mp .player-row{display:flex;align-items:center;gap:12px;padding:12px 14px;
   background:rgba(0,0,0,0.45);border:1px solid rgba(0,255,255,0.20);border-radius:6px;
   margin-bottom:8px;}
-.kg-mp .roster-scroll{max-height:min(36vh,320px);overflow:auto;padding-right:2px;margin-bottom:6px;}
+.kg-mp .roster-scroll{flex:1;min-height:0;overflow:auto;padding-right:2px;margin-bottom:6px;}
 .kg-mp .player-row.is-host{border-color:rgba(0,255,65,0.5);box-shadow:0 0 8px rgba(0,255,65,0.15);}
 .kg-mp .player-row.is-ai{border-color:rgba(153,0,255,0.5);border-style:dashed;
   background:rgba(153,0,255,0.05);}
@@ -165,7 +166,8 @@
   color:#e8e8ff;font-family:'Orbitron',monospace;font-size:14px;padding:12px 14px;border-radius:4px;
   letter-spacing:1px;outline:none;box-sizing:border-box;margin-bottom:12px;}
 .kg-mp .name-field:focus{border-color:#00FFFF;box-shadow:0 0 10px rgba(0,255,255,0.25);}
-.kg-mp .avatar-quick{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:8px;}
+.kg-mp .avatar-quick{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:8px;
+  overflow:auto;max-height:min(26dvh,26vh);padding-right:2px;}
 .kg-mp .av-btn{font-size:24px;width:44px;height:44px;background:rgba(0,0,0,0.4);
   border:1.5px solid rgba(0,255,255,0.2);border-radius:6px;cursor:pointer;
   transition:all 140ms ease;display:flex;align-items:center;justify-content:center;padding:0;}
@@ -176,7 +178,7 @@
   margin-bottom:14px;cursor:pointer;text-transform:uppercase;}
 .kg-mp .av-more:hover{color:#00FFFF;}
 .kg-mp .player-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
-  gap:12px;align-items:stretch;margin-bottom:14px;}
+  gap:10px;align-items:stretch;margin-bottom:10px;flex:1;min-height:0;overflow:auto;padding-right:2px;}
 .kg-mp .player-card{background:rgba(0,0,0,0.55);border:1.5px solid rgba(0,255,255,0.28);
   border-radius:10px;padding:14px 10px;text-align:center;
   transition:box-shadow 220ms ease;}
@@ -195,14 +197,14 @@
 .kg-mp .player-card-empty{background:rgba(0,0,0,0.18);border:1.5px dashed rgba(0,255,255,0.12);
   border-radius:10px;padding:14px 10px;text-align:center;
   color:#444;font-size:11px;letter-spacing:1px;display:flex;align-items:center;justify-content:center;}
-.kg-mp .lobby-footer{padding-top:12px;border-top:1px solid rgba(0,255,255,0.12);
-  position:sticky;bottom:0;background:linear-gradient(to top, rgba(4,4,20,0.98), rgba(4,4,20,0.85));}
+.kg-mp .lobby-footer{padding-top:10px;border-top:1px solid rgba(0,255,255,0.12);
+  margin-top:auto;position:sticky;bottom:0;background:linear-gradient(to top, rgba(4,4,20,0.98), rgba(4,4,20,0.85));}
 .kg-mp .summary-row{display:flex;justify-content:space-between;align-items:center;
   padding:6px 0;font-size:12px;}
 .kg-mp .summary-row + .summary-row{border-top:1px solid rgba(0,255,255,0.1);}
 .kg-mp .summary-label{color:#9aa;letter-spacing:1.5px;text-transform:uppercase;font-size:10px;}
 .kg-mp .summary-val{color:#00FFFF;text-shadow:0 0 6px rgba(0,255,255,0.4);font-weight:700;}
-.kg-mp .nav-row{display:flex;gap:10px;align-items:center;margin-top:18px;}
+.kg-mp .nav-row{display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:10px;}
 .kg-mp .nav-row .btn-back{flex:0 0 auto;}
 .kg-mp .nav-row .btn-next{flex:1;padding:14px;font-size:13px;}
 .kg-mp .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
@@ -220,38 +222,40 @@
   vertical-align:middle;margin-right:8px;}
 @keyframes kgspin{to{transform:rotate(360deg);}}
 @media (max-width:560px){
-  .kg-mp.kg-mp-vh{margin:6px auto;max-height:calc(100vh - 12px);}
-  .kg-mp-card{padding:16px 14px;max-height:calc(100vh - 12px);}
+  .kg-mp{height:min(99dvh,99vh);}
+  .kg-mp.kg-mp-vh{margin:0.5dvh auto;height:min(99dvh,99vh);}
+  .kg-mp-card{padding:10px 10px 8px;border-radius:8px;}
   .kg-mp .mode-grid{grid-template-columns:1fr;}
   .kg-mp .player-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-  .kg-mp h2{font-size:16px;}
-  .kg-mp .game-name{font-size:11px;}
-  .kg-mp .step-title{font-size:13px;}
-  .kg-mp button{font-size:14px;padding:13px 18px;}
-  .kg-mp .share-code-big{font-size:32px;letter-spacing:7px;}
+  .kg-mp h2{font-size:14px;}
+  .kg-mp .game-name{font-size:10px;margin-bottom:8px;}
+  .kg-mp .step-title{font-size:11px;margin:2px 0 8px;}
+  .kg-mp button{font-size:13px;padding:10px 12px;}
+  .kg-mp .share-code-big{font-size:24px;letter-spacing:5px;}
   .kg-mp .share-code-label{font-size:11px;}
   .kg-mp .share-link{font-size:12px;}
   .kg-mp .share-link-row{flex-direction:column;align-items:stretch;gap:8px;}
   .kg-mp .copy-btn{font-size:12px;padding:9px 14px;}
   .kg-mp .joined-count{font-size:12px;}
-  .kg-mp .mode-btn{padding:24px 10px;}
-  .kg-mp .mode-btn .mode-icon{font-size:34px;}
-  .kg-mp .mode-btn .mode-label{font-size:14px;}
+  .kg-mp .mode-btn{padding:16px 8px;}
+  .kg-mp .mode-btn .mode-icon{font-size:26px;margin-bottom:8px;}
+  .kg-mp .mode-btn .mode-label{font-size:12px;}
   .kg-mp .mode-btn .mode-sub{font-size:11px;}
-  .kg-mp .player-name{font-size:14px;}
+  .kg-mp .player-name{font-size:12px;}
   .kg-mp .player-tag{font-size:10px;}
   .kg-mp .player-status{font-size:11px;}
   .kg-mp .empty-slot{font-size:12px;}
   .kg-mp .diff-btn{font-size:12px;padding:7px 13px;}
-  .kg-mp .summary-row{font-size:13px;}
+  .kg-mp .summary-row{font-size:12px;padding:4px 0;}
   .kg-mp .summary-label{font-size:11px;}
-  .kg-mp .nav-row .btn-next{font-size:14px;padding:15px;}
+  .kg-mp .nav-row .btn-next{font-size:13px;padding:12px;}
   .kg-mp .nav-row{flex-wrap:wrap;}
   .kg-mp .nav-row .btn-back,.kg-mp .nav-row .btn-next{width:100%;}
-  .kg-mp .actions .btn-launch{font-size:16px;padding:18px;}
+  .kg-mp .actions .btn-launch{font-size:14px;padding:12px;}
   .kg-mp .err-msg{font-size:12px;}
   .kg-mp .info-msg{font-size:13px;}
   .kg-mp .link-btn{font-size:12px;}
+  .kg-mp .avatar-quick{max-height:min(22dvh,22vh);}
 }
 
 @media (min-width:561px) and (max-width:920px){
@@ -1083,6 +1087,8 @@
       _error = 'Multiplayer client not loaded'; _state = STATE.ERROR; render(); return null;
     }
     const prof = getProfile();
+    const connectName = String(_profileNameDraft || prof.name || '').trim();
+    const connectAvatar = String(_profileAvatarDraft || prof.avatarEmoji || '').trim();
     _mp = new KGMultiplayer(_opts.gameId, {});
     _mp.on('authenticated', (a) => { _myUserId = a.userId; });
     _mp.on('session_update', () => { if (_state !== STATE.LAUNCHING) { _state = STATE.LOBBY; render(); } });
@@ -1131,7 +1137,12 @@
       if (_state === STATE.LAUNCHING) return; // game took over
       _error = 'Disconnected from server'; _state = STATE.ERROR; render();
     });
-    _mp.connect({ username: prof.name });
+    _mp.connect({
+      username: connectName,
+      avatar_id: connectAvatar || undefined,
+      // Invite flow should not reuse a browser-stable guest identity.
+      freshGuestIdentity: _mode === 'guest',
+    });
     return _mp;
   }
 
@@ -1162,7 +1173,13 @@
   function connectAndJoin(code) {
     _state = STATE.LOBBY; render();
     const mp = ensureClient(); if (!mp) return;
+    const prof = getProfile();
+    const desiredName = String(_profileNameDraft || prof.name || '').trim();
+    const desiredAvatar = String(_profileAvatarDraft || prof.avatarEmoji || '').trim();
     const join = () => {
+      if (desiredName || desiredAvatar) {
+        mp.updateProfile({ username: desiredName, avatar_id: desiredAvatar });
+      }
       mp.joinByCode(code);
     };
     if (mp.userId) join(); else mp.on('authenticated', join);

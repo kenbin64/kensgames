@@ -1146,6 +1146,56 @@ function cutLabel(dest) {
   return victim ? ` — send ${victim.name}'s peg home` : '';
 }
 
+function safeUiText(value, fallback = '') {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, '&#96;');
+}
+
+function summarizeMoveForHint(move, player, playerIdx) {
+  if (!move) return 'Only one legal move — auto-playing';
+  const pegName = safeUiText(player && player.pegs && player.pegs[move.pegIdx] && player.pegs[move.pegIdx].nickname, `Peg ${(move.pegIdx || 0) + 1}`);
+  const playerName = safeUiText(player && player.name, PLAYER_NAMES[playerIdx] || 'Player');
+  const actor = `${playerName}'s ${pegName}`;
+
+  switch (move.type) {
+    case 'enter':
+      return `${actor} enters the board`;
+    case 'enterFastTrack':
+      return `${actor} enters FastTrack`;
+    case 'exitFastTrack':
+      return `${actor} exits FastTrack`;
+    case 'enterBullseye':
+      return `${actor} enters bullseye`;
+    case 'exitBullseye':
+      return `${actor} exits bullseye`;
+    case 'split':
+      return `${actor} starts a split-7 move`;
+    case 'move': {
+      const s = Number(move.steps) || 0;
+      const card = state.deck.get('currentCard');
+      const cardRules = card ? CARDS[card.value] : null;
+      const isBackward = cardRules && cardRules.direction === 'backward';
+      return `${actor} moves ${isBackward ? 'backward ' : ''}${Math.abs(s)} space${Math.abs(s) === 1 ? '' : 's'}`;
+    }
+    default:
+      return `${actor} makes the only legal move`;
+  }
+}
+
 function setOptionsPanelVisible(visible) {
   const panel = document.getElementById('panel-options');
   if (!panel) return;
@@ -1182,9 +1232,23 @@ function showMoveHints() {
   if (!hintsDiv) return;
   setOptionsPanelVisible(true);
   const vm = state.turn.get('validMoves') || [];
+
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const curPlayer = players[ci] || { name: PLAYER_NAMES[ci] || 'Player', pegs: [] };
+
   if (vm.length === 0) {
     hintsDiv.innerHTML = '<div class="hint" style="opacity:0.5;">No moves available — passing turn</div>';
     setTimeout(endTurn, 1200);
+    return;
+  }
+
+  // If there is exactly one legal move, auto-play it without requiring a click.
+  if (vm.length === 1) {
+    const autoText = summarizeMoveForHint(vm[0], curPlayer, ci);
+    hintsDiv.innerHTML = `<div class="hint hint-auto" style="opacity:0.85;cursor:default;">${escapeHtml(autoText)} — auto-playing</div>`;
+    if (window.highlightSinglePath) window.highlightSinglePath(0);
+    setTimeout(() => executeMove(0), 220);
     return;
   }
 
@@ -1195,25 +1259,16 @@ function showMoveHints() {
   const splitMoves = vm.filter(m => m.type === 'split');
   const regularMoves = vm.filter(m => m.type !== 'split');
 
-  // Resolve current player for peg nicknames
-  const players = state.players.get('list') || [];
-  const ci = state.players.get('current') || 0;
-  const curPlayer = players[ci];
-
-  // Color dot helper — inline colored circle before peg name
-  const colorDot = (color) =>
-    `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;box-shadow:0 0 3px ${color}"></span>`;
-  const playerDot = colorDot(curPlayer.color);
-
   // Build regular move buttons
   const buttons = [];
   regularMoves.forEach((m, _) => {
     const i = vm.indexOf(m);
     let icon = '', label = '';
     let short = '';
-    const pegName = curPlayer.pegs[m.pegIdx]?.nickname || `Peg ${m.pegIdx + 1}`;
+    const pegName = safeUiText(curPlayer.pegs[m.pegIdx] && curPlayer.pegs[m.pegIdx].nickname, `Peg ${m.pegIdx + 1}`);
+    const playerName = safeUiText(curPlayer.name, PLAYER_NAMES[ci] || 'Player');
     const shortPeg = `P${m.pegIdx + 1}`;
-    const dotName = `${playerDot}${pegName}`;
+    const actor = `${playerName}'s ${pegName}`;
     const peg = curPlayer.pegs[m.pegIdx];
     const cut = cutLabel(m.dest);
 
@@ -1221,7 +1276,7 @@ function showMoveHints() {
       case 'enter':
         if (buttons.some(b => b.isEnter)) return;
         icon = '🏠';
-        label = `${playerDot}Bring a peg onto the board${cut}`;
+        label = `${playerName} brings a peg onto the board${cut}`;
         short = `${shortPeg} enter`;
         buttons.push({ idx: i, icon, label, short, pegIdx: m.pegIdx, isEnter: true });
         return;
@@ -1231,29 +1286,29 @@ function showMoveHints() {
         const dest = m.dest;
         if (dest.startsWith('safe-')) {
           icon = '🛡️';
-          label = `${dotName} into safe zone`;
+          label = `${actor} into safe zone`;
           short = `${shortPeg} -> safe`;
         } else if (dest.startsWith('ft-')) {
           icon = '⚡';
           if (peg && peg.onFasttrack) {
-            label = `${dotName} traverse FastTrack ${s} space${s > 1 ? 's' : ''}`;
+            label = `${actor} traverse FastTrack ${s} space${s > 1 ? 's' : ''}`;
             short = `${shortPeg} FT +${s}`;
           } else {
             const who = ownerName(dest);
-            label = `${dotName} → ${who}'s FastTrack hole`;
+            label = `${actor} → ${who}'s FastTrack hole`;
             short = `${shortPeg} enter FT`;
           }
         } else if (dest.startsWith('home-')) {
           const who = ownerName(dest);
           icon = '🏠';
-          label = `${dotName} → ${who}'s home`;
+          label = `${actor} → ${who}'s home`;
           short = `${shortPeg} -> home`;
         } else {
           const card = state.deck.get('currentCard');
           const cardRules = card ? CARDS[card.value] : null;
           const isBackward = cardRules && cardRules.direction === 'backward';
           icon = s <= 3 ? '👣' : '🏃';
-          label = `${dotName} ${isBackward ? 'backward' : 'forward'} ${s} space${s > 1 ? 's' : ''}`;
+          label = `${actor} ${isBackward ? 'backward' : 'forward'} ${s} space${s > 1 ? 's' : ''}`;
           short = `${shortPeg} ${isBackward ? '-' : '+'}${s}`;
         }
         if (cut) label += cut;
@@ -1263,10 +1318,10 @@ function showMoveHints() {
       case 'enterFastTrack':
         icon = '⚡';
         if (peg && peg.onFasttrack) {
-          label = `${dotName} traverses FastTrack`;
+          label = `${actor} traverses FastTrack`;
           short = `${shortPeg} FT traverse`;
         } else {
-          label = `${dotName} enters FastTrack`;
+          label = `${actor} enters FastTrack`;
           short = `${shortPeg} FT enter`;
         }
         break;
@@ -1274,20 +1329,20 @@ function showMoveHints() {
       case 'exitFastTrack': {
         const who = ownerName(m.dest);
         icon = '🚪';
-        label = `${dotName} exits FastTrack at ${who}'s hole`;
+        label = `${actor} exits FastTrack at ${who}'s hole`;
         short = `${shortPeg} FT exit`;
         break;
       }
 
       case 'enterBullseye':
         icon = '🎯';
-        label = `${dotName} → center bullseye`;
+        label = `${actor} → center bullseye`;
         short = `${shortPeg} -> bullseye`;
         break;
 
       case 'exitBullseye':
         icon = '🚀';
-        label = `${dotName} exits bullseye`;
+        label = `${actor} exits bullseye`;
         short = `${shortPeg} bullseye exit`;
         break;
     }
@@ -1307,47 +1362,13 @@ function showMoveHints() {
 
   let html = '';
 
-  // Group regular moves by peg to reduce clutter while preserving hover previews.
+  // Render every legal move as a direct click target.
+  // This guarantees the turn can always advance without requiring a group-expand step.
   _hintGroups = {};
-  const grouped = new Map();
   dedupedButtons.forEach((b) => {
-    const key = Number.isFinite(b.pegIdx) ? `peg-${b.pegIdx}` : `misc-${b.type || 'move'}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(b);
-  });
-
-  grouped.forEach((groupButtons, key) => {
-    _hintGroups[key] = groupButtons.map(b => b.idx);
-    const first = groupButtons[0];
-    const pegLabel = Number.isFinite(first.pegIdx)
-      ? splitPegLabel(curPlayer, first.pegIdx)
-      : 'Move options';
-
-    if (groupButtons.length === 1) {
-      const only = groupButtons[0];
-      html += `<div class="hint" title="${only.label}" onclick="executeMove(${only.idx})" `
-        + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${only.idx})" `
-        + `onmouseleave="clearHintPreview()">${only.icon} ${only.short || only.label}</div>`;
-      return;
-    }
-
-    const expanded = _expandedHintGroup === key;
-    html += `<div class="hint hint-group ${expanded ? 'expanded' : ''}" `
-      + `onclick="toggleHintGroup('${key}')" `
-      + `onmouseenter="previewHintGroup('${key}')" `
-      + `onmouseleave="clearHintPreview()">`
-      + `🧭 ${pegLabel} · ${groupButtons.length} options ${expanded ? '▾' : '▸'}`
-      + `</div>`;
-
-    if (expanded) {
-      html += '<div class="hint-sublist">';
-      groupButtons.forEach((b) => {
-        html += `<div class="hint hint-sub" title="${b.label}" onclick="executeMove(${b.idx})" `
-          + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${b.idx})" `
-          + `onmouseleave="clearHintPreview()">${b.icon} ${b.short || b.label}</div>`;
-      });
-      html += '</div>';
-    }
+    html += `<div class="hint" title="${escapeAttr(b.label)}" onclick="executeMove(${b.idx})" `
+      + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${b.idx})" `
+      + `onmouseleave="clearHintPreview()">${escapeHtml(b.icon)} ${escapeHtml(b.short || b.label)}</div>`;
   });
 
   // Split selector UI (if splits are available)
@@ -1368,7 +1389,7 @@ let _splitStepChoice = null;
 
 function splitPegLabel(player, pegIdx) {
   const peg = player && player.pegs ? player.pegs[pegIdx] : null;
-  const nickname = peg && peg.nickname ? peg.nickname : `Peg ${Number(pegIdx) + 1}`;
+  const nickname = safeUiText(peg && peg.nickname, `Peg ${Number(pegIdx) + 1}`);
   return `${nickname} (Peg ${Number(pegIdx) + 1})`;
 }
 
@@ -1420,7 +1441,7 @@ function renderSplitSelector(splitMoves, allMoves) {
   html += '<select onchange="selectSplitPeg(this.value)" style="padding:9px;border-radius:8px;background:rgba(8,20,34,0.92);color:#e8f6ff;border:1px solid rgba(80,180,255,0.35);">';
   for (const pegIdx of pegOptions) {
     const selected = pegIdx === _splitPegIdx ? ' selected' : '';
-    html += `<option value="${pegIdx}"${selected}>${splitPegLabel(player, pegIdx)}</option>`;
+    html += `<option value="${pegIdx}"${selected}>${escapeHtml(splitPegLabel(player, pegIdx))}</option>`;
   }
   html += '</select>';
 
@@ -1442,7 +1463,7 @@ function renderSplitSelector(splitMoves, allMoves) {
       const primaryLabel = splitPegLabel(player, _splitPegIdx);
       const otherPegIdx = chosen.pegIdx === _splitPegIdx ? chosen.peg2Idx : chosen.pegIdx;
       const otherSteps = chosen.pegIdx === _splitPegIdx ? chosen.steps2 : chosen.steps;
-      html += `<div style="font-size:0.82em;color:#b7ffd6;">${primaryLabel} moves ${_splitStepChoice}. Then ${splitPegLabel(player, otherPegIdx)} moves ${otherSteps}.</div>`;
+      html += `<div style="font-size:0.82em;color:#b7ffd6;">${escapeHtml(primaryLabel)} moves ${_splitStepChoice}. Then ${escapeHtml(splitPegLabel(player, otherPegIdx))} moves ${otherSteps}.</div>`;
       html += `<button class="hint" style="margin-top:4px;" onclick="executeMove(${candidateIndices[0]})" `
         + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${candidateIndices[0]})" `
         + `onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">✅ Execute Split 7</button>`;
@@ -1456,7 +1477,7 @@ function renderSplitSelector(splitMoves, allMoves) {
         html += `<div class="split-pair" onclick="executeMove(${idx})" `
           + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${idx})" `
           + `onmouseleave="if(window.highlightMovePaths)window.highlightMovePaths()">`
-          + `<span>${peg1} ${m.steps} + ${peg2} ${m.steps2}</span></div>`;
+          + `<span>${escapeHtml(peg1)} ${m.steps} + ${escapeHtml(peg2)} ${m.steps2}</span></div>`;
       }
       html += '</div>';
     } else {

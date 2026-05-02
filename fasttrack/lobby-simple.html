@@ -479,11 +479,11 @@
       window.KGGameManager.loadRules('fasttrack').catch(() => { });
     }
   </script>
-  <script src="/js/multiplayer-client.js?v=20260501"></script>
-  <script src="/js/substrates/multiplayer_panel.js?v=20260501h"></script>
-  <script src="/js/substrates/game_setup.js?v=20260501h"></script>
+  <script src="/js/multiplayer-client.js?v=20260502a"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260502a"></script>
+  <script src="/js/substrates/game_setup.js?v=20260502a"></script>
   <script>
-    let username = localStorage.getItem('username') || localStorage.getItem('display_name') || '';
+    let username = localStorage.getItem('display_name') || localStorage.getItem('username') || '';
     const av = AvatarPicker.get();
 
     document.getElementById('p-name').textContent = username || 'Choose a name when you play';

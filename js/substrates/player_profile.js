@@ -38,9 +38,8 @@ const KGPlayerProfile = (() => {
     const cleaned = String(name || '').trim().slice(0, 20);
     if (!cleaned) return;
     safeLocalStorageSet(NAME_KEY, cleaned);
-    // Back-compat: many games look at `username`
-    const existingUsername = (safeLocalStorageGet(USERNAME_KEY) || '').trim();
-    if (!existingUsername) safeLocalStorageSet(USERNAME_KEY, cleaned);
+    // Back-compat: many games still read `username` first. Keep both in sync.
+    safeLocalStorageSet(USERNAME_KEY, cleaned);
   }
 
   function getAvatar() {
