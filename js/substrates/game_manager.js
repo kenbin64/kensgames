@@ -399,6 +399,229 @@
     return parsed && parsed.schema === 'kg.game.runtime/1' ? parsed : null;
   }
 
+  // ─── Rules registry ────────────────────────────────────────────────
+  // Each game declares a rules JSON (and optional scenarios JSON). Lobbies
+  // call registerGame() at load; the manager fetches, caches, and exposes
+  // a synchronous enforce() that evaluates rule assertions against a
+  // caller-supplied context object. Expandable: adding a new game is one
+  // registerGame() call.
+  const _registry = new Map();   // id -> { rulesUrl, scenariosUrl, name }
+  const _rulesCache = new Map(); // id -> parsed rules object
+  const _scenariosCache = new Map();
+  const _inflight = new Map();   // id -> Promise<rules>
+
+  const DEFAULT_REGISTRY = [
+    { id: 'fasttrack', rulesUrl: '/fasttrack/fasttrack.rules.json', scenariosUrl: null, name: 'FastTrack' },
+    { id: '4dtictactoe', rulesUrl: '/4DTicTacToe/rules.json', scenariosUrl: '/4DTicTacToe/manifold.game.json', name: 'Connect 4D' },
+    { id: 'brickbreaker3d', rulesUrl: '/brickbreaker3d/rules.json', scenariosUrl: null, name: 'BrickBreaker 3D' },
+    { id: 'starfighter', rulesUrl: '/starfighter/rules.json', scenariosUrl: '/starfighter/scenarios.json', name: 'Starfighter' },
+  ];
+
+  function registerGame(id, opts) {
+    const key = String(id || '').toLowerCase();
+    if (!key) return false;
+    const existing = _registry.get(key) || {};
+    const next = {
+      id: key,
+      rulesUrl: (opts && opts.rulesUrl) || existing.rulesUrl || null,
+      scenariosUrl: (opts && opts.scenariosUrl) || existing.scenariosUrl || null,
+      name: (opts && opts.name) || existing.name || key,
+    };
+    _registry.set(key, next);
+    return true;
+  }
+
+  function listGames() { return Array.from(_registry.keys()); }
+  function getRegistration(id) { return _registry.get(String(id || '').toLowerCase()) || null; }
+
+  function _fetchJson(url) {
+    if (typeof fetch !== 'function') {
+      return Promise.reject(new Error('KGGameManager.loadRules requires fetch (browser environment).'));
+    }
+    return fetch(url, { cache: 'no-cache' }).then((r) => {
+      if (!r.ok) throw new Error('rules fetch ' + r.status + ' ' + url);
+      return r.json();
+    });
+  }
+
+  function loadRules(id) {
+    const key = String(id || '').toLowerCase();
+    const reg = _registry.get(key);
+    if (!reg || !reg.rulesUrl) return Promise.reject(new Error('No rulesUrl registered for ' + key));
+    if (_rulesCache.has(key)) return Promise.resolve(_rulesCache.get(key));
+    if (_inflight.has(key)) return _inflight.get(key);
+
+    const p = _fetchJson(reg.rulesUrl).then((rules) => {
+      _rulesCache.set(key, rules);
+      _inflight.delete(key);
+      // Best-effort scenario load alongside.
+      if (reg.scenariosUrl && !_scenariosCache.has(key)) {
+        _fetchJson(reg.scenariosUrl).then((s) => _scenariosCache.set(key, s)).catch(() => { });
+      }
+      return rules;
+    }).catch((err) => {
+      _inflight.delete(key);
+      throw err;
+    });
+    _inflight.set(key, p);
+    return p;
+  }
+
+  function getRules(id) { return _rulesCache.get(String(id || '').toLowerCase()) || null; }
+  function getScenarios(id) { return _scenariosCache.get(String(id || '').toLowerCase()) || null; }
+  function setRules(id, rules) { _rulesCache.set(String(id || '').toLowerCase(), rules); return true; } // test/seed helper
+  function setScenarios(id, s) { _scenariosCache.set(String(id || '').toLowerCase(), s); return true; }
+
+  function _evalAssertion(expr, ctx) {
+    // Sandbox: assertion is a JS expression of `ctx`. Errors → skipped (not violated),
+    // so partial contexts during gameplay don't false-fail rules they don't apply to.
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('ctx', 'return (' + String(expr) + ');');
+      const result = fn(ctx);
+      return { ok: result !== false, skipped: result === undefined };
+    } catch (_) {
+      return { ok: true, skipped: true };
+    }
+  }
+
+  function enforce(id, ctx, opts) {
+    const options = opts || {};
+    const rules = getRules(id);
+    if (!rules || !Array.isArray(rules.rules)) {
+      return { ok: true, evaluated: 0, violations: [], skipped: 0, reason: 'rules-not-loaded' };
+    }
+    const wantCategory = options.category ? String(options.category) : null;
+    const subset = wantCategory
+      ? rules.rules.filter((r) => String(r.category || '') === wantCategory)
+      : rules.rules;
+    const violations = [];
+    let skipped = 0;
+    for (let i = 0; i < subset.length; i++) {
+      const r = subset[i];
+      if (!r || !r.assertion) continue;
+      const out = _evalAssertion(r.assertion, ctx);
+      if (out.skipped) { skipped++; continue; }
+      if (!out.ok) violations.push({ id: r.id, category: r.category, desc: r.desc });
+    }
+    return { ok: violations.length === 0, evaluated: subset.length, violations, skipped };
+  }
+
+  // Auto-register defaults so any page that loads game_manager.js can
+  // immediately call loadRules('fasttrack') etc. without prior wiring.
+  for (let i = 0; i < DEFAULT_REGISTRY.length; i++) registerGame(DEFAULT_REGISTRY[i].id, DEFAULT_REGISTRY[i]);
+
+  // ── Health monitor (Phase 6) ──────────────────────────────────────────────
+  // Append-only ring buffer kept in localStorage and best-effort POSTed to
+  // /api/gm/log so the AI can read /state/game-manager.log on the server.
+  const HEALTH_LOG_KEY = 'kg_gm_health_log';
+  const HEALTH_LOG_CAP = 200;
+  const HEALTH_INGEST_URL = '/api/gm/log';
+
+  function _healthStorage() {
+    try { return (typeof localStorage !== 'undefined') ? localStorage : null; } catch (_) { return null; }
+  }
+
+  function _readHealthBuffer() {
+    const s = _healthStorage();
+    if (!s) return [];
+    const raw = s.getItem(HEALTH_LOG_KEY);
+    const arr = raw ? safeJsonParse(raw) : null;
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function _writeHealthBuffer(arr) {
+    const s = _healthStorage();
+    if (!s) return;
+    try { s.setItem(HEALTH_LOG_KEY, JSON.stringify(arr.slice(-HEALTH_LOG_CAP))); } catch (_) { }
+  }
+
+  function _postHealthEntry(entry) {
+    if (typeof fetch !== 'function') return;
+    try {
+      fetch(HEALTH_INGEST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+        keepalive: true,
+      }).catch(() => { });
+    } catch (_) { }
+  }
+
+  function report(entry) {
+    const e = entry || {};
+    const rec = {
+      ts: new Date().toISOString(),
+      level: String(e.level || 'info'),
+      code: e.code ? String(e.code) : null,
+      gameId: e.gameId ? String(e.gameId).toLowerCase() : null,
+      sessionId: e.sessionId ? String(e.sessionId) : null,
+      userId: e.userId ? String(e.userId) : null,
+      message: e.message ? String(e.message) : '',
+      details: (e.details && typeof e.details === 'object') ? e.details : null,
+      page: (typeof location !== 'undefined' && location.pathname) ? location.pathname : null,
+      ua: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : null,
+    };
+    const buf = _readHealthBuffer();
+    buf.push(rec);
+    _writeHealthBuffer(buf);
+    const tag = '[GM ' + rec.level.toUpperCase() + ']';
+    const line = tag + ' ' + (rec.code ? rec.code + ' ' : '') + rec.message;
+    if (typeof console !== 'undefined') {
+      if (rec.level === 'error') console.error(line, rec.details || '');
+      else if (rec.level === 'warn') console.warn(line, rec.details || '');
+      else console.log(line, rec.details || '');
+    }
+    _postHealthEntry(rec);
+    return rec;
+  }
+
+  function getLog(limit) {
+    const buf = _readHealthBuffer();
+    const n = Math.max(0, Math.min(HEALTH_LOG_CAP, parseInt(limit, 10) || HEALTH_LOG_CAP));
+    return buf.slice(-n);
+  }
+
+  function clearLog() { _writeHealthBuffer([]); return true; }
+
+  function monitor(name, ok, details) {
+    if (ok) return { ok: true, name: String(name || '') };
+    return report({
+      level: 'warn',
+      code: 'invariant_failed',
+      message: 'Invariant failed: ' + String(name || ''),
+      details: (details && typeof details === 'object') ? details : { details: details },
+    });
+  }
+
+  // Capture uncaught client errors so the AI sees runtime breakage too.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('error', function (ev) {
+      if (!ev) return;
+      report({
+        level: 'error',
+        code: 'window_error',
+        message: ev.message || 'window error',
+        details: {
+          filename: ev.filename || null,
+          lineno: ev.lineno || null,
+          colno: ev.colno || null,
+          stack: (ev.error && ev.error.stack) ? String(ev.error.stack).slice(0, 1500) : null,
+        },
+      });
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      if (!ev) return;
+      const reason = ev.reason || {};
+      report({
+        level: 'error',
+        code: 'unhandled_rejection',
+        message: String(reason.message || reason || 'unhandled promise rejection'),
+        details: { stack: (reason.stack ? String(reason.stack).slice(0, 1500) : null) },
+      });
+    });
+  }
+
   const api = {
     AVATAR_EMOJIS,
     RUNTIME_KEY,
@@ -410,6 +633,21 @@
     persistGenericRuntime,
     readRuntimeFromStorage,
     readGenericRuntimeFromStorage,
+    // Rules registry (Phase 3)
+    registerGame,
+    listGames,
+    getRegistration,
+    loadRules,
+    getRules,
+    getScenarios,
+    setRules,
+    setScenarios,
+    enforce,
+    // Health monitor (Phase 6)
+    report,
+    getLog,
+    clearLog,
+    monitor,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
