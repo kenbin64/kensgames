@@ -28,6 +28,8 @@ const SFInput = (function () {
     const NAV_MAX_R = 55;               // max pixel radius for full deflection
     const NAV_DEAD = 8;                 // pixel dead zone (center = thrust zone)
 
+    let modeBadgeEl = null;
+
     // Touch action button tracking
     const touchBtns = {};               // id → held state
 
@@ -208,6 +210,9 @@ const SFInput = (function () {
             if (window.Starfighter) window.Starfighter.firePrimary();
         }, { passive: true });
 
+        _ensureMobileModeBadge();
+        _setMobileModeBadge(false);
+
         // ── Remaining action buttons (lock, boost, afterburner, RTB) ──
         _bindTouchHold('mob-fire', 'fireHeld');
         _bindGyroButton();
@@ -220,10 +225,21 @@ const SFInput = (function () {
     function _bindGyroButton() {
         const btn = document.getElementById('mob-tilt');
         if (!btn) return;
+        const imuSupported = (typeof window !== 'undefined') && (typeof DeviceOrientationEvent !== 'undefined');
         const setBtn = (on) => {
             btn.classList.toggle('active', !!on);
             btn.textContent = on ? 'TILT ON' : 'TILT';
+            _setMobileModeBadge(!!on);
         };
+        if (!imuSupported) {
+            btn.classList.remove('active');
+            btn.textContent = 'TOUCH';
+            btn.disabled = true;
+            btn.title = 'IMU not available. Using touch controls.';
+            btn.style.opacity = '0.65';
+            _setMobileModeBadge(false);
+            return;
+        }
         setBtn(false);
         btn.addEventListener('touchstart', async (e) => {
             e.preventDefault();
@@ -241,8 +257,46 @@ const SFInput = (function () {
         gyroYaw = Math.max(-1, Math.min(1, relYaw / 26));
     }
 
+    function _ensureMobileModeBadge() {
+        if (typeof document === 'undefined') return;
+        if (modeBadgeEl && modeBadgeEl.isConnected) return;
+        const host = document.getElementById('mobile-hud') || document.body;
+        const el = document.createElement('div');
+        el.id = 'mob-input-mode';
+        el.style.cssText = [
+            'position:fixed',
+            'left:12px',
+            'bottom:116px',
+            'z-index:24',
+            'padding:6px 10px',
+            'border-radius:8px',
+            'border:1px solid rgba(90,245,220,0.55)',
+            'background:rgba(8,16,28,0.78)',
+            'color:#a6fff0',
+            'font:700 11px system-ui,sans-serif',
+            'letter-spacing:.06em'
+        ].join(';');
+        host.appendChild(el);
+        modeBadgeEl = el;
+    }
+
+    function _setMobileModeBadge(imuOn) {
+        if (!isMobile) return;
+        _ensureMobileModeBadge();
+        if (!modeBadgeEl) return;
+        modeBadgeEl.textContent = imuOn ? 'IMU ACTIVE' : 'TOUCH MODE';
+        modeBadgeEl.style.borderColor = imuOn ? 'rgba(132,255,210,0.85)' : 'rgba(90,245,220,0.55)';
+        modeBadgeEl.style.color = imuOn ? '#ccffe8' : '#a6fff0';
+    }
+
     async function _toggleGyro() {
         try {
+            if (typeof DeviceOrientationEvent === 'undefined') {
+                gyroSupported = false;
+                gyroEnabled = false;
+                _setMobileModeBadge(false);
+                return false;
+            }
             if (!gyroEnabled) {
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const perm = await DeviceOrientationEvent.requestPermission();
@@ -255,17 +309,20 @@ const SFInput = (function () {
                 gyroZeroGamma = 0;
                 gyroPitch = 0;
                 gyroYaw = 0;
+                _setMobileModeBadge(true);
                 return true;
             }
             gyroEnabled = false;
             window.removeEventListener('deviceorientation', _onDeviceOrientation, true);
             gyroPitch = 0;
             gyroYaw = 0;
+            _setMobileModeBadge(false);
             return false;
         } catch (err) {
             console.warn('[SFInput] Gyro unavailable', err);
             gyroSupported = false;
             gyroEnabled = false;
+            _setMobileModeBadge(false);
             return false;
         }
     }
