@@ -59,23 +59,27 @@ const GameWizardSubstrate = (() => {
                 background: rgba(20, 20, 40, 0.9);
                 border: 2px solid #00b4ff;
                 border-radius: 24px;
-                padding: 50px;
+                padding: 20px;
                 max-width: 600px;
                 width: 90%;
+                height: min(94dvh, 94vh);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
                 box-shadow: 0 0 60px rgba(0, 180, 255, 0.3);
             ">
                 <h1 style="
                     font-family: 'Orbitron', sans-serif;
-                    font-size: 36px;
+                    font-size: clamp(24px, 4.2vw, 36px);
                     margin-bottom: 10px;
                     background: linear-gradient(135deg, #00b4ff, #ffd700);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                 ">🧙 Game Wizard</h1>
-                <p style="color: #94a3b8; margin-bottom: 40px;">Set up your single-player adventure</p>
+                <p style="color: #94a3b8; margin-bottom: 14px;">Set up your single-player adventure</p>
 
                 <!-- Step 1: Player Name -->
-                <div style="margin-bottom: 40px;">
+                <div style="margin-bottom: 16px;">
                     <label style="
                         display: block;
                         margin-bottom: 12px;
@@ -98,7 +102,7 @@ const GameWizardSubstrate = (() => {
                 </div>
 
                 <!-- Step 2: Avatar Selection -->
-                <div style="margin-bottom: 40px;">
+                <div style="margin-bottom: 16px;">
                     <label style="
                         display: block;
                         margin-bottom: 12px;
@@ -115,7 +119,7 @@ const GameWizardSubstrate = (() => {
                 </div>
 
                 <!-- Step 3: Difficulty & AI -->
-                <div style="margin-bottom: 40px;">
+                <div style="margin-bottom: 16px;">
                     <label style="
                         display: block;
                         margin-bottom: 12px;

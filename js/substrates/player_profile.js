@@ -63,7 +63,7 @@ const KGPlayerProfile = (() => {
     div.id = 'kg-name-modal';
     div.innerHTML = `
 <div id="kg-name-overlay" style="display:none;position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
-  <div style="background:rgba(4,4,20,.97);border:2px solid #00FFFF;box-shadow:0 0 24px #00FFFF,0 0 48px #00FFFF;border-radius:6px;padding:28px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;position:relative;">
+  <div style="background:rgba(4,4,20,.97);border:2px solid #00FFFF;box-shadow:0 0 24px #00FFFF,0 0 48px #00FFFF;border-radius:6px;padding:20px;width:100%;max-width:520px;height:min(92dvh,92vh);overflow:hidden;position:relative;display:flex;flex-direction:column;justify-content:center;">
     <div style="font-family:'Orbitron',monospace;font-size:18px;color:#00FFFF;text-shadow:0 0 24px #00FFFF;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Player Profile</div>
     <div id="kg-name-req" style="font-size:12px;color:#FF00FF;margin-bottom:16px;display:none;">You must choose a player name to continue.</div>
 

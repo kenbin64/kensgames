@@ -8,7 +8,6 @@
     "source": "4DTicTacToe/manifold.game.json",
     "config": "4DTicTacToe/manifold.game.json"
   },
-
   "lobby": {
     "min_players": 1,
     "max_players": 4,
@@ -17,73 +16,121 @@
     "supports_remote_multiplayer": true,
     "supports_bots": true,
     "default_player_count": 2,
-    "grid_for_players": { "1": 3, "2": 4, "3": 5, "4": 5 }
+    "grid_for_players": {
+      "1": 3,
+      "2": 4,
+      "3": 5,
+      "4": 5
+    }
   },
-
   "session": {
     "drop_model": "gravity_assisted",
     "scenarios_source": "manifold.game.json:attributes.scenarios",
     "default_scenario": "classic",
-    "win_lengths": { "classic": 4, "speed": 4, "territory": 4 },
+    "win_lengths": {
+      "classic": 4,
+      "speed": 4,
+      "territory": 4
+    },
     "speed_drop_seconds_per_turn": 10,
     "territory_win": "most_winning_combos_when_board_full"
   },
-
   "rules": [
     {
       "id": "T4_GRID_BY_PLAYERS",
       "category": "setup",
-      "x": 1, "y": 4, "z": 4,
+      "x": 1,
+      "y": 4,
+      "z": 4,
       "desc": "Grid size is determined by player count: 1→3, 2→4, 3→5, 4→5.",
       "assertion": "ctx.board.size === ctx.rules.lobby.grid_for_players[String(ctx.session.player_count)]"
     },
     {
+      "id": "T4_SETUP_NO_SCROLL",
+      "category": "setup",
+      "x": 1,
+      "y": 5,
+      "z": 5,
+      "desc": "All setup wizard controls (including Launch) must remain inside the viewport with no vertical scrolling.",
+      "assertion": "ctx.ui.setup.requiresScroll !== true && ctx.ui.setup.launchButtonInViewport === true"
+    },
+    {
+      "id": "T4_PLAYFIELD_IN_VIEWPORT",
+      "category": "setup",
+      "x": 1,
+      "y": 6,
+      "z": 6,
+      "desc": "Game board/cube and active playfield must remain fully visible inside the viewport across supported screen sizes.",
+      "assertion": "ctx.ui.playfield.fullyVisible === true"
+    },
+    {
       "id": "T4_DROP_GRAVITY",
       "category": "movement",
-      "x": 2, "y": 1, "z": 2,
+      "x": 2,
+      "y": 1,
+      "z": 2,
       "desc": "Balls drop into the lowest free cell of the chosen column (gravity-assisted).",
       "assertion": "ctx.move.row === ctx.board.lowestFree(ctx.move.col, ctx.move.layer)"
     },
     {
       "id": "T4_NO_FULL_COLUMN",
       "category": "movement",
-      "x": 2, "y": 2, "z": 4,
+      "x": 2,
+      "y": 2,
+      "z": 4,
       "desc": "Cannot drop into a column whose stack is full.",
       "assertion": "!ctx.board.columnFull(ctx.move.col, ctx.move.layer)"
     },
     {
       "id": "T4_WIN_LINE_4",
       "category": "win",
-      "x": 3, "y": 1, "z": 3,
+      "x": 3,
+      "y": 1,
+      "z": 3,
       "desc": "Default classic mode: first to align 4 in any straight line (3D + cross-layer) wins.",
       "assertion": "ctx.scenario.id !== 'classic' || (ctx.winner === null) || ctx.board.findLine(ctx.lastMove, 4) !== null"
     },
     {
       "id": "T4_TERRITORY_TIEBREAK",
       "category": "win",
-      "x": 3, "y": 2, "z": 6,
+      "x": 3,
+      "y": 2,
+      "z": 6,
       "desc": "Territory mode: when board fills, player with most winning lines wins.",
       "assertion": "ctx.scenario.id !== 'territory' || !ctx.board.boardFull || ctx.winner === ctx.board.maxScorer()"
     },
     {
       "id": "T4_SPEED_TIMER",
       "category": "session",
-      "x": 4, "y": 10, "z": 40,
+      "x": 4,
+      "y": 10,
+      "z": 40,
       "desc": "Speed mode: each turn must complete within 10 seconds or it is forfeited.",
       "assertion": "ctx.scenario.id !== 'speed' || ctx.move.elapsedMs <= 10000 || ctx.move.forfeited === true"
     },
     {
       "id": "T4_TURN_ORDER",
       "category": "session",
-      "x": 5, "y": 1, "z": 5,
+      "x": 5,
+      "y": 1,
+      "z": 5,
       "desc": "Players take turns in registration order; AI bots act when their turn comes up.",
       "assertion": "ctx.currentPlayer.id === ctx.session.players[(ctx.turnIndex) % ctx.session.players.length].id"
     }
   ],
-
   "ai_director": {
-    "consults": ["session", "scenarios"],
-    "may_generate": ["bot_difficulty_curve", "scenario_recommendation"],
-    "may_not_generate": ["win_length", "grid_size", "lives"]
+    "consults": [
+      "session",
+      "scenarios"
+    ],
+    "may_generate": [
+      "bot_difficulty_curve",
+      "scenario_recommendation"
+    ],
+    "may_not_generate": [
+      "win_length",
+      "grid_size",
+      "lives"
+    ]
   }
 }

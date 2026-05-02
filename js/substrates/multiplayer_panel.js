@@ -58,8 +58,8 @@
   // ── CSS (injected once) ─────────────────────────────────────────────
   // Canonical KensGames Tron palette: cyan (primary), green (go), purple (AI/accent).
   const CSS = `
-.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;height:min(96dvh,96vh);}
-.kg-mp.kg-mp-vh{height:min(96dvh,96vh);margin:2dvh auto;}
+.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;height:min(96dvh,96vh);overflow:hidden;}
+.kg-mp.kg-mp-vh{height:min(96dvh,96vh);margin:2dvh auto;overflow:hidden;}
 .kg-mp-card{background:rgba(4,4,20,0.94);border:2px solid #00FFFF;
   box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(153,0,255,0.20);
   border-radius:10px;padding:18px 20px 14px;height:100%;display:grid;
@@ -126,7 +126,7 @@
 .kg-mp .player-row{display:flex;align-items:center;gap:12px;padding:12px 14px;
   background:rgba(0,0,0,0.45);border:1px solid rgba(0,255,255,0.20);border-radius:6px;
   margin-bottom:8px;}
-.kg-mp .roster-scroll{flex:1;min-height:0;overflow:auto;padding-right:2px;margin-bottom:6px;}
+.kg-mp .roster-scroll{flex:1;min-height:0;overflow:hidden;padding-right:0;margin-bottom:6px;}
 .kg-mp .player-row.is-host{border-color:rgba(0,255,65,0.5);box-shadow:0 0 8px rgba(0,255,65,0.15);}
 .kg-mp .player-row.is-ai{border-color:rgba(153,0,255,0.5);border-style:dashed;
   background:rgba(153,0,255,0.05);}
@@ -167,7 +167,7 @@
   letter-spacing:1px;outline:none;box-sizing:border-box;margin-bottom:12px;}
 .kg-mp .name-field:focus{border-color:#00FFFF;box-shadow:0 0 10px rgba(0,255,255,0.25);}
 .kg-mp .avatar-quick{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:8px;
-  overflow:auto;max-height:min(26dvh,26vh);padding-right:2px;}
+  overflow:hidden;max-height:min(22dvh,22vh);padding-right:0;}
 .kg-mp .av-btn{font-size:24px;width:44px;height:44px;background:rgba(0,0,0,0.4);
   border:1.5px solid rgba(0,255,255,0.2);border-radius:6px;cursor:pointer;
   transition:all 140ms ease;display:flex;align-items:center;justify-content:center;padding:0;}
@@ -178,7 +178,7 @@
   margin-bottom:14px;cursor:pointer;text-transform:uppercase;}
 .kg-mp .av-more:hover{color:#00FFFF;}
 .kg-mp .player-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
-  gap:10px;align-items:stretch;margin-bottom:10px;flex:1;min-height:0;overflow:auto;padding-right:2px;}
+  gap:8px;align-items:stretch;margin-bottom:8px;flex:1;min-height:0;overflow:hidden;padding-right:0;}
 .kg-mp .player-card{background:rgba(0,0,0,0.55);border:1.5px solid rgba(0,255,255,0.28);
   border-radius:10px;padding:14px 10px;text-align:center;
   transition:box-shadow 220ms ease;}
@@ -251,16 +251,35 @@
   .kg-mp .nav-row .btn-next{font-size:13px;padding:12px;}
   .kg-mp .nav-row{flex-wrap:wrap;}
   .kg-mp .nav-row .btn-back,.kg-mp .nav-row .btn-next{width:100%;}
-  .kg-mp .actions .btn-launch{font-size:14px;padding:12px;}
+  .kg-mp .actions .btn-launch{font-size:13px;padding:10px;}
   .kg-mp .err-msg{font-size:12px;}
   .kg-mp .info-msg{font-size:13px;}
   .kg-mp .link-btn{font-size:12px;}
-  .kg-mp .avatar-quick{max-height:min(22dvh,22vh);}
+  .kg-mp .avatar-quick{max-height:min(18dvh,18vh);}
 }
 
 @media (min-width:561px) and (max-width:920px){
   .kg-mp .player-cards{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
+
+  @media (max-height:740px){
+    .kg-mp{height:min(99dvh,99vh);}
+    .kg-mp.kg-mp-vh{margin:0.5dvh auto;height:min(99dvh,99vh);}
+    .kg-mp-card{padding:10px 10px 8px;}
+    .kg-mp h2{font-size:13px;margin-bottom:2px;}
+    .kg-mp .game-name{font-size:9px;margin-bottom:6px;}
+    .kg-mp .step-title{font-size:10px;margin:2px 0 6px;}
+    .kg-mp .player-row{padding:8px 10px;margin-bottom:6px;}
+    .kg-mp .player-avatar{font-size:21px;width:26px;}
+    .kg-mp .player-name{font-size:11px;}
+    .kg-mp .summary{padding:10px;margin-bottom:8px;}
+    .kg-mp .summary-row{padding:3px 0;}
+    .kg-mp .actions{margin-top:10px;}
+    .kg-mp .actions .btn-launch{padding:9px;font-size:12px;}
+    .kg-mp .nav-row{padding-top:8px;}
+    .kg-mp .nav-row .btn-next{padding:10px;font-size:12px;}
+    .kg-mp .avatar-quick{max-height:min(15dvh,15vh);}
+  }
 `;
 
   function injectCSS() {

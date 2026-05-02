@@ -8476,6 +8476,79 @@ const Starfighter = (function () {
   function _setPhase(nextPhase) {
     state.phase = nextPhase;
     if (window.SFInput && SFInput.setMobilePhase) SFInput.setMobilePhase(nextPhase);
+    if (nextPhase === 'bay-ready') {
+      _initLaunchBayBriefingUI();
+      _showLaunchBayBriefing(true);
+      _updateLaunchBayBriefing();
+    } else {
+      _showLaunchBayBriefing(false);
+    }
+  }
+
+  function _initLaunchBayBriefingUI() {
+    const root = document.getElementById('launch-bay-briefing');
+    if (!root || root.dataset.bound === '1') return;
+
+    const launchNowBtn = document.getElementById('sfb-launch-now');
+    if (launchNowBtn) {
+      launchNowBtn.addEventListener('click', () => {
+        if (state.phase !== 'bay-ready' || !state.running || state.paused) return;
+        if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+        _beginLaunchSequence();
+      });
+    }
+
+    const muteBtn = document.getElementById('sfb-mute-brief');
+    if (muteBtn) {
+      muteBtn.addEventListener('click', () => {
+        const muted = root.classList.toggle('muted');
+        muteBtn.innerText = muted ? 'SHOW BRIEF' : 'MINIMIZE';
+      });
+    }
+
+    root.dataset.bound = '1';
+  }
+
+  function _showLaunchBayBriefing(show) {
+    const root = document.getElementById('launch-bay-briefing');
+    if (!root) return;
+    root.classList.toggle('active', !!show);
+    if (!show) root.classList.remove('muted');
+  }
+
+  function _updateLaunchBayBriefing() {
+    const root = document.getElementById('launch-bay-briefing');
+    if (!root) return;
+
+    const waveEl = document.getElementById('sfb-wave');
+    const callsignEl = document.getElementById('sfb-callsign');
+    const objectiveEl = document.getElementById('sfb-objective');
+    const threatEl = document.getElementById('sfb-threat');
+
+    if (waveEl) waveEl.textContent = String(state.wave || 1);
+    if (callsignEl) callsignEl.textContent = _cs();
+
+    const objective = _scenarioObjectiveLabel() || state._sortieObjectiveText || 'Launch and clear all hostiles in sector.';
+    if (objectiveEl) objectiveEl.textContent = objective;
+
+    const estimatedContacts = Math.max(3, Math.round((state.wave || 1) * 2.3 + 2));
+    if (threatEl) threatEl.textContent = `${estimatedContacts} HOSTILES (EST.)`;
+
+    _updateLaunchBayAutoCountdown();
+  }
+
+  function _updateLaunchBayAutoCountdown() {
+    const etaEl = document.getElementById('sfb-auto');
+    if (!etaEl) return;
+
+    if (!state._autoLaunchDeadline || state.phase !== 'bay-ready') {
+      etaEl.textContent = 'AUTO-LAUNCH STANDBY';
+      return;
+    }
+
+    const msLeft = Math.max(0, state._autoLaunchDeadline - performance.now());
+    const secLeft = Math.ceil(msLeft / 1000);
+    etaEl.textContent = `AUTO-LAUNCH T-${secLeft}s`;
   }
 
   // ── Kill Feed ──
@@ -10631,7 +10704,7 @@ const Starfighter = (function () {
 
     const overlay = document.createElement('div');
     overlay.id = 'tutorial-overlay';
-    overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);pointer-events:auto;overflow-y:auto;padding:20px';
+    overlay.style.cssText = 'position:absolute;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);pointer-events:auto;overflow:hidden;padding:20px';
 
     function _buildTutorialHTML(controller) {
       const kbControls = `
@@ -11101,6 +11174,9 @@ const Starfighter = (function () {
   }
 
   function _beginLaunchSequence() {
+    _clearAutoLaunchSchedule();
+    _showLaunchBayBriefing(false);
+
     const fullBriefing = !state._briefingShownOnce;
 
     _setPhase('launching');
@@ -11214,6 +11290,7 @@ const Starfighter = (function () {
     document.getElementById('countdown-display').style.display = 'none';
     document.getElementById('launch-prompt').style.display = 'none';
     document.getElementById('launch-overlay').style.display = 'none';
+    _showLaunchBayBriefing(false);
     document.getElementById('ship-panel').style.display = 'block';
     document.getElementById('crosshair').style.display = 'block';
     document.getElementById('gameplay-hud').style.display = 'block';
@@ -11428,17 +11505,32 @@ const Starfighter = (function () {
   // ── Auto-relaunch helper — replaces the missing red launch button. ──
   // Cancellable via state._autoLaunchTimer so a manual launch (or another
   // schedule) doesn't double-fire the cutscene.
-  function _scheduleAutoLaunch(delayMs) {
+  function _clearAutoLaunchSchedule() {
     if (state._autoLaunchTimer) {
       clearTimeout(state._autoLaunchTimer);
       state._autoLaunchTimer = null;
     }
+    if (state._autoLaunchTicker) {
+      clearInterval(state._autoLaunchTicker);
+      state._autoLaunchTicker = null;
+    }
+    state._autoLaunchDeadline = 0;
+    _updateLaunchBayAutoCountdown();
+  }
+
+  function _scheduleAutoLaunch(delayMs) {
+    _clearAutoLaunchSchedule();
+    const delay = Math.max(500, delayMs || 5000);
+    state._autoLaunchDeadline = performance.now() + delay;
+    _updateLaunchBayAutoCountdown();
+    state._autoLaunchTicker = setInterval(_updateLaunchBayAutoCountdown, 150);
+
     state._autoLaunchTimer = setTimeout(() => {
-      state._autoLaunchTimer = null;
+      _clearAutoLaunchSchedule();
       if (state.phase !== 'bay-ready' || !state.running || state.paused) return;
       if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
       _beginLaunchSequence();
-    }, delayMs || 5000);
+    }, delay);
   }
 
   const MANIFOLD_ARCHETYPES = {

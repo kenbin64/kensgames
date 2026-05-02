@@ -827,7 +827,7 @@
         left: 16px;
         width: 320px;
         max-height: 60vh;
-        overflow-y: auto;
+        overflow: hidden;
         z-index: 22;
         background: rgba(0, 10, 20, 0.88);
         border: 1px solid rgba(0, 255, 255, 0.15);
@@ -860,7 +860,7 @@
         right: 16px;
         width: 320px;
         max-height: 60vh;
-        overflow-y: auto;
+        overflow: hidden;
         z-index: 22;
         background: rgba(0, 10, 20, 0.88);
         border: 1px solid rgba(0, 255, 255, 0.15);
@@ -1191,6 +1191,134 @@
         z-index: 50
       }
 
+      #launch-bay-briefing {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        transform: translate(-50%, -50%);
+        z-index: 66;
+        width: min(92vw, 760px);
+        padding: 14px 16px;
+        border: 1px solid rgba(72, 210, 126, 0.4);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(4px);
+        font-family: 'Courier New', monospace;
+        color: #74ff99;
+        display: none;
+        pointer-events: auto;
+        overflow: hidden;
+      }
+
+      #launch-bay-briefing.active {
+        display: block;
+      }
+
+      #launch-bay-briefing .sfb-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+
+      #launch-bay-briefing .sfb-title {
+        grid-column: 1 / -1;
+        font-size: 12px;
+        letter-spacing: 3px;
+        color: #ffcf5a;
+      }
+
+      #launch-bay-briefing .sfb-line {
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: #74ff99;
+      }
+
+      #launch-bay-briefing .sfb-line .label {
+        color: #ffcf5a;
+        margin-right: 6px;
+      }
+
+      #launch-bay-briefing .sfb-objective {
+        grid-column: 1 / -1;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #8dffaf;
+        border-top: 1px solid rgba(116, 255, 153, 0.24);
+        border-bottom: 1px solid rgba(116, 255, 153, 0.24);
+        padding: 8px 0;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+
+      #launch-bay-briefing .sfb-actions {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      #launch-bay-briefing .sfb-btn {
+        flex: 1;
+        min-height: 34px;
+        border: 1px solid rgba(255, 207, 90, 0.45);
+        background: rgba(0, 0, 0, 0.25);
+        color: #ffcf5a;
+        letter-spacing: 1px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      #launch-bay-briefing .sfb-btn:hover {
+        background: rgba(255, 207, 90, 0.12);
+      }
+
+      #launch-bay-briefing .sfb-btn.launch {
+        border-color: rgba(116, 255, 153, 0.55);
+        color: #74ff99;
+      }
+
+      #launch-bay-briefing .sfb-btn.launch:hover {
+        background: rgba(116, 255, 153, 0.14);
+      }
+
+      #launch-bay-briefing .sfb-auto {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: #ffcf5a;
+        font-size: 11px;
+        letter-spacing: 2px;
+      }
+
+      #launch-bay-briefing.muted .sfb-line,
+      #launch-bay-briefing.muted .sfb-objective {
+        display: none;
+      }
+
+      @media (max-width: 720px) {
+        #launch-bay-briefing {
+          top: 58%;
+          width: min(96vw, 560px);
+          padding: 10px 10px;
+        }
+
+        #launch-bay-briefing .sfb-grid {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        #launch-bay-briefing .sfb-objective {
+          font-size: 11px;
+        }
+
+        #launch-bay-briefing .sfb-btn {
+          min-height: 36px;
+          font-size: 10px;
+        }
+      }
+
       /* ═══════════════════════════════════════
        RESPAWN OVERLAY — fighter lost
        ═══════════════════════════════════════ */
@@ -1388,7 +1516,7 @@
         background: rgba(0, 4, 12, 0.96);
         z-index: 110;
         pointer-events: auto;
-        overflow-y: auto;
+        overflow: hidden;
         font-family: monospace
       }
 
@@ -2199,6 +2327,295 @@
       .hidden {
         display: none !important
       }
+
+      /* ═══════════════════════════════════════
+       PANEL-FREE GAMEPLAY — hide old panels always
+       ═══════════════════════════════════════ */
+      #mob-nav-sphere,
+      #mob-btn-group,
+      #mob-hint,
+      #mission-panel,
+      #tutorial-panel,
+      #ctrl-overlay,
+      #ctrl-hamburger {
+        display: none !important;
+      }
+
+      /* Hide console buttons + comm ticker during active flight */
+      body.phase-combat #console-buttons,
+      body.phase-combat #comm-ticker {
+        display: none !important;
+      }
+
+      /* ═══════════════════════════════════════
+       EMERGENCY FRIGATE BUTTON — top right, combat only
+       ═══════════════════════════════════════ */
+      #sf-frigate-btn {
+        display: none;
+        position: fixed;
+        top: 8px;
+        right: 12px;
+        z-index: 50;
+        padding: 8px 14px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 1.5px;
+        color: #fff;
+        background: linear-gradient(180deg, rgba(180, 30, 0, 0.9), rgba(110, 10, 0, 0.95));
+        border: 1.5px solid rgba(255, 90, 50, 0.75);
+        border-radius: 6px;
+        cursor: pointer;
+        pointer-events: auto;
+        text-transform: uppercase;
+        backdrop-filter: blur(4px);
+        animation: frigPulse 2.2s ease-in-out infinite;
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #sf-frigate-btn.visible {
+        display: block;
+      }
+
+      #sf-frigate-btn:hover {
+        background: linear-gradient(180deg, rgba(220, 40, 0, 0.95), rgba(150, 15, 0, 1));
+        border-color: rgba(255, 120, 80, 0.9);
+      }
+
+      @keyframes frigPulse {
+
+        0%,
+        100% {
+          box-shadow: 0 0 10px rgba(255, 60, 0, 0.45);
+        }
+
+        50% {
+          box-shadow: 0 0 22px rgba(255, 80, 0, 0.75);
+        }
+      }
+
+      /* Nudge HUD below the frigate button */
+      #gameplay-hud {
+        top: 52px !important;
+      }
+
+      /* Secondary HUD rows — hidden on small screens */
+      @media (max-width: 768px) {
+        .hud-row-secondary {
+          display: none;
+        }
+
+        #gameplay-hud {
+          font-size: 11px !important;
+        }
+
+        #gameplay-hud .hud-bar-track {
+          width: 60px !important;
+        }
+
+        #gameplay-hud .hud-label {
+          width: 44px !important;
+          font-size: 9px !important;
+        }
+      }
+
+      /* ═══════════════════════════════════════
+       CONTROLS HINT — lower right, dismissable
+       ═══════════════════════════════════════ */
+      #sf-controls-hint {
+        display: none;
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
+        z-index: 50;
+        width: 168px;
+        padding: 10px 12px;
+        background: rgba(0, 10, 22, 0.84);
+        border: 1px solid rgba(0, 255, 255, 0.22);
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 10px;
+        color: rgba(0, 255, 255, 0.72);
+        line-height: 1.9;
+        pointer-events: auto;
+        backdrop-filter: blur(6px);
+      }
+
+      #sf-controls-hint.visible {
+        display: block;
+      }
+
+      #sf-hint-dismiss {
+        position: absolute;
+        top: 5px;
+        right: 8px;
+        background: none;
+        border: none;
+        color: rgba(0, 255, 255, 0.5);
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+        pointer-events: auto;
+      }
+
+      #sf-hint-dismiss:hover {
+        color: #fff;
+      }
+
+      .sf-hint-title {
+        font-size: 9px;
+        letter-spacing: 2px;
+        color: rgba(0, 255, 255, 0.4);
+        text-transform: uppercase;
+        margin-bottom: 5px;
+        padding-right: 16px;
+      }
+
+      #sf-controls-hint kbd {
+        font-size: 9px;
+        padding: 1px 4px;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid rgba(0, 255, 255, 0.28);
+        border-radius: 2px;
+        margin-right: 2px;
+      }
+
+      .sf-hint-mobile {
+        display: none;
+      }
+
+      .sf-hint-desktop {
+        display: block;
+      }
+
+      @media (hover: none) and (pointer: coarse) {
+        .sf-hint-desktop {
+          display: none;
+        }
+
+        .sf-hint-mobile {
+          display: block;
+        }
+
+        #sf-controls-hint {
+          width: 152px;
+          font-size: 9.5px;
+        }
+      }
+
+      /* Disable codex target-lock side panel on small screens. */
+      @media (max-width: 900px) {
+        #sf-codex-scan {
+          display: none !important;
+        }
+      }
+
+      /* ═══════════════════════════════════════
+       TEXT-ONLY OVERLAY MODE (transparent panels)
+       ═══════════════════════════════════════ */
+      :root {
+        --sf-text-green: #84ff9a;
+        --sf-text-gold: #ffd26b;
+      }
+
+      #gameplay-hud,
+      #ghud-show,
+      #sf-controls-hint,
+      #sf-frigate-btn,
+      #comm-ticker,
+      #console-buttons,
+      #console-buttons .console-btn,
+      #rescue-btn,
+      #cm-deploy-btn,
+      #cm-gauge-container,
+      #lock-alert,
+      #incoming-alert {
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+
+      #gameplay-hud .hud-bar-track,
+      #cm-gauge-bar,
+      #cm-gauge-fill,
+      #sf-controls-hint kbd,
+      #console-buttons .console-btn::before {
+        display: none !important;
+      }
+
+      #gameplay-hud,
+      #gameplay-hud .hud-label,
+      #gameplay-hud .hud-val,
+      #ghud-show,
+      #sf-controls-hint,
+      #sf-controls-hint *:not(button),
+      #comm-ticker-inner .comm-item,
+      #console-buttons .console-btn,
+      #rescue-btn,
+      #cm-deploy-btn,
+      #cm-gauge-label,
+      #cm-count,
+      #lock-alert,
+      #incoming-alert {
+        color: var(--sf-text-green) !important;
+        text-shadow: 0 0 6px rgba(132, 255, 154, 0.35) !important;
+      }
+
+      #ghud-lives,
+      #sf-frigate-btn,
+      #sf-hint-dismiss,
+      #comm-ticker-inner .comm-item.warning,
+      #lock-alert,
+      #incoming-alert {
+        color: var(--sf-text-gold) !important;
+        text-shadow: 0 0 8px rgba(255, 210, 107, 0.4) !important;
+      }
+
+      #sf-controls-hint {
+        padding: 0 !important;
+      }
+
+      #sf-frigate-btn,
+      #rescue-btn,
+      #cm-deploy-btn,
+      #console-buttons .console-btn {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      /* Lower visual weight for text labels when these elements are visible. */
+      #comm-ticker {
+        height: 20px !important;
+        opacity: 0.52 !important;
+      }
+
+      #comm-ticker-inner {
+        gap: 36px !important;
+        font-size: 10px !important;
+        line-height: 20px !important;
+        letter-spacing: 0.04em !important;
+      }
+
+      #console-buttons {
+        bottom: 10px !important;
+        gap: 10px !important;
+        opacity: 0.58 !important;
+      }
+
+      #console-buttons .console-btn {
+        font-size: 9px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.08em !important;
+      }
+
+      #console-buttons .console-btn:hover,
+      #console-buttons .console-btn:focus-visible {
+        opacity: 0.82 !important;
+      }
   </style>
 </head>
 
@@ -2229,7 +2646,7 @@
       </div>
       <span id="ghud-shield" class="hud-val">100</span>
     </div>
-    <div class="hud-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">HULL</span>
       <div class="hud-bar-track">
         <div id="ghud-hull-bar" class="hud-bar-fill hull" style="width:100%"></div>
@@ -2244,10 +2661,10 @@
       <span id="ghud-fuel" class="hud-val">100</span>
     </div>
     <div class="hud-row">
-      <span class="hud-label">TORPS</span>
+      <span class="hud-label">ROCS</span>
       <span id="ghud-torpedoes" class="hud-val">2</span>
     </div>
-    <div class="hud-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">WPN</span>
       <span id="ghud-weapon" class="hud-val" style="color:#00ff88">LASER</span>
     </div>
@@ -2255,30 +2672,30 @@
       <span class="hud-label">KILLS</span>
       <span id="ghud-kills" class="hud-val">0</span>
     </div>
-    <div class="hud-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">SCORE</span>
       <span id="ghud-score" class="hud-val">0</span>
     </div>
     <div class="hud-row">
-      <span class="hud-label">WAVE</span>
+      <span class="hud-label">SORTIE</span>
       <span id="ghud-wave" class="hud-val">1</span>
     </div>
     <div class="hud-row">
       <span class="hud-label">LIVES</span>
       <span id="ghud-lives" class="hud-val" style="letter-spacing:3px;color:#ff4444;font-size:11px">★★★</span>
     </div>
-    <div class="hud-row hud-score-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">BOOST</span>
       <div class="hud-bar-track">
         <div id="ghud-boost-bar" class="hud-bar-fill fuel" style="width:0%"></div>
       </div>
       <span id="ghud-boost" class="hud-val">RDY</span>
     </div>
-    <div class="hud-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">FA</span>
       <span id="ghud-fa" class="hud-val" style="color:#00ff88">ON</span>
     </div>
-    <div class="hud-row">
+    <div class="hud-row hud-row-secondary">
       <span class="hud-label">MODE</span>
       <span id="ghud-speed-mode" class="hud-val">CRUISE</span>
     </div>
@@ -2353,30 +2770,47 @@
   <div id="lock-alert">⚠ LOCK WARNING</div>
   <div id="incoming-alert">⚠ INCOMING</div>
 
-  <!-- ═══ MOBILE TOUCH HUD — shown only on phones/tablets ═══ -->
+  <!-- ═══ MOBILE TOUCH HUD — JS-compat stubs (all visually hidden by CSS) ═══ -->
   <div id="mobile-hud" style="display:none">
-    <!-- Nav Sphere — bottom center, drag to steer, hold for thrust -->
-    <div id="mob-nav-sphere">
+    <div id="mob-nav-sphere" style="display:none">
       <div id="mob-nav-knob"></div>
-      <div class="mob-nav-label">STEER</div>
-      <div class="mob-nav-thrust-label">HOLD = THRUST</div>
     </div>
-    <!-- Minimal action buttons (top-right corner) -->
-    <div id="mob-btn-group">
-      <button id="mob-fire" class="mob-btn" style="background:rgba(120,10,10,0.86);color:#ff8080">FIRE</button>
-      <button id="mob-tilt" class="mob-btn" style="background:rgba(10,40,120,0.86);color:#88b8ff">TILT</button>
-      <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
-      <button id="mob-afterburner" class="mob-btn mob-ab">AB</button>
-      <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
-      <button id="mob-rtb" class="mob-btn mob-rtb" style="display:none">RTB</button>
-      <button id="mob-call-tanker" class="mob-btn" style="display:none;background:rgba(0,80,40,0.8);color:#00ff88"
+    <div id="mob-btn-group" style="display:none">
+      <button id="mob-fire" class="mob-btn">FIRE</button>
+      <button id="mob-tilt" class="mob-btn">TILT</button>
+      <button id="mob-lock" class="mob-btn">LOCK</button>
+      <button id="mob-afterburner" class="mob-btn">AB</button>
+      <button id="mob-boost" class="mob-btn">BOOST</button>
+      <button id="mob-rtb" class="mob-btn" style="display:none">RTB</button>
+      <button id="mob-call-tanker" class="mob-btn" style="display:none"
         onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽</button>
-      <button id="mob-call-medic" class="mob-btn" style="display:none;background:rgba(80,15,15,0.8);color:#ff6666"
+      <button id="mob-call-medic" class="mob-btn" style="display:none"
         onclick="if(window.Starfighter&&Starfighter.callMedic)Starfighter.callMedic()">✚</button>
     </div>
-    <!-- Hint overlay (shown briefly on first load) -->
-    <div id="mob-hint" class="mob-hint">
-      HOLD FIRE = LASERS &nbsp;|&nbsp; TILT = STEER &nbsp;|&nbsp; TAP ✛ = TORPEDO
+    <div id="mob-hint" style="display:none"></div>
+  </div>
+
+  <!-- ═══ EMERGENCY FRIGATE BUTTON — top right, visible in combat ═══ -->
+  <button id="sf-frigate-btn" onclick="if(window.Starfighter&&Starfighter.emergencyRTB)Starfighter.emergencyRTB()">🚀
+    CALL FRIGATE</button>
+
+  <!-- ═══ CONTROLS HINT — lower right, dismissable ═══ -->
+  <div id="sf-controls-hint">
+    <button id="sf-hint-dismiss"
+      onclick="this.closest('#sf-controls-hint').classList.remove('visible');try{localStorage.setItem('sf_hint_dismissed','1')}catch(e){}">×</button>
+    <div class="sf-hint-title">CONTROLS</div>
+    <div class="sf-hint-desktop">
+      <div><kbd>Mouse</kbd> Aim</div>
+      <div><kbd>W/S</kbd> Throttle</div>
+      <div><kbd>Click</kbd> Laser · <kbd>R-Click</kbd> Missile</div>
+      <div><kbd>T</kbd> Lock · <kbd>V</kbd> FA · <kbd>Q/E</kbd> Roll</div>
+    </div>
+    <div class="sf-hint-mobile">
+      <div>TILT phone → steer</div>
+      <div>DRAG screen → steer</div>
+      <div>TAP = laser</div>
+      <div>DOUBLE TAP = missile</div>
+      <div>TOUCH = thrust</div>
     </div>
   </div>
 
@@ -2863,6 +3297,22 @@
     <div style="text-align:center;color:#ff00ff;font-size:3em;font-weight:bold;text-shadow:0 0 30px #ff00ff">CLEAR OF
       BAY</div>
     <div style="color:#ffff00;font-size:1.3em;margin-top:20px;text-shadow:0 0 10px #ffff00">ENGAGING ENEMY FORCES...
+    </div>
+  </div>
+
+  <div id="launch-bay-briefing" aria-live="polite" aria-label="Launch Bay Briefing">
+    <div class="sfb-grid">
+      <div class="sfb-title">LAUNCH BAY BRIEFING</div>
+      <div class="sfb-line"><span class="label">CALLSIGN</span><span id="sfb-callsign">PILOT</span></div>
+      <div class="sfb-line"><span class="label">WAVE</span><span id="sfb-wave">1</span></div>
+      <div class="sfb-line"><span class="label">THREAT</span><span id="sfb-threat">--</span></div>
+      <div class="sfb-line"><span class="label">STATUS</span>READY IN BAY</div>
+      <div class="sfb-objective" id="sfb-objective">Launch and clear all hostiles in sector.</div>
+      <div class="sfb-actions">
+        <button id="sfb-launch-now" class="sfb-btn launch">LAUNCH NOW</button>
+        <button id="sfb-mute-brief" class="sfb-btn">MINIMIZE</button>
+      </div>
+      <div class="sfb-auto" id="sfb-auto">AUTO-LAUNCH STANDBY</div>
     </div>
   </div>
 

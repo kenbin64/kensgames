@@ -312,7 +312,7 @@ function showRegisterScreen() {
         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
                     background: rgba(0,0,0,0.98); padding: 40px; border: 2px solid #00ffcc;
                     border-radius: 15px; z-index: 1100; font-family: Orbitron;
-                    max-height: 90vh; overflow-y: auto; min-width: 350px;">
+                    max-height: 90vh; overflow: hidden; min-width: 350px;">
             <h2 style="color: #00ffcc; margin-bottom: 20px; text-align: center;">CREATE ACCOUNT</h2>
 
             <div style="display: flex; flex-direction: column; gap: 12px;">

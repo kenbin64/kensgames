@@ -18,6 +18,10 @@ const SFInput = (function () {
     let gyroZeroGamma = 0;
     let gyroPitch = 0;
     let gyroYaw = 0;
+    let gyroPitchSmoothed = 0;
+    let gyroYawSmoothed = 0;
+    let gyroNeedsZero = false;
+    let gyroAutoPrompted = false;
 
     // Nav sphere state (center thumb control)
     let navActive = false;
@@ -27,6 +31,24 @@ const SFInput = (function () {
     let navThrust = false;               // center push = thrust
     const NAV_MAX_R = 55;               // max pixel radius for full deflection
     const NAV_DEAD = 8;                 // pixel dead zone (center = thrust zone)
+
+    // Global touch drag/tap controls (outside nav sphere/buttons)
+    let dragSteerActive = false;
+    let dragSteerTouchId = null;
+    let dragSteerLastX = 0;
+    let dragSteerLastY = 0;
+    let dragSteerStartX = 0;
+    let dragSteerStartY = 0;
+    let dragSteerMovedPx = 0;
+    let dragSteerStartMs = 0;
+    let dragSteerAccumX = 0;
+    let dragSteerAccumY = 0;
+    let singleTapTimer = null;
+    let TAP_MOVE_MAX_PX = 16;
+    let TAP_TIME_MAX_MS = 260;
+    let DOUBLE_TAP_WINDOW_MS = 320;
+    let DRAG_STEER_GAIN = 0.0048;
+    const GYRO_SMOOTH_ALPHA = 0.24;
 
     let modeBadgeEl = null;
     let mobilePhase = 'loading';
@@ -89,7 +111,7 @@ const SFInput = (function () {
             if (window.SFAudio) SFAudio.resume();
 
             // Ignore UI buttons — don't let them trigger pointer lock or fire weapons
-            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-skip-btn, #training-control-overlay') ||
+            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-skip-btn, #training-control-overlay') ||
                 (e.target.classList && (e.target.classList.contains('action-btn') || e.target.classList.contains('mob-btn') || e.target.classList.contains('console-btn') || e.target.classList.contains('avtn-btn') || e.target.classList.contains('avtn-select')))) return;
 
             if (document.pointerLockElement !== document.body) {
@@ -171,6 +193,13 @@ const SFInput = (function () {
     //  MOBILE CONTROLS — nav sphere (pitch/yaw/thrust), tap-to-fire
     // ══════════════════════════════════════════════════════════════════
     function _initMobileControls() {
+        // Slightly adapt touch thresholds for high-DPI phones.
+        const dpr = Math.max(1, Math.min(1.8, (window.devicePixelRatio || 1)));
+        TAP_MOVE_MAX_PX = Math.round(14 * dpr);
+        TAP_TIME_MAX_MS = 260;
+        DOUBLE_TAP_WINDOW_MS = 320;
+        DRAG_STEER_GAIN = 0.0046;
+
         // Show mobile HUD
         const mobileHud = document.getElementById('mobile-hud');
         if (mobileHud) mobileHud.style.display = 'block';
@@ -196,20 +225,11 @@ const SFInput = (function () {
             }, { passive: false });
         }
 
-        // ── Tap empty space = lasers ──
-        document.addEventListener('touchstart', (e) => {
-            if (window.SFAudio) SFAudio.resume();
-            // If launch prompt is showing, trigger launch
-            const lp = document.getElementById('launch-prompt');
-            if (lp && lp.style.display !== 'none' && lp.offsetParent !== null) {
-                launchTriggered = true;
-                return;
-            }
-            // Ignore touches on nav sphere, crosshair, buttons, panels
-            if (e.target.closest('#mob-nav-sphere, #crosshair, #console-buttons, #mobile-hud .mob-btn, #mob-btn-group, #mission-panel, #tutorial-panel, #loading-screen')) return;
-            // Tap anywhere else = fire selected weapon
-            if (window.Starfighter) window.Starfighter.firePrimary();
-        }, { passive: true });
+        // ── Global touch parsing: drag steer + tap fire + double-tap torpedo ──
+        document.addEventListener('touchstart', _combatTouchStart, { passive: false });
+        document.addEventListener('touchmove', _combatTouchMove, { passive: false });
+        document.addEventListener('touchend', _combatTouchEnd, { passive: false });
+        document.addEventListener('touchcancel', _combatTouchEnd, { passive: false });
 
         _ensureMobileModeBadge();
         _setMobileModeBadge(false);
@@ -257,11 +277,6 @@ const SFInput = (function () {
         const btn = document.getElementById('mob-tilt');
         if (!btn) return;
         const imuSupported = (typeof window !== 'undefined') && (typeof DeviceOrientationEvent !== 'undefined');
-        const setBtn = (on) => {
-            btn.classList.toggle('active', !!on);
-            btn.textContent = on ? 'TILT ON' : 'TILT';
-            _setMobileModeBadge(!!on);
-        };
         if (!imuSupported) {
             btn.classList.remove('active');
             btn.textContent = 'TOUCH';
@@ -271,21 +286,38 @@ const SFInput = (function () {
             _setMobileModeBadge(false);
             return;
         }
-        setBtn(false);
+        _syncGyroButtonVisual();
         btn.addEventListener('touchstart', async (e) => {
             e.preventDefault();
-            const enabled = await _toggleGyro();
-            setBtn(enabled);
+            await _toggleGyro();
+            _syncGyroButtonVisual();
         }, { passive: false });
+    }
+
+    function _syncGyroButtonVisual() {
+        const btn = document.getElementById('mob-tilt');
+        if (!btn) return;
+        btn.classList.toggle('active', !!gyroEnabled);
+        btn.textContent = gyroEnabled ? 'TILT ON' : 'TILT';
+        _setMobileModeBadge(!!gyroEnabled);
     }
 
     function _onDeviceOrientation(ev) {
         if (!gyroEnabled) return;
         if (typeof ev.beta !== 'number' || typeof ev.gamma !== 'number') return;
+        if (gyroNeedsZero) {
+            gyroZeroBeta = ev.beta;
+            gyroZeroGamma = ev.gamma;
+            gyroNeedsZero = false;
+        }
         const relPitch = (ev.beta - gyroZeroBeta);
         const relYaw = (ev.gamma - gyroZeroGamma);
-        gyroPitch = Math.max(-1, Math.min(1, relPitch / 28));
-        gyroYaw = Math.max(-1, Math.min(1, relYaw / 26));
+        const pitchNorm = Math.max(-1, Math.min(1, relPitch / 24));
+        const yawNorm = Math.max(-1, Math.min(1, relYaw / 22));
+        gyroPitchSmoothed += (pitchNorm - gyroPitchSmoothed) * GYRO_SMOOTH_ALPHA;
+        gyroYawSmoothed += (yawNorm - gyroYawSmoothed) * GYRO_SMOOTH_ALPHA;
+        gyroPitch = gyroPitchSmoothed;
+        gyroYaw = gyroYawSmoothed;
     }
 
     function _ensureMobileModeBadge() {
@@ -336,10 +368,11 @@ const SFInput = (function () {
                 window.addEventListener('deviceorientation', _onDeviceOrientation, true);
                 gyroSupported = true;
                 gyroEnabled = true;
-                gyroZeroBeta = 0;
-                gyroZeroGamma = 0;
+                gyroNeedsZero = true;
                 gyroPitch = 0;
                 gyroYaw = 0;
+                gyroPitchSmoothed = 0;
+                gyroYawSmoothed = 0;
                 _setMobileModeBadge(true);
                 return true;
             }
@@ -347,6 +380,9 @@ const SFInput = (function () {
             window.removeEventListener('deviceorientation', _onDeviceOrientation, true);
             gyroPitch = 0;
             gyroYaw = 0;
+            gyroPitchSmoothed = 0;
+            gyroYawSmoothed = 0;
+            gyroNeedsZero = false;
             _setMobileModeBadge(false);
             return false;
         } catch (err) {
@@ -355,6 +391,100 @@ const SFInput = (function () {
             gyroEnabled = false;
             _setMobileModeBadge(false);
             return false;
+        }
+    }
+
+    function _isGameplayTouchTarget(target) {
+        if (!target || !target.closest) return true;
+        return !target.closest(
+            '#mob-nav-sphere, #crosshair, #console-buttons, #mobile-hud .mob-btn, #mob-btn-group, #mission-panel, #tutorial-panel, #loading-screen, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #launch-prompt, #tutorial-overlay, #tutorial-prompt-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-control-overlay, #training-skip-btn'
+        );
+    }
+
+    function _combatTouchStart(e) {
+        if (!isMobile) return;
+        if (window.SFAudio) SFAudio.resume();
+
+        const lp = document.getElementById('launch-prompt');
+        if (lp && lp.style.display !== 'none' && lp.offsetParent !== null) {
+            launchTriggered = true;
+            return;
+        }
+
+        if (mobilePhase !== 'combat') return;
+        if (!_isGameplayTouchTarget(e.target)) return;
+        if (dragSteerActive || !e.changedTouches || !e.changedTouches.length) return;
+
+        if (!gyroAutoPrompted && !gyroEnabled) {
+            gyroAutoPrompted = true;
+            _toggleGyro().then(() => _syncGyroButtonVisual()).catch(() => _syncGyroButtonVisual());
+        }
+
+        const t = e.changedTouches[0];
+        dragSteerActive = true;
+        dragSteerTouchId = t.identifier;
+        dragSteerLastX = t.clientX;
+        dragSteerLastY = t.clientY;
+        dragSteerStartX = t.clientX;
+        dragSteerStartY = t.clientY;
+        dragSteerMovedPx = 0;
+        dragSteerStartMs = performance.now();
+        lastInputDevice = 'touch';
+        e.preventDefault();
+    }
+
+    function _combatTouchMove(e) {
+        if (!isMobile || !dragSteerActive) return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier !== dragSteerTouchId) continue;
+
+            const dx = t.clientX - dragSteerLastX;
+            const dy = t.clientY - dragSteerLastY;
+            dragSteerLastX = t.clientX;
+            dragSteerLastY = t.clientY;
+
+            dragSteerAccumX += dx;
+            dragSteerAccumY += dy;
+
+            const totalDx = t.clientX - dragSteerStartX;
+            const totalDy = t.clientY - dragSteerStartY;
+            dragSteerMovedPx = Math.max(dragSteerMovedPx, Math.hypot(totalDx, totalDy));
+            lastInputDevice = 'touch';
+            e.preventDefault();
+            break;
+        }
+    }
+
+    function _combatTouchEnd(e) {
+        if (!isMobile || !dragSteerActive) return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier !== dragSteerTouchId) continue;
+
+            const touchMs = performance.now() - dragSteerStartMs;
+            const isTap = dragSteerMovedPx <= TAP_MOVE_MAX_PX && touchMs <= TAP_TIME_MAX_MS;
+
+            dragSteerActive = false;
+            dragSteerTouchId = null;
+            dragSteerMovedPx = 0;
+            dragSteerStartMs = 0;
+
+            if (isTap) {
+                if (singleTapTimer) {
+                    clearTimeout(singleTapTimer);
+                    singleTapTimer = null;
+                    if (window.Starfighter) window.Starfighter.fireTorpedo();
+                } else {
+                    singleTapTimer = setTimeout(() => {
+                        singleTapTimer = null;
+                        if (window.Starfighter) window.Starfighter.firePrimary();
+                    }, DOUBLE_TAP_WINDOW_MS);
+                }
+            }
+
+            e.preventDefault();
+            break;
         }
     }
 
@@ -449,9 +579,18 @@ const SFInput = (function () {
             if (Math.abs(navDy) > 0.05) player.pitch -= navDy * dt * 2.5;
             lastInputDevice = 'touch';
         }
-        if (isMobile && gyroEnabled && !navActive) {
-            if (Math.abs(gyroYaw) > 0.03) player.yaw -= gyroYaw * dt * 2.4;
-            if (Math.abs(gyroPitch) > 0.03) player.pitch -= gyroPitch * dt * 2.4;
+        if (isMobile && (dragSteerAccumX !== 0 || dragSteerAccumY !== 0)) {
+            const dragX = Math.max(-42, Math.min(42, dragSteerAccumX));
+            const dragY = Math.max(-42, Math.min(42, dragSteerAccumY));
+            player.yaw = Math.max(-3.0, Math.min(3.0, (player.yaw || 0) - dragX * DRAG_STEER_GAIN));
+            player.pitch = Math.max(-3.0, Math.min(3.0, (player.pitch || 0) - dragY * DRAG_STEER_GAIN));
+            dragSteerAccumX = 0;
+            dragSteerAccumY = 0;
+            lastInputDevice = 'touch';
+        }
+        if (isMobile && gyroEnabled && !navActive && !dragSteerActive) {
+            if (Math.abs(gyroYaw) > 0.03) player.yaw -= gyroYaw * dt * 2.7;
+            if (Math.abs(gyroPitch) > 0.03) player.pitch -= gyroPitch * dt * 2.7;
             lastInputDevice = 'touch';
         }
         if (isMobile) {

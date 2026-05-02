@@ -866,7 +866,7 @@ select:focus {
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
-    overflow-y: auto;
+    overflow: hidden;
     /* 3D entrance + standing extrusion */
     box-shadow:
         3px 4px 0 rgba(0, 160, 255, 0.22),

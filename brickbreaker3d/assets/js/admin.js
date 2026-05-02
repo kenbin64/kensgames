@@ -24,7 +24,7 @@ class AdminPanel {
         const users = authSystem.users;
         const banned = authSystem.bannedUsers;
 
-        let userListHTML = '<div style="max-height: 400px; overflow-y: auto;">';
+        let userListHTML = '<div style="max-height: 400px; overflow: hidden;">';
 
         Object.values(users).forEach(user => {
             const isBanned = authSystem.isBanned(user.id);
@@ -68,7 +68,7 @@ class AdminPanel {
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
                         background: rgba(0,0,0,0.98); padding: 40px; border: 3px solid #8a2be2;
                         border-radius: 15px; z-index: 2000; font-family: Orbitron;
-                        max-width: 700px; max-height: 90vh; overflow-y: auto;">
+                        max-width: 700px; max-height: 90vh; overflow: hidden;">
                 <h1 style="color: #8a2be2; margin-bottom: 20px; text-align: center;">
                     🛡️ ADMIN MODERATION PANEL
                 </h1>
