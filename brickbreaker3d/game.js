@@ -259,6 +259,18 @@ function initMobileControls() {
     tiltBtn.id = 'bb-tilt-btn';
     tiltBtn.textContent = 'TILT';
     tiltBtn.style.cssText = 'height:44px;padding:0 14px;border:1px solid rgba(0,255,204,.55);background:rgba(4,20,34,.82);color:#00ffcc;border-radius:10px;font:700 12px Rajdhani,sans-serif;';
+    const imuSupported = (typeof window !== 'undefined') && (typeof DeviceOrientationEvent !== 'undefined');
+
+    const modeLabel = document.createElement('div');
+    modeLabel.id = 'bb-input-mode';
+    modeLabel.style.cssText = 'position:fixed;left:10px;bottom:62px;z-index:121;padding:6px 10px;border-radius:8px;border:1px solid rgba(0,255,204,.45);background:rgba(4,20,34,.78);color:#9ffff0;font:700 11px Rajdhani,sans-serif;letter-spacing:.06em;';
+    const setModeLabel = (isImu) => {
+        modeLabel.textContent = isImu ? 'IMU ACTIVE' : 'TOUCH MODE';
+        modeLabel.style.color = isImu ? '#b8ffe8' : '#9ffff0';
+        modeLabel.style.borderColor = isImu ? 'rgba(100,255,220,.75)' : 'rgba(0,255,204,.45)';
+    };
+    setModeLabel(false);
+    document.body.appendChild(modeLabel);
     const pad = document.createElement('div');
     pad.id = 'bb-touch-pad';
     pad.style.cssText = 'position:relative;flex:1;height:44px;border:1px solid rgba(0,255,204,.35);background:rgba(4,20,34,.66);border-radius:10px;overflow:hidden;';
@@ -304,7 +316,16 @@ function initMobileControls() {
         MOBILE_INPUT.tiltNormX = Math.max(-1, Math.min(1, ev.gamma / 30));
     };
 
+    if (!imuSupported) {
+        tiltBtn.textContent = 'TOUCH';
+        tiltBtn.disabled = true;
+        tiltBtn.style.opacity = '0.65';
+        tiltBtn.title = 'IMU not available. Using touch pad control.';
+        setModeLabel(false);
+    }
+
     tiltBtn.addEventListener('click', async () => {
+        if (!imuSupported) return;
         if (!MOBILE_INPUT.tiltEnabled) {
             try {
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -314,8 +335,10 @@ function initMobileControls() {
                 window.addEventListener('deviceorientation', onTilt, true);
                 MOBILE_INPUT.tiltEnabled = true;
                 tiltBtn.textContent = 'TILT ON';
+                setModeLabel(true);
             } catch (_) {
                 MOBILE_INPUT.tiltEnabled = false;
+                setModeLabel(false);
             }
             return;
         }
@@ -323,6 +346,7 @@ function initMobileControls() {
         MOBILE_INPUT.tiltNormX = 0;
         window.removeEventListener('deviceorientation', onTilt, true);
         tiltBtn.textContent = 'TILT';
+        setModeLabel(false);
     });
 }
 

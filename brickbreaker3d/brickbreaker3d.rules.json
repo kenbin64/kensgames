@@ -1,0 +1,175 @@
+{
+  "$schema": "manifold-rules/1.0",
+  "_meta": {
+    "id": "brickbreaker3d",
+    "name": "BrickBreaker 3D",
+    "version": "1.0.0",
+    "compiled": "2026-05-02",
+    "axiom": "z = x * y",
+    "notes": [
+      "Single source of truth for game-manager rule enforcement.",
+      "Split-screen same-device multiplayer is NOT supported; multiplayer requires remote players via invite code.",
+      "Bot (AI) support is solo-only: exactly one human paddle vs one AI paddle.",
+      "Remote multiplayer via invite code: 2–4 players, each on their own device."
+    ]
+  },
+  "axes": {
+    "x": {
+      "name": "rule_category",
+      "values": [
+        "mode",
+        "players",
+        "ball",
+        "lives",
+        "scoring",
+        "speed",
+        "win",
+        "session"
+      ]
+    },
+    "y": {
+      "name": "index_within_category"
+    },
+    "z": "x * y"
+  },
+  "modes": {
+    "solo": {
+      "id": "solo",
+      "label": "Solo",
+      "description": "One human player. Survive as many levels as possible.",
+      "min_players": 1,
+      "max_players": 1,
+      "human_players": 1,
+      "ai_players": 0,
+      "remote_players": false,
+      "invite_code_required": false,
+      "split_screen": false,
+      "gameMode_value": "easy",
+      "difficulty_options": [
+        "easy",
+        "hard"
+      ],
+      "lives": 5,
+      "lives_source": "params.lives_solo",
+      "balls_in_play": 1,
+      "win_condition": "clear_all_bricks",
+      "loss_condition": "lives_reach_zero",
+      "scoring": {
+        "brick_break_base": 10,
+        "level_clear_bonus": 500,
+        "life_remaining_bonus_per_life": 100
+      }
+    },
+    "solo_vs_bot": {
+      "id": "solo_vs_bot",
+      "label": "Solo vs Bot",
+      "description": "One human paddle vs one AI paddle. The AI competes for score on the same brick grid.",
+      "min_players": 1,
+      "max_players": 1,
+      "human_players": 1,
+      "ai_players": 1,
+      "remote_players": false,
+      "invite_code_required": false,
+      "split_screen": false,
+      "gameMode_value": "multi2",
+      "_note": "Uses the multi2 engine path; player 0 is human, player 1 is AI-controlled.",
+      "ai_difficulty_options": [
+        "normal",
+        "hard"
+      ],
+      "ai_difficulty_default": "normal",
+      "lives": 4,
+      "lives_formula": "max(2, 6 - num_paddles)",
+      "balls_in_play": 2,
+      "win_condition": "opponent_loses_all_lives_first",
+      "loss_condition": "human_loses_all_lives_first",
+      "scoring": {
+        "brick_break_base": 10,
+        "opponent_life_lost_bonus": 200
+      }
+    },
+    "multiplayer_invite": {
+      "id": "multiplayer_invite",
+      "label": "Multiplayer (Invite Code)",
+      "description": "2–4 players on separate devices. Host generates a code; others join with it.",
+      "min_players": 2,
+      "max_players": 4,
+      "human_players_range": [
+        2,
+        4
+      ],
+      "ai_players": 0,
+      "remote_players": true,
+      "invite_code_required": true,
+      "split_screen": false,
+      "_note": "Same-device split-screen is NOT supported. Each player must be on their own device.",
+      "gameMode_values": {
+        "2": "multi2",
+        "3": "multi3",
+        "4": "multi4"
+      },
+      "lives_formula": "max(2, 6 - num_players)",
+      "lives_by_count": {
+        "2": 4,
+        "3": 3,
+        "4": 2
+      },
+      "balls_in_play_formula": "num_players * 1",
+      "win_condition": "last_player_with_lives_remaining",
+      "loss_condition": "player_loses_all_lives",
+      "scoring": {
+        "brick_break_base": 10,
+        "rival_life_lost_bonus": 200,
+        "survival_round_bonus": 150
+      },
+      "session": {
+        "code_length": 6,
+        "code_charset": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+        "lobby_timeout_seconds": 300,
+        "reconnect_grace_seconds": 15
+      }
+    }
+  },
+  "speed": {
+    "easy": {
+      "base_phi_multiplier": 0.25,
+      "label": "Easy"
+    },
+    "hard": {
+      "base_phi_multiplier": 0.40,
+      "label": "Hard"
+    },
+    "multi": {
+      "base_phi_multiplier": 0.30,
+      "label": "Multiplayer"
+    },
+    "min_phi_multiplier": 0.22,
+    "max_phi_multiplier": 0.85,
+    "phi": 1.618,
+    "speed_formula": "base_phi_multiplier * phi"
+  },
+  "arena": {
+    "height": 50,
+    "ball_radius": 1,
+    "paddle_radius": 4.5,
+    "paddle_thickness": 0.85,
+    "brick_layers": 4,
+    "bricks_per_layer_formula": "arena-dependent, derived from PhysicsLens"
+  },
+  "enforcement": {
+    "same_device_multiplayer": "DISALLOWED — no split-screen, no shared keyboard/touch per player",
+    "max_remote_players": 4,
+    "ai_in_multiplayer_invite": "DISALLOWED — bots are solo_vs_bot mode only",
+    "mode_ids_accepted_by_lobby": [
+      "solo",
+      "solo_vs_bot",
+      "multiplayer_invite"
+    ],
+    "gamemanager_mode_map": {
+      "solo": "solo",
+      "multi": "solo_vs_bot",
+      "private": "multiplayer_invite"
+    },
+    "_note": "lobby.html maps: mode=solo→solo, mode=multi→solo_vs_bot, mode=private→multiplayer_invite"
+  }
+}
