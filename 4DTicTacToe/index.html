@@ -259,6 +259,7 @@
     (function enforceLandscape4D() {
       const guard = document.getElementById('orientation-guard-4d');
       const btn = document.getElementById('orientation-guard-4d-btn');
+      const setupOverlay = document.getElementById('mp-panel-overlay');
       const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
 
       async function tryLockLandscape() {
@@ -277,6 +278,13 @@
           guard.style.display = 'none';
           return;
         }
+
+        const setupOpen = !!(setupOverlay && setupOverlay.style.display !== 'none');
+        if (setupOpen) {
+          guard.style.display = 'none';
+          return;
+        }
+
         const portrait = window.innerHeight > window.innerWidth;
         guard.style.display = portrait ? 'flex' : 'none';
       }

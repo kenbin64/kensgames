@@ -2879,6 +2879,7 @@
       const guard = document.getElementById('orientation-guard-sf');
       const btn = document.getElementById('orientation-guard-sf-btn');
       const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+      let pausedByOrientationGuard = false;
 
       async function tryLockLandscape() {
         try {
@@ -2896,9 +2897,29 @@
           guard.style.display = 'none';
           return;
         }
+
+        const phase = (window.Starfighter && Starfighter.getPhase) ? String(Starfighter.getPhase() || '') : '';
+        const playPhase = phase === 'launching' || phase === 'combat' || phase === 'respawning';
+        if (!playPhase) {
+          guard.style.display = 'none';
+          if (pausedByOrientationGuard && window.Starfighter && Starfighter.setPaused) {
+            Starfighter.setPaused(false);
+            pausedByOrientationGuard = false;
+          }
+          return;
+        }
+
         const portrait = window.innerHeight > window.innerWidth;
         guard.style.display = portrait ? 'flex' : 'none';
-        if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(portrait);
+        if (window.Starfighter && Starfighter.setPaused) {
+          if (portrait) {
+            Starfighter.setPaused(true);
+            pausedByOrientationGuard = true;
+          } else if (pausedByOrientationGuard) {
+            Starfighter.setPaused(false);
+            pausedByOrientationGuard = false;
+          }
+        }
       }
 
       btn.addEventListener('click', async () => {
@@ -2909,6 +2930,7 @@
       window.addEventListener('orientationchange', updateGuard);
       window.addEventListener('resize', updateGuard);
       document.addEventListener('fullscreenchange', updateGuard);
+      setInterval(updateGuard, 300);
       updateGuard();
     })();
   </script>
