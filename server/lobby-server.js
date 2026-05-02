@@ -26,10 +26,91 @@ const Field = require('../js/manifold-field.js');
 const Proj = require('./manifold-projection.js');
 
 const PlayerManager = require('./player-manager.js');
+const UserRegistry = require('./user-registry.js');
 
 const PORT = parseInt(process.env.LOBBY_PORT || '8765', 10);
 const SEED_LOG = process.env.SEED_LOG || path.join(__dirname, '..', 'state', 'seeds.jsonl');
 const REPO_ROOT = path.join(__dirname, '..');
+const STATE_DIR = path.join(REPO_ROOT, 'state');
+const GM_LOG_FILE = process.env.GM_LOG || path.join(STATE_DIR, 'game-manager.log');
+const GM_LOG_MAX_BYTES = 4 * 1024 * 1024;     // rotate >4MB
+const GM_INGEST_MAX_BYTES = 16 * 1024;        // single POST cap
+
+function appendGmLog(entry) {
+  const line = JSON.stringify(entry) + '\n';
+  try {
+    if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
+    if (fs.existsSync(GM_LOG_FILE) && fs.statSync(GM_LOG_FILE).size > GM_LOG_MAX_BYTES) {
+      try { fs.renameSync(GM_LOG_FILE, GM_LOG_FILE + '.1'); } catch (_) { }
+    }
+    fs.appendFileSync(GM_LOG_FILE, line, 'utf8');
+  } catch (_) { /* best-effort; never crash the server */ }
+}
+
+function readGmLogTail(limit) {
+  try {
+    if (!fs.existsSync(GM_LOG_FILE)) return [];
+    const raw = fs.readFileSync(GM_LOG_FILE, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    const n = Math.max(1, Math.min(1000, parseInt(limit, 10) || 100));
+    return lines.slice(-n).map((ln) => { try { return JSON.parse(ln); } catch (_) { return { raw: ln }; } });
+  } catch (_) { return []; }
+}
+
+// JSON body reader bounded by `maxBytes`. Resolves to a parsed object or rejects.
+function readJsonBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    let buf = '';
+    let aborted = false;
+    req.on('data', (chunk) => {
+      buf += chunk;
+      if (buf.length > maxBytes) {
+        aborted = true;
+        reject(new Error('payload_too_large'));
+        try { req.destroy(); } catch (_) { }
+      }
+    });
+    req.on('end', () => {
+      if (aborted) return;
+      try { resolve(JSON.parse(buf || '{}')); }
+      catch (_) { reject(new Error('invalid_json')); }
+    });
+    req.on('error', () => { if (!aborted) reject(new Error('read_error')); });
+  });
+}
+
+// Tiny in-memory rate limiter (n requests per windowMs per key).
+const _rateBuckets = new Map();
+function rateLimit(key, n, windowMs) {
+  const now = Date.now();
+  const bucket = _rateBuckets.get(key) || [];
+  const fresh = bucket.filter((t) => now - t < windowMs);
+  if (fresh.length >= n) { _rateBuckets.set(key, fresh); return false; }
+  fresh.push(now);
+  _rateBuckets.set(key, fresh);
+  return true;
+}
+
+// Optional SMTP recovery sender. Refuses if SMTP_HOST not set (caller returns 503).
+function sendRecoveryEmail(to, secret) {
+  if (!process.env.SMTP_HOST) return Promise.reject(new Error('recovery_disabled'));
+  // Lazy require so plain server runs without nodemailer installed.
+  let nodemailer;
+  try { nodemailer = require('nodemailer'); }
+  catch (_) { return Promise.reject(new Error('recovery_disabled')); }
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+  });
+  return transporter.sendMail({
+    from: process.env.SMTP_FROM || 'no-reply@kensgames.com',
+    to,
+    subject: 'Your KensGames secret username',
+    text: `Your secret username is:\n\n  ${secret}\n\nKeep it private — anyone with it can sign in as you.`,
+  });
+}
 
 // ── Boot: open seed log, bloom games from manifests ─────────────────────────
 const log = Proj.load(SEED_LOG);
@@ -617,7 +698,7 @@ const httpServer = http.createServer((req, res) => {
   const origin = req.headers.origin || '*';
   const corsHeaders = {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-KG-Guest-Id',
     'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin',
@@ -629,9 +710,21 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Identity-First: derive the requester's stable user_id from the same
-  // kg_guest_id token the WS client uses, so REST and WS share one identity.
+  // Identity-First: derive the requester's stable user_id from either an
+  // X-KG-Secret (registered user) or X-KG-Guest-Id (anonymous guest).
+  const secretFromRequest = (request) => {
+    const hdr = request.headers['x-kg-secret'];
+    if (typeof hdr === 'string' && hdr) return hdr;
+    const auth = request.headers['authorization'];
+    if (typeof auth === 'string' && /^Bearer\s+/i.test(auth)) return auth.replace(/^Bearer\s+/i, '').trim();
+    return null;
+  };
   const playerIdFromRequest = (request) => {
+    const secret = secretFromRequest(request);
+    if (secret) {
+      const uid = UserRegistry.userIdFromSecret(secret);
+      if (uid) return uid;
+    }
     const hdr = request.headers['x-kg-guest-id'];
     if (!hdr || typeof hdr !== 'string') return null;
     return stableGuestId(hdr);
@@ -715,6 +808,93 @@ const httpServer = http.createServer((req, res) => {
     }));
     return;
   }
+  // ── User registry (passwordless, secret-as-bearer) ────────────────────────
+  const sendJson = (status, obj) => {
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  if (reqUrl.pathname === '/api/users' && req.method === 'POST') {
+    readJsonBody(req, 32 * 1024).then((body) => {
+      const out = UserRegistry.createUser(body || {});
+      if (!out.ok) return sendJson(400, { error: out.error, detail: out.detail || null });
+      // The secret is shown ONCE; client must persist it.
+      sendJson(201, { secret_username: out.secret_username, user_id: out.user_id, profile: out.profile });
+    }).catch((e) => sendJson(e.message === 'payload_too_large' ? 413 : 400, { error: e.message }));
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/me' && req.method === 'GET') {
+    const secret = secretFromRequest(req);
+    if (!secret) return sendJson(401, { error: 'missing_secret' });
+    const out = UserRegistry.lookupBySecret(secret);
+    if (!out.ok) return sendJson(out.error === 'not_found' || out.error === 'verify_failed' ? 401 : 400, { error: out.error });
+    sendJson(200, { user_id: out.user_id, profile: out.profile });
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/me' && req.method === 'PATCH') {
+    const secret = secretFromRequest(req);
+    if (!secret) return sendJson(401, { error: 'missing_secret' });
+    readJsonBody(req, 8 * 1024).then((body) => {
+      const out = UserRegistry.updateProfile(secret, body || {});
+      if (!out.ok) return sendJson(out.error === 'verify_failed' || out.error === 'not_found' ? 401 : 400, { error: out.error });
+      sendJson(200, { user_id: out.user_id, profile: out.profile });
+    }).catch((e) => sendJson(e.message === 'payload_too_large' ? 413 : 400, { error: e.message }));
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/me/avatar' && req.method === 'POST') {
+    const secret = secretFromRequest(req);
+    if (!secret) return sendJson(401, { error: 'missing_secret' });
+    readJsonBody(req, 24 * 1024).then((body) => {
+      // Accept either a full avatar object or a flat {mime, b64}.
+      const av = (body && body.type) ? body : { type: 'upload', mime: body && body.mime, b64: body && body.b64 };
+      const out = UserRegistry.setAvatar(secret, av);
+      if (!out.ok) return sendJson(out.error === 'verify_failed' || out.error === 'not_found' ? 401 : 400, { error: out.error, detail: out.detail || null });
+      sendJson(200, { user_id: out.user_id, profile: out.profile });
+    }).catch((e) => sendJson(e.message === 'payload_too_large' ? 413 : 400, { error: e.message }));
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/me/avatar' && req.method === 'GET') {
+    const secret = secretFromRequest(req);
+    if (!secret) return sendJson(401, { error: 'missing_secret' });
+    const out = UserRegistry.getAvatarData(secret);
+    if (!out.ok) return sendJson(out.error === 'verify_failed' ? 401 : 404, { error: out.error });
+    sendJson(200, { mime: out.mime, w: out.w, h: out.h, b64: out.b64 });
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/recover' && req.method === 'POST') {
+    const ip = (req.socket && req.socket.remoteAddress) || 'unknown';
+    if (!rateLimit('recover:' + ip, 5, 60 * 1000)) return sendJson(429, { error: 'rate_limited' });
+    readJsonBody(req, 4 * 1024).then((body) => {
+      const email = body && body.email;
+      if (!process.env.SMTP_HOST) return sendJson(503, { error: 'recovery_disabled' });
+      // Always 204 to prevent email enumeration; do the work asynchronously.
+      res.writeHead(204, corsHeaders); res.end();
+      const found = UserRegistry.findByEmail(email);
+      if (!found) return;
+      // We don't have the secret on disk; can't send it. Recovery requires a
+      // separate flow (rotate-secret) that we'll add later. For now, log only.
+      appendGmLog({
+        ts: new Date().toISOString(), level: 'warn', code: 'recovery_requested',
+        userId: found.user_id, message: 'Recovery requested but rotate-secret flow not yet implemented.',
+      });
+    }).catch((e) => sendJson(e.message === 'payload_too_large' ? 413 : 400, { error: e.message }));
+    return;
+  }
+  if (reqUrl.pathname === '/api/users/me/export' && req.method === 'GET') {
+    const secret = secretFromRequest(req);
+    if (!secret) return sendJson(401, { error: 'missing_secret' });
+    const lookup = UserRegistry.lookupBySecret(secret);
+    if (!lookup.ok) return sendJson(401, { error: lookup.error });
+    const bundle = { user_id: lookup.user_id, profile: lookup.profile, secret_username: secret };
+    const av = UserRegistry.getAvatarData(secret);
+    if (av.ok) bundle.avatar_b64 = av.b64;
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="kensgames-identity-${lookup.user_id}.json"`,
+      ...corsHeaders,
+    });
+    res.end(JSON.stringify(bundle, null, 2));
+    return;
+  }
   if (reqUrl.pathname === '/api/pm/status') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
     res.end(JSON.stringify({
@@ -735,6 +915,65 @@ const httpServer = http.createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, game_id: gameId }));
     return;
   }
+  // GameManager health log: clients POST issues here; AI / admin GETs the tail.
+  if (reqUrl.pathname === '/api/gm/log' && req.method === 'POST') {
+    let buf = '';
+    let aborted = false;
+    req.on('data', (chunk) => {
+      buf += chunk;
+      if (buf.length > GM_INGEST_MAX_BYTES) {
+        aborted = true;
+        res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+        res.end(JSON.stringify({ error: 'payload too large' }));
+        try { req.destroy(); } catch (_) { }
+      }
+    });
+    req.on('end', () => {
+      if (aborted) return;
+      let entry = null;
+      try { entry = JSON.parse(buf || '{}'); } catch (_) { entry = null; }
+      if (!entry || typeof entry !== 'object') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+        res.end(JSON.stringify({ error: 'invalid json' }));
+        return;
+      }
+      const rec = {
+        ts: entry.ts || new Date().toISOString(),
+        level: String(entry.level || 'info').slice(0, 16),
+        code: entry.code ? String(entry.code).slice(0, 64) : null,
+        gameId: entry.gameId ? String(entry.gameId).toLowerCase().slice(0, 32) : null,
+        sessionId: entry.sessionId ? String(entry.sessionId).slice(0, 64) : null,
+        userId: entry.userId ? String(entry.userId).slice(0, 64) : null,
+        message: entry.message ? String(entry.message).slice(0, 1000) : '',
+        details: (entry.details && typeof entry.details === 'object') ? entry.details : null,
+        page: entry.page ? String(entry.page).slice(0, 256) : null,
+        ua: entry.ua ? String(entry.ua).slice(0, 256) : null,
+        client_id: meId || null,
+        remote_ip: req.socket && req.socket.remoteAddress || null,
+      };
+      appendGmLog(rec);
+      res.writeHead(204, corsHeaders);
+      res.end();
+    });
+    req.on('error', () => {
+      if (!aborted) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+        res.end(JSON.stringify({ error: 'read error' }));
+      }
+    });
+    return;
+  }
+  if (reqUrl.pathname === '/api/gm/log' && req.method === 'GET') {
+    const limit = reqUrl.searchParams.get('limit');
+    const tail = readGmLogTail(limit);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
+    res.end(JSON.stringify({
+      log_file: GM_LOG_FILE,
+      count: tail.length,
+      entries: tail,
+    }));
+    return;
+  }
   if (req.url === '/manifold/frontier') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
     res.end(JSON.stringify({
@@ -745,7 +984,7 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders });
-  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, /api/pm/status, or WebSocket upgrade' }));
+  res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, /api/pm/status, /api/gm/log, or WebSocket upgrade' }));
 });
 
 const wss = new WebSocket.Server({ server: httpServer });
@@ -811,6 +1050,7 @@ if (require.main === module) {
     console.log(`  HTTP health:  http://0.0.0.0:${PORT}/health`);
     console.log(`  WebSocket:    ws://0.0.0.0:${PORT}`);
     console.log(`  Seed log:     ${SEED_LOG} (${log.count()} entries)`);
+    console.log(`  GM log:       ${GM_LOG_FILE}`);
     console.log(`  Catalog:      ${CATALOG.map(g => g.id).join(', ')}`);
     console.log('═══════════════════════════════════════════════');
   });
