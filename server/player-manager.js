@@ -34,6 +34,10 @@ const DEFAULTS = {
   healTimeout: 8000,  // ms to wait during heal before cancelling
   autoDisableAfter: 3,     // consecutive cancel-per-game count before auto-disable
   recentWindowMs: 5 * 60 * 1000,  // window for "recent" cancel counting
+  // Grace window after a ws close before replacing a human with a bot.
+  // Lobby→game page navigation always closes the lobby ws; the 3d page
+  // immediately reconnects via guest_login resume and calls registerConnection.
+  disconnectGraceMs: 8000,
 };
 
 const LOG_DIR = path.join(__dirname, '..', 'state');
@@ -74,6 +78,7 @@ function makeManagedSession(session) {
     turnSeq: 0,           // monotonic counter
     pendingAcks: new Map(),   // seq → { envelope, required: Set<userId>, acked: Set<userId> }
     ackTimers: new Map(),   // seq → Timeout
+    pendingDisconnects: new Map(), // userId → Timeout (grace before bot-replace)
     errorLog: [],          // { ts, event, detail } — last-N errors for the session
     cancelledAt: null,
   };
@@ -145,6 +150,13 @@ class PlayerManager {
       if (ms.status === 'cancelled' || ms.status === 'disabled') continue;
       if (ms.humanPlayers.some(p => p.user_id === userId)) {
         ms.connectionMap.set(userId, ws);
+        // Cancel any pending bot-replacement scheduled by a prior ws close.
+        // This is the normal path during lobby→game page navigation.
+        const pending = ms.pendingDisconnects.get(userId);
+        if (pending) {
+          clearTimeout(pending);
+          ms.pendingDisconnects.delete(userId);
+        }
         writeLog({ event: 'player_reconnect', sessionId: ms.sessionId, userId });
 
         // If we were healing and this was the blocking player, resume
@@ -264,6 +276,10 @@ class PlayerManager {
 
   /**
    * Called on WebSocket close for a player who was in a managed session.
+   * Schedules a delayed bot replacement; the timer is cancelled if the same
+   * user_id reconnects (via guest_login resume → registerConnection) within
+   * the disconnectGraceMs window. This is the normal lobby→game navigation
+   * path: the lobby ws closes, the game-page ws opens, identity resumes.
    */
   onPlayerDisconnect(userId, sessionId) {
     const ms = this._managed.get(sessionId);
@@ -287,8 +303,26 @@ class PlayerManager {
       }
     }
 
-    // During active play, a missing human is replaced by a bot immediately.
-    return this.replacePlayerWithBot(sessionId, userId, 'connection_lost');
+    // If a grace timer is already running for this user, leave it in place.
+    if (ms.pendingDisconnects.has(userId)) return false;
+
+    const grace = Math.max(0, Number(this._cfg.disconnectGraceMs) || 0);
+    if (grace === 0) {
+      return this.replacePlayerWithBot(sessionId, userId, 'connection_lost');
+    }
+
+    const timer = setTimeout(() => {
+      ms.pendingDisconnects.delete(userId);
+      // If they reconnected during the window, the timer was cancelled and
+      // this branch will not run. If they did not, replace with bot now.
+      if (this._managed.get(sessionId) !== ms) return;
+      if (ms.status === 'cancelled' || ms.status === 'disabled') return;
+      if (ms.connectionMap.has(userId)) return;
+      this.replacePlayerWithBot(sessionId, userId, 'connection_lost');
+    }, grace);
+    if (timer.unref) timer.unref();
+    ms.pendingDisconnects.set(userId, timer);
+    return false;
   }
 
   /**
@@ -699,6 +733,8 @@ class PlayerManager {
       for (const t of ms.ackTimers.values()) clearTimeout(t);
       ms.ackTimers.clear();
       ms.pendingAcks.clear();
+      for (const t of ms.pendingDisconnects.values()) clearTimeout(t);
+      ms.pendingDisconnects.clear();
     }
 
     if (session) {
