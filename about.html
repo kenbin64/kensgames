@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About — KensGames</title>
+    <meta name="description"
+        content="KensGames is a proof of concept for x-dimensional programming: manifolds as the source of truth, where every object is an identity x modified by a y derived from the manifold to yield z, the current state.">
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+    <link rel="stylesheet" href="/lib/fonts/fonts.css">
+    <style>
+        :root {
+            --neon-cyan: #00FFFF;
+            --neon-pink: #FF00FF;
+            --neon-yellow: #FFE800;
+            --neon-purple: #9900FF;
+            --neon-green: #00FF41;
+            --bg-dark: #04040C;
+            --bg-card: rgba(4, 4, 20, 0.94);
+            --text: #E0E0FF;
+            --text-muted: #8888AA;
+            --font-arcade: 'Orbitron', monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; overflow-x: hidden; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-dark); color: var(--text); line-height: 1.6; min-height: 100vh;
+            background-image:
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        nav { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;
+              border-bottom: 1px solid rgba(0,255,255,0.15); }
+        nav .logo { font-family: var(--font-arcade); font-size: 18px; letter-spacing: 3px; color: var(--neon-cyan);
+                    text-decoration: none; text-shadow: 0 0 8px var(--neon-cyan); }
+        nav a.back { color: var(--text-muted); text-decoration: none; font-size: 13px; letter-spacing: 1px; }
+        nav a.back:hover { color: var(--neon-pink); }
+        main { max-width: 880px; margin: 0 auto; padding: 60px 24px 80px; }
+        .eyebrow { font-family: var(--font-arcade); font-size: 11px; letter-spacing: 4px;
+                   color: var(--neon-purple); text-transform: uppercase; margin-bottom: 14px; }
+        h1 { font-family: var(--font-arcade); font-size: 42px; letter-spacing: 2px; color: var(--neon-cyan);
+             text-shadow: 0 0 12px rgba(0,255,255,0.5); margin-bottom: 8px; }
+        .lede { font-size: 18px; color: var(--text); line-height: 1.7; margin: 24px 0 40px;
+                padding-bottom: 32px; border-bottom: 1px solid rgba(255,0,255,0.18); }
+        h2 { font-family: var(--font-arcade); font-size: 16px; letter-spacing: 3px; color: var(--neon-pink);
+             text-transform: uppercase; margin: 36px 0 14px; }
+        p { color: var(--text-muted); margin-bottom: 16px; font-size: 15px; line-height: 1.85; }
+        code { color: var(--neon-yellow); background: rgba(255,232,0,0.08); padding: 2px 7px;
+               border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.92em; }
+        .axiom { background: var(--bg-card); border: 2px solid var(--neon-purple); border-radius: 6px;
+                 padding: 28px; margin: 28px 0; box-shadow: inset 0 0 24px rgba(153,0,255,0.12); }
+        .axiom .eq { font-family: var(--font-arcade); font-size: 28px; letter-spacing: 4px;
+                     color: var(--neon-yellow); text-align: center; margin: 8px 0 16px;
+                     text-shadow: 0 0 10px rgba(255,232,0,0.4); }
+        .axiom .legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
+        .axiom .legend div { text-align: center; padding: 12px; border: 1px solid rgba(0,255,255,0.18); border-radius: 4px; }
+        .axiom .legend strong { display: block; font-family: var(--font-arcade); color: var(--neon-cyan);
+                                font-size: 18px; margin-bottom: 4px; }
+        .axiom .legend span { font-size: 12px; color: var(--text-muted); }
+        .build-card { margin-top: 56px; background: var(--bg-card); border: 1px solid rgba(0,255,255,0.25);
+                      border-radius: 6px; padding: 24px; display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 20px; }
+        .build-card .field { font-family: var(--font-arcade); font-size: 10px; letter-spacing: 3px;
+                             color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }
+        .build-card .value { font-family: 'Courier New', monospace; font-size: 16px; color: var(--neon-green);
+                             word-break: break-all; }
+        .build-card .value.dim { color: var(--text); font-size: 14px; }
+        footer { text-align: center; padding: 24px; font-family: var(--font-arcade); font-size: 9px;
+                 letter-spacing: 3px; color: var(--text-muted); border-top: 1px solid rgba(0,255,255,0.1); }
+        @media (max-width: 600px) {
+            h1 { font-size: 30px; }
+            .axiom .legend { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a class="logo" href="/">KENSGAMES</a>
+        <a class="back" href="/">&#8592; Back to Portal</a>
+    </nav>
+
+    <main>
+        <div class="eyebrow">&#9632; The Theory &#9632;</div>
+        <h1>About</h1>
+
+        <p class="lede">
+            KensGames is a <strong style="color:var(--neon-cyan)">proof of concept for x-dimensional programming</strong>
+            &mdash; an architecture in which manifolds are the source of truth and every object in the system is
+            an identity <em>x</em> modified by a <em>y</em> derived from the manifold to yield <em>z</em>,
+            the current state.
+        </p>
+
+        <h2>The Axiom</h2>
+        <div class="axiom">
+            <div class="eq">z = x &middot; y</div>
+            <p style="text-align:center;color:var(--text);margin-bottom:0">
+                State is never stored. State is <em>computed</em> from identity and the manifold field at the
+                moment of observation.
+            </p>
+            <div class="legend">
+                <div><strong>x</strong><span>identity / seed / observer</span></div>
+                <div><strong>y</strong><span>modifier extracted from the manifold</span></div>
+                <div><strong>z</strong><span>manifested state at this instant</span></div>
+            </div>
+        </div>
+
+        <h2>Manifolds as Source of Truth</h2>
+        <p>
+            Conventional software stores state in tables and treats geometry as decoration. Here it is inverted.
+            A <strong style="color:var(--neon-purple)">Gyroid</strong> manifold (the canonical substrate) and an
+            auxiliary <strong style="color:var(--neon-purple)">Schwarz Diamond</strong> lens together form a
+            queryable field. Player positions, AI decisions, matchmaking, scoring, and rendering are all
+            <em>queries</em> against that field rather than rows in a database.
+        </p>
+        <p>
+            Each game on this portal &mdash; FastTrack, BrickBreaker 3D, 4D Tic-Tac-Toe, and Starfighter &mdash;
+            is a different lens onto the same underlying manifold. They share substrates for input, audio,
+            multiplayer, and lifecycle. What differs is the equation each lens evaluates.
+        </p>
+
+        <h2>Why a Game Portal</h2>
+        <p>
+            Games are the smallest complete systems that exercise identity, state, time, multiplayer consensus,
+            and rendering at once. If <code>z = x &middot; y</code> can survive contact with a real-time arcade,
+            it can survive contact with anything else.
+        </p>
+
+        <div class="build-card" id="build-card">
+            <div><div class="field">Version</div><div class="value" id="bv-version">&mdash;</div></div>
+            <div><div class="field">Build</div><div class="value" id="bv-build">&mdash;</div></div>
+            <div><div class="field">Built (UTC)</div><div class="value dim" id="bv-utc">&mdash;</div></div>
+            <div><div class="field">Channel</div><div class="value dim" id="bv-channel">&mdash;</div></div>
+        </div>
+    </main>
+
+    <footer>KENSGAMES &nbsp;&#9632;&nbsp; &copy; 2026 KENNETH BINGHAM &nbsp;&#9632;&nbsp; ALL RIGHTS RESERVED</footer>
+
+    <script>
+        (function () {
+            fetch('/version.json', { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (v) {
+                    if (!v) return;
+                    var set = function (id, val) { var el = document.getElementById(id); if (el && val) el.textContent = val; };
+                    set('bv-version', v.version ? 'v' + v.version : null);
+                    set('bv-build', v.build_sha || (v.build_utc ? v.build_utc.replace(/[^0-9]/g, '').slice(0, 12) : null));
+                    set('bv-utc', v.build_utc);
+                    set('bv-channel', v.release_channel);
+                })
+                .catch(function () { });
+        })();
+    </script>
+</body>
+
+</html>
