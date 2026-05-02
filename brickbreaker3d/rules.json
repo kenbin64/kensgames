@@ -1,0 +1,74 @@
+{
+  "$schema": "kg.rules/1.0",
+  "_meta": {
+    "id": "brickbreaker3d",
+    "name": "BrickBreaker 3D",
+    "version": "1.0.0",
+    "axiom": "z = x * y",
+    "source": "brickbreaker3d/assets/js/script.js"
+  },
+
+  "lobby": {
+    "min_players": 1,
+    "max_players": 1,
+    "supports_solo": true,
+    "supports_local_multiplayer": false,
+    "supports_remote_multiplayer": false,
+    "supports_bots": false,
+    "default_player_count": 1
+  },
+
+  "session": {
+    "initial_balls": 3,
+    "lives_model": "balls_remaining",
+    "level_model": "infinite_progressive",
+    "row_growth_per_level": "rows = 4 + floor(level/2)",
+    "lose_when": "balls_remaining === 0",
+    "win_when": "all_bricks_cleared",
+    "speed_growth": "phi"
+  },
+
+  "rules": [
+    {
+      "id": "BB_BALL_LIVES",
+      "category": "session",
+      "x": 1, "y": 3, "z": 3,
+      "desc": "Player starts each level with 3 balls. No separate life counter — running out of balls ends the run.",
+      "assertion": "ctx.balls.remaining >= 0 && (ctx.balls.remaining > 0 || ctx.gameOver === true)"
+    },
+    {
+      "id": "BB_LEVEL_GROWTH",
+      "category": "session",
+      "x": 2, "y": 1, "z": 2,
+      "desc": "Each cleared level increments level by 1; brick rows grow as 4 + floor(level/2).",
+      "assertion": "ctx.level >= 1 && ctx.bricks.rows === 4 + Math.floor(ctx.level / 2)"
+    },
+    {
+      "id": "BB_WIN_CLEAR",
+      "category": "session",
+      "x": 3, "y": 1, "z": 3,
+      "desc": "Level cleared when no bricks remain.",
+      "assertion": "!ctx.levelComplete || ctx.bricks.remaining === 0"
+    },
+    {
+      "id": "BB_SPEED_PHI",
+      "category": "physics",
+      "x": 4, "y": 1, "z": 4,
+      "desc": "Ball speed scales by golden ratio per cleared brick layer.",
+      "assertion": "ctx.ball.speed >= ctx.params.min_ball_speed_phi * 0.22 && ctx.ball.speed <= ctx.params.max_ball_speed_phi * 0.85"
+    },
+    {
+      "id": "BB_SOLO_ONLY",
+      "category": "lobby",
+      "x": 5, "y": 1, "z": 5,
+      "desc": "BrickBreaker 3D is single-player. Multiplayer wizard must hide BB or treat as not-applicable.",
+      "assertion": "ctx.session.player_count === 1"
+    }
+  ],
+
+  "ai_director": {
+    "consults": ["session"],
+    "may_generate": ["powerup_drops"],
+    "may_not_generate": ["lives", "win_condition"]
+  }
+}

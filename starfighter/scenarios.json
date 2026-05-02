@@ -1,0 +1,147 @@
+{
+  "$schema": "kg.scenarios/1.0",
+  "_meta": {
+    "id": "starfighter",
+    "name": "Starfighter — Hive Sigma Campaign",
+    "version": "1.0.0",
+    "axiom": "z = x * y",
+    "source": "starfighter/docs/BACKSTORY.md",
+    "lives_per_sortie": 3,
+    "training_repeatable": true
+  },
+
+  "training": {
+    "id": "training",
+    "name": "First Light — Training",
+    "summary": "Tutorial flight. Movement, gunnery, torpedo lock. Player ship is invulnerable. Plenty of drone targets and asteroids. Ends when fuel runs out.",
+    "duration_seconds": 240,
+    "lives": "infinite",
+    "invincible": true,
+    "fuel_cap_seconds": 240,
+    "objectives": [
+      { "id": "move", "desc": "Six-DOF movement check", "type": "tutorial" },
+      { "id": "fire", "desc": "Fire lasers at drones", "type": "tutorial" },
+      { "id": "lock", "desc": "Acquire torpedo lock", "type": "tutorial" },
+      { "id": "dock", "desc": "Auto-dock with Mercy or Lifeline", "type": "tutorial" }
+    ],
+    "spawns": {
+      "enemy_drones": 24,
+      "asteroids": 60,
+      "wreckage": 8
+    },
+    "outcome": { "win": "fuel_exhausted", "lose": null },
+    "unlock": null,
+    "available_after": "always"
+  },
+
+  "sorties": [
+    {
+      "id": "sortie-1",
+      "name": "First Light",
+      "summary": "Same as Training but counted as the first live sortie. Player can opt to skip if Training already passed.",
+      "lives": 3,
+      "objective": { "id": "complete_training", "desc": "Complete the training drill" },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
+      "unlock": "spread_laser",
+      "available_after": "training_or_skip"
+    },
+    {
+      "id": "sortie-2",
+      "name": "Picket Line",
+      "summary": "Hold the patrol perimeter; intercept the first real drone wing before it reaches Aurora Prime.",
+      "lives": 3,
+      "objective": { "id": "destroy_wave", "desc": "Destroy the inbound drone wing", "count": 12, "type": "enemy" },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted_or_aurora_breached" },
+      "unlock": "proton_torpedo_mk2",
+      "available_after": "sortie-1"
+    },
+    {
+      "id": "sortie-3",
+      "name": "Capital Strike",
+      "summary": "First Zorgon dreadnought enters the engagement zone. Kill it before it reaches Aurora Prime.",
+      "lives": 3,
+      "objective": { "id": "kill_capital", "desc": "Destroy 1 dreadnought", "count": 1, "type": "dreadnought" },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted_or_aurora_breached" },
+      "unlock": "afterburner_2",
+      "available_after": "sortie-2"
+    },
+    {
+      "id": "sortie-4",
+      "name": "Carrier Defence",
+      "summary": "Coordinated assault on the Resolute. Keep the carrier alive.",
+      "lives": 3,
+      "objective": { "id": "protect_carrier", "desc": "Keep UES Resolute hull > 25% for 6 minutes", "duration_seconds": 360, "asset": "resolute", "min_hull_pct": 0.25 },
+      "outcome": { "win": "objective_complete", "lose": "carrier_destroyed_or_lives_exhausted" },
+      "unlock": "shield_booster",
+      "available_after": "sortie-3"
+    },
+    {
+      "id": "sortie-5",
+      "name": "The Long Watch",
+      "summary": "The Hive-Moon edges closer. Bombers and predators in waves. The carrier is on borrowed time.",
+      "lives": 3,
+      "objective": { "id": "kill_count", "desc": "Destroy 30 hostiles", "count": 30, "type": "any_hostile" },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
+      "unlock": "hardpoint_mount",
+      "available_after": "sortie-4"
+    },
+    {
+      "id": "sortie-6",
+      "name": "Last Stand",
+      "summary": "The Resolute is lost. The Hive-Moon engulfs Aurora Prime. The campaign transitions inside the lattice.",
+      "lives": 3,
+      "scripted_loss": { "asset": "resolute", "trigger": "timer", "after_seconds": 480 },
+      "objective": { "id": "survive_to_transition", "desc": "Survive until the Hive-Moon engulfs Aurora Prime", "duration_seconds": 480 },
+      "outcome": { "win": "transition_to_hive", "lose": "lives_exhausted" },
+      "unlock": "lattice_navigator",
+      "available_after": "sortie-5"
+    },
+    {
+      "id": "sortie-7a",
+      "name": "Into the Hive",
+      "summary": "Enter the Hive-Moon's Schwarz Diamond gyroid. Locate Aurora Prime inside the labyrinth.",
+      "lives": 3,
+      "environment": "schwarz_diamond_gyroid",
+      "objective": { "id": "locate_asset", "desc": "Find Aurora Prime on radar inside the lattice", "asset": "aurora_prime" },
+      "spawns": { "zorgon_humanoid_swarm": true, "honeycomb_powerups": true },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
+      "unlock": "solvent_torpedo",
+      "available_after": "sortie-6"
+    },
+    {
+      "id": "sortie-7b",
+      "name": "The Honeycomb",
+      "summary": "Recover a sample of the queen's catalyst-bearing honeycomb. Return it to Aurora Prime scientists for solvent synthesis.",
+      "lives": 3,
+      "environment": "schwarz_diamond_gyroid",
+      "objective": { "id": "fetch_quest", "desc": "Collect 1 queen-class honeycomb sample and dock with Aurora Prime", "item": "queen_honeycomb", "deliver_to": "aurora_prime" },
+      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
+      "unlock": "solvent_dispersal_array",
+      "available_after": "sortie-7a"
+    },
+    {
+      "id": "sortie-7c",
+      "name": "The Throne Room",
+      "summary": "The solvent opens passages to the queen's chamber. Defeat the sentinels, incapacitate the queen, deliver the message. Peace treaty.",
+      "lives": 3,
+      "environment": "schwarz_diamond_gyroid",
+      "objective": { "id": "boss_incapacitate", "desc": "Incapacitate the queen (do not kill) and deliver the peace message", "boss": "zorgon_queen", "kill_allowed": false },
+      "outcome": { "win": "campaign_complete", "lose": "lives_exhausted" },
+      "unlock": "peace_treaty_credits",
+      "available_after": "sortie-7b",
+      "epilogue": "multidimensional_threat_reveal"
+    }
+  ],
+
+  "unlocks": {
+    "spread_laser": { "name": "Spread Laser", "category": "weapon", "slot": "primary" },
+    "proton_torpedo_mk2": { "name": "Proton Torpedo Mk II", "category": "weapon", "slot": "secondary" },
+    "afterburner_2": { "name": "Afterburner II", "category": "ability", "slot": "thrust" },
+    "shield_booster": { "name": "Shield Booster", "category": "ability", "slot": "defense" },
+    "hardpoint_mount": { "name": "Universal Hardpoint", "category": "ability", "slot": "expansion" },
+    "lattice_navigator": { "name": "Lattice Navigator", "category": "ability", "slot": "navigation", "requires": "schwarz_diamond_gyroid" },
+    "solvent_torpedo": { "name": "Solvent Torpedo", "category": "weapon", "slot": "secondary", "effect": "dissolves_gyroid_walls" },
+    "solvent_dispersal_array": { "name": "Solvent Dispersal Array", "category": "weapon", "slot": "expansion", "effect": "wide_area_solvent" },
+    "peace_treaty_credits": { "name": "Peace Treaty (Campaign Complete)", "category": "narrative", "slot": null }
+  }
+}

@@ -164,13 +164,63 @@ Their command vessel — the **Hive-Moon** — is a single mobile bio-construct
 roughly the diameter of Luna. It hangs at the system's edge, visible from any
 viewport on any clear sightline. It does not approach. It does not need to.
 It dispatches drone wings, scout swarms, capital units, and the occasional
-queen-ship; what it loses, it grows back. huge housing surviving Zorgons ships and queen. is built of
-hardened honey walls of swchartz diamon gyroind big enough passages for human starfigher to navigate and hunt for queen along encoutering enemy Zorgons ships, powerups, and a chapmber large enough to devour the Aurora Prime and all enhbitance that keep humans alive for workers and the Prime funcitonal to keep humans alive. about 5th sorties if not held back the Zorgon hive consumers aurora so star fighter must navigate the labrynth gyroid to find the ship. Easier to find than the queen. Qeens chamber inaccessible till a sample of ship can be brouth to Aurora Prima and a isope devaloped that disolves walls of gyroind to create bigger passageways untill queen chamber revealeed. A race against time because hive is self healing but its the only way to find the queen. area aound queen is heavy gaurded with defensive wheopans.
+queen-ship; what it loses, it grows back.
 
-Final boss the queen. Very large alien bree whose stinger emits plazma, her abdomin and compound eyes are most vulnarable. mission is to not kill her but incapaisate and deliver a message from Aurora Prime scientits that an antidote has been created from sample that allows earth bees to live in their invironment thus the zorgons can return to their own planet and both thrive. Must incopacate queen in order to deliver the message. Once gets message she declairs war over and signs peace treaty. Game ends with forboding multidimental ship rising up that is common enemy to Zogons and Humans. Stay tune Zorgons and Humans Must fight together to survive multidimensional enemy. Comming soon.
+### Inside the Hive-Moon
 
-You will never reach the Hive-Moon. You will only ever fight the things it
-sends.
+The Hive-Moon's interior is not hollow. It is honeycombed — a labyrinth of
+hardened honey-secretion that sets into a **Schwarz Diamond gyroid lattice**:
+trillions of interlocking triply-periodic minimal-surface chambers, walls of
+amber-glass crystal under bioluminescent veins. The passages are wide enough
+for a single Mk-IV Starfighter to thread, never wide enough for a capital
+ship. Inside live the surviving Zorgon population, the queen's court, the
+nurseries, and the mass-production wombs that grow new fighters and bombers
+from raw biomass.
+
+One chamber, near the moon's geometric centre, is sized to engulf an O'Neill
+wheel station whole. That is what the Hive-Moon is hunting Aurora Prime for —
+to ingest her, fold her into the lattice, keep her hydroponic farms and bee
+habitats running indefinitely on Zorgon power and Zorgon labour, with the
+21,000 humans aboard reduced to maintenance staff for the only catalyst
+factory in the galaxy.
+
+If the Resolute falls and the players cannot recover Aurora Prime in time,
+the Hive-Moon does exactly that. The wheel is taken. The campaign does not
+end — it transforms. The fighter wing must fly *into* the Hive-Moon's
+gyroid passages, locate Aurora inside the labyrinth, recover a sample of
+the queen's catalyst-bearing honeycomb, and return it to surviving Aurora
+scientists who can synthesise a **gyroid solvent** — an isotope-tagged
+catalyst that dissolves the Schwarz Diamond walls a little at a time,
+opening passages large enough to reach the queen's throne room.
+
+The hive is self-healing. Every passage the solvent opens begins resealing
+within minutes. It is a race against time and against waves of sentinels
+guarding the inner chambers.
+
+### The Queen
+
+The queen herself is the size of a small capital ship. Her stinger fires
+focused plasma; her abdomen and compound eyes are her only vulnerable
+surfaces. **The mission is not to kill her.** A dead queen leaves the
+Zorgon people leaderless and the war unresolved. The mission is to
+**incapacitate** her — strip her shielding, disable her stinger, hold her
+in place — long enough to deliver a single message from Aurora Prime's
+science council: an antidote has been synthesised that lets Earth bees
+thrive in a Zorgon atmosphere. The Zorgons can go home. They can produce
+their own catalyst again. They do not have to take Earth.
+
+When the message lands, the queen surrenders. A peace treaty is signed.
+The war ends.
+
+The closing cinematic reveals a vast, geometrically impossible vessel
+rising at the system's far edge — visibly multidimensional, hostile, and
+indifferent to the species distinction between Zorgon and Human. Both will
+have to fight together to survive what comes next.
+
+That is the sequel. This game ends with the treaty.
+
+You will never destroy the Hive-Moon. You will fly into it, save Aurora
+Prime, and end the war.
 
 ---
 
@@ -320,7 +370,51 @@ station, not a flight deck.
 
 ---
 
-## Your Mission
+## Your Mission — The Sortie Campaign
+
+The campaign is structured as a sequence of **sorties**. Each sortie is a
+single deployment from the Resolute with a specific objective. You get
+**three lives per sortie**. Lose all three, the sortie fails and you must
+retry it before progressing. Complete a sortie successfully and you unlock
+the next one — and a new weapon, ability, or hardpoint to take with you.
+
+The full campaign is **seven main sorties**, with sortie 7 itself having
+multiple sub-objectives (7a, 7b, 7c). Depending on how aggressively the
+player presses the defence of the Resolute, the carrier may survive longer
+or fall sooner — the campaign branches accordingly between sorties 4 and 6
+to account for that, but always converges on the same final arc inside the
+Hive-Moon.
+
+You can re-enter **Training** at any time between sorties. Training is
+non-lethal and exists to let you practise movement, gunnery, and any newly
+unlocked weapon or ability before risking it in combat.
+
+| # | Name | Objective | Key Unlock |
+|---|------|-----------|------------|
+| 1 | First Light (Training) | Movement, gunnery, torpedo lock — invulnerable; ends when fuel runs out | Baseline Mk-IV loadout |
+| 2 | Picket Line | Hold the patrol perimeter; intercept the first real drone wing | Spread laser |
+| 3 | Capital Strike | Kill the first Zorgon dreadnought before it reaches Aurora Prime | Proton torpedo upgrade |
+| 4 | Carrier Defence | Keep the Resolute alive through a coordinated assault | Afterburner II |
+| 5 | The Long Watch | The Hive-Moon edges closer; bombers and predators in waves | Shield booster |
+| 6 | Last Stand | Resolute is lost; Aurora Prime is engulfed by the Hive-Moon | Hardpoint mount |
+| 7a | Into the Hive | Enter the Schwarz Diamond gyroid; locate Aurora inside the labyrinth | Lattice navigator |
+| 7b | The Honeycomb | Locate and recover the catalyst-bearing honeycomb specimen | Solvent torpedo |
+| 7c | The Throne Room | Defeat the sentinels, incapacitate the queen, deliver the message | Peace treaty (campaign end) |
+
+### Sortie Rules
+
+- **Three lives per sortie.** When all three are lost the sortie ends in
+  failure and must be retried. No partial credit.
+- **No upgrades on failure.** Weapons, abilities, and hardpoints unlock
+  only on successful completion of the sortie that gates them.
+- **Every sortie has a stated objective.** The objective is shown at
+  briefing and tracked on the HUD. The objective ultimately advances the
+  arc that ends inside the Hive-Moon.
+- **Training is always available.** It does not consume lives, does not
+  change campaign state, and is the recommended place to test a newly
+  unlocked weapon before the next live sortie.
+
+### Standing Orders for Live Sorties
 
 1. **Launch** from the Resolute's hangar bay.
 2. **Engage** Zorgon fighter swarms before they reach Aurora Prime.
@@ -328,10 +422,9 @@ station, not a flight deck.
 4. **Use Mercy and Lifeline** to stay in the fight; auto-pilot to them when
    shields, fuel, or ordnance run low.
 5. **Return to the Resolute** for hull changes or extended downtime.
-6. **Survive.** The longer you hold, the longer Earth holds.
-
-There is no final wave. There is no winning. There is only how long you hold
-the line.
+6. **Hit the sortie objective.** The longer the carrier holds, the more
+   sorties you have to work with before the inevitable transition to
+   Sortie 6.
 
 ---
 
@@ -347,4 +440,3 @@ You will hear:
   help, calling out the things they're seeing out there
 
 The voices keep you grounded. You are not alone out here. Not yet.
-totopt  AR  FIRST

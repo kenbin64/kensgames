@@ -1,0 +1,137 @@
+{
+  "$schema": "kg.rules/1.0",
+  "_meta": {
+    "id": "starfighter",
+    "name": "Starfighter",
+    "version": "1.0.0",
+    "axiom": "z = x * y",
+    "scenarios": "starfighter/scenarios.json",
+    "backstory": "starfighter/docs/BACKSTORY.md",
+    "codex_data": "starfighter/codex_data.js"
+  },
+
+  "lobby": {
+    "min_players": 1,
+    "max_players": 8,
+    "supports_solo": true,
+    "supports_local_multiplayer": false,
+    "supports_remote_multiplayer": true,
+    "supports_bots": true,
+    "default_player_count": 1
+  },
+
+  "session": {
+    "lives_per_sortie": 3,
+    "training_invincible": true,
+    "training_repeatable": true,
+    "sortie_progression": "linear",
+    "campaign_length_min_sorties": 7,
+    "campaign_length_max_sorties": 10,
+    "unlocks_require_sortie_success": true,
+    "checkpoint_after_each_sortie": true
+  },
+
+  "rules": [
+    {
+      "id": "SF_LIVES_3",
+      "category": "session",
+      "x": 1, "y": 3, "z": 3,
+      "desc": "Each sortie grants exactly 3 lives. Death past 3 = sortie failure.",
+      "assertion": "ctx.sortie.livesUsed <= 3"
+    },
+    {
+      "id": "SF_TRAINING_INVINCIBLE",
+      "category": "session",
+      "x": 1, "y": 1, "z": 1,
+      "desc": "Player ship cannot be destroyed during the training scenario.",
+      "assertion": "ctx.scenario.id !== 'training' || ctx.player.invulnerable === true"
+    },
+    {
+      "id": "SF_TRAINING_FUEL_TIMER",
+      "category": "session",
+      "x": 1, "y": 240, "z": 240,
+      "desc": "Training ends when the fuel timer expires (default 240s).",
+      "assertion": "ctx.scenario.id !== 'training' || ctx.scenario.duration_seconds > 0"
+    },
+    {
+      "id": "SF_UNLOCK_GATE",
+      "category": "progression",
+      "x": 2, "y": 1, "z": 2,
+      "desc": "Unlock applies only on a successful sortie. Failed or abandoned sorties grant nothing.",
+      "assertion": "!ctx.sortie.unlockGranted || ctx.sortie.outcome === 'win'"
+    },
+    {
+      "id": "SF_SORTIE_LINEAR",
+      "category": "progression",
+      "x": 2, "y": 7, "z": 14,
+      "desc": "Sorties unlock in order. A sortie is available iff its 'available_after' is satisfied (or 'always').",
+      "assertion": "ctx.scenario.available_after === 'always' || ctx.session.completedSorties.includes(ctx.scenario.available_after) || (ctx.scenario.available_after === 'training_or_skip' && (ctx.session.completedSorties.includes('training') || ctx.session.skipTraining === true))"
+    },
+    {
+      "id": "SF_TRAINING_REENTRY",
+      "category": "progression",
+      "x": 2, "y": 0, "z": 0,
+      "desc": "Training is replayable at any time, including between sorties. It does not consume sortie state.",
+      "assertion": "ctx.scenario.id !== 'training' || ctx.session.canReplayTraining === true"
+    },
+    {
+      "id": "SF_QUEEN_NO_KILL",
+      "category": "narrative",
+      "x": 3, "y": 1, "z": 3,
+      "desc": "The queen must be incapacitated, not killed. A queen-kill event fails sortie-7c regardless of damage progress.",
+      "assertion": "ctx.event !== 'queen_destroyed' || ctx.scenario.id !== 'sortie-7c'"
+    },
+    {
+      "id": "SF_CARRIER_PROTECT",
+      "category": "narrative",
+      "x": 3, "y": 4, "z": 12,
+      "desc": "Sortie 4 fails if the UES Resolute is destroyed before the timer expires.",
+      "assertion": "ctx.scenario.id !== 'sortie-4' || ctx.assets.resolute.alive === true"
+    },
+    {
+      "id": "SF_AURORA_INGESTION",
+      "category": "narrative",
+      "x": 3, "y": 6, "z": 18,
+      "desc": "Sortie 6 ends with Aurora Prime ingested by the Hive-Moon (scripted, not failure). Triggers transition to sortie-7a.",
+      "assertion": "ctx.scenario.id !== 'sortie-6' || ctx.scenario.scripted_loss !== undefined"
+    },
+    {
+      "id": "SF_HIVE_INTERIOR",
+      "category": "environment",
+      "x": 4, "y": 3, "z": 12,
+      "desc": "Sorties 7a–7c take place inside the Schwarz Diamond gyroid lattice; capital ships cannot enter.",
+      "assertion": "!ctx.scenario.environment || ctx.scenario.environment !== 'schwarz_diamond_gyroid' || ctx.entity.class !== 'capital'"
+    },
+    {
+      "id": "SF_PEACE_END",
+      "category": "narrative",
+      "x": 5, "y": 1, "z": 5,
+      "desc": "Campaign completes only when the queen is incapacitated AND the peace message is delivered.",
+      "assertion": "ctx.event !== 'campaign_complete' || (ctx.queen.incapacitated === true && ctx.message.delivered === true)"
+    },
+    {
+      "id": "SF_EPILOGUE_REVEAL",
+      "category": "narrative",
+      "x": 5, "y": 1, "z": 5,
+      "desc": "On campaign completion, the multidimensional-threat epilogue cinematic plays.",
+      "assertion": "ctx.event !== 'campaign_complete' || ctx.epilogue === 'multidimensional_threat_reveal'"
+    }
+  ],
+
+  "ai_director": {
+    "consults": ["scenarios", "backstory", "codex_data"],
+    "may_generate": [
+      "training_drone_swarms",
+      "intermission_chatter",
+      "honeycomb_powerup_placement",
+      "sentinel_patrol_routes",
+      "wreckage_loot_tables"
+    ],
+    "may_not_generate": [
+      "campaign_endings",
+      "queen_outcome",
+      "unlock_table",
+      "lives_per_sortie"
+    ]
+  }
+}
