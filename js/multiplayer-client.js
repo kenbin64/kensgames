@@ -42,6 +42,8 @@ class KGMultiplayer {
     this._seq = 0;
     this._stateInterval = null;
     this.gameUuid = null;
+    this._hadSuccessfulConnect = false;
+    this._manualDisconnect = false;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -55,6 +57,7 @@ class KGMultiplayer {
 
   connect(auth) {
     if (this.ws && this.ws.readyState <= 1) return;
+    this._manualDisconnect = false;
     this.username = (auth && auth.username) || localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player';
 
     // Stable per-browser guest id, persisted in localStorage so the same browser
@@ -76,10 +79,13 @@ class KGMultiplayer {
       avatarId = 'person_smile';
     }
 
-    this.ws = new WebSocket(this.wsUrl());
+    const ws = new WebSocket(this.wsUrl());
+    this.ws = ws;
 
-    this.ws.onopen = () => {
+    ws.onopen = () => {
+      if (this.ws !== ws) return;
       this.connected = true;
+      this._hadSuccessfulConnect = true;
       this._hideReconnectOverlay();
       this._send({
         type: 'guest_login',
@@ -92,27 +98,45 @@ class KGMultiplayer {
       this._emit('connected');
     };
 
-    this.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      if (this.ws !== ws) return;
+      if (this.connected) this._hideReconnectOverlay();
       let data;
       try { data = JSON.parse(event.data); } catch { return; }
       this._handleMessage(data);
     };
 
-    this.ws.onclose = () => {
+    ws.onclose = () => {
+      if (this.ws !== ws) return;
       this.connected = false;
       this.gameStarted = false;
-      this._showReconnectOverlay('Connection lost. Reconnecting...');
+      if (!this._manualDisconnect && this._hadSuccessfulConnect && this._needsLiveConnection()) {
+        this._showReconnectOverlay('Connection lost. Reconnecting...');
+      }
       this._emit('disconnected');
-      // Auto-reconnect if was in a game
-      if (this.session) {
+      // Auto-reconnect only when we still need the live socket (remote humans present).
+      if (this.session && this._needsLiveConnection()) {
         this._reconnectTimer = setTimeout(() => this.connect(auth), 3000);
       }
     };
 
-    this.ws.onerror = () => {
+    ws.onerror = () => {
+      if (this.ws !== ws) return;
       console.error('[KGMultiplayer] WebSocket error');
-      this._showReconnectOverlay('Connection unstable. Reconnecting...');
+      if ((this._hadSuccessfulConnect || this.connected) && this._needsLiveConnection()) {
+        this._showReconnectOverlay('Connection unstable. Reconnecting...');
+      }
     };
+  }
+
+  // True only when the active session contains at least one remote human peer.
+  // Solo, AI-only, and post-game sessions never need the reconnect overlay because
+  // the local game can continue offline.
+  _needsLiveConnection() {
+    const s = this.session;
+    if (!s || !Array.isArray(s.players)) return false;
+    const me = this.userId;
+    return s.players.some(p => p && !p.is_ai && p.user_id !== me);
   }
 
   disconnect() {
@@ -125,7 +149,9 @@ class KGMultiplayer {
     this.isHost = false;
     this.gameStarted = false;
     this.remotePlayers.clear();
+    this._manualDisconnect = true;
     if (this.ws) { this.ws.close(); this.ws = null; }
+    this._hideReconnectOverlay();
     this.connected = false;
   }
 

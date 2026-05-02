@@ -67,6 +67,7 @@
       this._ready = false;
       this._gameUuid = null;
       this._reconnectVisible = false;
+      this._hadWsOpen = false;
 
       this._bindWsEvents();
     }
@@ -163,18 +164,30 @@
       ws._pmBoundEvents = true;
       if (typeof ws.addEventListener === 'function') {
         ws.addEventListener('close', () => {
-          this._showReconnectOverlay('Connection lost. Re-establishing session…');
+          if (this._ws !== ws) return;
+          if (this._hadWsOpen) {
+            this._showReconnectOverlay('Connection lost. Re-establishing session…');
+          }
         });
         ws.addEventListener('error', () => {
-          this._showReconnectOverlay('Connection unstable. Re-establishing session…');
+          if (this._ws !== ws) return;
+          if (this._hadWsOpen) {
+            this._showReconnectOverlay('Connection unstable. Re-establishing session…');
+          }
         });
         ws.addEventListener('open', () => {
+          if (this._ws !== ws) return;
+          this._hadWsOpen = true;
+          this._hideReconnectOverlay();
           this._showBanner('Connection restored. Syncing latest game state…', 'ok', 2200);
         });
       }
       if (typeof root !== 'undefined' && root.addEventListener) {
         root.addEventListener('offline', () => this._showReconnectOverlay('Offline. Reconnecting when network returns…'));
-        root.addEventListener('online', () => this._showBanner('Network online. Restoring game…', 'ok', 2500));
+        root.addEventListener('online', () => {
+          this._hideReconnectOverlay();
+          this._showBanner('Network online. Restoring game…', 'ok', 2500);
+        });
       }
     }
 
