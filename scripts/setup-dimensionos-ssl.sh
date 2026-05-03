@@ -6,9 +6,21 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 DOMAIN="${1:-dimensionos.net}"
 WWW_DOMAIN="www.${DOMAIN}"
-WEB_ROOT="${2:-/var/www/kensgames.com}"
 EMAIL="${3:-kenetics.art@gmail.com}"
 NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}"
+
+# Auto-detect the kensgames.com web root. The GH Actions workflow rsyncs to
+# /var/www/kensgames.com/public, but legacy deploy.sh uses /var/www/kensgames.com.
+# Caller can override with arg 2.
+if [[ -n "${2:-}" ]]; then
+  WEB_ROOT="$2"
+elif [[ -d /var/www/kensgames.com/public/x-dimensional ]]; then
+  WEB_ROOT=/var/www/kensgames.com/public
+elif [[ -d /var/www/kensgames.com/x-dimensional ]]; then
+  WEB_ROOT=/var/www/kensgames.com
+else
+  WEB_ROOT=/var/www/kensgames.com/public
+fi
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo bash scripts/setup-dimensionos-ssl.sh"
@@ -22,7 +34,9 @@ apt-get install -y nginx certbot python3-certbot-nginx
 echo "[2/7] Verifying shared web root at ${WEB_ROOT}..."
 if [[ ! -d "${WEB_ROOT}/x-dimensional" ]]; then
   echo "Error: ${WEB_ROOT}/x-dimensional not found."
-  echo "       Deploy the kensgames.com repo first (sudo bash deploy.sh) so the paradigm pages exist."
+  echo "       Deploy the kensgames repo to ${WEB_ROOT} first so the paradigm pages exist."
+  echo "       (Either fix the GH Actions VPS_SSH_KEY secret and re-push, or rsync"
+  echo "        the x-dimensional/ tree manually from a working clone of the repo.)"
   exit 1
 fi
 
