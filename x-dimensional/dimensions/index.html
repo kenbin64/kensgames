@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dimensions — Dimensional Programming · KensGames</title>
+    <meta name="description"
+        content="The second concept of Dimensional Programming: dimensions are not a hierarchy. Every identity is a point in the dimension above it and a whole in the dimension below it." />
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png" />
+    <link rel="stylesheet" href="/lib/fonts/fonts.css" />
+    <link rel="stylesheet" href="/x-dimensional/proof.css" />
+    <link rel="stylesheet" href="/x-dimensional/paradigm.css" />
+</head>
+
+<body>
+    <div class="proof-shell paradigm-shell">
+        <nav class="proof-nav">
+            <a class="crumb" href="/">KensGames</a>
+            <span class="sep">/</span>
+            <a class="crumb" href="/x-dimensional/">The Paradigm</a>
+            <span class="sep">/</span>
+            <span class="crumb" style="color: var(--neon-cyan)">2 · Dimensions</span>
+        </nav>
+
+        <div class="read-strip" aria-label="Reading sequence">
+            <span class="label">READ IN ORDER</span>
+            <a class="step" href="/x-dimensional/identity/">1 · Identity</a><span class="arr">→</span>
+            <a class="step current" href="/x-dimensional/dimensions/">2 · Dimensions</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/actors/">3 · Actors</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/manifestation/">4 · Manifestation</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/saddle/">See it live</a>
+        </div>
+
+        <h1 class="proof-title">2 · Dimensions</h1>
+        <p class="proof-subtitle">Dimensions are not a hierarchy. They are levels of observation. Every identity is a
+            point above and a whole below.</p>
+
+        <section class="plain-prose">
+            <h2>Plainly</h2>
+            <p>
+                Take a single point. It has no length, no width, no height —
+                it is just <em>a thing</em>. That is dimension zero.
+            </p>
+            <p>
+                Now line up ten of those points end-to-end. You have a line.
+                A line has length. That is dimension one. The line is built
+                from points by <strong>adding</strong> them together — which
+                is why <strong>+</strong> is the operator that grows along
+                the same dimension.
+            </p>
+            <p>
+                Now take that line and lay another line beside it. And another.
+                And another. Width × length. You have a plane. The plane is
+                built from lines by <strong>multiplying</strong> them together
+                — which is why <strong>×</strong> is the operator that lifts
+                you up one dimension. Stack planes the same way and you have
+                a volume.
+            </p>
+            <p>
+                Now look at that plane and ask "what is it made of?" The
+                answer is <em>lines</em>. You have just <strong>divided</strong>
+                the plane back into its rows. Division goes the other way —
+                it drops you down one dimension by exposing the parts that
+                were collapsed into the whole.
+            </p>
+        </section>
+
+        <figure class="figure">
+            <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg"
+                aria-label="Dimensional ladder: point, line, plane, volume">
+                <!-- 0D point -->
+                <text x="80" y="30" fill="#FFE800" font-family="Orbitron, monospace" font-size="11" letter-spacing="2"
+                    text-anchor="middle">0D</text>
+                <circle cx="80" cy="100" r="6" fill="#FFE800" />
+                <text x="80" y="170" fill="#8094B0" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">point</text>
+
+                <!-- 1D line via + -->
+                <text x="270" y="30" fill="#FFE800" font-family="Orbitron, monospace" font-size="11" letter-spacing="2"
+                    text-anchor="middle">1D — built by +</text>
+                <g fill="#FFE800">
+                    <circle cx="200" cy="100" r="5" />
+                    <circle cx="218" cy="100" r="5" />
+                    <circle cx="236" cy="100" r="5" />
+                    <circle cx="254" cy="100" r="5" />
+                    <circle cx="272" cy="100" r="5" />
+                    <circle cx="290" cy="100" r="5" />
+                    <circle cx="308" cy="100" r="5" />
+                    <circle cx="326" cy="100" r="5" />
+                </g>
+                <text x="270" y="170" fill="#8094B0" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">line (length)</text>
+
+                <!-- 2D plane via × -->
+                <text x="490" y="30" fill="#00FFFF" font-family="Orbitron, monospace" font-size="11" letter-spacing="2"
+                    text-anchor="middle">2D — built by ×</text>
+                <g fill="#00FFFF">
+                    <g>
+                        <circle cx="430" cy="70" r="4" />
+                        <circle cx="448" cy="70" r="4" />
+                        <circle cx="466" cy="70" r="4" />
+                        <circle cx="484" cy="70" r="4" />
+                        <circle cx="502" cy="70" r="4" />
+                        <circle cx="520" cy="70" r="4" />
+                        <circle cx="538" cy="70" r="4" />
+                        <circle cx="556" cy="70" r="4" />
+                    </g>
+                    <g>
+                        <circle cx="430" cy="88" r="4" />
+                        <circle cx="448" cy="88" r="4" />
+                        <circle cx="466" cy="88" r="4" />
+                        <circle cx="484" cy="88" r="4" />
+                        <circle cx="502" cy="88" r="4" />
+                        <circle cx="520" cy="88" r="4" />
+                        <circle cx="538" cy="88" r="4" />
+                        <circle cx="556" cy="88" r="4" />
+                    </g>
+                    <g>
+                        <circle cx="430" cy="106" r="4" />
+                        <circle cx="448" cy="106" r="4" />
+                        <circle cx="466" cy="106" r="4" />
+                        <circle cx="484" cy="106" r="4" />
+                        <circle cx="502" cy="106" r="4" />
+                        <circle cx="520" cy="106" r="4" />
+                        <circle cx="538" cy="106" r="4" />
+                        <circle cx="556" cy="106" r="4" />
+                    </g>
+                    <g>
+                        <circle cx="430" cy="124" r="4" />
+                        <circle cx="448" cy="124" r="4" />
+                        <circle cx="466" cy="124" r="4" />
+                        <circle cx="484" cy="124" r="4" />
+                        <circle cx="502" cy="124" r="4" />
+                        <circle cx="520" cy="124" r="4" />
+                        <circle cx="538" cy="124" r="4" />
+                        <circle cx="556" cy="124" r="4" />
+                    </g>
+                </g>
+                <text x="490" y="170" fill="#8094B0" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">plane (length × width)</text>
+
+                <!-- 3D volume via × again -->
+                <text x="710" y="30" fill="#FF00FF" font-family="Orbitron, monospace" font-size="11" letter-spacing="2"
+                    text-anchor="middle">3D — × again</text>
+                <g stroke="#FF00FF" stroke-width="1.2" fill="rgba(255,0,255,0.05)">
+                    <polygon points="650,135 720,135 760,105 690,105" />
+                    <polygon points="650,75 720,75 760,45 690,45" />
+                    <line x1="650" y1="75" x2="650" y2="135" />
+                    <line x1="720" y1="75" x2="720" y2="135" />
+                    <line x1="760" y1="45" x2="760" y2="105" />
+                    <line x1="690" y1="45" x2="690" y2="105" />
+                </g>
+                <text x="710" y="170" fill="#8094B0" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">volume (× height)</text>
+            </svg>
+            <figcaption>+ accumulates within a dimension. × ascends one dimension. ÷ descends one dimension.
+            </figcaption>
+        </figure>
+
+        <section class="sharp-prose">
+            <h2>Sharper — scale relativity</h2>
+            <p>
+                The dimensions above are not a fixed ladder with a privileged
+                bottom or top. <em>Dimension is relative to the observer.</em>
+                The same identity is simultaneously:
+            </p>
+            <ul>
+                <li>A <strong>point</strong>, when observed from one dimension up.</li>
+                <li>A <strong>whole</strong>, when observed at its own dimension.</li>
+                <li>A <strong>plane</strong>, when observed from one dimension down.</li>
+            </ul>
+            <p>
+                A car: from the parking lot's dimension it is one of many
+                points; at its own dimension it is the whole that contains
+                engine, wheels, frame; from the engine's dimension it is the
+                plane the engine inhabits. There is no privileged "atom" and
+                no privileged "system." This is the <strong>Russian Doll</strong>
+                principle, generalised.
+            </p>
+            <p
+                style="color: var(--neon-yellow); font-family: var(--font-arcade); font-size: 11px; letter-spacing: 1.5px; margin-top: 10px;">
+                AXIOM: Everything is a point in a higher dimension and a whole in a lower.
+            </p>
+        </section>
+
+        <figure class="figure">
+            <svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg"
+                aria-label="Russian Doll: parking lot, car, engine, piston">
+                <!-- Parking lot dimension -->
+                <text x="100" y="22" fill="#00FFFF" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">PARKING LOT</text>
+                <rect x="20" y="35" width="160" height="180" fill="rgba(0,255,255,0.04)" stroke="#00FFFF"
+                    stroke-width="1" />
+                <g fill="#00FFFF">
+                    <rect x="40" y="55" width="20" height="12" />
+                    <rect x="70" y="55" width="20" height="12" />
+                    <rect x="100" y="55" width="20" height="12" />
+                    <rect x="130" y="55" width="20" height="12" />
+                    <rect x="40" y="85" width="20" height="12" />
+                    <rect x="70" y="85" width="20" height="12" />
+                    <rect x="100" y="85" width="20" height="12" stroke="#FFE800" stroke-width="2" />
+                    <rect x="130" y="85" width="20" height="12" />
+                    <rect x="40" y="115" width="20" height="12" />
+                    <rect x="70" y="115" width="20" height="12" />
+                    <rect x="100" y="115" width="20" height="12" />
+                    <rect x="130" y="115" width="20" height="12" />
+                </g>
+                <text x="100" y="195" fill="#FFE800" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">a car is a point</text>
+
+                <!-- Arrow -->
+                <text x="220" y="120" fill="#FF00FF" font-family="Orbitron, monospace" font-size="10"
+                    text-anchor="middle">÷ explode</text>
+                <path d="M 195 130 L 245 130" stroke="#FF00FF" stroke-width="1.5" fill="none" />
+                <polygon points="245,130 235,124 235,136" fill="#FF00FF" />
+
+                <!-- Car dimension -->
+                <text x="320" y="22" fill="#00FFFF" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">A CAR</text>
+                <rect x="260" y="35" width="120" height="180" fill="rgba(0,255,255,0.04)" stroke="#00FFFF"
+                    stroke-width="1" />
+                <g fill="#00FFFF">
+                    <rect x="280" y="60" width="80" height="40" rx="4" stroke="#FFE800" stroke-width="2" />
+                    <text x="320" y="84" fill="#04040C" font-family="Orbitron, monospace" font-size="9"
+                        text-anchor="middle">engine</text>
+                    <circle cx="290" cy="120" r="6" />
+                    <circle cx="350" cy="120" r="6" />
+                    <rect x="278" y="140" width="84" height="20" rx="3" />
+                </g>
+                <text x="320" y="195" fill="#FFE800" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">an engine is a point</text>
+
+                <text x="420" y="120" fill="#FF00FF" font-family="Orbitron, monospace" font-size="10"
+                    text-anchor="middle">÷ explode</text>
+                <path d="M 395 130 L 445 130" stroke="#FF00FF" stroke-width="1.5" fill="none" />
+                <polygon points="445,130 435,124 435,136" fill="#FF00FF" />
+
+                <!-- Engine dimension -->
+                <text x="520" y="22" fill="#00FFFF" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">AN ENGINE</text>
+                <rect x="460" y="35" width="120" height="180" fill="rgba(0,255,255,0.04)" stroke="#00FFFF"
+                    stroke-width="1" />
+                <g fill="#00FFFF">
+                    <rect x="480" y="60" width="20" height="50" stroke="#FFE800" stroke-width="2" />
+                    <rect x="510" y="60" width="20" height="50" />
+                    <rect x="540" y="60" width="20" height="50" />
+                    <rect x="475" y="120" width="90" height="14" />
+                    <rect x="475" y="140" width="90" height="14" />
+                </g>
+                <text x="520" y="195" fill="#FFE800" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">a piston is a point</text>
+
+                <text x="620" y="120" fill="#FF00FF" font-family="Orbitron, monospace" font-size="10"
+                    text-anchor="middle">÷ explode</text>
+                <path d="M 595 130 L 645 130" stroke="#FF00FF" stroke-width="1.5" fill="none" />
+                <polygon points="645,130 635,124 635,136" fill="#FF00FF" />
+
+                <!-- Piston dimension -->
+                <text x="720" y="22" fill="#00FFFF" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">A PISTON</text>
+                <rect x="660" y="35" width="120" height="180" fill="rgba(0,255,255,0.04)" stroke="#00FFFF"
+                    stroke-width="1" />
+                <g fill="#00FFFF">
+                    <ellipse cx="720" cy="80" rx="40" ry="8" />
+                    <ellipse cx="720" cy="95" rx="40" ry="8" />
+                    <rect x="715" y="100" width="10" height="60" />
+                    <circle cx="720" cy="170" r="10" stroke="#FFE800" stroke-width="2" />
+                </g>
+                <text x="720" y="195" fill="#FFE800" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">a wrist-pin is a point</text>
+            </svg>
+            <figcaption>Same identity, four observer dimensions. ÷ descends; the highlighted point at each level is the
+                whole at the next.</figcaption>
+        </figure>
+
+        <section class="plain-prose" style="border-left-color: var(--neon-pink);">
+            <h2 style="color: var(--neon-pink);">What this rules out</h2>
+            <p>
+                Code that treats "the system" as fundamentally different from
+                "the parts." Architectures that assume there is a bottom (a
+                final atom) or a top (a final whole). Designs that mistake
+                the observer's chosen dimension for the structure of reality.
+                Each of these is committing a category error that
+                Dimensional Programming explicitly rejects.
+            </p>
+        </section>
+
+        <div class="next-bar">
+            <a class="prev" href="/x-dimensional/identity/">← 1 · Identity</a>
+            <a class="next" href="/x-dimensional/actors/">3 · Actors →</a>
+        </div>
+
+        <p class="footer-note">
+            Source axioms: <a href="/docs/X-DIMENSIONAL-AI-DIRECTIVE.md"><code>docs/X-DIMENSIONAL-AI-DIRECTIVE.md</code>
+                · Def 1.3.1 (Russian Doll), AGENTS.md (point/whole axiom)</a>
+        </p>
+
+        <p class="creator-credit">
+            <span class="name">CONCEIVED &amp; CREATED BY KENNETH BINGHAM</span><br>
+            SOFTWARE ENGINEER <span class="sep">·</span> AI SPECIALIST <span class="sep">·</span> IMAGINEER<br>
+            <a href="https://kensgames.com/">kensgames.com</a><span class="sep">·</span><a
+                href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a>
+        </p>
+    </div>
+</body>
+
+</html>

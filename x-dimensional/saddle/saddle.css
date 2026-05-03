@@ -1,0 +1,109 @@
+/* /x-dimensional/saddle/saddle.css
+ * Layout for the dedicated saddle-surface page. Inherits palette and
+ * arcade typography from /x-dimensional/proof.css. The page is
+ * deliberately not zero-scroll: per HR-1, scroll is permitted on
+ * dedicated study pages where the content does not fit a single
+ * viewport at a readable density.
+ */
+
+.saddle-shell { max-width: 1280px; }
+
+.saddle-stage {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin: 16px 0 20px;
+    align-items: stretch;
+}
+
+@media (min-width: 900px) {
+    .saddle-stage { grid-template-columns: 1fr 280px; }
+}
+
+#saddle {
+    display: block;
+    width: 100%;
+    height: 60vh;
+    min-height: 380px;
+    background:
+        radial-gradient(ellipse at 50% 60%, rgba(0, 80, 140, 0.18), transparent 70%),
+        var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.saddle-readout {
+    background: var(--bg-card-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.saddle-readout .kv {
+    grid-template-columns: 110px 1fr;
+}
+
+.saddle-readout .legend {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.legend .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+.legend .dot.orange { background: rgba(255, 180, 80, 0.95); box-shadow: 0 0 6px rgba(255, 180, 80, 0.5); }
+.legend .dot.cyan   { background: rgba(80, 200, 255, 0.95); box-shadow: 0 0 6px rgba(80, 200, 255, 0.5); }
+.legend .dot.yellow { background: #ffd54a;                  box-shadow: 0 0 8px rgba(255, 213, 74, 0.6); }
+
+.audience-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+    margin-top: 8px;
+}
+
+@media (min-width: 720px) {
+    .audience-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 1100px) {
+    .audience-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.audience-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+}
+
+.audience-card h3 {
+    font-family: var(--font-arcade);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: var(--neon-yellow);
+    margin-bottom: 8px;
+}
+
+.audience-card p {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.audience-card code {
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}

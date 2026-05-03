@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Paradigm — X-Dimensional Programming · KensGames</title>
+    <meta name="description"
+        content="Falsifiable, live-observed proof of the X-Dimensional programming paradigm. Each claim is computed in the browser at page-load time from the same code the games use; nothing is simulated." />
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png" />
+    <link rel="stylesheet" href="/lib/fonts/fonts.css" />
+    <link rel="stylesheet" href="/x-dimensional/proof.css" />
+    <link rel="stylesheet" href="/x-dimensional/paradigm.css" />
+</head>
+
+<body>
+    <div class="proof-shell paradigm-shell">
+        <nav class="proof-nav">
+            <a class="crumb" href="/">KensGames</a>
+            <span class="sep">/</span>
+            <span class="crumb" style="color: var(--neon-cyan)">The Paradigm</span>
+        </nav>
+
+        <div class="read-strip" aria-label="Reading sequence">
+            <span class="label">READ IN ORDER</span>
+            <a class="step" href="/x-dimensional/identity/">1 · Identity</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/dimensions/">2 · Dimensions</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/actors/">3 · Actors</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/manifestation/">4 · Manifestation</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/saddle/">See it live</a>
+        </div>
+
+        <h1 class="proof-title">X-Dimensional Programming — Live Proof</h1>
+        <p class="proof-subtitle">
+            Every value on these pages is computed in your browser at page load
+            from the same source files the shipped games use. No simulated data,
+            no pre-baked outputs, no theatre. Each claim states what would
+            disprove it. New here? Start with the <a href="/x-dimensional/identity/"
+                style="color: var(--neon-cyan);">four-page reading sequence above</a>.
+        </p>
+
+        <table class="honesty-table" aria-label="Claim category honesty table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>What it means here</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="cat-pill cat-mathematical">Mathematical</span></td>
+                    <td>Verified across all instances</td>
+                    <td>Tautology under the axioms — true by construction in any conforming manifest. Not "discovered,"
+                        enforced.</td>
+                </tr>
+                <tr>
+                    <td><span class="cat-pill cat-architectural">Architectural</span></td>
+                    <td>Falsifiable (static)</td>
+                    <td>Disprovable by static analysis or grep against the codebase as deployed.</td>
+                </tr>
+                <tr>
+                    <td><span class="cat-pill cat-behavioral">Behavioral</span></td>
+                    <td>Falsifiable (runtime)</td>
+                    <td>Disprovable by direct in-browser observation of the protocol output.</td>
+                </tr>
+                <tr>
+                    <td><span class="cat-pill cat-definitional">Definitional</span></td>
+                    <td>Stipulation, not prediction</td>
+                    <td>Foundational axioms that define the framework's vocabulary. Cannot be empirically falsified —
+                        only accepted, rejected, or refined.</td>
+                </tr>
+                <tr>
+                    <td><span class="cat-pill cat-aesthetic">Aesthetic</span></td>
+                    <td>Framing, not prediction</td>
+                    <td>Describes how the paradigm is presented; does not make a claim about the world.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2
+            style="font-family: var(--font-arcade); font-size: 14px; letter-spacing: 2px; color: var(--neon-yellow); margin: 8px 0;">
+            Falsifiable Claims (F1–F7)</h2>
+        <div id="claim-grid" class="claim-grid" aria-live="polite">
+            <p style="color: var(--text-muted); font-size: 12px;">Loading seed manifest…</p>
+        </div>
+
+        <h2
+            style="font-family: var(--font-arcade); font-size: 14px; letter-spacing: 2px; color: var(--neon-pink); margin: 24px 0 8px;">
+            Definitional Axioms (Not Falsifiable — Acknowledged)</h2>
+        <div id="axiom-grid" class="claim-grid"></div>
+
+        <p class="footer-note">
+            Source: <code style="color: var(--neon-cyan)">/x-dimensional/manifold.proof.json</code> · Engine: <code
+                style="color: var(--neon-cyan)">/x-dimensional/proof-runner.js</code> · Substrates loaded from <code
+                style="color: var(--neon-cyan)">/js/manifold.js</code> (the same module the games use).
+        </p>
+    </div>
+
+    <script src="/js/manifold.js"></script>
+    <script src="/x-dimensional/proof-runner.js"></script>
+    <script src="/x-dimensional/proof-runner-extra.js"></script>
+    <script>
+        (async () => {
+            const seed = await window.ProofRunner.loadSeed();
+            const claimGrid = document.getElementById('claim-grid');
+            claimGrid.innerHTML = '';
+            for (const c of seed.claims) {
+                const card = document.createElement('div');
+                card.className = 'claim-card';
+                card.innerHTML = `
+                    <span class="id">${c.id} · <span class="cat-pill cat-${c.category}">${c.category}</span></span>
+                    <span class="title">${c.title}</span>
+                    <span class="stmt">${c.statement}</span>
+                    <span class="fals">Disproved by: ${c.falsification}</span>
+                    <div class="actions">
+                        <a class="btn" href="/x-dimensional/experiment.html?claim=${c.id}">Run Live →</a>
+                    </div>
+                `;
+                claimGrid.appendChild(card);
+            }
+            const axGrid = document.getElementById('axiom-grid');
+            for (const a of seed.non_falsifiable_axioms) {
+                const card = document.createElement('div');
+                card.className = 'claim-card';
+                card.innerHTML = `
+                    <span class="id">${a.id} · <span class="cat-pill cat-${a.category}">${a.category}</span></span>
+                    <span class="title">${a.title}</span>
+                    <span class="stmt">${a.statement}</span>
+                    <span class="fals">Honest framing: ${a.honest_framing}</span>
+                `;
+                axGrid.appendChild(card);
+            }
+        })().catch(e => {
+            document.getElementById('claim-grid').innerHTML =
+                '<p style="color: var(--neon-red); font-size: 12px;">Seed load failed: ' + e.message + '</p>';
+        });
+    </script>
+</body>
+
+</html>

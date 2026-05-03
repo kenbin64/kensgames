@@ -1,0 +1,153 @@
+{
+  "_schema": "1.0",
+  "_doc": "Seed manifest for the X-Dimensional Paradigm proof-of-concept. Each claim is rendered LIVE in the browser by /x-dimensional/proof-runner.js. Nothing on the proof pages is pre-rendered or simulated.",
+  "name": "x-dimensional-paradigm-proof",
+  "version": "1.0.0",
+  "axiom": "z = x * y",
+  "categories": {
+    "mathematical": "Tautology under the axioms — true by construction. Verifiable across all instances; not 'discovered'.",
+    "architectural": "Falsifiable claim about the codebase. Disprovable by static analysis or grep.",
+    "behavioral": "Falsifiable claim about runtime behavior. Disprovable by observation.",
+    "definitional": "Stipulation, not prediction. Not falsifiable. Foundational by choice.",
+    "aesthetic": "Framing, not prediction. Not falsifiable."
+  },
+  "claims": [
+    {
+      "id": "F1",
+      "title": "Universal Access",
+      "category": "mathematical",
+      "statement": "For every shipped game, z == x * y where (x, y, z) are read at runtime from each game's manifold.game.json.",
+      "falsification": "A single shipped game whose manifest violates z == x * y disproves this claim.",
+      "protocol": "fetch_each_game_manifest_and_check_axiom",
+      "live_inputs": [
+        "manifold.portal.json",
+        "fasttrack/manifold.game.json",
+        "brickbreaker3d/manifold.game.json",
+        "4DTicTacToe/manifold.game.json",
+        "starfighter/manifold.game.json",
+        "cubic3d/manifold.game.json",
+        "assemble/manifold.game.json"
+      ],
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-axiom.test.js", "asserts": "every shipped game manifest satisfies z = x * y" }
+      ]
+    },
+    {
+      "id": "F2",
+      "title": "Substrate Purity",
+      "category": "behavioral",
+      "statement": "For each declared substrate (Gyroid, Schwarz Diamond, Schwarz Primitive), repeated calls with the same inputs return bit-identical outputs.",
+      "falsification": "A single (input, output_a, output_b) triple where output_a !== output_b for the same input disproves this claim for that substrate.",
+      "protocol": "call_each_substrate_n_times_check_identity",
+      "live_inputs": [
+        "js/manifold.js (window.Manifold.surface.gyroid)",
+        "js/manifold.js (window.Manifold.surface.diamond)"
+      ],
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-substrates.test.js", "asserts": "substrate refs exist on disk" },
+        { "kind": "test", "file": "tests/manifold-color-observation.test.js", "asserts": "substrate-as-observer purity (deterministic, finite)" }
+      ]
+    },
+    {
+      "id": "F3",
+      "title": "Determinism Across Reload",
+      "category": "behavioral",
+      "statement": "Substrate outputs at fixed coordinates are bit-identical across cold page reloads (no warm-cache bias, no random initialization).",
+      "falsification": "A previously-recorded output value (persisted in localStorage on first visit) differs from the freshly-computed value on a later reload, for the same substrate at the same coordinates.",
+      "protocol": "compare_fresh_eval_to_persisted_first_visit",
+      "live_inputs": [
+        "localStorage.proof_f3_baseline (persisted on first run)"
+      ],
+      "evidence": [
+        { "kind": "source", "file": "js/manifold.js", "asserts": "surface functions are pure: const gyroid = (x,y,z) => ..." }
+      ]
+    },
+    {
+      "id": "F4",
+      "title": "Manifest Is the Source of Truth",
+      "category": "architectural",
+      "statement": "Each game's runtime parameters trace back to a fetched manifold.game.json, not to hardcoded constants in game JS.",
+      "falsification": "A game whose JS hardcodes a value also declared in its manifest disproves this claim for that game.",
+      "protocol": "diff_manifest_params_against_runtime_window_globals",
+      "live_inputs": [
+        "fasttrack/manifold.game.json",
+        "brickbreaker3d/manifold.game.json",
+        "4DTicTacToe/manifold.game.json"
+      ],
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-params.test.js", "asserts": "every params.* key is consumed by game JS; game JS fetches its own manifold.game.json at runtime" }
+      ]
+    },
+    {
+      "id": "F5",
+      "title": "Registry / Source Agreement",
+      "category": "architectural",
+      "statement": "The compiled manifold.registry.json shipped to production has dimensions equal to source manifold.game.json for every game.",
+      "falsification": "Drift between registry.games[i].dimension and source manifold.dimension for any game disproves this claim.",
+      "protocol": "diff_registry_against_each_source_manifest",
+      "live_inputs": [
+        "js/manifold.registry.json",
+        "<each game>/manifold.game.json"
+      ],
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-registry.test.js", "asserts": "registry contains every portal-listed game; dimensions match source" }
+      ]
+    },
+    {
+      "id": "F6",
+      "title": "Algebraic Invertibility",
+      "category": "mathematical",
+      "statement": "For declared algebraic relations (z=xy, z=xy^2, z=x/y, z=x/y^2, m=xyz), the inverse extractions hold within float tolerance.",
+      "falsification": "Any (x, y) pair where z = x*y but extract_x(z, y) does not recover x, or extract_y(z, x) does not recover y, disproves this claim.",
+      "protocol": "verify_relation_inverses_over_random_samples",
+      "live_inputs": [
+        "Math.random()-seeded sample tuples (visible in the bloom output)"
+      ],
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-relations.test.js", "asserts": "z=xy invertibility: x = z/y and y = z/x recover identities; family cross-consistency" },
+        { "kind": "source", "file": "tests/_xmath.js", "asserts": "RELATIONS table: z=xy, z=x/y, z=xy^2, z=x/y^2, x=yz, x=y/z, y=xz, y=x/z, m=xyz" }
+      ]
+    },
+    {
+      "id": "F7",
+      "title": "Observability of State",
+      "category": "behavioral",
+      "statement": "Game runtime state visible to the user is derivable from (x, y, m) by re-evaluating the substrate — not stored separately and replayed.",
+      "falsification": "A game whose visible state cannot be reconstructed from (x, y, m) by re-evaluating its substrate at the same observer position disproves this claim for that game.",
+      "protocol": "scoped_observation_proof_per_game",
+      "live_inputs": [
+        "cubic3d/manifold.game.json (full proof)",
+        "fasttrack/manifold.game.json (partial proof: substrate observation only, lobby state out of scope)",
+        "starfighter/manifold.game.json (partial proof: substrate observation only)"
+      ],
+      "scope_admission": "Currently proven in full only for cubic3d. Partial for fasttrack, starfighter (substrate layer). Not yet proven for brickbreaker3d, 4DTicTacToe, assemble. This is a transparent admission, not theatre.",
+      "evidence": [
+        { "kind": "test", "file": "tests/manifold-color-observation.test.js", "asserts": "color is derived from manifold observation, not assumed" },
+        { "kind": "test", "file": "tests/manifold-geometry.test.js", "asserts": "geometry derived from manifold expressions" }
+      ]
+    }
+  ],
+  "non_falsifiable_axioms": [
+    {
+      "id": "Ax2.0",
+      "title": "Manifold Axiom",
+      "category": "definitional",
+      "statement": "A manifold is an expression-shape; computation is extraction from this shape.",
+      "honest_framing": "This is a stipulation about what we mean by 'manifold' in this paradigm. It cannot be empirically falsified; it can only be accepted, rejected, or refined as a definition."
+    },
+    {
+      "id": "Ax2.1",
+      "title": "Identity First",
+      "category": "definitional",
+      "statement": "Nothing proceeds until identity (x) is clear.",
+      "honest_framing": "An ordering rule on the framework, not a prediction about the world."
+    },
+    {
+      "id": "Ax2.11",
+      "title": "Roles, Not Types",
+      "category": "definitional",
+      "statement": "x, y, z are roles in a frame, not fixed types of value.",
+      "honest_framing": "A rule about how the labels are applied in any given frame; a value qualifies as 'x' iff some observer treats it as identity in that frame."
+    }
+  ]
+}

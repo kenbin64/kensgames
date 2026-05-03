@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Saddle — z = x · y · KensGames</title>
+    <meta name="description"
+        content="A 3D rendering of the saddle surface z = x · y, walked by system-domain identities under the recursion x_{n+1} = z_n. The geometry is the law; the law is the page." />
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png" />
+    <link rel="stylesheet" href="/lib/fonts/fonts.css" />
+    <link rel="stylesheet" href="/x-dimensional/proof.css" />
+    <link rel="stylesheet" href="/x-dimensional/paradigm.css" />
+    <link rel="stylesheet" href="/x-dimensional/saddle/saddle.css" />
+</head>
+
+<body>
+    <div class="proof-shell saddle-shell">
+        <nav class="proof-nav">
+            <a class="crumb" href="/">KensGames</a>
+            <span class="sep">/</span>
+            <a class="crumb" href="/x-dimensional/">The Paradigm</a>
+            <span class="sep">/</span>
+            <span class="crumb" style="color: var(--neon-cyan)">The Saddle</span>
+        </nav>
+
+        <div class="read-strip" aria-label="Reading sequence">
+            <span class="label">READ IN ORDER</span>
+            <a class="step" href="/x-dimensional/identity/">1 · Identity</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/dimensions/">2 · Dimensions</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/actors/">3 · Actors</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/manifestation/">4 · Manifestation</a><span class="arr">→</span>
+            <a class="step current" href="/x-dimensional/saddle/">See it live</a>
+        </div>
+
+        <h1 class="proof-title">z = x · y &nbsp;—&nbsp; The Saddle Surface</h1>
+        <p class="proof-subtitle">
+            <strong>Not arithmetic. Geometry.</strong>
+            This is the multiplication slice of the manifold. Two identities
+            meet at coordinates (x, y); the height of the surface at that
+            meeting <em>is</em> z, the manifested identity. z then becomes
+            the next x. The marker walks the law itself.
+        </p>
+
+        <div class="saddle-stage">
+            <canvas id="saddle" aria-label="3D saddle surface z = x · y, isometric projection"></canvas>
+            <aside class="saddle-readout" aria-live="polite">
+                <div class="kv">
+                    <span class="k">x (this step)</span><span class="v" id="x-name">—</span>
+                    <span class="k">y (modifier)</span><span class="v" id="y-name">—</span>
+                    <span class="k">z (manifested)</span><span class="v" id="z-name">—</span>
+                </div>
+                <p class="legend">
+                    <span class="dot orange"></span> x-axis &nbsp;
+                    <span class="dot cyan"></span> y-axis &nbsp;
+                    <span class="dot yellow"></span> current identity
+                </p>
+            </aside>
+        </div>
+
+        <section class="audience-grid" aria-label="Reading by audience">
+            <article class="audience-card">
+                <h3>For the curious</h3>
+                <p>
+                    The shape on screen is what multiplication looks like
+                    when you stop treating it as numbers. Walk along one
+                    edge — the surface slopes one way. Walk along the
+                    other — it slopes the opposite way. That is the saddle.
+                    Every "thing times another thing" in the system lands
+                    somewhere on this shape.
+                </p>
+            </article>
+            <article class="audience-card">
+                <h3>For mathematicians</h3>
+                <p>
+                    z = xy is a hyperbolic paraboloid (doubly ruled,
+                    Gaussian curvature K = −1/(1+x²+y²)² &lt; 0 everywhere
+                    except the origin saddle point). The two highlighted
+                    diagonals are its rulings. The recursion x<sub>n+1</sub> = z<sub>n</sub>
+                    is iteration of the map f<sub>y</sub>(x) = xy along an
+                    indexed sequence of y-values; with |y|&lt;1 it
+                    contracts to 0, with |y|&gt;1 it diverges. The
+                    walked path is the orbit.
+                </p>
+            </article>
+            <article class="audience-card">
+                <h3>For engineers</h3>
+                <p>
+                    No frameworks, no libraries, no shaders, no GPU.
+                    A single 175-line vanilla JS file (<code>saddle.js</code>)
+                    computes the surface, projects isometrically, and walks
+                    the orbit. The "trail" is not stored — it is recomputed
+                    each frame from the integer step. z is never cached;
+                    the head re-extracts <code>collapse(x, y)</code> every
+                    frame so the marker is provably on the manifold, not
+                    interpolated through it.
+                </p>
+            </article>
+            <article class="audience-card">
+                <h3>For the paradigm</h3>
+                <p>
+                    This page IS the manifold expressed in computer-identity.
+                    Reading <code>saddle.js</code> is reading the law as it
+                    participates in JavaScript. There is no abstract
+                    manifold elsewhere — the registry, the proof runner,
+                    and the games are projections of this same geometry.
+                </p>
+            </article>
+        </section>
+
+        <p class="footer-note">
+            Source: <a href="/x-dimensional/saddle/saddle.js"><code>/x-dimensional/saddle/saddle.js</code></a> ·
+            Companion: <a href="/x-dimensional/">paradigm proof surface</a> · Sister law (not yet rendered): z = x / y,
+            the hyperbolic divergence.
+        </p>
+
+        <p class="creator-credit">
+            <span class="name">CONCEIVED &amp; CREATED BY KENNETH BINGHAM</span><br>
+            SOFTWARE ENGINEER <span class="sep">·</span> AI SPECIALIST <span class="sep">·</span> IMAGINEER<br>
+            <a href="https://kensgames.com/">kensgames.com</a><span class="sep">·</span><a
+                href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a>
+        </p>
+    </div>
+
+    <script src="/x-dimensional/saddle/saddle.js"></script>
+</body>
+
+</html>

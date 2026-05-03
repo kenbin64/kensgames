@@ -1,0 +1,4 @@
+# Force LF line endings for shell scripts so they execute correctly
+# when checked out on Linux (VPS) regardless of contributor platform.
+*.sh        text eol=lf
+*.bash      text eol=lf

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manifestation — Dimensional Programming · KensGames</title>
+    <meta name="description"
+        content="The fourth concept of Dimensional Programming: z is the manifested identity that emerges when actors meet, and the next seed in the recursion. Time is the recursion of identity." />
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png" />
+    <link rel="stylesheet" href="/lib/fonts/fonts.css" />
+    <link rel="stylesheet" href="/x-dimensional/proof.css" />
+    <link rel="stylesheet" href="/x-dimensional/paradigm.css" />
+</head>
+
+<body>
+    <div class="proof-shell paradigm-shell">
+        <nav class="proof-nav">
+            <a class="crumb" href="/">KensGames</a>
+            <span class="sep">/</span>
+            <a class="crumb" href="/x-dimensional/">The Paradigm</a>
+            <span class="sep">/</span>
+            <span class="crumb" style="color: var(--neon-cyan)">4 · Manifestation</span>
+        </nav>
+
+        <div class="read-strip" aria-label="Reading sequence">
+            <span class="label">READ IN ORDER</span>
+            <a class="step" href="/x-dimensional/identity/">1 · Identity</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/dimensions/">2 · Dimensions</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/actors/">3 · Actors</a><span class="arr">→</span>
+            <a class="step current" href="/x-dimensional/manifestation/">4 · Manifestation</a><span class="arr">→</span>
+            <a class="step" href="/x-dimensional/saddle/">See it live</a>
+        </div>
+
+        <h1 class="proof-title">4 · Manifestation</h1>
+        <p class="proof-subtitle">When two identities meet through an actor, a third identity is born. That birth is z.
+            Time is z becoming the next x.</p>
+
+        <section class="plain-prose">
+            <h2>Plainly</h2>
+            <p>
+                Pages 1, 2, and 3 named the pieces. This page is what
+                <em>happens</em> when those pieces are put together.
+            </p>
+            <p>
+                Take two identities — <strong>x</strong> and
+                <strong>y</strong>. Apply an actor to them, say
+                <strong>×</strong>. Something new comes out. We call
+                that something <strong>z</strong>. It is not a number,
+                even when it looks like one. <strong>z is itself an
+                    identity</strong> — the identity that the act has just
+                manifested into the world.
+            </p>
+            <p>
+                And that newborn identity does not just sit there. It
+                becomes the <strong>next x</strong>. Another y meets it,
+                another act fires, another z emerges. That repeating
+                step — <em>z becoming the next x</em> — is what
+                Dimensional Programming calls <strong>time</strong>.
+                Time is not a clock ticking. Time is identity recurring.
+            </p>
+            <p>
+                The whole landscape of every possible (x, y) pair under
+                a given actor is called the <strong>manifold</strong>.
+                The manifold is never stored. It is queried, point by
+                point, only at the (x, y) the system actually visits.
+                Nothing in between is computed. Nothing in between
+                exists until asked.
+            </p>
+        </section>
+
+        <section class="sharp-prose">
+            <h2>Sharper</h2>
+            <ul>
+                <li><strong>Manifestation:</strong> <code>z = op(x, y)</code>. z is a first-class identity, not a value
+                    or a state cache.</li>
+                <li><strong>Recursion law:</strong> <code>x_{n+1} = z_n</code>. The output of one step is the input of
+                    the next. There is no recursion <em>within</em> a dimension; recursion is always from one manifested
+                    z back into x at the same or adjacent dimension.</li>
+                <li><strong>Manifold law:</strong> the surface <code>{ (x, y, z) : z = op(x, y) }</code> is geometric,
+                    not material. It is queried at the points the system traverses; it is never enumerated, indexed, or
+                    stored.</li>
+                <li><strong>Time:</strong> the trajectory of x through the recursion is what observers experience as
+                    time. Time has no separate variable.</li>
+            </ul>
+        </section>
+
+        <figure class="figure">
+            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg"
+                aria-label="Recursion: x meets y, manifests z, z becomes next x">
+                <defs>
+                    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+                        orient="auto">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#00FFFF" />
+                    </marker>
+                </defs>
+                <!-- Step n -->
+                <text x="120" y="22" fill="#FFE800" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">STEP n</text>
+                <circle cx="60" cy="100" r="8" fill="#FFE800" />
+                <text x="60" y="130" fill="#FFE800" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">x_n</text>
+                <text x="120" y="80" fill="#00FF41" font-family="Orbitron, monospace" font-size="14"
+                    text-anchor="middle">×</text>
+                <text x="120" y="125" fill="#8094B0" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">y_n</text>
+                <circle cx="120" cy="100" r="5" fill="#FF00FF" />
+                <path d="M 70 100 L 110 100" stroke="#00FFFF" stroke-width="1" />
+                <path d="M 130 100 L 170 100" stroke="#00FFFF" stroke-width="1.5" marker-end="url(#arr)" />
+                <circle cx="190" cy="100" r="10" fill="#00FFFF" />
+                <text x="190" y="130" fill="#00FFFF" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">z_n</text>
+
+                <!-- Recursion arrow -->
+                <path d="M 200 100 Q 280 30 360 100" stroke="#FFE800" stroke-width="1.5" fill="none"
+                    stroke-dasharray="5 4" />
+                <polygon points="360,100 350,94 350,106" fill="#FFE800" />
+                <text x="280" y="40" fill="#FFE800" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">x_{n+1} = z_n</text>
+
+                <!-- Step n+1 -->
+                <text x="430" y="22" fill="#FFE800" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">STEP n+1</text>
+                <circle cx="370" cy="100" r="8" fill="#FFE800" />
+                <text x="370" y="130" fill="#FFE800" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">x_{n+1}</text>
+                <text x="430" y="80" fill="#00FF41" font-family="Orbitron, monospace" font-size="14"
+                    text-anchor="middle">×</text>
+                <text x="430" y="125" fill="#8094B0" font-family="Consolas, monospace" font-size="10"
+                    text-anchor="middle">y_{n+1}</text>
+                <circle cx="430" cy="100" r="5" fill="#FF00FF" />
+                <path d="M 380 100 L 420 100" stroke="#00FFFF" stroke-width="1" />
+                <path d="M 440 100 L 480 100" stroke="#00FFFF" stroke-width="1.5" marker-end="url(#arr)" />
+                <circle cx="500" cy="100" r="10" fill="#00FFFF" />
+                <text x="500" y="130" fill="#00FFFF" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">z_{n+1}</text>
+
+                <path d="M 510 100 Q 590 30 670 100" stroke="#FFE800" stroke-width="1.5" fill="none"
+                    stroke-dasharray="5 4" />
+                <polygon points="670,100 660,94 660,106" fill="#FFE800" />
+
+                <!-- Step n+2 -->
+                <text x="740" y="22" fill="#FFE800" font-family="Orbitron, monospace" font-size="10"
+                    letter-spacing="1.5" text-anchor="middle">STEP n+2</text>
+                <circle cx="680" cy="100" r="8" fill="#FFE800" />
+                <text x="680" y="130" fill="#FFE800" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">x_{n+2}</text>
+                <text x="740" y="80" fill="#00FF41" font-family="Orbitron, monospace" font-size="14"
+                    text-anchor="middle">×</text>
+                <path d="M 690 100 L 770 100" stroke="#00FFFF" stroke-width="1.5" stroke-dasharray="2 3" />
+                <text x="775" y="104" fill="#8094B0" font-family="Consolas, monospace" font-size="11">…</text>
+
+                <text x="400" y="200" fill="#8094B0" font-family="Consolas, monospace" font-size="11"
+                    text-anchor="middle">time = the trajectory of x through this recursion</text>
+            </svg>
+            <figcaption>z is born from (x, y, op) and immediately becomes the next x. Time is not a variable; it is this
+                loop.</figcaption>
+        </figure>
+
+        <section class="sharp-prose">
+            <h2>The same surface, many lenses</h2>
+            <p>
+                Because the manifold is geometric and identity-blind,
+                the surface <code>z = x · y</code> is the same surface
+                whether the identities are colours, sounds, frames, or
+                game-states. A "lens" is a chosen interpretation of
+                what x, y, and z <em>name</em> in a given domain. The
+                geometry is invariant; only the names rotate.
+            </p>
+            <table class="def-table">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>x</th>
+                        <th>y</th>
+                        <th>z = x · y</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Numbers</td>
+                        <td><code>3</code></td>
+                        <td><code>4</code></td>
+                        <td><code>12</code></td>
+                    </tr>
+                    <tr>
+                        <td>Geometry</td>
+                        <td>length</td>
+                        <td>width</td>
+                        <td>area (one dim up)</td>
+                    </tr>
+                    <tr>
+                        <td>Colour</td>
+                        <td>hue</td>
+                        <td>luminance</td>
+                        <td>rendered shade</td>
+                    </tr>
+                    <tr>
+                        <td>Sound</td>
+                        <td>pitch</td>
+                        <td>amplitude</td>
+                        <td>perceived tone</td>
+                    </tr>
+                    <tr>
+                        <td>Harmonics</td>
+                        <td>fundamental</td>
+                        <td>partial</td>
+                        <td>chord identity</td>
+                    </tr>
+                    <tr>
+                        <td>Game frame</td>
+                        <td>input</td>
+                        <td>tick</td>
+                        <td>next state-identity</td>
+                    </tr>
+                    <tr>
+                        <td>Player session</td>
+                        <td>player</td>
+                        <td>event</td>
+                        <td>session-identity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="plain-prose" style="border-left-color: var(--neon-pink);">
+            <h2 style="color: var(--neon-pink);">What this rules out</h2>
+            <p>
+                State stores that hold z independently of (x, y). Caches
+                of "the manifold" as a precomputed table. Recursion that
+                runs <em>inside</em> a single dimension instead of
+                stepping through it. Code that treats time as a separate
+                clock variable rather than as the recursion of identity.
+                Each is a violation of the manifestation law.
+            </p>
+        </section>
+
+        <section class="sharp-prose" style="border-left-color: var(--neon-yellow);">
+            <h2 style="color: var(--neon-yellow);">See it live</h2>
+            <p>
+                The companion page <a href="/x-dimensional/saddle/"
+                    style="color: var(--neon-cyan);">/x-dimensional/saddle/</a>
+                renders the multiplicative manifold <code>z = x · y</code>
+                in 3D and walks system identities along it. Each frame
+                re-queries z from (x, y); the trail is not stored; the
+                head's z is provably <em>on</em> the surface. Watch the
+                paradigm execute.
+            </p>
+        </section>
+
+        <div class="next-bar">
+            <a class="prev" href="/x-dimensional/actors/">← 3 · Actors</a>
+            <a class="next" href="/x-dimensional/saddle/">See it live →</a>
+        </div>
+
+        <p class="footer-note">
+            Source axioms: <a href="/docs/X-DIMENSIONAL-AI-DIRECTIVE.md"><code>docs/X-DIMENSIONAL-AI-DIRECTIVE.md</code>
+                · Def 1.3 (z as manifested identity), Recursion Law, Manifold Law</a>
+        </p>
+
+        <p class="creator-credit">
+            <span class="name">CONCEIVED &amp; CREATED BY KENNETH BINGHAM</span><br>
+            SOFTWARE ENGINEER <span class="sep">·</span> AI SPECIALIST <span class="sep">·</span> IMAGINEER<br>
+            <a href="https://kensgames.com/">kensgames.com</a><span class="sep">·</span><a
+                href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a>
+        </p>
+    </div>
+</body>
+
+</html>

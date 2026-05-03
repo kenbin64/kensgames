@@ -1,0 +1,130 @@
+/* /x-dimensional/proof.css
+ * Minimal styles for the paradigm proof pages. Matches portal palette
+ * (Tron / 80s arcade) defined in /index.html. Zero-scroll where the
+ * content fits the viewport; experiment pages with tabular bloom data
+ * may scroll within their result panel only (HR-1 viewport rule).
+ */
+:root {
+    --neon-cyan: #00FFFF;
+    --neon-pink: #FF00FF;
+    --neon-yellow: #FFE800;
+    --neon-green: #00FF41;
+    --neon-red: #FF3060;
+    --bg-dark: #04040C;
+    --bg-card: rgba(8, 10, 28, 0.96);
+    --bg-card-2: rgba(12, 14, 36, 0.94);
+    --text: #E0E0FF;
+    --text-muted: #8094B0;
+    --text-dim: #4A5A78;
+    --border: rgba(0, 255, 255, 0.18);
+    --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-arcade: 'Orbitron', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+body {
+    font-family: var(--font-mono);
+    background: var(--bg-dark);
+    color: var(--text);
+    line-height: 1.55;
+    font-size: 14px;
+    overflow-x: hidden;
+}
+
+a { color: var(--neon-cyan); text-decoration: none; }
+a:hover { text-shadow: 0 0 6px var(--neon-cyan); }
+
+.proof-shell {
+    display: flex; flex-direction: column;
+    min-height: 100vh; max-width: 1200px; margin: 0 auto;
+    padding: 16px 24px;
+}
+
+.proof-nav {
+    display: flex; gap: 16px; align-items: center;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    font-family: var(--font-arcade); font-size: 11px; letter-spacing: 1.5px;
+}
+.proof-nav .crumb { color: var(--text-muted); }
+.proof-nav .crumb:hover { color: var(--neon-cyan); }
+.proof-nav .sep { color: var(--text-dim); }
+
+.proof-title {
+    font-family: var(--font-arcade); font-size: 20px; letter-spacing: 2px;
+    color: var(--neon-cyan); margin: 16px 0 4px;
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+}
+.proof-subtitle { color: var(--text-muted); font-size: 12px; margin-bottom: 16px; }
+
+.honesty-table {
+    width: 100%; border-collapse: collapse; margin: 12px 0 20px;
+    font-size: 12px;
+}
+.honesty-table th, .honesty-table td {
+    padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+}
+.honesty-table th { color: var(--neon-yellow); font-family: var(--font-arcade); letter-spacing: 1px; font-size: 10px; }
+.honesty-table td { vertical-align: top; }
+.cat-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 10px; letter-spacing: 1px; font-family: var(--font-arcade);
+}
+.cat-mathematical  { background: rgba(0, 255, 255, 0.12); color: var(--neon-cyan); }
+.cat-architectural { background: rgba(255, 232, 0, 0.12); color: var(--neon-yellow); }
+.cat-behavioral    { background: rgba(0, 255, 65, 0.12);  color: var(--neon-green); }
+.cat-definitional  { background: rgba(255, 0, 255, 0.10); color: var(--neon-pink); }
+.cat-aesthetic     { background: rgba(128, 148, 176, 0.14); color: var(--text-muted); }
+
+.claim-grid { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 8px; }
+@media (min-width: 720px) { .claim-grid { grid-template-columns: 1fr 1fr; } }
+
+.claim-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 4px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.claim-card .id { font-family: var(--font-arcade); font-size: 11px; color: var(--neon-yellow); letter-spacing: 2px; }
+.claim-card .title { font-family: var(--font-arcade); font-size: 14px; color: var(--text); letter-spacing: 1px; }
+.claim-card .stmt { color: var(--text-muted); font-size: 12px; }
+.claim-card .fals { color: var(--neon-pink); font-size: 11px; font-style: italic; }
+.claim-card .actions { display: flex; gap: 10px; margin-top: 4px; }
+.claim-card .btn {
+    padding: 4px 10px; border: 1px solid var(--neon-cyan);
+    color: var(--neon-cyan); font-family: var(--font-arcade);
+    font-size: 10px; letter-spacing: 1.5px; border-radius: 3px;
+}
+.claim-card .btn:hover { background: rgba(0, 255, 255, 0.08); }
+
+.bloom-panel {
+    background: var(--bg-card-2); border: 1px solid var(--border);
+    padding: 16px; border-radius: 4px; margin-top: 12px;
+    max-height: 60vh; overflow: auto;
+}
+.bloom-panel pre {
+    font-family: var(--font-mono); font-size: 12px; color: var(--text);
+    white-space: pre-wrap; word-break: break-all;
+}
+.bloom-panel .verdict {
+    display: inline-block; padding: 4px 12px; border-radius: 3px;
+    font-family: var(--font-arcade); font-size: 11px; letter-spacing: 1.5px;
+    margin-bottom: 10px;
+}
+.verdict-pass { background: rgba(0, 255, 65, 0.14); color: var(--neon-green); border: 1px solid var(--neon-green); }
+.verdict-fail { background: rgba(255, 48, 96, 0.14); color: var(--neon-red); border: 1px solid var(--neon-red); }
+.verdict-na   { background: rgba(128, 148, 176, 0.14); color: var(--text-muted); border: 1px solid var(--text-muted); }
+
+.kv { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin: 8px 0; font-size: 12px; }
+.kv .k { color: var(--text-muted); font-family: var(--font-arcade); font-size: 10px; letter-spacing: 1px; }
+.kv .v { color: var(--text); }
+
+.evidence-list { font-size: 12px; color: var(--text-muted); padding-left: 20px; }
+.evidence-list li { margin: 2px 0; }
+.evidence-list code { color: var(--neon-cyan); font-family: var(--font-mono); }
+
+.footer-note {
+    margin-top: auto; padding-top: 16px; font-size: 11px;
+    color: var(--text-dim); text-align: center;
+    border-top: 1px solid var(--border);
+}

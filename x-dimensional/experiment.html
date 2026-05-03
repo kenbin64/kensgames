@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Experiment — The Paradigm · KensGames</title>
+    <link rel="icon" href="/assets/images/logo/icon.png" type="image/png" />
+    <link rel="stylesheet" href="/lib/fonts/fonts.css" />
+    <link rel="stylesheet" href="/x-dimensional/proof.css" />
+</head>
+<body>
+    <div class="proof-shell">
+        <nav class="proof-nav">
+            <a class="crumb" href="/">KensGames</a>
+            <span class="sep">/</span>
+            <a class="crumb" href="/x-dimensional/">The Paradigm</a>
+            <span class="sep">/</span>
+            <span class="crumb" id="crumb-claim" style="color: var(--neon-cyan)">Loading…</span>
+        </nav>
+
+        <h1 class="proof-title" id="ex-title">Loading…</h1>
+        <p class="proof-subtitle" id="ex-statement"></p>
+
+        <div class="kv">
+            <div class="k">Claim ID</div>            <div class="v" id="ex-id">—</div>
+            <div class="k">Category</div>            <div class="v" id="ex-cat">—</div>
+            <div class="k">Protocol</div>            <div class="v" id="ex-proto">—</div>
+            <div class="k">Falsification</div>       <div class="v" id="ex-fals" style="color: var(--neon-pink)">—</div>
+            <div class="k">Live inputs</div>         <div class="v" id="ex-inputs">—</div>
+        </div>
+
+        <h2 style="font-family: var(--font-arcade); font-size: 12px; letter-spacing: 2px; color: var(--neon-yellow); margin: 12px 0 6px;">Bloom — Live Result</h2>
+        <div class="bloom-panel">
+            <div id="ex-verdict" class="verdict verdict-na">Running…</div>
+            <div class="kv" style="margin-top: 4px;">
+                <div class="k">Ran at</div>           <div class="v" id="ex-ran">—</div>
+                <div class="k">Elapsed</div>          <div class="v" id="ex-elapsed">—</div>
+                <div class="k">Summary</div>          <div class="v" id="ex-summary">—</div>
+            </div>
+            <pre id="ex-output">{}</pre>
+        </div>
+
+        <h2 style="font-family: var(--font-arcade); font-size: 12px; letter-spacing: 2px; color: var(--neon-cyan); margin: 16px 0 6px;">Evidence Trail</h2>
+        <ul class="evidence-list" id="ex-evidence"></ul>
+
+        <p class="footer-note">
+            Page rendered from <code style="color: var(--neon-cyan)">/x-dimensional/manifold.proof.json</code>;
+            protocol executed by <code style="color: var(--neon-cyan)">/x-dimensional/proof-runner.js</code>
+            (and <code style="color: var(--neon-cyan)">proof-runner-extra.js</code>) against the same
+            substrate code the games load from <code style="color: var(--neon-cyan)">/js/manifold.js</code>.
+            <br />Reload to re-execute. Shift-reload bypasses cache.
+        </p>
+    </div>
+
+    <script src="/js/manifold.js"></script>
+    <script src="/x-dimensional/proof-runner.js"></script>
+    <script src="/x-dimensional/proof-runner-extra.js"></script>
+    <script>
+        (async () => {
+            const params = new URLSearchParams(location.search);
+            const id = params.get('claim') || 'F1';
+            const out = document.getElementById('ex-output');
+            const verdict = document.getElementById('ex-verdict');
+            const setVerdict = (v) => {
+                verdict.className = 'verdict ' + (v === true ? 'verdict-pass' : v === false ? 'verdict-fail' : 'verdict-na');
+                verdict.textContent = v === true ? 'PASS — claim holds under this run'
+                    : v === false ? 'FAIL — claim disproved by this run'
+                    : 'NOT-A-VERDICT — see scope admission below';
+            };
+            try {
+                const result = await window.ProofRunner.run(id);
+                const c = result.claim;
+                document.title = `${c.id} ${c.title} — The Paradigm`;
+                document.getElementById('crumb-claim').textContent = c.id + ' ' + c.title;
+                document.getElementById('ex-title').textContent = c.id + ' · ' + c.title;
+                document.getElementById('ex-statement').textContent = c.statement;
+                document.getElementById('ex-id').textContent = c.id;
+                document.getElementById('ex-cat').innerHTML = `<span class="cat-pill cat-${c.category}">${c.category}</span>`;
+                document.getElementById('ex-proto').innerHTML = `<code>${c.protocol}</code>`;
+                document.getElementById('ex-fals').textContent = c.falsification;
+                document.getElementById('ex-inputs').innerHTML = (c.live_inputs || [])
+                    .map(s => `<code>${s}</code>`).join('<br />');
+                document.getElementById('ex-ran').textContent = result.ran_at || '—';
+                document.getElementById('ex-elapsed').textContent = (result.elapsed_ms || '—') + ' ms';
+                document.getElementById('ex-summary').textContent = result.summary || '—';
+                if (result.not_implemented) {
+                    setVerdict(null);
+                    out.textContent = '/* protocol "' + c.protocol + '" not yet implemented in proof-runner */\n'
+                        + JSON.stringify(result, null, 2);
+                } else {
+                    setVerdict(result.pass);
+                    out.textContent = JSON.stringify(result, (k, v) => k === 'claim' ? undefined : v, 2);
+                }
+                const evList = document.getElementById('ex-evidence');
+                evList.innerHTML = '';
+                for (const e of (c.evidence || [])) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong style="color: var(--text)">${e.kind}</strong>: <code>${e.file}</code> — ${e.asserts}`;
+                    evList.appendChild(li);
+                }
+                if (c.scope_admission) {
+                    const li = document.createElement('li');
+                    li.style.color = 'var(--neon-pink)';
+                    li.textContent = 'Scope admission: ' + c.scope_admission;
+                    evList.appendChild(li);
+                }
+            } catch (e) {
+                setVerdict(false);
+                out.textContent = 'Protocol execution failed: ' + e.message + '\n' + (e.stack || '');
+            }
+        })();
+    </script>
+</body>
+</html>

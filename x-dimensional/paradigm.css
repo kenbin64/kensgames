@@ -1,0 +1,269 @@
+/* /x-dimensional/paradigm.css
+ * Shared styles for the four explainer pages of the X-Dimensional
+ * paradigm: identity, dimensions, actors, manifestation. Inherits
+ * the Tron / arcade palette from proof.css. These pages are
+ * deliberately not zero-scroll: they are dedicated study pages
+ * (HR-1 permits scroll on dedicated study pages).
+ */
+
+.paradigm-shell {
+    max-width: 1100px;
+}
+
+/* Reading-sequence strip (top of every explainer page) */
+.read-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 18px;
+    padding: 10px 12px;
+    background: var(--bg-card-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+}
+
+.read-strip .label {
+    color: var(--neon-yellow);
+    margin-right: 6px;
+}
+
+.read-strip .step {
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+}
+
+.read-strip .step:hover {
+    color: var(--neon-cyan);
+}
+
+.read-strip .step.current {
+    color: var(--neon-cyan);
+    border-color: var(--neon-cyan);
+}
+
+.read-strip .arr {
+    color: var(--text-dim);
+    padding: 2px 0;
+}
+
+/* Plain-language opening (the lay reader lands here first) */
+.plain-prose {
+    background: var(--bg-card);
+    border-left: 3px solid var(--neon-yellow);
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.plain-prose h2 {
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--neon-yellow);
+    margin-bottom: 8px;
+}
+
+.plain-prose p {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 8px;
+}
+
+.plain-prose p:last-child {
+    margin-bottom: 0;
+}
+
+/* Sharper formulation (mathematicians / engineers land here second) */
+.sharp-prose {
+    background: var(--bg-card-2);
+    border-left: 3px solid var(--neon-cyan);
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.sharp-prose h2 {
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--neon-cyan);
+    margin-bottom: 8px;
+}
+
+.sharp-prose p,
+.sharp-prose li {
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.sharp-prose ul,
+.sharp-prose ol {
+    margin: 6px 0 6px 22px;
+}
+
+.sharp-prose code {
+    color: var(--neon-green);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 4px;
+    background: rgba(0, 255, 65, 0.06);
+    border-radius: 2px;
+}
+
+/* SVG diagram frames (every page has at least one inline-SVG figure) */
+.figure {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    margin: 16px 0;
+}
+
+.figure svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.figure figcaption {
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* Two-column tables for definitions and lenses */
+.def-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 12px;
+}
+
+.def-table th,
+.def-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+    vertical-align: top;
+}
+
+.def-table th {
+    color: var(--neon-yellow);
+    font-family: var(--font-arcade);
+    letter-spacing: 1px;
+    font-size: 10px;
+}
+
+.def-table code {
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+}
+
+/* Operator cards (used on the actors page) */
+.op-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+    margin: 12px 0;
+}
+
+@media (min-width: 720px) {
+    .op-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.op-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px;
+}
+
+.op-card .glyph {
+    font-family: var(--font-arcade);
+    font-size: 28px;
+    color: var(--neon-cyan);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.op-card .name {
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--neon-yellow);
+}
+
+.op-card .role {
+    color: var(--text);
+    font-size: 13px;
+    margin: 4px 0 6px;
+}
+
+.op-card .law {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+
+/* Inter-page footer link bar */
+.next-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-arcade);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+}
+
+.next-bar .prev {
+    color: var(--text-muted);
+}
+
+.next-bar .next {
+    color: var(--neon-cyan);
+}
+
+/* Creator credit (appears at the very bottom of every paradigm page) */
+.creator-credit {
+    margin-top: 18px;
+    padding: 10px 0 4px;
+    border-top: 1px dashed var(--border);
+    text-align: center;
+    font-family: var(--font-arcade);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    line-height: 1.8;
+}
+
+.creator-credit .name {
+    color: var(--neon-yellow);
+}
+
+.creator-credit a {
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.creator-credit a:hover {
+    color: var(--neon-cyan);
+}
+
+.creator-credit .sep {
+    color: var(--border);
+    margin: 0 6px;
+}
