@@ -5,7 +5,7 @@
 > beats. Light cleanup permitted for typos and run-ons; voice and
 > phrasing preserved verbatim wherever load-bearing.
 >
-> - **Character:** Jules — guide through dimensional and manifold computing. Verne-adjacent, slightly off-world, warm, folksy.
+> - **Character:** Jules — your dimensional tour guide. Walks visitors through dimensional and manifold computing. Verne-adjacent, slightly off-world, warm, folksy. Museum-docent register ("mind the step, no flash photography") sits comfortably alongside the field-naturalist register ("pick one up, look at the angles").
 > - **Audience:** general reader. No assumed math.
 > - **Render targets:** `/x-dimensional/walkthrough/` (read-along page), pull-quote callouts on each explainer page, audio narration (later).
 
@@ -60,10 +60,12 @@ script into every render target listed above.
 
 ## Beat 1 · Greeting & Frame
 
-Hello, I'm Jules. I'm your guide through dimensional and manifold
-computing. Don't let the names scare you off — by the end of a short
-walk together you'll see you've been living in this stuff your whole
-life. You just hadn't been handed the words for it yet.
+Hello, I'm Jules — your dimensional tour guide. Mind the step,
+no flash photography, and don't let the names scare you off. We're
+going to take a short walk through dimensional and manifold
+computing, and by the end you'll see you've been living in this
+stuff your whole life. You just hadn't been handed the words for
+it yet.
 
 Here's the trick of the whole thing: every time the human race picks
 up a new dimension, we stop thinking about it. We just *use* it.
@@ -174,7 +176,34 @@ You've been doing it your whole life.
 
 ---
 
-## Beat 6 · Closing
+## Beat 6 · The Games (and the Stradivarius)
+
+So go play the games. That's the rest of the lesson.
+
+Those four games on this site aren't running on bits and bytes the
+way you might expect. They're living manifolds. A motion here, a
+score there, a rule being followed — none of that is happening
+because somebody wrote a procedure that says "if this then that."
+It's happening because the games *see a shape and react to it.* The
+pattern isn't in the code. The pattern is in the manifold, and the
+shape itself gives up its secrets — secrets that were there all
+along.
+
+Same with a sound. Same with a song. Music isn't sitting in a file
+somewhere waiting to be played back. A Stradivarius doesn't *contain*
+its tone — it *is* the shape that produces that tone when a master
+pulls the right string the right way. That's all a fine instrument
+ever does: react to its own manifold, its own shape and composition.
+The musician isn't pushing music into the wood. They're pulling out
+what was already there, written into the geometry the day it was
+carved.
+
+The games on this site are played the same way. Pick one up. Pull a
+string. See what was there all along.
+
+---
+
+## Beat 7 · Closing
 
 So that's the walk. Identity, dimensions, manifolds, manifestation.
 Four pieces of vocabulary for things you were already doing. Now you
