@@ -14,22 +14,25 @@
   "claims": [
     {
       "id": "F1",
-      "title": "Universal Access",
-      "category": "mathematical",
-      "statement": "For every shipped game, z == x * y where (x, y, z) are read at runtime from each game's manifold.game.json.",
-      "falsification": "A single shipped game whose manifest violates z == x * y disproves this claim.",
-      "protocol": "fetch_each_game_manifest_and_check_axiom",
+      "title": "Public Registry Contract",
+      "category": "architectural",
+      "statement": "Every entry in the public game registry shipped to the browser exposes the public-safe contract (id, name, path, entry, multiplayer, bridge) — no internal wiring fields.",
+      "falsification": "A shipped registry entry that omits one of the contract fields, or that exposes wiring fields beyond the public surface, disproves this claim.",
+      "protocol": "fetch_public_registry_and_check_contract",
       "live_inputs": [
-        "manifold.portal.json",
-        "fasttrack/manifold.game.json",
-        "brickbreaker3d/manifold.game.json",
-        "4DTicTacToe/manifold.game.json",
-        "starfighter/manifold.game.json",
-        "cubic3d/manifold.game.json",
-        "assemble/manifold.game.json"
+        "js/manifold.registry.json"
       ],
       "evidence": [
-        { "kind": "test", "file": "tests/manifold-axiom.test.js", "asserts": "every shipped game manifest satisfies z = x * y" }
+        {
+          "kind": "test",
+          "file": "tests/manifold-axiom.test.js",
+          "asserts": "internal axiom holds at compile time on every source manifest"
+        },
+        {
+          "kind": "test",
+          "file": "tests/manifold-registry.test.js",
+          "asserts": "shipped registry entries satisfy the public-safe contract"
+        }
       ]
     },
     {
@@ -44,8 +47,16 @@
         "js/manifold.js (window.Manifold.surface.diamond)"
       ],
       "evidence": [
-        { "kind": "test", "file": "tests/manifold-substrates.test.js", "asserts": "substrate refs exist on disk" },
-        { "kind": "test", "file": "tests/manifold-color-observation.test.js", "asserts": "substrate-as-observer purity (deterministic, finite)" }
+        {
+          "kind": "test",
+          "file": "tests/manifold-substrates.test.js",
+          "asserts": "substrate refs exist on disk"
+        },
+        {
+          "kind": "test",
+          "file": "tests/manifold-color-observation.test.js",
+          "asserts": "substrate-as-observer purity (deterministic, finite)"
+        }
       ]
     },
     {
@@ -59,38 +70,27 @@
         "localStorage.proof_f3_baseline (persisted on first run)"
       ],
       "evidence": [
-        { "kind": "source", "file": "js/manifold.js", "asserts": "surface functions are pure: const gyroid = (x,y,z) => ..." }
+        {
+          "kind": "source",
+          "file": "js/manifold.js",
+          "asserts": "surface functions are pure: const gyroid = (x,y,z) => ..."
+        }
       ]
     },
     {
       "id": "F4",
       "title": "Manifest Is the Source of Truth",
       "category": "architectural",
-      "statement": "Each game's runtime parameters trace back to a fetched manifold.game.json, not to hardcoded constants in game JS.",
-      "falsification": "A game whose JS hardcodes a value also declared in its manifest disproves this claim for that game.",
+      "statement": "Each game's runtime parameters trace back to a declarative manifest, not to hardcoded constants in game JS.",
+      "falsification": "A game whose JS hardcodes a value that is also declared in its manifest disproves this claim for that game.",
       "protocol": "diff_manifest_params_against_runtime_window_globals",
-      "live_inputs": [
-        "fasttrack/manifold.game.json",
-        "brickbreaker3d/manifold.game.json",
-        "4DTicTacToe/manifold.game.json"
-      ],
+      "live_inputs": [],
       "evidence": [
-        { "kind": "test", "file": "tests/manifold-params.test.js", "asserts": "every params.* key is consumed by game JS; game JS fetches its own manifold.game.json at runtime" }
-      ]
-    },
-    {
-      "id": "F5",
-      "title": "Registry / Source Agreement",
-      "category": "architectural",
-      "statement": "The compiled manifold.registry.json shipped to production has dimensions equal to source manifold.game.json for every game.",
-      "falsification": "Drift between registry.games[i].dimension and source manifold.dimension for any game disproves this claim.",
-      "protocol": "diff_registry_against_each_source_manifest",
-      "live_inputs": [
-        "js/manifold.registry.json",
-        "<each game>/manifold.game.json"
-      ],
-      "evidence": [
-        { "kind": "test", "file": "tests/manifold-registry.test.js", "asserts": "registry contains every portal-listed game; dimensions match source" }
+        {
+          "kind": "test",
+          "file": "tests/manifold-params.test.js",
+          "asserts": "every declared param is consumed by game JS; game JS reads its manifest at runtime"
+        }
       ]
     },
     {
@@ -104,26 +104,38 @@
         "Math.random()-seeded sample tuples (visible in the bloom output)"
       ],
       "evidence": [
-        { "kind": "test", "file": "tests/manifold-relations.test.js", "asserts": "z=xy invertibility: x = z/y and y = z/x recover identities; family cross-consistency" },
-        { "kind": "source", "file": "tests/_xmath.js", "asserts": "RELATIONS table: z=xy, z=x/y, z=xy^2, z=x/y^2, x=yz, x=y/z, y=xz, y=x/z, m=xyz" }
+        {
+          "kind": "test",
+          "file": "tests/manifold-relations.test.js",
+          "asserts": "z=xy invertibility: x = z/y and y = z/x recover identities; family cross-consistency"
+        },
+        {
+          "kind": "source",
+          "file": "tests/_xmath.js",
+          "asserts": "RELATIONS table: z=xy, z=x/y, z=xy^2, z=x/y^2, x=yz, x=y/z, y=xz, y=x/z, m=xyz"
+        }
       ]
     },
     {
       "id": "F7",
       "title": "Observability of State",
       "category": "behavioral",
-      "statement": "Game runtime state visible to the user is derivable from (x, y, m) by re-evaluating the substrate — not stored separately and replayed.",
-      "falsification": "A game whose visible state cannot be reconstructed from (x, y, m) by re-evaluating its substrate at the same observer position disproves this claim for that game.",
+      "statement": "Game runtime state visible to the user is derivable by re-evaluating the substrate — not stored separately and replayed.",
+      "falsification": "A game whose visible state cannot be reconstructed by re-evaluating its substrate at the same observer position disproves this claim for that game.",
       "protocol": "scoped_observation_proof_per_game",
-      "live_inputs": [
-        "cubic3d/manifold.game.json (full proof)",
-        "fasttrack/manifold.game.json (partial proof: substrate observation only, lobby state out of scope)",
-        "starfighter/manifold.game.json (partial proof: substrate observation only)"
-      ],
-      "scope_admission": "Currently proven in full only for cubic3d. Partial for fasttrack, starfighter (substrate layer). Not yet proven for brickbreaker3d, 4DTicTacToe, assemble. This is a transparent admission, not theatre.",
+      "live_inputs": [],
+      "scope_admission": "Currently proven in full for one game; partial for others where only the substrate layer has been audited; not yet proven for the remainder. This is a transparent admission, not theatre.",
       "evidence": [
-        { "kind": "test", "file": "tests/manifold-color-observation.test.js", "asserts": "color is derived from manifold observation, not assumed" },
-        { "kind": "test", "file": "tests/manifold-geometry.test.js", "asserts": "geometry derived from manifold expressions" }
+        {
+          "kind": "test",
+          "file": "tests/manifold-color-observation.test.js",
+          "asserts": "color is derived from manifold observation, not assumed"
+        },
+        {
+          "kind": "test",
+          "file": "tests/manifold-geometry.test.js",
+          "asserts": "geometry derived from manifold expressions"
+        }
       ]
     }
   ],

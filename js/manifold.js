@@ -96,6 +96,145 @@ const Manifold = (() => {
   };
 
   // ══════════════════════════════════════════════════════════════════════════
+  // WINKI — algebraic 6-saddle octahedral closure of z = xy.
+  // The complete orbit of the gather axiom under axis-relabel × sign:
+  //   s=0: z = +m·xy   s=1: z = -m·xy
+  //   s=2: y = +m·xz   s=3: y = -m·xz
+  //   s=4: x = +m·yz   s=5: x = -m·yz
+  // All six surfaces meet at the origin; each pair of cells in a cubic
+  // lattice tiles seamlessly when the sign of m flips on (i+j+k) odd —
+  // the bipartite topology of the Schwarz-D substrate.
+  //
+  // HELIX — 1-D progression manifold (sequential traversal). Complement
+  // to the winki: holds direction and order, not simultaneity.
+  //
+  // No storage. No GLB. Pure algebra over (x, y, z).
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const WINKI_M = 0.25;     // surface coupling — derived from cube half-size 2
+  const WINKI_HALF = 2;     // bounding cube spans [-HALF, +HALF] on each axis
+  const WINKI_SURFACES = [
+    { axOut: 2, axA: 0, axB: 1, sign: +1, label: 'z=+xy' },
+    { axOut: 2, axA: 0, axB: 1, sign: -1, label: 'z=-xy' },
+    { axOut: 1, axA: 0, axB: 2, sign: +1, label: 'y=+xz' },
+    { axOut: 1, axA: 0, axB: 2, sign: -1, label: 'y=-xz' },
+    { axOut: 0, axA: 1, axB: 2, sign: +1, label: 'x=+yz' },
+    { axOut: 0, axA: 1, axB: 2, sign: -1, label: 'x=-yz' },
+  ];
+
+  function winkiSurface(s, a, b, m) {
+    const M = m == null ? WINKI_M : m;
+    return WINKI_SURFACES[s | 0].sign * M * a * b;
+  }
+
+  // Residual of (x,y,z) against surface s. Zero ⇒ point lies on the surface.
+  function winkiResidual(s, x, y, z, m) {
+    const S = WINKI_SURFACES[s | 0];
+    const M = m == null ? WINKI_M : m;
+    const xyz = [x, y, z];
+    return xyz[S.axOut] - S.sign * M * xyz[S.axA] * xyz[S.axB];
+  }
+
+  // Bipartite tiling sign: cells at lattice (i,j,k) flip sign when (i+j+k) odd,
+  // mirroring the Schwarz-D parity that makes face-line patterns match across
+  // every shared cube boundary.
+  function winkiCellSign(i, j, k) {
+    return ((((i | 0) + (j | 0) + (k | 0)) & 1)) ? -1 : +1;
+  }
+
+  // Map a world coordinate into the cell containing it. side = full edge length
+  // of one cell (defaults to 2·HALF). Returns { cell, local, sign }.
+  function winkiLocalize(x, y, z, side) {
+    const S = side == null ? (WINKI_HALF * 2) : side;
+    const i = Math.floor((x + WINKI_HALF) / S);
+    const j = Math.floor((y + WINKI_HALF) / S);
+    const k = Math.floor((z + WINKI_HALF) / S);
+    return {
+      cell: [i, j, k],
+      local: [x - (i * S + WINKI_HALF), y - (j * S + WINKI_HALF), z - (k * S + WINKI_HALF)],
+      sign: winkiCellSign(i, j, k),
+    };
+  }
+
+  // Triangulate one winki cell. Returns Float32 vertex/normal arrays and a
+  // Uint32 index array — six saddle patches, RES×RES quads each. Caller can
+  // hand these straight to a THREE.BufferGeometry without further processing.
+  function winkiMesh(resolution, m, half) {
+    const RES = Math.max(2, (resolution | 0) || 16);
+    const M = m == null ? WINKI_M : m;
+    const H = half == null ? WINKI_HALF : half;
+    const stride = RES + 1;
+    const vertsPerSurface = stride * stride;
+    const trisPerSurface = RES * RES * 2;
+    const positions = new Float32Array(WINKI_SURFACES.length * vertsPerSurface * 3);
+    const normals = new Float32Array(positions.length);
+    const indices = new Uint32Array(WINKI_SURFACES.length * trisPerSurface * 3);
+    let pOff = 0, nOff = 0, iOff = 0;
+    for (let s = 0; s < WINKI_SURFACES.length; s++) {
+      const S = WINKI_SURFACES[s];
+      const base = s * vertsPerSurface;
+      for (let j = 0; j <= RES; j++) {
+        const b = -H + (2 * H * j) / RES;
+        for (let i = 0; i <= RES; i++) {
+          const a = -H + (2 * H * i) / RES;
+          const o = S.sign * M * a * b;
+          // Surface tangents: ∂/∂a = e_a + sign·M·b·e_out, ∂/∂b = e_b + sign·M·a·e_out
+          // Normal = tangent_a × tangent_b — three components keyed by axis indices.
+          const dA = S.sign * M * b, dB = S.sign * M * a;
+          const t1 = [0, 0, 0]; t1[S.axA] = 1; t1[S.axOut] = dA;
+          const t2 = [0, 0, 0]; t2[S.axB] = 1; t2[S.axOut] = dB;
+          let nx = t1[1] * t2[2] - t1[2] * t2[1];
+          let ny = t1[2] * t2[0] - t1[0] * t2[2];
+          let nz = t1[0] * t2[1] - t1[1] * t2[0];
+          const nl = Math.hypot(nx, ny, nz) || 1;
+          nx /= nl; ny /= nl; nz /= nl;
+          const xyz = [0, 0, 0]; xyz[S.axA] = a; xyz[S.axB] = b; xyz[S.axOut] = o;
+          positions[pOff++] = xyz[0]; positions[pOff++] = xyz[1]; positions[pOff++] = xyz[2];
+          normals[nOff++] = nx; normals[nOff++] = ny; normals[nOff++] = nz;
+        }
+      }
+      for (let j = 0; j < RES; j++) {
+        for (let i = 0; i < RES; i++) {
+          const a = base + j * stride + i;
+          indices[iOff++] = a; indices[iOff++] = a + stride; indices[iOff++] = a + 1;
+          indices[iOff++] = a + 1; indices[iOff++] = a + stride; indices[iOff++] = a + stride + 1;
+        }
+      }
+    }
+    return { positions, normals, indices, surfaceCount: WINKI_SURFACES.length, m: M, half: H };
+  }
+
+  const Winki = {
+    M: WINKI_M, HALF: WINKI_HALF, SURFACES: WINKI_SURFACES,
+    surface: winkiSurface, residual: winkiResidual,
+    cellSign: winkiCellSign, localize: winkiLocalize, mesh: winkiMesh,
+  };
+
+  // HELIX — sequential traversal. radius r, axial pitch p, angular rate ω.
+  // helixSamples returns a Float32Array of N flat (x,y,z) triples for direct
+  // upload as a line-strip. Default pitch is φ to honour the proportion rule.
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  function helixCurve(t, opts) {
+    const o = opts || {};
+    const r = o.radius == null ? 1 : o.radius;
+    const p = o.pitch == null ? PHI : o.pitch;
+    const w = o.omega == null ? Math.PI * 2 : o.omega;
+    return { x: Math.cos(t * w) * r, y: t * p, z: Math.sin(t * w) * r };
+  }
+  function helixSamples(n, opts) {
+    const N = Math.max(2, n | 0);
+    const out = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const p = helixCurve(i / (N - 1), opts);
+      out[i * 3] = p.x; out[i * 3 + 1] = p.y; out[i * 3 + 2] = p.z;
+    }
+    return out;
+  }
+  const Helix = { PHI, curve: helixCurve, samples: helixSamples };
+
+
+
+  // ══════════════════════════════════════════════════════════════════════════
   // DERIVE — everything from two numbers
   // These are NOT stored. They are computed every time you ask.
   // ══════════════════════════════════════════════════════════════════════════
@@ -1188,6 +1327,16 @@ const Manifold = (() => {
 
     // Surface math (pure functions, zero storage)
     surface: { gyroid, diamond, blend, diamondGrad },
+
+    // Winki — algebraic 6-saddle octahedral closure (z=xy in all axis/sign
+    // permutations). Building unit for 4DTicTacToe and the humanoid-bee
+    // honeycomb starbase in Starfighter. Pure algebra; replaces winki.glb
+    // at runtime per the GLB-as-source-reference rule.
+    Winki,
+
+    // Helix — 1-D progression manifold. Complement to the winki: holds
+    // sequence and direction (φ-pitched by default).
+    Helix,
 
     // TPMS field kernel (Gyroid + Schwartz Diamond + trig). The runtime
     // manifold the four-function loop (observe / solve / collapse / bloom)

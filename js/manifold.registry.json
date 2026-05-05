@@ -1,42 +1,29 @@
 {
   "_schema": "1.0",
-  "_compiled": "2026-04-30T17:00:00Z",
-  "_axiom": "z = x * y — every game must satisfy this",
+  "_compiled": "2026-05-04T00:00:00Z",
   "portal": "kensgames-portal",
+  "domain": "kensgames.com",
   "games": [
     {
       "id": "fasttrack",
       "name": "FastTrack",
       "version": "2.1.0",
       "status": "production",
-      "entry": "/fasttrack/index.html",
-      "lobby": "/fasttrack/lobby.html",
-      "join": "/fasttrack/join.html",
-      "play": "/fasttrack/play.html",
-      "dimension": {
-        "x": 3,
-        "y": 45,
-        "z": 135,
-        "_note": "z = x*y = 3 players avg * 45 min avg = 135"
-      },
-      "substrates": {
-        "core": "fasttrack-game-core.js",
-        "manifold": "fasttrack_manifold_substrate.js",
-        "render3d": "fasttrack-3d.js",
-        "renderer3d": "schwarz_diamond_renderer.js",
-        "analytics": "analytics_substrate.js",
-        "growth": "growth_substrate.js",
-        "seo": "seo_substrate.js",
-        "lobby_client": "lobby_client.js",
-        "avatars": "avatars.js"
-      },
-      "server": { "type": "node", "lobby_port": 3001 },
+      "path": "fasttrack/",
+      "entry": "index.html",
+      "lobby": "lobby.html",
+      "multiplayer": true,
+      "bridge": "window.__MANIFOLD__",
       "manifold_compatibility": {
         "bridge_included": true,
         "state_exposed": true,
         "postmessage_protocol": true
       },
-      "tags": ["multiplayer", "board", "3d", "helix"],
+      "tags": [
+        "multiplayer",
+        "board",
+        "3d"
+      ],
       "thumbnail": "/fasttrack/assets/thumb.png"
     },
     {
@@ -44,30 +31,22 @@
       "name": "StarFighter",
       "version": "1.0.0",
       "status": "production",
-      "entry": "/starfighter/index.html",
-      "lobby": "/starfighter/lobby.html",
-      "dimension": {
-        "x": 2,
-        "y": 30,
-        "z": 60,
-        "_note": "z = x*y = 2 players avg * 30 min avg = 60"
-      },
-      "substrates": {
-        "bundle": "bundle.js",
-        "codex": "codex.js",
-        "codex_data": "codex_data.js",
-        "enhance": "enhance.js",
-        "input": "input.js",
-        "intro": "intro.js",
-        "multiplayer": "multiplayer.js"
-      },
-      "server": { "type": "node", "entry": "starfighter/server.js" },
+      "path": "starfighter/",
+      "entry": "index.html",
+      "lobby": "lobby.html",
+      "multiplayer": true,
+      "bridge": "window.__MANIFOLD__",
       "manifold_compatibility": {
         "bridge_included": true,
         "state_exposed": true,
         "postmessage_protocol": true
       },
-      "tags": ["multiplayer", "space", "combat", "3d", "anpc"],
+      "tags": [
+        "multiplayer",
+        "space",
+        "combat",
+        "3d"
+      ],
       "thumbnail": "/starfighter/assets/thumb.png"
     },
     {
@@ -75,24 +54,21 @@
       "name": "4D Connect",
       "version": "2.0.0",
       "status": "production",
-      "entry": "/4DTicTacToe/index.html",
-      "dimension": {
-        "x": 2,
-        "y": 12,
-        "z": 24,
-        "_note": "z = x*y = 2 players * 12 min = 24; game is a 4-dimensional manifold"
-      },
-      "substrates": {
-        "plane": "manifold.js:BoardManifold",
-        "height": "manifold.js:Turns",
-        "render": "game.js:animate"
-      },
+      "path": "4DTicTacToe/",
+      "entry": "index.html",
+      "multiplayer": true,
+      "bridge": "window.__MANIFOLD__",
       "manifold_compatibility": {
         "bridge_included": true,
         "state_exposed": true,
         "postmessage_protocol": true
       },
-      "tags": ["multiplayer", "strategy", "4d", "connect"],
+      "tags": [
+        "multiplayer",
+        "strategy",
+        "4d",
+        "connect"
+      ],
       "thumbnail": "/4DTicTacToe/assets/thumb.png"
     },
     {
@@ -100,27 +76,22 @@
       "name": "BrickBreaker 3D",
       "version": "1.0.0",
       "status": "production",
-      "entry": "/brickbreaker3d/index.html",
-      "lobby": "/brickbreaker3d/lobby.html",
-      "dimension": {
-        "x": 2,
-        "y": 22,
-        "z": 44,
-        "_note": "z = x*y = 2 players avg * 22 min avg = 44"
-      },
-      "substrates": {
-        "physics": "brickbreaker_manifold_substrate.js:PhysicsLens",
-        "graphics": "brickbreaker_manifold_substrate.js:GraphicsLens",
-        "audio": "brickbreaker_manifold_substrate.js:AudioLens",
-        "score": "brickbreaker_manifold_substrate.js:ScoreLens",
-        "game_state": "brickbreaker_manifold_substrate.js:GameStateLens"
-      },
+      "path": "brickbreaker3d/",
+      "entry": "index.html",
+      "lobby": "lobby.html",
+      "multiplayer": true,
+      "bridge": "window.__MANIFOLD__",
       "manifold_compatibility": {
         "bridge_included": true,
         "state_exposed": true,
         "postmessage_protocol": true
       },
-      "tags": ["multiplayer", "arcade", "physics", "3d"],
+      "tags": [
+        "multiplayer",
+        "arcade",
+        "physics",
+        "3d"
+      ],
       "thumbnail": "/brickbreaker3d/assets/thumb.png"
     }
   ]

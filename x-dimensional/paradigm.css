@@ -267,3 +267,135 @@
     color: var(--border);
     margin: 0 6px;
 }
+
+
+/* Jules pull-quote (narrator callout on each explainer page) */
+.jules-quote {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 0, 255, 0.28);
+    border-left: 3px solid var(--neon-pink);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px 14px;
+    margin: 14px 0 18px;
+    position: relative;
+}
+
+.jules-quote .voice {
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    letter-spacing: 1.8px;
+    color: var(--neon-pink);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.jules-quote .voice .who {
+    color: var(--neon-pink);
+}
+
+.jules-quote .voice .listen {
+    color: var(--text-muted);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+}
+
+.jules-quote .voice .listen a {
+    color: var(--neon-cyan);
+}
+
+.jules-quote blockquote {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.7;
+    font-style: italic;
+    margin: 0;
+}
+
+.jules-quote blockquote::before {
+    content: "\201C";
+    color: var(--neon-pink);
+    font-size: 22px;
+    line-height: 0;
+    vertical-align: -6px;
+    margin-right: 4px;
+}
+
+.jules-quote blockquote::after {
+    content: "\201D";
+    color: var(--neon-pink);
+    font-size: 22px;
+    line-height: 0;
+    vertical-align: -10px;
+    margin-left: 2px;
+}
+
+/* Walkthrough page: beat structure, threaded read */
+.beat {
+    margin: 28px 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.beat:first-of-type {
+    border-top: none;
+    padding-top: 0;
+}
+
+.beat .beat-tag {
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--neon-yellow);
+    margin-bottom: 4px;
+}
+
+.beat .beat-tag .num {
+    color: var(--neon-cyan);
+}
+
+.beat h2 {
+    font-family: var(--font-arcade);
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    color: var(--neon-cyan);
+    margin: 0 0 10px;
+}
+
+.beat .narration p {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.75;
+    margin: 0 0 10px;
+}
+
+.beat .narration p:last-child {
+    margin-bottom: 0;
+}
+
+.beat .narration em {
+    color: var(--neon-yellow);
+    font-style: italic;
+}
+
+.beat .narration strong {
+    color: var(--neon-cyan);
+    font-weight: normal;
+}
+
+.beat .deeper {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--bg-card-2);
+    border-left: 2px solid var(--neon-cyan);
+    font-family: var(--font-arcade);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+}
+
+.beat .deeper a {
+    color: var(--neon-cyan);
+}

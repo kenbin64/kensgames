@@ -26,12 +26,18 @@ async function loadRegistry() {
         const reg = await res.json();
         (reg.games || []).forEach(g => {
             const url = '/' + g.path + (g.lobby || g.entry);
+            // The public registry exposes a derived `multiplayer` flag
+            // (HR-53). Older shipped registries may carry a `dimension`
+            // block; fall back to that only if the explicit flag is
+            // absent so a stale on-disk artifact still drives the badge.
+            const mp = (typeof g.multiplayer === 'boolean')
+                ? g.multiplayer
+                : !!(g.dimension && g.dimension.x > 1);
             GAMES[g.id] = {
                 title: g.name,
                 url,
-                multiplayer: g.dimension && g.dimension.x > 1,
+                multiplayer: mp,
                 version: g.version,
-                dimension: g.dimension,
                 status: g.status,
             };
         });
@@ -68,15 +74,15 @@ document.addEventListener('DOMContentLoaded', () => {
         connectLobby();
     });
 });
-        // Derive card bloom via portal session substrate (z=x*y) once registry is loaded
-        if (window.PortalSessionSubstrate) {
-            (reg.games || []).forEach(g => {
-                try {
-                    const bloom = window.PortalSessionSubstrate.cardBloom(g);
-                    if (GAMES[g.id]) GAMES[g.id].bloom = bloom;
-                } catch (_) { }
-            });
-        }
+// Derive card bloom via portal session substrate (z=x*y) once registry is loaded
+if (window.PortalSessionSubstrate) {
+    (reg.games || []).forEach(g => {
+        try {
+            const bloom = window.PortalSessionSubstrate.cardBloom(g);
+            if (GAMES[g.id]) GAMES[g.id].bloom = bloom;
+        } catch (_) { }
+    });
+}
 
 // ── AUTH ──────────────────────────────────────────────────────
 function showAuth(mode) {

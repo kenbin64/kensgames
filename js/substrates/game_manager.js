@@ -417,6 +417,379 @@
     { id: 'starfighter', rulesUrl: '/starfighter/rules.json', scenariosUrl: '/starfighter/scenarios.json', name: 'Starfighter' },
   ];
 
+  // ── Setup workflow governance (AI-observable) ─────────────────────────────
+  const SETUP_TRACE_KEY = 'kg_setup_trace';
+  const SETUP_TRACE_CAP = 300;
+
+  const DEFAULT_SETUP_PROFILE = {
+    id: 'default',
+    // Panel capabilities that drive which options are practical for a game.
+    panel: {
+      supportsSameScreen: false,
+      supportsMatchmaker: true,
+      supportsOpenGames: true,
+    },
+    // Canonical option family map requested by product.
+    options: ['solo', 'solo-bots', 'host-invite', 'private-invite', 'matchmaker', 'browse', 'same-screen'],
+    authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+    signup: {
+      guestAllowedModes: ['solo', 'solo-bots', 'host-invite', 'same-screen'],
+      signedInModes: ['private-invite', 'matchmaker', 'browse'],
+      createMethods: ['quick-create', 'signed-in-create'],
+      joinMethods: ['url-code', 'open-lobby-list', 'skill-matchmaker'],
+    },
+    // Ordered setup steps for compliance monitoring.
+    requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
+  };
+
+  const GAME_SETUP_PROFILES = {
+    starfighter: {
+      panel: { supportsSameScreen: false, supportsMatchmaker: true, supportsOpenGames: true },
+      options: ['solo', 'solo-bots', 'host-invite', 'private-invite', 'matchmaker', 'browse'],
+      authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+      requiredSteps: ['profile_ready', 'mode_selected', 'invite_shared', 'roster_ready', 'launch_confirmed', 'launched'],
+    },
+    fasttrack: {
+      panel: { supportsSameScreen: true, supportsMatchmaker: true, supportsOpenGames: true },
+      options: ['solo', 'solo-bots', 'host-invite', 'private-invite', 'matchmaker', 'browse', 'same-screen'],
+      authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+      requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
+    },
+    brickbreaker3d: {
+      panel: { supportsSameScreen: true, supportsMatchmaker: true, supportsOpenGames: true },
+      options: ['solo', 'solo-bots', 'host-invite', 'private-invite', 'matchmaker', 'browse', 'same-screen'],
+      authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+      requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
+    },
+    '4dtictactoe': {
+      panel: { supportsSameScreen: true, supportsMatchmaker: true, supportsOpenGames: true },
+      options: ['solo', 'solo-bots', 'host-invite', 'private-invite', 'matchmaker', 'browse', 'same-screen'],
+      authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+      requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
+    },
+  };
+
+  const PROFILE_TO_PANEL_MODE = {
+    'solo': 'solo',
+    'solo-bots': 'solo-bots',
+    'host-invite': 'friend',
+    'private-invite': 'private',
+    'matchmaker': 'matchmaker',
+    'browse': 'browse',
+    'same-screen': 'same-screen',
+  };
+
+  const PANEL_TO_PROFILE_MODE = {
+    'solo': 'solo',
+    'solo-bots': 'solo-bots',
+    'friend': 'host-invite',
+    'private': 'private-invite',
+    'matchmaker': 'matchmaker',
+    'browse': 'browse',
+    'same-screen': 'same-screen',
+  };
+
+  let _setupDecisionResolver = null;
+
+  function _clamp01(v, fallback) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function createAdaptiveSetupResolver(signalProvider) {
+    return function adaptiveSetupResolver(gameId, context, baseProfile) {
+      const base = getSetupProcess(gameId, baseProfile || {});
+      const signals = (typeof signalProvider === 'function')
+        ? (signalProvider(gameId, context || {}, base) || {})
+        : ((context && context.signals) || {});
+
+      const queueHealth = _clamp01(signals.queueHealth, 1);
+      const lobbyHealth = _clamp01(signals.lobbyHealth, 1);
+      const serviceHealth = _clamp01(signals.serviceHealth, 1);
+      const isSignedIn = !!signals.isSignedIn;
+
+      const blocked = new Set(Array.isArray(signals.blockedModes) ? signals.blockedModes.map(String) : []);
+      const only = Array.isArray(signals.onlyModes) ? new Set(signals.onlyModes.map(String)) : null;
+
+      let options = (base.options || []).slice();
+
+      if (queueHealth < 0.35 || serviceHealth < 0.35) {
+        blocked.add('matchmaker');
+      }
+      if (lobbyHealth < 0.25 || serviceHealth < 0.25) {
+        blocked.add('browse');
+      }
+      if (!isSignedIn) {
+        blocked.add('private-invite');
+        blocked.add('matchmaker');
+        blocked.add('browse');
+      }
+
+      options = options.filter(function (m) {
+        const mode = String(m);
+        if (only && !only.has(mode)) return false;
+        return !blocked.has(mode);
+      });
+
+      if (!options.length) options = ['solo', 'solo-bots'];
+
+      return {
+        options: options,
+        panel: Object.assign({}, base.panel, {
+          supportsMatchmaker: options.indexOf('matchmaker') >= 0,
+          supportsOpenGames: options.indexOf('browse') >= 0,
+          supportsSameScreen: options.indexOf('same-screen') >= 0,
+        }),
+      };
+    };
+  }
+
+  function enableAdaptiveSetupPolicy(signalProvider) {
+    return setSetupDecisionResolver(createAdaptiveSetupResolver(signalProvider));
+  }
+
+  function _setupStorage() {
+    try { return (typeof sessionStorage !== 'undefined') ? sessionStorage : null; } catch (_) { return null; }
+  }
+
+  function _readSetupTrace() {
+    const s = _setupStorage();
+    if (!s) return [];
+    const raw = s.getItem(SETUP_TRACE_KEY);
+    const arr = raw ? safeJsonParse(raw) : null;
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function _writeSetupTrace(trace) {
+    const s = _setupStorage();
+    if (!s) return;
+    try { s.setItem(SETUP_TRACE_KEY, JSON.stringify((trace || []).slice(-SETUP_TRACE_CAP))); } catch (_) { }
+  }
+
+  function _pushSetupTrace(rec) {
+    const trace = _readSetupTrace();
+    trace.push(rec);
+    _writeSetupTrace(trace);
+  }
+
+  function _normalizeGameId(gameId) {
+    return String(gameId || '').toLowerCase();
+  }
+
+  function getSetupProcess(gameId, opts) {
+    const id = _normalizeGameId(gameId);
+    const profile = Object.assign({}, DEFAULT_SETUP_PROFILE, GAME_SETUP_PROFILES[id] || {}, opts || {});
+    profile.id = id || DEFAULT_SETUP_PROFILE.id;
+    profile.panel = Object.assign({}, DEFAULT_SETUP_PROFILE.panel, (GAME_SETUP_PROFILES[id] && GAME_SETUP_PROFILES[id].panel) || {}, (opts && opts.panel) || {});
+    profile.options = Array.isArray(profile.options) ? profile.options.slice() : DEFAULT_SETUP_PROFILE.options.slice();
+    profile.authRequiredModes = Array.isArray(profile.authRequiredModes)
+      ? profile.authRequiredModes.slice()
+      : DEFAULT_SETUP_PROFILE.authRequiredModes.slice();
+    profile.signup = Object.assign({}, DEFAULT_SETUP_PROFILE.signup, profile.signup || {}, (opts && opts.signup) || {});
+    profile.requiredSteps = Array.isArray(profile.requiredSteps) ? profile.requiredSteps.slice() : DEFAULT_SETUP_PROFILE.requiredSteps.slice();
+    return profile;
+  }
+
+  function _modeMeta(modeId) {
+    switch (modeId) {
+      case 'solo': return { label: 'Solo', joinMethod: 'none', createMethod: 'instant' };
+      case 'solo-bots': return { label: 'Solo + AI Bots', joinMethod: 'none', createMethod: 'instant-with-bots' };
+      case 'host-invite': return { label: 'Invite Friends (URL + Code)', joinMethod: 'url-code', createMethod: 'host-create' };
+      case 'private-invite': return { label: 'Signed-In Private Invite', joinMethod: 'url-code', createMethod: 'signed-in-create' };
+      case 'matchmaker': return { label: 'Matchmaker', joinMethod: 'queue', createMethod: 'queue' };
+      case 'browse': return { label: 'Join Offered Games', joinMethod: 'open-lobby-list', createMethod: 'open-lobby-create' };
+      case 'same-screen': return { label: 'Same Screen', joinMethod: 'none', createMethod: 'local-device' };
+      default: return { label: String(modeId || 'Unknown'), joinMethod: 'unknown', createMethod: 'unknown' };
+    }
+  }
+
+  function assessMultiplayerPotential(gameId, context) {
+    const ctx = context || {};
+    const profile = getSetupProcess(gameId, ctx.profile || {});
+    const modeIds = Array.isArray(profile.options) ? profile.options : DEFAULT_SETUP_PROFILE.options;
+    const authReq = new Set(Array.isArray(profile.authRequiredModes) ? profile.authRequiredModes : []);
+    const modes = modeIds.map((modeId) => {
+      const mm = _modeMeta(modeId);
+      return {
+        id: String(modeId),
+        panelMode: PROFILE_TO_PANEL_MODE[String(modeId)] || null,
+        label: mm.label,
+        requiresSignIn: authReq.has(String(modeId)),
+        joinMethod: mm.joinMethod,
+        createMethod: mm.createMethod,
+      };
+    });
+
+    return {
+      gameId: profile.id,
+      panel: Object.assign({}, profile.panel),
+      modes,
+      signup: Object.assign({}, profile.signup),
+      allowedPanelModes: modes.map((m) => m.panelMode).filter(Boolean),
+      authRequiredPanelModes: Array.from(authReq)
+        .map((m) => PROFILE_TO_PANEL_MODE[String(m)] || null)
+        .filter(Boolean),
+      mapping: {
+        profileToPanel: Object.assign({}, PROFILE_TO_PANEL_MODE),
+        panelToProfile: Object.assign({}, PANEL_TO_PROFILE_MODE),
+      },
+    };
+  }
+
+  function setSetupDecisionResolver(fn) {
+    _setupDecisionResolver = (typeof fn === 'function') ? fn : null;
+    return !!_setupDecisionResolver;
+  }
+
+  function resolveSetupProcess(gameId, context) {
+    const ctx = context || {};
+    const base = getSetupProcess(gameId);
+    let resolved = base;
+    if (_setupDecisionResolver) {
+      try {
+        const out = _setupDecisionResolver(gameId, ctx, base);
+        if (out && typeof out === 'object') {
+          resolved = getSetupProcess(gameId, out);
+        }
+      } catch (err) {
+        report({
+          level: 'warn',
+          code: 'setup_process_resolver_failed',
+          gameId: _normalizeGameId(gameId),
+          message: 'Setup decision resolver failed; using default process',
+          details: { error: err && err.message ? err.message : String(err) },
+        });
+      }
+    }
+    return Object.assign({}, resolved, {
+      assessment: assessMultiplayerPotential(gameId, { profile: resolved, context: ctx }),
+    });
+  }
+
+  function beginSetupFlow(meta) {
+    const m = meta || {};
+    const gameId = _normalizeGameId(m.gameId);
+    const flow = {
+      flowId: String(m.flowId || ('flow_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8))),
+      gameId,
+      gameName: m.gameName ? String(m.gameName) : gameId,
+      startedAt: Date.now(),
+      profile: getSetupProcess(gameId),
+      steps: [],
+      status: 'active',
+      source: m.source ? String(m.source) : 'unknown',
+      sessionId: m.sessionId ? String(m.sessionId) : null,
+      userId: m.userId ? String(m.userId) : null,
+    };
+    _pushSetupTrace({ ts: new Date().toISOString(), type: 'setup_flow_started', flow });
+    report({
+      level: 'info',
+      code: 'setup_flow_started',
+      gameId,
+      sessionId: flow.sessionId,
+      userId: flow.userId,
+      message: 'Setup flow started',
+      details: { flowId: flow.flowId, source: flow.source },
+    });
+    return flow;
+  }
+
+  function recordSetupStep(flow, stepId, details) {
+    if (!flow || !stepId) return null;
+    const step = {
+      id: String(stepId),
+      ts: Date.now(),
+      details: (details && typeof details === 'object') ? details : null,
+    };
+    flow.steps = Array.isArray(flow.steps) ? flow.steps : [];
+    flow.steps.push(step);
+    _pushSetupTrace({
+      ts: new Date().toISOString(),
+      type: 'setup_step',
+      flowId: flow.flowId,
+      gameId: flow.gameId,
+      step,
+    });
+    report({
+      level: 'info',
+      code: 'setup_step',
+      gameId: flow.gameId,
+      sessionId: flow.sessionId,
+      userId: flow.userId,
+      message: 'Setup step: ' + step.id,
+      details: { flowId: flow.flowId, step: step.id, stepDetails: step.details },
+    });
+    return step;
+  }
+
+  function evaluateSetupCompliance(flow, opts) {
+    const options = opts || {};
+    if (!flow) return { ok: false, missing: ['flow'], completed: [], required: [] };
+    const profile = options.profile || flow.profile || getSetupProcess(flow.gameId);
+    const completed = (flow.steps || []).map((s) => String(s && s.id || ''));
+    const modeStep = (flow.steps || []).find((s) => s && s.id === 'profile_ready' && s.details && s.details.launchMode);
+    const launchMode = modeStep && modeStep.details ? String(modeStep.details.launchMode || '') : '';
+    const required = (Array.isArray(profile.requiredSteps) ? profile.requiredSteps : []).filter((stepId) => {
+      if (stepId !== 'invite_shared') return true;
+      return launchMode === 'friend' || launchMode === 'private';
+    });
+    const completedSet = new Set((flow.steps || []).map((s) => String(s && s.id || '')));
+    const missing = required.filter((r) => !completedSet.has(String(r)));
+    return {
+      ok: missing.length === 0,
+      required,
+      completed: completed,
+      missing,
+      flowId: flow.flowId,
+      gameId: flow.gameId,
+      launchMode: launchMode || null,
+    };
+  }
+
+  function finalizeSetupFlow(flow, status, details) {
+    if (!flow) return null;
+    flow.status = String(status || 'completed');
+    flow.finishedAt = Date.now();
+    const compliance = evaluateSetupCompliance(flow);
+    const rec = {
+      ts: new Date().toISOString(),
+      type: 'setup_flow_finished',
+      flowId: flow.flowId,
+      gameId: flow.gameId,
+      status: flow.status,
+      compliance,
+      details: (details && typeof details === 'object') ? details : null,
+    };
+    _pushSetupTrace(rec);
+    report({
+      level: compliance.ok ? 'info' : 'warn',
+      code: compliance.ok ? 'setup_flow_compliant' : 'setup_flow_noncompliant',
+      gameId: flow.gameId,
+      sessionId: flow.sessionId,
+      userId: flow.userId,
+      message: compliance.ok ? 'Setup flow completed with compliance' : 'Setup flow completed with missing steps',
+      details: {
+        flowId: flow.flowId,
+        status: flow.status,
+        missing: compliance.missing,
+        providedDetails: rec.details,
+      },
+    });
+    return rec;
+  }
+
+  function getSetupTrace(limit) {
+    const trace = _readSetupTrace();
+    const n = Math.max(0, Math.min(SETUP_TRACE_CAP, parseInt(limit, 10) || SETUP_TRACE_CAP));
+    return trace.slice(-n);
+  }
+
+  function clearSetupTrace() {
+    _writeSetupTrace([]);
+    return true;
+  }
+
   function registerGame(id, opts) {
     const key = String(id || '').toLowerCase();
     if (!key) return false;
@@ -643,6 +1016,19 @@
     setRules,
     setScenarios,
     enforce,
+    // Setup workflow governance
+    getSetupProcess,
+    assessMultiplayerPotential,
+    setSetupDecisionResolver,
+    createAdaptiveSetupResolver,
+    enableAdaptiveSetupPolicy,
+    resolveSetupProcess,
+    beginSetupFlow,
+    recordSetupStep,
+    evaluateSetupCompliance,
+    finalizeSetupFlow,
+    getSetupTrace,
+    clearSetupTrace,
     // Health monitor (Phase 6)
     report,
     getLog,

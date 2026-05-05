@@ -893,7 +893,70 @@
             group.add(core);
             group.userData.core = core;   // referenced in animation
 
-            // Hexagonal cell patches on the surface (two rings + top cap)
+            // Honeycomb winki skin — the building unit of the hive starbase.
+            // Each cell is the algebraic 6-saddle octahedral closure of z=xy,
+            // sourced from Manifold.Winki.mesh() (no GLB at runtime per the
+            // GLB-as-source-reference rule). Cells are tiled bipartite-signed
+            // around the hull so neighbours connect along their shared spines.
+            const Mfd = (typeof window !== 'undefined') ? window.Manifold : null;
+            if (Mfd && Mfd.Winki) {
+                const wMesh = Mfd.Winki.mesh(8);
+                const wGeo = new T.BufferGeometry();
+                wGeo.setAttribute('position', new T.BufferAttribute(wMesh.positions, 3));
+                wGeo.setAttribute('normal', new T.BufferAttribute(wMesh.normals, 3));
+                wGeo.setIndex(new T.BufferAttribute(wMesh.indices, 1));
+                const cellSkinMat = new T.MeshStandardMaterial({
+                    color: new T.Color(0.14, 0.08, 0.02),
+                    emissive: amber, emissiveIntensity: 0.42,
+                    roughness: 0.78, metalness: 0.30,
+                    side: T.DoubleSide,
+                });
+                // Phi-spaced rings of winki cells around an oblate hull.
+                // ringCfg = { y, radiusXZ, count, cellScale }
+                const phi = 1.6180339887498949;
+                const rings = [
+                    { y: 0.36, rxz: 0.84, count: 12, cellScale: 0.18 },
+                    { y: -0.18, rxz: 0.78, count: 14, cellScale: 0.16 },
+                    { y: 0.74, rxz: 0.42, count: 7, cellScale: 0.15 },
+                    { y: -0.50, rxz: 0.62, count: 9, cellScale: 0.14 },
+                ];
+                let total = 0; rings.forEach(r => total += r.count);
+                const winkiInst = new T.InstancedMesh(wGeo, cellSkinMat, total);
+                winkiInst.frustumCulled = false;
+                const m4 = new T.Matrix4(), q = new T.Quaternion(), s3 = new T.Vector3();
+                const eye = new T.Vector3(), up = new T.Vector3(0, 1, 0), look = new T.Matrix4();
+                let ringIdx = 0, slot = 0;
+                rings.forEach(r => {
+                    for (let i = 0; i < r.count; i++) {
+                        const a = (i / r.count) * Math.PI * 2;
+                        const cx = Math.cos(a) * r.rxz * 1.55;
+                        const cz = Math.sin(a) * r.rxz * 1.25;
+                        const cy = r.y;
+                        // Bipartite sign: alternate around the ring AND between rings,
+                        // so the lattice parity (i+j+k) is preserved on the curved hull.
+                        const sgn = (((i + ringIdx) & 1) ? -1 : +1);
+                        // Scale: cell extends ±2 in local; world size = 2*cellScale*HALF.
+                        // Y-flip via sgn applied to scale.y achieves sign-mirror without rebuilding geometry.
+                        s3.set(r.cellScale * 0.5, sgn * r.cellScale * 0.5, r.cellScale * 0.5);
+                        // Orient cell so its +y axis points outward from hull centre.
+                        eye.set(cx, cy, cz);
+                        look.lookAt(eye, new T.Vector3(0, cy * 0.4, 0), up);
+                        q.setFromRotationMatrix(look);
+                        m4.compose(eye, q, s3);
+                        winkiInst.setMatrixAt(slot++, m4);
+                    }
+                    ringIdx++;
+                });
+                winkiInst.instanceMatrix.needsUpdate = true;
+                group.add(winkiInst);
+                group.userData.winkiSkin = winkiInst;
+                // φ tag: surfaces × rings · gather sign — keeps the proportion
+                // budget honest when this layer is later tuned.
+                group.userData.winkiPhi = phi;
+            }
+
+            // Hexagonal cell accents on the hull surface — sit on top of the
+            // winki skin as raised cap-stones, two equator rings + a top cap.
             const HEX = 6;
             function addHexRing(radius, y, count, scale) {
                 for (let i = 0; i < count; i++) {

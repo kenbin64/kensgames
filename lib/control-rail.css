@@ -1,0 +1,261 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   control-rail.css — HR-6.2 Fixed Control Rail
+   ─────────────────────────────────────────────────────────────────────────
+   The "controls plane" of every kensgames page. A viewport-fixed footer
+   (and optional fixed header) that hosts every interactive button, status
+   line, and roster widget so the content plane (game canvas, wizard panel,
+   promo) never has overlay UI on top of it.
+
+   See docs/HARD_RULES.md HR-6.2 for the full rule.
+
+   USAGE — host page:
+     <link rel="stylesheet" href="/lib/control-rail.css">
+     <script src="/lib/control-rail.js" defer></script>
+     <body>
+       <header id="kg-header"></header>      <!-- optional, hidden until populated -->
+       <main class="kg-content"> ... </main>  <!-- content plane -->
+       <aside id="kg-rail"></aside>           <!-- always present, opt-in via KGRail.set() -->
+     </body>
+
+   USAGE — caller (wizard / game):
+     KGRail.set(`<button data-act="back">←</button><button data-act="go">▶</button>`);
+     railNode.querySelector('[data-act="go"]').addEventListener('click', launch);
+   ──────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Rail height = button height + a thin breath of padding. The rail uses
+     box-sizing: border-box (below) so this var is the *actual* rendered
+     height edge-to-edge; the body's padding-bottom matches it exactly. */
+  --kg-rail-h: 48px;
+  --kg-rail-h-tall: 96px;
+  --kg-header-h: 0px;
+  --kg-rail-bg: rgba(4, 4, 26, 0.96);
+  --kg-rail-border: rgba(0, 255, 255, 0.32);
+  --kg-rail-shadow: 0 -2px 24px rgba(0, 255, 255, 0.18);
+  --kg-header-bg: rgba(4, 4, 26, 0.94);
+  --kg-header-border: rgba(0, 255, 255, 0.22);
+}
+
+@media (max-width: 560px) {
+  :root {
+    --kg-rail-h: 52px;
+  }
+}
+
+/* Content plane wrapper — subtracts header + rail from the viewport so
+   content never sits underneath either chrome layer. */
+.kg-content {
+  min-height: calc(100dvh - var(--kg-rail-h) - var(--kg-header-h));
+  padding-top: var(--kg-header-h);
+  padding-bottom: var(--kg-rail-h);
+  box-sizing: border-box;
+}
+
+/* Variant: lock content to exactly one viewport (no scroll inside the
+   content plane). Page scroll is still permitted at the document level. */
+.kg-content.kg-content-locked {
+  height: calc(100dvh - var(--kg-rail-h) - var(--kg-header-h));
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Fixed footer — the rail ──────────────────────────────────────────── */
+#kg-rail {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--kg-rail-h);
+  background: var(--kg-rail-bg);
+  border-top: 1px solid var(--kg-rail-border);
+  box-shadow: var(--kg-rail-shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 12px;
+  box-sizing: border-box;
+  font-family: 'Orbitron', 'Rajdhani', system-ui, sans-serif;
+  color: #cff;
+  transition: height 200ms ease;
+}
+
+#kg-rail:empty {
+  /* Empty rail still reserves height (so content layout doesn't jump when
+     the rail's contents are swapped). Page can hide it via .kg-rail-hidden. */
+  visibility: hidden;
+}
+
+#kg-rail.kg-rail-tall {
+  height: var(--kg-rail-h-tall);
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px;
+}
+
+body.kg-rail-hidden #kg-rail {
+  display: none;
+}
+
+body.kg-rail-hidden {
+  --kg-rail-h: 0px;
+}
+
+/* Default rail children: keep buttons / status text on a single row that
+   never wraps off-screen. Children opt out by setting their own flex rules. */
+#kg-rail>* {
+  flex: 0 0 auto;
+}
+
+#kg-rail>.kg-rail-grow,
+#kg-rail>.btn-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#kg-rail>.kg-rail-status {
+  flex: 1 1 auto;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #9aa;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Button styles for rail children. Panel-class buttons (.btn-cyan, .btn-ghost,
+   .btn-primary, .btn-purple) are normally scoped under .kg-mp, but rail
+   children live outside that scope, so re-declare the visual contract here. */
+#kg-rail button {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+#kg-rail button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#kg-rail .btn-ghost {
+  background: transparent;
+  color: #00FFFF;
+  border: 1px solid #00FFFF;
+}
+
+#kg-rail .btn-ghost:hover:not([disabled]) {
+  background: rgba(0, 255, 255, 0.12);
+}
+
+#kg-rail .btn-cyan {
+  background: #00FFFF;
+  color: #04041a;
+  border: none;
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.5);
+}
+
+#kg-rail .btn-cyan:hover:not([disabled]) {
+  background: #66ffff;
+  box-shadow: 0 0 22px rgba(0, 255, 255, 0.8);
+}
+
+#kg-rail .btn-cyan[disabled] {
+  background: #333;
+  color: #777;
+  box-shadow: none;
+}
+
+#kg-rail .btn-primary {
+  background: #00FF41;
+  color: #04041a;
+  border: none;
+  box-shadow: 0 0 14px rgba(0, 255, 65, 0.55);
+}
+
+#kg-rail .btn-primary:hover:not([disabled]) {
+  background: #66ff7a;
+  box-shadow: 0 0 24px rgba(0, 255, 65, 0.85);
+}
+
+#kg-rail .btn-primary[disabled] {
+  background: #333;
+  color: #777;
+  box-shadow: none;
+}
+
+#kg-rail .btn-purple {
+  background: transparent;
+  color: #c4a3ff;
+  border: 1px solid #9900FF;
+}
+
+#kg-rail .btn-purple:hover:not([disabled]) {
+  background: rgba(153, 0, 255, 0.18);
+  box-shadow: 0 0 12px rgba(153, 0, 255, 0.45);
+}
+
+@media (max-width: 560px) {
+  #kg-rail button {
+    padding: 0 14px;
+    font-size: 12px;
+  }
+}
+
+/* ── Fixed header — opt-in companion ──────────────────────────────────── */
+#kg-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--kg-header-h);
+  background: var(--kg-header-bg);
+  border-bottom: 1px solid var(--kg-header-border);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  box-sizing: border-box;
+  font-family: 'Orbitron', 'Rajdhani', system-ui, sans-serif;
+  color: #cff;
+  transition: height 200ms ease;
+}
+
+#kg-header:empty {
+  display: none;
+}
+
+body.kg-header-active {
+  --kg-header-h: 48px;
+}
+
+@media (max-width: 560px) {
+  body.kg-header-active {
+    --kg-header-h: 44px;
+  }
+}
+
+/* Safe-area padding for iOS home-indicator devices. The rail keeps its
+   declared height edge-to-edge on desktop; only iOS devices with a real
+   home-indicator inset get extra bottom padding (and the rail height var
+   should be increased by the page if it wants buttons above the indicator). */
+@supports (padding: max(0px)) {
+  #kg-rail {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  #kg-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}

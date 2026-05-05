@@ -247,6 +247,16 @@ const KGPlayerProfile = (() => {
     if (!el) return;
 
     const required = String(el.dataset.profileRequired || '').toLowerCase() === 'true';
+
+    // If profile is already set, just render the badge immediately.
+    // Only prompt when explicitly required (data-profile-required="true"),
+    // never on a landing/portal page just because the element exists.
+    if (!required && (hasName() || hasAvatar())) {
+      renderBadge(el);
+      return;
+    }
+    if (!required) return;
+
     ensure(required, () => {
       renderBadge(el);
     });

@@ -8,6 +8,7 @@
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
+  <link rel="stylesheet" href="/lib/hollywood-lobby.css">
   <style>
     :root {
       /* FastTrack lobby leans on the canonical KensGames Tron palette:
@@ -47,7 +48,8 @@
     body {
       display: flex;
       flex-direction: column;
-      min-height: 100dvh;
+      height: 100dvh;
+      overflow: hidden;
       background-color: #000006;
       background-image: radial-gradient(ellipse at 50% 0%, rgba(0, 180, 255, 0.08) 0%, transparent 60%),
         radial-gradient(ellipse at 50% 100%, rgba(187, 0, 255, 0.08) 0%, transparent 60%);
@@ -60,6 +62,20 @@
       align-items: center;
       padding: 18px 16px 24px;
       gap: 14px;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #mp-panel-host {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      position: relative;
+      isolation: isolate;
     }
 
     /* Cabinet art — small badge on desktop, hidden on phones so the setup
@@ -414,6 +430,21 @@
         margin-bottom: 6px;
       }
     }
+
+    @media (max-height: 760px) {
+      .cabinet {
+        display: none;
+      }
+
+      .lobby-wrap {
+        padding: 10px 12px 10px;
+        gap: 8px;
+      }
+
+      .player-card {
+        padding: 8px 12px;
+      }
+    }
   </style>
   <script src="/js/analytics.js"></script>
 </head>
@@ -428,13 +459,17 @@
       <ul class="arc-nav-links">
         <li><a href="/">&#8592; Portal</a></li>
         <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
-        <li><a href="/starfighter/lobby.html?v=20260501">Alien Attack</a></li>
+        <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+        <li><a href="/4DTicTacToe/">4D TicTacToe</a></li>
+        <li><a href="/assemble/">Assemble</a></li>
       </ul>
       <div class="arc-nav-right" id="nav-avatar"></div>
     </div>
   </nav>
 
   <div class="lobby-wrap">
+    <div class="hollywood-hills" aria-hidden="true"></div>
+    <div class="hollywood-searchlights" aria-hidden="true"></div>
     <!-- Arcade Cabinet Art -->
     <div class="cabinet">
       <div class="cab-top"></div>
@@ -462,7 +497,7 @@
     </div>
 
     <!-- Unified multiplayer panel mount -->
-    <div id="mp-panel-host" style="width:100%;max-width:560px;margin:0 auto;"></div>
+    <div id="mp-panel-host"></div>
   </div>
 
   <!-- Lightweight profile gate: prompts for name + avatar on first visit. -->
@@ -480,7 +515,8 @@
     }
   </script>
   <script src="/js/multiplayer-client.js?v=20260502a"></script>
-  <script src="/js/substrates/multiplayer_panel.js?v=20260502a"></script>
+  <!-- viewport-lock: no-scroll -->
+  <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
   <script src="/js/substrates/game_setup.js?v=20260502a"></script>
   <script>
     let username = localStorage.getItem('display_name') || localStorage.getItem('username') || '';

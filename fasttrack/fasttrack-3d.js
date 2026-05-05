@@ -2465,6 +2465,9 @@ async function init3D() {
   _buildArtOverlay();
   _wireArtClickHandler();
 
+  // Wire pick-on-board handler (desktop: click holes/route to pick a move).
+  setupBoardPickHandler();
+
   console.log('✅ FastTrack 3D Billiard Room initialized | 🜂 manifold surface active');
 }
 
@@ -3920,6 +3923,8 @@ function createPeg(id, playerIndex, holeId, colorIndex = null) {
   pegGroup.userData.pegId = id;
   pegGroup.userData.playerIndex = playerIndex;
   pegGroup.userData.holeId = holeId;
+  pegGroup.userData.color = color;
+  pegGroup.userData.colorHex = '#' + color.toString(16).padStart(6, '0');
 
   // Add to scene (pegs render above board)
   scene.add(pegGroup);
@@ -4828,21 +4833,32 @@ function fitVerticalFovToAspect(cam) {
 
 function onWindowResize() {
   if (!renderer || !camera) return;
-  const isMobile = window.innerWidth <= 600;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  // On mobile, inset the rendered viewport so the board appears in the gap
-  // between the player panel (top strip) and action panel (bottom strip).
-  let topH = 0, botH = 0;
-  if (isMobile) {
-    const topPanel = document.getElementById('panel-players');
-    const botPanel = document.getElementById('panel-action');
-    topH = topPanel ? Math.round(topPanel.getBoundingClientRect().height) : 55;
-    botH = botPanel ? Math.round(botPanel.getBoundingClientRect().height) : 75;
-  }
+  // Always inset the rendered viewport so the board sits in the gap between
+  // the fixed top header (#panel-players) and the fixed bottom rail
+  // (#panel-action / #panel-options / #panel-cam). HR-6.2.
+  const topPanel = document.getElementById('panel-players');
+  const actionPanel = document.getElementById('panel-action');
+  const optionsPanel = document.getElementById('panel-options');
+  const camPanel = document.getElementById('panel-cam');
+  const footerBg = document.getElementById('ft-footer-bg');
+  const topH = topPanel ? Math.round(topPanel.getBoundingClientRect().height) : 0;
+  const visibleH = (el) => {
+    if (!el) return 0;
+    const cs = window.getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
+    return Math.round(el.getBoundingClientRect().height);
+  };
+  const botH = Math.max(
+    visibleH(actionPanel),
+    visibleH(optionsPanel),
+    visibleH(camPanel),
+    visibleH(footerBg)
+  );
   const viewH = Math.max(h - topH - botH, 100);
   renderer.setSize(w, h);
-  renderer.setScissorTest(isMobile);
+  renderer.setScissorTest(true);
   renderer.setViewport(0, botH, w, viewH);
   renderer.setScissor(0, botH, w, viewH);
   camera.aspect = w / viewH;
@@ -4995,6 +5011,416 @@ function highlightSinglePath(moveIdx) {
   if (moveIdx >= 0 && moveIdx < vm.length) {
     highlightMovePaths([vm[moveIdx]]);
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PICK-ON-BOARD — desktop: click any hole on a unique route to play
+// (Mobile keeps the hint pill panel — touch targets too small here.)
+// ════════════════════════════════════════════════════════════════
+let _routeIndex = new Map();   // holeId -> [moveIdx, ...]
+let _routeIndexHash = '';      // re-build only when valid moves change
+const _pickRaycaster = (typeof THREE !== 'undefined') ? new THREE.Raycaster() : null;
+const _pickMouse = (typeof THREE !== 'undefined') ? new THREE.Vector2() : null;
+
+function _currentValidMoves() {
+  return (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.turn.get('validMoves') || [] : [];
+}
+
+// Build holeId -> [entry, ...] index from the current valid moves.
+// Entries are tagged so click/hover can dispatch the right action:
+//   { kind:'move',         moveIdx }                            — regular move
+//   { kind:'split-first',  pegIdx, steps, sampleIdx }           — pick a 7-split's first leg
+//   { kind:'split-second', moveIdx }                            — complete a 7-split after first leg picked
+//
+// Dedup rules mirror renderHints:
+//   - 'enter' moves collapse to one
+//   - non-enter regular moves dedup by dest|pegIdx
+//   - split first legs dedup by pegIdx:steps (the path is determined by them)
+//   - split second-leg entries are emitted only for splits whose first leg
+//     matches the in-progress getSplitChoice(); the OTHER peg's path is exposed
+function _getSplitChoice() {
+  if (typeof window.getSplitChoice !== 'function') return null;
+  const c = window.getSplitChoice();
+  return (c && c.pegIdx != null && c.steps != null) ? c : null;
+}
+
+function _buildRouteIndex(moves) {
+  const index = new Map();
+  const pushEntry = (hid, entry) => {
+    if (!hid) return;
+    if (!index.has(hid)) index.set(hid, []);
+    index.get(hid).push(entry);
+  };
+  const seenNon = new Set();
+  let seenEnter = false;
+  const splitFirstSeen = new Set();
+  const choice = _getSplitChoice();
+
+  moves.forEach((m, i) => {
+    if (!m) return;
+
+    if (m.type === 'split') {
+      if (!choice) {
+        // Expose both legs as first-leg pick targets.
+        const legs = [
+          { pegIdx: m.pegIdx, steps: m.steps, path: m.path, dest: m.dest },
+          { pegIdx: m.peg2Idx, steps: m.steps2, path: m.path2, dest: m.dest2 },
+        ];
+        for (const leg of legs) {
+          const key = `${leg.pegIdx}:${leg.steps}`;
+          if (splitFirstSeen.has(key)) continue;
+          splitFirstSeen.add(key);
+          if (Array.isArray(leg.path)) {
+            for (const hid of leg.path) {
+              pushEntry(hid, { kind: 'split-first', pegIdx: leg.pegIdx, steps: leg.steps, sampleIdx: i });
+            }
+          }
+          pushEntry(leg.dest, { kind: 'split-first', pegIdx: leg.pegIdx, steps: leg.steps, sampleIdx: i });
+        }
+      } else {
+        // Only this split if its first leg matches the player's choice;
+        // expose the OTHER (unpicked) leg's holes as second-leg completions.
+        let secondLeg = null;
+        if (m.pegIdx === choice.pegIdx && m.steps === choice.steps) {
+          secondLeg = { path: m.path2, dest: m.dest2 };
+        } else if (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps) {
+          secondLeg = { path: m.path, dest: m.dest };
+        }
+        if (secondLeg) {
+          if (Array.isArray(secondLeg.path)) {
+            for (const hid of secondLeg.path) {
+              pushEntry(hid, { kind: 'split-second', moveIdx: i });
+            }
+          }
+          pushEntry(secondLeg.dest, { kind: 'split-second', moveIdx: i });
+        }
+      }
+      return;
+    }
+
+    if (m.type === 'enter') {
+      if (seenEnter) return;
+      seenEnter = true;
+    } else {
+      const key = (m.dest || '') + '|' + m.pegIdx;
+      if (seenNon.has(key)) return;
+      seenNon.add(key);
+    }
+    if (Array.isArray(m.path)) {
+      for (const hid of m.path) pushEntry(hid, { kind: 'move', moveIdx: i });
+    }
+    pushEntry(m.dest, { kind: 'move', moveIdx: i });
+  });
+  return index;
+}
+
+function _refreshRouteIndex() {
+  const vm = _currentValidMoves();
+  const choice = _getSplitChoice();
+  const choiceTag = choice ? `${choice.pegIdx}:${choice.steps}` : '';
+  const hash = vm.map(m => `${m.type}:${m.pegIdx}:${m.dest}:${m.steps || ''}`).join('|') + '#' + choiceTag;
+  if (hash !== _routeIndexHash) {
+    _routeIndexHash = hash;
+    _routeIndex = _buildRouteIndex(vm);
+  }
+  return _routeIndex;
+}
+
+function _entryKey(e) {
+  if (!e) return '';
+  if (e.kind === 'move' || e.kind === 'split-second') return `${e.kind}:${e.moveIdx}`;
+  if (e.kind === 'split-first') return `split-first:${e.pegIdx}:${e.steps}`;
+  return '';
+}
+
+// Highlight just the relevant route for a hover entry.
+function _previewEntry(entry, vm) {
+  if (!entry) return;
+  if (entry.kind === 'move') {
+    if (typeof window.highlightSinglePath === 'function') window.highlightSinglePath(entry.moveIdx);
+    return;
+  }
+  if (entry.kind === 'split-first') {
+    const m = vm[entry.sampleIdx];
+    if (!m || typeof window.highlightMovePaths !== 'function') return;
+    const isLeg1 = (m.pegIdx === entry.pegIdx && m.steps === entry.steps);
+    const synth = {
+      type: 'move',
+      path: isLeg1 ? m.path : m.path2,
+      dest: isLeg1 ? m.dest : m.dest2
+    };
+    window.highlightMovePaths([synth]);
+    return;
+  }
+  if (entry.kind === 'split-second') {
+    const m = vm[entry.moveIdx];
+    if (!m || typeof window.highlightMovePaths !== 'function') return;
+    const choice = _getSplitChoice();
+    if (!choice) return;
+    const firstIsLeg1 = (m.pegIdx === choice.pegIdx && m.steps === choice.steps);
+    const synth = {
+      type: 'move',
+      path: firstIsLeg1 ? m.path2 : m.path,
+      dest: firstIsLeg1 ? m.dest2 : m.dest
+    };
+    window.highlightMovePaths([synth]);
+  }
+}
+
+function _restoreDefaultHighlight() {
+  if (typeof window.highlightMovePaths !== 'function') return;
+  const vm = _currentValidMoves();
+  const choice = _getSplitChoice();
+  if (choice) {
+    const candidates = vm.filter(m => m && m.type === 'split'
+      && ((m.pegIdx === choice.pegIdx && m.steps === choice.steps)
+        || (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps)));
+    window.highlightMovePaths(candidates);
+  } else {
+    window.highlightMovePaths();
+  }
+}
+
+function _commitEntry(entry) {
+  if (!entry) return;
+  if (entry.kind === 'move' || entry.kind === 'split-second') {
+    if (typeof window.executeMove === 'function') window.executeMove(entry.moveIdx);
+    return;
+  }
+  if (entry.kind === 'split-first') {
+    if (typeof window.selectSplitPeg === 'function') window.selectSplitPeg(entry.pegIdx);
+    if (typeof window.selectSplitSteps === 'function') window.selectSplitSteps(entry.steps);
+    // showMoveHints (called by the selectors) re-highlights candidates for us.
+  }
+}
+
+function _pickHoleAtClient(clientX, clientY) {
+  if (!_pickRaycaster || !renderer || !camera) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _pickMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  _pickMouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  _pickRaycaster.setFromCamera(_pickMouse, camera);
+  const meshes = [];
+  for (const h of holeRegistry.values()) {
+    if (h.mesh) meshes.push(h.mesh);
+  }
+  const hits = _pickRaycaster.intersectObjects(meshes, false);
+  if (!hits.length) return null;
+  const hitMesh = hits[0].object;
+  for (const [hid, h] of holeRegistry) {
+    if (h.mesh === hitMesh) return hid;
+  }
+  return null;
+}
+
+// ── Hover tooltip — single shared bubble used as the hint surface on desktop ──
+let _hoverTip = null;
+
+function _ensureHoverTip() {
+  if (_hoverTip) return _hoverTip;
+  const el = document.createElement('div');
+  el.id = 'ft-hover-tip';
+  el.style.cssText = [
+    'position:fixed', 'pointer-events:none', 'z-index:9999',
+    'padding:6px 10px', 'border-radius:8px', 'font:600 13px/1.25 system-ui,sans-serif',
+    'box-shadow:0 4px 14px rgba(0,0,0,0.35)', 'border:1px solid rgba(255,255,255,0.18)',
+    'background:#101018', 'color:#f4f8ff', 'max-width:260px',
+    'opacity:0', 'transition:opacity 80ms linear', 'transform:translate(12px,12px)'
+  ].join(';');
+  document.body.appendChild(el);
+  _hoverTip = el;
+  return el;
+}
+
+// YIQ contrast — picks dark or light foreground for a given hex bg.
+// Threshold 140 matches the FastTrack palette extremes (Snake green edge case).
+function _yiqFg(hex) {
+  if (!hex) return '#f4f8ff';
+  const h = hex.replace('#', '');
+  if (h.length !== 6) return '#f4f8ff';
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 140 ? '#0a0a14' : '#f4f8ff';
+}
+
+function _showHoverTip(text, bgHex, x, y) {
+  const el = _ensureHoverTip();
+  el.textContent = text;
+  if (bgHex) {
+    el.style.background = bgHex;
+    el.style.color = _yiqFg(bgHex);
+    el.style.borderColor = 'rgba(0,0,0,0.25)';
+  } else {
+    el.style.background = '#101018';
+    el.style.color = '#f4f8ff';
+    el.style.borderColor = 'rgba(255,255,255,0.18)';
+  }
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.opacity = '1';
+}
+
+function _hideHoverTip() {
+  if (_hoverTip) _hoverTip.style.opacity = '0';
+}
+
+// Resolve the active player's color (hex string) for entries that don't carry
+// a peg color of their own (e.g. enter from holding before a peg exists).
+function _activePlayerColorHex() {
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ci = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+  const p = players[ci];
+  if (p && p.color) return p.color;
+  const c = RAINBOW_COLORS[ci] || 0xffffff;
+  return '#' + c.toString(16).padStart(6, '0');
+}
+
+// Compact destination glyph for the current move.
+//   outer/side  → ±N  (sign by card direction)
+//   ft-*        → "ft +N" if peg already on FT, "→ ⚡ ft" if entering
+//   safe-*      → "→ 🛡️"
+//   home-*      → "→ 🏠"
+//   bullseye    → "→ 🎯"
+function _compactMoveText(m, pegName, cur) {
+  if (!m) return pegName;
+  const peg = cur && cur.pegs && cur.pegs[m.pegIdx];
+  const dest = m.dest || '';
+  const s = Number(m.steps) || 0;
+
+  switch (m.type) {
+    case 'enter': return `${pegName} enter board`;
+    case 'enterFastTrack':
+      return (peg && peg.onFasttrack) ? `${pegName} ft +${s}` : `${pegName} → ⚡ ft`;
+    case 'exitFastTrack': return `${pegName} leaves ⚡`;
+    case 'enterBullseye': return `${pegName} → 🎯`;
+    case 'exitBullseye': return `${pegName} leaves 🎯`;
+    case 'move': {
+      if (dest.startsWith('safe-')) return `${pegName} → 🛡️`;
+      if (dest.startsWith('home-')) return `${pegName} → 🏠`;
+      if (dest === 'bullseye') return `${pegName} → 🎯`;
+      if (dest.startsWith('ft-')) {
+        return (peg && peg.onFasttrack) ? `${pegName} ft +${s}` : `${pegName} → ⚡ ft`;
+      }
+      const card = (window.FastTrackCore && window.FastTrackCore.state)
+        ? window.FastTrackCore.state.deck.get('currentCard') : null;
+      const rules = (card && typeof window.getCardRules === 'function')
+        ? window.getCardRules(card.value) : null;
+      const isBackward = rules && rules.direction === 'backward';
+      const sign = isBackward ? '-' : '+';
+      return `${pegName} ${sign}${s}`;
+    }
+    default: return pegName;
+  }
+}
+
+// Build {text, color} for an entry produced by _buildRouteIndex.
+function _describeEntry(entry, vm) {
+  if (!entry) return null;
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ci = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+  const cur = players[ci];
+  const colorOf = () => (cur && cur.color) ? cur.color : _activePlayerColorHex();
+  const nameOf = (pegIdx) => {
+    const p = cur && cur.pegs && cur.pegs[pegIdx];
+    return (p && p.nickname) || `Peg ${pegIdx + 1}`;
+  };
+
+  if (entry.kind === 'move') {
+    const m = vm[entry.moveIdx];
+    if (!m) return null;
+    const cut = window.cutLabel ? window.cutLabel(m.dest) : '';
+    let text = _compactMoveText(m, nameOf(m.pegIdx), cur);
+    if (cut) text += ' ✂';
+    return { text, color: colorOf() };
+  }
+  if (entry.kind === 'split-first') {
+    return { text: `split: ${nameOf(entry.pegIdx)} +${entry.steps}`, color: colorOf() };
+  }
+  if (entry.kind === 'split-second') {
+    const m = vm[entry.moveIdx];
+    if (!m) return null;
+    const choice = (typeof window.getSplitChoice === 'function') ? window.getSplitChoice() : null;
+    if (!choice) return { text: `then ${nameOf(m.pegIdx)} +${m.steps || 0}`, color: colorOf() };
+    const firstIsLeg1 = (m.pegIdx === choice.pegIdx && m.steps === choice.steps);
+    const secondPegIdx = firstIsLeg1 ? m.peg2Idx : m.pegIdx;
+    const secondSteps = firstIsLeg1 ? m.steps2 : m.steps;
+    const cut = window.cutLabel ? window.cutLabel(firstIsLeg1 ? m.dest2 : m.dest) : '';
+    return { text: `then ${nameOf(secondPegIdx)} +${secondSteps}${cut ? ' ✂' : ''}`, color: colorOf() };
+  }
+  return null;
+}
+
+function setupBoardPickHandler() {
+  if (!renderer || !renderer.domElement) return;
+  const dom = renderer.domElement;
+  const isDesktop = () => window.matchMedia('(min-width: 601px)').matches;
+  const artOverlayOpen = () =>
+    !!document.getElementById('art-gallery-overlay')?.classList.contains('visible');
+
+  let lastHoverKey = '';
+
+  const clearHover = () => {
+    if (lastHoverKey !== '') {
+      lastHoverKey = '';
+      _restoreDefaultHighlight();
+    }
+    dom.style.cursor = '';
+    _hideHoverTip();
+  };
+
+  dom.addEventListener('pointermove', (e) => {
+    if (!isDesktop() || artOverlayOpen()) { _hideHoverTip(); return; }
+    // Skip while user is rotating/dragging the camera (any mouse button held).
+    if (e.buttons !== 0) { _hideHoverTip(); return; }
+    const idx = _refreshRouteIndex();
+    if (idx.size === 0) { clearHover(); return; }
+    const hid = _pickHoleAtClient(e.clientX, e.clientY);
+    const matches = hid ? (idx.get(hid) || []) : [];
+    if (matches.length === 1) {
+      dom.style.cursor = 'pointer';
+      const key = _entryKey(matches[0]);
+      const vm = _currentValidMoves();
+      if (lastHoverKey !== key) {
+        lastHoverKey = key;
+        _previewEntry(matches[0], vm);
+      }
+      const desc = _describeEntry(matches[0], vm);
+      if (desc) _showHoverTip(desc.text, desc.color, e.clientX, e.clientY);
+      else _hideHoverTip();
+    } else if (matches.length > 1) {
+      dom.style.cursor = 'help';
+      if (lastHoverKey !== '') {
+        lastHoverKey = '';
+        _restoreDefaultHighlight();
+      }
+      _showHoverTip(`${matches.length} routes share this hole — pick a unique destination`, null, e.clientX, e.clientY);
+    } else {
+      clearHover();
+    }
+  });
+
+  dom.addEventListener('pointerleave', () => { clearHover(); });
+
+  dom.addEventListener('click', (e) => {
+    if (!isDesktop() || artOverlayOpen()) return;
+    const idx = _refreshRouteIndex();
+    if (idx.size === 0) return;
+    const hid = _pickHoleAtClient(e.clientX, e.clientY);
+    const matches = hid ? (idx.get(hid) || []) : [];
+    if (matches.length === 1) {
+      _hideHoverTip();
+      _commitEntry(matches[0]);
+    }
+    // matches.length === 0 (missed) or > 1 (ambiguous) → no-op; the player
+    // can click a more specific hole on the desired route.
+  });
 }
 
 // ════════════════════════════════════════════════════════════════

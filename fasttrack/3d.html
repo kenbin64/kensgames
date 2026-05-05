@@ -973,6 +973,251 @@
       opacity: 0.6;
     }
 
+    /* ════════════════════════════════════════════════
+       HR-6.2 — FastTrack chrome at desktop sizes:
+       fixed top header (player strip) + fixed bottom rail
+       (action / hints / camera). 3D canvas insets to fit
+       the middle band (see onWindowResize).
+       ════════════════════════════════════════════════ */
+    @media (min-width: 601px) {
+      #panel-players {
+        top: 0;
+        left: 0;
+        right: 0;
+        max-width: none;
+        width: 100%;
+        border-radius: 0;
+        /* leaves room on the left for #panel-action (card+draw) and on the
+           right for the music/leave/settings/emoji buttons. */
+        padding: 6px 200px 6px 168px;
+        transform: none;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 12px;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      #panel-players:hover {
+        transform: none;
+      }
+
+      #helix-viz {
+        display: none;
+      }
+
+      #game-status {
+        border-bottom: none;
+        padding: 0;
+        margin: 0;
+        font-size: 0.85em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
+        max-width: 180px;
+      }
+
+      #player-list {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 6px;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .player-row {
+        padding: 4px 9px;
+        font-size: 0.92em;
+        transform: none;
+        flex: 0 0 auto;
+        min-width: 0;
+      }
+
+      .player-row:hover {
+        transform: none;
+      }
+
+      .player-name {
+        max-width: 110px;
+      }
+
+      /* Card + draw lives in the TOP-LEFT corner of the header.
+         The card image itself acts as the draw button — no separate
+         #draw-btn is shown at desktop sizes. */
+      #panel-action {
+        top: 4px;
+        left: 8px;
+        bottom: auto;
+        right: auto;
+        width: auto;
+        min-width: 0;
+        max-width: 156px;
+        border-radius: 8px;
+        padding: 2px 6px;
+        transform: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 60;
+      }
+
+      #panel-action:hover {
+        transform: none;
+      }
+
+      #panel-action #card-area {
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        box-shadow: none;
+        border-bottom: none;
+        border-radius: 0;
+        transform: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      #panel-action #card-area:hover {
+        transform: none;
+        box-shadow: none;
+      }
+
+      #panel-action #card-label {
+        display: none;
+      }
+
+      #panel-action #current-card {
+        font-size: 1.6em;
+        margin: 0;
+        line-height: 1;
+      }
+
+      #panel-action #current-card .card-back {
+        width: 28px;
+        height: 40px;
+        border-width: 2px;
+        box-shadow: inset 0 0 0 2px #1a0a0a, inset 0 0 0 3px #c8a84e,
+          inset 0 0 8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.5);
+      }
+
+      #panel-action #current-card .card-back::before {
+        font-size: 8px;
+      }
+
+      #panel-action #card-info {
+        font-size: 0.72em;
+        line-height: 1.1;
+        white-space: nowrap;
+        max-width: 92px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #panel-action #draw-btn {
+        display: none;
+      }
+
+      /* Camera fills the bottom rail. Move hints are NOT shown as pill
+         buttons on desktop — the player picks moves directly on the 3D
+         board (see setupBoardPickHandler in fasttrack-3d.js). The hints
+         panel is reserved for the 7-split selector only, which has its
+         own complex multi-stage UI that doesn't fit pick-on-board. */
+      #panel-options {
+        left: 12px;
+        right: 240px;
+        bottom: 0;
+        width: auto;
+        max-height: 38vh;
+        border-radius: 0;
+        padding: 6px 12px;
+        transform: none;
+      }
+
+      #panel-options:hover {
+        transform: none;
+      }
+
+      /* Hide the regular hint pills — desktop picks moves on the board. */
+      #panel-options #move-hints .hint {
+        display: none;
+      }
+
+      /* Collapse the hints panel entirely when no split selector is
+         present (i.e. for non-7 cards there's nothing to render here). */
+      #panel-options:not(:has(.split-header)) {
+        display: none;
+      }
+
+      #panel-cam {
+        right: 12px;
+        bottom: 0;
+        top: auto;
+        border-radius: 0;
+        transform: none;
+      }
+
+      #panel-cam:hover {
+        transform: none;
+      }
+
+      /* The header strip carries a faint translucent backdrop so player
+         text stays readable over the 3D scene. The footer band gets its
+         own opaque-ish strip so its controls read clearly without each
+         control needing its own card background. */
+      #panel-players {
+        background: rgba(8, 16, 30, 0.5);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      }
+
+      #panel-action,
+      #panel-options,
+      #panel-cam {
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: none;
+        box-shadow: none;
+      }
+
+      #ft-footer-bg {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 44px;
+        z-index: 10;
+        pointer-events: none;
+        background: rgba(8, 16, 30, 0.5);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+      }
+
+      /* Game log lives out of the header strip — collapsed pill in the
+         bottom-right corner of the footer, above the camera buttons. */
+      #panel-log {
+        top: auto;
+        left: auto;
+        right: 12px;
+        bottom: 52px;
+        width: 140px;
+        max-height: 22px;
+        z-index: 60;
+      }
+
+      #panel-log.expanded {
+        max-height: 220px;
+      }
+    }
+
     /* ═══ MOBILE: top strip + bottom action ═══ */
     @media (max-width: 600px) {
       #panel-players {
@@ -1012,20 +1257,38 @@
         flex-direction: row;
         gap: 2px;
         flex: 1;
+        min-width: 0;
+        overflow: hidden;
       }
 
-      .player-row {
+      /* Mobile shows only the current player's chip — name + color swatch.
+         Hiding the other players prevents the row from overflowing the
+         narrow strip and bleeding into the game-status text. */
+      #player-list .player-row {
+        display: none;
+      }
+
+      #player-list .player-row.active {
+        display: flex;
         padding: 3px 7px;
         font-size: 0.9em;
         transform: none !important;
+        animation: none;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .player-name {
         font-size: 0.9em;
         color: #e8eeff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .player-pegs {
+      .player-pegs,
+      .turn-chip {
         display: none;
       }
 
@@ -1713,6 +1976,9 @@
 
   <div id="container"></div>
 
+  <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
+  <div id="ft-footer-bg" aria-hidden="true"></div>
+
   <!-- ── Player strip — top-left ── -->
   <div id="panel-players" class="glass-panel">
     <div id="game-status">Your turn</div>
@@ -1730,7 +1996,9 @@
 
   <!-- ── Action panel — bottom-left ── -->
   <div id="panel-action" class="glass-panel">
-    <div id="card-area">
+    <div id="card-area" onclick="drawCard()" role="button" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();drawCard();}" title="Draw a card"
+      aria-label="Draw a card">
       <div id="card-label">Card</div>
       <div id="current-card">
         <div class="card-back"></div>

@@ -38,6 +38,14 @@ const MOBILE_INPUT = {
     touchNormX: 0,
     tiltEnabled: false,
     tiltNormX: 0,
+    tiltMode: 'paddle', // 'paddle' | 'camera'
+    paddleTouchId: null,
+    cameraTouchId: null,
+    cameraTouchActive: false,
+    tiltNormYaw: 0,
+    tiltNormPitch: 0,
+    tiltNeutralGamma: null,
+    tiltNeutralBeta: null,
 };
 
 // Ball speeds (PHI-scaled — golden-ratio kick over the previous baseline so
@@ -208,6 +216,14 @@ function initScene() {
     controls.minDistance = 40;
     controls.maxDistance = 250;
     controls.target.set(0, 0, 0);
+    // Mobile: we handle one-finger orbit with our own gesture zone so paddle and camera
+    // controls never fight each other. Keep two-finger pinch zoom via OrbitControls.
+    if (MOBILE_INPUT.enabled && THREE.TOUCH) {
+        controls.touches = {
+            ONE: THREE.TOUCH.NONE,
+            TWO: THREE.TOUCH.DOLLY,
+        };
+    }
 
     raycaster = new THREE.Raycaster();
     floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), HALF_H - 0.5);
@@ -252,25 +268,42 @@ function initScene() {
 
 function initMobileControls() {
     if (document.getElementById('bb-mobile-controls')) return;
+
+    const rotateCameraGesture = (dx, dy, mult = 0.005) => {
+        if (!controls) return;
+        controls.rotateLeft(dx * mult);
+        controls.rotateUp(dy * mult);
+        controls.update();
+    };
+
     const wrap = document.createElement('div');
     wrap.id = 'bb-mobile-controls';
-    wrap.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:120;display:flex;gap:10px;align-items:center;';
+    wrap.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:140;display:flex;gap:8px;align-items:center;';
     const tiltBtn = document.createElement('button');
     tiltBtn.id = 'bb-tilt-btn';
     tiltBtn.textContent = 'TILT';
-    tiltBtn.style.cssText = 'height:44px;padding:0 14px;border:1px solid rgba(0,255,204,.55);background:rgba(4,20,34,.82);color:#00ffcc;border-radius:10px;font:700 12px Rajdhani,sans-serif;';
+    tiltBtn.style.cssText = 'height:44px;padding:0 10px;border:1px solid rgba(0,255,204,.55);background:rgba(4,20,34,.82);color:#00ffcc;border-radius:10px;font:700 11px Rajdhani,sans-serif;';
+
+    const gyroModeBtn = document.createElement('button');
+    gyroModeBtn.id = 'bb-gyro-mode-btn';
+    gyroModeBtn.textContent = 'GYRO:PADDLE';
+    gyroModeBtn.style.cssText = 'height:44px;padding:0 10px;border:1px solid rgba(0,255,204,.45);background:rgba(4,20,34,.72);color:#9ffff0;border-radius:10px;font:700 11px Rajdhani,sans-serif;';
+
     const imuSupported = (typeof window !== 'undefined') && (typeof DeviceOrientationEvent !== 'undefined');
 
     const modeLabel = document.createElement('div');
     modeLabel.id = 'bb-input-mode';
-    modeLabel.style.cssText = 'position:fixed;left:10px;bottom:62px;z-index:121;padding:6px 10px;border-radius:8px;border:1px solid rgba(0,255,204,.45);background:rgba(4,20,34,.78);color:#9ffff0;font:700 11px Rajdhani,sans-serif;letter-spacing:.06em;';
-    const setModeLabel = (isImu) => {
-        modeLabel.textContent = isImu ? 'IMU ACTIVE' : 'TOUCH MODE';
+    modeLabel.style.cssText = 'position:fixed;left:10px;bottom:62px;z-index:141;padding:6px 10px;border-radius:8px;border:1px solid rgba(0,255,204,.45);background:rgba(4,20,34,.78);color:#9ffff0;font:700 11px Rajdhani,sans-serif;letter-spacing:.06em;';
+    const setModeLabel = (isImu, tiltMode = MOBILE_INPUT.tiltMode) => {
+        modeLabel.textContent = isImu
+            ? (tiltMode === 'camera' ? 'GYRO CAMERA + SWIPE PADDLE' : 'GYRO PADDLE + SWIPE CAMERA')
+            : 'SWIPE LEFT=PADDLE | RIGHT=CAM';
         modeLabel.style.color = isImu ? '#b8ffe8' : '#9ffff0';
         modeLabel.style.borderColor = isImu ? 'rgba(100,255,220,.75)' : 'rgba(0,255,204,.45)';
     };
     setModeLabel(false);
     document.body.appendChild(modeLabel);
+
     const pad = document.createElement('div');
     pad.id = 'bb-touch-pad';
     pad.style.cssText = 'position:relative;flex:1;height:44px;border:1px solid rgba(0,255,204,.35);background:rgba(4,20,34,.66);border-radius:10px;overflow:hidden;';
@@ -279,8 +312,18 @@ function initMobileControls() {
     thumb.style.cssText = 'position:absolute;top:4px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:18px;background:rgba(0,255,204,.28);border:1px solid rgba(0,255,204,.8);';
     pad.appendChild(thumb);
     wrap.appendChild(tiltBtn);
+    wrap.appendChild(gyroModeBtn);
     wrap.appendChild(pad);
     document.body.appendChild(wrap);
+
+    const paddleZone = document.createElement('div');
+    paddleZone.id = 'bb-gesture-paddle';
+    paddleZone.style.cssText = 'position:fixed;left:0;top:56px;bottom:64px;width:58vw;z-index:130;touch-action:none;background:transparent;';
+    const cameraZone = document.createElement('div');
+    cameraZone.id = 'bb-gesture-camera';
+    cameraZone.style.cssText = 'position:fixed;right:0;top:56px;bottom:64px;width:42vw;z-index:130;touch-action:none;background:transparent;';
+    document.body.appendChild(paddleZone);
+    document.body.appendChild(cameraZone);
 
     const setThumb = (norm) => {
         const w = pad.clientWidth - 40;
@@ -289,40 +332,106 @@ function initMobileControls() {
     setThumb(0);
 
     const updateTouchNorm = (clientX) => {
-        const r = pad.getBoundingClientRect();
+        const r = paddleZone.getBoundingClientRect();
         const t = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
         MOBILE_INPUT.touchNormX = t * 2 - 1;
         setThumb(MOBILE_INPUT.touchNormX);
     };
 
-    pad.addEventListener('touchstart', (e) => {
+    paddleZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        if (!touch) return;
+        MOBILE_INPUT.paddleTouchId = touch.identifier;
         MOBILE_INPUT.touchActive = true;
-        updateTouchNorm(e.touches[0].clientX);
-    }, { passive: true });
-    pad.addEventListener('touchmove', (e) => {
+        updateTouchNorm(touch.clientX);
+    }, { passive: false });
+
+    paddleZone.addEventListener('touchmove', (e) => {
         if (!MOBILE_INPUT.touchActive) return;
-        updateTouchNorm(e.touches[0].clientX);
-    }, { passive: true });
+        e.preventDefault();
+        const touch = Array.from(e.touches).find(t => t.identifier === MOBILE_INPUT.paddleTouchId);
+        if (!touch) return;
+        updateTouchNorm(touch.clientX);
+    }, { passive: false });
+
     const releaseTouch = () => {
         MOBILE_INPUT.touchActive = false;
+        MOBILE_INPUT.paddleTouchId = null;
         MOBILE_INPUT.touchNormX = 0;
         setThumb(0);
     };
-    pad.addEventListener('touchend', releaseTouch, { passive: true });
-    pad.addEventListener('touchcancel', releaseTouch, { passive: true });
+    paddleZone.addEventListener('touchend', (e) => {
+        const ended = Array.from(e.changedTouches).some(t => t.identifier === MOBILE_INPUT.paddleTouchId);
+        if (ended) releaseTouch();
+    }, { passive: true });
+    paddleZone.addEventListener('touchcancel', releaseTouch, { passive: true });
+
+    cameraZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        if (!touch) return;
+        MOBILE_INPUT.cameraTouchActive = true;
+        MOBILE_INPUT.cameraTouchId = touch.identifier;
+        MOBILE_INPUT._cameraLastX = touch.clientX;
+        MOBILE_INPUT._cameraLastY = touch.clientY;
+    }, { passive: false });
+
+    cameraZone.addEventListener('touchmove', (e) => {
+        if (!MOBILE_INPUT.cameraTouchActive) return;
+        e.preventDefault();
+        const touch = Array.from(e.touches).find(t => t.identifier === MOBILE_INPUT.cameraTouchId);
+        if (!touch) return;
+        const dx = touch.clientX - (MOBILE_INPUT._cameraLastX ?? touch.clientX);
+        const dy = touch.clientY - (MOBILE_INPUT._cameraLastY ?? touch.clientY);
+        MOBILE_INPUT._cameraLastX = touch.clientX;
+        MOBILE_INPUT._cameraLastY = touch.clientY;
+        rotateCameraGesture(dx, dy, 0.0065);
+    }, { passive: false });
+
+    const releaseCamTouch = () => {
+        MOBILE_INPUT.cameraTouchActive = false;
+        MOBILE_INPUT.cameraTouchId = null;
+        MOBILE_INPUT._cameraLastX = null;
+        MOBILE_INPUT._cameraLastY = null;
+    };
+    cameraZone.addEventListener('touchend', (e) => {
+        const ended = Array.from(e.changedTouches).some(t => t.identifier === MOBILE_INPUT.cameraTouchId);
+        if (ended) releaseCamTouch();
+    }, { passive: true });
+    cameraZone.addEventListener('touchcancel', releaseCamTouch, { passive: true });
 
     const onTilt = (ev) => {
         if (!MOBILE_INPUT.tiltEnabled || typeof ev.gamma !== 'number') return;
         MOBILE_INPUT.tiltNormX = Math.max(-1, Math.min(1, ev.gamma / 30));
+        if (MOBILE_INPUT.tiltNeutralGamma == null) MOBILE_INPUT.tiltNeutralGamma = ev.gamma;
+        if (MOBILE_INPUT.tiltNeutralBeta == null) MOBILE_INPUT.tiltNeutralBeta = ev.beta;
+        const dg = ev.gamma - MOBILE_INPUT.tiltNeutralGamma;
+        const db = ev.beta - MOBILE_INPUT.tiltNeutralBeta;
+        MOBILE_INPUT.tiltNormYaw = Math.max(-1, Math.min(1, dg / 26));
+        MOBILE_INPUT.tiltNormPitch = Math.max(-1, Math.min(1, db / 26));
     };
 
     if (!imuSupported) {
         tiltBtn.textContent = 'TOUCH';
         tiltBtn.disabled = true;
+        gyroModeBtn.disabled = true;
+        gyroModeBtn.style.opacity = '0.65';
         tiltBtn.style.opacity = '0.65';
         tiltBtn.title = 'IMU not available. Using touch pad control.';
+        gyroModeBtn.title = 'IMU not available.';
         setModeLabel(false);
     }
+
+    gyroModeBtn.addEventListener('click', () => {
+        MOBILE_INPUT.tiltMode = (MOBILE_INPUT.tiltMode === 'paddle') ? 'camera' : 'paddle';
+        gyroModeBtn.textContent = MOBILE_INPUT.tiltMode === 'camera' ? 'GYRO:CAMERA' : 'GYRO:PADDLE';
+        if (MOBILE_INPUT.tiltMode === 'camera') {
+            MOBILE_INPUT.tiltNeutralGamma = null;
+            MOBILE_INPUT.tiltNeutralBeta = null;
+        }
+        setModeLabel(MOBILE_INPUT.tiltEnabled, MOBILE_INPUT.tiltMode);
+    });
 
     tiltBtn.addEventListener('click', async () => {
         if (!imuSupported) return;
@@ -334,8 +443,10 @@ function initMobileControls() {
                 }
                 window.addEventListener('deviceorientation', onTilt, true);
                 MOBILE_INPUT.tiltEnabled = true;
+                MOBILE_INPUT.tiltNeutralGamma = null;
+                MOBILE_INPUT.tiltNeutralBeta = null;
                 tiltBtn.textContent = 'TILT ON';
-                setModeLabel(true);
+                setModeLabel(true, MOBILE_INPUT.tiltMode);
             } catch (_) {
                 MOBILE_INPUT.tiltEnabled = false;
                 setModeLabel(false);
@@ -344,6 +455,8 @@ function initMobileControls() {
         }
         MOBILE_INPUT.tiltEnabled = false;
         MOBILE_INPUT.tiltNormX = 0;
+        MOBILE_INPUT.tiltNormYaw = 0;
+        MOBILE_INPUT.tiltNormPitch = 0;
         window.removeEventListener('deviceorientation', onTilt, true);
         tiltBtn.textContent = 'TILT';
         setModeLabel(false);
@@ -354,11 +467,19 @@ function applyMobilePaddleControl() {
     if (!MOBILE_INPUT.enabled || !gameActive || gamePaused || paddles.length === 0 || !players[0] || !players[0].alive) return;
     let n = null;
     if (MOBILE_INPUT.touchActive) n = MOBILE_INPUT.touchNormX;
-    else if (MOBILE_INPUT.tiltEnabled) n = MOBILE_INPUT.tiltNormX;
+    else if (MOBILE_INPUT.tiltEnabled && MOBILE_INPUT.tiltMode === 'paddle') n = MOBILE_INPUT.tiltNormX;
     if (n === null) return;
     const p = paddles[0];
     const tx = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, n * PADDLE_BOUND));
     movePaddleTo(0, tx, p.position.z);
+}
+
+function applyMobileCameraControl() {
+    if (!MOBILE_INPUT.enabled || !controls || !gameActive || gamePaused) return;
+    if (!(MOBILE_INPUT.tiltEnabled && MOBILE_INPUT.tiltMode === 'camera')) return;
+    // Subtle gyro orbit so the cube can be inspected without stealing paddle control.
+    controls.rotateLeft(MOBILE_INPUT.tiltNormYaw * 0.028);
+    controls.rotateUp(MOBILE_INPUT.tiltNormPitch * 0.018);
 }
 
 function initReflections() {
@@ -1028,6 +1149,7 @@ function animate() {
     const isMulti = gameMode.startsWith('multi');
 
     applyMobilePaddleControl();
+    applyMobileCameraControl();
 
     if (isMulti) updateAIPaddles();
 

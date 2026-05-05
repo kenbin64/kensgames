@@ -1226,6 +1226,10 @@ function toggleHintGroup(groupKey) {
 window.previewHintGroup = previewHintGroup;
 window.clearHintPreview = clearHintPreview;
 window.toggleHintGroup = toggleHintGroup;
+window.summarizeMoveForHint = summarizeMoveForHint;
+window.cutLabel = cutLabel;
+window.ownerName = ownerName;
+window.getCardRules = function (rank) { return state.cards.get(rank) || null; };
 
 function showMoveHints() {
   const hintsDiv = document.getElementById('move-hints');
@@ -1252,8 +1256,21 @@ function showMoveHints() {
     return;
   }
 
-  // Light up all destination paths on the 3D board
-  if (window.highlightMovePaths) window.highlightMovePaths(vm);
+  // Light up all destination paths on the 3D board.
+  // If a split first leg has been picked, restrict highlights to candidate
+  // completions so only the second-leg routes glow.
+  if (window.highlightMovePaths) {
+    const splitChoice = (_splitPegIdx != null && _splitStepChoice != null)
+      ? { pegIdx: _splitPegIdx, steps: _splitStepChoice } : null;
+    if (splitChoice) {
+      const candidates = vm.filter(m => m && m.type === 'split'
+        && ((m.pegIdx === splitChoice.pegIdx && m.steps === splitChoice.steps)
+          || (m.peg2Idx === splitChoice.pegIdx && m.steps2 === splitChoice.steps)));
+      window.highlightMovePaths(candidates);
+    } else {
+      window.highlightMovePaths(vm);
+    }
+  }
 
   // Separate split moves from regular moves
   const splitMoves = vm.filter(m => m.type === 'split');
@@ -1267,7 +1284,7 @@ function showMoveHints() {
     let short = '';
     const pegName = safeUiText(curPlayer.pegs[m.pegIdx] && curPlayer.pegs[m.pegIdx].nickname, `Peg ${m.pegIdx + 1}`);
     const playerName = safeUiText(curPlayer.name, PLAYER_NAMES[ci] || 'Player');
-    const shortPeg = `P${m.pegIdx + 1}`;
+    const shortPeg = pegName;
     const actor = `${playerName}'s ${pegName}`;
     const peg = curPlayer.pegs[m.pegIdx];
     const cut = cutLabel(m.dest);
@@ -1349,12 +1366,16 @@ function showMoveHints() {
     buttons.push({ idx: i, type: m.type, icon, label, short, dest: m.dest, pegIdx: m.pegIdx });
   });
 
-  // Deduplicate — when multiple buttons share the same destination hole AND type, keep only the first
+  // Deduplicate — same peg landing on the same destination hole is the
+  // same move from the player's perspective, even if the engine emitted
+  // it under different move types (e.g. 'move' into an ft-* hole vs.
+  // 'enterFastTrack' for the same peg). Key by dest+pegIdx so wording
+  // variants like "enter FT" and "FT enter" collapse to one button.
   const seenDests = new Set();
   const dedupedButtons = buttons.filter(b => {
     if (b.type === 'enter') return true;          // enter buttons already deduped above
     if (!b.dest) return true;
-    const key = b.dest + '|' + b.type;
+    const key = b.dest + '|' + b.pegIdx;
     if (seenDests.has(key)) return false;
     seenDests.add(key);
     return true;
@@ -1404,6 +1425,29 @@ function renderSplitSelector(splitMoves, allMoves) {
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const player = players[ci];
+
+  // Desktop: pick-on-board flow (raycaster in fasttrack-3d.js handles the
+  // clicks). Just emit instructions + a cancel pill in the rail.
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(min-width: 601px)').matches;
+  if (isDesktop) {
+    let html = '<div class="split-header">✂️ Split 7</div>';
+    if (_splitPegIdx == null || _splitStepChoice == null) {
+      html += '<div style="font-size:0.82em;color:#9fdcff;text-align:center;padding:6px 4px;">'
+        + 'Click any glowing hole on the board — that route\'s peg + step count becomes your <b>first leg</b>.'
+        + '</div>';
+    } else {
+      const pegName = safeUiText(player && player.pegs && player.pegs[_splitPegIdx]
+        && player.pegs[_splitPegIdx].nickname, `Peg ${_splitPegIdx + 1}`);
+      const remaining = 7 - _splitStepChoice;
+      html += `<div style="font-size:0.82em;color:#b7ffd6;text-align:center;padding:6px 4px;">`
+        + `<b>${escapeHtml(pegName)}</b> moves ${_splitStepChoice}. `
+        + `Now click a destination for the other peg (${remaining} steps).`
+        + `</div>`;
+      html += '<button class="hint" style="margin:2px 4px;" onclick="cancelSplitChoice()">↺ Cancel first leg</button>';
+    }
+    return html;
+  }
 
   // Build peg -> first-step options from legal split moves.
   const pegMap = new Map(); // pegIdx -> Set<steps>
@@ -1532,6 +1576,12 @@ window.selectSplitPeg = selectSplitPeg;
 window.selectSplitSteps = selectSplitSteps;
 window.previewSplitChoice = previewSplitChoice;
 window.clearSplitPreview = clearSplitPreview;
+window.getSplitChoice = () => ({ pegIdx: _splitPegIdx, steps: _splitStepChoice });
+window.cancelSplitChoice = () => {
+  _splitPegIdx = null;
+  _splitStepChoice = null;
+  showMoveHints();
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MOVE EXECUTION

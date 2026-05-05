@@ -148,6 +148,23 @@
       text-shadow: 0 0 5px #39ff14;
     }
 
+    @media (hover: none) and (pointer: coarse) {
+      #hud {
+        top: 68px;
+        right: 10px;
+        bottom: auto;
+        font-size: 15px;
+      }
+
+      #info {
+        top: 68px;
+        left: 10px;
+        bottom: auto;
+        font-size: 11px;
+        max-width: 48vw;
+      }
+    }
+
     #orientation-guard-bb {
       position: fixed;
       inset: 0;
@@ -224,7 +241,8 @@
     <button onclick="startGame('multi3')">👥 3 Players</button>
     <button onclick="startGame('multi4')">👥 4 Players</button>
   </div>
-  <div id="info">SPACE: Pause | ESC: Menu | MOUSE: Paddle | RIGHT-CLICK: Rotate | SCROLL: Zoom</div>
+  <div id="info">SPACE: Pause | ESC: Menu | DESKTOP: Mouse paddle, right-drag orbit | MOBILE: left swipe=paddle, right
+    swipe=orbit, optional gyro</div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>

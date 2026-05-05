@@ -25,6 +25,95 @@
 (function initDimensionalBridge() {
   window.DIMENSIONAL_SESSION = window.DIMENSIONAL_SESSION || {};
 
+  // Global viewport policy:
+  // - Desktop (non-landing): no page scrolling, fit content into a single viewport.
+  // - Smartphone/tablet touch: allow vertical scroll for stacked layouts.
+  // - Wizard helper: only one step visible at a time when data-wizard-step attrs are used.
+  function installViewportPolicy() {
+    if (window.KGViewportPolicy) return window.KGViewportPolicy;
+
+    const isLanding = () => /\/landing\.html$/i.test((typeof location !== 'undefined' ? location.pathname : '') || '');
+    const isMobileLike = () => (
+      (typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches)
+      || /Android|iPhone|iPad|iPod|Mobile/i.test((typeof navigator !== 'undefined' ? navigator.userAgent : '') || '')
+      || Math.min(window.innerWidth || 0, window.innerHeight || 0) < 700
+    );
+
+    const policy = {
+      apply() {
+        if (isLanding()) return;
+
+        const html = document.documentElement;
+        const body = document.body;
+        if (!html || !body) return;
+
+        const mobile = isMobileLike();
+        html.style.height = '100dvh';
+        body.style.height = '100dvh';
+        html.style.maxHeight = '100dvh';
+        body.style.maxHeight = '100dvh';
+
+        if (mobile) {
+          html.style.overflowX = 'hidden';
+          html.style.overflowY = 'auto';
+          body.style.overflowX = 'hidden';
+          body.style.overflowY = 'auto';
+          html.style.zoom = '';
+          body.style.zoom = '';
+          return;
+        }
+
+        // Desktop: hard no-scroll policy.
+        html.style.overflow = 'hidden';
+        body.style.overflow = 'hidden';
+
+        // If content still exceeds viewport, uniformly scale page down to fit.
+        // Uses CSS zoom (Chromium/Electron); safe no-op elsewhere.
+        html.style.zoom = '';
+        body.style.zoom = '';
+        const vw = Math.max(1, window.innerWidth || 1);
+        const vh = Math.max(1, window.innerHeight || 1);
+        const sw = Math.max(body.scrollWidth || 1, html.scrollWidth || 1);
+        const sh = Math.max(body.scrollHeight || 1, html.scrollHeight || 1);
+        const scale = Math.min(1, vw / sw, vh / sh);
+        if (scale < 0.999) {
+          const z = Math.max(0.72, scale);
+          html.style.zoom = String(z);
+        }
+      },
+
+      applyWizardSingleStep(host) {
+        if (!host) return;
+        const steps = Array.from(host.querySelectorAll('[data-wizard-step]'));
+        if (!steps.length) return;
+        let active = steps.findIndex((el) => el.hasAttribute('data-active') || el.classList.contains('active'));
+        if (active < 0) active = 0;
+        for (let i = 0; i < steps.length; i++) {
+          steps[i].style.display = i === active ? '' : 'none';
+        }
+      },
+    };
+
+    window.KGViewportPolicy = policy;
+    return policy;
+  }
+
+  function applyViewportPolicyNow() {
+    const policy = installViewportPolicy();
+    policy.apply();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyViewportPolicyNow, { once: true });
+  } else {
+    applyViewportPolicyNow();
+  }
+  window.addEventListener('resize', () => {
+    if (window.KGViewportPolicy && typeof window.KGViewportPolicy.apply === 'function') {
+      window.KGViewportPolicy.apply();
+    }
+  });
+
   function toManifoldY(session) {
     const game = session && session.game ? session.game : {};
     const players = game.players || {};

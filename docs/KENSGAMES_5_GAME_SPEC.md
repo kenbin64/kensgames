@@ -1,5 +1,11 @@
 # KensGames Comprehensive 4-Game Product Spec (No-Code)
 
+> **Hard-rule precedence:** [`HARD_RULES.md`](HARD_RULES.md) is the source
+> of truth for product constraints (viewport/scroll, wizard sharing,
+> multiplayer modes, auth, no-duplication). This spec has been reconciled
+> to align with HARD_RULES; if any future drift is detected, HARD_RULES
+> wins. Read HARD_RULES.md first.
+
 ## 0. Revision Changelog (Compact)
 - Version: 4-game-revision-1
 - Date: 2026-04-30
@@ -73,9 +79,12 @@ Always preserve a valid, fair, fully initialized game state for all players, and
 ### 4.1 Product Principle
 - Portal is public-first and conversion-focused.
 - Browsing is open.
-- Participating in multiplayer matches requires authentication.
-- Solo or bot-only modes may allow guest play.
-- Setup complexity is guided through modal wizard flow.
+- Landing (`/`) and invite-join (`/join`) are reachable without sign-in (HARD_RULES HR-13).
+- Guest play is allowed for: solo, solo-with-bots, invite-join, hosting a private invite-code match, and joining/hosting a casual public match (HR-13, HR-16).
+- Account is required only for persistent features: profile, friends, leaderboards, ranked matches (HR-16).
+- Display name + avatar are mandatory before joining any match, guest or registered (HR-14).
+- Registration is invited (not required) at the post-match prompt (HR-15); guest identity is claimable into the new account (HR-17.4).
+- Setup complexity is guided through the **single shared sequential wizard** used by every game (HR-7, HR-9). One decision per step; never present the entire form at once.
 
 ### 4.2 Global Navigation and Shell
 Global top navigation contains:
@@ -349,12 +358,15 @@ Bottom section:
 ## 9. Game Specifications (4 Canonical Games)
 
 ### 9.1 Common Setup Flow
-[Portal card Play] -> [Game landing] -> [Auth gate (mode-dependent)] -> [Mode selection] -> [Player configuration (human/bot)] -> [Match options] -> [Ready/Launch] -> [Play surface] -> [Post-match]
+[Portal card Play] -> [Game landing] -> [Identity step (name + avatar)] -> [Mode selection] -> [Player configuration (human/bot)] -> [Match options] -> [Ready/Launch] -> [Play surface] -> [Post-match (registration invite for guests)]
 
-Auth gate rules:
-- solo/offline-vs-bot can allow guest play
-- public/ranked/private multiplayer requires account for host
-- invite-code guest join may be allowed by game mode
+This flow is implemented by the single shared wizard (HR-7); each bracketed segment is one wizard step (HR-9).
+
+Identity & auth rules (HR-13–17):
+- Identity step (name + avatar) is mandatory for all players, guest or registered.
+- Solo, solo-with-bots, invite-join, private invite-code hosting, and casual public matches: guest allowed.
+- Ranked matches and persistent-profile features: account required (passkey / OAuth / magic link per HR-17).
+- Account-required steps prompt sign-in inline; the wizard does not redirect to a separate auth page.
 
 ### 9.2 FastTrack
 Game fantasy:

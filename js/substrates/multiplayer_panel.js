@@ -54,16 +54,29 @@
   let _profileNameDraft = '';
   let _profileAvatarDraft = null;
   let _localEditPlayerId = null;
+  let _soloBotsWanted = null;
+  let _lastStageKey = '';
+  let _modePage = 0;
 
   // ── CSS (injected once) ─────────────────────────────────────────────
   // Canonical KensGames Tron palette: cyan (primary), green (go), purple (AI/accent).
   const CSS = `
-.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;height:min(96dvh,96vh);overflow:hidden;}
-.kg-mp.kg-mp-vh{height:min(96dvh,96vh);margin:2dvh auto;overflow:hidden;}
+/* HR-6.2: when the wizard rail is mounted, carve the rail's reserved
+   height out of the body via border-box padding-bottom so the fixed-bottom
+   rail never overlaps the panel. Container + button visuals live in
+   /lib/control-rail.css (auto-injected by injectRailMount). */
+body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:border-box;}
+.kg-mp{font-family:'Orbitron',monospace;color:#e8e8ff;max-width:min(980px,98vw);width:100%;margin:0 auto;height:100%;max-height:100%;overflow:hidden;}
+.kg-mp.kg-mp-vh{height:100%;max-height:100%;margin:0 auto;overflow:hidden;}
+/* Flex column so any number of header rows (h2, subtitle, optional progress
+   dots, optional step-title) sit at intrinsic height and the .step row
+   absorbs the remaining space — without clipping its tail when extra
+   header rows are present. .step scrolls internally if it overflows. */
 .kg-mp-card{background:rgba(4,4,20,0.94);border:2px solid #00FFFF;
   box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(153,0,255,0.20);
-  border-radius:10px;padding:18px 20px 14px;height:100%;display:grid;
-  grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;}
+  border-radius:10px;padding:18px 20px 14px;height:100%;display:flex;
+  flex-direction:column;min-height:0;overflow:hidden;}
+.kg-mp-card > .step{flex:1 1 auto;min-height:0;overflow:auto;}
 .kg-mp h2{font-size:15px;letter-spacing:3px;color:#00FFFF;
   text-shadow:0 0 12px rgba(0,255,255,0.6);margin:0 0 4px;text-transform:uppercase;text-align:center;}
 .kg-mp .game-name{font-size:10px;color:#8aa;letter-spacing:2px;margin-bottom:18px;text-align:center;text-transform:uppercase;}
@@ -93,20 +106,24 @@
   transform:scale(1.25);}
 .kg-mp .step{animation:kgFade 240ms ease;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 @keyframes kgFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-.kg-mp .mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+/* Single-row mode chooser (HR-6.1): all play-mode cards stay on one line at
+   desktop/tablet so nothing gets pushed below the fold. Cards shrink to fit. */
+.kg-mp .mode-grid{display:flex;flex-wrap:nowrap;gap:8px;align-items:stretch;}
+.kg-mp .mode-grid > .mode-btn{flex:1 1 0;min-width:0;}
 .kg-mp .mode-btn{background:rgba(0,0,0,0.4);border:1.5px solid rgba(0,255,255,0.4);
-  color:#fff;padding:32px 14px;border-radius:8px;text-align:center;cursor:pointer;
+  color:#fff;padding:12px 10px;border-radius:8px;text-align:center;cursor:pointer;
   transition:all 200ms ease;font-family:inherit;}
 .kg-mp .mode-btn:hover{border-color:#00FFFF;background:rgba(0,255,255,0.08);
   box-shadow:0 0 18px rgba(0,255,255,0.35);transform:translateY(-3px);}
+.kg-mp .mode-btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none;}
 .kg-mp .mode-btn[data-act="friend"]{border-color:rgba(153,0,255,0.45);}
 .kg-mp .mode-btn[data-act="friend"]:hover{border-color:#9900FF;background:rgba(153,0,255,0.10);
   box-shadow:0 0 18px rgba(153,0,255,0.45);}
 .kg-mp .mode-btn[data-act="friend"] .mode-label{color:#c4a3ff;}
 .kg-mp .mode-btn .mode-icon{font-size:42px;display:block;margin-bottom:12px;
-  filter:drop-shadow(0 0 6px currentColor);}
-.kg-mp .mode-btn .mode-label{font-size:13px;letter-spacing:2px;color:#00FFFF;font-weight:700;}
-.kg-mp .mode-btn .mode-sub{font-size:10px;color:#9aa;margin-top:8px;letter-spacing:1px;line-height:1.5;}
+  filter:drop-shadow(0 0 6px currentColor);font-size:22px;margin-bottom:5px;}
+.kg-mp .mode-btn .mode-label{font-size:11px;letter-spacing:1.5px;color:#00FFFF;font-weight:700;}
+.kg-mp .mode-btn .mode-sub{font-size:9px;color:#9aa;margin-top:4px;letter-spacing:0.5px;line-height:1.4;}
 .kg-mp .share-box{background:rgba(0,0,0,0.55);border:1.5px dashed rgba(153,0,255,0.55);
   padding:14px 14px;border-radius:8px;margin-bottom:10px;text-align:center;
   box-shadow:inset 0 0 24px rgba(153,0,255,0.06);}
@@ -197,23 +214,32 @@
 .kg-mp .player-card-empty{background:rgba(0,0,0,0.18);border:1.5px dashed rgba(0,255,255,0.12);
   border-radius:10px;padding:14px 10px;text-align:center;
   color:#444;font-size:11px;letter-spacing:1px;display:flex;align-items:center;justify-content:center;}
-.kg-mp .lobby-footer{padding-top:10px;border-top:1px solid rgba(0,255,255,0.12);
-  margin-top:auto;position:sticky;bottom:0;background:linear-gradient(to top, rgba(4,4,20,0.98), rgba(4,4,20,0.85));}
+/* HR-6.2: action rows live in the fixed control rail (#kg-rail), not in the
+   panel. Any .nav-row/.actions/.lobby-footer that slips through is hidden. */
+.kg-mp .nav-row,.kg-mp .actions,.kg-mp .lobby-footer,.kg-mp .footer{display:none !important;}
 .kg-mp .summary-row{display:flex;justify-content:space-between;align-items:center;
   padding:6px 0;font-size:12px;}
 .kg-mp .summary-row + .summary-row{border-top:1px solid rgba(0,255,255,0.1);}
 .kg-mp .summary-label{color:#9aa;letter-spacing:1.5px;text-transform:uppercase;font-size:10px;}
 .kg-mp .summary-val{color:#00FFFF;text-shadow:0 0 6px rgba(0,255,255,0.4);font-weight:700;}
-.kg-mp .nav-row{display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:10px;}
-.kg-mp .nav-row .btn-back{flex:0 0 auto;}
-.kg-mp .nav-row .btn-next{flex:1;padding:14px;font-size:13px;}
-.kg-mp .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
-.kg-mp .actions .btn-launch{flex:1;min-width:200px;padding:18px;font-size:15px;}
+/* Status-text color variants for the rail (control-rail.css ships the
+   neutral .kg-rail-status look; these add wizard-state coloring). */
+#kg-rail .kg-rail-status.ready{color:#00FF41;text-shadow:0 0 6px rgba(0,255,65,0.5);}
+#kg-rail .kg-rail-status.error{color:#ff4060;}
 .kg-mp .err-msg{color:#ff4060;font-size:11px;margin-top:10px;letter-spacing:1px;
   padding:10px;background:rgba(255,64,96,0.08);border:1px solid rgba(255,64,96,0.3);border-radius:4px;}
 .kg-mp .info-msg{color:#9aa;font-size:12px;margin-top:8px;letter-spacing:1px;text-align:center;line-height:1.6;}
-.kg-mp .footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px;
-  padding-top:14px;border-top:1px solid rgba(0,255,255,0.15);}
+.kg-mp .policy-box{margin:0 0 12px;padding:10px 12px;border:1px solid rgba(0,255,255,0.28);border-radius:8px;
+  background:linear-gradient(180deg,rgba(0,255,255,0.05),rgba(0,0,0,0.18));}
+.kg-mp .policy-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00ffff;margin-bottom:6px;}
+/* policy-title kept for back-compat; primary heading now uses <summary> */
+.kg-mp .policy-line{font-size:11px;color:#b7d7df;line-height:1.5;}
+.kg-mp .policy-box summary{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00ffff;
+  cursor:pointer;list-style:none;padding:0;}
+.kg-mp .policy-box summary::before{content:'▶ ';font-size:8px;}
+.kg-mp .policy-box[open] summary::before{content:'▼ ';}
+.kg-mp .footer{order:-1;display:flex;justify-content:space-between;align-items:center;
+  margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid rgba(0,255,255,0.15);}
 .kg-mp .link-btn{background:none;border:none;color:#9aa;font-size:11px;
   cursor:pointer;letter-spacing:1px;padding:4px 8px;font-family:inherit;text-transform:uppercase;}
 .kg-mp .link-btn:hover{color:#00FFFF;}
@@ -222,10 +248,14 @@
   vertical-align:middle;margin-right:8px;}
 @keyframes kgspin{to{transform:rotate(360deg);}}
 @media (max-width:560px){
-  .kg-mp{height:min(99dvh,99vh);}
-  .kg-mp.kg-mp-vh{margin:0.5dvh auto;height:min(99dvh,99vh);}
+  .kg-mp{height:100%;max-height:100%;}
+  .kg-mp.kg-mp-vh{margin:0 auto;height:100%;max-height:100%;}
   .kg-mp-card{padding:10px 10px 8px;border-radius:8px;}
-  .kg-mp .mode-grid{grid-template-columns:1fr;}
+  /* Phone: drop the single-row constraint and let mode cards wrap into a
+     compact 2-column grid (or 1-column if the panel is very narrow). */
+  .kg-mp .mode-grid{display:grid;flex-wrap:initial;
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+  .kg-mp .mode-grid > .mode-btn{flex:initial;}
   .kg-mp .player-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
   .kg-mp h2{font-size:14px;}
   .kg-mp .game-name{font-size:10px;margin-bottom:8px;}
@@ -263,8 +293,8 @@
 }
 
   @media (max-height:740px){
-    .kg-mp{height:min(99dvh,99vh);}
-    .kg-mp.kg-mp-vh{margin:0.5dvh auto;height:min(99dvh,99vh);}
+    .kg-mp{height:100%;max-height:100%;}
+    .kg-mp.kg-mp-vh{margin:0 auto;height:100%;max-height:100%;}
     .kg-mp-card{padding:10px 10px 8px;}
     .kg-mp h2{font-size:13px;margin-bottom:2px;}
     .kg-mp .game-name{font-size:9px;margin-bottom:6px;}
@@ -297,6 +327,54 @@
     l.rel = 'stylesheet';
     l.href = '/lib/bootstrap/css/bootstrap.min.css';
     document.head.appendChild(l);
+  }
+
+  // HR-6.2: ensure the fixed control rail mount + stylesheet exist so wizard
+  // navigation can be emitted outside the panel (and outside any game canvas).
+  function injectRailMount() {
+    if (!document.getElementById('kg-control-rail-css')) {
+      const l = document.createElement('link');
+      l.id = 'kg-control-rail-css';
+      l.rel = 'stylesheet';
+      l.href = '/lib/control-rail.css';
+      document.head.appendChild(l);
+    }
+    let rail = document.getElementById('kg-rail');
+    if (!rail) {
+      rail = document.createElement('aside');
+      rail.id = 'kg-rail';
+      rail.setAttribute('role', 'toolbar');
+      rail.setAttribute('aria-label', 'Wizard controls');
+      document.body.appendChild(rail);
+    }
+    document.body.classList.add('kg-mp-rail-on');
+    return rail;
+  }
+
+  // Render a single row of wizard controls into the fixed rail. `html` is the
+  // inner HTML for the .kg-rail-row container; `handlers` maps data-act keys
+  // → click handlers. Calling with html=null clears the rail.
+  function setRail(html, handlers) {
+    const rail = injectRailMount();
+    if (html == null) {
+      rail.innerHTML = '';
+      return rail;
+    }
+    rail.innerHTML = html;
+    if (handlers) {
+      Object.keys(handlers).forEach(key => {
+        rail.querySelectorAll('[data-act="' + key + '"]').forEach(el => {
+          el.addEventListener('click', (e) => handlers[key](e, el));
+        });
+      });
+    }
+    return rail;
+  }
+
+  function clearRail() {
+    const rail = document.getElementById('kg-rail');
+    if (rail) rail.innerHTML = '';
+    document.body.classList.remove('kg-mp-rail-on');
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────
@@ -484,10 +562,33 @@
   // ── Render ──────────────────────────────────────────────────────────
   function render() {
     if (!_root) return;
+    emitStageChange();
     if (_state === STATE.ERROR) return renderError();
     if (_state === STATE.LAUNCHING) return renderLaunching();
     if (_state === STATE.CHOOSE) return renderChoose();
     if (_state === STATE.LOBBY) return renderLobby();
+  }
+
+  function currentStageInfo() {
+    const stage = (_state === STATE.LOBBY)
+      ? (String(_step || 'lobby'))
+      : String(_state || 'unknown');
+    return {
+      state: _state,
+      stage,
+      mode: _mode || null,
+      gameId: _opts && _opts.gameId ? _opts.gameId : null,
+      timestamp: Date.now(),
+    };
+  }
+
+  function emitStageChange() {
+    if (!_opts || typeof _opts.onStageChange !== 'function') return;
+    const info = currentStageInfo();
+    const key = [info.state, info.stage, info.mode || '', info.gameId || ''].join('|');
+    if (key === _lastStageKey) return;
+    _lastStageKey = key;
+    try { _opts.onStageChange(info); } catch (_) { }
   }
 
   function renderShell(inner, opts) {
@@ -522,7 +623,32 @@
     return steps.map((_, i) => i < idx ? 'done' : (i === idx ? 'active' : ''));
   }
 
+  function modeTokenToAct(token) {
+    const t = String(token || '').toLowerCase();
+    if (t === 'host-invite') return 'friend';
+    if (t === 'private-invite') return 'private';
+    return t;
+  }
+
+  function resolveModeSets() {
+    const allowedRaw = (_opts && Array.isArray(_opts.allowedModes)) ? _opts.allowedModes : null;
+    const authRaw = (_opts && Array.isArray(_opts.authRequiredModes)) ? _opts.authRequiredModes : null;
+    const allowed = allowedRaw ? new Set(allowedRaw.map(modeTokenToAct)) : null;
+    const auth = authRaw ? new Set(authRaw.map(modeTokenToAct)) : new Set();
+    return { allowed, auth };
+  }
+
+  function isAllowedMode(act, allowedSet) {
+    if (!allowedSet) return true;
+    return allowedSet.has(String(act || ''));
+  }
+
   function renderModeChoice() {
+    const modeSets = resolveModeSets();
+    const allowed = modeSets.allowed;
+    const auth = modeSets.auth;
+
+    const sameScreenEnabled = !!(_opts && _opts.supportsSameScreen) && isAllowedMode('same-screen', allowed);
     const sameScreenButton = (_opts && _opts.supportsSameScreen) ? `
         <button class="mode-btn" data-act="same-screen">
           <span class="mode-icon">🎮</span>
@@ -530,25 +656,126 @@
           <div class="mode-sub">Local co-op on one device</div>
         </button>
       ` : '';
+
+    const matchmakerEnabled = !(_opts && _opts.supportsMatchmaker === false) && isAllowedMode('matchmaker', allowed);
+    const browseEnabled = !(_opts && _opts.supportsOpenGames === false) && isAllowedMode('browse', allowed);
+
+    const mustSignIn = (act) => auth.has(String(act || ''));
+    const signInTag = (act) => mustSignIn(act) ? 'Sign-in required' : '';
+    const policy = (_opts && _opts.modePolicy && typeof _opts.modePolicy === 'object') ? _opts.modePolicy : null;
+    const policyModes = policy && Array.isArray(policy.modes) ? policy.modes : [];
+    const enabledModeNames = policyModes
+      .filter(function (m) { return m && m.panelMode && isAllowedMode(m.panelMode, allowed); })
+      .map(function (m) { return m.label || m.id; });
+    const signupMethods = (_opts && _opts.signupMethods && typeof _opts.signupMethods === 'object') ? _opts.signupMethods : null;
+    const policyBox = (policy || signupMethods) ? `
+      <details class="policy-box">
+        <summary>Mode Policy</summary>
+        <div class="policy-line">Enabled: ${esc(enabledModeNames.length ? enabledModeNames.join(' · ') : 'Solo')}</div>
+        ${signupMethods ? `<div class="policy-line">Create: ${esc((signupMethods.createMethods || []).join(', ') || 'quick-create')}</div>` : ''}
+        ${signupMethods ? `<div class="policy-line">Join: ${esc((signupMethods.joinMethods || []).join(', ') || 'url-code')}</div>` : ''}
+      </details>
+    ` : '';
+
+    const modeCards = [];
+    if (isAllowedMode('solo', allowed)) modeCards.push(`
+      <button class="mode-btn" data-act="solo">
+        <span class="mode-icon">🤖</span>
+        <span class="mode-label">Solo</span>
+        <div class="mode-sub">Single-player run</div>
+      </button>
+    `);
+    if (isAllowedMode('solo-bots', allowed)) modeCards.push(`
+      <button class="mode-btn" data-act="solo-bots">
+        <span class="mode-icon">🧠</span>
+        <span class="mode-label">Solo + Bots</span>
+        <div class="mode-sub">Train against AI roster</div>
+      </button>
+    `);
+    if (isAllowedMode('friend', allowed)) modeCards.push(`
+      <button class="mode-btn" data-act="friend">
+        <span class="mode-icon">🔗</span>
+        <span class="mode-label">Host + Invite URL/Code</span>
+        <div class="mode-sub">Share link or code to join</div>
+      </button>
+    `);
+    if (isAllowedMode('private', allowed)) modeCards.push(`
+      <button class="mode-btn" data-act="private">
+        <span class="mode-icon">🛡️</span>
+        <span class="mode-label">Create Signed-In Game</span>
+        <div class="mode-sub">Private lobby for invited friends${signInTag('private') ? ' · ' + signInTag('private') : ''}</div>
+      </button>
+    `);
+    modeCards.push(`
+      <button class="mode-btn" data-act="matchmaker" ${matchmakerEnabled ? '' : 'disabled'}>
+        <span class="mode-icon">🏁</span>
+        <span class="mode-label">Skill Matchmaker</span>
+        <div class="mode-sub">${matchmakerEnabled ? ('Queue by skill bracket' + (signInTag('matchmaker') ? ' · ' + signInTag('matchmaker') : '')) : 'Not enabled for this game'}</div>
+      </button>
+    `);
+    modeCards.push(`
+      <button class="mode-btn" data-act="browse" ${browseEnabled ? '' : 'disabled'}>
+        <span class="mode-icon">📡</span>
+        <span class="mode-label">Join Available Games</span>
+        <div class="mode-sub">${browseEnabled ? ('Browse active sessions' + (signInTag('browse') ? ' · ' + signInTag('browse') : '')) : 'Use invite code/link for now'}</div>
+      </button>
+    `);
+    if (sameScreenEnabled) modeCards.push(sameScreenButton);
+
+    const pageSize = 4;
+    const totalPages = Math.max(1, Math.ceil(modeCards.length / pageSize));
+    if (_modePage >= totalPages) _modePage = 0;
+    if (_modePage < 0) _modePage = 0;
+    const start = _modePage * pageSize;
+    const visibleModeCards = modeCards.slice(start, start + pageSize).join('');
+
     renderShell(`
+      ${policyBox}
       <div class="mode-grid">
-        <button class="mode-btn" data-act="solo">
-          <span class="mode-icon">🤖</span>
-          <span class="mode-label">Solo vs AI</span>
-          <div class="mode-sub">Practice against bots</div>
-        </button>
-        <button class="mode-btn" data-act="friend">
-          <span class="mode-icon">👥</span>
-          <span class="mode-label">Play a Friend</span>
-          <div class="mode-sub">Share a code or link</div>
-        </button>
-        ${sameScreenButton}
+        ${visibleModeCards}
       </div>
     `, { stepTitle: 'Choose how to play' });
+
+    if (totalPages > 1) {
+      setRail(`
+        <button class="btn-ghost" data-act="mode-prev" ${_modePage === 0 ? 'disabled' : ''}>← Previous</button>
+        <span class="kg-rail-status">Mode page ${_modePage + 1} of ${totalPages}</span>
+        <button class="btn-ghost" data-act="mode-next" ${_modePage >= totalPages - 1 ? 'disabled' : ''}>More →</button>
+      `, {
+        'mode-prev': () => { _modePage = Math.max(0, _modePage - 1); renderModeChoice(); },
+        'mode-next': () => { _modePage = Math.min(totalPages - 1, _modePage + 1); renderModeChoice(); },
+      });
+    } else {
+      setRail(`<span class="kg-rail-status">▼ Pick a mode above to begin</span>`);
+    }
+
     _root.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => {
+      if (b.disabled) return;
       const act = b.getAttribute('data-act');
-      _mode = act;
-      _step = (act === 'friend') ? STEP.SHARE : STEP.ROSTER;
+      if (!isAllowedMode(act, allowed)) return;
+      if (mustSignIn(act) && _opts && typeof _opts.onSignInRequired === 'function') {
+        const proceed = _opts.onSignInRequired({ mode: act, gameId: _opts.gameId });
+        if (proceed === false) return;
+      }
+      _soloBotsWanted = null;
+      if (act === 'solo-bots') {
+        _mode = 'solo';
+        _soloBotsWanted = 2;
+      } else if (act === 'private') {
+        _mode = 'friend';
+      } else if (act === 'matchmaker') {
+        // Current backend path: friend queue endpoint is used as provisional matchmaker transport.
+        _mode = 'friend';
+      } else if (act === 'browse') {
+        const joinUrl = new URL('/join.html', location.origin);
+        if (_opts && _opts.gameId) joinUrl.searchParams.set('game', _opts.gameId);
+        location.href = joinUrl.toString();
+        return;
+      } else {
+        _mode = act;
+      }
+
+      _step = (_mode === 'friend') ? STEP.SHARE : STEP.ROSTER;
       // Collect name/avatar now if not yet set — deferred until user actually plays
       if (!_profileNameDraft) {
         renderNameStep({ guest: false });
@@ -576,26 +803,33 @@
       </div>
       <input class="name-field" id="kg-name-step" type="text" maxlength="18"
         placeholder="Your name..." value="${esc(_profileNameDraft || '')}" autocomplete="off" spellcheck="false">
-      <div class="nav-row">
-        ${isGuest ? '<button class="btn-ghost btn-back" data-act="cancel">← Cancel</button>' : '<button class="btn-ghost btn-back" data-act="back">← Back</button>'}
-        <button class="btn-cyan btn-next" id="kg-name-next" disabled>Next →</button>
-      </div>
       <div class="info-msg">${isGuest ? `Invite code: ${esc(code || '...')}` : 'Step 1 of 3'}</div>
     `, { stepTitle: isGuest ? 'Invited Player Wizard · Name' : 'Setup · Player Name' });
 
+    const goNext = () => renderAvatarStep(opts);
+    setRail(`
+      ${isGuest
+        ? '<button class="btn-ghost" data-act="cancel">← Cancel</button>'
+        : '<button class="btn-ghost" data-act="back">← Back</button>'}
+      <span class="kg-rail-status">${isGuest ? `Invite ${esc(code || '...')}` : 'Step 1 of 3'}</span>
+      <button class="btn-cyan btn-grow" data-act="next" disabled>Next →</button>
+    `, {
+      back: () => renderModeChoice(),
+      cancel: leaveAndReset,
+      next: goNext,
+    });
+
     const nameEl = _root.querySelector('#kg-name-step');
-    const nextBtn = _root.querySelector('#kg-name-next');
+    const railNext = document.querySelector('#kg-rail [data-act="next"]');
     const sync = () => {
       _profileNameDraft = nameEl.value.trim();
-      nextBtn.disabled = _profileNameDraft.length < 1;
+      if (railNext) railNext.disabled = _profileNameDraft.length < 1;
     };
     nameEl.addEventListener('input', sync);
+    nameEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && _profileNameDraft.length >= 1) goNext();
+    });
     sync();
-    nextBtn.addEventListener('click', () => renderAvatarStep(opts));
-    const cancel = _root.querySelector('[data-act="cancel"]');
-    if (cancel) cancel.addEventListener('click', leaveAndReset);
-    const back = _root.querySelector('[data-act="back"]');
-    if (back) back.addEventListener('click', () => renderModeChoice());
   }
 
   function renderAvatarStep(opts) {
@@ -611,22 +845,40 @@
       </div>
       <div class="avatar-quick">${buttons}</div>
       <div class="av-more" id="kg-av-more">+ More avatars</div>
-      <div class="nav-row">
-        <button class="btn-ghost btn-back" data-act="back">← Back</button>
-        <button class="btn-cyan btn-next" id="kg-av-next" ${_profileAvatarDraft ? '' : 'disabled'}>Next →</button>
-      </div>
-      <div class="info-msg">${isGuest ? 'Step 2 of 3' : 'Step 2 of 3'}</div>
+      <div class="info-msg">Step 2 of 3</div>
     `, { stepTitle: isGuest ? 'Invited Player Wizard · Avatar' : 'Setup · Avatar' });
 
+    const advance = () => {
+      saveProfileDraft();
+      if (isGuest) {
+        clearUrlCode();
+        connectAndJoin(_pendingCode);
+      } else if (_mode === 'same-screen') {
+        buildLocalLobby();
+      } else if (_mode) {
+        connectAndCreate(_mode === 'friend');
+      } else {
+        renderModeChoice();
+      }
+    };
+    setRail(`
+      <button class="btn-ghost" data-act="back">← Back</button>
+      <span class="kg-rail-status">Step 2 of 3</span>
+      <button class="btn-cyan btn-grow" data-act="next" ${_profileAvatarDraft ? '' : 'disabled'}>Next →</button>
+    `, {
+      back: () => renderNameStep(opts),
+      next: advance,
+    });
+
     const preview = _root.querySelector('#kg-av-preview');
-    const nextBtn = _root.querySelector('#kg-av-next');
+    const railNext = document.querySelector('#kg-rail [data-act="next"]');
     _root.querySelectorAll('.av-btn').forEach(b => {
       b.addEventListener('click', () => {
         _root.querySelectorAll('.av-btn').forEach(x => x.classList.remove('selected'));
         b.classList.add('selected');
         _profileAvatarDraft = b.getAttribute('data-av');
         if (preview) preview.textContent = _profileAvatarDraft;
-        nextBtn.disabled = !_profileAvatarDraft;
+        if (railNext) railNext.disabled = !_profileAvatarDraft;
       });
     });
     _root.querySelector('#kg-av-more').addEventListener('click', () => {
@@ -636,23 +888,8 @@
           if (preview) preview.textContent = _profileAvatarDraft;
           _root.querySelectorAll('.av-btn').forEach(x =>
             x.classList.toggle('selected', x.getAttribute('data-av') === _profileAvatarDraft));
-          nextBtn.disabled = !_profileAvatarDraft;
+          if (railNext) railNext.disabled = !_profileAvatarDraft;
         });
-      }
-    });
-    _root.querySelector('[data-act="back"]').addEventListener('click', () => renderNameStep(opts));
-    nextBtn.addEventListener('click', () => {
-      saveProfileDraft();
-      if (isGuest) {
-        clearUrlCode();
-        connectAndJoin(_pendingCode);
-      } else if (_mode === 'same-screen') {
-        buildLocalLobby();
-      } else if (_mode) {
-        // Came here from mode selection — go straight to game
-        connectAndCreate(_mode === 'friend');
-      } else {
-        renderModeChoice();
       }
     });
   }
@@ -666,17 +903,24 @@
   function renderError() {
     renderShell(`
       <div class="err-msg">${esc(_error || 'Connection error')}</div>
-      <div class="actions"><button class="btn-primary btn-launch" data-act="retry">▶ Try Again</button></div>
-    `);
-    _root.querySelector('[data-act="retry"]').addEventListener('click', () => {
-      _error = null; _state = STATE.CHOOSE; render();
-      try { _mp && _mp.disconnect(); } catch { /* ignore */ }
-      _mp = null;
+    `, { stepTitle: 'Connection Error' });
+    setRail(`
+      <button class="btn-ghost" data-act="back">← Back</button>
+      <span class="kg-rail-status">${esc(_error || 'Connection error')}</span>
+      <button class="btn-primary btn-grow" data-act="retry">▶ Try Again</button>
+    `, {
+      back: leaveAndReset,
+      retry: () => {
+        _error = null; _state = STATE.CHOOSE; render();
+        try { _mp && _mp.disconnect(); } catch { /* ignore */ }
+        _mp = null;
+      },
     });
   }
 
   function renderLaunching() {
     renderShell(`<div class="info-msg"><span class="spinner"></span>Launching ${esc(_opts.gameName)}…</div>`);
+    setRail(`<span class="kg-rail-status">Launching ${esc(_opts.gameName)}…</span>`);
   }
 
   // Wizard dispatcher: lobby is broken into substeps so each screen shows
@@ -724,15 +968,27 @@
         placeholder="Player name..." value="${esc(currentName)}" autocomplete="off" spellcheck="false">
       <div class="avatar-quick">${avatarButtons}</div>
       <div class="av-more" id="kg-local-av-more">+ More avatars</div>
-      <div class="nav-row">
-        <button class="btn-ghost btn-back" data-act="cancel-edit">← Back</button>
-        <button class="btn-cyan btn-next" id="kg-local-save">Save Player</button>
-      </div>
     `, { stepTitle: 'Edit Local Player' });
 
     const nameEl = _root.querySelector('#kg-local-name');
     const preview = _root.querySelector('#kg-local-av-preview');
     let selectedAvatar = currentAvatar;
+
+    setRail(`
+      <button class="btn-ghost" data-act="cancel-edit">← Back</button>
+      <span class="kg-rail-status">Edit local player</span>
+      <button class="btn-cyan btn-grow" data-act="save">Save Player</button>
+    `, {
+      'cancel-edit': () => { _localEditPlayerId = null; render(); },
+      save: () => {
+        player.username = sanitizeLocalPlayerName(nameEl && nameEl.value, currentName);
+        const avatar = normalizeLocalHumanAvatar(selectedAvatar, players, player.user_id);
+        player.avatar = avatar;
+        player.avatar_id = avatar;
+        _localEditPlayerId = null;
+        render();
+      },
+    });
 
     _root.querySelectorAll('.av-btn').forEach(b => {
       b.addEventListener('click', () => {
@@ -757,26 +1013,6 @@
         }
       });
     }
-
-    const saveBtn = _root.querySelector('#kg-local-save');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => {
-        player.username = sanitizeLocalPlayerName(nameEl && nameEl.value, currentName);
-        const avatar = normalizeLocalHumanAvatar(selectedAvatar, players, player.user_id);
-        player.avatar = avatar;
-        player.avatar_id = avatar;
-        _localEditPlayerId = null;
-        render();
-      });
-    }
-
-    const cancelBtn = _root.querySelector('[data-act="cancel-edit"]');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
-        _localEditPlayerId = null;
-        render();
-      });
-    }
   }
 
   // Step 1 (friend host only): just the share code/link. Nothing else competes
@@ -798,18 +1034,19 @@
         </div>
       </div>
       <div class="info-msg">Send the code or link. You'll add bots and launch on the next screens.</div>
-      <div class="nav-row">
-        <button class="btn-ghost btn-back" data-act="cancel">← Leave</button>
-        <button class="btn-cyan btn-next" data-act="to-roster">Add Players →</button>
-      </div>
     `, { progress: progressFor(STEP.SHARE), stepTitle: 'Invite a Friend' });
+
+    setRail(`
+      <button class="btn-ghost" data-act="cancel">← Leave</button>
+      <span class="kg-rail-status">${others > 0 ? `${others} friend${others === 1 ? '' : 's'} joined` : 'Waiting for friends…'}</span>
+      <button class="btn-cyan btn-grow" data-act="to-roster">Add Players →</button>
+    `, {
+      cancel: leaveAndReset,
+      'to-roster': () => { _step = STEP.ROSTER; render(); },
+    });
 
     _root.querySelectorAll('[data-copy]').forEach(b =>
       b.addEventListener('click', () => copyToClipboard(b.getAttribute('data-copy'), b)));
-    _root.querySelector('[data-act="to-roster"]').addEventListener('click', () => {
-      _step = STEP.ROSTER; render();
-    });
-    _root.querySelector('[data-act="cancel"]').addEventListener('click', leaveAndReset);
   }
 
   // Step 2: roster + bot controls. No share box, no big launch button — just
@@ -870,9 +1107,6 @@
       </div>`;
 
     const backStep = (_mode === 'friend') ? STEP.SHARE : null;
-    const backBtn = backStep
-      ? `<button class="btn-ghost btn-back" data-act="back">← Back</button>`
-      : `<button class="btn-ghost btn-back" data-act="cancel">← Leave</button>`;
 
     renderShell(`
       <div class="roster-scroll">
@@ -880,13 +1114,21 @@
         ${emptyRows}
       </div>
       ${aiControls}
-      <div class="nav-row">
-        ${backBtn}
-        <button class="btn-cyan btn-next" data-act="to-launch" ${allReady ? '' : 'disabled'}>
-          ${allReady ? 'Continue →' : `Need ${minP - count} more`}
-        </button>
-      </div>
     `, { progress: progressFor(STEP.ROSTER), stepTitle: `Players (${count} / ${maxP})` });
+
+    setRail(`
+      ${backStep
+        ? '<button class="btn-ghost" data-act="back">← Back</button>'
+        : '<button class="btn-ghost" data-act="cancel">← Leave</button>'}
+      <span class="kg-rail-status">${count} / ${maxP} · ${allReady ? 'all ready' : `need ${Math.max(0, minP - count)} more`}</span>
+      <button class="btn-cyan btn-grow" data-act="to-launch" ${allReady ? '' : 'disabled'}>
+        ${allReady ? 'Continue →' : `Need ${Math.max(0, minP - count)} more`}
+      </button>
+    `, {
+      back: () => { _step = backStep; render(); },
+      cancel: leaveAndReset,
+      'to-launch': () => { _step = STEP.LAUNCH; render(); },
+    });
 
     _root.querySelectorAll('[data-diff]').forEach(b =>
       b.addEventListener('click', () => { _aiDifficulty = b.getAttribute('data-diff'); render(); }));
@@ -906,12 +1148,6 @@
         if (_mp.removePlayer) _mp.removePlayer(id);
         else if (_mp.removeBot) _mp.removeBot(id);
       }));
-    const next = _root.querySelector('[data-act="to-launch"]');
-    if (next) next.addEventListener('click', () => { _step = STEP.LAUNCH; render(); });
-    const back = _root.querySelector('[data-act="back"]');
-    if (back) back.addEventListener('click', () => { _step = backStep; render(); });
-    const cancel = _root.querySelector('[data-act="cancel"]');
-    if (cancel) cancel.addEventListener('click', leaveAndReset);
   }
 
   // Step 3 (host): final confirmation. Summary of who's playing + Launch.
@@ -939,19 +1175,16 @@
       <div class="info-msg">${ready
         ? 'All set. Launch when ready.'
         : `Need at least ${minP} players ready before launch.`}</div>
-      <div class="nav-row">
-        <button class="btn-ghost btn-back" data-act="back">← Back</button>
-        <button class="btn-primary btn-next" data-act="launch" ${ready ? '' : 'disabled'}>
-          ▶ Launch
-        </button>
-      </div>
     `, { progress: progressFor(STEP.LAUNCH), stepTitle: 'Ready to Launch' });
 
-    _root.querySelector('[data-act="back"]').addEventListener('click', () => {
-      _step = STEP.ROSTER; render();
+    setRail(`
+      <button class="btn-ghost" data-act="back">← Back</button>
+      <span class="kg-rail-status">${ready ? 'All set · launch when ready' : `Need ${minP} ready`}</span>
+      <button class="btn-primary btn-grow" data-act="launch" ${ready ? '' : 'disabled'}>▶ Launch</button>
+    `, {
+      back: () => { _step = STEP.ROSTER; render(); },
+      launch: hostLaunch,
     });
-    const launchBtn = _root.querySelector('[data-act="launch"]');
-    if (launchBtn) launchBtn.addEventListener('click', hostLaunch);
   }
 
   // Guest onboarding: welcome screen shown BEFORE joining. Name + avatar + Ready.
@@ -1000,7 +1233,7 @@
     const limitOptions = [2, 3, 4, 5, 6].map(n =>
       `<option value="${n}" ${maxP === n ? 'selected' : ''}>${n}</option>`).join('');
 
-    const footer = isHost ? `
+    const contentBody = isHost ? `
       <div class="ai-controls">
         <button class="btn-purple" data-act="add-ai" ${canAddAi ? '' : 'disabled'}>+ Add Bot</button>
         <div class="ai-difficulty">
@@ -1014,24 +1247,7 @@
             ${limitOptions}
           </select>
         </div>
-      </div>
-      <div class="lobby-footer">
-        <div class="info-msg">${canLaunch
-        ? 'All players ready. Launch when you are!'
-        : `Waiting for players… (${count} / ${minP} minimum)`
-      }</div>
-        <div class="nav-row">
-          <button class="btn-ghost btn-back" data-act="back-to-share">← Invite More</button>
-          <button class="btn-primary btn-next" data-act="launch" ${canLaunch ? '' : 'disabled'}>▶ Launch</button>
-        </div>
-      </div>` : `
-      <div class="lobby-footer">
-        <div class="info-msg">${meReady ? 'Ready confirmed. Waiting for host to launch…' : 'Press Join to confirm your ready status.'}</div>
-        <div class="nav-row">
-          <button class="btn-cyan btn-next" data-act="guest-join" ${meReady ? 'disabled' : ''}>${meReady ? '✔ Joined' : 'Join'}</button>
-          <button class="btn-ghost btn-back" data-act="cancel">← Leave</button>
-        </div>
-      </div>`;
+      </div>` : '';
 
     const hostName = (players.find(p => p.is_host) || {}).username || 'Host';
     const subtitle = isHost
@@ -1044,33 +1260,46 @@
       <div class="step-title">${isHost ? 'Game Lobby' : 'You\u2019re In!'}</div>
       <div class="step">
         <div class="player-cards">${cards}${empties}</div>
-        ${footer}
+        ${contentBody}
       </div>
     </div></div>`;
 
     if (isHost) {
+      const railStatus = canLaunch
+        ? 'All players ready · launch when you are'
+        : `Waiting for players… (${count} / ${minP} minimum)`;
+      setRail(`
+        <button class="btn-ghost" data-act="back-to-share">← Invite More</button>
+        <span class="kg-rail-status">${railStatus}</span>
+        <button class="btn-primary btn-grow" data-act="launch" ${canLaunch ? '' : 'disabled'}>▶ Launch</button>
+      `, {
+        'back-to-share': () => { _step = STEP.SHARE; render(); },
+        launch: hostLaunch,
+      });
+
       _root.querySelectorAll('[data-diff]').forEach(b =>
         b.addEventListener('click', () => { _aiDifficulty = b.getAttribute('data-diff'); render(); }));
       const addAi = _root.querySelector('[data-act="add-ai"]');
       if (addAi) addAi.addEventListener('click', () => _mp.addBot(_aiDifficulty));
       const limitSel = _root.querySelector('[data-act="set-limit"]');
       if (limitSel) limitSel.addEventListener('change', () => _mp.setMaxPlayers(parseInt(limitSel.value, 10)));
-      const backToShare = _root.querySelector('[data-act="back-to-share"]');
-      if (backToShare) backToShare.addEventListener('click', () => { _step = STEP.SHARE; render(); });
-      const launchBtn = _root.querySelector('[data-act="launch"]');
-      if (launchBtn) launchBtn.addEventListener('click', hostLaunch);
     } else {
-      const joinBtn = _root.querySelector('[data-act="guest-join"]');
-      if (joinBtn) {
-        joinBtn.addEventListener('click', () => {
+      const railStatus = meReady
+        ? 'Ready confirmed · waiting for host to launch…'
+        : 'Press Join to confirm your ready status';
+      setRail(`
+        <button class="btn-ghost" data-act="cancel">← Leave</button>
+        <span class="kg-rail-status">${railStatus}</span>
+        <button class="btn-cyan btn-grow" data-act="guest-join" ${meReady ? 'disabled' : ''}>${meReady ? '✔ Joined' : 'Join'}</button>
+      `, {
+        cancel: leaveAndReset,
+        'guest-join': () => {
           if (_mp && _mp.session && _mp.userId) {
             const mine = _mp.session.players.find(p => p.user_id === _mp.userId);
             if (mine && !mine.ready) _mp.toggleReady();
           }
-        });
-      }
-      const cancel = _root.querySelector('[data-act="cancel"]');
-      if (cancel) cancel.addEventListener('click', leaveAndReset);
+        },
+      });
     }
   }
 
@@ -1172,7 +1401,7 @@
     const mp = ensureClient(); if (!mp) return;
     const create = () => {
       mp.createGame({ private: !!isPrivate, max_players: _opts.maxPlayers });
-      const wantBots = (_mode === 'solo') ? Math.max(0, _opts.soloDefaultBots || 1) : 0;
+      const wantBots = (_mode === 'solo') ? Math.max(0, _soloBotsWanted != null ? _soloBotsWanted : (_opts.soloDefaultBots || 1)) : 0;
       let botsAdded = 0;
       const onceReady = () => {
         if (mp.session && mp.userId) {
@@ -1478,6 +1707,7 @@
       _mp = null; _myUserId = null; _localEditPlayerId = null;
       if (_root) _root.innerHTML = '';
       _root = null; _opts = null;
+      clearRail();
     },
     get session() { return _mp ? _mp.session : null; },
     get client() { return _mp; },

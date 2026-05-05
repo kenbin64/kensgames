@@ -33,8 +33,10 @@
             font-family: 'Rajdhani', sans-serif;
             background: var(--bg-dark);
             color: var(--text);
-            overflow-x: hidden;
-            min-height: 100vh;
+            overflow: hidden;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
         }
 
         #bg-canvas {
@@ -109,8 +111,11 @@
         main {
             position: relative;
             z-index: 1;
-            padding-top: 100px;
-            min-height: 100vh;
+            padding-top: 20px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .lounge-header {

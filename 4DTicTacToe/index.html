@@ -19,11 +19,14 @@
     <a href="/" class="nav-logo">KEN<span style="color:#fff">S</span>GAMES</a>
     <ul class="nav-links">
       <li><a href="/" style="color:var(--cyan);font-weight:700">&#8592; PORTAL</a></li>
-      <li><a href="/starfighter/">Alien Attack</a></li>
-      <li><a href="/fasttrack/">FastTrack</a></li>
+      <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
+      <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
+      <li><a href="/brickbreaker3d/lobby.html">BrickBreaker</a></li>
     </ul>
   </nav>
   <div class="player-panel p1-panel active" id="panel-p1">
+    <button class="panel-dismiss" onclick="event.stopPropagation();togglePanel('p1')" title="Toggle panel"
+      aria-label="Toggle player 1 panel">×</button>
     <div class="panel-badge p1-badge pulse" id="badge-p1">1</div>
     <div class="panel-name" id="name-p1">PLAYER 1</div>
     <span class="score-lbl">WINS</span>
@@ -38,6 +41,8 @@
     <div class="panel-mode" id="mode-p1">CLASSIC</div>
   </div>
   <div class="player-panel p2-panel" id="panel-p2">
+    <button class="panel-dismiss" onclick="event.stopPropagation();togglePanel('p2')" title="Toggle panel"
+      aria-label="Toggle player 2 panel">×</button>
     <div class="panel-badge p2-badge" id="badge-p2">2</div>
     <div class="panel-name" id="name-p2">PLAYER 2</div>
     <span class="score-lbl">WINS</span>
@@ -52,6 +57,8 @@
     <div class="panel-mode" id="mode-p2">CLASSIC</div>
   </div>
   <div class="player-panel p3-panel" id="panel-p3" style="display:none">
+    <button class="panel-dismiss" onclick="event.stopPropagation();togglePanel('p3')" title="Toggle panel"
+      aria-label="Toggle player 3 panel">×</button>
     <div class="panel-badge p3-badge" id="badge-p3">3</div>
     <div class="panel-name" id="name-p3">PLAYER 3</div>
     <span class="score-lbl">WINS</span>
@@ -66,6 +73,8 @@
     <div class="panel-mode" id="mode-p3">CLASSIC</div>
   </div>
   <div class="player-panel p4-panel" id="panel-p4" style="display:none">
+    <button class="panel-dismiss" onclick="event.stopPropagation();togglePanel('p4')" title="Toggle panel"
+      aria-label="Toggle player 4 panel">×</button>
     <div class="panel-badge p4-badge" id="badge-p4">4</div>
     <div class="panel-name" id="name-p4">PLAYER 4</div>
     <span class="score-lbl">WINS</span>

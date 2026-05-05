@@ -1023,6 +1023,23 @@ let cDrag = false, cLX = 0, cLY = 0, cDownX = 0, cDownY = 0, cMoved = 0, cBtn = 
 const ORBIT_SENS = 0.0045;
 const parallax = { x: 0, y: 0, tx: 0, ty: 0 };
 function setCam(p) { document.getElementById('btn-cama').classList.toggle('on', p === 'A'); document.getElementById('btn-camb').classList.toggle('on', p === 'B'); document.getElementById('btn-follow').classList.remove('on'); camFollow = false; camPosT.copy(CAM_PRESETS[p].pos); camLookT.copy(CAM_PRESETS[p].target); }
+// Toggle a player panel between expanded and collapsed (thin tab) states.
+// Collapsed panels show only the dismiss/re-open button, never covering the board.
+function togglePanel(pid) {
+  const el = document.getElementById('panel-' + pid);
+  if (!el) return;
+  el.classList.toggle('panel-collapsed');
+  const collapsed = el.classList.contains('panel-collapsed');
+  el.style.pointerEvents = collapsed ? 'auto' : '';
+}
+// Collapsed-tab click: clicking anywhere on a collapsed panel re-expands it.
+// Dismiss button stops propagation so it doesn't bubble to this handler.
+document.addEventListener('click', function (e) {
+  const panel = e.target.closest('.player-panel.panel-collapsed');
+  if (!panel) return;
+  const pid = panel.id.replace('panel-', '');
+  togglePanel(pid);
+});
 function toggleFollow() { camFollow = !camFollow; document.getElementById('btn-follow').classList.toggle('on', camFollow); if (camFollow) { document.getElementById('btn-cama').classList.remove('on'); document.getElementById('btn-camb').classList.remove('on'); } }
 function resetCam() { setCam('A'); }
 // Right-button drag (or any drag past 6px) ROTATES THE CUBE about world axes. Left-click without
@@ -1479,16 +1496,38 @@ let snapAnim = null;
 const _snapTmp = new THREE.Vector3();
 function onBallSettled() {
   const p = physBall.p;
-  // Deterministic chamber attach: segment the cube into chamber cells and map the settle point
-  // directly to that segment. If occupied, only face-adjacent chambers are considered.
-  const cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
   Audio4D.onSettle();
   boardGlow.intensity = 0;
+  // Resolution order — no teleport rule: always prefer the column-gravity target.
+  // 1. Predicted landing cell (computed by predictLanding at drop time — the canonical gravity target).
+  let cell = null;
+  if (physBall.predicted) {
+    const [pgx, pgy, pgz] = physBall.predicted;
+    if (pgx >= 0 && pgx < G && pgy >= 0 && pgy < G && pgz >= 0 && pgz < G && !BM.getCell(pgx, pgy, pgz))
+      cell = physBall.predicted;
+  }
+  // 2. Column nearest-free (gravity stack within the drop column — no cross-column teleport).
+  if (!cell && physBall.dropColumn) {
+    const colCell = nearestFreeCellInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z, physBall.y + SADDLE_CELL * 0.6);
+    if (colCell) cell = colCell;
+  }
+  // 3. Exact physics resting segment (where the ball physically came to rest).
+  if (!cell) cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
+  // 4. Face-adjacent cells only — one step from the resting segment, no further.
   if (!cell) {
+    const seed = settledSegmentFromWorld(physBall.x, physBall.y, physBall.z);
+    const adj = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (const [dx, dy, dz] of adj) {
+      const ax = seed.gx + dx, ay = seed.gy + dy, az = seed.gz + dz;
+      if (ax < 0 || ax >= G || ay < 0 || ay >= G || az < 0 || az >= G) continue;
+      if (!BM.getCell(ax, ay, az)) { cell = [ax, ay, az]; break; }
+    }
+  }
+  if (!cell) {
+    // No valid adjacent cell — the column is full; discard the ball and continue.
     scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
     isDropping = false; if (!isGameOver) maybeSpawnTurnBall(); return;
   }
-  // Compute the chamber-centre in world space (boardGroup may be at a 90deg rotation snap).
   const [gx, gy, gz] = cell;
   const toWorld = nodePos(gx, gy, gz); boardGroup.localToWorld(toWorld);
   snapAnim = {

@@ -35,13 +35,15 @@
     html,
     body {
       width: 100%;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
     body {
       font-family: 'Rajdhani', 'Poppins', sans-serif;
       color: var(--ink);
-      min-height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
       background:
         radial-gradient(900px 500px at 10% -5%, rgba(132, 238, 255, 0.22), transparent 70%),
         radial-gradient(800px 520px at 100% -10%, rgba(179, 255, 119, 0.16), transparent 72%),
@@ -188,6 +190,10 @@
     }
 
     main {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
       padding: 24px 0 56px;
     }
 
@@ -672,7 +678,7 @@
         <div class="hero-stats">
           <div class="chip"><strong id="stat-games">0</strong><span>Games</span></div>
           <div class="chip"><strong>Live</strong><span>Multiplayer Ready</span></div>
-          <div class="chip"><strong>0 Ads</strong><span>No Paywalls</span></div>
+          <div class="chip"><strong>Browser</strong><span>Play Instantly</span></div>
         </div>
       </article>
 
@@ -760,7 +766,7 @@
         desc: 'First-person deep-space combat with wave AI, evasive maneuvers, and squad pressure.',
         multiplayer: true,
         url: '/starfighter/',
-        lobbyUrl: '/starfighter/lobby.html?v=20260501',
+        lobbyUrl: '/starfighter/lobby.html',
         thumb: '/assets/images/starfighter_landing.png',
       },
       {
@@ -891,7 +897,7 @@
     function lobbyPathForGameId(gameId) {
       const map = {
         fasttrack: '/fasttrack/lobby.html',
-        starfighter: '/starfighter/lobby.html?v=20260501',
+        starfighter: '/starfighter/lobby.html',
         brickbreaker3d: '/brickbreaker3d/lobby.html',
         brickbreaker: '/brickbreaker3d/lobby.html',
         '4dtictactoe': '/4DTicTacToe/',

@@ -509,8 +509,7 @@
           display: none !important;
         }
 
-        #ctrl-overlay,
-        #ctrl-hamburger {
+        #ctrl-overlay {
           display: none !important;
         }
       }
@@ -1037,43 +1036,38 @@
         fill: rgba(0, 255, 255, 0.3)
       }
 
-      /* Mobile hamburger toggle */
+      /* Mobile HUD hamburger toggle */
       #ctrl-hamburger {
         display: none;
-        position: absolute;
-        bottom: 16px;
-        right: 16px;
-        z-index: 26;
-        width: 36px;
-        height: 36px;
-        background: rgba(2, 8, 18, 0.85);
-        border: 1px solid rgba(0, 255, 255, 0.3);
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 210;
+        width: 38px;
+        height: 38px;
+        background: transparent;
+        border: none;
         border-radius: 6px;
         cursor: pointer;
         pointer-events: auto;
-        color: #0ff;
-        font-size: 20px;
+        color: var(--sf-text-gold);
+        font-size: 24px;
         align-items: center;
         justify-content: center;
-        line-height: 36px;
-        text-align: center
+        line-height: 1;
+        text-align: center;
+        text-shadow: 0 0 8px rgba(255, 210, 107, 0.45)
       }
 
       #ctrl-hamburger:hover {
-        background: rgba(0, 40, 80, 0.8)
+        color: #ffe18f
+      }
+
+      #ctrl-overlay {
+        display: none !important;
       }
 
       @media(max-width:768px) {
-        #ctrl-overlay {
-          display: none !important;
-          bottom: 60px;
-          right: 10px
-        }
-
-        #ctrl-overlay.mobile-open {
-          display: block !important
-        }
-
         #ctrl-hamburger {
           display: flex
         }
@@ -2331,15 +2325,14 @@
       /* ═══════════════════════════════════════
        PANEL-FREE GAMEPLAY — hide old panels always
        ═══════════════════════════════════════ */
-      #mob-nav-sphere,
-      #mob-btn-group,
       #mob-hint,
       #mission-panel,
       #tutorial-panel,
-      #ctrl-overlay,
-      #ctrl-hamburger {
+      #ctrl-overlay {
         display: none !important;
       }
+
+      /* mob-nav-sphere, mob-btn-group, ctrl-hamburger — managed by JS (setMobilePhase + _initMobileControls) */
 
       /* Hide console buttons + comm ticker during active flight */
       body.phase-combat #console-buttons,
@@ -2615,6 +2608,123 @@
       #console-buttons .console-btn:hover,
       #console-buttons .console-btn:focus-visible {
         opacity: 0.82 !important;
+      }
+
+      /* ═══════════════════════════════════════
+       SMARTPHONE DRAWER HUD — panel-free playfield
+       ═══════════════════════════════════════ */
+      #sf-mobile-delta {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 215;
+        display: none;
+        max-width: 88vw;
+        text-align: center;
+        color: var(--sf-text-green);
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-shadow: 0 0 8px rgba(132, 255, 154, 0.48);
+        pointer-events: none;
+      }
+
+      @media (hover: none) and (pointer: coarse) {
+
+        /* Show the hamburger menu button on all touch devices */
+        #ctrl-hamburger {
+          display: flex !important;
+        }
+
+        #gameplay-hud,
+        #ghud-show,
+        #console-buttons,
+        #sf-controls-hint,
+        #rescue-btn,
+        #cm-deploy-btn,
+        #cm-gauge-container,
+        #comm-ticker,
+        #sf-frigate-btn,
+        #lock-alert,
+        #incoming-alert {
+          display: none !important;
+          pointer-events: none !important;
+        }
+
+        #radar-overlay {
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          width: 134px;
+          height: 134px;
+          bottom: 8px;
+          left: 8px;
+        }
+
+        body.sf-mobile-menu-open #gameplay-hud,
+        body.sf-mobile-menu-open #console-buttons,
+        body.sf-mobile-menu-open #sf-controls-hint,
+        body.sf-mobile-menu-open #rescue-btn,
+        body.sf-mobile-menu-open #cm-deploy-btn,
+        body.sf-mobile-menu-open #cm-gauge-container,
+        body.sf-mobile-menu-open #sf-frigate-btn {
+          display: block !important;
+          pointer-events: auto !important;
+          opacity: 1 !important;
+          z-index: 208 !important;
+        }
+
+        body.sf-mobile-menu-open #gameplay-hud {
+          top: 52px;
+          right: 10px;
+          left: auto;
+          max-width: 56vw;
+        }
+
+        body.sf-mobile-menu-open #console-buttons {
+          bottom: 12px !important;
+          left: auto;
+          right: 10px;
+          transform: none;
+          display: flex !important;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px !important;
+        }
+
+        body.sf-mobile-menu-open #sf-controls-hint {
+          right: 10px;
+          bottom: 210px;
+          width: min(58vw, 210px);
+          display: block !important;
+        }
+
+        body.sf-mobile-menu-open #rescue-btn {
+          right: 10px;
+          bottom: 170px;
+          left: auto;
+          transform: none;
+        }
+
+        body.sf-mobile-menu-open #cm-deploy-btn {
+          right: 10px;
+          bottom: 132px;
+          left: auto;
+          transform: none;
+        }
+
+        body.sf-mobile-menu-open #cm-gauge-container {
+          right: 10px;
+          bottom: 102px;
+          left: auto;
+          transform: none;
+        }
+
+        body.sf-mobile-menu-open #sf-frigate-btn {
+          top: 54px;
+          right: 10px;
+        }
       }
   </style>
 </head>
@@ -3002,8 +3112,11 @@
       Press CONTROLS button to close</div>
   </div>
 
-  <!-- ═══ CONTROLLER WIREFRAME OVERLAY — bottom-right ═══ -->
-  <div id="ctrl-hamburger" onclick="document.getElementById('ctrl-overlay').classList.toggle('mobile-open')">☰</div>
+  <!-- ═══ MOBILE HUD HAMBURGER + EVENT TEXT ═══ -->
+  <button id="ctrl-hamburger" type="button" aria-label="Toggle HUD menu" title="Toggle HUD menu">☰</button>
+  <div id="sf-mobile-delta" aria-live="polite"></div>
+
+  <!-- ═══ CONTROLLER WIREFRAME OVERLAY — legacy, hidden by CSS ═══ -->
   <div id="ctrl-overlay">
     <!-- KEYBOARD + MOUSE wireframe (default) -->
     <svg id="ctrl-kb" width="220" height="140" viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
@@ -3582,6 +3695,116 @@
         e.preventDefault();
         set(!document.body.classList.contains('hud-stats-hidden'));
       });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      const isMobileCoarse = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      if (!isMobileCoarse) return;
+
+      const body = document.body;
+      const burger = document.getElementById('ctrl-hamburger');
+      const pulseEl = document.getElementById('sf-mobile-delta');
+      const tracked = {
+        shield: document.getElementById('ghud-shield'),
+        hull: document.getElementById('ghud-hull'),
+        fuel: document.getElementById('ghud-fuel'),
+        kills: document.getElementById('ghud-kills'),
+        score: document.getElementById('ghud-score'),
+        wave: document.getElementById('ghud-wave'),
+        lives: document.getElementById('ghud-lives')
+      };
+      let lastSig = '';
+      let pulseTimer = null;
+
+      function setMenuOpen(open) {
+        body.classList.toggle('sf-mobile-menu-open', !!open);
+      }
+
+      function showPulse(text, gold) {
+        if (!pulseEl || !text) return;
+        pulseEl.textContent = text;
+        pulseEl.style.display = 'block';
+        pulseEl.style.color = gold ? 'var(--sf-text-gold)' : 'var(--sf-text-green)';
+        pulseEl.style.textShadow = gold
+          ? '0 0 8px rgba(255,210,107,0.52)'
+          : '0 0 8px rgba(132,255,154,0.48)';
+        if (pulseTimer) clearTimeout(pulseTimer);
+        pulseTimer = setTimeout(() => {
+          pulseEl.style.display = 'none';
+        }, 2400);
+      }
+
+      if (burger) {
+        burger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setMenuOpen(!body.classList.contains('sf-mobile-menu-open'));
+        });
+      }
+
+      document.addEventListener('click', (e) => {
+        const open = body.classList.contains('sf-mobile-menu-open');
+        if (!open) return;
+        if (e.target.closest('#ctrl-hamburger, #gameplay-hud, #console-buttons, #sf-controls-hint, #rescue-btn, #cm-deploy-btn, #cm-gauge-container, #sf-frigate-btn')) return;
+        setMenuOpen(false);
+      }, true);
+
+      const tickerInner = document.getElementById('comm-ticker-inner');
+      if (tickerInner && window.MutationObserver) {
+        const obs = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            for (const n of m.addedNodes) {
+              if (!n || !n.textContent) continue;
+              const line = String(n.textContent).trim();
+              if (!line) continue;
+              if (!body.classList.contains('sf-mobile-menu-open')) {
+                const loud = /warning|incoming|lock|critical|alert|damaged/i.test(line);
+                showPulse(line.slice(0, 100), loud);
+              }
+            }
+          }
+        });
+        obs.observe(tickerInner, { childList: true });
+      }
+
+      setInterval(() => {
+        const phase = (window.Starfighter && Starfighter.getPhase) ? String(Starfighter.getPhase() || '') : '';
+        const playPhase = phase === 'combat' || phase === 'respawning' || phase === 'launching';
+        if (burger) burger.style.display = playPhase ? 'flex' : 'none';
+        if (!playPhase) {
+          setMenuOpen(false);
+          if (pulseEl) pulseEl.style.display = 'none';
+          return;
+        }
+
+        const sig = [
+          tracked.shield?.textContent || '',
+          tracked.hull?.textContent || '',
+          tracked.fuel?.textContent || '',
+          tracked.kills?.textContent || '',
+          tracked.score?.textContent || '',
+          tracked.wave?.textContent || '',
+          tracked.lives?.textContent || ''
+        ].join('|');
+
+        if (!lastSig) {
+          lastSig = sig;
+          return;
+        }
+
+        if (sig !== lastSig && !body.classList.contains('sf-mobile-menu-open')) {
+          const msg = [
+            'SH ' + (tracked.shield?.textContent || '--'),
+            'HU ' + (tracked.hull?.textContent || '--'),
+            'FU ' + (tracked.fuel?.textContent || '--'),
+            'K ' + (tracked.kills?.textContent || '0'),
+            'SC ' + (tracked.score?.textContent || '0')
+          ].join('  ');
+          showPulse(msg, false);
+        }
+        lastSig = sig;
+      }, 340);
     })();
   </script>
 </body>

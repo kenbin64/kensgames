@@ -85,7 +85,7 @@
       background: var(--glass);
       backdrop-filter: blur(14px);
       border-radius: 10px;
-      padding: 12px 10px;
+      padding: 30px 10px 12px;
       z-index: 100;
       display: flex;
       flex-direction: column;
@@ -93,6 +93,59 @@
       border: 1px solid var(--gborder);
       pointer-events: none;
       transition: border-color .4s, box-shadow .4s;
+    }
+
+    /* Dismiss button — top-right corner of each panel */
+    .panel-dismiss {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      color: rgba(200, 220, 255, 0.55);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      transition: background .15s, color .15s;
+      z-index: 2;
+    }
+
+    .panel-dismiss:hover {
+      background: rgba(255, 80, 80, 0.22);
+      color: #ff8888;
+    }
+
+    /* Collapsed state — panel folds to a thin vertical tab */
+    .player-panel.panel-collapsed {
+      width: 22px !important;
+      padding: 4px 2px !important;
+      overflow: hidden !important;
+      pointer-events: auto !important;
+      cursor: pointer;
+    }
+
+    .player-panel.panel-collapsed>*:not(.panel-dismiss) {
+      display: none !important;
+    }
+
+    .player-panel.panel-collapsed .panel-dismiss {
+      position: static;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.1);
+      color: rgba(200, 220, 255, 0.4);
+      margin: auto;
+      transform: rotate(45deg);
+      /* × becomes + when collapsed, signalling "re-open" */
     }
 
     .player-panel.p1-panel {

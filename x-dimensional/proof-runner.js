@@ -13,7 +13,6 @@
 
     const SEED_URL = '/x-dimensional/manifold.proof.json';
     const REGISTRY_URL = '/js/manifold.registry.json';
-    const PORTAL_URL = '/manifold.portal.json';
 
     async function loadJSON(url) {
         const r = await fetch(url, { cache: 'no-store' });
@@ -24,25 +23,30 @@
     // ── PROTOCOLS ─────────────────────────────────────────────────────
     const protocols = {};
 
-    // F1. Universal Access. Fetch every game manifest the portal lists,
-    // compute z = x*y from declared (x,y), compare against declared z.
-    protocols.fetch_each_game_manifest_and_check_axiom = async () => {
-        const portal = await loadJSON(PORTAL_URL);
-        const rows = [];
-        for (const g of portal.games) {
-            try {
-                const m = await loadJSON('/' + g.manifold);
-                const dim = m.dimension || g.dimension || {};
-                const { x, y, z } = dim;
-                const computed = x * y;
-                rows.push({ id: g.id, x, y, z, computed, pass: computed === z });
-            } catch (e) {
-                rows.push({ id: g.id, error: e.message, pass: false });
-            }
-        }
+    // F1. Public registry shape. Fetch the public game registry the portal
+    // ships and assert every entry exposes the public-safe contract:
+    // (id, name, path, entry, multiplayer, bridge). The internal axiom is
+    // enforced at compile time on source manifests; the public surface
+    // exposes only the derived `multiplayer` flag (HR-53).
+    protocols.fetch_public_registry_and_check_contract = async () => {
+        const reg = await loadJSON(REGISTRY_URL);
+        const games = Array.isArray(reg.games) ? reg.games : [];
+        const required = ['id', 'name', 'path', 'entry', 'multiplayer', 'bridge'];
+        const rows = games.map(g => {
+            const missing = required.filter(k => g[k] === undefined);
+            return {
+                id: g.id || '(no id)',
+                name: g.name || '(no name)',
+                multiplayer: g.multiplayer === true,
+                missing,
+                pass: missing.length === 0,
+            };
+        });
         const failed = rows.filter(r => !r.pass);
-        return { rows, pass: failed.length === 0, summary:
-            `${rows.length - failed.length} / ${rows.length} games satisfy z = x*y` };
+        return {
+            rows, pass: games.length > 0 && failed.length === 0, summary:
+                `${rows.length - failed.length} / ${rows.length} registry entries satisfy the public contract`
+        };
     };
 
     // F2. Substrate purity. Call each substrate N times at the same point;
@@ -68,8 +72,10 @@
                 rows.push({ substrate: name, point: p, value: first, calls: N, pass: identical });
             }
         }
-        return { rows, pass: rows.every(r => r.pass),
-            summary: `${rows.filter(r => r.pass).length} / ${rows.length} (substrate × point) sets are identity-stable across ${N} calls` };
+        return {
+            rows, pass: rows.every(r => r.pass),
+            summary: `${rows.filter(r => r.pass).length} / ${rows.length} (substrate × point) sets are identity-stable across ${N} calls`
+        };
     };
 
     // F3. Determinism across reload. First visit persists baseline; every
@@ -97,36 +103,21 @@
             baseline: baseline.values[i] ? baseline.values[i].value : null,
             pass: baseline.values[i] && f.value === baseline.values[i].value,
         }));
-        return { rows, baseline_recorded_at: baseline.recordedAt, first_visit: firstVisit,
+        return {
+            rows, baseline_recorded_at: baseline.recordedAt, first_visit: firstVisit,
             pass: rows.every(r => r.pass),
             summary: firstVisit
                 ? 'First visit — baseline persisted. Reload this page to verify cross-reload determinism.'
-                : `${rows.filter(r => r.pass).length} / ${rows.length} probes match the baseline recorded at ${baseline.recordedAt}` };
+                : `${rows.filter(r => r.pass).length} / ${rows.length} probes match the baseline recorded at ${baseline.recordedAt}`
+        };
     };
 
-    // F5. Registry / source agreement. Compare js/manifold.registry.json
-    // against each game's source manifold.game.json, dimension by dimension.
-    protocols.diff_registry_against_each_source_manifest = async () => {
-        const reg = await loadJSON(REGISTRY_URL);
-        const portal = await loadJSON(PORTAL_URL);
-        const rows = [];
-        for (const g of portal.games) {
-            const r = reg.games.find(x => x.id === g.id);
-            if (!r) { rows.push({ id: g.id, pass: false, reason: 'absent from registry' }); continue; }
-            try {
-                const src = await loadJSON('/' + g.manifold);
-                const sd = src.dimension || g.dimension || {};
-                const rd = r.dimension || {};
-                const drift = ['x', 'y', 'z'].filter(k => sd[k] !== rd[k]);
-                rows.push({ id: g.id, source: sd, registry: rd, pass: drift.length === 0,
-                    drift: drift.length ? drift : null });
-            } catch (e) {
-                rows.push({ id: g.id, pass: false, reason: e.message });
-            }
-        }
-        return { rows, pass: rows.every(r => r.pass),
-            summary: `${rows.filter(r => r.pass).length} / ${rows.length} games agree between registry and source` };
-    };
+    // F5 (registry / source agreement) was a compile-time invariant
+    // exposed as a runtime protocol. Per HR-53 the public surface no
+    // longer fetches per-game source manifests, so the agreement check
+    // runs only at compile time (engine/manifold_compiler.py) and in the
+    // test suite. The seed entry resolves through the not_implemented
+    // branch in run() below.
 
     // Public API
     window.ProofRunner = {
@@ -138,8 +129,10 @@
             const claim = seed.claims.find(c => c.id === claimId);
             if (!claim) throw new Error('unknown claim ' + claimId);
             const proto = protocols[claim.protocol];
-            if (!proto) return { claim, not_implemented: true,
-                pass: null, summary: 'protocol "' + claim.protocol + '" not yet implemented in proof-runner.js' };
+            if (!proto) return {
+                claim, not_implemented: true,
+                pass: null, summary: 'protocol "' + claim.protocol + '" not yet implemented in proof-runner.js'
+            };
             const t0 = performance.now();
             const result = await proto(opts);
             const ms = (performance.now() - t0).toFixed(2);

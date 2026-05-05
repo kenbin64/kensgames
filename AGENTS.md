@@ -12,6 +12,7 @@
 
 ## Read First
 
+- [`docs/HARD_RULES.md`](docs/HARD_RULES.md): **hard product constraints** — product positioning, creator profile, nav/branding, license boundary, brand stack (HR-0–HR-0.10), viewport/scroll (HR-1–6, HR-6.1 single-viewport rule for all non-landing pages, **HR-6.2 fixed control rail** — every button/control lives in a viewport-fixed footer outside the game/wizard/3D layer; relaxes HR-6.1's vertical no-scroll clause), shared wizard architecture (HR-7–12), guest-friendly landing (HR-13–16), passkeys-first passwordless auth (HR-17), no-duplication restatement (HR-18), shared game manager (HR-21–26), decision substrates (HR-27–30), AI participation + MCP (HR-31–36), performance tailoring (HR-37–39), platform distribution (HR-40–46), generative AI roles HR-47–49 (Game Master, Game Maker, Games Promoter), federated content (HR-50–52), trade-secret boundary (HR-53), compliance procedure (HR-19–20). Supersedes any softer guidance in other docs.
 - [`README.md`](README.md): high-level portal and deployment summary
 - [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](docs/X-DIMENSIONAL-AI-DIRECTIVE.md): **formal axiomatic model** — Definitions, Axioms, Constraints, Corollaries for x/y/z/m programming. Read before touching manifold logic.
 - [`docs/UltimateAIDirective.md`](docs/UltimateAIDirective.md): general intelligence principles governing searching, retrieving, determining, presenting.

@@ -1551,7 +1551,7 @@
                 <h1>KENS<span class="accent">GAMES</span></h1>
                 <div class="hero-sub">World Class Arcade Portal &mdash; Est. 2026</div>
                 <p>A new breed of arcade gaming where every game, every score, and every player exists in a unified
-                    geometric space. No ads. No pay-to-win. Just pure skill.</p>
+                    geometric space &mdash; built end-to-end by an independent creator.</p>
                 <div class="hero-cta">
                     <a class="btn-play" href="#games"
                         style="text-decoration:none;display:inline-flex;align-items:center">&#9654; PLAY NOW</a>
@@ -1560,8 +1560,9 @@
                         href="/fasttrack/" onclick="event.preventDefault();goToGame('/fasttrack/');">FASTTRACK
                         &#9654;</a>
                 </div>
-                <div class="hero-note">Free &nbsp;&#9632;&nbsp; Play with bots &nbsp;&#9632;&nbsp;
-                    Play with friends via code or link &nbsp;&#9632;&nbsp; No signup</div>
+                <div class="hero-note">Play in browser &nbsp;&#9632;&nbsp; Bots or friends &nbsp;&#9632;&nbsp;
+                    Code or link to invite &nbsp;&#9632;&nbsp; <a href="#creator"
+                        style="color:var(--neon-yellow);text-decoration:none">Art &amp; merch &#9654;</a></div>
             </div>
 
             <div class="arcade-wall" aria-label="Arcade consoles">
@@ -1874,9 +1875,12 @@
                     intensity.
                 </p>
                 <p style="font-size:16px;color:var(--text-muted);line-height:1.9;">
-                    When I&rsquo;m not coding, I create digital and generative artwork available at my art store. I also
-                    write
-                    about programming, game design, and the philosophy of building things that matter.
+                    When I&rsquo;m not coding, I paint and create generative artwork. Originals and licensed
+                    reproductions &mdash; <strong style="color:var(--neon-yellow)">prints, mugs, t-shirts, pillows,
+                        tote bags, phone cases, and more</strong> &mdash; are available at
+                    <a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener"
+                        style="color:var(--neon-cyan);text-decoration:none">my Fine Art America shop &#9654;</a>.
+                    I also write about programming, game design, and the philosophy of building things that matter.
                 </p>
             </div>
             <div
@@ -1903,6 +1907,9 @@
                     <a href="mailto:kenetrics.art@gmail.com"
                         style="color:var(--neon-pink);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
                         &#9993; <span>kenetrics.art@gmail.com</span></a>
+                    <a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener"
+                        style="color:var(--neon-yellow);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:10px;transition:color 0.2s">
+                        &#9733; <span>Shop &mdash; Prints, Mugs, T-Shirts, Pillows</span></a>
                 </div>
             </div>
         </div>
@@ -2033,9 +2040,9 @@
                 5. Privacy</h3>
             <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
                 We collect only what&rsquo;s necessary: email, username, and gameplay data (scores, session stats). We
-                do not sell
-                data to third parties. We do not use tracking pixels or advertising networks. No ads. No data brokers.
-                Ever.
+                do not sell your data to third parties or data brokers. Some games may include in-app purchases or
+                third-party advertising in the future; if and when they do, it will be disclosed in-app and remain
+                separate from the data-sale prohibition above.
             </p>
 
             <h3
@@ -2070,8 +2077,11 @@
         <div class="footer-inner">
             <div class="footer-brand">
                 <span class="logo">KEN<span>S</span>GAMES</span>
-                <p>A world-class arcade portal powered by a geometry-driven engine built from scratch. No ads. No
-                    pay-to-win. Just games.</p>
+                <p>A world-class arcade portal powered by a geometry-driven engine built from scratch by an
+                    independent creator. Original art, prints, and merch available at the
+                    <a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank" rel="noopener"
+                        style="color:var(--neon-yellow);text-decoration:none">Fine Art America shop</a>.
+                </p>
             </div>
             <div class="footer-col">
                 <h4>Games</h4>
@@ -2096,6 +2106,8 @@
                 <ul>
                     <li><a href="/about.html">About</a></li>
                     <li><a href="#creator">Creator</a></li>
+                    <li><a href="https://fineartamerica.com/profiles/kenneth-bingham" target="_blank"
+                            rel="noopener">Shop &mdash; Art &amp; Merch</a></li>
                     <li><a href="#manifold">Manifold</a></li>
                     <li><a href="#tos">Terms of Service</a></li>
                     <li><a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Blog</a></li>
@@ -2105,14 +2117,15 @@
         <div class="footer-bottom">
             <div class="footer-copy"><span>KensGames</span> &copy; 2026 Kenneth Bingham &mdash; All rights reserved
             </div>
-            <div class="footer-copy">No ads &nbsp;&#9632;&nbsp; No tracking &nbsp;&#9632;&nbsp; No pay-to-win</div>
+            <div class="footer-copy">Independent &nbsp;&#9632;&nbsp; Geometry-first &nbsp;&#9632;&nbsp; Built from
+                scratch</div>
         </div>
     </footer>
 
     <script src="/js/manifold.js?v=7"></script>
     <script src="/gyroid.js"></script>
-    <script src="/js/substrates/avatar_picker.js"></script>
-    <script src="/js/substrates/player_profile.js"></script>
+    <script src="/js/substrates/avatar_picker.js?v=20260504"></script>
+    <script src="/js/substrates/player_profile.js?v=20260504"></script>
     <script src="/js/substrates/manifold_ingestor.js"></script>
     <script src="/js/substrates/portal_session_substrate.js"></script>
     <script>
@@ -2145,9 +2158,9 @@
         // Persistence: localStorage (cross-session) + Manifold.write (in-session)
         window.KGPlay = (function () {
             const REGISTRY = {
-                fasttrack: { name: 'FastTrack', lobby: '/fasttrack/lobby-simple.html' },
+                fasttrack: { name: 'FastTrack', lobby: '/fasttrack/lobby.html' },
                 '4dtictactoe': { name: '4D TicTacToe', lobby: '/4DTicTacToe/' },
-                starfighter: { name: 'Alien Space Attack', lobby: '/starfighter/lobby.html?v=20260501' },
+                starfighter: { name: 'Alien Space Attack', lobby: '/starfighter/lobby.html' },
                 brickbreaker3d: { name: 'BrickBreaker 3D', lobby: '/brickbreaker3d/lobby.html' },
             };
             const PATH_TO_KEY = {

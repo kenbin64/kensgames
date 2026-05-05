@@ -191,6 +191,7 @@ const SpaceManifold = (function () {
 
     // ── Target Lock ── (acquire-then-hold; enemy can shake via evasion)
     'targeting.acquireDot': 0.993,        // cos(~7°): fresh acquisition cone
+    'targeting.acquireTime': 1.0,         // s: dwell in crosshair before lock engages
     'targeting.refreshDot': 0.993,        // re-centering on target resets hold timer
     'targeting.breakDot': 0.866,          // cos(~30°): lock breaks if target leaves this cone
     'targeting.holdRange': 5000,          // m: lock breaks beyond this distance
@@ -14233,12 +14234,16 @@ const Starfighter = (function () {
   let _crosshairTarget = null;
   let _lockHoldTimer = 0;
   let _lockPrevDot = 0;
+  let _acquireTimer = 0;
+  let _acquireCandidate = null;
 
   function _breakLock(crosshair) {
     _crosshairLocked = false;
     _crosshairTarget = null;
     _lockHoldTimer = 0;
     _lockPrevDot = 0;
+    _acquireTimer = 0;
+    _acquireCandidate = null;
     if (state.player) state.player.lockedTarget = null;
     if (crosshair) crosshair.classList.remove('locked');
   }
@@ -14300,22 +14305,40 @@ const Starfighter = (function () {
     }
 
     if (bestTarget && bestDot >= dim('targeting.acquireDot')) {
-      _crosshairLocked = true;
+      if (_acquireCandidate === bestTarget) _acquireTimer += (dt || 0);
+      else {
+        _acquireCandidate = bestTarget;
+        _acquireTimer = 0;
+      }
       _crosshairTarget = bestTarget;
-      _lockHoldTimer = 0;
-      _lockPrevDot = bestDot;
-      p.lockedTarget = bestTarget;
-      crosshair.classList.add('locked');
-      crosshair.classList.remove('tracking');
-      if (window.SFAudio) SFAudio.playSound('lock_tone');
-    } else if (bestTarget) {
-      _crosshairTarget = bestTarget;
+      p.lockedTarget = null;
       crosshair.classList.remove('locked');
       crosshair.classList.add('tracking');
+
+      if (_acquireTimer >= (dim('targeting.acquireTime') || 1.0)) {
+        _crosshairLocked = true;
+        _crosshairTarget = bestTarget;
+        _lockHoldTimer = 0;
+        _lockPrevDot = bestDot;
+        p.lockedTarget = bestTarget;
+        crosshair.classList.add('locked');
+        crosshair.classList.remove('tracking');
+        if (window.SFAudio) SFAudio.playSound('lock_tone');
+      }
+    } else if (bestTarget) {
+      _crosshairTarget = bestTarget;
+      _acquireCandidate = null;
+      _acquireTimer = 0;
+      crosshair.classList.remove('locked');
+      crosshair.classList.add('tracking');
+      p.lockedTarget = null;
     } else {
       _crosshairTarget = null;
+      _acquireCandidate = null;
+      _acquireTimer = 0;
       crosshair.classList.remove('locked');
       crosshair.classList.remove('tracking');
+      p.lockedTarget = null;
     }
   }
 
@@ -15414,44 +15437,36 @@ const Starfighter = (function () {
       }
     }
 
-    // Sweep beam — rotates in ship-local space
+    // Sweep beam remains visual-only. Contact plotting is now full-time so
+    // all in-range entities (enemy, friendly, asteroid, objective) are always present.
     const SWEEP_PERIOD = dim('radar.sweepPeriod');
-    const BEAM_HALF = THREE.MathUtils.degToRad(dim('radar.beamWidth') / 2);
     const PERSISTENCE = dim('radar.persistence');
     const nowSec = performance.now() / 1000;
     const sweepAngle = ((nowSec / SWEEP_PERIOD) % 1.0) * Math.PI * 2;
     if (radarSweepGroup) radarSweepGroup.rotation.y = sweepAngle;
 
-    // Sweep detection — check entity azimuth in ship-local space
-    const TWO_PI = Math.PI * 2;
     const radarMax = RADAR_RANGE * 1.2;
     const radarMaxSq = radarMax * radarMax;
     state.entities.forEach(e => {
-      if (e === state.player || e.type === 'laser' || e.type === 'machinegun' || e.type === 'baseship') return;
+      if (e === state.player || !e.position || e.markedForDeletion) return;
+      if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'baseship') return;
+
       const rx = e.position.x - pPos.x;
       const ry = e.position.y - pPos.y;
       const rz = e.position.z - pPos.z;
       const distSq = rx * rx + ry * ry + rz * rz;
       if (distSq < 1 || distSq > radarMaxSq) return;
+
       const dist = Math.sqrt(distSq);
-
-      // Transform to ship-local for azimuth check
       const localDir = new THREE.Vector3(rx, ry, rz).normalize().applyQuaternion(invQuat);
-      let az = Math.atan2(localDir.x, -localDir.z); // -Z is forward
-      if (az < 0) az += TWO_PI;
-      let sw = sweepAngle % TWO_PI;
-      if (sw < 0) sw += TWO_PI;
-      let diff = Math.abs(az - sw);
-      if (diff > Math.PI) diff = TWO_PI - diff;
-
-      if (diff < BEAM_HALF) {
-        radarContacts.set(e, {
-          t: nowSec,
-          // Store ship-local direction for rendering
-          lx: localDir.x, ly: localDir.y, lz: localDir.z,
-          type: e.type, dist: dist
-        });
-      }
+      radarContacts.set(e, {
+        t: nowSec,
+        lx: localDir.x,
+        ly: localDir.y,
+        lz: localDir.z,
+        type: e.type,
+        dist: dist
+      });
     });
 
     const _pushObjectiveContact = (obj, type) => {
@@ -15496,7 +15511,7 @@ const Starfighter = (function () {
     const lockedTarget = state.player.lockedTarget;
     const _DPr = M ? M.DiningPhilosophers : null;
 
-    // Locked target always tracked (real-time position, not sweep-gated)
+    // Locked target is force-refreshed each frame so lock fidelity never drops.
     // 🍴 Fork check — skip if target entity was destroyed
     if (lockedTarget && lockedTarget.position && lockedTarget !== state.player &&
       lockedTarget.type !== 'laser' && lockedTarget.type !== 'baseship' &&
@@ -15507,21 +15522,22 @@ const Starfighter = (function () {
       const ld = Math.sqrt(lx * lx + ly * ly + lz * lz);
       if (ld > 1) {
         const localDir = new THREE.Vector3(lx, ly, lz).normalize().applyQuaternion(invQuat);
-        const existing = radarContacts.get(lockedTarget);
-        if (!existing || (nowSec - existing.t) > SWEEP_PERIOD * 0.5) {
-          radarContacts.set(lockedTarget, {
-            t: nowSec,
-            lx: localDir.x, ly: localDir.y, lz: localDir.z,
-            type: lockedTarget.type, dist: ld
-          });
-        }
+        radarContacts.set(lockedTarget, {
+          t: nowSec,
+          lx: localDir.x,
+          ly: localDir.y,
+          lz: localDir.z,
+          type: lockedTarget.type,
+          dist: ld
+        });
       }
     }
 
+    const contactMaxAge = Math.max(SWEEP_PERIOD * 1.5, 1.2);
     radarContacts.forEach((c, entity) => {
       const age = nowSec - c.t;
       if (!entity || entity.markedForDeletion) { radarContacts.delete(entity); return; }
-      if (age > SWEEP_PERIOD) { radarContacts.delete(entity); return; }
+      if (age > contactMaxAge) { radarContacts.delete(entity); return; }
       if (blipIdx >= radarBlipPool.length) return;
 
       // Re-compute ship-local direction for live entities (smooth tracking)
@@ -15627,11 +15643,18 @@ const Starfighter = (function () {
       blip.material.transparent = true;
       blip.material.opacity = fadeAlpha;
 
-      // FOV highlight — in ship-local space, forward is -Z, so dot = -nz
-      const cosHalfFov = Math.cos(THREE.MathUtils.degToRad(75 / 2));
-      if (-nz > cosHalfFov) {
-        blip.material.opacity = Math.min(fadeAlpha + 0.3, 1.0);
-        blip.scale.multiplyScalar(1.2);
+      // Viewport indicator: highlight only if contact is truly inside camera frustum
+      // (both horizontal and vertical half-angles, not vertical-only dot test).
+      const halfV = THREE.MathUtils.degToRad(75 / 2);
+      const halfH = Math.atan(Math.tan(halfV) * (window.innerWidth / Math.max(1, window.innerHeight)));
+      const fwd = -nz;
+      if (fwd > 0.01) {
+        const hAngle = Math.atan2(Math.abs(nx), fwd);
+        const vAngle = Math.atan2(Math.abs(ny), fwd);
+        if (hAngle <= halfH && vAngle <= halfV) {
+          blip.material.opacity = Math.min(fadeAlpha + 0.36, 1.0);
+          blip.scale.multiplyScalar(1.24);
+        }
       }
     });
 

@@ -48,6 +48,7 @@ const SFInput = (function () {
     let TAP_TIME_MAX_MS = 260;
     let DOUBLE_TAP_WINDOW_MS = 320;
     let DRAG_STEER_GAIN = 0.0048;
+    let DRAG_THROTTLE_GAIN = 0.0024;
     const GYRO_SMOOTH_ALPHA = 0.24;
 
     let modeBadgeEl = null;
@@ -111,7 +112,7 @@ const SFInput = (function () {
             if (window.SFAudio) SFAudio.resume();
 
             // Ignore UI buttons — don't let them trigger pointer lock or fire weapons
-            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-skip-btn, #training-control-overlay') ||
+            if (e.target.closest('#console-buttons, #mobile-hud, #mission-panel, #tutorial-panel, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #mob-calibrate, #fs-resume, #fs-resume-overlay, #tutorial-prompt-overlay, #tutorial-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-skip-btn, #training-control-overlay, #ctrl-hamburger, #sf-mobile-delta, #sf-controls-hint, #rescue-btn, #cm-deploy-btn, #cm-gauge-container, #sf-frigate-btn') ||
                 (e.target.classList && (e.target.classList.contains('action-btn') || e.target.classList.contains('mob-btn') || e.target.classList.contains('console-btn') || e.target.classList.contains('avtn-btn') || e.target.classList.contains('avtn-select')))) return;
 
             if (document.pointerLockElement !== document.body) {
@@ -199,6 +200,7 @@ const SFInput = (function () {
         TAP_TIME_MAX_MS = 260;
         DOUBLE_TAP_WINDOW_MS = 320;
         DRAG_STEER_GAIN = 0.0046;
+        DRAG_THROTTLE_GAIN = 0.0024;
 
         // Show mobile HUD
         const mobileHud = document.getElementById('mobile-hud');
@@ -397,7 +399,7 @@ const SFInput = (function () {
     function _isGameplayTouchTarget(target) {
         if (!target || !target.closest) return true;
         return !target.closest(
-            '#mob-nav-sphere, #crosshair, #console-buttons, #mobile-hud .mob-btn, #mob-btn-group, #mission-panel, #tutorial-panel, #loading-screen, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #launch-prompt, #tutorial-overlay, #tutorial-prompt-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-control-overlay, #training-skip-btn'
+            '#mob-nav-sphere, #crosshair, #console-buttons, #mobile-hud .mob-btn, #mob-btn-group, #mission-panel, #tutorial-panel, #loading-screen, #launch-btn, #skip-launch-btn, #launch-bay-briefing, #launch-prompt, #tutorial-overlay, #tutorial-prompt-overlay, #rescue-bay-overlay, #bay-debrief, #respawn-overlay, #waveclear-overlay, #death-screen, #eliminated-overlay, #training-control-overlay, #training-skip-btn, #ctrl-hamburger, #sf-mobile-delta, #sf-controls-hint, #rescue-btn, #cm-deploy-btn, #cm-gauge-container, #sf-frigate-btn'
         );
     }
 
@@ -582,8 +584,11 @@ const SFInput = (function () {
         if (isMobile && (dragSteerAccumX !== 0 || dragSteerAccumY !== 0)) {
             const dragX = Math.max(-42, Math.min(42, dragSteerAccumX));
             const dragY = Math.max(-42, Math.min(42, dragSteerAccumY));
+            // One-finger gesture flight model:
+            //   X drag => yaw (left/right steering)
+            //   Y drag => throttle (forward swipe accelerates, back swipe decelerates)
             player.yaw = Math.max(-3.0, Math.min(3.0, (player.yaw || 0) - dragX * DRAG_STEER_GAIN));
-            player.pitch = Math.max(-3.0, Math.min(3.0, (player.pitch || 0) - dragY * DRAG_STEER_GAIN));
+            player.throttle = Math.max(0, Math.min(1, (player.throttle || 0) - dragY * DRAG_THROTTLE_GAIN));
             dragSteerAccumX = 0;
             dragSteerAccumY = 0;
             lastInputDevice = 'touch';

@@ -182,12 +182,22 @@ def build_registry(portal: dict, game_specs: list[dict]) -> dict:
     """
     Emit the manifold.registry.json that the portal's arcade.js reads
     to populate the game grid and discovery algorithm.
+
+    Trade-secret boundary (HR-53, docs/HARD_RULES.md §13): this artifact
+    is shipped to the public web root and fetched by the browser. It must
+    not expose per-game (x, y, z) triples, the role assignment, the axiom
+    statement, or the substrate filenames. Only public-safe fields and
+    derived flags are emitted here. Internal axiom validation runs at
+    compile time on the source manifests; the result is reflected only as
+    a derived ``multiplayer`` boolean on the public surface.
     """
     games_out = []
     for spec in game_specs:
         dim = spec.get("dimension", {})
         manifold_val = spec.get("manifold")
         fallback_id  = manifold_val if isinstance(manifold_val, str) else spec.get("id", "unknown")
+        x_val = dim.get("x")
+        multiplayer = isinstance(x_val, int) and x_val > 1
         games_out.append({
             "id":      spec.get("id", fallback_id),
             "name":    spec["name"],
@@ -196,12 +206,7 @@ def build_registry(portal: dict, game_specs: list[dict]) -> dict:
             "entry":   spec.get("entry", "index.html"),
             "lobby":   spec.get("lobby"),
             "status":  spec.get("status", "production"),
-            "dimension": {
-                "x": dim.get("x"),
-                "y": dim.get("y"),
-                "z": dim.get("z"),
-            },
-            "substrates": list(spec.get("substrates", {}).keys()),
+            "multiplayer": multiplayer,
             "bridge":  spec.get("manifold_bridge", {}).get("entry_var"),
             "deploy":  spec.get("deploy", {}),
         })
@@ -211,7 +216,6 @@ def build_registry(portal: dict, game_specs: list[dict]) -> dict:
         "_compiled":  datetime.now(timezone.utc).isoformat(),
         "portal":     portal["name"],
         "domain":     portal["domain"],
-        "dimensions": portal["dimensions"],
         "games":      games_out,
     }
 

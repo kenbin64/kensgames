@@ -1,0 +1,241 @@
+/* hollywood-lobby.css
+   Shared old-Hollywood backdrop for KensGames per-game lobbies.
+   Cyan/purple Tron palette, perspective ground grid with twinkling
+   street lights, soft Hollywood Hills silhouette, the HOLLYWOOD sign
+   on the right ridge, and animated searchlight cones sweeping the sky.
+
+   Apply by:
+     1. <link rel="stylesheet" href="/lib/hollywood-lobby.css">
+     2. Wrap lobby content in <div class="lobby-wrap"> with
+        position:relative, overflow:hidden already set by the page.
+     3. As the first children of .lobby-wrap (before any UI):
+          <div class="hollywood-hills" aria-hidden="true"></div>
+          <div class="hollywood-searchlights" aria-hidden="true"></div>
+*/
+
+.lobby-wrap {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+.lobby-wrap>* {
+  position: relative;
+  z-index: 1;
+}
+
+/* Perspective Tron ground plane + warm street-light haze along the
+   foot of the hills. Lives on .lobby-wrap::before so no extra DOM. */
+.lobby-wrap::before {
+  content: "";
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 23%;
+  bottom: -16%;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(0, 240, 255, 0.26) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 235, 255, 0.22) 1px, transparent 1px),
+    radial-gradient(circle at 22% 76%, rgba(255, 215, 120, 0.42) 0 1px, transparent 2px),
+    radial-gradient(circle at 38% 72%, rgba(255, 220, 140, 0.36) 0 1px, transparent 2px),
+    radial-gradient(circle at 54% 78%, rgba(255, 215, 120, 0.34) 0 1px, transparent 2px),
+    radial-gradient(circle at 69% 74%, rgba(255, 220, 140, 0.36) 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 77%, rgba(255, 215, 120, 0.34) 0 1px, transparent 2px);
+  background-size: 28px 28px, 28px 28px, 120px 70px, 120px 70px, 120px 70px, 120px 70px, 120px 70px;
+  background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position: 0 0, 0 0, 22% 76%, 38% 72%, 54% 78%, 69% 74%, 84% 77%;
+  transform: perspective(1200px) rotateX(77deg) translateY(6px) translateZ(-90px);
+  transform-origin: center top;
+  opacity: 0.74;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 12px rgba(0, 255, 255, 0.34));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.75) 44%, rgba(0, 0, 0, 0.22) 75%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.75) 44%, rgba(0, 0, 0, 0.22) 75%, rgba(0, 0, 0, 0) 100%);
+  animation: hollywoodGlow 2.8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* Hollywood Hills silhouette — anchored as a horizon band across the
+   TOP of the lobby (just under the nav and above the cabinet/wizard
+   column). Five overlapping ellipses give a layered ridge of misty
+   hills with a faint cyan rim catching the searchlight glow. Sitting
+   in the upper "sky" band keeps the silhouette visible regardless of
+   how wide the centered wizard panel grows. */
+.hollywood-hills {
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  top: 0;
+  height: 24%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 22% 95% at 10% 100%, rgba(4, 10, 20, 0.96) 0%, rgba(4, 10, 20, 0) 68%),
+    radial-gradient(ellipse 20% 110% at 28% 100%, rgba(2, 8, 18, 0.94) 0%, rgba(2, 8, 18, 0) 70%),
+    radial-gradient(ellipse 24% 120% at 50% 100%, rgba(6, 12, 24, 0.97) 0%, rgba(6, 12, 24, 0) 66%),
+    radial-gradient(ellipse 22% 105% at 72% 100%, rgba(4, 10, 20, 0.95) 0%, rgba(4, 10, 20, 0) 70%),
+    radial-gradient(ellipse 24% 100% at 92% 100%, rgba(4, 10, 20, 0.94) 0%, rgba(4, 10, 20, 0) 70%);
+  filter: drop-shadow(0 -2px 8px rgba(0, 220, 255, 0.22)) drop-shadow(0 -1px 2px rgba(187, 0, 255, 0.18));
+}
+
+/* Distant HOLLYWOOD sign on the LEFT ridge (the second hill from the
+   left, around x≈28%). Small, off-center, and slightly recessed so it
+   reads as far away — and well clear of the centered wizard panel. */
+.lobby-wrap::after {
+  content: "HOLLYWOOD";
+  position: absolute;
+  left: 14%;
+  width: 22%;
+  top: 7%;
+  pointer-events: none;
+  z-index: 0;
+  text-align: center;
+  font-family: var(--fa);
+  font-size: clamp(7px, 0.78vw, 10px);
+  letter-spacing: 2.4px;
+  color: rgba(255, 247, 210, 0.88);
+  text-shadow: 0 0 2px rgba(255, 246, 214, 0.85), 0 0 6px rgba(255, 236, 170, 0.55), 0 0 12px rgba(255, 200, 100, 0.35);
+  opacity: 0.92;
+  transform: perspective(900px) rotateX(6deg) translateZ(36px);
+  animation: hollywoodGlow 2.8s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* Two animated searchlight cones rising from BEHIND the hill ridge
+   into the sky band above the wizard panel. Anchored to the top
+   horizon strip so the cones sweep the only clear airspace on the
+   page (and are not occluded by the centered UI column). */
+.hollywood-searchlights {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 28%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  animation: hollywoodCameraSway 10s ease-in-out infinite;
+  will-change: transform;
+}
+
+.hollywood-searchlights::before,
+.hollywood-searchlights::after {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 0;
+  bottom: -6%;
+  background: conic-gradient(from 350deg at 30% 100%, transparent 0deg 4deg, rgba(180, 245, 255, 0.34) 8deg 22deg, transparent 26deg 360deg);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  filter: blur(1.5px) drop-shadow(0 0 14px rgba(140, 240, 255, 0.45));
+  transform-origin: 30% 100%;
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 22%, rgba(0, 0, 0, 0.6) 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 22%, rgba(0, 0, 0, 0.6) 78%, transparent 100%);
+  will-change: transform, opacity;
+}
+
+.hollywood-searchlights::before {
+  animation: hollywoodSearchLeft 5.2s ease-in-out infinite;
+}
+
+.hollywood-searchlights::after {
+  background: conic-gradient(from 350deg at 72% 100%, transparent 0deg 4deg, rgba(180, 245, 255, 0.30) 8deg 20deg, transparent 24deg 360deg);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  transform-origin: 72% 100%;
+  animation: hollywoodSearchRight 6.4s ease-in-out infinite;
+}
+
+@keyframes hollywoodGlow {
+
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+
+  50% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes hollywoodSearchLeft {
+
+  0%,
+  100% {
+    transform: rotate(-16deg) translateZ(12px);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: rotate(14deg) translateZ(48px);
+    opacity: 0.85;
+  }
+}
+
+@keyframes hollywoodSearchRight {
+
+  0%,
+  100% {
+    transform: rotate(18deg) translateZ(8px);
+    opacity: 0.46;
+  }
+
+  50% {
+    transform: rotate(-12deg) translateZ(40px);
+    opacity: 0.78;
+  }
+}
+
+@keyframes hollywoodCameraSway {
+
+  0%,
+  100% {
+    transform: translateX(-0.6%) rotateZ(-0.3deg);
+  }
+
+  50% {
+    transform: translateX(0.8%) rotateZ(0.35deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .lobby-wrap::before,
+  .lobby-wrap::after,
+  .hollywood-searchlights,
+  .hollywood-searchlights::before,
+  .hollywood-searchlights::after {
+    animation: none;
+  }
+}
+
+@media (max-height: 760px) {
+  .lobby-wrap::before {
+    left: -4%;
+    right: -4%;
+    top: 26%;
+    background-size: 24px 24px, 24px 24px, 100px 60px, 100px 60px, 100px 60px, 100px 60px, 100px 60px;
+  }
+
+  .lobby-wrap::after {
+    top: 5%;
+    letter-spacing: 1.8px;
+    font-size: clamp(6px, 0.7vw, 9px);
+  }
+
+  .hollywood-hills {
+    top: 0;
+    height: 20%;
+  }
+
+  .hollywood-searchlights {
+    height: 24%;
+  }
+}

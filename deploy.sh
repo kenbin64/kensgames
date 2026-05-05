@@ -66,7 +66,11 @@ echo -e "${YELLOW}[3/5] Deploying files...${NC}"
 # Create deployment directory if it doesn't exist
 mkdir -p "$DEPLOY_PATH"
 
-# Sync full static site (all games + shared JS/CSS/assets)
+# Sync full static site (all games + shared JS/CSS/assets).
+# Trade-secret excludes (HR-53 in docs/HARD_RULES.md): docs/, dist/, the
+# portal-level manifold config, every per-game manifold.game.json, and
+# all repo-level *.md files (AGENTS.md, README.md, etc.) are vault
+# material and must not reach the public web root.
 rsync -a \
     --exclude '.git/' \
     --exclude '.github/' \
@@ -80,6 +84,12 @@ rsync -a \
     --exclude 'server/' \
     --exclude 'state/' \
     --exclude 'tests/' \
+    --exclude 'docs/' \
+    --exclude 'dist/' \
+    --exclude 'proposals/' \
+    --exclude 'manifold.portal.json' \
+    --exclude 'manifold.game.json' \
+    --exclude '*.md' \
     "$SRC_BASE/" "$DEPLOY_PATH/"
 
 echo -e "${GREEN}✓ Files deployed to $DEPLOY_PATH${NC}"

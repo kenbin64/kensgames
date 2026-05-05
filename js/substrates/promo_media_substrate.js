@@ -465,7 +465,7 @@ const PromoMediaSubstrate = (() => {
                         const carousel = document.getElementById('${carouselId}');
 
                         const ensureLoaded = (index) => {
-                            const img = carousel.querySelector(`.carousel - image[data - index="${index}"]`);
+                            const img = carousel.querySelector('.carousel-image[data-index="' + index + '"]');
                             if (!img) return;
                             const ds = img.getAttribute('data-src');
                             if (ds && img.getAttribute('src') && img.getAttribute('src').startsWith('data:image')) {
