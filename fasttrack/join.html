@@ -675,27 +675,41 @@
                         document.getElementById('pending-submessage').textContent = 'Server may be offline. Click cancel to try again.';
                     }, 6000);
 
-                    // Prefer unified auth message (more compatible across server versions).
-                    // Guest path: token empty/guest-* will be treated as guest_login by the lobby server.
-                    const storedName = (() => {
-                        try { return localStorage.getItem('username') || localStorage.getItem('display_name') || null; } catch (e) { return null; }
+                    // Per-browser stable guest token. The lobby server derives user_id by
+                    // hashing this token (stableGuestId), so a literal 'guest-' would collapse
+                    // every guest into a single shared seat — invitee B and invitee C would
+                    // collide as the same player. A persisted random suffix keeps the same
+                    // identity across reloads on one browser while distinguishing browsers.
+                    const guestToken = (() => {
+                        try {
+                            let t = localStorage.getItem('kg_guest_token');
+                            if (!t || !/^guest-[a-f0-9]{16,}$/i.test(t)) {
+                                const rnd = (window.crypto && window.crypto.getRandomValues)
+                                    ? Array.from(window.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')
+                                    : (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 32);
+                                t = 'guest-' + rnd;
+                                localStorage.setItem('kg_guest_token', t);
+                            }
+                            return t;
+                        } catch (e) {
+                            return 'guest-' + Date.now().toString(16) + Math.random().toString(16).slice(2);
+                        }
                     })();
-                    const effectiveName = storedName || name;
 
                     if (token) {
                         socket.send(JSON.stringify({
                             type: 'auth',
                             token,
-                            username: effectiveName,
-                            guest_name: effectiveName,
+                            username: name,
+                            guest_name: name,
                             avatar_id: avatarId || selectedAvatar
                         }));
                     } else {
                         socket.send(JSON.stringify({
                             type: 'auth',
-                            token: 'guest-',
-                            username: effectiveName,
-                            guest_name: effectiveName,
+                            token: guestToken,
+                            username: name,
+                            guest_name: name,
                             avatar_id: selectedAvatar
                         }));
 
@@ -707,7 +721,8 @@
                             try {
                                 socket.send(JSON.stringify({
                                     type: 'guest_login',
-                                    name: effectiveName,
+                                    token: guestToken,
+                                    name: name,
                                     avatar_id: selectedAvatar
                                 }));
                             } catch (e) { }
