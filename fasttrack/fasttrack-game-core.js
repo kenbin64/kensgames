@@ -578,10 +578,104 @@ function shuffleDeck() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MULTIPLAYER SYNC — drawCard / executeMove / reshuffle relay over KGMultiplayer
+// ═══════════════════════════════════════════════════════════════════════════
+// _mpClient is a KGMultiplayer instance set by 3d.html via setMultiplayerClient.
+// _applying is true while we're re-running an action received from a peer so the
+// commit path doesn't echo it back. _isMpMode() is true only when we're in a
+// real session (not solo or same-screen).
+let _mpClient = null;
+let _applying = false;
+
+function setMultiplayerClient(client) {
+  _mpClient = client || null;
+}
+
+function _isMpMode() {
+  const mode = state.meta.get('gameMode');
+  return _mpClient && (mode === 'private' || mode === 'public' || mode === 'multiplayer');
+}
+
+function _myUserId() {
+  return state.meta.get('myUserId') || (_mpClient && _mpClient.userId) || null;
+}
+
+function _activePlayerUserId() {
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const p = players[ci];
+  return (p && p.userId) || null;
+}
+
+function _isMyTurn() {
+  if (!_isMpMode()) return true;
+  const me = _myUserId();
+  const active = _activePlayerUserId();
+  return me && active && String(me) === String(active);
+}
+
+function _isHost() {
+  if (!_mpClient) return true;
+  return !!_mpClient.isHost;
+}
+
+function _broadcast(action, payload) {
+  if (!_isMpMode() || _applying) return;
+  try { _mpClient.sendAction(action, payload || {}); }
+  catch (err) { console.warn('[ft-mp] broadcast failed', action, err); }
+}
+
+// Re-run a peer's action locally under the _applying guard.
+// Called by 3d.html via window.FastTrackCore.applyRemoteAction(action, payload).
+function applyRemoteAction(action, payload) {
+  if (!action) return;
+  _applying = true;
+  try {
+    switch (action) {
+      case 'draw': {
+        // Inject the card the host actually drew so deck order matches.
+        const card = payload && payload.card;
+        if (!card) break;
+        const deck = state.deck.get('cards') || [];
+        // Remove one matching card from local deck (by display) so the local
+        // deck stays in sync with the broadcaster's. If not found we still
+        // proceed — _drawCardCommit uses the card from the payload, not the deck.
+        const idx = deck.findIndex(c => c && c.display === card.display);
+        if (idx >= 0) { deck.splice(idx, 1); state.deck.set('cards', deck); }
+        _drawCardCommit(card);
+        break;
+      }
+      case 'move': {
+        const move = payload && payload.move;
+        if (!move) break;
+        // Replace local validMoves with this single resolved move so executeMove
+        // operates on a known index. The local validMoves were already populated
+        // by calculateValidMoves after the draw was applied above.
+        state.turn.set('validMoves', [move]);
+        executeMove(0);
+        break;
+      }
+      case 'reshuffle': {
+        const cards = payload && Array.isArray(payload.cards) ? payload.cards : null;
+        if (!cards) break;
+        state.deck.set('cards', cards.slice());
+        state.deck.set('discard', []);
+        break;
+      }
+    }
+  } finally {
+    _applying = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DRAW CARD
 // ═══════════════════════════════════════════════════════════════════════════
 function drawCard() {
   if (state.turn.get('phase') !== 'draw') return;
+  // Multiplayer: only the active player drives the draw locally; remote peers
+  // receive the card via applyRemoteAction and replay it under the _applying guard.
+  if (!_applying && _isMpMode() && !_isMyTurn()) return;
   dismissYourTurnPopup();
 
   let deck = state.deck.get('cards') || [];
@@ -592,10 +686,21 @@ function drawCard() {
     shuffleDeck();
     deck = state.deck.get('cards');
     log('Deck reshuffled');
+    // Tell peers the post-shuffle deck order so their next remote draw matches.
+    if (!_applying && _isHost()) _broadcast('reshuffle', { cards: deck.slice() });
   }
 
   const card = deck.pop();
   state.deck.set('cards', deck);
+  _drawCardCommit(card);
+
+  // Broadcast the actual card we drew so all peers replay the same value.
+  if (!_applying) _broadcast('draw', { card });
+}
+
+// Commit a drawn card into local state + UI. Shared by drawCard (local actor)
+// and applyRemoteAction (peer) so visual side-effects stay consistent.
+function _drawCardCommit(card) {
   state.deck.set('currentCard', card);
   state.turn.set('phase', 'move');
   _splitPegIdx = null;
@@ -1274,123 +1379,23 @@ function showMoveHints() {
 
   // Separate split moves from regular moves
   const splitMoves = vm.filter(m => m.type === 'split');
-  const regularMoves = vm.filter(m => m.type !== 'split');
 
-  // Build regular move buttons
-  const buttons = [];
-  regularMoves.forEach((m, _) => {
-    const i = vm.indexOf(m);
-    let icon = '', label = '';
-    let short = '';
-    const pegName = safeUiText(curPlayer.pegs[m.pegIdx] && curPlayer.pegs[m.pegIdx].nickname, `Peg ${m.pegIdx + 1}`);
-    const playerName = safeUiText(curPlayer.name, PLAYER_NAMES[ci] || 'Player');
-    const shortPeg = pegName;
-    const actor = `${playerName}'s ${pegName}`;
-    const peg = curPlayer.pegs[m.pegIdx];
-    const cut = cutLabel(m.dest);
-
-    switch (m.type) {
-      case 'enter':
-        if (buttons.some(b => b.isEnter)) return;
-        icon = '🏠';
-        label = `${playerName} brings a peg onto the board${cut}`;
-        short = `${shortPeg} enter`;
-        buttons.push({ idx: i, icon, label, short, pegIdx: m.pegIdx, isEnter: true });
-        return;
-
-      case 'move': {
-        const s = m.steps;
-        const dest = m.dest;
-        if (dest.startsWith('safe-')) {
-          icon = '🛡️';
-          label = `${actor} into safe zone`;
-          short = `${shortPeg} -> safe`;
-        } else if (dest.startsWith('ft-')) {
-          icon = '⚡';
-          if (peg && peg.onFasttrack) {
-            label = `${actor} traverse FastTrack ${s} space${s > 1 ? 's' : ''}`;
-            short = `${shortPeg} FT +${s}`;
-          } else {
-            const who = ownerName(dest);
-            label = `${actor} → ${who}'s FastTrack hole`;
-            short = `${shortPeg} enter FT`;
-          }
-        } else if (dest.startsWith('home-')) {
-          const who = ownerName(dest);
-          icon = '🏠';
-          label = `${actor} → ${who}'s home`;
-          short = `${shortPeg} -> home`;
-        } else {
-          const card = state.deck.get('currentCard');
-          const cardRules = card ? CARDS[card.value] : null;
-          const isBackward = cardRules && cardRules.direction === 'backward';
-          icon = s <= 3 ? '👣' : '🏃';
-          label = `${actor} ${isBackward ? 'backward' : 'forward'} ${s} space${s > 1 ? 's' : ''}`;
-          short = `${shortPeg} ${isBackward ? '-' : '+'}${s}`;
-        }
-        if (cut) label += cut;
-        break;
-      }
-
-      case 'enterFastTrack':
-        icon = '⚡';
-        if (peg && peg.onFasttrack) {
-          label = `${actor} traverses FastTrack`;
-          short = `${shortPeg} FT traverse`;
-        } else {
-          label = `${actor} enters FastTrack`;
-          short = `${shortPeg} FT enter`;
-        }
-        break;
-
-      case 'exitFastTrack': {
-        const who = ownerName(m.dest);
-        icon = '🚪';
-        label = `${actor} exits FastTrack at ${who}'s hole`;
-        short = `${shortPeg} FT exit`;
-        break;
-      }
-
-      case 'enterBullseye':
-        icon = '🎯';
-        label = `${actor} → center bullseye`;
-        short = `${shortPeg} -> bullseye`;
-        break;
-
-      case 'exitBullseye':
-        icon = '🚀';
-        label = `${actor} exits bullseye`;
-        short = `${shortPeg} bullseye exit`;
-        break;
-    }
-    buttons.push({ idx: i, type: m.type, icon, label, short, dest: m.dest, pegIdx: m.pegIdx });
-  });
-
-  // Deduplicate — same peg landing on the same destination hole is the
-  // same move from the player's perspective, even if the engine emitted
-  // it under different move types (e.g. 'move' into an ft-* hole vs.
-  // 'enterFastTrack' for the same peg). Key by dest+pegIdx so wording
-  // variants like "enter FT" and "FT enter" collapse to one button.
-  const seenDests = new Set();
-  const dedupedButtons = buttons.filter(b => {
-    if (b.type === 'enter') return true;          // enter buttons already deduped above
-    if (!b.dest) return true;
-    const key = b.dest + '|' + b.pegIdx;
-    if (seenDests.has(key)) return false;
-    seenDests.add(key);
-    return true;
-  });
-
+  // Pick-on-board: the 3D board itself is the input surface — destinations
+  // glow in the active player's color and accept clicks/taps. The rail just
+  // shows a neutral status line so the player knows it's their turn and what
+  // to do. Split-7 still needs the rail because it's a two-step decision and
+  // the picker doesn't yet have a way to confirm the second leg unambiguously.
+  const playerName = safeUiText(curPlayer.name, PLAYER_NAMES[ci] || 'Player');
   let html = '';
-
-  // Render every legal move as a direct click target.
-  // This guarantees the turn can always advance without requiring a group-expand step.
-  _hintGroups = {};
-  dedupedButtons.forEach((b) => {
-    html += `<div class="hint" title="${escapeAttr(b.label)}" onclick="executeMove(${b.idx})" `
-      + `onmouseenter="if(window.highlightSinglePath)window.highlightSinglePath(${b.idx})" `
-      + `onmouseleave="clearHintPreview()">${escapeHtml(b.icon)} ${escapeHtml(b.short || b.label)}</div>`;
-  });
+  if (splitMoves.length === 0) {
+    html += '<div class="hint hint-status" style="opacity:0.85;cursor:default;">'
+      + `Your turn, ${escapeHtml(playerName)} — click a glowing hole to move.`
+      + '</div>';
+  } else {
+    html += '<div class="hint hint-status" style="opacity:0.85;cursor:default;">'
+      + `Your turn, ${escapeHtml(playerName)} — click a glowing hole, or use the split panel below.`
+      + '</div>';
+  }
 
   // Split selector UI (if splits are available)
   if (splitMoves.length > 0) {
@@ -1398,8 +1403,6 @@ function showMoveHints() {
   }
 
   hintsDiv.innerHTML = html;
-
-  // Peg name sprites are always visible (managed in renderBoard3D)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1653,12 +1656,20 @@ function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
 }
 
 function executeMove(moveIdx) {
+  // Multiplayer: only the active player drives a move locally; remote peers
+  // receive the resolved move via applyRemoteAction and replay it under guard.
+  if (!_applying && _isMpMode() && !_isMyTurn()) return;
+
   // Clear path highlights when a move is chosen
   if (window.clearHighlights) window.clearHighlights();
 
   const vm = state.turn.get('validMoves') || [];
   const move = vm[moveIdx];
   if (!move) return;
+
+  // Broadcast the resolved move BEFORE applying so peers see it the moment we do.
+  // The local actor is gated above; this only runs when we're the deciding peer.
+  if (!_applying) _broadcast('move', { move });
 
   // ── DEBOUNCE: clear valid moves immediately to prevent double-click ──
   state.turn.set('validMoves', []);

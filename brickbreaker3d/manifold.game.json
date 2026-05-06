@@ -9,6 +9,8 @@
     "z": 44,
     "_note": "z = x*y = 2 players avg * 22 min avg = 44"
   },
+  "maxPlayers": 4,
+  "recommendedPlayers": 2,
   "entry": "index.html",
   "lobby": "lobby.html",
   "substrates": {

@@ -31,7 +31,7 @@
 'use strict';
 
 (function (root) {
-  const STATE = { CHOOSE: 'choose', LOBBY: 'lobby', LAUNCHING: 'launching', ERROR: 'error' };
+  const STATE = { CHOOSE: 'choose', BROWSE: 'browse', LOBBY: 'lobby', LAUNCHING: 'launching', ERROR: 'error' };
   // Wizard substeps inside LOBBY. One topic per screen, no scrolling required.
   //   share  — friend host: just the code/link to send out
   //   roster — players + bot controls
@@ -57,6 +57,9 @@
   let _soloBotsWanted = null;
   let _lastStageKey = '';
   let _modePage = 0;
+  let _browseSessions = [];
+  let _browseTimer = null;
+  let _browseRequested = false;
 
   // ── CSS (injected once) ─────────────────────────────────────────────
   // Canonical KensGames Tron palette: cyan (primary), green (go), purple (AI/accent).
@@ -140,6 +143,22 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
 .kg-mp .copy-btn.copied{background:rgba(0,255,65,0.2);color:#00FF41;border-color:#00FF41;}
 .kg-mp .joined-count{font-size:11px;color:#00FF41;letter-spacing:2px;text-transform:uppercase;
   margin-top:14px;text-shadow:0 0 6px rgba(0,255,65,0.5);}
+.kg-mp .browse-list{display:flex;flex-direction:column;gap:8px;
+  flex:1;min-height:0;overflow:auto;padding-right:4px;}
+.kg-mp .browse-row{display:grid;grid-template-columns:1fr auto auto auto;
+  align-items:center;gap:12px;padding:12px 14px;background:rgba(0,0,0,0.45);
+  border:1px solid rgba(0,255,255,0.30);border-radius:6px;color:#fff;
+  font-family:inherit;text-align:left;cursor:pointer;transition:all 180ms ease;}
+.kg-mp .browse-row:hover:not([disabled]){border-color:#00FFFF;
+  background:rgba(0,255,255,0.08);box-shadow:0 0 14px rgba(0,255,255,0.30);
+  transform:translateY(-1px);}
+.kg-mp .browse-row.is-disabled,.kg-mp .browse-row[disabled]{
+  opacity:.55;cursor:not-allowed;border-color:rgba(255,255,255,0.18);}
+.kg-mp .browse-row-name{font-size:13px;font-weight:700;color:#00FFFF;letter-spacing:1px;}
+.kg-mp .browse-row-host{font-size:11px;color:#c4a3ff;}
+.kg-mp .browse-row-count{font-size:11px;color:#00FF41;letter-spacing:1px;
+  font-family:'Orbitron',monospace;}
+.kg-mp .browse-row-wait{font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;}
 .kg-mp .player-row{display:flex;align-items:center;gap:12px;padding:12px 14px;
   background:rgba(0,0,0,0.45);border:1px solid rgba(0,255,255,0.20);border-radius:6px;
   margin-bottom:8px;}
@@ -566,6 +585,7 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
     if (_state === STATE.ERROR) return renderError();
     if (_state === STATE.LAUNCHING) return renderLaunching();
     if (_state === STATE.CHOOSE) return renderChoose();
+    if (_state === STATE.BROWSE) return renderBrowse();
     if (_state === STATE.LOBBY) return renderLobby();
   }
 
@@ -767,9 +787,12 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
         // Current backend path: friend queue endpoint is used as provisional matchmaker transport.
         _mode = 'friend';
       } else if (act === 'browse') {
-        const joinUrl = new URL('/join.html', location.origin);
-        if (_opts && _opts.gameId) joinUrl.searchParams.set('game', _opts.gameId);
-        location.href = joinUrl.toString();
+        // In-panel public lobby browser. Connect, list, click-to-join.
+        _mode = 'browse';
+        if (!_profileNameDraft) { renderNameStep({ guest: false }); return; }
+        if (!_profileAvatarDraft) { renderAvatarStep({ guest: false }); return; }
+        saveProfileDraft();
+        startBrowse();
         return;
       } else {
         _mode = act;
@@ -855,6 +878,8 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
         connectAndJoin(_pendingCode);
       } else if (_mode === 'same-screen') {
         buildLocalLobby();
+      } else if (_mode === 'browse') {
+        startBrowse();
       } else if (_mode) {
         connectAndCreate(_mode === 'friend');
       } else {
@@ -898,6 +923,94 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
     // Always show mode cards first — name/avatar wizard runs only when the
     // user actively picks a mode, so the landing screen has no form gates.
     return renderModeChoice();
+  }
+
+  // ── Browse: in-panel public lobby browser ──────────────────────────
+  function startBrowse() {
+    _state = STATE.BROWSE;
+    _browseSessions = [];
+    _browseRequested = false;
+    render();
+    const mp = ensureClient(); if (!mp) return;
+    const requestList = () => { try { mp.listGames(_opts.gameId); } catch { /* ignore */ } };
+    const onList = (sessions) => {
+      _browseSessions = Array.isArray(sessions) ? sessions : [];
+      _browseRequested = true;
+      if (_state === STATE.BROWSE) render();
+    };
+    mp.on('session_list', onList);
+    if (mp.userId) requestList(); else mp.on('authenticated', requestList);
+    if (_browseTimer) clearInterval(_browseTimer);
+    _browseTimer = setInterval(() => {
+      if (_state !== STATE.BROWSE) { clearInterval(_browseTimer); _browseTimer = null; return; }
+      requestList();
+    }, 4000);
+  }
+
+  function stopBrowse() {
+    if (_browseTimer) { clearInterval(_browseTimer); _browseTimer = null; }
+  }
+
+  function formatWaitTime(createdAt) {
+    if (!createdAt) return '';
+    const secs = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
+    if (secs < 60) return secs + 's';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return mins + 'm';
+    return Math.floor(mins / 60) + 'h';
+  }
+
+  function renderBrowse() {
+    const game = (_opts && _opts.gameName) || (_opts && _opts.gameId) || 'this game';
+    let body = '';
+    if (!_browseRequested) {
+      body = `<div class="info-msg"><span class="spinner"></span>Looking for open games…</div>`;
+    } else if (!_browseSessions.length) {
+      body = `
+        <div class="info-msg">No public games waiting for ${esc(game)}.</div>
+        <div class="info-msg" style="opacity:.7;font-size:.9em;">
+          Refreshes every few seconds. Or host your own from the previous screen.
+        </div>`;
+    } else {
+      const rows = _browseSessions.map(s => {
+        const filled = Number(s.player_count || (s.players ? s.players.length : 0)) || 0;
+        const cap = Number(s.max_players) || 0;
+        const host = s.host_username || (s.players && s.players[0] && s.players[0].username) || 'host';
+        const name = s.game_name || s.game_id || game;
+        const wait = formatWaitTime(s.created_at);
+        const status = s.status || 'waiting';
+        const full = cap > 0 && filled >= cap;
+        const disabled = full || status !== 'waiting';
+        return `
+          <button class="browse-row${disabled ? ' is-disabled' : ''}"
+                  data-act="join" data-code="${esc(s.session_code || '')}" ${disabled ? 'disabled' : ''}>
+            <span class="browse-row-name">${esc(name)}</span>
+            <span class="browse-row-host">host: ${esc(host)}</span>
+            <span class="browse-row-count">${filled}/${cap || '?'}${full ? ' · full' : ''}</span>
+            <span class="browse-row-wait">${wait ? 'waiting ' + esc(wait) : ''}</span>
+          </button>`;
+      }).join('');
+      body = `<div class="browse-list">${rows}</div>`;
+    }
+    renderShell(body, { stepTitle: `Browse · ${esc(game)}` });
+    setRail(`
+      <button class="btn-ghost" data-act="back">← Back</button>
+      <span class="kg-rail-status">${_browseSessions.length} open game${_browseSessions.length === 1 ? '' : 's'}</span>
+      <button class="btn-cyan" data-act="refresh">↻ Refresh</button>
+    `, {
+      back: () => { stopBrowse(); leaveAndReset(); },
+      refresh: () => { try { _mp && _mp.listGames(_opts.gameId); } catch { /* ignore */ } },
+    });
+    _root.querySelectorAll('.browse-row[data-act="join"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.getAttribute('data-code');
+        if (!code) return;
+        stopBrowse();
+        _mode = 'guest';
+        _pendingCode = code;
+        connectAndJoin(code);
+      });
+    });
   }
 
   function renderError() {
@@ -1633,6 +1746,9 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
   }
 
   function leaveAndReset() {
+    if (_browseTimer) { clearInterval(_browseTimer); _browseTimer = null; }
+    _browseSessions = [];
+    _browseRequested = false;
     try { _mp && _mp.leave(); } catch { /* ignore */ }
     try { _mp && _mp.disconnect(); } catch { /* ignore */ }
     _mp = null; _myUserId = null; _mode = null; _step = null; _state = STATE.CHOOSE;

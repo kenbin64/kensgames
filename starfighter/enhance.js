@@ -1610,6 +1610,8 @@ const SFEnhance = (function () {
   // ── Sortie tracking ───────────────────────────────────────────────────
   // A sortie spans one mission. Commit results to career on mission swap.
   function _trackSortie(mission) {
+    const st = window.Starfighter && window.Starfighter.getState ? window.Starfighter.getState() : null;
+    if (st && st._trainingSortieActive) return;
     if (!mission) return;
     if (!_sortie || _sortie.missionRef !== mission) {
       if (_sortie) {

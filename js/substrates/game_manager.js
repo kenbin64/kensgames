@@ -467,6 +467,12 @@
       authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
       requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
     },
+    cubic3d: {
+      panel: { supportsSameScreen: true, supportsMatchmaker: true, supportsOpenGames: true },
+      options: ['solo', 'host-invite', 'private-invite', 'matchmaker', 'browse', 'same-screen'],
+      authRequiredModes: ['private-invite', 'matchmaker', 'browse'],
+      requiredSteps: ['profile_ready', 'mode_selected', 'roster_ready', 'launch_confirmed', 'launched'],
+    },
   };
 
   const PROFILE_TO_PANEL_MODE = {

@@ -4880,6 +4880,33 @@ function setCameraView(mode) {
 // ════════════════════════════════════════════════════════════════
 const highlightMeshes = [];  // track glow rings for cleanup
 let highlightAnimFrame = null;
+// Original emissive state of any hole mesh we boosted, keyed by holeId.
+// Restored in clearHighlights so destination glow doesn't bleed across turns.
+const _boostedHoles = new Map(); // holeId -> { color: THREE.Color, intensity: number }
+
+function _restoreBoostedHoles() {
+  for (const [hid, prev] of _boostedHoles) {
+    const hole = holeRegistry.get(hid);
+    if (hole && hole.mesh && hole.mesh.material && hole.mesh.material.emissive) {
+      hole.mesh.material.emissive.copy(prev.color);
+      hole.mesh.material.emissiveIntensity = prev.intensity;
+    }
+  }
+  _boostedHoles.clear();
+}
+
+function _boostHoleEmissive(holeId, hexColor) {
+  const hole = holeRegistry.get(holeId);
+  if (!hole || !hole.mesh || !hole.mesh.material || !hole.mesh.material.emissive) return;
+  if (!_boostedHoles.has(holeId)) {
+    _boostedHoles.set(holeId, {
+      color: hole.mesh.material.emissive.clone(),
+      intensity: hole.mesh.material.emissiveIntensity
+    });
+  }
+  hole.mesh.material.emissive.set(hexColor);
+  hole.mesh.material.emissiveIntensity = 1.4;
+}
 
 function clearHighlights() {
   for (const mesh of highlightMeshes) {
@@ -4888,6 +4915,7 @@ function clearHighlights() {
     if (mesh.material) mesh.material.dispose();
   }
   highlightMeshes.length = 0;
+  _restoreBoostedHoles();
   if (highlightAnimFrame) {
     cancelAnimationFrame(highlightAnimFrame);
     highlightAnimFrame = null;
@@ -4954,30 +4982,31 @@ function highlightMovePaths(moves) {
     ? window.FastTrackCore.state.turn.get('validMoves') || [] : []);
   if (vm.length === 0) return;
 
-  for (const m of vm) {
-    // Color based on move type
-    let color = 0x00ff88;  // green default
-    if (m.type === 'enter') color = 0xffd700;  // gold
-    if (m.type === 'enterFastTrack') color = 0xff44ff;  // magenta
-    if (m.type === 'enterBullseye') color = 0xff4444;  // red
-    if (m.type === 'exitBullseye') color = 0x44aaff;  // blue
+  // All routes glow in the active player's color so the destination "turns
+  // their color" as the spec requires. Split moves get a complementary tint
+  // for the second peg's leg so the two legs remain visually separable.
+  const playerHex = _activePlayerColorHex();
+  const playerColor = parseInt(playerHex.replace('#', ''), 16);
+  const splitColor2 = 0xffaa00; // orange accent for split second leg
 
+  for (const m of vm) {
     // Highlight intermediate path holes (dimmer)
     if (m.path) {
       for (let i = 0; i < m.path.length - 1; i++) {
-        createGlowRing(m.path[i], color, false);
+        createGlowRing(m.path[i], playerColor, false);
       }
     }
-    // Highlight destination (brighter)
-    createGlowRing(m.dest, color, true);
+    // Highlight destination (brighter) — ring + boosted hole emissive
+    createGlowRing(m.dest, playerColor, true);
+    _boostHoleEmissive(m.dest, playerColor);
 
     // Split moves — also highlight the second peg's path
     if (m.type === 'split' && m.path2) {
-      const color2 = 0xffaa00; // orange for second path
       for (let i = 0; i < m.path2.length - 1; i++) {
-        createGlowRing(m.path2[i], color2, false);
+        createGlowRing(m.path2[i], splitColor2, false);
       }
-      createGlowRing(m.dest2, color2, true);
+      createGlowRing(m.dest2, splitColor2, true);
+      _boostHoleEmissive(m.dest2, splitColor2);
     }
   }
 
@@ -5014,8 +5043,11 @@ function highlightSinglePath(moveIdx) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PICK-ON-BOARD — desktop: click any hole on a unique route to play
-// (Mobile keeps the hint pill panel — touch targets too small here.)
+// PICK-ON-BOARD — click (or tap) any hole on a unique route to play.
+// Pointer events cover both mouse and touch so the same flow runs
+// on desktop and mobile. Ambiguous holes (multiple routes share
+// them) are no-ops; the player picks a hole further along the
+// route they want.
 // ════════════════════════════════════════════════════════════════
 let _routeIndex = new Map();   // holeId -> [moveIdx, ...]
 let _routeIndexHash = '';      // re-build only when valid moves change
@@ -5360,7 +5392,6 @@ function _describeEntry(entry, vm) {
 function setupBoardPickHandler() {
   if (!renderer || !renderer.domElement) return;
   const dom = renderer.domElement;
-  const isDesktop = () => window.matchMedia('(min-width: 601px)').matches;
   const artOverlayOpen = () =>
     !!document.getElementById('art-gallery-overlay')?.classList.contains('visible');
 
@@ -5376,7 +5407,7 @@ function setupBoardPickHandler() {
   };
 
   dom.addEventListener('pointermove', (e) => {
-    if (!isDesktop() || artOverlayOpen()) { _hideHoverTip(); return; }
+    if (artOverlayOpen()) { _hideHoverTip(); return; }
     // Skip while user is rotating/dragging the camera (any mouse button held).
     if (e.buttons !== 0) { _hideHoverTip(); return; }
     const idx = _refreshRouteIndex();
@@ -5392,7 +5423,7 @@ function setupBoardPickHandler() {
         _previewEntry(matches[0], vm);
       }
       const desc = _describeEntry(matches[0], vm);
-      if (desc) _showHoverTip(desc.text, desc.color, e.clientX, e.clientY);
+      if (desc) _showHoverTip(`${desc.text} — click to move`, desc.color, e.clientX, e.clientY);
       else _hideHoverTip();
     } else if (matches.length > 1) {
       dom.style.cursor = 'help';
@@ -5409,7 +5440,7 @@ function setupBoardPickHandler() {
   dom.addEventListener('pointerleave', () => { clearHover(); });
 
   dom.addEventListener('click', (e) => {
-    if (!isDesktop() || artOverlayOpen()) return;
+    if (artOverlayOpen()) return;
     const idx = _refreshRouteIndex();
     if (idx.size === 0) return;
     const hid = _pickHoleAtClient(e.clientX, e.clientY);

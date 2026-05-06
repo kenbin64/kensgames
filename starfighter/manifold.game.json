@@ -9,6 +9,8 @@
     "z": 60,
     "_note": "z = x*y = 2 players avg * 30 min avg = 60"
   },
+  "maxPlayers": 4,
+  "recommendedPlayers": 4,
   "entry": "index.html",
   "substrates": {
     "bundle": "bundle.js",

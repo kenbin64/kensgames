@@ -3217,6 +3217,7 @@ const SFProgression = (function () {
 
   function endMission(stats) {
     const c = career();
+    if (stats && stats.trainingOnly) return;
     c.gamesPlayed++;
     c.totalDeaths += (stats.deaths || 0);
     c.totalWaves += (stats.waveReached || 0);
@@ -4861,11 +4862,12 @@ const SF3D = (function () {
 
   // Show/hide cockpit (called by core.js on launch complete)
   function showCockpit(visible) {
-    cockpitVisible = visible;
+    cockpitVisible = true;
     lastCockpitToggleAt = Date.now();
-    lastCockpitToggleValue = !!visible;
-    if (cockpitModel) cockpitModel.visible = visible;
-    if (manifoldCockpitGroup) manifoldCockpitGroup.visible = visible && (MANIFOLD_COCKPIT_DEBUG || cockpitLoadFailed);
+    lastCockpitToggleValue = true;
+    if (cockpitGroup) cockpitGroup.visible = true;
+    if (cockpitModel) cockpitModel.visible = true;
+    if (manifoldCockpitGroup) manifoldCockpitGroup.visible = MANIFOLD_COCKPIT_DEBUG || cockpitLoadFailed;
   }
 
   function getCockpitDebugState() {
@@ -10392,7 +10394,7 @@ const Starfighter = (function () {
 
       if (this.flightAssist) {
         // FA-ON: velocity dampens to zero — damping from manifold dimension
-        if (this.throttle < 0.01 && this.strafeH === 0 && this.strafeV === 0) {
+        if (Math.abs(this.throttle) < 0.01 && this.strafeH === 0 && this.strafeV === 0) {
           this.velocity.multiplyScalar(1 - dt / dim('player.faDamping'));
         } else {
           this.velocity.lerp(targetVel, dim('player.faLerp'));
@@ -10866,6 +10868,7 @@ const Starfighter = (function () {
   function _startPracticeMode() {
     _setPhase('combat'); // Use combat phase for full controls
     state._practiceMode = true;
+    state._trainingSortieActive = true;
 
     // Spawn player safely
     if (state.player) {
@@ -10889,6 +10892,8 @@ const Starfighter = (function () {
       SF3D.setLaunchPhase(false);
       SF3D.showCockpit(true);
     }
+    const exitBtn = document.getElementById('training-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'block';
 
     // Audio setup
     if (window.SFAudio) {
@@ -10932,7 +10937,7 @@ const Starfighter = (function () {
       exitHint = document.createElement('div');
       exitHint.id = 'practice-exit-hint';
       exitHint.style.cssText = 'position:absolute;top:40px;left:50%;transform:translateX(-50%);z-index:65;padding:8px 24px;font-family:monospace;font-size:12px;background:rgba(0,0,0,0.7);color:#ffd24a;border:1px solid rgba(255,210,74,0.3);border-radius:4px;pointer-events:none;text-align:center';
-      exitHint.innerHTML = 'PRACTICE MODE — Press <b>Escape</b> or <b>Pause</b> to end practice and launch mission';
+      exitHint.innerHTML = 'TRAINING SORTIE — Press <b>Escape</b> to free the cursor. Click <b>EXIT TRAINING</b> or use <b>Pause</b> to end training and launch the first real sortie.';
       document.body.appendChild(exitHint);
     }
     exitHint.style.display = 'block';
@@ -11135,9 +11140,12 @@ const Starfighter = (function () {
 
   function _endPracticeMode() {
     state._practiceMode = false;
+    state._trainingSortieActive = false;
     _hidePracticeInputOverlay();
     const hint = document.getElementById('practice-exit-hint');
     if (hint) hint.style.display = 'none';
+    const exitBtn = document.getElementById('training-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'none';
     if (state._practiceEscapeHandler) {
       document.removeEventListener('keydown', state._practiceEscapeHandler);
       state._practiceEscapeHandler = null;
@@ -11296,6 +11304,7 @@ const Starfighter = (function () {
     document.getElementById('crosshair').style.display = 'block';
     document.getElementById('gameplay-hud').style.display = 'block';
     document.getElementById('radar-overlay').style.display = 'block';
+    _ensureCombatHudVisible();
     initRadar();
     if (window.SF3D) {
       SF3D.setLaunchPhase(false); // End launch phase - show baseship
@@ -12042,6 +12051,7 @@ const Starfighter = (function () {
         waveReached: ms.waveReached,
         flightTime: elapsed,
         score: state.score,
+        trainingOnly: !!state._trainingSortieActive,
       });
       // Show career kill tally on death screen
       const tallyHtml = SFProgression.renderKillTallyHTML();
@@ -14034,9 +14044,12 @@ const Starfighter = (function () {
   // ── Skip Training — ends wave 1 early by clearing hostiles and RTB'ing ──
   function _skipTraining() {
     if (state.wave !== 1 || state.phase !== 'combat') return;
+    state._trainingSortieActive = false;
     // Hide the training skip button immediately
     const trainSkip = document.getElementById('training-skip-btn');
     if (trainSkip) trainSkip.style.display = 'none';
+    const exitBtn = document.getElementById('training-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'none';
     // Clear all hostile entities
     const HOSTILE_TYPES = new Set(['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'egg', 'youngling']);
     state.entities.forEach(e => {
@@ -14056,6 +14069,13 @@ const Starfighter = (function () {
       cdEl.style.color = '#00ff88';
       cdEl.innerHTML = 'TRAINING COMPLETE<br><span style="font-size:0.4em;color:#88ccff">Returning to bay - Wave 2 standing by</span>';
     }
+  }
+
+  function _ensureCombatHudVisible() {
+    const crosshair = document.getElementById('crosshair');
+    const radar = document.getElementById('radar-overlay');
+    if (crosshair) crosshair.style.display = 'block';
+    if (radar) radar.style.display = 'block';
   }
 
   // ── Request Dock — manual redock, player flies themselves ──
@@ -15693,6 +15713,7 @@ const Starfighter = (function () {
     resume: () => _setPaused(false),
     exitGame,
     openTutorial,
+    exitTraining: _endPracticeMode,
     _skipTraining,
   };
 

@@ -10,6 +10,7 @@
     "_note": "z = x*y = 3 players avg * 45 min avg = 135"
   },
   "maxPlayers": 6,
+  "recommendedPlayers": 4,
   "entry": "index.html",
   "lobby": "lobby.html",
   "join": "join.html",

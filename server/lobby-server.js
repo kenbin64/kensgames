@@ -122,29 +122,48 @@ function bootGameCatalog() {
   try {
     const portal = JSON.parse(fs.readFileSync(portalPath, 'utf8'));
     (portal.games || []).forEach(g => games.push({
-      id: g.id, name: g.name, dimension: g.dimension || null, manifest: g.manifest,
+      id: g.id, name: g.name, dimension: g.dimension || null,
+      // Portal manifest uses `manifold` (path to per-game json); accept either spelling.
+      manifest: g.manifold || g.manifest || null,
+      dirPath: g.path || null,
     }));
   } catch (e) { /* portal manifest optional */ }
   // Per-game manifests for dimension data.
+  // Always re-read maxPlayers/recommendedPlayers from the manifest even if dimension was supplied
+  // by the portal, because the portal manifest does not carry per-game cap fields.
   games.forEach(g => {
-    if (g.dimension) return;
     try {
-      const mp = path.join(REPO_ROOT, g.id, 'manifold.game.json');
-      const mg = JSON.parse(fs.readFileSync(mp, 'utf8'));
-      g.dimension = mg.dimension || { x: 1, y: 1, z: 1 };
-      // maxPlayers is a gameplay cap and should not default to dimension.x (which is often an average).
+      // Prefer the explicit manifest path from the portal (handles dirs whose
+      // case differs from the lowercase game id, e.g. 4DTicTacToe vs 4dtictactoe).
+      const candidates = [
+        g.manifest && path.join(REPO_ROOT, g.manifest),
+        g.dirPath && path.join(REPO_ROOT, g.dirPath, 'manifold.game.json'),
+        path.join(REPO_ROOT, g.id, 'manifold.game.json'),
+      ].filter(Boolean);
+      let mg = null;
+      for (const c of candidates) {
+        try { mg = JSON.parse(fs.readFileSync(c, 'utf8')); break; } catch (_) { /* try next */ }
+      }
+      if (!mg) throw new Error('no manifest found');
+      if (!g.dimension) g.dimension = mg.dimension || { x: 1, y: 1, z: 1 };
+      // maxPlayers is a gameplay cap and is authoritative from the manifest.
       const manifestMax = Number(mg.maxPlayers || mg.max_players || 0);
-      g.maxPlayers = Number.isFinite(manifestMax) && manifestMax >= 2
-        ? Math.min(6, Math.floor(manifestMax))
-        : undefined;
-    } catch (e) { g.dimension = { x: 1, y: 1, z: 1 }; }
+      if (Number.isFinite(manifestMax) && manifestMax >= 2) {
+        g.maxPlayers = Math.floor(manifestMax);
+      }
+      const manifestRec = Number(mg.recommendedPlayers || mg.recommended_players || 0);
+      if (Number.isFinite(manifestRec) && manifestRec >= 1) {
+        g.recommendedPlayers = Math.floor(manifestRec);
+      }
+    } catch (e) { if (!g.dimension) g.dimension = { x: 1, y: 1, z: 1 }; }
   });
   // Fallback minimal catalog for known games not in the manifest.
+  // Tuple shape: [id, name, maxPlayers, recommendedPlayers].
   const have = new Set(games.map(g => g.id));
-  [['fasttrack', 'Fast Track', 6], ['starfighter', 'Starfighter', 6],
-  ['brickbreaker3d', 'BrickBreaker 3D', 4], ['4dtictactoe', '4D Tic-Tac-Toe', 4],
-  ['cubic3d', 'Cubic', 4]].forEach(([id, name, mp]) => {
-    if (!have.has(id)) games.push({ id, name, dimension: { x: mp, y: 1, z: mp }, maxPlayers: mp });
+  [['fasttrack', 'Fast Track', 6, 4], ['starfighter', 'Starfighter', 4, 4],
+  ['brickbreaker3d', 'BrickBreaker 3D', 4, 2], ['4dtictactoe', '4D Tic-Tac-Toe', 4, 2],
+  ['cubic3d', 'Cubic', 4, 2]].forEach(([id, name, mp, rp]) => {
+    if (!have.has(id)) games.push({ id, name, dimension: { x: mp, y: 1, z: mp }, maxPlayers: mp, recommendedPlayers: rp });
   });
   games.forEach(g => Proj.ensureGame(log, g.id, g.dimension, g.name));
   return games;
@@ -178,7 +197,7 @@ const connections = new Map();    // ws → { user_id, user, session_x_id }
 const pm = new PlayerManager(connections, liveSessions, send, broadcastSession);
 
 function freshSession(sx, gameId, hostUser, isPrivate) {
-  const game = CATALOG_BY_ID[gameId] || { name: gameId, maxPlayers: 6 };
+  const game = CATALOG_BY_ID[gameId] || { name: gameId, maxPlayers: 6, recommendedPlayers: 4 };
   return {
     x: sx,
     session_id: sx.id,
@@ -190,6 +209,7 @@ function freshSession(sx, gameId, hostUser, isPrivate) {
     host_username: hostUser.username,
     is_private: !!isPrivate,
     max_players: game.maxPlayers || 6,
+    recommended_players: game.recommendedPlayers || game.maxPlayers || 4,
     players: [],
     settings: { lobby_accepted: false },
     status: 'waiting',
@@ -208,6 +228,7 @@ function sanitize(s) {
     host_username: s.host_username,
     is_private: s.is_private,
     max_players: s.max_players,
+    recommended_players: s.recommended_players,
     player_count: s.players.length,
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
@@ -444,6 +465,44 @@ handlers.join_by_code = (ws, data) => {
   joinExisting(ws, conn, s);
 };
 
+// matchmake: industry-standard QuickJoin. Find the oldest waiting public
+// session for game_id with at least one seat open and join it. If none
+// exists, create a new public session so the player waits as host.
+handlers.matchmake = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  if (!hasRenderableProfile(conn)) {
+    return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before matchmaking' });
+  }
+  const gameId = (data && data.game_id) || 'fasttrack';
+  if (!CATALOG_BY_ID[gameId]) return send(ws, { type: 'error', message: 'Unknown game: ' + gameId });
+  const candidates = [];
+  for (const s of liveSessions.values()) {
+    if (s.status !== 'waiting' || s.is_private) continue;
+    if (s.game_id !== gameId) continue;
+    if (s.players.length >= s.max_players) continue;
+    if (s.players.some(p => p.user_id === conn.user_id)) continue;
+    candidates.push(s);
+  }
+  candidates.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+  if (candidates.length > 0) {
+    send(ws, { type: 'matchmake_result', action: 'joined', session_id: candidates[0].session_id });
+    return joinExisting(ws, conn, candidates[0]);
+  }
+  // No open public session — create one and wait.
+  const sx = Proj.bloomSession(log, gameId, 'public', conn.user_id, { is_private: false });
+  const s = freshSession(sx, gameId, conn.user, false);
+  s.players.push({
+    user_id: conn.user_id, username: conn.user.username,
+    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: false
+  });
+  liveSessions.set(s.session_id, s);
+  conn.session_x_id = s.session_id;
+  send(ws, { type: 'matchmake_result', action: 'created', session_id: s.session_id });
+  send(ws, { type: 'session_created', session: sanitize(s) });
+  broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
+};
+
 handlers.resolve_code = (ws, data) => {
   const code = String((data && data.code) || '').toUpperCase();
   const s = sessionByCode(code);
@@ -481,7 +540,9 @@ handlers.update_session_settings = (ws, data) => {
   if (!s || s.host_id !== conn.user_id) return;
   if (data && data.settings) Object.assign(s.settings, data.settings);
   if (data && typeof data.max_players === 'number') {
-    const requested = Math.max(2, Math.min(6, data.max_players));
+    const game = CATALOG_BY_ID[s.game_id] || {};
+    const ceiling = Number.isFinite(game.maxPlayers) ? game.maxPlayers : 6;
+    const requested = Math.max(2, Math.min(ceiling, data.max_players));
     // Never drop below current player count
     s.max_players = Math.max(requested, s.players.length);
   }
@@ -649,7 +710,8 @@ handlers.game_over = (ws, data) => {
 // Catalog endpoint — clients can ask the manifold for the registered games.
 handlers.list_games = (ws) => send(ws, {
   type: 'game_catalog', games: CATALOG.map(g => ({
-    id: g.id, name: g.name, dimension: g.dimension, max_players: g.maxPlayers,
+    id: g.id, name: g.name, dimension: g.dimension,
+    max_players: g.maxPlayers, recommended_players: g.recommendedPlayers,
   }))
 });
 

@@ -9,6 +9,8 @@
     "z": 24,
     "_note": "z = x*y = 2 players * 12 min = 24; the game itself is a 4-dimensional manifold (4D board)"
   },
+  "maxPlayers": 4,
+  "recommendedPlayers": 2,
   "entry": "index.html",
   "substrates": {
     "plane": "manifold.js:BoardManifold",

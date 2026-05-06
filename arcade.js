@@ -10,10 +10,10 @@ const LOBBY_WS = location.protocol === 'https:'
 // Fallback game table — overwritten at runtime by loadRegistry()
 const GAMES = {
     fasttrack: { title: 'FastTrack', url: '/fasttrack/lobby.html', multiplayer: true },
-    brickbreaker3d: { title: 'BrickBreaker 3D', url: '/brickbreaker3d/index.html', multiplayer: true },
-    starfighter: { title: 'StarFighter', url: '/starfighter/index.html', multiplayer: false },
-    '4dtictactoe': { title: '4D TicTacToe', url: '/4DTicTacToe/index.html', multiplayer: true },
-    cubic3d: { title: 'Cubic', url: '/cubic3d/index.html', multiplayer: false },
+    brickbreaker3d: { title: 'BrickBreaker 3D', url: '/brickbreaker3d/lobby.html', multiplayer: true },
+    starfighter: { title: 'StarFighter', url: '/starfighter/lobby.html', multiplayer: true },
+    '4dtictactoe': { title: '4D TicTacToe', url: '/4DTicTacToe/lobby.html', multiplayer: true },
+    cubic3d: { title: 'Cubic', url: '/cubic3d/lobby.html', multiplayer: true },
 };
 
 // ── MANIFOLD REGISTRY ─────────────────────────────────────────

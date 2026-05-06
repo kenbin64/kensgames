@@ -9,6 +9,7 @@ const SFInput = (function () {
     let launchTriggered = false;
     let spacebarJustPressed = false;
     let lastInputDevice = 'keyboard'; // auto-detect: 'keyboard', 'gamepad', 'touch'
+    let mouseLookActive = false;
 
     // ── Mobile / Touch state ──
     let isMobile = false;
@@ -65,6 +66,7 @@ const SFInput = (function () {
 
     function init(p) {
         player = p;
+        mouseLookActive = false;
 
         window.addEventListener('keydown', e => {
             // If a UI button is focused, let the browser handle Tab/Enter/Space natively
@@ -100,6 +102,8 @@ const SFInput = (function () {
                 if (btns.length) btns[0].focus();
                 lastInputDevice = 'keyboard';
             }
+
+            if (e.code === 'Escape') mouseLookActive = false;
         });
         window.addEventListener('keyup', e => {
             // Don't register key-up for keys that were never set (button-focused bypass)
@@ -118,9 +122,9 @@ const SFInput = (function () {
             if (document.pointerLockElement !== document.body) {
                 enterImmersive();
             } else {
-                if (e.button === 0) window.Starfighter.firePrimary();   // Left click — selected weapon
-                if (e.button === 2) window.Starfighter.fireTorpedo(); // Right click — torpedo (GDD §10.1)
-                if (e.button === 1) window.Starfighter.fireTorpedo(); // Middle click — torpedo alt
+                if (e.button === 0) window.Starfighter.fireLaser();
+                if (e.button === 2) window.Starfighter.fireTorpedo();
+                if (e.button === 1) window.Starfighter.firePrimary();
             }
         });
 
@@ -133,6 +137,7 @@ const SFInput = (function () {
                 player.yaw = Math.max(-3.0, Math.min(3.0, (player.yaw || 0) - mx * 0.005));
                 player.pitch = Math.max(-3.0, Math.min(3.0, (player.pitch || 0) - my * 0.005));
                 lastInputDevice = 'mouse';
+                mouseLookActive = true;
             }
         });
 
@@ -142,7 +147,7 @@ const SFInput = (function () {
             if (document.pointerLockElement === document.body) {
                 e.preventDefault();
                 const step = e.deltaY > 0 ? -0.08 : 0.08;
-                player.throttle = Math.min(1, Math.max(0, player.throttle + step));
+                player.throttle = Math.min(1, Math.max(-1, player.throttle + step));
                 lastInputDevice = 'mouse';
             } else {
                 // Not in pointer lock — an overlay is showing; scroll wheel activates focused button
@@ -167,11 +172,13 @@ const SFInput = (function () {
                 // Locked — hide cursor and the resume prompt
                 document.body.classList.add('immersed');
                 _setResumePromptVisible(false);
+                mouseLookActive = true;
             } else {
                 // Pointer lock lost — pause game, surface click-to-resume
                 document.body.classList.remove('immersed');
                 if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(true);
                 if (!_isElectron) _setResumePromptVisible(true);
+                mouseLookActive = false;
             }
         });
 
@@ -565,7 +572,7 @@ const SFInput = (function () {
 
         // Throttle (W/S)
         if (keys['KeyW']) { player.throttle = Math.min(1, player.throttle + dt * 0.5); lastInputDevice = 'keyboard'; }
-        if (keys['KeyS']) { player.throttle = Math.max(0, player.throttle - dt * 0.5); lastInputDevice = 'keyboard'; }
+        if (keys['KeyS']) { player.throttle = Math.max(-1, player.throttle - dt * 0.5); lastInputDevice = 'keyboard'; }
 
         // GDD §4.1: Afterburner (Shift hold)
         player.afterburnerActive = keys['ShiftLeft'] || keys['ShiftRight'] || !!touchBtns['afterburnerHeld'];
@@ -623,11 +630,13 @@ const SFInput = (function () {
         }
         if (keys['ControlLeft'] || keys['ControlRight']) player.strafeV = -1;
 
-        // Arrow keys alternative for pitch/yaw
-        if (keys['ArrowUp']) player.pitch += dt * 2.0;
-        if (keys['ArrowDown']) player.pitch -= dt * 2.0;
-        if (keys['ArrowLeft']) player.yaw += dt * 2.0;
-        if (keys['ArrowRight']) player.yaw -= dt * 2.0;
+        // Arrow keys alternative for pitch/yaw when mouse-look is inactive
+        if (!mouseLookActive) {
+            if (keys['ArrowUp']) player.pitch += dt * 2.0;
+            if (keys['ArrowDown']) player.pitch -= dt * 2.0;
+            if (keys['ArrowLeft']) player.yaw += dt * 2.0;
+            if (keys['ArrowRight']) player.yaw -= dt * 2.0;
+        }
 
         // GDD §4.1: Boost (F tap) — was torpedo, now boost per GDD
         if (keys['KeyF']) {
@@ -775,7 +784,7 @@ const SFInput = (function () {
             // Left stick: Throttle Y + Strafe X (GDD §12.4)
             const lsx = _curveAxis(pad.axes[0], _deadzoneMove, _expoMove);
             const lsy = _curveAxis(pad.axes[1], _deadzoneMove, _expoMove);
-            if (lsy !== 0) player.throttle = Math.min(1, Math.max(0, player.throttle - lsy * dt * 0.55));
+            if (lsy !== 0) player.throttle = Math.min(1, Math.max(-1, player.throttle - lsy * dt * 0.55));
             player.strafeH = lsx; // ensure it returns to 0 when stick centers
 
             // Bumpers: Roll (GDD §12.4: L1/R1)

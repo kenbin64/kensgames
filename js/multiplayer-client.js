@@ -312,9 +312,9 @@ class KGMultiplayer {
     this._send({ type: 'update_session_settings', settings });
   }
 
-  /** Set max player limit for this session (host only, 2-6) */
+  /** Set max player limit for this session (host only). Server enforces the per-game cap. */
   setMaxPlayers(n) {
-    const clamped = Math.max(2, Math.min(6, parseInt(n, 10) || 6));
+    const clamped = Math.max(2, parseInt(n, 10) || 2);
     this._send({ type: 'update_session_settings', settings: {}, max_players: clamped });
   }
 
