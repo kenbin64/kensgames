@@ -212,6 +212,14 @@ function freshSession(sx, gameId, hostUser, isPrivate) {
     recommended_players: game.recommendedPlayers || game.maxPlayers || 4,
     players: [],
     settings: { lobby_accepted: false },
+    // Single authoritative runtime object for this session.
+    authoritative: {
+      instance_id: crypto.randomUUID(),
+      rev: 0,
+      state: null,
+      updated_by: null,
+      updated_at: null,
+    },
     status: 'waiting',
     created_at: Date.now(),
   };
@@ -266,6 +274,34 @@ function publicSessions(gameId) {
     out.push(sanitize(s));
   }
   return out;
+}
+
+function serializePlayers(s) {
+  return (s.players || []).map((p) => ({
+    user_id: p.user_id,
+    username: p.username,
+    avatar_id: p.avatar_id,
+    is_host: !!p.is_host,
+    is_ai: !!p.is_ai,
+    slot: p.slot,
+    ready: !!p.ready,
+  }));
+}
+
+function sendAuthoritativeState(ws, s) {
+  if (!ws || !s || !s.authoritative || !s.authoritative.state) return;
+  send(ws, {
+    type: 'game_state',
+    session_id: s.session_id,
+    game_uuid: s.game_uuid,
+    instance_id: s.authoritative.instance_id,
+    seq: s.authoritative.rev,
+    authoritative: true,
+    from: s.authoritative.updated_by || s.host_id,
+    state: s.authoritative.state,
+    players: serializePlayers(s),
+    updated_at: s.authoritative.updated_at,
+  });
 }
 
 function leaveCurrentSession(ws, conn) {
@@ -430,7 +466,12 @@ function joinExisting(ws, conn, s) {
   if (isReturningPlayer) {
     conn.session_x_id = s.session_id;
     ws.join(s.session_id);
-    return send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
+    send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
+    if (s.status === 'playing') {
+      pm.registerConnection(conn.user_id, ws);
+      sendAuthoritativeState(ws, s);
+    }
+    return;
   }
   if (!hasRenderableProfile(conn)) {
     return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before joining a game' });
@@ -639,6 +680,7 @@ handlers.start_game = (ws) => {
   if (!conn) return;
   const s = liveSessions.get(conn.session_x_id);
   if (!s) return send(ws, { type: 'error', message: 'Not in a game' });
+  if (s.status === 'playing') return send(ws, { type: 'error', message: 'Game already launched for this session' });
   if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can start the game' });
   if (s.players.length < 2) return send(ws, { type: 'error', message: 'Need at least 2 players' });
   if (!s.players.every(p => String(p.username || '').trim().length >= 2 && !!normalizeAvatarId(p.avatar_id))) {
@@ -648,11 +690,18 @@ handlers.start_game = (ws) => {
   if (!s.settings.lobby_accepted) return send(ws, { type: 'error', message: 'Host must accept the group before launch' });
   s.status = 'playing';
   Proj.bloomEvent(log, s.x, [0, 0, 0, 0, 1, 1], { kind: 'game_started', session_id: s.session_id, game_id: s.game_id });
-  broadcastSession(s, { type: 'game_started', session: sanitize(s) });
   if (!s.is_private) broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
   // Hand off to PlayerManager: verify all players connected, take inventory,
   // then broadcast pm_game_ready (or cancel on failure).
   pm.startSession(s.session_id);
+};
+
+handlers.pm_sync_report = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const sessionId = (data && data.session_id) || conn.session_x_id;
+  if (!sessionId) return;
+  pm.recordSyncReport(sessionId, conn.user_id, data || {});
 };
 
 // In-play relay. Frame-rate messages — NOT logged. The seed log keeps
@@ -685,8 +734,45 @@ handlers.game_action = (ws, data) => {
 handlers.game_state = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
-  if (conn.session_x_id) pm.updateGoodState(conn.session_x_id, data);
-  relay('game_state', ws, data);
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return;
+  if (s.status !== 'playing') return;
+  // One authoritative instance per session: host publishes canonical state.
+  if (conn.user_id !== s.host_id) {
+    return send(ws, { type: 'error', message: 'Only host can publish authoritative game state' });
+  }
+  if (!s.authoritative || !s.authoritative.instance_id) {
+    s.authoritative = {
+      instance_id: crypto.randomUUID(),
+      rev: 0,
+      state: null,
+      updated_by: null,
+      updated_at: null,
+    };
+  }
+
+  s.authoritative.rev += 1;
+  s.authoritative.state = (data && Object.prototype.hasOwnProperty.call(data, 'state')) ? data.state : data;
+  s.authoritative.updated_by = conn.user_id;
+  s.authoritative.updated_at = Date.now();
+
+  const frame = {
+    type: 'game_state',
+    session_id: s.session_id,
+    game_uuid: s.game_uuid,
+    instance_id: s.authoritative.instance_id,
+    seq: s.authoritative.rev,
+    authoritative: true,
+    from: conn.user_id,
+    state: s.authoritative.state,
+    players: serializePlayers(s),
+    updated_at: s.authoritative.updated_at,
+  };
+
+  pm.updateGoodState(s.session_id, frame);
+  // Broadcast to the whole game room (including sender) so everyone sees
+  // the exact same canonical board snapshot.
+  broadcastSession(s, frame);
 };
 
 // game_action_ack: client confirms it received a turn broadcast.

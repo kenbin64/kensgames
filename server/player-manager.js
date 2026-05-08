@@ -32,6 +32,9 @@ const DEFAULTS = {
   connectMaxRetries: 3,     // cancel after this many failed attempts
   ackTimeout: 5000,  // ms for all humans to ack a turn broadcast
   healTimeout: 8000,  // ms to wait during heal before cancelling
+  syncProbeTimeout: 5000, // ms to wait for sync probe reports
+  syncProbeRetries: 2, // retries after initial sync probe attempt
+  monitorIntervalMs: 15000, // periodic probe while session is active
   autoDisableAfter: 3,     // consecutive cancel-per-game count before auto-disable
   recentWindowMs: 5 * 60 * 1000,  // window for "recent" cancel counting
   // Grace window after a ws close before replacing a human with a bot.
@@ -76,6 +79,9 @@ function makeManagedSession(session) {
     connectRetries: 0,
     lastGoodState: null,        // snapshot of last confirmed broadcast
     turnSeq: 0,           // monotonic counter
+    injectedPlayers: [],
+    syncProbe: null,
+    monitorTimer: null,
     pendingAcks: new Map(),   // seq → { envelope, required: Set<userId>, acked: Set<userId> }
     ackTimers: new Map(),   // seq → Timeout
     pendingDisconnects: new Map(), // userId → Timeout (grace before bot-replace)
@@ -119,6 +125,12 @@ class PlayerManager {
   startSession(sessionId) {
     const session = this._liveSessions.get(sessionId);
     if (!session) return;
+
+    const existing = this._managed.get(sessionId);
+    if (existing && existing.status !== 'cancelled' && existing.status !== 'disabled') {
+      writeLog({ level: 'warn', event: 'duplicate_start_blocked', sessionId, message: 'Session already managed; refusing second instance' });
+      return;
+    }
 
     if (this.isGameDisabled(session.game_id)) {
       const info = this._disabledGames.get(session.game_id);
@@ -275,6 +287,27 @@ class PlayerManager {
   }
 
   /**
+   * Record client-side sync report for a probe. Game Manager validates that
+   * every player is on the same session + instance + roster identity.
+   */
+  recordSyncReport(sessionId, userId, report) {
+    const ms = this._managed.get(sessionId);
+    if (!ms || !ms.syncProbe) return;
+    const current = ms.syncProbe;
+    if (report && report.probe_id && report.probe_id !== current.id) return;
+    current.reports.set(userId, {
+      session_id: report && report.session_id ? String(report.session_id) : null,
+      game_uuid: report && report.game_uuid ? String(report.game_uuid) : null,
+      instance_id: report && report.instance_id ? String(report.instance_id) : null,
+      username: report && report.username ? String(report.username) : null,
+      roster_sig: report && report.roster_sig ? String(report.roster_sig) : null,
+    });
+    if (current.reports.size >= ms.humanPlayers.length) {
+      this._finalizeSyncProbe(sessionId, current.id);
+    }
+  }
+
+  /**
    * Called on WebSocket close for a player who was in a managed session.
    * Schedules a delayed bot replacement; the timer is cancelled if the same
    * user_id reconnects (via guest_login resume → registerConnection) within
@@ -427,6 +460,8 @@ class PlayerManager {
       connected: ms.connectionMap.size,
       turnSeq: ms.turnSeq,
       pendingAcks: ms.pendingAcks.size,
+      syncProbeActive: !!ms.syncProbe,
+      syncReports: ms.syncProbe ? ms.syncProbe.reports.size : 0,
       errorLog: ms.errorLog.slice(-10),
     };
   }
@@ -474,6 +509,32 @@ class PlayerManager {
         return;
       }
 
+      // Single authoritative instance per session. Game Manager owns runtime setup.
+      if (!session.authoritative || !session.authoritative.instance_id) {
+        session.authoritative = {
+          instance_id: session.game_uuid || ('inst_' + Date.now().toString(36)),
+          rev: 0,
+          state: null,
+          updated_by: session.host_id,
+          updated_at: Date.now(),
+        };
+      }
+
+      // Inject every player (human + bot) into one shared game instance.
+      ms.injectedPlayers = ms.players.map((p, idx) => ({
+        user_id: p.user_id,
+        username: p.username,
+        avatar_id: p.avatar_id,
+        is_ai: !!p.is_ai,
+        is_host: !!p.is_host,
+        ready: !!p.ready,
+        slot: idx,
+        role: p.is_ai ? 'bot' : 'player',
+        instance_id: session.authoritative.instance_id,
+        session_id: session.session_id,
+      }));
+      session.players = ms.players;
+
       ms.status = 'active';
       writeLog({
         event: 'session_verified',
@@ -483,9 +544,45 @@ class PlayerManager {
       });
 
       this._broadcast(session, {
+        type: 'game_started',
+        session,
+        session_id: session.session_id,
+        game_uuid: ms.gameUuid,
+        instance_id: session.authoritative.instance_id,
+      });
+
+      this._broadcast(session, {
+        type: 'pm_players_injected',
+        session_id: session.session_id,
+        game_uuid: ms.gameUuid,
+        instance_id: session.authoritative.instance_id,
+        players: ms.injectedPlayers,
+        message: 'Players injected into one shared game instance.',
+      });
+
+      const initialState = {
+        type: 'game_state',
+        session_id: session.session_id,
+        game_uuid: ms.gameUuid,
+        instance_id: session.authoritative.instance_id,
+        seq: session.authoritative.rev,
+        authoritative: true,
+        from: session.host_id,
+        state: session.authoritative.state,
+        players: ms.injectedPlayers,
+        updated_at: session.authoritative.updated_at,
+      };
+      ms.lastGoodState = initialState;
+      this._broadcast(session, initialState);
+
+      this._requestSyncProbe(sessionId, 'launch');
+      this._startSyncMonitoring(sessionId);
+
+      this._broadcast(session, {
         type: 'pm_game_ready',
         session_id: sessionId,
         game_uuid: ms.gameUuid,
+        instance_id: session.authoritative.instance_id,
         players: ms.players,
         human_count: ms.humanPlayers.length,
         bot_count: ms.bots.length,
@@ -717,6 +814,156 @@ class PlayerManager {
     }
   }
 
+  _expectedRosterSig(ms) {
+    return ms.players
+      .slice()
+      .sort((a, b) => (a.slot || 0) - (b.slot || 0))
+      .map((p) => `${p.slot}:${String(p.username || '').trim().toLowerCase()}`)
+      .join('|');
+  }
+
+  _requestSyncProbe(sessionId, reason) {
+    const ms = this._managed.get(sessionId);
+    const session = this._liveSessions.get(sessionId);
+    if (!ms || !session || ms.status === 'cancelled' || ms.status === 'disabled') return;
+    if (ms.syncProbe) return;
+
+    const expectedRosterSig = this._expectedRosterSig(ms);
+    const probe = {
+      id: `probe_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 6)}`,
+      attempt: 0,
+      reason: reason || 'monitor',
+      expectedRosterSig,
+      reports: new Map(),
+      timer: null,
+    };
+    ms.syncProbe = probe;
+
+    this._broadcast(session, {
+      type: 'pm_sync_probe',
+      probe_id: probe.id,
+      session_id: session.session_id,
+      game_uuid: ms.gameUuid,
+      instance_id: session.authoritative && session.authoritative.instance_id,
+      expected_roster_sig: expectedRosterSig,
+      expected_players: ms.players.map((p) => ({ user_id: p.user_id, username: p.username, slot: p.slot })),
+      message: 'Game Manager sync probe: confirm this client is on the single shared game instance.',
+    });
+
+    probe.timer = setTimeout(() => this._finalizeSyncProbe(sessionId, probe.id), this._cfg.syncProbeTimeout);
+    if (probe.timer && probe.timer.unref) probe.timer.unref();
+  }
+
+  _retrySyncProbe(sessionId, lastProbe, reason) {
+    const ms = this._managed.get(sessionId);
+    const session = this._liveSessions.get(sessionId);
+    if (!ms || !session) return;
+    const nextAttempt = (lastProbe && Number(lastProbe.attempt || 0) + 1) || 1;
+    const maxRetries = Math.max(0, Number(this._cfg.syncProbeRetries) || 0);
+    if (nextAttempt > maxRetries) {
+      this._cancelAndBroadcast(sessionId, `Game Manager sync validation failed: ${reason}`);
+      return;
+    }
+
+    const expectedRosterSig = this._expectedRosterSig(ms);
+    const probe = {
+      id: `probe_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 6)}`,
+      attempt: nextAttempt,
+      reason: 'retry',
+      expectedRosterSig,
+      reports: new Map(),
+      timer: null,
+    };
+    ms.syncProbe = probe;
+
+    writeLog({ level: 'warn', event: 'sync_probe_retry', sessionId, message: `retry=${nextAttempt} reason=${reason}` });
+
+    this._broadcast(session, {
+      type: 'pm_sync_probe',
+      probe_id: probe.id,
+      session_id: session.session_id,
+      game_uuid: ms.gameUuid,
+      instance_id: session.authoritative && session.authoritative.instance_id,
+      expected_roster_sig: expectedRosterSig,
+      expected_players: ms.players.map((p) => ({ user_id: p.user_id, username: p.username, slot: p.slot })),
+      retry: nextAttempt,
+      message: 'Game Manager retrying sync validation for single-instance enforcement.',
+    });
+
+    probe.timer = setTimeout(() => this._finalizeSyncProbe(sessionId, probe.id), this._cfg.syncProbeTimeout);
+    if (probe.timer && probe.timer.unref) probe.timer.unref();
+  }
+
+  _finalizeSyncProbe(sessionId, probeId) {
+    const ms = this._managed.get(sessionId);
+    const session = this._liveSessions.get(sessionId);
+    if (!ms || !session || !ms.syncProbe) return;
+    const probe = ms.syncProbe;
+    if (probe.id !== probeId) return;
+    if (probe.timer) clearTimeout(probe.timer);
+
+    const expectedPlayers = new Map(ms.humanPlayers.map((p) => [p.user_id, p]));
+    const expectedRosterSig = probe.expectedRosterSig;
+    const expectedInstanceId = session.authoritative && session.authoritative.instance_id;
+    const failures = [];
+
+    for (const [userId, p] of expectedPlayers) {
+      const r = probe.reports.get(userId);
+      if (!r) {
+        failures.push(`missing:${userId}`);
+        continue;
+      }
+      if (r.session_id !== sessionId) failures.push(`session:${userId}`);
+      if (ms.gameUuid && r.game_uuid !== String(ms.gameUuid)) failures.push(`game_uuid:${userId}`);
+      if (expectedInstanceId && r.instance_id !== String(expectedInstanceId)) failures.push(`instance:${userId}`);
+      if (String(r.username || '').trim() !== String(p.username || '').trim()) failures.push(`name:${userId}`);
+      if (r.roster_sig !== expectedRosterSig) failures.push(`roster:${userId}`);
+    }
+
+    ms.syncProbe = null;
+
+    if (failures.length > 0) {
+      this._retrySyncProbe(sessionId, probe, failures.join(','));
+      return;
+    }
+
+    this._broadcast(session, {
+      type: 'pm_sync_ok',
+      session_id: sessionId,
+      game_uuid: ms.gameUuid,
+      instance_id: expectedInstanceId,
+      roster_sig: expectedRosterSig,
+      message: 'Game Manager validated single shared instance and synchronized roster.',
+    });
+  }
+
+  _startSyncMonitoring(sessionId) {
+    const ms = this._managed.get(sessionId);
+    if (!ms || ms.monitorTimer) return;
+    const intervalMs = Math.max(2000, Number(this._cfg.monitorIntervalMs) || 15000);
+    const timer = setInterval(() => {
+      const cur = this._managed.get(sessionId);
+      if (!cur) return;
+      if (cur.status !== 'active') return;
+      if (cur.syncProbe) return;
+      this._requestSyncProbe(sessionId, 'monitor');
+    }, intervalMs);
+    if (timer.unref) timer.unref();
+    ms.monitorTimer = timer;
+  }
+
+  _stopSyncMonitoring(ms) {
+    if (!ms) return;
+    if (ms.monitorTimer) {
+      clearInterval(ms.monitorTimer);
+      ms.monitorTimer = null;
+    }
+    if (ms.syncProbe && ms.syncProbe.timer) {
+      clearTimeout(ms.syncProbe.timer);
+    }
+    ms.syncProbe = null;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Private: cancel / disable
   // ═══════════════════════════════════════════════════════════════════════════
@@ -730,6 +977,7 @@ class PlayerManager {
     if (ms) {
       ms.status = 'cancelled';
       ms.cancelledAt = Date.now();
+      this._stopSyncMonitoring(ms);
       for (const t of ms.ackTimers.values()) clearTimeout(t);
       ms.ackTimers.clear();
       ms.pendingAcks.clear();

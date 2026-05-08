@@ -290,6 +290,16 @@ class KGMultiplayer {
     });
   }
 
+  _currentRosterSig() {
+    const s = this.session;
+    if (!s || !Array.isArray(s.players)) return '';
+    return s.players
+      .slice()
+      .sort((a, b) => (a.slot || 0) - (b.slot || 0))
+      .map((p) => `${p.slot}:${String(p.username || '').trim().toLowerCase()}`)
+      .join('|');
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // ROOM / SESSION MANAGEMENT
   // ═══════════════════════════════════════════════════════════════════════
@@ -540,6 +550,27 @@ class KGMultiplayer {
       case 'pm_resync':
         this._showReconnectOverlay('Resyncing game state...');
         this._emit('pm_resync', data);
+        break;
+
+      case 'pm_sync_probe': {
+        const activeSessionId = (this.session && this.session.session_id) || null;
+        const sessionId = activeSessionId || data.session_id || null;
+        const gameUuid = this.gameUuid || (this.session && this.session.game_uuid) || data.game_uuid || null;
+        this._send({
+          type: 'pm_sync_report',
+          probe_id: data.probe_id,
+          session_id: sessionId,
+          game_uuid: gameUuid,
+          instance_id: data.instance_id || null,
+          username: this.username || null,
+          roster_sig: this._currentRosterSig(),
+        });
+        this._emit('pm_sync_probe', data);
+        break;
+      }
+
+      case 'pm_sync_ok':
+        this._emit('pm_sync_ok', data);
         break;
 
       case 'pm_heal_ok':
