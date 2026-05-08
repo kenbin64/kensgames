@@ -49,31 +49,49 @@ class KGMultiplayer {
   // ═══════════════════════════════════════════════════════════════════════
   // CONNECTION
   // ═══════════════════════════════════════════════════════════════════════
-  wsUrl() {
+  _ioBaseUrl() {
     const h = location.hostname;
-    if (h === 'localhost' || h === '127.0.0.1') return 'ws://' + h + ':8765';
-    return 'wss://' + h + '/ws';
+    if (h === 'localhost' || h === '127.0.0.1') return 'http://' + h + ':8765';
+    return location.protocol + '//' + location.host;
   }
 
   connect(auth) {
-    if (this.ws && this.ws.readyState <= 1) return;
+    if (this.ws && (this.ws.connected || this.ws.active)) return;
     this._manualDisconnect = false;
     this.username = (auth && auth.username) || localStorage.getItem('display_name') || localStorage.getItem('username') || 'Player';
 
     const freshGuestIdentity = !!(auth && auth.freshGuestIdentity);
 
+    // Prefer the same site auth token used by lobby flows so identity remains
+    // stable when the game page reconnects and can rejoin its live room.
+    let siteToken = null;
+    try { siteToken = localStorage.getItem('user_token'); } catch { /* ignore */ }
+
     // Stable per-browser guest id, persisted in localStorage so the same browser
     // keeps the same identity across reloads/games (no accounts).
     let guestId = null;
-    if (!freshGuestIdentity) {
-      try { guestId = localStorage.getItem('kg_guest_id'); } catch { /* ignore */ }
+    // Explicit token override — used when the game page reconnects after a page
+    // navigation (e.g. lobby → game). Bypasses both localStorage and fresh-generate.
+    if (auth && auth.guestToken) {
+      guestId = String(auth.guestToken);
+    } else if (siteToken) {
+      guestId = String(siteToken);
+    } else if (!freshGuestIdentity) {
+      try {
+        guestId = localStorage.getItem('kg_guest_token') || localStorage.getItem('kg_guest_id');
+      } catch { /* ignore */ }
     }
     if (!guestId) {
       guestId = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       if (!freshGuestIdentity) {
-        try { localStorage.setItem('kg_guest_id', guestId); } catch { /* ignore */ }
+        try {
+          localStorage.setItem('kg_guest_token', guestId);
+          localStorage.setItem('kg_guest_id', guestId);
+        } catch { /* ignore */ }
       }
     }
+    // Expose the active token so callers can persist it for cross-page handoff.
+    this._guestId = guestId;
 
     let avatarId = (auth && (auth.avatar_id || auth.avatarId)) || null;
     if (!avatarId) {
@@ -87,54 +105,93 @@ class KGMultiplayer {
       avatarId = 'person_smile';
     }
 
-    const ws = new WebSocket(this.wsUrl());
-    this.ws = ws;
-
-    ws.onopen = () => {
-      if (this.ws !== ws) return;
-      this.connected = true;
-      this._hadSuccessfulConnect = true;
-      this._hideReconnectOverlay();
-      this._send({
-        type: 'guest_login',
-        token: guestId,
-        username: this.username,
-        guest_name: this.username,
-        name: this.username,
-        avatar_id: avatarId,
+    const attachSocket = () => {
+      const socket = io(this._ioBaseUrl(), {
+        path: '/ws',
+        transports: ['websocket', 'polling'],
+        reconnection: false, // KGMultiplayer handles its own reconnect logic
       });
-      this._emit('connected');
+      this.ws = socket;
+
+      socket.on('connect', () => {
+        this.connected = true;
+        this._hadSuccessfulConnect = true;
+        this._hideReconnectOverlay();
+        this._send({
+          type: 'guest_login',
+          token: guestId,
+          username: this.username,
+          guest_name: this.username,
+          name: this.username,
+          avatar_id: avatarId,
+        });
+        this._emit('connected');
+      });
+
+      socket.on('message', (data) => {
+        if (this.connected) this._hideReconnectOverlay();
+        this._handleMessage(data);
+      });
+
+      socket.on('disconnect', () => {
+        this.connected = false;
+        this.gameStarted = false;
+        if (!this._manualDisconnect && this._hadSuccessfulConnect && this._needsLiveConnection()) {
+          this._showReconnectOverlay('Connection lost. Reconnecting...');
+        }
+        this._emit('disconnected');
+        // Auto-reconnect only when we still need the live socket (remote humans present).
+        if (this.session && this._needsLiveConnection()) {
+          this._reconnectTimer = setTimeout(() => this.connect(auth), 3000);
+        }
+      });
+
+      socket.on('connect_error', () => {
+        console.error('[KGMultiplayer] Socket.IO connection error');
+        if ((this._hadSuccessfulConnect || this.connected) && this._needsLiveConnection()) {
+          this._showReconnectOverlay('Connection unstable. Reconnecting...');
+        }
+      });
     };
 
-    ws.onmessage = (event) => {
-      if (this.ws !== ws) return;
-      if (this.connected) this._hideReconnectOverlay();
-      let data;
-      try { data = JSON.parse(event.data); } catch { return; }
-      this._handleMessage(data);
-    };
+    if (typeof io === 'undefined') {
+      this._loadSocketIoClient()
+        .then(() => attachSocket())
+        .catch((err) => {
+          console.error('[KGMultiplayer] Failed to load Socket.IO client', err);
+          this._emit('error', 'Failed to load realtime client');
+          this._emit('disconnected');
+        });
+      return;
+    }
 
-    ws.onclose = () => {
-      if (this.ws !== ws) return;
-      this.connected = false;
-      this.gameStarted = false;
-      if (!this._manualDisconnect && this._hadSuccessfulConnect && this._needsLiveConnection()) {
-        this._showReconnectOverlay('Connection lost. Reconnecting...');
-      }
-      this._emit('disconnected');
-      // Auto-reconnect only when we still need the live socket (remote humans present).
-      if (this.session && this._needsLiveConnection()) {
-        this._reconnectTimer = setTimeout(() => this.connect(auth), 3000);
-      }
-    };
+    attachSocket();
+  }
 
-    ws.onerror = () => {
-      if (this.ws !== ws) return;
-      console.error('[KGMultiplayer] WebSocket error');
-      if ((this._hadSuccessfulConnect || this.connected) && this._needsLiveConnection()) {
-        this._showReconnectOverlay('Connection unstable. Reconnecting...');
+  _loadSocketIoClient() {
+    if (typeof io !== 'undefined') return Promise.resolve();
+    if (KGMultiplayer._socketIoLoader) return KGMultiplayer._socketIoLoader;
+
+    KGMultiplayer._socketIoLoader = new Promise((resolve, reject) => {
+      if (typeof document === 'undefined') {
+        reject(new Error('Socket.IO client missing and no DOM available to load it'));
+        return;
       }
-    };
+      const existing = document.querySelector('script[data-kg-socket-io="1"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Socket.IO script failed to load')), { once: true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = '/js/socket.io.min.js';
+      script.async = true;
+      script.dataset.kgSocketIo = '1';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Socket.IO script failed to load'));
+      document.head.appendChild(script);
+    });
+    return KGMultiplayer._socketIoLoader;
   }
 
   // True only when the active session contains at least one remote human peer.
@@ -158,7 +215,7 @@ class KGMultiplayer {
     this.gameStarted = false;
     this.remotePlayers.clear();
     this._manualDisconnect = true;
-    if (this.ws) { this.ws.close(); this.ws = null; }
+    if (this.ws) { this.ws.disconnect(); this.ws = null; }
     this._hideReconnectOverlay();
     this.connected = false;
   }
@@ -183,8 +240,8 @@ class KGMultiplayer {
   }
 
   _send(data) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
+    if (this.ws && this.ws.connected) {
+      this.ws.emit('message', data);
     }
   }
 

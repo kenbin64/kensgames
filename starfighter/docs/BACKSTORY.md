@@ -184,18 +184,32 @@ habitats running indefinitely on Zorgon power and Zorgon labour, with the
 21,000 humans aboard reduced to maintenance staff for the only catalyst
 factory in the galaxy.
 
-If the Resolute falls and the players cannot recover Aurora Prime in time,
-the Hive-Moon does exactly that. The wheel is taken. The campaign does not
-end — it transforms. The fighter wing must fly *into* the Hive-Moon's
-gyroid passages, locate Aurora inside the labyrinth, recover a sample of
-the queen's catalyst-bearing honeycomb, and return it to surviving Aurora
-scientists who can synthesise a **gyroid solvent** — an isotope-tagged
-catalyst that dissolves the Schwarz Diamond walls a little at a time,
-opening passages large enough to reach the queen's throne room.
+In Sortie 5 the Dreadnought closes on the home carrier. The carrier has
+laser cannons, but she cannot manoeuvre — she is not stealthy. The fighters
+must close in and hit the Dreadnought hard. Whatever happens, the Dreadnought
+makes one final decision: it fires every tactical nuclear warhead aboard in a
+full last-ditch barrage aimed at the Resolute. The Resolute's captain sees it
+coming and gives the only order that makes sense — every tactical nuke aboard
+the Resolute, all at once, return fire. Both barrages meet in the void between
+them. Blinding. Catastrophic. When the light clears, both ships are gone.
+They destroyed each other.
 
-The hive is self-healing. Every passage the solvent opens begins resealing
-within minutes. It is a race against time and against waves of sentinels
-guarding the inner chambers.
+In the silence that follows, the alien honeycomb hive base moves in through
+the debris field. It opens like a vast organic maw and engulfs the human space
+wheel station, drawing it inside the labyrinth within. The wheel station
+disappears. Swallowed whole.
+
+The fighter wing is alone in the void, with no carrier, no home, and no way
+out except through the hive itself. The campaign does not end — it transforms.
+Fighters must fly *into* the hive, thread the Schwarz Diamond lattice,
+locate the wheel station on radar, and reach the surviving scientists aboard
+who have spent every remaining hour synthesising an antidote — a compound that
+lets Earth bees thrive in a Zorgon atmosphere. The Zorgons can go home. They
+never needed to take Earth. That message must reach the queen.
+
+A **solvent weapon** opens passages in the self-healing honeycomb walls — but
+they reseal within minutes. Every chamber opened is a race against time and
+against waves of sentinels guarding the inner passages.
 
 ### The Queen
 
@@ -391,15 +405,15 @@ unlocked weapon or ability before risking it in combat.
 
 | # | Name | Objective | Key Unlock |
 |---|------|-----------|------------|
-| 1 | First Light (Training) | Movement, gunnery, torpedo lock — invulnerable; ends when fuel runs out | Baseline Mk-IV loadout |
-| 2 | Picket Line | Hold the patrol perimeter; intercept the first real drone wing | Spread laser |
-| 3 | Capital Strike | Kill the first Zorgon dreadnought before it reaches Aurora Prime | Proton torpedo upgrade |
-| 4 | Carrier Defence | Keep the Resolute alive through a coordinated assault | Afterburner II |
-| 5 | The Long Watch | The Hive-Moon edges closer; bombers and predators in waves | Shield booster |
-| 6 | Last Stand | Resolute is lost; Aurora Prime is engulfed by the Hive-Moon | Hardpoint mount |
-| 7a | Into the Hive | Enter the Schwarz Diamond gyroid; locate Aurora inside the labyrinth | Lattice navigator |
-| 7b | The Honeycomb | Locate and recover the catalyst-bearing honeycomb specimen | Solvent torpedo |
-| 7c | The Throne Room | Defeat the sentinels, incapacitate the queen, deliver the message | Peace treaty (campaign end) |
+| Training | First Light | Movement, laser gunnery, torpedo lock — invulnerable; ends when fuel runs out | Laser cannon baseline |
+| 1 | First Combat | Laser only — intercept the first Zorgon drone wing | Guided missiles |
+| 2 | Full Throttle | Perimeter defense; master quick thrust and reverse thrust (mouse wheel) | Quick thrust / reverse thrust |
+| 3 | Asteroid Run | Clear the asteroid field to protect the armada; dodge enemy fighters using the debris for cover | Power Shield; Power Pulse |
+| 4 | Mercy Flight | Defend Rescue Shuttles and Medical Frigates from bomber assault | EMP Pulse; Extra Armor |
+| 5 | Dreadnought | Destroy the Dreadnought before it destroys the home carrier | — |
+| **CUTSCENE** | **Mutual Destruction** | *Dreadnought and Resolute fire full tactical nuke barrages — both destroyed. Hive devours the wheel station.* | — |
+| 6 | Into the Labyrinth | Navigate the Schwarz Diamond lattice inside the hive; find the wheel station on radar | Lattice Navigator; Solvent Weapon |
+| 7 | The Throne Room | Open the queen's chamber, fight her guards, incapacitate her, deliver the antidote | Peace treaty (campaign end) |
 
 ### Sortie Rules
 

@@ -2092,10 +2092,11 @@
     <div id="game-log"></div>
   </div>
 
-  <!-- Self-hosted Three.js + OrbitControls -->
+  <!-- Self-hosted Three.js + OrbitControls + BufferGeometryUtils -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="/js/multiplayer-client.js?v=20260501"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
 
   <!-- 🜂 MANIFOLD ENGINE — z = x · y sacred primitive + Schwarz Diamond geometry -->
   <script src="../../js/manifold.js?v=7"></script>
@@ -2109,7 +2110,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260502a"></script>
+  <script src="fasttrack-game-core.js?v=20260506a"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
@@ -2121,7 +2122,7 @@
   <script src="schwarz_diamond_renderer.js?v=20260501"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260501i"></script>
+  <script src="fasttrack-3d.js?v=20260507a"></script>
 
   <script>
     const EMOJI_REACTIONS = [

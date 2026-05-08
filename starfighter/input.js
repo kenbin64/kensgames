@@ -1,6 +1,6 @@
 /**
  * Starfighter Input
- * Mouse (Virtual Joystick), Keyboard, Gamepad API
+ * Mouse (primary) · Gamepad / Joystick · WebXR · Touch (mobile) · Keyboard (backup)
  */
 
 const SFInput = (function () {
@@ -8,7 +8,9 @@ const SFInput = (function () {
     const keys = {};
     let launchTriggered = false;
     let spacebarJustPressed = false;
-    let lastInputDevice = 'keyboard'; // auto-detect: 'keyboard', 'gamepad', 'touch'
+    // Default to 'mouse' on desktop; keyboard is a backup hint only.
+    // Switches to 'gamepad'/'touch'/'xr' as soon as those substrates report activity.
+    let lastInputDevice = 'mouse';
     let mouseLookActive = false;
 
     // ── Mobile / Touch state ──
@@ -141,16 +143,24 @@ const SFInput = (function () {
             }
         });
 
-        // Scroll wheel — throttle control in-game; activate focused button on overlays
+        // Scroll wheel — Quick Thrust / Reverse Thrust (in-game) or overlay activation
+        // deltaY > 0 = wheel down = decelerate/reverse
+        // deltaY < 0 = wheel up   = accelerate/thrust forward
+        // Shift+wheel = fine step (0.02), plain wheel = normal step (0.08)
         document.addEventListener('wheel', e => {
             if (!player) return;
             if (document.pointerLockElement === document.body) {
                 e.preventDefault();
-                const step = e.deltaY > 0 ? -0.08 : 0.08;
-                player.throttle = Math.min(1, Math.max(-1, player.throttle + step));
+                const step = e.shiftKey ? 0.02 : 0.08;
+                const delta = e.deltaY > 0 ? -step : step;
+                player.throttle = Math.min(1, Math.max(-1, player.throttle + delta));
                 lastInputDevice = 'mouse';
+                // Notify HUD speed indicator of thrust direction change
+                _lastWheelDir = delta > 0 ? 1 : -1;
+                clearTimeout(_wheelDirTimer);
+                _wheelDirTimer = setTimeout(() => { _lastWheelDir = 0; }, 600);
             } else {
-                // Not in pointer lock — an overlay is showing; scroll wheel activates focused button
+                // Overlay visible — scroll wheel activates focused button
                 const focused = document.activeElement;
                 if (focused && (focused.tagName === 'BUTTON' || focused.tagName === 'SELECT')) {
                     e.preventDefault();
@@ -190,7 +200,14 @@ const SFInput = (function () {
         });
 
         // ── Mobile detection & setup ──
-        isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024);
+        // Coarse-pointer / no-hover devices are mobile regardless of screen width
+        // (covers landscape iPads, foldables, large Android phones, Chrome OS touch).
+        const ua = navigator.userAgent || '';
+        const coarse = (typeof window.matchMedia === 'function')
+            && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+        const uaTouch = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua);
+        const multiTouch = ('ontouchstart' in window) && (navigator.maxTouchPoints || 0) > 1;
+        isMobile = uaTouch || coarse || multiTouch;
         if (isMobile) {
             lastInputDevice = 'touch';
             _initMobileControls();
@@ -253,6 +270,11 @@ const SFInput = (function () {
 
         // Sync touch HUD visibility with current game phase as soon as controls mount.
         setMobilePhase(mobilePhase);
+
+        // First-touch overlay: provides the iOS user-gesture needed for
+        // DeviceOrientationEvent.requestPermission() and DeviceMotionEvent.requestPermission().
+        // Also visible on Android to confirm the touch substrate is alive pre-combat.
+        _ensureMotionPromptOverlay();
     }
 
     function setMobilePhase(phase) {
@@ -402,6 +424,111 @@ const SFInput = (function () {
             return false;
         }
     }
+
+    // ── DeviceMotionEvent (acceleration / shake) ─────────────────────────
+    // Wired separately from deviceorientation because iOS gates each behind
+    // its own requestPermission() call. Shake = countermeasure (or boost as
+    // fallback if no countermeasure substrate exists on the game module).
+    let _motionEnabled = false;
+    let _accelMag = 0;
+    let _accelMagPrev = 0;
+    let _lastShakeMs = 0;
+    const SHAKE_THRESHOLD = 22;       // m/s² delta — sharp wrist-flick territory
+    const SHAKE_COOLDOWN_MS = 600;    // anti-double-fire window
+
+    async function _requestMotionPermission() {
+        try {
+            if (typeof DeviceMotionEvent === 'undefined') return false;
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                const perm = await DeviceMotionEvent.requestPermission();
+                if (perm !== 'granted') return false;
+            }
+            window.addEventListener('devicemotion', _onDeviceMotion, true);
+            _motionEnabled = true;
+            return true;
+        } catch (err) {
+            console.warn('[SFInput] DeviceMotion unavailable', err);
+            return false;
+        }
+    }
+
+    function _onDeviceMotion(ev) {
+        const a = ev.accelerationIncludingGravity || ev.acceleration;
+        if (!a) return;
+        const m = Math.sqrt((a.x || 0) * (a.x || 0) + (a.y || 0) * (a.y || 0) + (a.z || 0) * (a.z || 0));
+        _accelMagPrev = _accelMag;
+        _accelMag = m;
+        const delta = Math.abs(m - _accelMagPrev);
+        const now = performance.now();
+        if (delta > SHAKE_THRESHOLD && (now - _lastShakeMs) > SHAKE_COOLDOWN_MS && mobilePhase === 'combat') {
+            _lastShakeMs = now;
+            lastInputDevice = 'touch';
+            const SF = window.Starfighter;
+            if (SF && typeof SF.deployCountermeasure === 'function') SF.deployCountermeasure();
+            else if (SF && typeof SF.fireTorpedo === 'function') SF.fireTorpedo();
+            else if (player && typeof player.activateBoost === 'function') player.activateBoost();
+        }
+    }
+
+    // ── First-touch motion-controls overlay ──────────────────────────────
+    // Exists so iOS can grant orientation/motion permission from a real user
+    // gesture (a button press inside the overlay), and so Android users see
+    // proof that the touch substrate is alive before they reach combat.
+    function _ensureMotionPromptOverlay() {
+        if (typeof document === 'undefined') return;
+        if (document.getElementById('mob-motion-prompt')) return;
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('sf_motion_prompted') === '1') return;
+        } catch (_) { /* private mode */ }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'mob-motion-prompt';
+        overlay.style.cssText = [
+            'position:fixed', 'inset:0', 'z-index:1000',
+            'background:radial-gradient(ellipse at center, rgba(8,18,30,0.96), rgba(2,4,8,0.98))',
+            'display:flex', 'align-items:center', 'justify-content:center',
+            'font:600 15px/1.4 system-ui,sans-serif', 'color:#cdfff0',
+            'padding:24px', 'box-sizing:border-box', '-webkit-tap-highlight-color:transparent'
+        ].join(';');
+        overlay.innerHTML = ''
+            + '<div style="max-width:420px;text-align:center;border:1px solid rgba(90,245,220,0.55);'
+            + 'border-radius:14px;padding:24px 22px;background:rgba(8,16,28,0.85);'
+            + 'box-shadow:0 0 60px rgba(90,245,220,0.18) inset">'
+            + '<div style="font:800 18px/1.2 system-ui,sans-serif;color:#a6fff0;letter-spacing:.05em;margin-bottom:10px">MOTION CONTROLS</div>'
+            + '<div style="margin:0 0 16px 0;color:#9fd6cf">Tilt to fly · Tap to fire · Shake for countermeasure</div>'
+            + '<button id="mob-motion-enable" style="display:block;width:100%;margin:0 0 10px 0;padding:14px 18px;'
+            + 'border:1px solid rgba(132,255,210,0.85);border-radius:10px;background:rgba(20,80,70,0.55);'
+            + 'color:#ccffe8;font:700 15px system-ui,sans-serif;letter-spacing:.04em">Enable Motion</button>'
+            + '<button id="mob-motion-skip" style="display:block;width:100%;padding:12px 18px;'
+            + 'border:1px solid rgba(90,245,220,0.35);border-radius:10px;background:transparent;'
+            + 'color:#7fbfb5;font:600 13px system-ui,sans-serif;letter-spacing:.04em">Touch Only</button>'
+            + '</div>';
+        document.body.appendChild(overlay);
+
+        const _persist = () => { try { localStorage.setItem('sf_motion_prompted', '1'); } catch (_) { } };
+        const _close = () => { _persist(); if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+        const _enable = async (e) => {
+            if (e) e.preventDefault();
+            // Order matters on iOS: orientation first, then motion. Both are
+            // user-gesture-gated and called from within this touch handler.
+            await _toggleGyro();
+            await _requestMotionPermission();
+            _syncGyroButtonVisual();
+            _close();
+        };
+        const enableBtn = document.getElementById('mob-motion-enable');
+        const skipBtn = document.getElementById('mob-motion-skip');
+        if (enableBtn) {
+            enableBtn.addEventListener('touchstart', _enable, { passive: false });
+            enableBtn.addEventListener('click', _enable);
+        }
+        if (skipBtn) {
+            skipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); _close(); }, { passive: false });
+            skipBtn.addEventListener('click', _close);
+        }
+    }
+
+
 
     function _isGameplayTouchTarget(target) {
         if (!target || !target.closest) return true;
@@ -889,23 +1016,29 @@ const SFInput = (function () {
             e['live-fa'].style.color = fa ? '#0ff' : '#f80';
         }
 
-        // Device auto-detection
+        // Device auto-detection — primary hint shown in priority order:
+        //   touch (mobile) → xr → gamepad/joystick → mouse → keyboard (backup)
         const devEl = e['detected-device'];
         if (devEl) {
+            const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const pad = pads[0];
             if (lastInputDevice === 'touch') {
-                devEl.textContent = 'TOUCH + GYRO';
+                devEl.textContent = _motionEnabled || gyroEnabled ? 'TOUCH + MOTION' : 'TOUCH';
                 devEl.style.color = '#0f8';
+            } else if (lastInputDevice === 'xr' || _xrSession) {
+                devEl.textContent = 'VR / WEBXR';
+                devEl.style.color = '#a8f';
+            } else if (lastInputDevice === 'gamepad' && pad) {
+                const name = pad.id.length > 30 ? pad.id.substring(0, 30) + '…' : pad.id;
+                const looksJoystick = /joystick|stick|t\.16|hotas|throttle/i.test(pad.id || '');
+                devEl.textContent = (looksJoystick ? 'JOYSTICK: ' : 'GAMEPAD: ') + name;
+                devEl.style.color = '#f80';
+            } else if (lastInputDevice === 'keyboard') {
+                devEl.textContent = 'KEYBOARD (backup) · MOUSE';
+                devEl.style.color = '#5cf';
             } else {
-                const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-                const pad = pads[0];
-                if (lastInputDevice === 'gamepad' && pad) {
-                    const name = pad.id.length > 30 ? pad.id.substring(0, 30) + '…' : pad.id;
-                    devEl.textContent = 'GAMEPAD: ' + name;
-                    devEl.style.color = '#f80';
-                } else {
-                    devEl.textContent = 'KEYBOARD + MOUSE';
-                    devEl.style.color = '#0ff';
-                }
+                devEl.textContent = 'MOUSE · keyboard backup';
+                devEl.style.color = '#0ff';
             }
         }
     }
@@ -966,7 +1099,144 @@ const SFInput = (function () {
         if (window.Starfighter && Starfighter.setPaused) Starfighter.setPaused(false);
     }
 
-    return { init, update, getLaunchTriggered, checkLaunch, isKeyDown, updateLivePanel, togglePanel, enterImmersive, setMobilePhase, isMobile: () => isMobile };
+    // ── Wheel thrust direction — read by hud.js speed indicator ──────────
+    let _lastWheelDir = 0;
+    let _wheelDirTimer = null;
+    function getWheelDir() { return _lastWheelDir; }
+
+    // ── Joystick / HOTAS axis mapping ────────────────────────────────────
+    // Standard HOTAS layout (Thrustmaster, CH, Logitech X52, etc.):
+    //   axes[0] = stick X (roll/yaw)  axes[1] = stick Y (pitch)
+    //   axes[2] = twist / rudder      axes[3] = hat X or secondary
+    //   axes[4] = throttle slider     axes[5] = hat Y
+    // Detected when pad.axes.length >= 6 (SFHud shows '🕹 JOYSTICK').
+    function _applyJoystickAxes(pad, dt) {
+        if (!pad || pad.axes.length < 6) return;
+        const dead = 0.05;
+        const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+        const dz = v => Math.abs(v) < dead ? 0 : v;
+
+        // Stick pitch / yaw
+        const jx = dz(pad.axes[0] || 0);
+        const jy = dz(pad.axes[1] || 0);
+        if (jx !== 0) player.yaw = clamp((player.yaw || 0) + jx * dt * 3.0, -3, 3);
+        if (jy !== 0) player.pitch = clamp((player.pitch || 0) + jy * dt * 3.0, -3, 3);
+
+        // Twist / rudder → roll
+        const twist = dz(pad.axes[2] || 0);
+        if (twist !== 0) player.roll = clamp((player.roll || 0) + twist * dt * 2.0, -3, 3);
+
+        // Throttle slider (axis 4 on HOTAS) — axis value is -1 (full back) to +1 (full fwd)
+        const thr = pad.axes[4];
+        if (thr !== undefined) {
+            // Map from [-1,+1] (hardware) → [0,1] (game throttle)
+            const mapped = ((-thr) + 1) / 2;   // full-back = 0, full-fwd = 1
+            player.throttle = clamp(mapped, -1, 1);
+        }
+    }
+
+    // ── WebXR / VR controller input ──────────────────────────────────────
+    // Called every frame when an XR session is active.
+    // XR controller mappings (Oculus/Meta Quest, Index, etc.):
+    //   Primary (right) hand:  buttons[0]=trigger, [1]=squeeze, [4]=A, [5]=B
+    //   Secondary (left) hand: buttons[0]=trigger, [1]=squeeze, [4]=X, [5]=Y
+    //   axes[2] = thumbstick X,  axes[3] = thumbstick Y
+    let _xrSession = null;
+    let _xrRefSpace = null;
+
+    function _applyXRControllers() {
+        if (!_xrSession) return;
+        const inputSources = _xrSession.inputSources;
+        if (!inputSources) return;
+
+        for (const src of inputSources) {
+            const gp = src.gamepad;
+            if (!gp) continue;
+            const hand = src.handedness; // 'right' | 'left'
+
+            const trigger = gp.buttons[0] ? gp.buttons[0].value : 0;
+            const squeeze = gp.buttons[1] ? gp.buttons[1].pressed : false;
+            const btnA = gp.buttons[4] ? gp.buttons[4].pressed : false;  // A / X
+            const btnB = gp.buttons[5] ? gp.buttons[5].pressed : false;  // B / Y
+            const stickX = gp.axes[2] || 0;
+            const stickY = gp.axes[3] || 0;
+
+            if (hand === 'right') {
+                // Right trigger → fire laser (hold)
+                if (trigger > 0.5 && window.Starfighter) window.Starfighter.firePrimary();
+                // Right squeeze → lock on
+                if (squeeze && !this._xrRSqueeze && window.Starfighter) window.Starfighter.tryLockOnTarget();
+                this._xrRSqueeze = squeeze;
+                // A → fire torpedo
+                if (btnA && !this._xrA && window.Starfighter) window.Starfighter.fireTorpedo();
+                this._xrA = btnA;
+                // Right thumbstick Y → pitch
+                if (Math.abs(stickY) > 0.08) player.pitch = Math.max(-3, Math.min(3, (player.pitch || 0) + stickY * 0.05));
+                // Right thumbstick X → yaw
+                if (Math.abs(stickX) > 0.08) player.yaw = Math.max(-3, Math.min(3, (player.yaw || 0) - stickX * 0.05));
+            } else if (hand === 'left') {
+                // Left trigger → afterburner
+                player.afterburnerActive = trigger > 0.5;
+                // Left thumbstick Y → throttle
+                if (Math.abs(stickY) > 0.08) player.throttle = Math.min(1, Math.max(-1, (player.throttle || 0) - stickY * 0.04));
+                // Left thumbstick X → roll
+                if (Math.abs(stickX) > 0.08) player.roll = Math.max(-3, Math.min(3, (player.roll || 0) + stickX * 0.05));
+                // X → cycle weapon
+                if (btnA && !this._xrX && window.Starfighter) window.Starfighter.cycleWeapon();
+                this._xrX = btnA;
+                // Y → toggle flight assist
+                if (btnB && !this._xrY && player) player.toggleFlightAssist && player.toggleFlightAssist();
+                this._xrY = btnB;
+            }
+        }
+    }
+
+    // Initialise a WebXR immersive-vr session and hand it to Three.js renderer.
+    function enterXR() {
+        if (!navigator.xr) { console.warn('[SFInput] WebXR not supported'); return; }
+        navigator.xr.requestSession('immersive-vr', {
+            requiredFeatures: ['local-floor'],
+            optionalFeatures: ['bounded-floor', 'hand-tracking'],
+        }).then(session => {
+            _xrSession = session;
+            lastInputDevice = 'vr';
+            session.addEventListener('end', () => {
+                _xrSession = null;
+                _xrRefSpace = null;
+                lastInputDevice = 'keyboard';
+                if (window.SFHud) SFHud.init && SFHud.init();
+            });
+            // Hand the session to Three.js renderer if available
+            if (window.SF3D && SF3D.renderer) {
+                SF3D.renderer.xr.enabled = true;
+                SF3D.renderer.xr.setSession(session).catch(err => console.warn('[SFInput] XR setSession:', err));
+            }
+            session.requestReferenceSpace('local-floor')
+                .then(rs => { _xrRefSpace = rs; })
+                .catch(() => session.requestReferenceSpace('local').then(rs => { _xrRefSpace = rs; }));
+        }).catch(err => console.warn('[SFInput] enterXR failed:', err));
+    }
+
+    // Patch update() to also call joystick + XR handlers each frame
+    const _origUpdate = update;
+    update = function (dt) {
+        _origUpdate.call(this, dt);
+        if (player) {
+            const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const pad = pads[0];
+            if (pad && pad.axes.length >= 6) {
+                // Joystick/HOTAS takes precedence when enough axes present
+                _applyJoystickAxes(pad, dt);
+            }
+            _applyXRControllers.call(this);
+        }
+    };
+
+    return {
+        init, update, getLaunchTriggered, checkLaunch, isKeyDown,
+        updateLivePanel, togglePanel, enterImmersive, enterXR,
+        getWheelDir, setMobilePhase, isMobile: () => isMobile
+    };
 })();
 
 window.SFInput = SFInput;

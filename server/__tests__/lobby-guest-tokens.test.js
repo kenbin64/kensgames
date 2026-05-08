@@ -11,7 +11,8 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const WebSocket = require('ws');
+// Use socket.io-client to match the server's socket.io transport.
+const { io: ioClient } = require('socket.io-client');
 
 const tmpStateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kg-lobby-test-'));
 process.env.SEED_LOG = path.join(tmpStateDir, 'seeds.jsonl');
@@ -19,12 +20,12 @@ process.env.LOBBY_PORT = '0';
 
 const { httpServer, liveSessions } = require('../lobby-server');
 
-let wsBaseUrl = '';
+let baseUrl = '';
 
 beforeAll(done => {
   httpServer.listen(0, '127.0.0.1', () => {
     const { port } = httpServer.address();
-    wsBaseUrl = `ws://127.0.0.1:${port}`;
+    baseUrl = `http://127.0.0.1:${port}`;
     done();
   });
 });
@@ -34,52 +35,60 @@ afterAll(done => {
 });
 
 function openClient() {
-  const ws = new WebSocket(wsBaseUrl);
-  const inbox = [];
-  const waiters = [];
-  ws.on('message', raw => {
-    let msg; try { msg = JSON.parse(raw); } catch { return; }
-    inbox.push(msg);
-    waiters.splice(0).forEach(w => w(msg));
-  });
-  function waitFor(predicate, timeoutMs = 2000) {
-    const found = inbox.find(predicate);
-    if (found) return Promise.resolve(found);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timeout waiting for message')), timeoutMs);
-      const handler = msg => {
-        if (!predicate(msg)) { waiters.push(handler); return; }
-        clearTimeout(timer);
-        resolve(msg);
-      };
-      waiters.push(handler);
+  return new Promise((resolve, reject) => {
+    const socket = ioClient(baseUrl, {
+      path: '/ws',
+      transports: ['websocket'],
+      forceNew: true,
+      timeout: 5000,
     });
-  }
-  return new Promise(resolve => {
-    ws.once('open', () => resolve({ ws, inbox, waitFor }));
+    const inbox = [];
+    const waiters = [];
+
+    socket.on('message', msg => {
+      inbox.push(msg);
+      waiters.splice(0).forEach(w => w(msg));
+    });
+
+    function waitFor(predicate, timeoutMs = 4000) {
+      const found = inbox.find(predicate);
+      if (found) return Promise.resolve(found);
+      return new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error('timeout waiting for message')), timeoutMs);
+        const handler = msg => {
+          if (!predicate(msg)) { waiters.push(handler); return; }
+          clearTimeout(timer);
+          res(msg);
+        };
+        waiters.push(handler);
+      });
+    }
+
+    socket.once('connect', () => resolve({ socket, inbox, waitFor }));
+    socket.once('connect_error', err => reject(err));
   });
 }
 
 async function authAs(client, token, name) {
-  client.ws.send(JSON.stringify({
+  client.socket.emit('message', {
     type: 'auth', token, username: name, guest_name: name, avatar_id: 'person_smile',
-  }));
+  });
   return client.waitFor(m => m.type === 'auth_success');
 }
 
 async function hostPrivateGame(client) {
-  client.ws.send(JSON.stringify({ type: 'create_session', game_id: 'fasttrack', private: true }));
+  client.socket.emit('message', { type: 'create_session', game_id: 'fasttrack', private: true });
   const created = await client.waitFor(m => m.type === 'session_created');
   return created.session.session_code;
 }
 
 async function joinByCode(client, code) {
-  client.ws.send(JSON.stringify({ type: 'join_by_code', code }));
+  client.socket.emit('message', { type: 'join_by_code', code });
   return client.waitFor(m => m.type === 'session_joined' || m.type === 'session_update' || m.type === 'error');
 }
 
 function closeAll(...clients) {
-  for (const c of clients) { try { c.ws.close(); } catch (_) {} }
+  for (const c of clients) { try { c.socket.disconnect(); } catch (_) { } }
 }
 
 describe('FastTrack guest invite identity isolation', () => {
@@ -123,7 +132,7 @@ describe('FastTrack guest invite identity isolation', () => {
     await authAs(inviteeB, sharedToken, 'Bob2');
     await joinByCode(inviteeB, code);
     await authAs(inviteeC, sharedToken, 'Charlie2');
-    await joinByCode(inviteeC, code).catch(() => {});
+    await joinByCode(inviteeC, code).catch(() => { });
 
     const session = Array.from(liveSessions.values()).find(s => s.session_code === code);
     expect(session).toBeDefined();

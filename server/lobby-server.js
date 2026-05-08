@@ -20,7 +20,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const WebSocket = require('ws');
+const { Server: IOServer } = require('socket.io');
 
 const Field = require('../js/manifold-field.js');
 const Proj = require('./manifold-projection.js');
@@ -240,16 +240,14 @@ function sanitize(s) {
   };
 }
 
-function send(ws, data) {
-  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+function send(socket, data) {
+  if (socket && socket.connected) socket.emit('message', data);
 }
 function broadcastSession(s, data, exclude) {
-  for (const [ws, conn] of connections) {
-    if (ws === exclude) continue;
-    if (conn.session_x_id === s.session_id) send(ws, data);
-  }
+  const target = io.to(s.session_id);
+  (exclude ? target.except(exclude.id) : target).emit('message', data);
 }
-function broadcastAll(data) { for (const [ws] of connections) send(ws, data); }
+function broadcastAll(data) { io.emit('message', data); }
 
 function sessionByCode(code) {
   // First try the live cache (newest), then fall back to a pure observe of
@@ -275,6 +273,7 @@ function leaveCurrentSession(ws, conn) {
   if (!s) return null;
   s.players = s.players.filter(p => p.user_id !== conn.user_id);
   s.players.forEach((p, i) => { p.slot = i; });
+  ws.leave(s.session_id);
   conn.session_x_id = null;
   if (s.players.length === 0 || (s.host_id === conn.user_id && s.players.filter(p => !p.is_ai).length === 0)) {
     liveSessions.delete(s.session_id);
@@ -302,8 +301,12 @@ handlers.ping = (ws) => send(ws, { type: 'pong' });
 handlers.cancel_join_request = () => { /* no-op */ };
 
 function stableGuestId(token) {
-  if (!token || typeof token !== 'string' || !token.startsWith('guest-')) return null;
-  return 'guest_' + crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
+  if (!token || typeof token !== 'string') return null;
+  const normalized = String(token).trim();
+  if (!normalized) return null;
+  // Keep identity stable across lobby -> game navigation for any bearer token
+  // (guest token or site auth token) so reconnect can rejoin the same room.
+  return 'guest_' + crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
 
 const ALLOWED_AVATAR_IDS = new Set([
@@ -355,6 +358,7 @@ handlers.guest_login = (ws, data) => {
   for (const s of liveSessions.values()) {
     if (s.players.some(p => p.user_id === userId)) {
       connections.get(ws).session_x_id = s.session_id;
+      ws.join(s.session_id);
       send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
       if (s.status === 'playing') send(ws, { type: 'game_started', session: sanitize(s) });
       if (s.status === 'playing') {
@@ -412,6 +416,7 @@ handlers.create_session = (ws, data) => {
   });
   liveSessions.set(s.session_id, s);
   conn.session_x_id = s.session_id;
+  ws.join(s.session_id);
   send(ws, { type: 'session_created', session: sanitize(s) });
   if (!isPrivate) broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
 };
@@ -421,15 +426,17 @@ handlers.list_sessions = (ws, data) => {
 };
 
 function joinExisting(ws, conn, s) {
+  const isReturningPlayer = !!(s && Array.isArray(s.players) && s.players.some(p => p.user_id === conn.user_id));
+  if (isReturningPlayer) {
+    conn.session_x_id = s.session_id;
+    ws.join(s.session_id);
+    return send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
+  }
   if (!hasRenderableProfile(conn)) {
     return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before joining a game' });
   }
   if (s.status !== 'waiting') return send(ws, { type: 'error', message: 'Game already started' });
   if (s.players.length >= s.max_players) return send(ws, { type: 'error', message: 'Game is full' });
-  if (s.players.some(p => p.user_id === conn.user_id)) {
-    conn.session_x_id = s.session_id;
-    return send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
-  }
   if (conn.session_x_id) leaveCurrentSession(ws, conn);
   Proj.bloomPlayer(log, s.x, { user_id: conn.user_id, username: conn.user.username });
   s.players.push({
@@ -438,6 +445,7 @@ function joinExisting(ws, conn, s) {
   });
   s.settings.lobby_accepted = false;
   conn.session_x_id = s.session_id;
+  ws.join(s.session_id);
   send(ws, { type: 'session_joined', session: sanitize(s) });
   broadcastSession(s, {
     type: 'player_joined', username: conn.user.username,
@@ -498,6 +506,7 @@ handlers.matchmake = (ws, data) => {
   });
   liveSessions.set(s.session_id, s);
   conn.session_x_id = s.session_id;
+  ws.join(s.session_id);
   send(ws, { type: 'matchmake_result', action: 'created', session_id: s.session_id });
   send(ws, { type: 'session_created', session: sanitize(s) });
   broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
@@ -1053,30 +1062,34 @@ const httpServer = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, /api/pm/status, /api/gm/log, or WebSocket upgrade' }));
 });
 
-const wss = new WebSocket.Server({ server: httpServer });
+const io = new IOServer(httpServer, {
+  path: '/ws',
+  cors: { origin: '*', credentials: true },
+  transports: ['websocket', 'polling'],
+});
 
-wss.on('connection', (ws) => {
-  console.log(`[Lobby] New connection (total: ${wss.clients.size})`);
-  send(ws, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
+io.on('connection', (socket) => {
+  console.log(`[Lobby] New connection (total: ${io.engine.clientsCount})`);
+  send(socket, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
 
-  ws.on('message', async (raw) => {
-    let data;
-    try { data = JSON.parse(raw); }
-    catch { return send(ws, { type: 'error', message: 'Invalid message format' }); }
+  socket.on('message', async (data) => {
+    if (!data || typeof data !== 'object') {
+      return send(socket, { type: 'error', message: 'Invalid message format' });
+    }
     const handler = handlers[data.type];
     if (!handler) {
       console.warn(`[Lobby] Unknown message type: ${data.type}`);
       return;
     }
-    try { await handler(ws, data); }
+    try { await handler(socket, data); }
     catch (err) {
       console.error(`[Lobby] Handler error for ${data.type}:`, err);
-      send(ws, { type: 'error', message: 'Server error' });
+      send(socket, { type: 'error', message: 'Server error' });
     }
   });
 
-  ws.on('close', () => {
-    const conn = connections.get(ws);
+  socket.on('disconnect', () => {
+    const conn = connections.get(socket);
     if (conn) {
       const s = liveSessions.get(conn.session_x_id);
       if (conn.session_x_id) {
@@ -1084,17 +1097,17 @@ wss.on('connection', (ws) => {
         // If PlayerManager replaced this live player with a bot, do not remove
         // the seat from the session by running leaveCurrentSession().
         if (!replaced || !s || s.status !== 'playing') {
-          leaveCurrentSession(ws, conn);
+          leaveCurrentSession(socket, conn);
         }
       } else {
-        leaveCurrentSession(ws, conn);
+        leaveCurrentSession(socket, conn);
       }
-      connections.delete(ws);
+      connections.delete(socket);
     }
-    console.log(`[Lobby] Disconnected (total: ${wss.clients.size})`);
+    console.log(`[Lobby] Disconnected (total: ${io.engine.clientsCount})`);
   });
 
-  ws.on('error', (err) => console.error('[Lobby] WebSocket error:', err.message));
+  socket.on('error', (err) => console.error('[Lobby] Socket.IO error:', err && err.message));
 });
 
 // Cleanup stale waiting sessions every 5 minutes (30-min idle threshold).
@@ -1122,4 +1135,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { httpServer, wss, handlers, liveSessions, connections, log, CATALOG, pm };
+module.exports = { httpServer, io, handlers, liveSessions, connections, log, CATALOG, pm };

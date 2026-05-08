@@ -1460,6 +1460,11 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
       const session = (data && data.session) || (_mp && _mp.session);
       const activeUserId = _myUserId || (_mp && _mp.userId) || null;
       const launchPayload = cloneLaunchSession(session, activeUserId);
+      // Persist the live guest token to sessionStorage so the game page can
+      // reconnect as the same identity — critical for guests who used freshGuestIdentity.
+      try {
+        if (_mp && _mp._guestId) sessionStorage.setItem('kg_mp_session_token', _mp._guestId);
+      } catch { /* ignore */ }
       const launchFailSafe = setTimeout(() => {
         if (_state === STATE.LAUNCHING) {
           _error = 'Launch handoff did not complete. Please try Launch again.';

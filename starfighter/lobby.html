@@ -612,7 +612,7 @@
       window.KGGameManager.loadRules('starfighter').catch(() => { });
     }
   </script>
-  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
   <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
   <script src="/js/substrates/game_setup.js?v=20260430"></script>
   <script>
@@ -668,23 +668,11 @@
         maxPlayers: 6,
         gamePath: '/starfighter/index.html',
         onLaunch: (summary) => {
-          const mode = summary && summary.hasRemoteHumans ? 'private' : 'solo';
-          if (window.KGGameSetup && typeof window.KGGameSetup.persistGenericRuntime === 'function') {
-            window.KGGameSetup.persistGenericRuntime(summary, {
-              gameId: 'starfighter',
-              gameName: 'Alien Space Attack',
-              mode,
-            });
-            window.location.href = '/starfighter/index.html';
-            return;
-          }
-
-          const code = summary && summary.code ? summary.code : '';
-          if (mode === 'private') {
-            window.location.href = '/starfighter/index.html?mode=private&code=' + encodeURIComponent(code);
-          } else {
-            window.location.href = '/starfighter/index.html?mode=solo';
-          }
+          window.KGGameSetup.launchTo(summary, {
+            gameId: 'starfighter',
+            gameName: 'Alien Space Attack',
+            gamePath: '/starfighter/index.html',
+          });
         },
       });
     }

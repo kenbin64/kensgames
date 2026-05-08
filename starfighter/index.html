@@ -980,7 +980,7 @@
        ═══════════════════════════════════════ */
       #ctrl-overlay {
         position: absolute;
-        bottom: 16px;
+        bottom: calc(var(--kg-rail-h, 48px) + 16px);
         right: 16px;
         z-index: 25;
         pointer-events: none;
@@ -1972,10 +1972,10 @@
        ═══════════════════════════════════════ */
       @media(max-width:600px) {
         #radar-overlay {
-          width: 121px;
-          height: 121px;
-          bottom: 10px;
-          left: 10px
+          width: 148px;
+          height: 148px;
+          bottom: 72px;
+          left: 8px;
         }
       }
 
@@ -1983,14 +1983,16 @@
        RADAR OVERLAY — bottom-left
        ═══════════════════════════════════════ */
       #radar-overlay {
-        position: absolute;
-        bottom: 16px;
+        position: fixed;
+        bottom: 72px;
         left: 16px;
-        width: 178px;
-        height: 178px;
-        z-index: 18;
+        width: 224px;
+        height: 224px;
+        z-index: 30;
         pointer-events: none;
         display: none;
+        background: rgba(0, 8, 18, 0.6);
+        backdrop-filter: blur(2px);
         border: 1px solid rgba(0, 255, 255, 0.25);
         border-radius: 50%;
         overflow: hidden;
@@ -2001,6 +2003,286 @@
         width: 100%;
         height: 100%;
         border-radius: 50%
+      }
+
+      /* ===========================================
+       SF CONTROL RAIL - fixed footer (HR-6.2)
+       =========================================== */
+      #sf-rail {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 64px;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 10px;
+        background: linear-gradient(180deg, rgba(0, 8, 18, 0.93) 0%, rgba(0, 4, 12, 0.98) 100%);
+        border-top: 1px solid rgba(0, 200, 255, 0.2);
+        box-shadow: 0 -2px 16px rgba(0, 180, 255, 0.1);
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 10px;
+        color: #8af;
+        pointer-events: auto;
+        user-select: none;
+      }
+
+      #sf-rail .sf-rail-left {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 160px;
+      }
+
+      #sf-rail .sf-rail-center {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        justify-content: center;
+      }
+
+      #sf-rail .sf-rail-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
+        min-width: 140px;
+      }
+
+      #sf-rail .sf-stat-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        line-height: 1;
+      }
+
+      #sf-rail .sf-stat-lbl {
+        color: rgba(0, 255, 255, 0.5);
+        font-size: 9px;
+        width: 20px;
+        text-align: right;
+        letter-spacing: 0.5px;
+      }
+
+      #sf-rail .sf-bar-track {
+        width: 72px;
+        height: 7px;
+        background: rgba(0, 20, 40, 0.8);
+        border: 1px solid rgba(0, 200, 255, 0.15);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      #sf-rail .sf-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.25s ease;
+      }
+
+      .sf-bar-shield {
+        background: linear-gradient(90deg, #2af, #06f);
+      }
+
+      .sf-bar-hull {
+        background: linear-gradient(90deg, #f84, #a40);
+      }
+
+      .sf-bar-fuel {
+        background: linear-gradient(90deg, #4f8, #0a4);
+      }
+
+      .sf-bar-speed {
+        background: linear-gradient(90deg, #fa4, #f80);
+      }
+
+      #sf-rail .sf-stat-val {
+        color: #cef;
+        font-size: 9px;
+        min-width: 22px;
+        text-align: right;
+      }
+
+      #sf-rail .sf-speed-val {
+        color: #fa4;
+      }
+
+      #sf-rail .sf-speed-dir {
+        font-size: 9px;
+        width: 10px;
+        text-align: center;
+        font-weight: bold;
+      }
+
+      #sf-rail .sf-btn {
+        padding: 5px 9px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 9px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        color: #b8d8f0;
+        background: linear-gradient(180deg, rgba(30, 45, 62, 0.95), rgba(15, 25, 38, 0.98));
+        border: 1.5px solid rgba(80, 120, 160, 0.45);
+        border-radius: 3px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: background 0.12s, box-shadow 0.12s;
+        white-space: nowrap;
+        touch-action: manipulation;
+      }
+
+      #sf-rail .sf-btn:hover {
+        background: linear-gradient(180deg, rgba(40, 60, 85, 0.95), rgba(25, 38, 55, 0.98));
+        border-color: rgba(0, 200, 255, 0.55);
+        box-shadow: 0 0 8px rgba(0, 180, 255, 0.2);
+        color: #e0f4ff;
+      }
+
+      #sf-rail .sf-btn:active {
+        transform: translateY(1px);
+        box-shadow: none;
+      }
+
+      .sf-btn-fire {
+        border-color: rgba(0, 255, 100, 0.5) !important;
+        color: #0fa !important;
+      }
+
+      .sf-btn-missile {
+        border-color: rgba(255, 180, 0, 0.5) !important;
+        color: #fb0 !important;
+      }
+
+      .sf-btn-emp {
+        border-color: rgba(120, 80, 255, 0.5) !important;
+        color: #a8f !important;
+      }
+
+      .sf-btn-pulse {
+        border-color: rgba(0, 200, 255, 0.5) !important;
+        color: #0ef !important;
+      }
+
+      .sf-btn-shield {
+        border-color: rgba(0, 100, 255, 0.5) !important;
+        color: #6af !important;
+      }
+
+      .sf-btn-frigate {
+        border-color: rgba(255, 60, 0, 0.55) !important;
+        color: #f80 !important;
+      }
+
+      .sf-btn-boost,
+      .sf-btn-ab {
+        border-color: rgba(255, 220, 0, 0.4) !important;
+        color: #fd0 !important;
+      }
+
+      .sf-btn-lock {
+        border-color: rgba(255, 100, 0, 0.5) !important;
+        color: #fa4 !important;
+      }
+
+      .sf-btn-cm {
+        border-color: rgba(0, 200, 200, 0.4) !important;
+        color: #0cc !important;
+      }
+
+      .sf-btn-sys {
+        font-size: 11px;
+        padding: 4px 7px;
+      }
+
+      .sf-btn-leave {
+        border-color: rgba(255, 60, 60, 0.5) !important;
+        color: #f66 !important;
+      }
+
+      #sf-rail .sf-ammo-count {
+        font-size: 8px;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 1px 3px;
+        border-radius: 2px;
+        margin-left: 2px;
+      }
+
+      #sf-rail .sf-game-btns {
+        display: flex;
+        gap: 3px;
+        margin-top: 2px;
+      }
+
+      #sf-rail .sf-weapon-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      #sf-rail .sf-weapon-name {
+        color: #fa0;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+
+      #sf-rail .sf-stat-sep {
+        color: rgba(0, 200, 255, 0.3);
+        margin: 0 2px;
+      }
+
+      #sf-rail .sf-lives {
+        font-size: 11px;
+        letter-spacing: 2px;
+      }
+
+      #sf-rail .sf-input-mode {
+        font-size: 9px;
+        color: rgba(0, 200, 255, 0.5);
+        letter-spacing: 1px;
+        margin-top: 2px;
+      }
+
+      .sf-voice-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 0;
+      }
+
+      .sf-voice-label {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        color: rgba(0, 255, 255, 0.7);
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+
+      .sf-voice-select {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        background: rgba(0, 10, 22, 0.9);
+        color: #cef;
+        border: 1px solid rgba(0, 200, 255, 0.35);
+        border-radius: 4px;
+        padding: 6px 8px;
+        cursor: pointer;
+        max-width: 260px;
+      }
+
+      .sf-voice-hint {
+        font-family: 'Courier New', monospace;
+        font-size: 10px;
+        color: rgba(120, 180, 220, 0.55);
+        max-width: 260px;
+        line-height: 1.4;
+      }
+
+      #game-canvas {
+        bottom: 64px !important;
       }
 
       /* ═══════════════════════════════════════
@@ -2334,9 +2616,8 @@
 
       /* mob-nav-sphere, mob-btn-group, ctrl-hamburger — managed by JS (setMobilePhase + _initMobileControls) */
 
-      /* Hide console buttons + comm ticker during active flight */
-      body.phase-combat #console-buttons,
-      body.phase-combat #comm-ticker {
+      /* Hide legacy console buttons in combat (rail handles all controls) */
+      body.phase-combat #console-buttons {
         display: none !important;
       }
 
@@ -2653,12 +2934,10 @@
         }
 
         #radar-overlay {
-          border: none !important;
-          box-shadow: none !important;
-          background: transparent !important;
-          width: 134px;
-          height: 134px;
-          bottom: 8px;
+          border: 1px solid rgba(0, 255, 255, 0.25) !important;
+          width: 148px;
+          height: 148px;
+          bottom: 68px;
           left: 8px;
         }
 
@@ -2988,7 +3267,9 @@
     (function enforceLandscapeSF() {
       const guard = document.getElementById('orientation-guard-sf');
       const btn = document.getElementById('orientation-guard-sf-btn');
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent)
+        || (typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches)
+        || ('ontouchstart' in window && (navigator.maxTouchPoints || 0) > 1);
       let pausedByOrientationGuard = false;
 
       async function tryLockLandscape() {
@@ -3630,12 +3911,14 @@
       AGAIN</button>
   </div>
 
-  <!-- Three.js (global THREE + GLTFLoader) — required by bundle.js, intro.js, enhance.js -->
+  <!-- Three.js (global THREE + GLTFLoader + BufferGeometryUtils) — required by bundle.js, intro.js, enhance.js, ship_painter.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
   <!-- Unified Manifold core + bridge — bundle.js's SpaceManifold delegates to window.Manifold -->
   <script src="/js/manifold.js"></script>
   <script src="/js/manifold_bridge.js"></script>
+  <script src="/js/substrates/winki_substrate.js"></script>
   <!-- Game Logic -->
   <script>
     window.addEventListener('DOMContentLoaded', () => {
@@ -3663,14 +3946,15 @@
     });
   </script>
   <!-- Input subsystem (window.SFInput) — bundle.js consumes but does not define it -->
-  <script src="input.js?v=20260428e"></script>
-  <script src="bundle.js?v=20260428e"></script>
+  <script src="input.js?v=20260507a"></script>
+  <script src="bundle.js?v=20260507a"></script>
   <!-- Codex / Enhance / Intro live outside bundle.js — load them as standalone scripts so the
        cinematic prologue (SFIntro) auto-boots and the post-bundle enhancers can attach. -->
   <script src="codex_data.js?v=20260428e"></script>
   <script src="codex.js?v=20260428e"></script>
-  <script src="enhance.js?v=20260428e"></script>
+  <script src="enhance.js?v=20260507a"></script>
   <script src="intro.js?v=20260428e"></script>
+  <script src="hud.js?v=20260428e"></script>
   <script>
     // Stat-panel toggle: × button + backtick (`) hotkey hide/show #gameplay-hud
     // so the panel never sits permanently in the player's field of view. Choice

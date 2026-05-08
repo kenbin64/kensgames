@@ -47,6 +47,50 @@
       "downloads/**"
     ]
   },
+  "platforms": {
+    "_note": "HR-40/41 — marquee game; all platform targets required",
+    "web": {
+      "url": "https://kensgames.com/starfighter/",
+      "status": "live"
+    },
+    "steam": {
+      "wrapper": "electron/",
+      "appid_placeholder": "STARFIGHTER_STEAM_APPID",
+      "status": "ready"
+    },
+    "windows": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:win",
+      "status": "ready"
+    },
+    "macos": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:mac",
+      "status": "ready"
+    },
+    "linux": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:linux",
+      "status": "ready"
+    },
+    "ios": {
+      "wrapper": "capacitor",
+      "config": "capacitor.config.json",
+      "bundle_id": "com.butterflyfx.starfighter",
+      "status": "ready"
+    },
+    "android": {
+      "wrapper": "capacitor",
+      "config": "capacitor.config.json",
+      "package": "com.butterflyfx.starfighter",
+      "status": "ready"
+    },
+    "vr": {
+      "mode": "webxr",
+      "entry": "index.html",
+      "status": "ready"
+    }
+  },
   "deploy": {
     "target": "/var/www/kensgames.com/starfighter/",
     "type": "static_with_server"

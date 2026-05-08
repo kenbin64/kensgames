@@ -99,6 +99,20 @@ function getAvatarIdFromStorage() {
     }
 }
 
+function getOrCreateGuestToken() {
+    try {
+        let token = localStorage.getItem('kg_guest_token') || localStorage.getItem('kg_guest_id');
+        if (!token || !/^guest-/i.test(token)) {
+            token = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+        localStorage.setItem('kg_guest_token', token);
+        localStorage.setItem('kg_guest_id', token);
+        return token;
+    } catch (e) {
+        return `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+}
+
 function autoAuthenticateToLobby() {
     if (state._authSent) return;
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
@@ -125,6 +139,7 @@ function autoAuthenticateToLobby() {
     if (state.pendingAction === 'join' || state.pendingAction === 'code') {
         send({
             type: 'guest_login',
+            token: getOrCreateGuestToken(),
             name: username,
             avatar_id: avatarId || 'person_smile'
         });
@@ -686,6 +701,7 @@ function joinByCodeAsGuest() {
     if (state.connected) {
         send({
             type: 'guest_login',
+            token: getOrCreateGuestToken(),
             name: `Player_${Math.random().toString(36).slice(2, 6)}`,
             avatar_id: 'person_smile'
         });
@@ -1116,6 +1132,7 @@ function joinByCode(event) {
     if (!state.user) {
         send({
             type: 'guest_login',
+            token: getOrCreateGuestToken(),
             name: guestName || `Guest_${Math.random().toString(36).slice(2, 6)}`,
             avatar_id: 'person_smile'
         });

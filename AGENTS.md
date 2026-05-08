@@ -33,8 +33,14 @@
   - `cd /var/www/kensgames.com && node server/lobby-server.js`
 - Restart the FastTrack lobby process on the VPS when needed:
   - `cd /var/www/kensgames.com && npx pm2 restart fasttrack-lobby`
-- Starfighter desktop wrapper:
+- Starfighter desktop wrapper (Electron):
   - `cd /var/www/kensgames.com/starfighter/electron && npm install && npm run start`
+- FastTrack desktop wrapper (Electron):
+  - `cd /var/www/kensgames.com/fasttrack/electron && npm install && npm run start`
+- Build Starfighter for all platforms (Win/Mac/Linux):
+  - `cd /var/www/kensgames.com/starfighter/electron && npm install && npm run build:all`
+- Build FastTrack for all platforms (Win/Mac/Linux):
+  - `cd /var/www/kensgames.com/fasttrack/electron && npm install && npm run build:all`
 - Alternate Starfighter native wrapper:
   - `cd /var/www/kensgames.com/starfighter/native/electron && npm install && npm run start`
 - Starfighter mobile wrapper:

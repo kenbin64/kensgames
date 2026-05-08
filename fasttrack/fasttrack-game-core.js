@@ -2357,7 +2357,9 @@ function updateUI() {
   const drawBtn = document.getElementById('draw-btn');
   if (drawBtn) {
     const cp = players[ci];
-    drawBtn.disabled = phase !== 'draw' || cp.isBot;
+    // In multiplayer: only the active player's client enables the draw button.
+    const notMyTurn = _isMpMode() && !_isMyTurn();
+    drawBtn.disabled = phase !== 'draw' || cp.isBot || notMyTurn;
   }
   const gs = document.getElementById('game-status');
   if (gs) {
@@ -2890,6 +2892,10 @@ window.FastTrackCore = {
   CutsceneManager,
   getManifoldMetrics,
   updateMetricsPanel,
+  // Multiplayer wiring — set by 3d.html after initGame so the live KGMultiplayer
+  // socket can broadcast moves and replay peer actions under the _applying guard.
+  setMultiplayerClient,
+  applyRemoteAction,
 };
 
 // Also expose directly for onclick handlers in HTML

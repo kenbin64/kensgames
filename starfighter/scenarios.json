@@ -9,7 +9,6 @@
     "lives_per_sortie": 3,
     "training_repeatable": true
   },
-
   "training": {
     "id": "training",
     "name": "First Light — Training",
@@ -19,129 +18,352 @@
     "invincible": true,
     "fuel_cap_seconds": 240,
     "objectives": [
-      { "id": "move", "desc": "Six-DOF movement check", "type": "tutorial" },
-      { "id": "fire", "desc": "Fire lasers at drones", "type": "tutorial" },
-      { "id": "lock", "desc": "Acquire torpedo lock", "type": "tutorial" },
-      { "id": "dock", "desc": "Auto-dock with Mercy or Lifeline", "type": "tutorial" }
+      {
+        "id": "move",
+        "desc": "Six-DOF movement check",
+        "type": "tutorial"
+      },
+      {
+        "id": "fire",
+        "desc": "Fire lasers at drones",
+        "type": "tutorial"
+      },
+      {
+        "id": "lock",
+        "desc": "Acquire torpedo lock",
+        "type": "tutorial"
+      },
+      {
+        "id": "dock",
+        "desc": "Auto-dock with Mercy or Lifeline",
+        "type": "tutorial"
+      }
     ],
     "spawns": {
       "enemy_drones": 24,
       "asteroids": 60,
       "wreckage": 8
     },
-    "outcome": { "win": "fuel_exhausted", "lose": null },
+    "outcome": {
+      "win": "fuel_exhausted",
+      "lose": null
+    },
     "unlock": null,
     "available_after": "always"
   },
-
   "sorties": [
     {
       "id": "sortie-1",
-      "name": "First Light",
-      "summary": "Same as Training but counted as the first live sortie. Player can opt to skip if Training already passed.",
+      "name": "First Combat",
+      "summary": "First live sortie. Laser cannons only. Intercept the initial Zorgon drone wing before it reaches the armada. Get a feel for combat before more weapons are cleared for deployment.",
       "lives": 3,
-      "objective": { "id": "complete_training", "desc": "Complete the training drill" },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
-      "unlock": "spread_laser",
+      "weapons_available": [
+        "laser"
+      ],
+      "objective": {
+        "id": "destroy_wave",
+        "desc": "Destroy the inbound drone wing",
+        "count": 12,
+        "type": "enemy"
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "lives_exhausted_or_armada_breached"
+      },
+      "unlock": "guided_missiles",
       "available_after": "training_or_skip"
     },
     {
       "id": "sortie-2",
-      "name": "Picket Line",
-      "summary": "Hold the patrol perimeter; intercept the first real drone wing before it reaches Aurora Prime.",
+      "name": "Full Throttle",
+      "summary": "Faster interceptor wings. New thrust mechanics are cleared: mouse wheel forward for quick burst thrust, mouse wheel backward for reverse thrust. Master these or you will not survive what is coming.",
       "lives": 3,
-      "objective": { "id": "destroy_wave", "desc": "Destroy the inbound drone wing", "count": 12, "type": "enemy" },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted_or_aurora_breached" },
-      "unlock": "proton_torpedo_mk2",
+      "weapons_available": [
+        "laser",
+        "guided_missiles"
+      ],
+      "new_controls": [
+        {
+          "id": "quick_thrust",
+          "input": "mouse_wheel_forward",
+          "desc": "Quick burst thrust — sudden forward acceleration"
+        },
+        {
+          "id": "reverse_thrust",
+          "input": "mouse_wheel_backward",
+          "desc": "Reverse thrust — brake hard or back away"
+        }
+      ],
+      "objective": {
+        "id": "destroy_wave",
+        "desc": "Hold the perimeter — destroy 20 hostiles",
+        "count": 20,
+        "type": "any_hostile"
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "lives_exhausted_or_armada_breached"
+      },
+      "unlock": "quick_thrust",
       "available_after": "sortie-1"
     },
     {
       "id": "sortie-3",
-      "name": "Capital Strike",
-      "summary": "First Zorgon dreadnought enters the engagement zone. Kill it before it reaches Aurora Prime.",
+      "name": "Asteroid Run",
+      "summary": "A dense asteroid field is on collision course with the armada. Fighters must clear it — dodging and destroying debris while Zorgon fighters use the chaos as cover. Power Shield absorbs asteroid impacts. Power Pulse clears swarms of smaller debris and cracks larger ones.",
       "lives": 3,
-      "objective": { "id": "kill_capital", "desc": "Destroy 1 dreadnought", "count": 1, "type": "dreadnought" },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted_or_aurora_breached" },
-      "unlock": "afterburner_2",
+      "weapons_available": [
+        "laser",
+        "guided_missiles"
+      ],
+      "new_ability": {
+        "id": "power_shield",
+        "desc": "Hardened hull field — absorb a limited number of asteroid impacts without taking damage."
+      },
+      "new_weapon": {
+        "id": "power_pulse",
+        "desc": "Spherical energy burst — clears small asteroid debris in radius, cracks larger ones. No damage to ships."
+      },
+      "environment": "dense_asteroid_field",
+      "objective": {
+        "id": "clear_asteroid_field",
+        "desc": "Protect the armada — destroy or scatter enough of the asteroid field",
+        "type": "asteroid_clear",
+        "threshold_pct": 0.75
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "lives_exhausted_or_armada_destroyed"
+      },
+      "unlock": [
+        "power_shield",
+        "power_pulse"
+      ],
       "available_after": "sortie-2"
     },
     {
       "id": "sortie-4",
-      "name": "Carrier Defence",
-      "summary": "Coordinated assault on the Resolute. Keep the carrier alive.",
+      "name": "Mercy Flight",
+      "summary": "Rescue Shuttles and Medical Frigates are under coordinated attack by Zorgon bombers. Protect them. Bombers hit hard — close in and use the EMP Pulse to disable their weapons before they release ordnance. Extra Armor lets you take a few hits on the approach.",
       "lives": 3,
-      "objective": { "id": "protect_carrier", "desc": "Keep UES Resolute hull > 25% for 6 minutes", "duration_seconds": 360, "asset": "resolute", "min_hull_pct": 0.25 },
-      "outcome": { "win": "objective_complete", "lose": "carrier_destroyed_or_lives_exhausted" },
-      "unlock": "shield_booster",
+      "weapons_available": [
+        "laser",
+        "guided_missiles",
+        "power_pulse"
+      ],
+      "new_ability": {
+        "id": "emp_pulse",
+        "desc": "Close-range electromagnetic burst — disables a bomber's weapons and engines. Costs significant fuel. Get close."
+      },
+      "new_ability_2": {
+        "id": "extra_armor",
+        "desc": "Activated armor plating — reduces incoming damage for a short burst window."
+      },
+      "objective": {
+        "id": "protect_assets",
+        "desc": "Keep at least 2 of 3 rescue/medical ships alive",
+        "assets": [
+          "rescue_shuttle",
+          "medical_frigate"
+        ],
+        "min_survivors": 2
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "assets_lost_or_lives_exhausted"
+      },
+      "unlock": [
+        "emp_pulse",
+        "extra_armor"
+      ],
       "available_after": "sortie-3"
     },
     {
       "id": "sortie-5",
-      "name": "The Long Watch",
-      "summary": "The Hive-Moon edges closer. Bombers and predators in waves. The carrier is on borrowed time.",
+      "name": "Dreadnought",
+      "summary": "A Zorgon Dreadnought is bearing down on the home space carrier. The carrier has laser cannons but cannot manoeuvre — she is not stealthy. Fighters must move in and hit the Dreadnought hard before it tears the carrier apart. This will be the most dangerous fight you have seen.",
       "lives": 3,
-      "objective": { "id": "kill_count", "desc": "Destroy 30 hostiles", "count": 30, "type": "any_hostile" },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
-      "unlock": "hardpoint_mount",
-      "available_after": "sortie-4"
-    },
-    {
-      "id": "sortie-6",
-      "name": "Last Stand",
-      "summary": "The Resolute is lost. The Hive-Moon engulfs Aurora Prime. The campaign transitions inside the lattice.",
-      "lives": 3,
-      "scripted_loss": { "asset": "resolute", "trigger": "timer", "after_seconds": 480 },
-      "objective": { "id": "survive_to_transition", "desc": "Survive until the Hive-Moon engulfs Aurora Prime", "duration_seconds": 480 },
-      "outcome": { "win": "transition_to_hive", "lose": "lives_exhausted" },
-      "unlock": "lattice_navigator",
-      "available_after": "sortie-5"
-    },
-    {
-      "id": "sortie-7a",
-      "name": "Into the Hive",
-      "summary": "Enter the Hive-Moon's Schwarz Diamond gyroid. Locate Aurora Prime inside the labyrinth.",
-      "lives": 3,
-      "environment": "schwarz_diamond_gyroid",
-      "objective": { "id": "locate_asset", "desc": "Find Aurora Prime on radar inside the lattice", "asset": "aurora_prime" },
-      "spawns": { "zorgon_humanoid_swarm": true, "honeycomb_powerups": true },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
-      "unlock": "solvent_torpedo",
-      "available_after": "sortie-6"
-    },
-    {
-      "id": "sortie-7b",
-      "name": "The Honeycomb",
-      "summary": "Recover a sample of the queen's catalyst-bearing honeycomb. Return it to Aurora Prime scientists for solvent synthesis.",
-      "lives": 3,
-      "environment": "schwarz_diamond_gyroid",
-      "objective": { "id": "fetch_quest", "desc": "Collect 1 queen-class honeycomb sample and dock with Aurora Prime", "item": "queen_honeycomb", "deliver_to": "aurora_prime" },
-      "outcome": { "win": "objective_complete", "lose": "lives_exhausted" },
-      "unlock": "solvent_dispersal_array",
-      "available_after": "sortie-7a"
-    },
-    {
-      "id": "sortie-7c",
-      "name": "The Throne Room",
-      "summary": "The solvent opens passages to the queen's chamber. Defeat the sentinels, incapacitate the queen, deliver the message. Peace treaty.",
-      "lives": 3,
-      "environment": "schwarz_diamond_gyroid",
-      "objective": { "id": "boss_incapacitate", "desc": "Incapacitate the queen (do not kill) and deliver the peace message", "boss": "zorgon_queen", "kill_allowed": false },
-      "outcome": { "win": "campaign_complete", "lose": "lives_exhausted" },
-      "unlock": "peace_treaty_credits",
-      "available_after": "sortie-7b",
-      "epilogue": "multidimensional_threat_reveal"
+      "weapons_available": [
+        "laser",
+        "guided_missiles",
+        "power_pulse",
+        "emp_pulse"
+      ],
+      "objective": {
+        "id": "kill_capital",
+        "desc": "Destroy the Dreadnought before it destroys the carrier",
+        "count": 1,
+        "type": "dreadnought"
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "carrier_destroyed_or_lives_exhausted"
+      },
+      "unlock": null,
+      "available_after": "sortie-4",
+      "scripted_ending": "mutual_destruction_cutscene"
     }
   ],
-
+  "cutscenes": [
+    {
+      "id": "mutual_destruction_cutscene",
+      "trigger": "after_sortie-5",
+      "name": "Mutual Destruction",
+      "beats": [
+        "The Dreadnought, mortally wounded and losing control, makes its final decision.",
+        "Every tactical nuclear warhead aboard fires simultaneously — a full barrage aimed at the UES Resolute.",
+        "The Resolute's captain sees the incoming volley. There is no time to evade.",
+        "The order goes out: return fire — every tactical nuke aboard, all at once.",
+        "Both barrages meet in the void between them. The detonations are blinding — wave after wave of white light expanding across the engagement zone.",
+        "When the light clears, there is silence. The Dreadnought is gone. The UES Resolute is gone. They destroyed each other.",
+        "The alien honeycomb hive base moves in through the debris field. Slowly. Without hurry.",
+        "It opens like a vast organic maw and envelops the human space wheel station — drawing it inside the hive, folding it into the labyrinth within.",
+        "The wheel station disappears. Swallowed whole.",
+        "NARRATOR: The military base has been destroyed. Our home — the wheel station — has been taken into the hive. The human race is at the mercy of the bee alien Zorgons. Generation after generation, bred to tend the bee farms, to produce the honey the Zorgons need to survive.",
+        "NARRATOR: Only you can save the human race from alien bee tyranny. Penetrate the alien bee hive — thread the labyrinth — and find the human space station. The fate of humanity is in your hands."
+      ],
+      "models": [
+        {
+          "role": "aggressor",
+          "glb": "assets/models/alienhoneycombhvestarbase.glb"
+        },
+        {
+          "role": "ingested",
+          "glb": "assets/models/humanspacewheelhomebase.glb"
+        }
+      ],
+      "music": "foreboding_hive_theme",
+      "narrator_voice": true
+    }
+  ],
+  "hive_sorties": [
+    {
+      "id": "sortie-6",
+      "name": "Into the Labyrinth",
+      "summary": "You are inside the hive. The Schwarz Diamond lattice stretches in every direction — interlocking honeycomb chambers, wide enough for a single fighter, never wide enough for a capital ship. Predator drones patrol the passages. Honeycombs glow with power-ups. The human space station shows on radar — use it to find your way, but it is still a labyrinth.",
+      "lives": 3,
+      "environment": "schwarz_diamond_gyroid",
+      "weapons_available": [
+        "laser",
+        "guided_missiles",
+        "power_pulse",
+        "emp_pulse"
+      ],
+      "spawns": {
+        "enemy_type": "AlienEnemyPreditorDrone",
+        "honeycomb_powerups": true
+      },
+      "radar_guide": {
+        "asset": "humanspacewheelhomebase",
+        "desc": "Space station visible on radar — use it to orient, but the labyrinth will still confuse you"
+      },
+      "objective": {
+        "id": "locate_asset",
+        "desc": "Find the human space station inside the labyrinth",
+        "asset": "humanspacewheelhomebase"
+      },
+      "outcome": {
+        "win": "objective_complete",
+        "lose": "lives_exhausted"
+      },
+      "unlock": [
+        "lattice_navigator",
+        "solvent_weapon"
+      ],
+      "available_after": "mutual_destruction_cutscene"
+    },
+    {
+      "id": "sortie-7",
+      "name": "The Throne Room",
+      "summary": "Human scientists aboard the station have synthesised an antidote — a compound that lets Earth bees thrive in Zorgon atmosphere. The Zorgons can go home. They never needed to take Earth. Deliver it to the queen. A solvent weapon opens passages in the self-healing honeycomb walls, but they reseal fast — it is a race against time. Fight the queen's guards, incapacitate her, and deliver the message.",
+      "lives": 3,
+      "environment": "schwarz_diamond_gyroid",
+      "weapons_available": [
+        "laser",
+        "guided_missiles",
+        "power_pulse",
+        "emp_pulse",
+        "solvent_weapon"
+      ],
+      "objective": {
+        "id": "boss_incapacitate",
+        "desc": "Incapacitate the queen (do not kill) and deliver the peace antidote",
+        "boss": "zorgon_queen",
+        "kill_allowed": false
+      },
+      "outcome": {
+        "win": "campaign_complete",
+        "lose": "lives_exhausted"
+      },
+      "unlock": "peace_treaty_credits",
+      "available_after": "sortie-6",
+      "epilogue": "multidimensional_threat_reveal",
+      "epilogue_beats": [
+        "The queen receives the antidote message. A long silence.",
+        "She decrees: the war is over. The humans are free.",
+        "The bees can live among the Zorgons at last. After a millennium, they can return home.",
+        "Never again will they make war.",
+        "And then — at the far edge of the system — something vast appears. Geometrically impossible. Multidimensional. It does not distinguish between Zorgon and Human.",
+        "For the first time in the history of both species, two fleets form up side by side.",
+        "That is the sequel. This is the end."
+      ]
+    }
+  ],
   "unlocks": {
-    "spread_laser": { "name": "Spread Laser", "category": "weapon", "slot": "primary" },
-    "proton_torpedo_mk2": { "name": "Proton Torpedo Mk II", "category": "weapon", "slot": "secondary" },
-    "afterburner_2": { "name": "Afterburner II", "category": "ability", "slot": "thrust" },
-    "shield_booster": { "name": "Shield Booster", "category": "ability", "slot": "defense" },
-    "hardpoint_mount": { "name": "Universal Hardpoint", "category": "ability", "slot": "expansion" },
-    "lattice_navigator": { "name": "Lattice Navigator", "category": "ability", "slot": "navigation", "requires": "schwarz_diamond_gyroid" },
-    "solvent_torpedo": { "name": "Solvent Torpedo", "category": "weapon", "slot": "secondary", "effect": "dissolves_gyroid_walls" },
-    "solvent_dispersal_array": { "name": "Solvent Dispersal Array", "category": "weapon", "slot": "expansion", "effect": "wide_area_solvent" },
-    "peace_treaty_credits": { "name": "Peace Treaty (Campaign Complete)", "category": "narrative", "slot": null }
+    "guided_missiles": {
+      "name": "Guided Missiles",
+      "category": "weapon",
+      "slot": "secondary",
+      "desc": "Lock-on guided warhead. Limited magazine."
+    },
+    "quick_thrust": {
+      "name": "Quick Thrust / Reverse Thrust",
+      "category": "control",
+      "slot": "thrust",
+      "desc": "Mouse wheel forward = burst thrust. Mouse wheel backward = reverse thrust."
+    },
+    "power_shield": {
+      "name": "Power Shield",
+      "category": "ability",
+      "slot": "defense",
+      "desc": "Absorbs asteroid and debris impacts. Limited charges."
+    },
+    "power_pulse": {
+      "name": "Power Pulse",
+      "category": "weapon",
+      "slot": "secondary",
+      "desc": "Spherical burst — clears small debris, cracks larger asteroids. No ship damage."
+    },
+    "emp_pulse": {
+      "name": "EMP Pulse",
+      "category": "ability",
+      "slot": "special",
+      "desc": "Close-range electromagnetic burst — disables bomber weapons and engines. High fuel cost."
+    },
+    "extra_armor": {
+      "name": "Extra Armor",
+      "category": "ability",
+      "slot": "defense",
+      "desc": "Short-duration activated armor plating — reduces incoming damage."
+    },
+    "lattice_navigator": {
+      "name": "Lattice Navigator",
+      "category": "ability",
+      "slot": "navigation",
+      "requires": "schwarz_diamond_gyroid",
+      "desc": "Enhanced radar that maps the gyroid lattice around you."
+    },
+    "solvent_weapon": {
+      "name": "Solvent Weapon",
+      "category": "weapon",
+      "slot": "expansion",
+      "effect": "dissolves_gyroid_walls",
+      "desc": "Opens passages in the self-healing honeycomb walls. They reseal — work fast."
+    },
+    "peace_treaty_credits": {
+      "name": "Peace Treaty — Campaign Complete",
+      "category": "narrative",
+      "slot": null
+    }
   }
 }

@@ -514,7 +514,7 @@
       window.KGGameManager.loadRules('fasttrack').catch(() => { });
     }
   </script>
-  <script src="/js/multiplayer-client.js?v=20260502a"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
   <!-- viewport-lock: no-scroll -->
   <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
   <script src="/js/substrates/game_setup.js?v=20260502a"></script>
@@ -547,7 +547,7 @@
         });
 
         if (runtime) {
-          window.location.href = '/fasttrack/3d.html';
+          window.location.href = '/fasttrack/3d.html?launch=1';
           return;
         }
 
@@ -583,7 +583,7 @@
           } catch (_) { }
         }
 
-        window.location.href = '/fasttrack/3d.html';
+        window.location.href = '/fasttrack/3d.html?launch=1';
       },
     });
   </script>
