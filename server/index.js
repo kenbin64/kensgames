@@ -597,6 +597,38 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: Date.now() });
 });
 
+// Proxy GM log ingest/tail to lobby server so public /api/gm/log works even
+// when nginx routes /api/* to this auth service.
+async function proxyGmLog(req, res) {
+  const lobbyBase = `http://127.0.0.1:${process.env.LOBBY_PORT || '8765'}`;
+  const target = `${lobbyBase}/api/gm/log${req.method === 'GET' && req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (req.headers['x-kg-guest-id']) headers['X-KG-Guest-Id'] = String(req.headers['x-kg-guest-id']);
+  if (req.headers['x-kg-secret']) headers['X-KG-Secret'] = String(req.headers['x-kg-secret']);
+  if (req.headers.authorization) headers['Authorization'] = String(req.headers.authorization);
+
+  try {
+    const init = {
+      method: req.method,
+      headers,
+    };
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      init.body = JSON.stringify(req.body || {});
+    }
+    const upstream = await fetch(target, init);
+    const text = await upstream.text();
+    res.status(upstream.status);
+    const ct = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
+    res.set('Content-Type', ct);
+    return res.send(text);
+  } catch (err) {
+    return res.status(502).json({ error: 'gm_log_proxy_failed', detail: err && err.message ? err.message : String(err) });
+  }
+}
+
+app.post('/api/gm/log', proxyGmLog);
+app.get('/api/gm/log', proxyGmLog);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ENDPOINT: POST /api/auth/resend-verification
 // ═══════════════════════════════════════════════════════════════════════════
