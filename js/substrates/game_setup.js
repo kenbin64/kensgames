@@ -269,7 +269,9 @@
   //   onSolo(runtime)               — local/AI game; no socket needed
   //   onMultiplayer(session, mp)    — session.client = live KGMultiplayer
   //   onMissing()                   — no ?launch=1 or no valid runtime
-  //   reconnectTimeout              — ms before falling back to onSolo (default 6000)
+  //   onMultiplayerTimeout(info)    — multiplayer reconnect did not converge
+  //   reconnectTimeout              — ms per reconnect attempt (default 6000)
+  //   reconnectAttempts             — attempts before timeout callback (default 3)
   // }
   function consumeRuntime(gameId, handlers) {
     if (!handlers) handlers = {};
@@ -320,6 +322,8 @@
     const mp = new root.KGMultiplayer(gameId);
     let _launched = false;
     const timeoutMs = typeof handlers.reconnectTimeout === 'number' ? handlers.reconnectTimeout : 6000;
+    const maxAttempts = Math.max(1, typeof handlers.reconnectAttempts === 'number' ? handlers.reconnectAttempts : 3);
+    let _attempt = 0;
 
     const doLaunch = function (serverSession) {
       if (_launched) return;
@@ -345,13 +349,26 @@
       if (typeof handlers.onMultiplayer === 'function') handlers.onMultiplayer(merged, mp);
     };
 
-    var _fallbackTimer = setTimeout(function () {
-      if (!_launched) {
-        _launched = true;
-        console.warn('[KGGameSetup] reconnect timeout for', gameId, '— running local');
-        if (typeof handlers.onSolo === 'function') handlers.onSolo(runtime);
-      }
-    }, timeoutMs);
+    let _fallbackTimer = null;
+    function scheduleAttemptTimeout() {
+      if (_fallbackTimer) clearTimeout(_fallbackTimer);
+      _fallbackTimer = setTimeout(function () {
+        if (_launched) return;
+        _attempt += 1;
+        if (_attempt < maxAttempts) {
+          console.warn('[KGGameSetup] reconnect attempt', _attempt, 'failed for', gameId, '- retrying');
+          try { mp.disconnect(); } catch { /* ignore */ }
+          mp.connect(sessionToken ? { guestToken: sessionToken } : {});
+          scheduleAttemptTimeout();
+          return;
+        }
+        // Fail closed: do NOT run unsynced local state for multiplayer launches.
+        console.error('[KGGameSetup] reconnect timeout for', gameId, 'after', maxAttempts, 'attempts');
+        if (typeof handlers.onMultiplayerTimeout === 'function') {
+          handlers.onMultiplayerTimeout({ gameId: gameId, attempts: maxAttempts, timeoutMs: timeoutMs });
+        }
+      }, timeoutMs);
+    }
 
     mp.on('game_started', function (data) {
       doLaunch(data && data.session ? data.session : (mp.session || {}));
@@ -359,6 +376,7 @@
     mp.on('session_update', function (data) {
       if (data && data.status === 'playing') doLaunch(data);
     });
+    scheduleAttemptTimeout();
     mp.connect(sessionToken ? { guestToken: sessionToken } : {});
     return true;
   }
