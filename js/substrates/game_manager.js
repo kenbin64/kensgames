@@ -896,6 +896,7 @@
   const HEALTH_LOG_KEY = 'kg_gm_health_log';
   const HEALTH_LOG_CAP = 200;
   const HEALTH_INGEST_URL = '/api/gm/log';
+  const HEALTH_INGEST_FALLBACK_URL = '/ws/api/gm/log';
 
   function _healthStorage() {
     try { return (typeof localStorage !== 'undefined') ? localStorage : null; } catch (_) { return null; }
@@ -923,6 +924,16 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
         keepalive: true,
+      }).then((res) => {
+        if (res && !res.ok && res.status === 404) {
+          return fetch(HEALTH_INGEST_FALLBACK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entry),
+            keepalive: true,
+          }).catch(() => { });
+        }
+        return null;
       }).catch(() => { });
     } catch (_) { }
   }
