@@ -1,0 +1,119 @@
+{
+  "name": "fasttrack-desktop",
+  "productName": "FastTrack",
+  "version": "1.0.0",
+  "description": "FastTrack — ButterflyFx Multiplayer Board Game",
+  "author": {
+    "name": "Kenneth Bingham",
+    "email": "kenetics.art@gmail.com"
+  },
+  "license": "SEE LICENSE IN ../../LICENSE.md",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl"
+  },
+  "build": {
+    "appId": "com.butterflyfx.fasttrack",
+    "productName": "FastTrack",
+    "copyright": "© 2026 Kenneth Bingham / ButterflyFx",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**",
+      "../index.html",
+      "../fasttrack-game.js",
+      "../fasttrack-game-core.js",
+      "../fasttrack-3d.js",
+      "../fasttrack-sound.js",
+      "../lobby_client.js",
+      "../board_manifold.js",
+      "../substrate_manifold.js",
+      "../fasttrack_manifold_substrate.js",
+      "../analytics_substrate.js",
+      "../growth_substrate.js",
+      "../manifold.game.json",
+      "../board_inventory.json",
+      "../fasttrack.rules.json",
+      "../assets/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.games",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Game"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "electron": "^31.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.0.0"
+  },
+  "optionalDependencies": {
+    "greenworks": "^0.15.0"
+  }
+}

@@ -3,9 +3,9 @@
    Only accessible to superuser and admins
    ═══════════════════════════════════════════════════════════════ */
 
-const LOBBY_WS = location.protocol === 'https:'
-    ? `wss://${location.host}/ws`
-    : `ws://${location.hostname}:8765`;
+const LOBBY_WS_BASE = location.protocol === 'https:'
+    ? `https://${location.host}`
+    : `http://${location.hostname}:8765`;
 
 let ws = null;
 let currentUser = null;
@@ -36,23 +36,27 @@ function showPanel(role) {
 
 // ── WEBSOCKET ────────────────────────────────────────────────
 function connectAdmin() {
-    ws = new WebSocket(LOBBY_WS);
-    ws.onopen = () => {
+    ws = io(LOBBY_WS_BASE, {
+        path: '/ws',
+        transports: ['websocket', 'polling'],
+        reconnection: false,
+    });
+    ws.on('connect', () => {
         // Login first
         send({ type: 'login', username: currentUser.username, password: '' });
         // Use token-based auth if available
         if (currentUser.token) {
             send({ type: 'auth', token: currentUser.token });
         }
-    };
-    ws.onmessage = (e) => {
-        try { handleMsg(JSON.parse(e.data)); } catch(err) { console.warn(err); }
-    };
-    ws.onclose = () => setTimeout(connectAdmin, 3000);
+    });
+    ws.on('message', (data) => {
+        try { handleMsg(data); } catch(err) { console.warn(err); }
+    });
+    ws.on('disconnect', () => setTimeout(connectAdmin, 3000));
 }
 
 function send(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws && ws.connected) ws.emit('message', msg);
 }
 
 function handleMsg(msg) {

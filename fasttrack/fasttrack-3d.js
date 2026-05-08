@@ -853,94 +853,108 @@ function createBilliardRoom() {
   adWoodTex.wrapS = adWoodTex.wrapT = THREE.RepeatWrapping;
   adWoodTex.repeat.set(8, 1);
 
-  // Brass material for divider strips and rail
+  // ── ROOM ORNAMENT SUBSTRATE — (x → y → z) recursion ──
+  // x = ornament SEED (walls, wainscot height, pilaster spacing, cap step count)
+  // y = lens bloomRoomOrnaments(seed): bakes per-element world transforms,
+  //     concatenates by material family, returns 4 merged geometries
+  // z = the now: 4 meshes added to the scene this tick (was ~120 individual meshes).
+  // Identity recursion: the ornament z is fully derived from the seed every init;
+  // nothing about the room is stored as an independent z anywhere else.
   const brassMat = new THREE.MeshStandardMaterial({ color: 0xB8860B, roughness: 0.12, metalness: 0.92, envMapIntensity: 1.2 });
+  const moldingMat = new THREE.MeshStandardMaterial({ color: 0x2a1c0e, roughness: 0.35, metalness: 0.12, envMapIntensity: 0.5 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a0f05, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.4 });
+  const woodMat = new THREE.MeshStandardMaterial({ map: adWoodTex, color: 0x3a1a00, roughness: 0.38, metalness: 0.10 });
   const WAINSCOT_H = 130;
 
-  const addArtDecoPanelling = (wallW, pos, rotY) => {
-    // Walnut wainscot panel
-    const pGeo = new THREE.PlaneGeometry(wallW - 10, WAINSCOT_H);
-    const pMat = new THREE.MeshStandardMaterial({ map: adWoodTex, color: 0x3a1a00, roughness: 0.38, metalness: 0.10 });
-    const panel = new THREE.Mesh(pGeo, pMat);
-    panel.position.set(pos.x, WAINSCOT_H / 2, pos.z);
-    panel.rotation.y = rotY || 0;
-    scene.add(panel);
+  const ornamentSeed = {
+    walls: [
+      { w: ROOM_WIDTH, pos: new THREE.Vector3(0, 0, -ROOM_DEPTH / 2 + 2), rotY: 0, moldOff: new THREE.Vector3(0, 0, 2) },
+      { w: ROOM_DEPTH, pos: new THREE.Vector3(-ROOM_WIDTH / 2 + 2, 0, 0), rotY: Math.PI / 2, moldOff: new THREE.Vector3(2, 0, 0) },
+      { w: ROOM_DEPTH, pos: new THREE.Vector3(ROOM_WIDTH / 2 - 2, 0, 0), rotY: -Math.PI / 2, moldOff: new THREE.Vector3(-2, 0, 0) },
+      { w: ROOM_WIDTH, pos: new THREE.Vector3(0, 0, ROOM_DEPTH / 2 - 2), rotY: Math.PI, moldOff: new THREE.Vector3(0, 0, -2) },
+    ],
+    wainscotH: WAINSCOT_H,
+    pilasterSpacing: 160,
+    capSteps: 3,
+  };
 
-    // Brass cap rail on top of wainscot
-    const railGeo = new THREE.BoxGeometry(wallW, 5, 5);
-    const rail = new THREE.Mesh(railGeo, brassMat);
-    rail.position.set(pos.x, WAINSCOT_H, pos.z);
-    rail.rotation.y = rotY || 0;
-    scene.add(rail);
-
-    // Brass base strip at floor
-    const baseStripGeo = new THREE.BoxGeometry(wallW, 8, 4);
-    const baseStrip = new THREE.Mesh(baseStripGeo, brassMat);
-    baseStrip.position.set(pos.x, 4, pos.z);
-    baseStrip.rotation.y = rotY || 0;
-    scene.add(baseStrip);
-
-    // Vertical brass divider strips — Art Deco pilasters every ~160 units
-    const stripCount = Math.floor(wallW / 160);
-    for (let si = 0; si < stripCount; si++) {
-      const sx = -wallW / 2 + (si + 1) * (wallW / (stripCount + 1));
-      const stripGeo = new THREE.BoxGeometry(4, WAINSCOT_H, 4);
-      const strip = new THREE.Mesh(stripGeo, brassMat);
-      // Position locally then rotate
-      const localV = new THREE.Vector3(sx, WAINSCOT_H / 2, 0);
-      localV.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY || 0);
-      strip.position.set(pos.x + localV.x, localV.y, pos.z + localV.z);
-      strip.rotation.y = rotY || 0;
-      scene.add(strip);
-
-      // Stepped Art Deco cap on each pilaster — 3-step ziggurat
-      for (let step = 0; step < 3; step++) {
-        const sw = 6 - step * 1.5;
-        const sh = 4 - step;
-        const sy = WAINSCOT_H + step * sh;
-        const capGeo = new THREE.BoxGeometry(sw, sh, sw);
-        const cap = new THREE.Mesh(capGeo, brassMat);
-        const capV = new THREE.Vector3(sx, sy + sh / 2, 0);
-        capV.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY || 0);
-        cap.position.set(pos.x + capV.x, capV.y, pos.z + capV.z);
-        cap.rotation.y = rotY || 0;
-        scene.add(cap);
-      }
+  const _bake = (geo, pos, quat) => {
+    const m = new THREE.Matrix4().compose(pos, quat || new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+    geo.applyMatrix4(m);
+    return geo;
+  };
+  const _merge = (geos) => {
+    if (THREE.BufferGeometryUtils && typeof THREE.BufferGeometryUtils.mergeBufferGeometries === 'function') {
+      return THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false);
     }
+    console.warn('[ft-3d] BufferGeometryUtils missing — ornament z falling back to first geometry only');
+    return geos[0];
   };
 
-  addArtDecoPanelling(ROOM_WIDTH, new THREE.Vector3(0, 0, -ROOM_DEPTH / 2 + 2), 0);
-  addArtDecoPanelling(ROOM_DEPTH, new THREE.Vector3(-ROOM_WIDTH / 2 + 2, 0, 0), Math.PI / 2);
-  addArtDecoPanelling(ROOM_DEPTH, new THREE.Vector3(ROOM_WIDTH / 2 - 2, 0, 0), -Math.PI / 2);
-  addArtDecoPanelling(ROOM_WIDTH, new THREE.Vector3(0, 0, ROOM_DEPTH / 2 - 2), Math.PI); // 4th wall
+  const bloomRoomOrnaments = (seed) => {
+    const brass = [], wood = [], molding = [], baseboard = [];
+    const yQuat = (rotY) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY || 0);
 
-  // ── CROWN MOLDING — decorative ceiling trim ──
-  const moldingMat = new THREE.MeshStandardMaterial({ color: 0x2a1c0e, roughness: 0.35, metalness: 0.12, envMapIntensity: 0.5 });
-  const addMolding = (w, pos, rotY) => {
-    const geo = new THREE.BoxGeometry(w, 8, 8);
-    const mesh = new THREE.Mesh(geo, moldingMat);
-    mesh.position.copy(pos);
-    mesh.rotation.y = rotY || 0;
-    scene.add(mesh);
-  };
-  addMolding(ROOM_WIDTH, new THREE.Vector3(0, ROOM_HEIGHT - 4, -ROOM_DEPTH / 2 + 4), 0);
-  addMolding(ROOM_DEPTH, new THREE.Vector3(-ROOM_WIDTH / 2 + 4, ROOM_HEIGHT - 4, 0), Math.PI / 2);
-  addMolding(ROOM_DEPTH, new THREE.Vector3(ROOM_WIDTH / 2 - 4, ROOM_HEIGHT - 4, 0), -Math.PI / 2);
-  addMolding(ROOM_WIDTH, new THREE.Vector3(0, ROOM_HEIGHT - 4, ROOM_DEPTH / 2 - 4), Math.PI);
+    for (const wall of seed.walls) {
+      const q = yQuat(wall.rotY);
 
-  // ── BASEBOARDS ──
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a0f05, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.4 });
-  const addBaseboard = (w, pos, rotY) => {
-    const geo = new THREE.BoxGeometry(w, 10, 4);
-    const mesh = new THREE.Mesh(geo, baseMat);
-    mesh.position.copy(pos);
-    mesh.rotation.y = rotY || 0;
-    scene.add(mesh);
+      wood.push(_bake(
+        new THREE.PlaneGeometry(wall.w - 10, seed.wainscotH),
+        new THREE.Vector3(wall.pos.x, seed.wainscotH / 2, wall.pos.z), q
+      ));
+      brass.push(_bake(
+        new THREE.BoxGeometry(wall.w, 5, 5),
+        new THREE.Vector3(wall.pos.x, seed.wainscotH, wall.pos.z), q
+      ));
+      brass.push(_bake(
+        new THREE.BoxGeometry(wall.w, 8, 4),
+        new THREE.Vector3(wall.pos.x, 4, wall.pos.z), q
+      ));
+
+      const stripCount = Math.floor(wall.w / seed.pilasterSpacing);
+      for (let si = 0; si < stripCount; si++) {
+        const sx = -wall.w / 2 + (si + 1) * (wall.w / (stripCount + 1));
+        const stripV = new THREE.Vector3(sx, seed.wainscotH / 2, 0).applyQuaternion(q);
+        brass.push(_bake(
+          new THREE.BoxGeometry(4, seed.wainscotH, 4),
+          new THREE.Vector3(wall.pos.x + stripV.x, stripV.y, wall.pos.z + stripV.z), q
+        ));
+        for (let step = 0; step < seed.capSteps; step++) {
+          const sw = 6 - step * 1.5;
+          const sh = 4 - step;
+          const sy = seed.wainscotH + step * sh;
+          const capV = new THREE.Vector3(sx, sy + sh / 2, 0).applyQuaternion(q);
+          brass.push(_bake(
+            new THREE.BoxGeometry(sw, sh, sw),
+            new THREE.Vector3(wall.pos.x + capV.x, capV.y, wall.pos.z + capV.z), q
+          ));
+        }
+      }
+
+      molding.push(_bake(
+        new THREE.BoxGeometry(wall.w, 8, 8),
+        new THREE.Vector3(wall.pos.x + wall.moldOff.x, ROOM_HEIGHT - 4, wall.pos.z + wall.moldOff.z), q
+      ));
+      baseboard.push(_bake(
+        new THREE.BoxGeometry(wall.w, 10, 4),
+        new THREE.Vector3(wall.pos.x, 5, wall.pos.z), q
+      ));
+    }
+
+    return {
+      brass: new THREE.Mesh(_merge(brass), brassMat),
+      wood: new THREE.Mesh(_merge(wood), woodMat),
+      molding: new THREE.Mesh(_merge(molding), moldingMat),
+      baseboard: new THREE.Mesh(_merge(baseboard), baseMat),
+    };
   };
-  addBaseboard(ROOM_WIDTH, new THREE.Vector3(0, 5, -ROOM_DEPTH / 2 + 2), 0);
-  addBaseboard(ROOM_DEPTH, new THREE.Vector3(-ROOM_WIDTH / 2 + 2, 5, 0), Math.PI / 2);
-  addBaseboard(ROOM_DEPTH, new THREE.Vector3(ROOM_WIDTH / 2 - 2, 5, 0), -Math.PI / 2);
-  addBaseboard(ROOM_WIDTH, new THREE.Vector3(0, 5, ROOM_DEPTH / 2 - 2), Math.PI);
+
+  const _orn = bloomRoomOrnaments(ornamentSeed);
+  _orn.brass.name = 'orn:brass';
+  _orn.wood.name = 'orn:wood';
+  _orn.molding.name = 'orn:molding';
+  _orn.baseboard.name = 'orn:baseboard';
+  scene.add(_orn.brass, _orn.wood, _orn.molding, _orn.baseboard);
 
   // ── ART DECO WALL SCONCES — 1930s speakeasy brass torchières ──
   // Each sconce: brass backplate + fan-shaped frosted glass shade + warm PointLight
@@ -2447,6 +2461,37 @@ async function init3D() {
       console.log(`🎮 Game initialized from invite session: ${playerCount} players | code=${sessionCode || inviteCode}`);
     } else {
       console.log(`🎮 Game initialized: ${playerCount} players | human="${humanName}" ${humanAvatar} | bots=${aiDifficulty}`);
+    }
+
+    // ── Live multiplayer relay (private/public/multiplayer modes only) ──
+    // The lobby page hands us the resolved roster via sessionStorage, but the
+    // live WebSocket is closed by the navigation. Re-open it here so draws,
+    // moves, and reshuffles are broadcast to peers via game_action and replayed
+    // locally under FastTrackCore's _applying guard.
+    const isLiveMpMode = (gameMode === 'private' || gameMode === 'public' || gameMode === 'multiplayer');
+    if (isLiveMpMode && window.KGMultiplayer && (sessionCode || inviteCode)) {
+      try {
+        const mp = new window.KGMultiplayer('fasttrack');
+        mp.on('game_action', (msg) => {
+          if (!msg || !msg.action) return;
+          // Skip our own echoes — server fans out to all peers including the sender.
+          if (msg.from && mp.userId && String(msg.from) === String(mp.userId)) return;
+          try { window.FastTrackCore.applyRemoteAction(msg.action, msg.payload); }
+          catch (err) { console.warn('[ft-mp] applyRemoteAction failed', msg.action, err); }
+        });
+        mp.on('session_update', (session) => {
+          if (!session) return;
+          // Server auto-resumes our seat on guest_login; capture host status so
+          // _isHost() reflects reality for reshuffle authority.
+          mp.isHost = session.host_id === mp.userId;
+        });
+        mp.connect();
+        window.FastTrackCore.setMultiplayerClient(mp);
+        window.__FT_MP__ = mp;
+        console.log('🌐 FastTrack multiplayer relay attached | code=' + (sessionCode || inviteCode));
+      } catch (err) {
+        console.warn('[ft-mp] failed to attach multiplayer relay', err);
+      }
     }
   }
 

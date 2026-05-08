@@ -53,6 +53,45 @@
       "manifest.json"
     ]
   },
+  "platforms": {
+    "_note": "HR-40/41 — marquee game; all platform targets required",
+    "web": {
+      "url": "https://kensgames.com/fasttrack/",
+      "status": "live"
+    },
+    "steam": {
+      "wrapper": "electron/",
+      "appid_placeholder": "FASTTRACK_STEAM_APPID",
+      "status": "ready"
+    },
+    "windows": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:win",
+      "status": "ready"
+    },
+    "macos": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:mac",
+      "status": "ready"
+    },
+    "linux": {
+      "wrapper": "electron/",
+      "build_cmd": "npm run build:linux",
+      "status": "ready"
+    },
+    "ios": {
+      "wrapper": "capacitor",
+      "config": "capacitor.config.json",
+      "bundle_id": "com.butterflyfx.fasttrack",
+      "status": "ready"
+    },
+    "android": {
+      "wrapper": "capacitor",
+      "config": "capacitor.config.json",
+      "package": "com.butterflyfx.fasttrack",
+      "status": "ready"
+    }
+  },
   "deploy": {
     "target": "/var/www/kensgames.com/fasttrack/",
     "type": "static_with_server"

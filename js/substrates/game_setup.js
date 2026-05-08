@@ -239,6 +239,130 @@
     return mounted;
   }
 
+  // ─── Universal lobby → game navigation ────────────────────────────────────
+  // Manifold contract: z = x * y
+  //   x = session identity (the game, the players — who they are)
+  //   y = launch mode modifiers (ai/friend/same-screen — how they play)
+  //   z = the running game (derived, never stored independently)
+  //
+  // Every lobby's onLaunch reduces to: persist x, navigate to z-entry.
+  // Game-specific intent (gameId, gameName, gamePath) is the only x input.
+  // The substrate handles the universal z derivation and navigation.
+  function launchTo(summary, opts) {
+    const gameId = opts && opts.gameId;
+    const gameName = opts && opts.gameName;
+    const gamePath = (opts && opts.gamePath) || ('/' + gameId + '/index.html');
+    const modeMap = { friend: 'private', ai: 'multi', 'same-screen': 'same-screen' };
+    const launchMode = summary && summary.launchMode;
+    const mode = (opts && opts.mode) || modeMap[launchMode] || 'solo';
+    persistGenericRuntime(summary, { gameId, gameName, mode });
+    root.location.href = gamePath + '?launch=1';
+  }
+
+  // ─── Universal game-side runtime consumer ─────────────────────────────────
+  // Called by each game's index.html on load. Reads the z (persisted runtime)
+  // left by the lobby, determines whether y (a live socket) is needed to
+  // manifest z, reconnects x (player identity) to the server if so, and
+  // delivers a fully-wired session to the game via callbacks.
+  //
+  // handlers: {
+  //   onSolo(runtime)               — local/AI game; no socket needed
+  //   onMultiplayer(session, mp)    — session.client = live KGMultiplayer
+  //   onMissing()                   — no ?launch=1 or no valid runtime
+  //   reconnectTimeout              — ms before falling back to onSolo (default 6000)
+  // }
+  function consumeRuntime(gameId, handlers) {
+    if (!handlers) handlers = {};
+    let params = null;
+    try { params = new URL(root.location.href).searchParams; } catch { /* ignore */ }
+    if (!params || params.get('launch') !== '1') {
+      if (typeof handlers.onMissing === 'function') handlers.onMissing();
+      return false;
+    }
+
+    const manager = root.KGGameManager;
+    let runtime = null;
+    if (manager && typeof manager.readGenericRuntimeFromStorage === 'function') {
+      runtime = manager.readGenericRuntimeFromStorage(gameId);
+    }
+    if (!runtime || !runtime.game ||
+      String(runtime.game.id || '').toLowerCase() !== String(gameId || '').toLowerCase()) {
+      if (typeof handlers.onMissing === 'function') handlers.onMissing();
+      return false;
+    }
+
+    // Clean URL — prevents re-triggering on refresh.
+    try {
+      params.delete('launch');
+      const q = params.toString();
+      root.history.replaceState(null, '', root.location.pathname + (q ? ('?' + q) : '') + root.location.hash);
+    } catch { /* ignore */ }
+
+    const players = Array.isArray(runtime.players) ? runtime.players : [];
+    const humanCount = players.filter(function (p) { return !p.is_ai; }).length;
+    const launchMode = runtime.game && runtime.game.mode;
+    const needsSocket = humanCount > 1
+      && launchMode !== 'ai' && launchMode !== 'solo'
+      && typeof root.KGMultiplayer !== 'undefined';
+
+    if (!needsSocket) {
+      if (typeof handlers.onSolo === 'function') handlers.onSolo(runtime);
+      return true;
+    }
+
+    // Multiplayer path: x (player identity token) reconnects via y (socket)
+    // to bloom z (the live session + synced game state).
+    // The server auto-resumes: guest_login with the same token → same user_id
+    // → finds player in 'playing' session → sends game_started automatically.
+    let sessionToken = null;
+    try { sessionToken = root.sessionStorage.getItem('kg_mp_session_token') || null; } catch { /* ignore */ }
+
+    const mp = new root.KGMultiplayer(gameId);
+    let _launched = false;
+    const timeoutMs = typeof handlers.reconnectTimeout === 'number' ? handlers.reconnectTimeout : 6000;
+
+    const doLaunch = function (serverSession) {
+      if (_launched) return;
+      _launched = true;
+      if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+      const sesData = runtime.session || null;
+      const myUserId = mp.userId || (sesData && sesData.my_user_id) || null;
+      const serverPlayers = serverSession && Array.isArray(serverSession.players) && serverSession.players.length > 0
+        ? serverSession.players : null;
+      const isHost = !!(serverSession && serverSession.host_id && myUserId &&
+        String(serverSession.host_id) === String(myUserId));
+      const merged = Object.assign({}, sesData, serverSession, {
+        client: mp,
+        my_user_id: myUserId,
+        is_host: isHost,
+        players: serverPlayers || players,
+      });
+      if (serverPlayers) {
+        // Refresh the cached roster with the authoritative server list.
+        runtime.players = serverPlayers;
+        runtime.game.player_count = serverPlayers.length;
+      }
+      if (typeof handlers.onMultiplayer === 'function') handlers.onMultiplayer(merged, mp);
+    };
+
+    var _fallbackTimer = setTimeout(function () {
+      if (!_launched) {
+        _launched = true;
+        console.warn('[KGGameSetup] reconnect timeout for', gameId, '— running local');
+        if (typeof handlers.onSolo === 'function') handlers.onSolo(runtime);
+      }
+    }, timeoutMs);
+
+    mp.on('game_started', function (data) {
+      doLaunch(data && data.session ? data.session : (mp.session || {}));
+    });
+    mp.on('session_update', function (data) {
+      if (data && data.status === 'playing') doLaunch(data);
+    });
+    mp.connect(sessionToken ? { guestToken: sessionToken } : {});
+    return true;
+  }
+
   root.KGGameSetup = {
     summarizeSession,
     persistSession,
@@ -246,6 +370,8 @@
     buildFastTrackRuntime,
     persistFastTrackRuntime,
     persistGenericRuntime,
+    launchTo,
+    consumeRuntime,
     mount,
   };
 }(window));

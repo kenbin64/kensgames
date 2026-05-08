@@ -1477,12 +1477,15 @@ const SFEnhance = (function () {
   }
 
   // ── Radar HUD scaling ─────────────────────────────────────────────────
+  // Anchor at bottom-left so the φ-scale grows up-and-right from the
+  // cockpit's left-side golden-ratio mount. Anchoring at bottom-right
+  // (previous behavior) pushed the scaled-up left edge off-screen.
   function _scaleRadar() {
     if (_radarScaled) return;
     const tryScale = () => {
       const el = document.querySelector('#radar, #radar-overlay, .radar, [data-hud="radar"]');
       if (!el) return false;
-      el.style.transformOrigin = 'bottom right';
+      el.style.transformOrigin = 'bottom left';
       el.style.transform = 'scale(' + RADAR_SCALE + ')';
       _radarScaled = true;
       return true;

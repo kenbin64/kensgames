@@ -3,9 +3,9 @@
    z = player * session (the saddle invocation)
    ═══════════════════════════════════════════════════════════════ */
 
-const LOBBY_WS = location.protocol === 'https:'
-    ? `wss://${location.host}/ws`
-    : `ws://${location.hostname}:8765`;
+const LOBBY_WS_BASE = location.protocol === 'https:'
+    ? `https://${location.host}`
+    : `http://${location.hostname}:8765`;
 
 // Fallback game table — overwritten at runtime by loadRegistry()
 const GAMES = {
@@ -368,22 +368,27 @@ function handleGuestJoin(e) {
 
 // ── WEBSOCKET ────────────────────────────────────────────────
 function connectLobby() {
-    try {
-        ws = new WebSocket(LOBBY_WS);
-        ws.onopen = () => {
-            console.log('[Arcade] Lobby connected');
-            if (currentUser) sendWS({ type: 'auth', token: currentUser.token });
-        };
-        ws.onmessage = (e) => {
-            try { handleMessage(JSON.parse(e.data)); } catch (err) { console.warn('[Arcade] Parse error', err); }
-        };
-        ws.onclose = () => { console.log('[Arcade] Lobby disconnected, reconnecting...'); setTimeout(connectLobby, 3000); };
-        ws.onerror = () => { };
-    } catch (e) { setTimeout(connectLobby, 5000); }
+    ws = io(LOBBY_WS_BASE, {
+        path: '/ws',
+        transports: ['websocket', 'polling'],
+        reconnection: false,
+    });
+    ws.on('connect', () => {
+        console.log('[Arcade] Lobby connected');
+        if (currentUser) sendWS({ type: 'auth', token: currentUser.token });
+    });
+    ws.on('message', (data) => {
+        try { handleMessage(data); } catch (err) { console.warn('[Arcade] Parse error', err); }
+    });
+    ws.on('disconnect', () => {
+        console.log('[Arcade] Lobby disconnected, reconnecting...');
+        setTimeout(connectLobby, 3000);
+    });
+    ws.on('connect_error', () => { setTimeout(connectLobby, 5000); });
 }
 
 function sendWS(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws && ws.connected) ws.emit('message', msg);
 }
 
 function handleMessage(msg) {

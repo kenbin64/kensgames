@@ -77,15 +77,36 @@
     }
 
     @media (max-height: 760px) {
-      .lobby-wrap { padding: 10px 12px 10px; gap: 8px; }
-      .player-card { padding: 8px 12px; margin-bottom: 8px; }
+      .lobby-wrap {
+        padding: 10px 12px 10px;
+        gap: 8px;
+      }
+
+      .player-card {
+        padding: 8px 12px;
+        margin-bottom: 8px;
+      }
     }
 
     @media (max-width: 640px) {
-      .lobby-wrap { padding: 10px 10px 12px; gap: 8px; }
-      .player-card { padding: 8px 12px; gap: 10px; margin-bottom: 8px; }
-      .player-name { font-size: 14px; }
-      .player-meta { font-size: 11px; }
+      .lobby-wrap {
+        padding: 10px 10px 12px;
+        gap: 8px;
+      }
+
+      .player-card {
+        padding: 8px 12px;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .player-name {
+        font-size: 14px;
+      }
+
+      .player-meta {
+        font-size: 11px;
+      }
     }
   </style>
   <script src="/js/analytics.js"></script>
@@ -131,7 +152,7 @@
       window.KGGameManager.loadRules('4dtictactoe').catch(() => { });
     }
   </script>
-  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
   <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
   <script src="/js/substrates/game_setup.js?v=20260430"></script>
   <script>
@@ -151,16 +172,11 @@
       maxPlayers: 4,
       gamePath: '/4DTicTacToe/index.html',
       onLaunch: (summary) => {
-        const playerCount = Math.max(1, Number(summary && summary.playerCount || 1));
-        const mode = summary && summary.hasRemoteHumans ? 'private' : (playerCount > 1 ? 'multi' : 'solo');
-        if (window.KGGameSetup && typeof window.KGGameSetup.persistGenericRuntime === 'function') {
-          window.KGGameSetup.persistGenericRuntime(summary, {
-            gameId: '4dtictactoe',
-            gameName: '4D TicTacToe',
-            mode,
-          });
-        }
-        window.location.href = '/4DTicTacToe/index.html';
+        window.KGGameSetup.launchTo(summary, {
+          gameId: '4dtictactoe',
+          gameName: '4D TicTacToe',
+          gamePath: '/4DTicTacToe/index.html',
+        });
       },
     });
   </script>

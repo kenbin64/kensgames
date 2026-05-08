@@ -278,7 +278,7 @@
       window.KGGameManager.loadRules('brickbreaker3d').catch(() => { });
     }
   </script>
-  <script src="/js/multiplayer-client.js"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
   <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
   <script src="/js/substrates/game_setup.js?v=20260430"></script>
   <script>
@@ -298,27 +298,11 @@
       maxPlayers: 4,
       gamePath: '/brickbreaker3d/play.html',
       onLaunch: (summary) => {
-        const playerCount = Math.max(1, Number(summary && summary.playerCount || 1));
-        const mode = summary && summary.hasRemoteHumans ? 'private' : (playerCount > 1 ? 'multi' : 'solo');
-
-        if (window.KGGameSetup && typeof window.KGGameSetup.persistGenericRuntime === 'function') {
-          window.KGGameSetup.persistGenericRuntime(summary, {
-            gameId: 'brickbreaker3d',
-            gameName: 'BrickBreaker 3D',
-            mode,
-          });
-          window.location.href = '/brickbreaker3d/play.html';
-          return;
-        }
-
-        const code = summary && summary.code ? summary.code : '';
-        if (mode === 'private') {
-          window.location.href = '/brickbreaker3d/play.html?mode=private&code=' + encodeURIComponent(code) + '&players=' + playerCount;
-        } else if (mode === 'multi') {
-          window.location.href = '/brickbreaker3d/play.html?mode=multi&players=' + playerCount;
-        } else {
-          window.location.href = '/brickbreaker3d/play.html?mode=solo';
-        }
+        window.KGGameSetup.launchTo(summary, {
+          gameId: 'brickbreaker3d',
+          gameName: 'BrickBreaker 3D',
+          gamePath: '/brickbreaker3d/play.html',
+        });
       },
     });
   </script>

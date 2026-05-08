@@ -107,7 +107,8 @@ const KGSync = {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+function _canvasH() { return canvas.clientHeight || (window.innerHeight - 96); }
+renderer.setSize(window.innerWidth, _canvasH());
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -185,40 +186,88 @@ function saddleCellQuaternion(_cx, _cy, _cz, out) {
   // handles continuity between adjacent chambers. Identity quaternion for every cell.
   return out.set(0, 0, 0, 1);
 }
-// Saddle field in cell-local coords: f = z - (x*y)/SADDLE_HALF, scaled so |z|_max == SADDLE_HALF
-// (the chamber half-width). The "z = xy" primitive is preserved in normalised units (u=x/h, v=y/h).
-// |grad f| = sqrt(1 + (x/h)^2 + (y/h)^2) >= 1 everywhere -- collision is well-conditioned.
+// Saddle field in cell-local coords — delegated to WinkiSubstrate (the manifold IS the source).
+// x = position on the surface, y = scale modifier (SADDLE_HALF normalises to unit cell).
+// z = x·y is the signed distance; grad(x) is the analytic surface normal.
+// The substrate observes; the game never re-derives.
 function saddleSignedDistance(lx, ly, lz) {
+  if (typeof WinkiSubstrate !== 'undefined') {
+    // Normalise to the unit cell [-1,+1] so WinkiSubstrate works in its own coords.
+    const h = SADDLE_HALF;
+    const u = lx / h, v = ly / h, w = lz / h;
+    // face +W: observed value = -(u·v) in unit coords → scale back to cell space
+    const raw = WinkiSubstrate.observe([u, v, w], 1.0) * h;
+    const g = WinkiSubstrate.grad([u, v, w]);
+    const gMag = Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) || 1;
+    return (lz - raw) / gMag;
+  }
+  // Fallback (substrate not loaded yet)
   const h = SADDLE_HALF;
   const f = lz - (lx * ly) / h;
   const gMag = Math.sqrt(1 + (lx * lx + ly * ly) / (h * h));
   return f / gMag;
 }
-function saddleGrad(lx, ly, _lz, out) {
+function saddleGrad(lx, ly, lz, out) {
+  if (typeof WinkiSubstrate !== 'undefined') {
+    const h = SADDLE_HALF;
+    const g = WinkiSubstrate.grad([lx / h, ly / h, lz / h]);
+    return out.set(g[0], g[1], g[2]);
+  }
   const h = SADDLE_HALF;
   return out.set(-ly / h, -lx / h, 1);
 }
-// Visual lattice: load winki.glb (a single z=xy chamber primitive baked in Blender) and
-// instance it 4x4x4 with NO rotation. The primitive's built-in geometry handles continuity
-// at chamber boundaries, so each cell is just translated to its chamber centre.
-// Cached source winki geometry: the GLB only needs to be loaded once, even if the grid is
-// resized between games (the InstancedMesh is rebuilt with a fresh count from this source).
-let _winkiSrc = null;
-function _winkiInstancedMesh(srcMesh) {
+// Visual lattice: each cell is a saddle surface z = xy/h derived directly from the
+// Winki manifold equation (the +W face: w = uv, normalized to cell half-extent h).
+// No GLB needed — the manifold equation paints the picture synchronously.
+let _winkiGeo = null;
+function _makeWinkiGeo(cellSize) {
+  const N = 32; // 32×32 grid → 2048 tris per cell, same density as the GLB at cell scale
+  const h = cellSize * 0.5;
+  const verts = (N + 1) * (N + 1);
+  const pos = new Float32Array(verts * 3);
+  const nor = new Float32Array(verts * 3);
+  const idx = new Uint16Array(N * N * 6);
+  let vi = 0;
+  // The manifold equation samples: WinkiSubstrate.saddle.top(u,v) = -(u*v) is face +W.
+  // Negate gives z = u*v (outward-facing cell). Falls back to inline if substrate absent.
+  const _wSaddle = (typeof WinkiSubstrate !== 'undefined') ? WinkiSubstrate.saddle.top : null;
+  for (let j = 0; j <= N; j++) {
+    const v = -1 + 2 * j / N;
+    for (let i = 0; i <= N; i++) {
+      const u = -1 + 2 * i / N;
+      // z = x·y on the +W face of the Winki manifold (the image shown by the designer).
+      // WinkiSubstrate.saddle.top returns -(u·v); negate for outward saddle.
+      const w = _wSaddle ? -_wSaddle(u, v, 0) : u * v;
+      pos[vi * 3] = u * h;
+      pos[vi * 3 + 1] = v * h;
+      pos[vi * 3 + 2] = w * h;
+      // Analytic normal from the manifold gradient: grad(-(u·v)) = (-v, -u, 1) normalised
+      const g = (typeof WinkiSubstrate !== 'undefined')
+        ? WinkiSubstrate.grad([u, v, w])
+        : [-v, -u, 1];
+      const nl = Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) || 1;
+      nor[vi * 3] = g[0] / nl;
+      nor[vi * 3 + 1] = g[1] / nl;
+      nor[vi * 3 + 2] = g[2] / nl;
+      vi++;
+    }
+  }
+  let ti = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const a = j * (N + 1) + i, b = a + 1, c = a + (N + 1), d = c + 1;
+      idx[ti++] = a; idx[ti++] = b; idx[ti++] = d;
+      idx[ti++] = a; idx[ti++] = d; idx[ti++] = c;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  return geo;
+}
+function _winkiInstancedMesh(geo) {
   const saddleInstanceCount = G * G * G;
-  // Bake the source node's transform into the geometry, then recentre & uniform-scale so
-  // the primitive bbox spans exactly one chamber (SADDLE_CELL across each axis).
-  const geo = srcMesh.geometry.clone();
-  geo.applyMatrix4(srcMesh.matrixWorld);
-  geo.computeBoundingBox();
-  const bb = geo.boundingBox, size = new THREE.Vector3(); bb.getSize(size);
-  const center = new THREE.Vector3(); bb.getCenter(center);
-  const recenter = new THREE.Matrix4().makeTranslation(-center.x, -center.y, -center.z);
-  geo.applyMatrix4(recenter);
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const scale = SADDLE_CELL / maxDim;
-  geo.applyMatrix4(new THREE.Matrix4().makeScale(scale, scale, scale));
-  geo.computeVertexNormals();
   const mat = new THREE.MeshStandardMaterial({
     color: 0x88bbff, emissive: 0x335577, emissiveIntensity: 0.55,
     metalness: 0.35, roughness: 0.18,
@@ -243,52 +292,125 @@ function _winkiInstancedMesh(srcMesh) {
 }
 function makeManifoldLattice() {
   const group = new THREE.Group();
-  // Outer cage -- bright cube silhouette so the saddle lattice bbox reads as a perfect cube.
-  const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2));
-  const cageMat = new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.9, linewidth: 2 });
-  const cage = new THREE.LineSegments(cageE, cageMat);
-  group.add(cage);
-  // 2px-like cage thickness fallback: WebGL often ignores linewidth, so layer a second pass.
-  const cagePass2 = new THREE.LineSegments(cageE, new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.55, linewidth: 2 }));
-  cagePass2.scale.setScalar(1.002);
-  group.add(cagePass2);
-  // Translucent reflective cube shell. BackSide so we see through the front into the
-  // chambers but still catch starfield reflections on the inside walls.
-  const shellGeo = new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2);
-  const shellMat = new THREE.MeshStandardMaterial({
-    color: 0x223a66, emissive: 0x081428, emissiveIntensity: 0.35,
-    metalness: 0.85, roughness: 0.08,
-    envMap, envMapIntensity: 1.4,
-    transparent: true, opacity: 0.09, side: THREE.BackSide,
-    depthWrite: false
-  });
-  const shell = new THREE.Mesh(shellGeo, shellMat); shell.renderOrder = 0; group.add(shell);
-  boardGroup.add(group);
-  // First call fetches winki.glb, caches the source mesh in _winkiSrc, then builds the
-  // instanced grid. Subsequent calls (after a grid resize) skip the fetch and rebuild
-  // immediately from the cached source.
-  const buildInstanced = (srcMesh) => {
-    const inst = _winkiInstancedMesh(srcMesh);
-    group.add(inst);
-    group.userData.surfaceMesh = inst;
-    // Register as a raycast collider so the ball bounces off the actual winki surface
-    // (motion-path test in collideBallVsGlb + 10-direction safety scan in safetyScanGlb).
-    glbColliders.push(inst);
-  };
-  if (_winkiSrc) {
-    buildInstanced(_winkiSrc);
+
+  // Player glow colors — same as BPALETTE, used throughout so the board breathes
+  // with the same palette as the jewel balls that live inside it.
+  const PGLOW = [0xc81a2a, 0x1f8a4a, 0x6020c8, 0xd9a82a]; // red, green, purple, gold
+
+  // ── Outer cage — 12-edge cube, one color per axis pair ───────────────────
+  // Each of the 3 axis pairs (X edges, Y edges, Z edges) gets a different player
+  // color so the cube reads as colorful rather than monochrome.
+  if (typeof WinkiSubstrate !== 'undefined') {
+    const cageData = WinkiSubstrate.makeCage(GY_HALF);
+    // Split the 12 edges into 3 groups of 4 by axis (layout: 4 bottom, 4 top, 4 vertical)
+    const edgeGroups = [
+      { start: 0, count: 4, color: PGLOW[0] },  // bottom ring  — red
+      { start: 4, count: 4, color: PGLOW[2] },  // top ring     — purple
+      { start: 8, count: 4, color: PGLOW[3] },  // verticals    — gold
+    ];
+    for (const eg of edgeGroups) {
+      const slice = cageData.positions.slice(eg.start * 6, (eg.start + eg.count) * 6);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(slice, 3));
+      group.add(new THREE.LineSegments(geo,
+        new THREE.LineBasicMaterial({ color: eg.color, transparent: true, opacity: 0.85 })));
+      // Thickness pass
+      const geo2 = geo.clone();
+      const ls2 = new THREE.LineSegments(geo2,
+        new THREE.LineBasicMaterial({ color: eg.color, transparent: true, opacity: 0.45 }));
+      ls2.scale.setScalar(1.003);
+      group.add(ls2);
+    }
   } else {
-    const loader = new THREE.GLTFLoader();
-    loader.load('assets/models/winki.glb', (gltf) => {
-      let srcMesh = null;
-      gltf.scene.updateMatrixWorld(true);
-      gltf.scene.traverse(o => { if (!srcMesh && o.isMesh) srcMesh = o; });
-      if (!srcMesh) return;
-      _winkiSrc = srcMesh;
-      buildInstanced(srcMesh);
-    }, undefined, (err) => { console.warn('winki.glb load failed', err); });
+    const cageE = new THREE.EdgesGeometry(new THREE.BoxGeometry(GY_HALF * 2, GY_HALF * 2, GY_HALF * 2));
+    group.add(new THREE.LineSegments(cageE,
+      new THREE.LineBasicMaterial({ color: 0x66aaff, transparent: true, opacity: 0.85 })));
   }
-  return group;
+
+  // ── Fractal inner cages — nested cubes, each octant tinted by nearest player color ──
+  if (typeof WinkiSubstrate !== 'undefined') {
+    const fractalDepth = G <= 3 ? 1 : 0;
+    if (fractalDepth > 0) {
+      const fractalData = WinkiSubstrate.makeFractalCages(GY_HALF, fractalDepth);
+      for (let lv = 1; lv < fractalData.length; lv++) {
+        const lvData = fractalData[lv];
+        lvData.cages.forEach((cell, ci) => {
+          const color = PGLOW[ci % PGLOW.length];
+          const translated = new Float32Array(cell.positions.length);
+          for (let i = 0; i < cell.positions.length; i += 3) {
+            translated[i] = cell.positions[i] + cell.origin[0];
+            translated[i + 1] = cell.positions[i + 1] + cell.origin[1];
+            translated[i + 2] = cell.positions[i + 2] + cell.origin[2];
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(translated, 3));
+          group.add(new THREE.LineSegments(geo,
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22 })));
+        });
+      }
+    }
+  }
+
+  // ── Translucent reflective shell — 6 faces tinted with player colors ─────
+  // Each face of the bounding cube picks up one player color as its emissive tint.
+  // BackSide + envMap = you see the starfield and player-colored light reflected inside.
+  // 6 separate PlaneGeometry meshes instead of one BoxGeometry so each face can differ.
+  const faceConfigs = [
+    { axis: 'y', sign: +1, rot: [-Math.PI / 2, 0, 0], color: PGLOW[0], emissive: 0x3a0a0a }, // top    — red
+    { axis: 'y', sign: -1, rot: [+Math.PI / 2, 0, 0], color: PGLOW[1], emissive: 0x0a1a0e }, // bottom — green
+    { axis: 'x', sign: +1, rot: [0, -Math.PI / 2, 0], color: PGLOW[3], emissive: 0x1a1200 }, // right  — gold
+    { axis: 'x', sign: -1, rot: [0, +Math.PI / 2, 0], color: PGLOW[2], emissive: 0x180a30 }, // left   — purple
+    { axis: 'z', sign: +1, rot: [0, 0, 0], color: PGLOW[2], emissive: 0x150826 }, // front  — purple
+    { axis: 'z', sign: -1, rot: [0, Math.PI, 0], color: PGLOW[3], emissive: 0x1a1200 }, // back   — gold
+  ];
+  const planeSize = GY_HALF * 2;
+  for (const fc of faceConfigs) {
+    const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+    const planeMat = new THREE.MeshStandardMaterial({
+      color: fc.color, emissive: fc.emissive, emissiveIntensity: 0.5,
+      metalness: 0.9, roughness: 0.06,
+      envMap, envMapIntensity: 1.8,
+      transparent: true, opacity: 0.5, side: THREE.BackSide,
+      depthWrite: false,
+    });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.set(...fc.rot);
+    plane.position[fc.axis] = fc.sign * GY_HALF;
+    plane.renderOrder = 0;
+    group.add(plane);
+  }
+
+  boardGroup.add(group);
+
+  // ── Saddle surface mesh (instanced, one per cell) ─────────────────────────
+  if (!_winkiGeo || Math.abs(_winkiGeo.userData.cellSize - SADDLE_CELL) > 1e-6) {
+    _winkiGeo = _makeWinkiGeo(SADDLE_CELL);
+    _winkiGeo.userData.cellSize = SADDLE_CELL;
+  }
+  const inst = _winkiInstancedMesh(_winkiGeo);
+  group.add(inst);
+  group.userData.surfaceMesh = inst;
+
+  // ── Wireframe overlay — all 6 saddle faces per cell, player-colored ───────
+  // Each cell tinted by the player color at that cell's (cx+cy+cz) parity mod 4
+  // so the grid shimmers with all 4 colors — no single cell dominates.
+  if (typeof WinkiSubstrate !== 'undefined') {
+    const wfData = WinkiSubstrate.makeFullWireframe(SADDLE_HALF, 12);
+    for (let cx = 0; cx < G; cx++) {
+      for (let cy = 0; cy < G; cy++) {
+        for (let cz = 0; cz < G; cz++) {
+          const color = PGLOW[(cx + cy + cz) % PGLOW.length];
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(wfData.positions.slice(), 3));
+          const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
+          const wfCell = new THREE.LineSegments(geo, mat);
+          saddleCellCenter(cx, cy, cz, _t);
+          wfCell.position.copy(_t);
+          group.add(wfCell);
+        }
+      }
+    }
+  }
 }
 let glbOverlay = makeManifoldLattice();
 // Per-cell sphere obstacles in nodePositions handle the cell-snap collisions; the lattice
@@ -858,7 +980,26 @@ function snapBoardRotation() {
   boardGroup.updateMatrixWorld(true);
 }
 
-// Snap a free-form local-space aim point to the nearest column center on the currently-up face.
+// ── Upright-orientation helpers ──────────────────────────────────────────────
+const _upTestV = new THREE.Vector3();
+function isUpright() {
+  _upTestV.set(0, 1, 0).applyQuaternion(boardGroup.quaternion);
+  return _upTestV.y >= 0.94;
+}
+function snapToUpright() {
+  let best = null, bestY = -Infinity;
+  for (const q of CUBE_ORIENTS) {
+    _upTestV.set(0, 1, 0).applyQuaternion(q);
+    if (_upTestV.y > bestY) { bestY = _upTestV.y; best = q; }
+  }
+  if (best) { boardGroup.quaternion.copy(best); boardGroup.updateMatrixWorld(true); }
+  updateOrientBtn();
+}
+function updateOrientBtn() {
+  const btn = document.getElementById('btn-orient');
+  if (!btn) return;
+  btn.hidden = isUpright();
+} to the nearest column center on the currently - up face.
 // Returns { latA, latB, faceIdx } so the caller can use topFaceWorldPos() for a clean drop.
 // Without this, balls released between passages bounce off the top of a gyroid wall and roll
 // down the outside of the cube instead of falling through a column.
@@ -973,6 +1114,11 @@ function settledSegmentTargetNode(x, y, z) {
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
   if (!KGSync.canActLocally()) return;
+  if (!isUpright()) {
+    const btn = document.getElementById('btn-orient');
+    if (btn) { btn.hidden = false; btn.classList.add('orient-pulse'); setTimeout(() => btn.classList.remove('orient-pulse'), 700); }
+    return;
+  }
   // Capture the ghost's current world-space aim point BEFORE we snap, so the ball spawns
   // above the column the player was actually pointing at (re-projected after snap).
   const p = ghostBall.p;
@@ -1731,11 +1877,66 @@ function startGame() {
   resetGame(true);
   Audio4D.startMusic();
 }
+
+// ── Manifold-first launch consumer ────────────────────────────────────────
+// x = this game session (identity: '4dtictactoe', the players, the token)
+// y = the substrate (KGGameSetup.consumeRuntime queries x's lobby-persisted z)
+// z = the running game (derived by onSolo or onMultiplayer callbacks below)
+//
+// No reconnect logic lives here — the substrate owns that. The game only
+// expresses what makes it unique: how to hydrate its state from a runtime,
+// and what startGame() means for 4D Connect.
+function _consumeLaunchRuntime() {
+  if (typeof KGGameSetup === 'undefined' || typeof KGGameSetup.consumeRuntime !== 'function') {
+    // Substrate not loaded yet — fall through to panel.
+    return false;
+  }
+
+  function _hydrateFromRuntime(runtime) {
+    const players = Array.isArray(runtime.players) ? runtime.players : [];
+    PLAYERS = players;
+    numPlayers = Math.max(1, Math.min(4, Number((runtime.game && runtime.game.player_count) || players.length || 1)));
+    const launchMode = runtime.game && runtime.game.mode;
+    vsMode = (launchMode === 'ai' || launchMode === 'multi') ? 'ai' : 'pvp';
+    for (let i = 0; i < numPlayers; i++) {
+      const pl = PLAYERS[i] || null;
+      setPlayerIdentity(i + 1, (pl && (pl.username || pl.name)) || ('PLAYER ' + (i + 1)), avatarFor(pl, i + 1));
+    }
+  }
+
+  function _hydrateFromSession(session) {
+    if (session && Array.isArray(session.players) && session.players.length > 0) {
+      PLAYERS = session.players;
+      numPlayers = Math.max(1, Math.min(4, Number(session.player_count || PLAYERS.length)));
+      for (let i = 0; i < numPlayers; i++) {
+        const pl = PLAYERS[i] || null;
+        setPlayerIdentity(i + 1, (pl && (pl.username || pl.name)) || ('PLAYER ' + (i + 1)), avatarFor(pl, i + 1));
+      }
+    }
+  }
+
+  return KGGameSetup.consumeRuntime('4dtictactoe', {
+    onSolo(runtime) {
+      _hydrateFromRuntime(runtime);
+      startGame();
+    },
+    onMultiplayer(session, mp) {
+      _hydrateFromRuntime({ players: session.players || [], game: { player_count: session.player_count, mode: 'pvp' } });
+      _hydrateFromSession(session);
+      KGSync.init(session);
+      startGame();
+    },
+    onMissing() {
+      openMultiplayerPanel();
+    },
+  });
+}
+
 function rematch() { document.getElementById('result-overlay').classList.remove('show'); resetGame(false); Audio4D.startMusic(); }
 function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); snapAnim = null; _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') setPlayerIdentity(2, 'AI OPPONENT', 'AI'); maybeSpawnTurnBall(); }
 let lastT = 0;
-function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); stepSnapAnim(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); renderer.render(scene, camera); }
-window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); stepSnapAnim(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); updateOrientBtn(); renderer.render(scene, camera); }
+window.addEventListener('resize', () => { camera.aspect = window.innerWidth / _canvasH(); camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, _canvasH()); });
 function setPreloadProgress(p) { document.getElementById('pre-bar').style.width = p + '%'; }
 function setPreloadMsg(m) { const el = document.getElementById('pre-msg'); if (el) el.textContent = m; }
 function finishPreload() { const pre = document.getElementById('preloader'); pre.style.opacity = '0'; setTimeout(() => pre.style.display = 'none', 850); }
@@ -1773,7 +1974,11 @@ Promise.all([manifestReady, glbReady]).then(() => {
   setPreloadMsg('READY');
   setTimeout(finishPreload, 400);
   setTimeout(() => {
-    try { openMultiplayerPanel(); } catch (e) { console.warn('[4D] panel autostart failed', e); }
+    try {
+      if (!_consumeLaunchRuntime()) openMultiplayerPanel();
+    } catch (e) {
+      console.warn('[4D] panel autostart failed', e);
+    }
   }, 0);
   // Bridge after manifest resolves so dimensions yield from the manifold.
   if (typeof ManifoldBridge !== 'undefined') {

@@ -59,16 +59,24 @@ const SpaceManifold = (function () {
   function stamp(e) {
     const p = e.position;
     const u = p.x * K, v = p.y * K, wz = p.z * K;
-    // z = xy² (quadratic projection), m = xyz (full coupling)
-    const w = u * v * v;
-    const m = u * v * wz;
-    e._m = {
-      u, v, w,
-      m,                                             // manifold value: xyz
-      field: Math.cos(u) * Math.cos(v) * Math.cos(wz)
-        - Math.sin(u) * Math.sin(v) * Math.sin(wz), // Schwartz Diamond
-      phase: Math.atan2(v, u),
-    };
+    // z = x·y on the Winki manifold — the entity's phase is where it stands on the saddle.
+    // WinkiSubstrate.observe([u,v,wz], 1.0) reads the field value at this position.
+    // WinkiSubstrate.faceOf([u,v,wz]) tells us which of the 6 saddle phases owns this entity.
+    let w, m, field, phase;
+    if (typeof WinkiSubstrate !== 'undefined') {
+      w = -WinkiSubstrate.saddle.top(u, v, wz);          // gather: z = u·v (outward)
+      m = WinkiSubstrate.observe([u, v, wz], 1.0);       // full manifold read at position
+      field = m;                                          // Winki replaces Schwartz Diamond
+      phase = WinkiSubstrate.faceOf([u, v, wz]).id;      // which saddle phase owns this entity
+    } else {
+      // Fallback (substrate not loaded)
+      w = u * v * v;
+      m = u * v * wz;
+      field = Math.cos(u) * Math.cos(v) * Math.cos(wz)
+        - Math.sin(u) * Math.sin(v) * Math.sin(wz); // Schwartz Diamond
+      phase = Math.atan2(v, u);
+    }
+    e._m = { u, v, w, m, field, phase };
     return e._m;
   }
 
@@ -95,9 +103,16 @@ const SpaceManifold = (function () {
     'player.hyperdriveCooldown': 15, // seconds cooldown after disengage
     'player.hyperdriveSpoolTime': 2.0, // seconds to spool up
     'player.hull': 100,    // starting hull
-    'player.shields': 100,    // starting shields
+    'player.shields': 200,   // starting shields — doubled for staying power; inverse-square degradation means early shots do little, late shots are lethal
     'player.torpedoes': 8,      // torpedo magazine
     'player.fuel': 100,    // fuel capacity
+
+    // ── Shield degradation — inverse-square law ──
+    // Each hit amplifies as the field weakens: scale = 1 + (maxMult-1) × (1 - s)²
+    // where s = current/max shields.  Full shields → 1× damage.  Near zero → maxMult×.
+    // Effect: handles ~8-10 shots at full strength; collapses fast once depleted.
+    'shields.degradeMaxMult': 8,    // max drain multiplier when shields near-zero
+    'shields.criticalPct': 0.20,    // fraction of max shields that triggers auto-medic call
     'player.boostDuration': 3.0,    // seconds
     'player.boostFuelCost': 25,     // fuel units per boost
     'player.boostCooldown': 8.0,    // seconds after boost expires
@@ -189,14 +204,14 @@ const SpaceManifold = (function () {
     'support.autopilotSpeed': 360,        // m/s cruise speed to support ship
     'support.returnSpeed': 300,           // m/s cruise speed back to combat
 
-    // ── Target Lock ── (acquire-then-hold; enemy can shake via evasion)
-    'targeting.acquireDot': 0.993,        // cos(~7°): fresh acquisition cone
-    'targeting.acquireTime': 1.0,         // s: dwell in crosshair before lock engages
-    'targeting.refreshDot': 0.993,        // re-centering on target resets hold timer
-    'targeting.breakDot': 0.866,          // cos(~30°): lock breaks if target leaves this cone
-    'targeting.holdRange': 5000,          // m: lock breaks beyond this distance
-    'targeting.holdTime': 5.0,            // s: max hold after acquisition without refresh
-    'targeting.shakeRate': 8.0,           // s of timer added per unit angular slip (target evading)
+    // ── Target Lock ── (crosshair intercept lock; enemy can shake via evasion)
+    'targeting.acquireDot': 0.9975,       // cos(~4°): tight cone — target must cross the visual crosshair
+    'targeting.acquireTime': 0.0,         // s: immediate lock when target crosses crosshair
+    'targeting.refreshDot': 0.9975,       // same as acquire; kept for API compatibility
+    'targeting.breakDot': 0.906,          // cos(~25°): lock breaks if target evades past this cone
+    'targeting.holdRange': 4500,          // m: lock breaks if target runs past weapon range
+    'targeting.holdTime': 3.0,            // s: hard 3-second lock cap
+    'targeting.shakeRate': 16.0,          // evasion impact doubled — agile enemies can break lock early
     'entity.egg.radius': 18,    // 3× human scale
     'entity.egg.hull': 30,
     'entity.egg.hatchTime': 4,
@@ -263,6 +278,18 @@ const SpaceManifold = (function () {
     'mass.youngling': 8,
     'mass.pickup': 1,
     'mass.default': 20,
+    // ── Asteroid mass by fragmentation stage ──
+    'mass.asteroid.large': 400,         // stage 0 — full boulder (catastrophic)
+    'mass.asteroid.medium': 120,        // stage 1 — mid fragment
+    'mass.asteroid.small': 30,          // stage 2 — small rock
+    // ── Debris shrapnel from ship/asteroid explosions ──
+    'mass.debris': 8,
+    'debris.radius': 5,
+    'debris.lifetime': 2.2,             // seconds before debris expires
+    'debris.damage': 16,                // flat damage on a debris hit
+    'debris.spawnCount': 4,             // shrapnel pieces per ship explosion
+    'debris.minSpeed': 80,
+    'debris.maxSpeed': 260,
 
     // ── Timing ──
     'timing.launch': 8.0,    // launch sequence seconds
@@ -564,18 +591,37 @@ const SFANPC = (function () {
   // ══════════════════════════════════════════════════════════════════
 
   /**
-   * Linear manifold: z = x * y
-   * Used for proportional response (communication, tactical decisions)
+   * Linear manifold: z = x · y
+   * Used for proportional response (communication, tactical decisions).
+   * Delegates to WinkiSubstrate.observe() — the manifold IS the equation.
+   * x and y are scalar intensities in [0,1]; the substrate normalises to unit cell.
    */
   function manifoldLinear(x, y) {
+    if (typeof WinkiSubstrate !== 'undefined') {
+      // Scale scalars into the [-1,+1] unit cell (center = 0.5 on each axis)
+      const u = (x - 0.5) * 2, v = (y - 0.5) * 2;
+      // face +W: observe returns -(u·v); negate to get gather (z = u·v)
+      const z = -WinkiSubstrate.saddle.top(u, v, 0);
+      // Remap [-1,+1] → [0,1]
+      return Math.max(0, Math.min(1, (z + 1) * 0.5));
+    }
     return Math.max(0, Math.min(1, x * y));
   }
 
   /**
-   * Asymmetric manifold: z = x * y²
-   * Used for escalation (aggression, weapon selection, panic)
+   * Asymmetric manifold: z = x · y²
+   * Used for escalation (aggression, weapon selection, panic).
+   * Winki +V face: v = -(z·x) → the asymmetric form when z is treated as y².
    */
   function manifoldAsymmetric(x, y) {
+    if (typeof WinkiSubstrate !== 'undefined') {
+      const u = (x - 0.5) * 2, v = (y - 0.5) * 2;
+      // Asymmetric: fold y through itself first (y² = y gathered by y)
+      const ySquared = -WinkiSubstrate.saddle.top(v, v, 0); // gather v with itself
+      // Then gather x with y² on face +W
+      const z = -WinkiSubstrate.saddle.top(u, ySquared, 0);
+      return Math.max(0, Math.min(1, (z + 1) * 0.5));
+    }
     return Math.max(0, Math.min(1, x * y * y));
   }
 
@@ -1863,7 +1909,76 @@ const SFANPC = (function () {
 
     // Character schemas (for external reference)
     CHARACTER_SCHEMAS,
+
+    // Voice profile — set by SFHud from lobby wingman-voice selector
+    setVoiceProfile(profile) {
+      if (!profile) return;
+      // Store for use in assemblePhrase / text-to-speech
+      this._voiceProfile = profile;
+      // Wire Web Speech API voice if available
+      if (typeof speechSynthesis !== 'undefined') {
+        speechSynthesis.cancel();
+        const voices = speechSynthesis.getVoices();
+        if (voices.length) {
+          this._speechVoice = _pickBestVoice(voices, profile);
+        } else {
+          speechSynthesis.addEventListener('voiceschanged', () => {
+            this._speechVoice = _pickBestVoice(speechSynthesis.getVoices(), profile);
+          }, { once: true });
+        }
+      }
+    },
+    getVoiceProfile() { return this._voiceProfile || null; },
+    speakLine(text) {
+      if (typeof speechSynthesis === 'undefined' || !text) return;
+      const utt = new SpeechSynthesisUtterance(text);
+      if (this._speechVoice) utt.voice = this._speechVoice;
+      utt.rate = 1.0;
+      utt.pitch = this._voiceProfile && this._voiceProfile.gender === 'female' ? 1.1 : 0.95;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utt);
+    },
   };
+
+  // Voice matching helper — picks best Web Speech API voice for a profile
+  function _pickBestVoice(voices, profile) {
+    if (!voices || !voices.length) return null;
+    const accentKws = {
+      american: ['en-US', 'United States'],
+      british: ['en-GB', 'United Kingdom'],
+      australian: ['en-AU', 'Australia'],
+      canadian: ['en-CA', 'Canada'],
+      irish: ['en-IE', 'Ireland'],
+      scottish: ['en-GB', 'Scotland'],
+      indian: ['en-IN', 'India'],
+      japanese: ['ja-JP', 'Japan'],
+      brazilian: ['pt-BR', 'Brazil'],
+      french: ['fr-FR', 'France'],
+      spanish: ['es-ES', 'Spanish'],
+      german: ['de-DE', 'Germany'],
+      nigerian: ['en-NG', 'Nigeria', 'en-US'],
+      'south-african': ['en-ZA', 'South Africa'],
+      neutral: ['en-US'],
+      robotic: ['en-US'],
+    };
+    const kws = accentKws[profile.accent] || ['en-US'];
+    const genderFilter = (v) => {
+      const name = (v.name || '').toLowerCase();
+      if (profile.gender === 'female') return name.includes('female') || name.includes('woman') || ['samantha', 'victoria', 'karen', 'moira', 'fiona', 'veena', 'ava', 'siri'].some(n => name.includes(n));
+      if (profile.gender === 'male') return name.includes('male') || name.includes('man') || ['alex', 'daniel', 'tom', 'lee', 'oliver', 'fred', 'jorge', 'diego', 'markus', 'yuri'].some(n => name.includes(n));
+      return true;
+    };
+    for (const kw of kws) {
+      const match = voices.find(v => (v.lang || '').includes(kw) && genderFilter(v));
+      if (match) return match;
+    }
+    // Fallback: any voice matching language only
+    for (const kw of kws) {
+      const match = voices.find(v => (v.lang || '').startsWith(kw.split('-')[0]));
+      if (match) return match;
+    }
+    return voices[0];
+  }
 
 })();
 
@@ -10141,10 +10256,35 @@ const Starfighter = (function () {
       if (this.type === 'tanker' || this.type === 'medic') return;
 
       if (this.shields > 0) {
-        this.shields -= amt;
+        // ── Inverse-square shield degradation ──────────────────────────────
+        // A strong field deflects most energy; as it weakens, each hit bleeds
+        // through more. Formula: drain = amt × (1 + (M-1) × (1-s)²)
+        //   s = current/max shields,  M = shields.degradeMaxMult
+        // Full shields (s=1) → 1× drain.  Depleted (s≈0) → M× drain.
+        // This means the first several shots barely dent shields, but once
+        // the field drops below ~50% it collapses rapidly.
+        const maxS = this.type === 'player' ? dim('player.shields') : (this._maxShields || 100);
+        const s = Math.max(0, Math.min(1, this.shields / maxS));
+        const M = dim('shields.degradeMaxMult') || 8;
+        const scale = 1 + (M - 1) * (1 - s) * (1 - s);
+        const drain = amt * scale;
+
+        this.shields -= drain;
         if (this.shields < 0) {
-          this.hull += this.shields;
+          this.hull += this.shields;   // bleed-through to hull
           this.shields = 0;
+        }
+
+        // ── Auto-call medic when shields hit critical level ────────────────
+        if (this.type === 'player' && !state._autoMedicCalled &&
+          this.shields < maxS * (dim('shields.criticalPct') || 0.20)) {
+          state._autoMedicCalled = true;
+          if (_canCallMedic && _canCallMedic()) {
+            _callSupport('medic');
+            addComm(_crew('dec'), `${_cs()} — shields critical! Emergency frigate incoming!`, 'warning');
+          } else {
+            addComm(_crew('dec'), `${_cs()} — shields critical! No frigate available — evade!`, 'warning');
+          }
         }
       } else {
         this.hull -= amt;
@@ -10168,6 +10308,27 @@ const Starfighter = (function () {
 
       this.markedForDeletion = true;
       if (M) M.remove(this.id);
+
+      // ── Debris cloud — spawn hot shrapnel for ships & large asteroids ──
+      // Debris entities are short-lived, fast, and deal flat damage on contact.
+      const _debrisEligible = new Set(['enemy', 'interceptor', 'bomber', 'predator', 'dreadnought', 'alien-baseship', 'wingman', 'asteroid']);
+      if (_debrisEligible.has(this.type)) {
+        const _cnt = dim('debris.spawnCount') || 4;
+        const _minSpd = dim('debris.minSpeed') || 80;
+        const _maxSpd = dim('debris.maxSpeed') || 260;
+        for (let _di = 0; _di < _cnt; _di++) {
+          const _db = new Entity('debris', this.position.x, this.position.y, this.position.z);
+          _db.radius = dim('debris.radius') || 5;
+          _db.maxAge = dim('debris.lifetime') || 2.2;
+          _db.hull = 1;
+          _db.shields = 0;
+          const _spd = _minSpd + Math.random() * (_maxSpd - _minSpd);
+          const _dir = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+          _db.velocity = this.velocity.clone().add(_dir.multiplyScalar(_spd));
+          state.entities.push(_db);
+        }
+      }
+
       // Decrement cluster alive count when a clustered enemy is destroyed
       if (this._clusterId !== undefined) {
         const _cl = state.clusters.find(c => c.id === this._clusterId);
@@ -10881,11 +11042,10 @@ const Starfighter = (function () {
       state.player.torpedoes = 99;
     }
 
-    // Show HUD
+    // Show HUD (gameplay-hud suppressed — stats live in SFHud footer rail, HR-6.2)
     document.getElementById('countdown-display').style.display = 'none';
     document.getElementById('ship-panel').style.display = 'block';
     document.getElementById('crosshair').style.display = 'block';
-    document.getElementById('gameplay-hud').style.display = 'block';
     document.getElementById('radar-overlay').style.display = 'block';
     initRadar();
     if (window.SF3D) {
@@ -11302,7 +11462,7 @@ const Starfighter = (function () {
     _showLaunchBayBriefing(false);
     document.getElementById('ship-panel').style.display = 'block';
     document.getElementById('crosshair').style.display = 'block';
-    document.getElementById('gameplay-hud').style.display = 'block';
+    // gameplay-hud suppressed — stats live in SFHud footer rail (HR-6.2)
     document.getElementById('radar-overlay').style.display = 'block';
     _ensureCombatHudVisible();
     initRadar();
@@ -12266,6 +12426,7 @@ const Starfighter = (function () {
     const safeDt = Math.min(dt, 0.1);
 
     try {
+      _syncHudVisibilityFromPhase();
 
       // ── Pause gate: freeze simulation updates, keep current frame rendered ──
       if (state.paused) {
@@ -13662,17 +13823,17 @@ const Starfighter = (function () {
       // Apply repairs based on type
       if (state._supportCall === 'tanker') {
         // Tanker: fuel + hull + shields + rearm
-        state.player.fuel = Math.min(100, state.player.fuel + dt * dim('entity.tanker.fuelRepairRate'));
-        state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.tanker.hullRepairRate'));
-        state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.tanker.shieldRepairRate'));
+        state.player.fuel = Math.min(dim('player.fuel'), state.player.fuel + dt * dim('entity.tanker.fuelRepairRate'));
+        state.player.hull = Math.min(dim('player.hull'), state.player.hull + dt * dim('entity.tanker.hullRepairRate'));
+        state.player.shields = Math.min(dim('player.shields'), state.player.shields + dt * dim('entity.tanker.shieldRepairRate'));
         // Rearm torpedoes gradually
         if (state._supportDockTimer > 1.0 && state.player.torpedoes < 2) {
           state.player.torpedoes = Math.min(2, state.player.torpedoes + 1);
         }
       } else {
         // Medic: hull + shields only — NO rearm, NO refuel
-        state.player.hull = Math.min(100, state.player.hull + dt * dim('entity.medic.hullRepairRate'));
-        state.player.shields = Math.min(100, state.player.shields + dt * dim('entity.medic.shieldRepairRate'));
+        state.player.hull = Math.min(dim('player.hull'), state.player.hull + dt * dim('entity.medic.hullRepairRate'));
+        state.player.shields = Math.min(dim('player.shields'), state.player.shields + dt * dim('entity.medic.shieldRepairRate'));
       }
 
       // HUD progress
@@ -13744,6 +13905,7 @@ const Starfighter = (function () {
     state._supportPhase = null;
     state._supportDockTimer = 0;
     state._supportReturnPos = null;
+    state._autoMedicCalled = false; // allow another auto-call if shields drop again
     state._supportLastComm = 0;
     state._postSupportAutoLand = false;
     const cdEl = document.getElementById('countdown-display');
@@ -14078,6 +14240,32 @@ const Starfighter = (function () {
     if (radar) radar.style.display = 'block';
   }
 
+  // Keep radar/crosshair aligned to flight state so transitions cannot orphan them hidden.
+  // Allowlist all phases where the player ship is in motion in the world; only pre-flight
+  // (loading / bay-ready / tutorial overlay) explicitly hides the combat HUD.
+  function _syncHudVisibilityFromPhase() {
+    const crosshair = document.getElementById('crosshair');
+    const radar = document.getElementById('radar-overlay');
+    if (!crosshair && !radar) return;
+
+    const p = state.phase;
+    const inFlight = state.respawning
+      || p === 'combat' || p === 'launching' || p === 'land-approach'
+      || p === 'landing' || p === 'docking';
+    const display = inFlight ? 'block' : 'none';
+
+    if (crosshair && crosshair.style.display !== display) crosshair.style.display = display;
+    if (radar && radar.style.display !== display) radar.style.display = display;
+
+    // If the radar overlay was just made visible but its WebGL renderer was
+    // never created (e.g. the player launched via a path that skipped the
+    // explicit initRadar() calls at 10959/11377), bring it up lazily.
+    // initRadar() is idempotent — it early-returns when the scene is already built.
+    if (display === 'block' && !radarRenderer) {
+      try { initRadar(); } catch (_) { /* canvas may not yet be attached */ }
+    }
+  }
+
   // ── Request Dock — manual redock, player flies themselves ──
   function _requestDock() {
     if (state.phase !== 'combat') return;
@@ -14246,10 +14434,9 @@ const Starfighter = (function () {
     if (bestTarget && window.SFAudio) SFAudio.playSound('lock_tone');
   }
 
-  // ── Auto-targeting: acquire-then-hold lock; evasion erodes the timer ──
-  // Crosshair establishes lock when an enemy enters the acquisition cone, then maintains
-  // it through the wider break cone for up to holdTime seconds. Angular slip (target
-  // drifting away from aim point — caused by evasive maneuvers) accelerates timer decay.
+  // ── Auto-targeting: crosshair intercept lock with hard 3s cap ──
+  // When a hostile crosses the center crosshair in range, lock engages immediately.
+  // Lock persists for up to holdTime seconds and can break sooner if the target evades.
   let _crosshairLocked = false;
   let _crosshairTarget = null;
   let _lockHoldTimer = 0;
@@ -14287,7 +14474,6 @@ const Starfighter = (function () {
           const slip = Math.max(0, _lockPrevDot - dot);
           _lockHoldTimer += (dt || 0) + slip * dim('targeting.shakeRate');
           _lockPrevDot = dot;
-          if (dot >= dim('targeting.refreshDot')) _lockHoldTimer = 0; // re-centering refreshes
           if (_lockHoldTimer < dim('targeting.holdTime')) {
             p.lockedTarget = _crosshairTarget;
             crosshair.classList.add('locked');
@@ -14317,8 +14503,8 @@ const Starfighter = (function () {
       _v2.multiplyScalar(1 / dist);
       const dot = _v1.dot(_v2);
 
-      // ~15° cone for tracking awareness (cos(15°) ≈ 0.966)
-      if (dot > 0.966 && dot > bestDot) {
+      // ~8° awareness cone — slightly larger than acquire so tracking starts just before lock
+      if (dot > 0.990 && dot > bestDot) {
         bestDot = dot;
         bestTarget = e;
       }
@@ -14335,7 +14521,7 @@ const Starfighter = (function () {
       crosshair.classList.remove('locked');
       crosshair.classList.add('tracking');
 
-      if (_acquireTimer >= (dim('targeting.acquireTime') || 1.0)) {
+      if (_acquireTimer >= (dim('targeting.acquireTime') || 0.0)) {
         _crosshairLocked = true;
         _crosshairTarget = bestTarget;
         _lockHoldTimer = 0;
@@ -14632,6 +14818,23 @@ const Starfighter = (function () {
       if (a.type !== 'laser' && a.type !== 'torpedo' && b.type !== 'laser' && b.type !== 'torpedo') return;
     }
 
+    // ── Debris shrapnel — deals flat damage on impact, then disappears ──
+    if (a.type === 'debris' || b.type === 'debris') {
+      const _deb = a.type === 'debris' ? a : b;
+      const _doth = _deb === a ? b : a;
+      // Only harm solid ships; skip baseship, projectiles, other debris
+      const _dSolid = _doth.type !== 'debris' && _doth.type !== 'baseship' &&
+        _doth.type !== 'laser' && _doth.type !== 'torpedo' &&
+        _doth.type !== 'machinegun' && _doth.type !== 'plasma';
+      if (_dSolid) {
+        _deb.markedForDeletion = true;
+        if (M) M.remove(_deb.id);
+        _doth.takeDamage(dim('debris.damage') || 16);
+        if (window.SF3D) SF3D.spawnImpactEffect(_deb.position, 0xff8800);
+      }
+      return;
+    }
+
     // ── Plasma special handling — disable, don't kill directly ──
     if (a.type === 'plasma') {
       if (b.type === 'predator') return; // predators immune to own plasma
@@ -14743,17 +14946,74 @@ const Starfighter = (function () {
     } else {
       // Physical crash - skip if player during launch
       if (!(state.phase === 'launching' && (a.type === 'player' || b.type === 'player'))) {
-        a.takeDamage(50);
-        b.takeDamage(50);
+        // ── Kinetic collision damage: dmg = kK × mass(other) × |Δv|² ──
+        // Each entity takes damage proportional to the other's mass (Newton 3rd-law feel).
+        // Calibrated: player head-on with interceptor at 500 m/s ≈ 25 dmg each;
+        // player rams a dreadnought at 400 m/s ≈ catastrophic hull breach.
+        const kK = dim('damage.kineticK');
+        const minDv = dim('damage.kineticMinDvSq');
+        const cap = dim('damage.kineticMaxPerHit');
 
-        if (window.SF3D) {
-          SF3D.spawnImpactEffect(a.position.clone().add(b.position).multiplyScalar(0.5), 0xff0088);
+        const dvx = a.velocity.x - b.velocity.x;
+        const dvy = a.velocity.y - b.velocity.y;
+        const dvz = a.velocity.z - b.velocity.z;
+        const dvSq = dvx * dvx + dvy * dvy + dvz * dvz;
+
+        if (dvSq >= minDv) {
+          const _getMass = (e) => {
+            if (e.type === 'asteroid') {
+              const s = e._asteroidStage || 0;
+              return dim(s === 0 ? 'mass.asteroid.large' : s === 1 ? 'mass.asteroid.medium' : 'mass.asteroid.small');
+            }
+            return dim('mass.' + e.type) || dim('mass.default');
+          };
+          const massA = _getMass(a), massB = _getMass(b);
+          const dmgA = Math.min(cap, kK * massB * dvSq);
+          const dmgB = Math.min(cap, kK * massA * dvSq);
+
+          const aIsAsteroid = a.type === 'asteroid', bIsAsteroid = b.type === 'asteroid';
+
+          if (aIsAsteroid && !bIsAsteroid) {
+            // Asteroid rams a ship — fragment the asteroid, deal kinetic damage to ship
+            b.takeDamage(dmgB);
+            _fragmentAsteroid(a, null);
+            if (b.type === 'player' && (a._asteroidStage || 0) === 0) {
+              addComm(_crew('dec'), `${_cs()} — catastrophic impact! Asteroid collision!`, 'warning');
+            }
+          } else if (bIsAsteroid && !aIsAsteroid) {
+            a.takeDamage(dmgA);
+            _fragmentAsteroid(b, null);
+            if (a.type === 'player' && (b._asteroidStage || 0) === 0) {
+              addComm(_crew('dec'), `${_cs()} — catastrophic impact! Asteroid collision!`, 'warning');
+            }
+          } else {
+            // Ship-to-ship: both take kinetic damage
+            // Skip gentle brushes between player and own wingman (landing maneuvers, etc.)
+            const wingmanScrape = (a.type === 'wingman' || b.type === 'wingman') &&
+              (a.type === 'player' || b.type === 'player') &&
+              dvSq < 40000; // < ~200 m/s relative
+            if (!wingmanScrape) {
+              a.takeDamage(dmgA);
+              b.takeDamage(dmgB);
+              // Capital-ship ram warning
+              const _isCap = (t) => t === 'dreadnought' || t === 'alien-baseship';
+              if (a.type === 'player' && _isCap(b.type) && dmgA >= 80) {
+                addComm(_crew('dec'), `${_cs()} — you collided with a capital ship! Hull critical!`, 'warning');
+              } else if (b.type === 'player' && _isCap(a.type) && dmgB >= 80) {
+                addComm(_crew('dec'), `${_cs()} — you collided with a capital ship! Hull critical!`, 'warning');
+              }
+            }
+          }
         }
 
-        // Bounce
+        if (window.SF3D) {
+          SF3D.spawnImpactEffect(a.position.clone().add(b.position).multiplyScalar(0.5), 0xff4400);
+        }
+
+        // Bounce both entities apart
         const n = a.position.clone().sub(b.position).normalize();
-        a.velocity.add(n.clone().multiplyScalar(50));
-        b.velocity.sub(n.clone().multiplyScalar(50));
+        a.velocity.add(n.clone().multiplyScalar(60));
+        b.velocity.sub(n.clone().multiplyScalar(60));
       }
     }
   }
@@ -15469,7 +15729,8 @@ const Starfighter = (function () {
     const radarMaxSq = radarMax * radarMax;
     state.entities.forEach(e => {
       if (e === state.player || !e.position || e.markedForDeletion) return;
-      if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'baseship') return;
+      // exclude projectiles and debris from radar
+      if (e.type === 'laser' || e.type === 'machinegun' || e.type === 'debris') return;
 
       const rx = e.position.x - pPos.x;
       const ry = e.position.y - pPos.y;
@@ -15589,37 +15850,53 @@ const Starfighter = (function () {
       const sweepFrac = age / SWEEP_PERIOD;
       const fadeAlpha = PERSISTENCE * (1.0 - sweepFrac);
 
-      // IFF color coding (GDD §6)
+      // IFF color + size coding (GDD §6 — canonical blip palette)
+      // ── Enemy fighters (small red) ──────────────────────────────────────
       if (c.type === 'enemy') {
-        blip.material.color.setHex(0xff2222);
+        blip.material.color.setHex(0xff2200);   // red fighter
         blip.scale.setScalar(1.0);
       } else if (c.type === 'interceptor') {
-        blip.material.color.setHex(0xff4444);
-        blip.scale.setScalar(0.8);
-      } else if (c.type === 'bomber') {
-        blip.material.color.setHex(0xff8800);
-        blip.scale.setScalar(1.4);
-      } else if (c.type === 'dreadnought') {
-        blip.material.color.setHex(0xff0044);
-        blip.scale.setScalar(2.5);
-      } else if (c.type === 'alien-baseship') {
-        blip.material.color.setHex(0xff00ff);
-        blip.scale.setScalar(2.0);
+        blip.material.color.setHex(0xff2200);   // red fighter
+        blip.scale.setScalar(0.9);
       } else if (c.type === 'predator') {
-        blip.material.color.setHex(0xcc0000);
+        blip.material.color.setHex(0xff2200);   // red fighter (large alien)
         blip.scale.setScalar(1.3);
-      } else if (c.type === 'torpedo') {
-        blip.material.color.setHex(0x00ffff);
-        blip.scale.setScalar(0.7);
+        // ── Enemy capitals (large orange) ───────────────────────────────────
+      } else if (c.type === 'bomber') {
+        blip.material.color.setHex(0xff6600);   // orange medium ship
+        blip.scale.setScalar(1.6);
+      } else if (c.type === 'dreadnought') {
+        blip.material.color.setHex(0xff5500);   // orange capital
+        blip.scale.setScalar(2.6);
+      } else if (c.type === 'alien-baseship') {
+        blip.material.color.setHex(0xff4400);   // orange enemy baseship
+        blip.scale.setScalar(2.2);
+      } else if (c.type === 'alien-base' || c.type === 'hive') {
+        blip.material.color.setHex(0xff5500);   // orange enemy structure
+        blip.scale.setScalar(3.0);
+        // ── Friendly fighters (small green) ─────────────────────────────────
       } else if (c.type === 'wingman') {
-        blip.material.color.setHex(0x44ff44);
+        blip.material.color.setHex(0x00ff44);   // green friendly fighter
         blip.scale.setScalar(1.0);
+        // ── Friendly capitals / support (large amber) ───────────────────────
+      } else if (c.type === 'baseship') {
+        blip.material.color.setHex(0xffaa00);   // amber friendly carrier
+        blip.scale.setScalar(3.2);
       } else if (c.type === 'tanker') {
-        blip.material.color.setHex(0x00ff88);
-        blip.scale.setScalar(1.2);
+        blip.material.color.setHex(0xffbb00);   // amber friendly tanker
+        blip.scale.setScalar(1.6);
       } else if (c.type === 'medic') {
-        blip.material.color.setHex(0x44ffff);
-        blip.scale.setScalar(1.3);
+        blip.material.color.setHex(0xffcc44);   // amber medical frigate
+        blip.scale.setScalar(1.5);
+        // ── Torpedoes (cyan, tiny) ──────────────────────────────────────────
+      } else if (c.type === 'torpedo') {
+        blip.material.color.setHex(0x00ffff);   // cyan torpedo
+        blip.scale.setScalar(0.65);
+        // ── Asteroid clusters (white) ───────────────────────────────────────
+      } else if (c.type === 'asteroid') {
+        blip.material.color.setHex(0xffffff);   // white asteroid/rock
+        blip.scale.setScalar(1.1);
+        // ── Objective types ─────────────────────────────────────────────────
       } else if (c.type === 'aurora-objective') {
         blip.material.color.setHex(0x66aaff);
         blip.scale.setScalar(2.0);
@@ -15636,18 +15913,16 @@ const Starfighter = (function () {
       } else if (c.type === 'rescue-pod') {
         blip.material.color.setHex(0x66ccff);
         blip.scale.setScalar(1.8 + Math.sin(performance.now() * 0.008) * 0.2);
-      } else if (c.type === 'asteroid') {
-        blip.material.color.setHex(0xbb9966);
-        blip.scale.setScalar(1.15);
       } else if (c.type === 'queen-chamber-locked') {
         blip.material.color.setHex(0xff4422);
         blip.scale.setScalar(2.5);
       } else if (c.type === 'queen-chamber-open') {
         blip.material.color.setHex(0xffdd33);
         blip.scale.setScalar(2.8);
+        // ── Heavenly bodies / stations / environmental (blue) ───────────────
       } else {
-        blip.material.color.setHex(0x4488ff);
-        blip.scale.setScalar(1.0);
+        blip.material.color.setHex(0x2266ff);   // blue — planet, station, unknown
+        blip.scale.setScalar(1.4);
       }
 
       // Locked target — always visible, pulses yellow
@@ -15696,6 +15971,7 @@ const Starfighter = (function () {
     init,
     getState: () => state,
     getPhase: () => state.phase,
+    getDim: dim,
     firePrimary,
     fireLaser: () => fireLaser(state.player, 'player'),
     fireTorpedo: () => fireTorpedo(state.player, 'player'),
