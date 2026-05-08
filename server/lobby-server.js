@@ -20,13 +20,34 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { Server: IOServer } = require('socket.io');
+const crossws = require('crossws/adapters/node');
 
 const Field = require('../js/manifold-field.js');
 const Proj = require('./manifold-projection.js');
 
 const PlayerManager = require('./player-manager.js');
 const UserRegistry = require('./user-registry.js');
+const GameObject = require('./game-object.js');
+
+// ── Colyseus room factory (optional; degrades gracefully if not running) ─────
+const COLYSEUS_PORT = parseInt(process.env.COLYSEUS_PORT || '2567', 10);
+const COLYSEUS_BASE = `http://127.0.0.1:${COLYSEUS_PORT}`;
+
+async function createColyseusRoom(gameId, options) {
+  try {
+    const fetch = globalThis.fetch || await import('node-fetch').then(m => m.default).catch(() => null);
+    if (!fetch) return null;
+    const res = await fetch(`${COLYSEUS_BASE}/matchmake/create/${gameId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options || {}),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(2000) : undefined,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.roomId ? data : null;
+  } catch { return null; }
+}
 
 const PORT = parseInt(process.env.LOBBY_PORT || '8765', 10);
 const SEED_LOG = process.env.SEED_LOG || path.join(__dirname, '..', 'state', 'seeds.jsonl');
@@ -191,7 +212,8 @@ function gameRoutes(gameId) {
 // These are CACHES of the log frontier, not authority. On restart they are
 // rebuilt from the log in O(N) where N = active sessions.
 const liveSessions = new Map();   // session_x_id → { x, players, settings, status, …ephemeral }
-const connections = new Map();    // ws → { user_id, user, session_x_id }
+const connections = new Map();    // peer → { user_id, user, session_x_id }
+const activePeers = new Set();    // connected peers (authenticated or not)
 
 // ── Player Manager (single authority for all active sessions) ───────────────
 const pm = new PlayerManager(connections, liveSessions, send, broadcastSession);
@@ -229,6 +251,7 @@ function sanitize(s) {
   return {
     session_id: s.session_id,
     session_code: s.session_code,
+    colyseus_room_id: s.colyseus_room_id || null,
     game_uuid: s.game_uuid || null,
     game_id: s.game_id,
     game_name: s.game_name,
@@ -248,14 +271,21 @@ function sanitize(s) {
   };
 }
 
-function send(socket, data) {
-  if (socket && socket.connected) socket.emit('message', data);
+function send(peer, data) {
+  if (!peer || !peer.websocket || peer.websocket.readyState !== 1) return;
+  try { peer.send(JSON.stringify(data)); } catch (_) { /* best effort */ }
 }
 function broadcastSession(s, data, exclude) {
-  const target = io.to(s.session_id);
-  (exclude ? target.except(exclude.id) : target).emit('message', data);
+  if (!s || !s.session_id) return;
+  for (const [peer, conn] of connections.entries()) {
+    if (!conn || conn.session_x_id !== s.session_id) continue;
+    if (exclude && peer.id === exclude.id) continue;
+    send(peer, data);
+  }
 }
-function broadcastAll(data) { io.emit('message', data); }
+function broadcastAll(data) {
+  for (const peer of activePeers) send(peer, data);
+}
 
 function sessionByCode(code) {
   // First try the live cache (newest), then fall back to a pure observe of
@@ -313,6 +343,7 @@ function leaveCurrentSession(ws, conn) {
   conn.session_x_id = null;
   if (s.players.length === 0 || (s.host_id === conn.user_id && s.players.filter(p => !p.is_ai).length === 0)) {
     liveSessions.delete(s.session_id);
+    GameObject.remove(s.session_id);
     broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
     return s;
   }
@@ -320,6 +351,7 @@ function leaveCurrentSession(ws, conn) {
     const newHost = s.players.find(p => !p.is_ai);
     if (newHost) { s.host_id = newHost.user_id; s.host_username = newHost.username; newHost.is_host = true; }
   }
+  syncGameObjectSession(s);
   broadcastSession(s, {
     type: 'player_left', username: conn.user.username,
     players: s.players.map(p => ({
@@ -327,6 +359,7 @@ function leaveCurrentSession(ws, conn) {
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
+  emitGameObject(s);
   return s;
 }
 
@@ -345,11 +378,6 @@ function stableGuestId(token) {
   return 'guest_' + crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
 
-const ALLOWED_AVATAR_IDS = new Set([
-  'person_smile', 'person_cool', 'animal_lion', 'animal_fox',
-  'space_rocket', 'fantasy_dragon', 'scifi_robot', 'sport_soccer',
-  'robot', 'generic_shape',
-]);
 const TECH_BOT_NAMES = ['quantum', 'nexus', 'circuit', 'vector', 'axiom', 'cypher', 'ion', 'neon'];
 
 function sanitizeUsername(raw, fallback) {
@@ -359,11 +387,8 @@ function sanitizeUsername(raw, fallback) {
 }
 
 function normalizeAvatarId(raw) {
-  const id = String(raw || '').trim();
-  if (!id) return 'generic_shape';
-  if (ALLOWED_AVATAR_IDS.has(id)) return id;
-  // If avatar "word" leaks in from UI text, force generic shape.
-  return 'generic_shape';
+  // Accept emoji and word-id avatars; only sanitize obviously invalid payloads.
+  return GameObject.sanitizeAvatar(raw, '👤');
 }
 
 function hasRenderableProfile(conn) {
@@ -371,6 +396,43 @@ function hasRenderableProfile(conn) {
   const nameOk = String(conn.user.username || '').trim().length >= 2;
   const avatarOk = !!normalizeAvatarId(conn.user.avatar_id);
   return nameOk && avatarOk;
+}
+
+function toSessionPlayersFromGame(gameJson) {
+  return (gameJson.players || []).map((p) => ({
+    user_id: p.userId,
+    username: p.name,
+    avatar_id: p.avatar,
+    is_host: !!p.isHost,
+    is_ai: !!p.isAI,
+    slot: Number(p.slot) || 0,
+    ready: !!p.isReady,
+  }));
+}
+
+function syncGameObjectSession(session) {
+  const g = GameObject.upsertFromSession(session);
+  if (!g) return null;
+  const gj = g.toJSON();
+  session.players = toSessionPlayersFromGame(gj);
+  session.host_id = gj.hostId || session.host_id;
+  const host = session.players.find(p => p.user_id === session.host_id);
+  if (host) session.host_username = host.username;
+  session.max_players = gj.maxPlayers;
+  session.settings = { ...(gj.settings || {}) };
+  session.status = gj.phase || session.status;
+  return gj;
+}
+
+function emitGameObject(session, options) {
+  const gameObject = syncGameObjectSession(session);
+  if (!gameObject) return;
+  const payload = { type: 'game_object', game_object: gameObject, session_id: session.session_id };
+  if (options && options.toSocket) {
+    send(options.toSocket, payload);
+    return;
+  }
+  broadcastSession(session, payload, options && options.excludeSocket);
 }
 
 function techBotName(seedName, aiCount) {
@@ -396,6 +458,7 @@ handlers.guest_login = (ws, data) => {
       connections.get(ws).session_x_id = s.session_id;
       ws.join(s.session_id);
       send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
+      emitGameObject(s, { toSocket: ws });
       if (s.status === 'playing') send(ws, { type: 'game_started', session: sanitize(s) });
       if (s.status === 'playing') {
         pm.registerConnection(userId, ws);
@@ -425,6 +488,16 @@ handlers.update_profile = (ws, data) => {
   if (data && data.username) {
     conn.user.username = sanitizeUsername(data.username, conn.user.username);
   }
+  const s = liveSessions.get(conn.session_x_id);
+  if (s) {
+    const p = s.players.find(pp => pp.user_id === conn.user_id);
+    if (p) {
+      p.username = conn.user.username;
+      p.avatar_id = conn.user.avatar_id;
+    }
+    emitGameObject(s);
+    broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'profile_updated' });
+  }
   send(ws, { type: 'profile_updated', user: conn.user });
 };
 handlers.update_player_info = handlers.update_profile;
@@ -450,10 +523,12 @@ handlers.create_session = (ws, data) => {
     user_id: conn.user_id, username: conn.user.username,
     avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: false
   });
+  syncGameObjectSession(s);
   liveSessions.set(s.session_id, s);
   conn.session_x_id = s.session_id;
   ws.join(s.session_id);
   send(ws, { type: 'session_created', session: sanitize(s) });
+  emitGameObject(s);
   if (!isPrivate) broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
 };
 
@@ -467,6 +542,7 @@ function joinExisting(ws, conn, s) {
     conn.session_x_id = s.session_id;
     ws.join(s.session_id);
     send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
+    emitGameObject(s, { toSocket: ws });
     if (s.status === 'playing') {
       pm.registerConnection(conn.user_id, ws);
       sendAuthoritativeState(ws, s);
@@ -485,6 +561,7 @@ function joinExisting(ws, conn, s) {
     avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: false, is_ai: false, slot: s.players.length, ready: false
   });
   s.settings.lobby_accepted = false;
+  syncGameObjectSession(s);
   conn.session_x_id = s.session_id;
   ws.join(s.session_id);
   send(ws, { type: 'session_joined', session: sanitize(s) });
@@ -495,6 +572,7 @@ function joinExisting(ws, conn, s) {
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   }, ws);
+  emitGameObject(s);
   broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'joined' });
 }
 
@@ -545,11 +623,13 @@ handlers.matchmake = (ws, data) => {
     user_id: conn.user_id, username: conn.user.username,
     avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: false
   });
+  syncGameObjectSession(s);
   liveSessions.set(s.session_id, s);
   conn.session_x_id = s.session_id;
   ws.join(s.session_id);
   send(ws, { type: 'matchmake_result', action: 'created', session_id: s.session_id });
   send(ws, { type: 'session_created', session: sanitize(s) });
+  emitGameObject(s);
   broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
 };
 
@@ -597,7 +677,9 @@ handlers.update_session_settings = (ws, data) => {
     s.max_players = Math.max(requested, s.players.length);
   }
   s.settings.lobby_accepted = false;
+  syncGameObjectSession(s);
   broadcastSession(s, { type: 'session_settings_updated', session: sanitize(s) });
+  emitGameObject(s);
 };
 
 handlers.toggle_ready = (ws) => {
@@ -609,9 +691,11 @@ handlers.toggle_ready = (ws) => {
   if (!player) return;
   player.ready = !player.ready;
   s.settings.lobby_accepted = false;
+  syncGameObjectSession(s);
   const payload = sanitize(s);
   broadcastSession(s, { type: 'ready_update', session: payload, user_id: conn.user_id, ready: player.ready });
   send(ws, { type: 'ready_update', session: payload, user_id: conn.user_id, ready: player.ready });
+  emitGameObject(s);
 };
 
 handlers.accept_lobby = (ws) => {
@@ -624,9 +708,11 @@ handlers.accept_lobby = (ws) => {
     return send(ws, { type: 'error', message: 'All players must be ready before accepting' });
   }
   s.settings.lobby_accepted = true;
+  syncGameObjectSession(s);
   Proj.bloomEvent(log, s.x, [1, 1, 0, 0, 0, 0], { kind: 'lobby_accepted', session_id: s.session_id });
   broadcastSession(s, { type: 'lobby_accepted', session: sanitize(s) });
   send(ws, { type: 'lobby_accepted', session: sanitize(s) });
+  emitGameObject(s);
 };
 
 handlers.add_ai_player = (ws, data) => {
@@ -644,6 +730,7 @@ handlers.add_ai_player = (ws, data) => {
     is_host: false, is_ai: true, slot: s.players.length, ready: true
   });
   s.settings.lobby_accepted = false;
+  syncGameObjectSession(s);
   broadcastSession(s, {
     type: 'player_joined', username: aiName,
     players: s.players.map(p => ({
@@ -651,6 +738,7 @@ handlers.add_ai_player = (ws, data) => {
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
+  emitGameObject(s);
   broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'ai_added' });
 };
 
@@ -665,6 +753,7 @@ handlers.remove_ai_player = (ws, data) => {
   const removed = s.players.splice(idx, 1)[0];
   s.players.forEach((p, i) => { p.slot = i; });
   s.settings.lobby_accepted = false;
+  syncGameObjectSession(s);
   broadcastSession(s, {
     type: 'player_left', username: removed.username,
     players: s.players.map(p => ({
@@ -672,6 +761,7 @@ handlers.remove_ai_player = (ws, data) => {
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
     }))
   });
+  emitGameObject(s);
   broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'ai_removed' });
 };
 
@@ -689,11 +779,32 @@ handlers.start_game = (ws) => {
   if (!s.players.every(p => p.is_ai || p.ready)) return send(ws, { type: 'error', message: 'All players must be ready' });
   if (!s.settings.lobby_accepted) return send(ws, { type: 'error', message: 'Host must accept the group before launch' });
   s.status = 'playing';
+  syncGameObjectSession(s);
+  emitGameObject(s);
   Proj.bloomEvent(log, s.x, [0, 0, 0, 0, 1, 1], { kind: 'game_started', session_id: s.session_id, game_id: s.game_id });
   if (!s.is_private) broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
-  // Hand off to PlayerManager: verify all players connected, take inventory,
-  // then broadcast pm_game_ready (or cancel on failure).
-  pm.startSession(s.session_id);
+
+  // Create a Colyseus room for this session (delta-patch state sync engine).
+  // Attach roomId to session so PlayerManager can include it in pm_game_ready.
+  const colyseusOptions = {
+    maxPlayers: s.max_players,
+    sessionCode: s.session_code,
+    lobbySessionId: s.session_id,
+  };
+  createColyseusRoom(s.game_id, colyseusOptions).then(room => {
+    if (room && room.roomId) {
+      s.colyseus_room_id = room.roomId;
+      // Notify all players in the session of the Colyseus room endpoint
+      broadcastSession(s, {
+        type: 'colyseus_room',
+        roomId: room.roomId,
+        endpoint: `wss://kensgames.com/colyseus`,
+        session_id: s.session_id,
+      });
+    }
+    // Hand off to PlayerManager regardless of whether Colyseus is available
+    pm.startSession(s.session_id);
+  }).catch(() => pm.startSession(s.session_id));
 };
 
 handlers.pm_sync_report = (ws, data) => {
@@ -1148,52 +1259,80 @@ const httpServer = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, /api/pm/status, /api/gm/log, or WebSocket upgrade' }));
 });
 
-const io = new IOServer(httpServer, {
-  path: '/ws',
-  cors: { origin: '*', credentials: true },
-  transports: ['websocket', 'polling'],
+const wsAdapter = crossws({
+  hooks: {
+    open(peer) {
+      activePeers.add(peer);
+      // Keep legacy method names used throughout handlers.
+      peer.join = (topic) => peer.subscribe(topic);
+      peer.leave = (topic) => peer.unsubscribe(topic);
+      console.log(`[Lobby] New connection (total: ${activePeers.size})`);
+      send(peer, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
+    },
+
+    async message(peer, message) {
+      let data;
+      try {
+        const raw = typeof message.text === 'function' ? message.text() : null;
+        data = raw && typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch (_) {
+        return send(peer, { type: 'error', message: 'Invalid message format' });
+      }
+      if (!data || typeof data !== 'object') {
+        return send(peer, { type: 'error', message: 'Invalid message format' });
+      }
+      const handler = handlers[data.type];
+      if (!handler) {
+        console.warn(`[Lobby] Unknown message type: ${data.type}`);
+        return;
+      }
+      try { await handler(peer, data); }
+      catch (err) {
+        console.error(`[Lobby] Handler error for ${data.type}:`, err);
+        send(peer, { type: 'error', message: 'Server error' });
+      }
+    },
+
+    close(peer) {
+      const conn = connections.get(peer);
+      if (conn) {
+        const s = liveSessions.get(conn.session_x_id);
+        if (conn.session_x_id) {
+          const replaced = pm.onPlayerDisconnect(conn.user_id, conn.session_x_id);
+          // If PlayerManager replaced this live player with a bot, do not remove
+          // the seat from the session by running leaveCurrentSession().
+          if (!replaced || !s || s.status !== 'playing') {
+            leaveCurrentSession(peer, conn);
+          }
+        } else {
+          leaveCurrentSession(peer, conn);
+        }
+        connections.delete(peer);
+      }
+      activePeers.delete(peer);
+      console.log(`[Lobby] Disconnected (total: ${activePeers.size})`);
+    },
+
+    error(peer, err) {
+      console.error('[Lobby] WebSocket error:', err && err.message ? err.message : err);
+      if (peer) {
+        activePeers.delete(peer);
+        connections.delete(peer);
+      }
+    },
+  },
 });
 
-io.on('connection', (socket) => {
-  console.log(`[Lobby] New connection (total: ${io.engine.clientsCount})`);
-  send(socket, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
-
-  socket.on('message', async (data) => {
-    if (!data || typeof data !== 'object') {
-      return send(socket, { type: 'error', message: 'Invalid message format' });
-    }
-    const handler = handlers[data.type];
-    if (!handler) {
-      console.warn(`[Lobby] Unknown message type: ${data.type}`);
-      return;
-    }
-    try { await handler(socket, data); }
-    catch (err) {
-      console.error(`[Lobby] Handler error for ${data.type}:`, err);
-      send(socket, { type: 'error', message: 'Server error' });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    const conn = connections.get(socket);
-    if (conn) {
-      const s = liveSessions.get(conn.session_x_id);
-      if (conn.session_x_id) {
-        const replaced = pm.onPlayerDisconnect(conn.user_id, conn.session_x_id);
-        // If PlayerManager replaced this live player with a bot, do not remove
-        // the seat from the session by running leaveCurrentSession().
-        if (!replaced || !s || s.status !== 'playing') {
-          leaveCurrentSession(socket, conn);
-        }
-      } else {
-        leaveCurrentSession(socket, conn);
-      }
-      connections.delete(socket);
-    }
-    console.log(`[Lobby] Disconnected (total: ${io.engine.clientsCount})`);
-  });
-
-  socket.on('error', (err) => console.error('[Lobby] Socket.IO error:', err && err.message));
+httpServer.on('upgrade', (req, socket, head) => {
+  if (!req.url || !req.url.startsWith('/ws')) {
+    socket.destroy();
+    return;
+  }
+  if (req.headers.upgrade !== 'websocket') {
+    socket.destroy();
+    return;
+  }
+  wsAdapter.handleUpgrade(req, socket, head);
 });
 
 // Cleanup stale waiting sessions every 5 minutes (30-min idle threshold).
@@ -1202,6 +1341,7 @@ setInterval(() => {
   for (const [id, s] of liveSessions) {
     if (s.created_at < stale && s.status === 'waiting') {
       liveSessions.delete(id);
+      GameObject.remove(id);
       broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: id });
       console.log(`[Lobby] Cleaned up stale session ${id}`);
     }
@@ -1221,4 +1361,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { httpServer, io, handlers, liveSessions, connections, log, CATALOG, pm };
+module.exports = { httpServer, io: wsAdapter, wsAdapter, handlers, liveSessions, connections, log, CATALOG, pm };
