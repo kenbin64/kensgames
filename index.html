@@ -1823,6 +1823,64 @@
             margin-bottom: 24px;
         }
 
+        .jules-script-preview {
+            position: relative;
+            background: rgba(8, 8, 30, 0.72);
+            border: 1px solid rgba(0, 255, 255, 0.35);
+            border-radius: 8px;
+            padding: 16px 18px 44px;
+            margin: 0 0 18px 0;
+            max-height: 172px;
+            overflow: hidden;
+        }
+
+        .jules-script-preview::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 58px;
+            background: linear-gradient(to bottom, rgba(8, 8, 30, 0), rgba(8, 8, 30, 0.98));
+            pointer-events: none;
+        }
+
+        .jules-script-title {
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.35);
+        }
+
+        .jules-script-preview p {
+            margin: 0;
+            color: #c9d6ff;
+            line-height: 1.66;
+            font-size: 14px;
+        }
+
+        .jules-script-more {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 18px;
+            color: var(--neon-cyan);
+            text-decoration: none;
+            font-family: var(--font-arcade);
+            font-size: 11px;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            text-shadow: 0 0 7px rgba(0, 255, 255, 0.4);
+        }
+
+        .jules-script-more:hover {
+            color: #7cf7ff;
+            text-shadow: 0 0 14px rgba(0, 255, 255, 0.6);
+        }
+
         .jules-cta {
             display: inline-flex;
             align-items: center;
@@ -1872,6 +1930,18 @@
                     scare you off. We&rsquo;re going to take a short walk through dimensional and manifold computing
                     &mdash; by the end you&rsquo;ll see you&rsquo;ve been living in this stuff your whole life.&rdquo;
                 </p>
+                <div class="jules-script-preview" aria-label="Jewels script preview">
+                    <div class="jules-script-title">Jewels Script (Preview)</div>
+                    <p>
+                        Every player enters as a single point with a name, a color, and a seat. No duplicates. No
+                        shadows. The board is one shared field, not six copies pretending to agree. When launch is
+                        hit, the field blooms once; every peg, every move, every turn is projected from that same
+                        bloom. If two screens disagree, that is not a mystery, it is a broken projection. The fix is
+                        always the same: return to one source, verify every seat against it, and broadcast only what
+                        the source allows.
+                    </p>
+                </div>
+                <a class="jules-script-more" href="/x-dimensional/walkthrough/">Continue Jewels Script &#9654;</a>
                 <a class="jules-cta" href="/x-dimensional/walkthrough/">Take the tour with Jules &#9654;</a>
             </div>
         </div>
