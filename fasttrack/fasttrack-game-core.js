@@ -1557,6 +1557,22 @@ function selectSplitPeg(pegIdx) {
 function selectSplitSteps(step) {
   const parsed = Number(step);
   _splitStepChoice = Number.isFinite(parsed) ? parsed : null;
+
+  // If this first-leg choice yields exactly one legal completion, auto-play it.
+  // This keeps split flow fast and avoids requiring a redundant second click.
+  const vm = state.turn.get('validMoves') || [];
+  const candidateIndices = (_splitPegIdx != null && _splitStepChoice != null)
+    ? vm
+      .map((m, idx) => ({ m, idx }))
+      .filter(({ m }) => splitMoveMatchesChoice(m, _splitPegIdx, _splitStepChoice))
+      .map(({ idx }) => idx)
+    : [];
+
+  if (candidateIndices.length === 1) {
+    executeMove(candidateIndices[0]);
+    return;
+  }
+
   showMoveHints(); // Re-render with selection
 }
 

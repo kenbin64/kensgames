@@ -3340,6 +3340,19 @@ function createHole(id, type, playerIdx, x, y, z, shape, props = {}) {
   mesh.position.set(x, y - 1, z);
   boardGroup.add(mesh);
 
+  // Expanded invisible hit area so hole picking is forgiving.
+  const pickGeo = new THREE.CylinderGeometry(radius + 7, radius + 7, 6, 20);
+  const pickMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const pickMesh = new THREE.Mesh(pickGeo, pickMat);
+  pickMesh.position.set(x, y - 1, z);
+  pickMesh.userData.holeId = id;
+  boardGroup.add(pickMesh);
+
   // Add diamond marker for HOME holes — extruded to match hole depth, with center cutout
   if (shape === 'diamond') {
     const dSize = 17;
@@ -3377,7 +3390,7 @@ function createHole(id, type, playerIdx, x, y, z, shape, props = {}) {
     boardGroup.add(diamond);
   }
 
-  holeRegistry.set(id, { id, type, playerIdx, position: { x, y, z }, mesh, ...props });
+  holeRegistry.set(id, { id, type, playerIdx, position: { x, y, z }, mesh, pickMesh, ...props });
   return holeRegistry.get(id);
 }
 
@@ -3440,7 +3453,19 @@ function createFastTrackHole(id, playerIdx, x, y, z) {
   holeMesh.position.set(x, y, z);
   boardGroup.add(holeMesh);
 
-  holeRegistry.set(id, { id, type: 'fasttrack', playerIdx, position: { x, y, z }, mesh: holeMesh, isFastTrack: true });
+  const pickGeo = new THREE.CylinderGeometry(HOLE_RADIUS + 7, HOLE_RADIUS + 7, 6, 20);
+  const pickMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const pickMesh = new THREE.Mesh(pickGeo, pickMat);
+  pickMesh.position.set(x, y, z);
+  pickMesh.userData.holeId = id;
+  boardGroup.add(pickMesh);
+
+  holeRegistry.set(id, { id, type: 'fasttrack', playerIdx, position: { x, y, z }, mesh: holeMesh, pickMesh, isFastTrack: true });
 }
 
 function createBullseye() {
@@ -3537,7 +3562,19 @@ function createBullseye() {
   innerDomeMesh.position.set(0, LINE_HEIGHT, 0);
   boardGroup.add(innerDomeMesh);
 
-  holeRegistry.set('bullseye', { id: 'bullseye', type: 'bullseye', playerIdx: -1, position: { x: 0, y: LINE_HEIGHT - 2, z: 0 }, mesh: centerHoleMesh });
+  const bullPickGeo = new THREE.CylinderGeometry(CENTER_HOLE_RADIUS + 8, CENTER_HOLE_RADIUS + 8, 7, 24);
+  const bullPickMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const bullPickMesh = new THREE.Mesh(bullPickGeo, bullPickMat);
+  bullPickMesh.position.set(0, LINE_HEIGHT - 2, 0);
+  bullPickMesh.userData.holeId = 'bullseye';
+  boardGroup.add(bullPickMesh);
+
+  holeRegistry.set('bullseye', { id: 'bullseye', type: 'bullseye', playerIdx: -1, position: { x: 0, y: LINE_HEIGHT - 2, z: 0 }, mesh: centerHoleMesh, pickMesh: bullPickMesh });
 
   // ── FAST TRACK LOGO — procedural text ring around bullseye ──
   const logoRadius = CENTER_HOLE_RADIUS + RING_WIDTH * 6 + 12; // just outside colored rings
@@ -4922,19 +4959,19 @@ function clearHighlights() {
   }
 }
 
-function createGlowRing(holeId, color, isDestination) {
+function createGlowRing(holeId, color, isDestination, opts = {}) {
   const hole = holeRegistry.get(holeId);
   if (!hole) return null;
 
-  // Outer ring
-  const radius = isDestination ? 20 : 13;
-  const thickness = isDestination ? 5 : 4;
-  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 32);
+  const pulsing = opts.pulsing !== false;
+  const radius = isDestination ? 11.5 : 9.5;
+  const thickness = isDestination ? 2.8 : 2.2;
+  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 40);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
-    opacity: isDestination ? 1.0 : 0.6,
+    opacity: pulsing ? (isDestination ? 0.92 : 0.62) : (isDestination ? 0.68 : 0.44),
     side: THREE.DoubleSide,
     depthWrite: false,
     polygonOffset: true,
@@ -4945,35 +4982,85 @@ function createGlowRing(holeId, color, isDestination) {
   ring.position.set(hole.position.x, hole.position.y + 5, hole.position.z);
   ring.renderOrder = 10;
   ring.userData.isDestination = isDestination;
-  ring.userData.baseMat = ringMat;
+  ring.userData.isDisc = false;
+  ring.userData.pulsing = pulsing;
   boardGroup.add(ring);
   highlightMeshes.push(ring);
 
-  // For destination holes: add a filled glow disc underneath for extra pop
-  if (isDestination) {
-    const discGeo = new THREE.CircleGeometry(radius - thickness, 32);
-    discGeo.rotateX(-Math.PI / 2);
-    const discMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.22,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3
-    });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.position.set(hole.position.x, hole.position.y + 4, hole.position.z);
-    disc.renderOrder = 9;
-    disc.userData.isDestination = true;
-    disc.userData.isDisc = true;
-    disc.userData.baseMat = discMat;
-    boardGroup.add(disc);
-    highlightMeshes.push(disc);
-  }
+  const discGeo = new THREE.CircleGeometry(radius - thickness, 40);
+  discGeo.rotateX(-Math.PI / 2);
+  const discMat = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: pulsing ? (isDestination ? 0.18 : 0.12) : (isDestination ? 0.26 : 0.18),
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3
+  });
+  const disc = new THREE.Mesh(discGeo, discMat);
+  disc.position.set(hole.position.x, hole.position.y + 4, hole.position.z);
+  disc.renderOrder = 9;
+  disc.userData.isDestination = isDestination;
+  disc.userData.isDisc = true;
+  disc.userData.pulsing = pulsing;
+  boardGroup.add(disc);
+  highlightMeshes.push(disc);
 
   return ring;
+}
+
+function createPegHalo(pegId, color, opts = {}) {
+  const peg = pegRegistry.get(pegId);
+  if (!peg || !peg.mesh) return null;
+  const pulsing = opts.pulsing !== false;
+  const radius = 12;
+  const thickness = 2.8;
+  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 40);
+  ringGeo.rotateX(-Math.PI / 2);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: pulsing ? 0.9 : 0.6,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(peg.mesh.position.x, boardGroup.position.y + LINE_HEIGHT + 0.6, peg.mesh.position.z);
+  ring.renderOrder = 10;
+  ring.userData.isDestination = true;
+  ring.userData.isDisc = false;
+  ring.userData.pulsing = pulsing;
+  boardGroup.add(ring);
+  highlightMeshes.push(ring);
+  return ring;
+}
+
+function _activePlayerColorInt() {
+  const hex = _activePlayerColorHex();
+  const parsed = parseInt(String(hex || '').replace('#', ''), 16);
+  return Number.isFinite(parsed) ? parsed : 0x66ccff;
+}
+
+function _drawCommittedSplitPath(vm, color) {
+  const choice = _getSplitChoice();
+  if (!choice) return;
+  const first = vm.find(m => m && m.type === 'split'
+    && ((m.pegIdx === choice.pegIdx && m.steps === choice.steps)
+      || (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps)));
+  if (!first) return;
+
+  const firstIsLeg1 = first.pegIdx === choice.pegIdx && first.steps === choice.steps;
+  const from = firstIsLeg1 ? first.from : first.from2;
+  const path = firstIsLeg1 ? first.path : first.path2;
+  if (from && from !== 'holding') createGlowRing(from, color, false, { pulsing: false });
+  if (Array.isArray(path)) {
+    for (const hid of path) createGlowRing(hid, color, hid === (path[path.length - 1]), { pulsing: false });
+  }
 }
 
 function highlightMovePaths(moves) {
@@ -4982,51 +5069,42 @@ function highlightMovePaths(moves) {
     ? window.FastTrackCore.state.turn.get('validMoves') || [] : []);
   if (vm.length === 0) return;
 
-  // All routes glow in the active player's color so the destination "turns
-  // their color" as the spec requires. Split moves get a complementary tint
-  // for the second peg's leg so the two legs remain visually separable.
-  const playerHex = _activePlayerColorHex();
-  const playerColor = parseInt(playerHex.replace('#', ''), 16);
-  const splitColor2 = 0xffaa00; // orange accent for split second leg
+  const color = _activePlayerColorInt();
+  const index = _buildRouteIndex(vm);
 
-  for (const m of vm) {
-    // Highlight intermediate path holes (dimmer)
-    if (m.path) {
-      for (let i = 0; i < m.path.length - 1; i++) {
-        createGlowRing(m.path[i], playerColor, false);
-      }
-    }
-    // Highlight destination (brighter) — ring + boosted hole emissive
-    createGlowRing(m.dest, playerColor, true);
-    _boostHoleEmissive(m.dest, playerColor);
+  // If split first leg is already chosen, keep it lit (solid) while
+  // second-leg choices pulse as clickable targets.
+  _drawCommittedSplitPath(vm, color);
 
-    // Split moves — also highlight the second peg's path
-    if (m.type === 'split' && m.path2) {
-      for (let i = 0; i < m.path2.length - 1; i++) {
-        createGlowRing(m.path2[i], splitColor2, false);
-      }
-      createGlowRing(m.dest2, splitColor2, true);
-      _boostHoleEmissive(m.dest2, splitColor2);
+  for (const [key, entries] of index.entries()) {
+    if (!Array.isArray(entries) || entries.length !== 1) continue;
+    if (key.startsWith('peg:')) {
+      const pegIdx = Number(key.slice(4));
+      const players = (window.FastTrackCore && window.FastTrackCore.state)
+        ? window.FastTrackCore.state.players.get('list') || [] : [];
+      const ci = (window.FastTrackCore && window.FastTrackCore.state)
+        ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+      const peg = players[ci] && players[ci].pegs ? players[ci].pegs[pegIdx] : null;
+      if (peg && peg.id) createPegHalo(peg.id, color, { pulsing: true });
+      continue;
     }
+    createGlowRing(key, color, true, { pulsing: true });
   }
 
-  // Pulsing animation
   function pulseHighlights() {
-    const t = performance.now() * 0.0045;
+    const t = performance.now() * 0.0046;
     for (const mesh of highlightMeshes) {
-      if (mesh.userData.isDestination) {
-        if (mesh.userData.isDisc) {
-          // Disc pulses opacity only
-          mesh.material.opacity = 0.22 + Math.sin(t * 2.2) * 0.14;
-        } else {
-          // Ring pulses opacity + scale
-          mesh.material.opacity = 0.85 + Math.sin(t * 2.2) * 0.15;
-          const scale = 1 + Math.sin(t * 1.8) * 0.16;
-          mesh.scale.set(scale, 1, scale);
-        }
+      if (!mesh.userData.pulsing) continue;
+      if (mesh.userData.isDisc) {
+        mesh.material.opacity = mesh.userData.isDestination
+          ? 0.18 + Math.sin(t * 2.1) * 0.12
+          : 0.12 + Math.sin(t * 2.1) * 0.08;
       } else {
-        // Path holes: moderate pulse
-        mesh.material.opacity = 0.6 + Math.sin(t * 2.2) * 0.22;
+        mesh.material.opacity = mesh.userData.isDestination
+          ? 0.84 + Math.sin(t * 2.1) * 0.16
+          : 0.58 + Math.sin(t * 2.1) * 0.20;
+        const scale = 1 + Math.sin(t * 1.8) * 0.12;
+        mesh.scale.set(scale, 1, scale);
       }
     }
     highlightAnimFrame = requestAnimationFrame(pulseHighlights);
@@ -5049,7 +5127,7 @@ function highlightSinglePath(moveIdx) {
 // them) are no-ops; the player picks a hole further along the
 // route they want.
 // ════════════════════════════════════════════════════════════════
-let _routeIndex = new Map();   // holeId -> [moveIdx, ...]
+let _routeIndex = new Map();   // targetKey(holeId|peg:<idx>) -> [entry, ...]
 let _routeIndexHash = '';      // re-build only when valid moves change
 const _pickRaycaster = (typeof THREE !== 'undefined') ? new THREE.Raycaster() : null;
 const _pickMouse = (typeof THREE !== 'undefined') ? new THREE.Vector2() : null;
@@ -5074,19 +5152,24 @@ function _currentValidMoves() {
 function _getSplitChoice() {
   if (typeof window.getSplitChoice !== 'function') return null;
   const c = window.getSplitChoice();
-  return (c && c.pegIdx != null && c.steps != null) ? c : null;
+  if (!c || c.pegIdx == null) return null;
+  return {
+    pegIdx: Number(c.pegIdx),
+    steps: c.steps == null ? null : Number(c.steps)
+  };
 }
 
 function _buildRouteIndex(moves) {
   const index = new Map();
-  const pushEntry = (hid, entry) => {
-    if (!hid) return;
-    if (!index.has(hid)) index.set(hid, []);
-    index.get(hid).push(entry);
+  const pushEntry = (key, entry) => {
+    if (!key) return;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(entry);
   };
   const seenNon = new Set();
   let seenEnter = false;
-  const splitFirstSeen = new Set();
+  const splitPegSeen = new Set();
+  const splitStepSeen = new Set();
   const choice = _getSplitChoice();
 
   moves.forEach((m, i) => {
@@ -5094,39 +5177,53 @@ function _buildRouteIndex(moves) {
 
     if (m.type === 'split') {
       if (!choice) {
-        // Expose both legs as first-leg pick targets.
-        const legs = [
-          { pegIdx: m.pegIdx, steps: m.steps, path: m.path, dest: m.dest },
-          { pegIdx: m.peg2Idx, steps: m.steps2, path: m.path2, dest: m.dest2 },
-        ];
-        for (const leg of legs) {
-          const key = `${leg.pegIdx}:${leg.steps}`;
-          if (splitFirstSeen.has(key)) continue;
-          splitFirstSeen.add(key);
-          if (Array.isArray(leg.path)) {
-            for (const hid of leg.path) {
-              pushEntry(hid, { kind: 'split-first', pegIdx: leg.pegIdx, steps: leg.steps, sampleIdx: i });
-            }
-          }
-          pushEntry(leg.dest, { kind: 'split-first', pegIdx: leg.pegIdx, steps: leg.steps, sampleIdx: i });
+        // Stage 1 of split: all eligible pegs pulse; route holes stay off.
+        const pegOptions = [m.pegIdx, m.peg2Idx];
+        for (const pegIdx of pegOptions) {
+          if (splitPegSeen.has(pegIdx)) continue;
+          splitPegSeen.add(pegIdx);
+          pushEntry(`peg:${pegIdx}`, { kind: 'split-first-peg', pegIdx, sampleIdx: i });
         }
+      } else if (choice.steps == null) {
+        // Stage 2a: peg chosen, now expose first-leg destination routes.
+        let leg = null;
+        if (m.pegIdx === choice.pegIdx) {
+          leg = { from: m.from, path: m.path, dest: m.dest, steps: m.steps };
+        } else if (m.peg2Idx === choice.pegIdx) {
+          leg = { from: m.from2, path: m.path2, dest: m.dest2, steps: m.steps2 };
+        }
+        if (!leg) return;
+        const legPathKey = Array.isArray(leg.path) ? leg.path.join('>') : '';
+        const legKey = `${choice.pegIdx}:${leg.steps}:${leg.dest}:${legPathKey}`;
+        if (splitStepSeen.has(legKey)) return;
+        splitStepSeen.add(legKey);
+        if (leg.from && leg.from !== 'holding') {
+          pushEntry(leg.from, { kind: 'split-first', pegIdx: choice.pegIdx, steps: leg.steps, sampleIdx: i });
+        }
+        if (Array.isArray(leg.path)) {
+          for (const hid of leg.path) {
+            pushEntry(hid, { kind: 'split-first', pegIdx: choice.pegIdx, steps: leg.steps, sampleIdx: i });
+          }
+        }
+        pushEntry(leg.dest, { kind: 'split-first', pegIdx: choice.pegIdx, steps: leg.steps, sampleIdx: i });
       } else {
-        // Only this split if its first leg matches the player's choice;
-        // expose the OTHER (unpicked) leg's holes as second-leg completions.
+        // Stage 2b: first leg locked; expose only unpicked second-leg route.
         let secondLeg = null;
         if (m.pegIdx === choice.pegIdx && m.steps === choice.steps) {
-          secondLeg = { path: m.path2, dest: m.dest2 };
+          secondLeg = { from: m.from2, path: m.path2, dest: m.dest2 };
         } else if (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps) {
-          secondLeg = { path: m.path, dest: m.dest };
+          secondLeg = { from: m.from, path: m.path, dest: m.dest };
         }
-        if (secondLeg) {
-          if (Array.isArray(secondLeg.path)) {
-            for (const hid of secondLeg.path) {
-              pushEntry(hid, { kind: 'split-second', moveIdx: i });
-            }
+        if (!secondLeg) return;
+        if (secondLeg.from && secondLeg.from !== 'holding') {
+          pushEntry(secondLeg.from, { kind: 'split-second', moveIdx: i });
+        }
+        if (Array.isArray(secondLeg.path)) {
+          for (const hid of secondLeg.path) {
+            pushEntry(hid, { kind: 'split-second', moveIdx: i });
           }
-          pushEntry(secondLeg.dest, { kind: 'split-second', moveIdx: i });
         }
+        pushEntry(secondLeg.dest, { kind: 'split-second', moveIdx: i });
       }
       return;
     }
@@ -5138,6 +5235,10 @@ function _buildRouteIndex(moves) {
       const key = (m.dest || '') + '|' + m.pegIdx;
       if (seenNon.has(key)) return;
       seenNon.add(key);
+    }
+
+    if (m.from && m.from !== 'holding') {
+      pushEntry(m.from, { kind: 'move', moveIdx: i });
     }
     if (Array.isArray(m.path)) {
       for (const hid of m.path) pushEntry(hid, { kind: 'move', moveIdx: i });
@@ -5162,6 +5263,7 @@ function _refreshRouteIndex() {
 function _entryKey(e) {
   if (!e) return '';
   if (e.kind === 'move' || e.kind === 'split-second') return `${e.kind}:${e.moveIdx}`;
+  if (e.kind === 'split-first-peg') return `split-first-peg:${e.pegIdx}`;
   if (e.kind === 'split-first') return `split-first:${e.pegIdx}:${e.steps}`;
   return '';
 }
@@ -5173,12 +5275,20 @@ function _previewEntry(entry, vm) {
     if (typeof window.highlightSinglePath === 'function') window.highlightSinglePath(entry.moveIdx);
     return;
   }
+  if (entry.kind === 'split-first-peg') {
+    if (typeof window.highlightMovePaths !== 'function') return;
+    const pegSplits = vm.filter(m => m && m.type === 'split'
+      && (m.pegIdx === entry.pegIdx || m.peg2Idx === entry.pegIdx));
+    window.highlightMovePaths(pegSplits);
+    return;
+  }
   if (entry.kind === 'split-first') {
     const m = vm[entry.sampleIdx];
     if (!m || typeof window.highlightMovePaths !== 'function') return;
     const isLeg1 = (m.pegIdx === entry.pegIdx && m.steps === entry.steps);
     const synth = {
       type: 'move',
+      from: isLeg1 ? m.from : m.from2,
       path: isLeg1 ? m.path : m.path2,
       dest: isLeg1 ? m.dest : m.dest2
     };
@@ -5193,6 +5303,7 @@ function _previewEntry(entry, vm) {
     const firstIsLeg1 = (m.pegIdx === choice.pegIdx && m.steps === choice.steps);
     const synth = {
       type: 'move',
+      from: firstIsLeg1 ? m.from2 : m.from,
       path: firstIsLeg1 ? m.path2 : m.path,
       dest: firstIsLeg1 ? m.dest2 : m.dest
     };
@@ -5205,10 +5316,16 @@ function _restoreDefaultHighlight() {
   const vm = _currentValidMoves();
   const choice = _getSplitChoice();
   if (choice) {
-    const candidates = vm.filter(m => m && m.type === 'split'
-      && ((m.pegIdx === choice.pegIdx && m.steps === choice.steps)
-        || (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps)));
-    window.highlightMovePaths(candidates);
+    if (choice.steps == null) {
+      const candidates = vm.filter(m => m && m.type === 'split'
+        && (m.pegIdx === choice.pegIdx || m.peg2Idx === choice.pegIdx));
+      window.highlightMovePaths(candidates);
+    } else {
+      const candidates = vm.filter(m => m && m.type === 'split'
+        && ((m.pegIdx === choice.pegIdx && m.steps === choice.steps)
+          || (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps)));
+      window.highlightMovePaths(candidates);
+    }
   } else {
     window.highlightMovePaths();
   }
@@ -5220,6 +5337,10 @@ function _commitEntry(entry) {
     if (typeof window.executeMove === 'function') window.executeMove(entry.moveIdx);
     return;
   }
+  if (entry.kind === 'split-first-peg') {
+    if (typeof window.selectSplitPeg === 'function') window.selectSplitPeg(entry.pegIdx);
+    return;
+  }
   if (entry.kind === 'split-first') {
     if (typeof window.selectSplitPeg === 'function') window.selectSplitPeg(entry.pegIdx);
     if (typeof window.selectSplitSteps === 'function') window.selectSplitSteps(entry.steps);
@@ -5227,23 +5348,68 @@ function _commitEntry(entry) {
   }
 }
 
-function _pickHoleAtClient(clientX, clientY) {
+function _pegIdxForPegId(pegId) {
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ci = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+  const cur = players[ci];
+  if (!cur || !Array.isArray(cur.pegs)) return null;
+  const idx = cur.pegs.findIndex(p => p && p.id === pegId);
+  return idx >= 0 ? idx : null;
+}
+
+function _pickTargetAtClient(clientX, clientY) {
   if (!_pickRaycaster || !renderer || !camera) return null;
   const rect = renderer.domElement.getBoundingClientRect();
   _pickMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
   _pickMouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
   _pickRaycaster.setFromCamera(_pickMouse, camera);
-  const meshes = [];
+
+  const holeMeshes = [];
   for (const h of holeRegistry.values()) {
-    if (h.mesh) meshes.push(h.mesh);
+    if (h.pickMesh) holeMeshes.push(h.pickMesh);
+    else if (h.mesh) holeMeshes.push(h.mesh);
   }
-  const hits = _pickRaycaster.intersectObjects(meshes, false);
-  if (!hits.length) return null;
-  const hitMesh = hits[0].object;
-  for (const [hid, h] of holeRegistry) {
-    if (h.mesh === hitMesh) return hid;
+  const holeHits = _pickRaycaster.intersectObjects(holeMeshes, false);
+  if (holeHits.length) {
+    const holeId = holeHits[0].object && holeHits[0].object.userData
+      ? holeHits[0].object.userData.holeId : null;
+    if (holeId) return { kind: 'hole', holeId };
   }
+
+  const pegRoots = [];
+  for (const peg of pegRegistry.values()) {
+    if (peg && peg.mesh) pegRoots.push(peg.mesh);
+  }
+  const pegHits = _pickRaycaster.intersectObjects(pegRoots, true);
+  if (pegHits.length) {
+    let n = pegHits[0].object;
+    while (n && !n.userData?.pegId) n = n.parent;
+    const pegId = n && n.userData ? n.userData.pegId : null;
+    if (pegId) {
+      const pegIdx = _pegIdxForPegId(pegId);
+      if (pegIdx != null) return { kind: 'peg', pegId, pegIdx };
+    }
+  }
+
   return null;
+}
+
+function _entriesForTarget(target, routeIndex) {
+  if (!target || !routeIndex) return [];
+  if (target.kind === 'peg') {
+    const splitKey = `peg:${target.pegIdx}`;
+    const splitMatches = routeIndex.get(splitKey) || [];
+    if (splitMatches.length) return splitMatches;
+    const peg = pegRegistry.get(target.pegId);
+    const holeId = peg && peg.holeId ? peg.holeId : null;
+    return holeId ? (routeIndex.get(holeId) || []) : [];
+  }
+  if (target.kind === 'hole') {
+    return routeIndex.get(target.holeId) || [];
+  }
+  return [];
 }
 
 // ── Hover tooltip — single shared bubble used as the hint surface on desktop ──
@@ -5372,6 +5538,9 @@ function _describeEntry(entry, vm) {
     if (cut) text += ' ✂';
     return { text, color: colorOf() };
   }
+  if (entry.kind === 'split-first-peg') {
+    return { text: `split: choose ${nameOf(entry.pegIdx)}`, color: colorOf() };
+  }
   if (entry.kind === 'split-first') {
     return { text: `split: ${nameOf(entry.pegIdx)} +${entry.steps}`, color: colorOf() };
   }
@@ -5412,8 +5581,8 @@ function setupBoardPickHandler() {
     if (e.buttons !== 0) { _hideHoverTip(); return; }
     const idx = _refreshRouteIndex();
     if (idx.size === 0) { clearHover(); return; }
-    const hid = _pickHoleAtClient(e.clientX, e.clientY);
-    const matches = hid ? (idx.get(hid) || []) : [];
+    const target = _pickTargetAtClient(e.clientX, e.clientY);
+    const matches = _entriesForTarget(target, idx);
     if (matches.length === 1) {
       dom.style.cursor = 'pointer';
       const key = _entryKey(matches[0]);
@@ -5431,7 +5600,7 @@ function setupBoardPickHandler() {
         lastHoverKey = '';
         _restoreDefaultHighlight();
       }
-      _showHoverTip(`${matches.length} routes share this hole — pick a unique destination`, null, e.clientX, e.clientY);
+      _showHoverTip(`${matches.length} routes overlap here — pick a pulsing unique target`, null, e.clientX, e.clientY);
     } else {
       clearHover();
     }
@@ -5443,8 +5612,8 @@ function setupBoardPickHandler() {
     if (artOverlayOpen()) return;
     const idx = _refreshRouteIndex();
     if (idx.size === 0) return;
-    const hid = _pickHoleAtClient(e.clientX, e.clientY);
-    const matches = hid ? (idx.get(hid) || []) : [];
+    const target = _pickTargetAtClient(e.clientX, e.clientY);
+    const matches = _entriesForTarget(target, idx);
     if (matches.length === 1) {
       _hideHoverTip();
       _commitEntry(matches[0]);
