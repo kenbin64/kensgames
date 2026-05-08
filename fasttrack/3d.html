@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FastTrack 3D — Manifold Gaming</title>
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <script>
     // X-Dimensional Bootstrap: resolve Game and Player identities before init.
     //
@@ -45,10 +46,17 @@
 
       const code = kgGame && kgGame.code;
       const endpoint = code
-        ? `/ws/api/session/bootstrap?code=${encodeURIComponent(code)}`
-        : `/ws/api/players/me`;
+        ? `/api/session/bootstrap?code=${encodeURIComponent(code)}`
+        : `/api/players/me`;
       try {
-        const res = await fetch(endpoint);
+        let res = await fetch(endpoint);
+        // Safety fallback for environments that only expose lobby APIs behind /ws.
+        if (!res.ok && (res.status === 400 || res.status === 404)) {
+          const wsEndpoint = code
+            ? `/ws/api/session/bootstrap?code=${encodeURIComponent(code)}`
+            : `/ws/api/players/me`;
+          res = await fetch(wsEndpoint);
+        }
         if (!res.ok) throw new Error(`Bootstrap failed: ${res.status}`);
         const data = await res.json();
         const me = data.me || data;
