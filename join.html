@@ -106,7 +106,7 @@
 
     function lobbyPathForGameId(gameId) {
       const map = {
-        fasttrack: '/fasttrack/lobby.html',
+        fasttrack: '/fasttrack/lobby-simple.html',
         starfighter: '/starfighter/lobby.html',
         brickbreaker3d: '/brickbreaker3d/lobby.html',
         brickbreaker: '/brickbreaker3d/lobby.html',
@@ -167,17 +167,10 @@
           }
           status.textContent = 'Found game — redirecting…';
 
-          // FastTrack has a dedicated join wizard (player name + avatar + ready).
-          // Route FastTrack invite codes there so players don't skip setup.
-          const reportedPath = (d.game_lobby_path || d.game_path || '');
-          const isFastTrack = (d.game_id === 'fasttrack') || (typeof reportedPath === 'string' && reportedPath.includes('/fasttrack/'));
-
           const sessionGameId = d && d.session && d.session.game_id;
           const fallbackPath = lobbyPathForGameId(d.game_id || sessionGameId || gameHint);
 
-          const rawPath = isFastTrack
-            ? '/fasttrack/join.html'
-            : (d.game_lobby_path || d.game_path || fallbackPath);
+          const rawPath = d.game_lobby_path || d.game_path || fallbackPath;
 
           const url = new URL(rawPath, location.origin);
           url.searchParams.set('code', code);
