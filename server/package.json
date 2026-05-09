@@ -19,7 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.93.0",
     "bcrypt": "^6.0.0",
-    "colyseus": "^0.15.57",
+    "colyseus": "^0.17.10",
     "cors": "^2.8.5",
     "crossws": "^0.4.5",
     "dotenv": "^16.0.3",
