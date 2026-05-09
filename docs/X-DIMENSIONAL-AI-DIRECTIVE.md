@@ -108,21 +108,40 @@ $$\text{Collapse}: z \rightarrow x'$$
 
 ---
 
-## Def 1.8 — Manifold Reference Surfaces
+## Def 1.8 — Canonical Substrate (Zynxy) and Historical Reference Surfaces
 
-The manifold m is a continuous geometric field. Its closest reference forms are the Schwarz Diamond gyroid trigonometric family (Swartz Diamond).
+The manifold m is a continuous geometric field. Its **canonical substrate** in this engine is **Zynxy** — a self-tiling cubic structure assembled from the manifold's own axiom `z = xy`. Earlier triply-periodic minimal surfaces (Gyroid, Schwarz Diamond, Schwarz Primitive) are kept only as historical approximations and fast-evaluatable SDF reference fields.
 
-**Gyroid-class** (canonical substrate — storage, indexing, joining):
+**Zynxy** (canonical substrate — storage, indexing, joining, geometry, gradient, lensing):
+
+Genesis: take the saddle `z = xy` (Ax 2.4, the universal access law) and rotate it 90° into each of the six xyz cube-face positions. The six instances form **two tristars**:
+
+- **Top tristar** at pole `(+1, +1, +1)`: faces `+W`, `+U`, `+V` meet at one cube vertex, each at 90° to the others.
+- **Bottom tristar** at pole `(−1, −1, −1)`: faces `−W`, `−U`, `−V` meet at the antipodal cube vertex, each at 90° to the others.
+
+Because every face is the same axiom (`z = xy`) re-oriented, faces seam without any rotation correction. The structure is **self-tiling cubic** (PASSAGE / CHAMBER / SPINE topology) and combinable along x, y, z to form arbitrary lattices. As a continuous waveform Zynxy carries every angle, every inflection, every state-change, every peak and valley required to express any datatype and any computation purely from the substrate.
+
+**Reference mesh** (visual aid only, not a runtime asset): `4DTicTacToe/assets/models/winki.glb`. Per `AGENTS.md`, GLB files are **source references**; runtime geometry MUST be derived from the Zynxy equations, seeds, and substrate parameters, not loaded from the GLB. The GLB is removed once the equivalent procedural geometry is verified.
+
+**Canonical operator implementation:** `js/substrates/winki_substrate.js` (to be renamed `zynxy_substrate.js` in Phase 2). Every operator (observe, explode, grad, compare, depth, power, root, project, union, exclude, nestObserve, tile, lattice) is a pure lens — nothing stored, everything derived on read.
+
+---
+
+**Historical / approximation surfaces** (kept only where a fast SDF scalar field is convenient; never canonical):
+
+*Gyroid-class* (legacy substrate name; retained as a fast SDF approximation only):
 
 $$\sin(x)\cos(y) + \sin(y)\cos(z) + \sin(z)\cos(x) = c$$
 
-**Schwarz D-class** (auxiliary lens — visual geometry, AI inflection, force fields):
+*Schwarz P-class* (auxiliary SDF reference):
 
 $$\cos(x) + \cos(y) + \cos(z) = c$$
 
-**Full Schwarz Diamond form** (product-of-cosines variant):
+*Schwarz D-class* (auxiliary SDF reference; closest trig approximation of Zynxy):
 
 $$\cos(x)\cos(y)\cos(z) - \sin(x)\sin(y)\sin(z) = 0$$
+
+These formulas MAY be used as fast-evaluatable scalar fields. They MUST NOT be treated as the canonical substrate. The canonical substrate is Zynxy.
 
 The manifold is not static storage. It is a queryable geometry field from which structure and state are extracted relative to x as the observing identity.
 

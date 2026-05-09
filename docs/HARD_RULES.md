@@ -587,11 +587,16 @@ What **is** owned, and what every public surface must protect, is the
 **system-level wiring** that selects, composes, and assigns roles
 to those public-domain pieces in this product. Specifically:
 
-- **Substrate selection.** Which substrate is canonical (the Gyroid),
-  which is auxiliary (Schwarz Diamond as a lens), and how they
-  compose, is vault material. Per-game substrate filenames, lens
-  classes, and renderer wirings (e.g. `schwarz_diamond_renderer.js`,
-  per-game `*_manifold_substrate.js`) are vault material.
+- **Substrate selection.** Which substrate is canonical (**Zynxy** —
+  the self-tiling cubic of `z = xy` rotated into the six xyz face
+  positions, two tristars at antipodal poles), which trigonometric
+  surfaces are retained as deprecated fast-SDF approximations
+  (Gyroid, Schwarz Primitive, Schwarz Diamond), and how they compose,
+  is vault material. Per-game substrate filenames, lens classes, and
+  renderer wirings (e.g. `js/substrates/winki_substrate.js` →
+  `zynxy_substrate.js`, per-game `*_manifold_substrate.js`) are vault
+  material. The reference GLB (`4DTicTacToe/assets/models/winki.glb`)
+  is a source asset only, never a runtime asset (per `AGENTS.md`).
 - **Role assignment.** The mapping `x = identity/seed/observer`,
   `y = modifiers/nutrients`, `z = manifested state`, `m = manifold
   garden` (`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`) is vault material.

@@ -58,7 +58,7 @@
 - The manifold model is: **x** = identity/seed/observer, **y** = modifiers/nutrients (extracted from m, never assumed), **z** = manifested state/bloom (never stored independently — always derived), **m** = manifold garden (queryable field, not a database). See [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](docs/X-DIMENSIONAL-AI-DIRECTIVE.md).
 - Multiplication gathers (unite). Division explodes (decompose). Horizontal traversal = division-dominant. Vertical traversal = multiplication-dominant. Traversal resistance $r \ge 1$; $r = 1$ is the void crossing (no resistance).
 - Seven-layer dimensional ladder and Fibonacci scaling ($F_n = F_{n-1} + F_{n-2}$, levels $[1,1,2,3,5,8,13]$) govern layer magnitude and traversal step sizing.
-- The Gyroid is the canonical substrate. The Schwarz Diamond is an auxiliary lens only — never store, index, or route queries by it.
+- **Zynxy** is the canonical substrate — a self-tiling cubic of `z = xy` rotated into the six cube faces (two tristars at antipodal poles, each face at 90° to its neighbours). Implementation: `js/substrates/winki_substrate.js` (Phase-2 rename to `zynxy_substrate.js`). Reference mesh: `4DTicTacToe/assets/models/winki.glb` — **reference only, not a runtime asset**; runtime geometry is derived from the substrate equations and the GLB is removed once procedural equivalents ship. Gyroid and Schwarz Diamond formulas are retained only as fast-evaluatable SDF approximations of Zynxy; never treat them as canonical, never store or index by them.
 
 ## Known Pitfalls
 

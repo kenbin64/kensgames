@@ -19,9 +19,11 @@
  * and every entity's manifold value m = xyz is pure multiplicative coupling.
  *
  * STORAGE: 16 bytes per point (two Float64s in a typed array)
- * SURFACE: Schwarz Diamond + Gyroid blend — computed, never stored
- *   Gyroid is the canonical substrate; Schwartz Diamond is an auxiliary lens.
- *   See docs/SUBSTRATES.md for role split.
+ * SURFACE: Zynxy substrate — computed, never stored
+ *   Zynxy is the canonical substrate (self-tiling cubic of z=xy in the six
+ *   xyz face positions, two tristars at antipodal poles). Gyroid and Schwarz
+ *   Diamond trig forms are retained only as fast-eval SDF approximations.
+ *   See docs/SUBSTRATES.md for the doctrine.
  * LENSES:  Pure functions from (x, y, z) → any domain
  *
  * One VPS. One equation. Infinite projections.

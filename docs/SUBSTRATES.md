@@ -20,40 +20,46 @@ Apps and games are seeded with an `x` and bloom organically as `y` evolves from 
 
 This doc names the two TPMS surfaces in this repo, the role each one plays, and the rule that keeps them separate.
 
-## The two surfaces
+## The canonical substrate: Zynxy
 
-| Surface | Genesis | Role | Canonical mesh |
-|---|---|---|---|
-| **Gyroid** | `sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = c` | **Substrate** — storage, indexing, joining; canonical m field | procedural (no GLB) |
-| **Schwarz Diamond** | `z = xy` rotated 90° into all six xyz face-positions (see below) | **Auxiliary lens** — visual geometry, AI inflection, force fields | `starfighter/assets/models/winki.glb` |
+> **Doctrinal correction.** Earlier revisions of this file named two TPMS surfaces (Gyroid and Schwarz Diamond) as substrate + lens. That model was a stepping-stone. The engine now has **one canonical substrate**: **Zynxy**. Gyroid and Schwarz Diamond are demoted to fast-evaluatable SDF approximations of Zynxy and may be used as cheap scalar fields where appropriate. They are never canonical and never used for storage, indexing, or routing.
 
-The Gyroid is the canonical substrate — the single TPMS the engine is built on. The algebraic transforms (gather/explode families) applied to x, y, z, and m generate the geometric shapes that are the manifolds. The Schwarz Diamond surface is a derived lens computed on read; it is never stored, never indexed, and never used as keys.
+**Zynxy** is a self-tiling cubic structure built from the manifold's own axiom `z = xy`, rotated 90° into each of the six xyz cube-face positions. The six instances pair into **two tristars** at antipodal cube vertices:
 
-### The Schwartz Diamond: what it actually is
+- **Top tristar** at pole `(+1, +1, +1)` — faces `+W`, `+U`, `+V` meet at 90°.
+- **Bottom tristar** at pole `(−1, −1, −1)` — faces `−W`, `−U`, `−V` meet at 90°.
 
-> **Previous documentation was an approximation. This is the corrected definition.**
+Because every face is the same axiom re-oriented, faces seam with zero rotation correction. The structure tiles seamlessly along x, y, z to form arbitrary lattices, and as a continuous waveform it carries every angle, inflection, state-change, peak and valley needed to express any datatype and any computation directly from the substrate.
 
-The Schwartz Diamond in this framework is **not** merely the trigonometric level-set `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0`. That formula approximates the shape but misses the generative insight.
+| Property | Value |
+|---|---|
+| Genesis | `z = xy` rotated into the six xyz cube faces |
+| Topology | Self-tiling cubic with PASSAGE / CHAMBER / SPINE regions |
+| Symmetry | Two tristars (3+3 saddles) at antipodal cube poles, each face at 90° |
+| Reference mesh (source only) | `4DTicTacToe/assets/models/winki.glb` |
+| Operator implementation | `js/substrates/winki_substrate.js` (Phase-2 rename → `zynxy_substrate.js`) |
 
-The **true genesis** of the Schwartz Diamond here is:
+### GLB is reference-only
 
-$$\text{Take } z = xy \text{ and rotate it 90° into each of the six xyz face-positions.}$$
+Per `AGENTS.md`: GLB files are **source references**, not deployable runtime assets. The `winki.glb` mesh exists so the substrate's geometry can be inspected and verified. Runtime geometry MUST be derived from the Zynxy equations / seeds / substrate parameters. Once procedural equivalents are verified, the GLB is removed from the deploy artifact.
 
-This produces a "completed square" — six instances of `z = xy`, one per cube face, each the next phase of the same transform. Because the surface is generated from `z = xy` (the manifold's own axiom), each face aligns perfectly with its neighbour **without any additional rotation adjustment**. The result has the same self-tiling property as a cube — 6-fold face symmetry, all joins seamless, no seam-correction needed.
+### Operators
 
-The canonical mesh embodying this shape is **`starfighter/assets/models/winki.glb`** (144 KB, glTF 2.0 binary).
+The canonical JS operator set is at `js/substrates/winki_substrate.js` (renaming to `zynxy_substrate.js` in Phase 2). It implements every operator as a pure lens — nothing stored, everything derived on read:
 
-- It is the reference geometry for the Schwartz Diamond lens in all code.
-- Visual mesh generation samples the winki surface rather than re-deriving the trig approximation.
-- The "8-fold symmetry" cited in earlier documentation was wrong. The correct symmetry is **6-fold** (one phase per cube face), which maps cleanly onto the six weapon hard-points, six sortie acts, and six crew stations in the game design.
+`observe`, `explode`, `grad`, `compare`, `depth`, `power`, `root`, `project`, `union`, `exclude`, `nestObserve`, `tile`, `lattice`.
 
-For all code that previously used `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0`: keep using it where a fast-evaluatable SDF scalar field is needed, but recognise it as an approximation of the winki surface, not the definition.
+## Historical reference surfaces (deprecated as substrates)
 
-For all code that previously used `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0`: keep using it where a fast-evaluatable SDF scalar field is needed, but recognise it as an approximation of the winki surface, not the definition.
+These trigonometric level-sets are kept only as fast-evaluatable scalar fields. They are **not** the substrate.
 
-The closest textbook proximity reference for the continuous periodic structure is the Schwarz (Swartz) Diamond gyroid family — see [`docs/X-DIMENSIONAL-AI-DIRECTIVE.md`](X-DIMENSIONAL-AI-DIRECTIVE.md) Def 1.8.
+| Surface | Equation | Permitted use |
+|---|---|---|
+| Gyroid | `sin(x)cos(y) + sin(y)cos(z) + sin(z)cos(x) = c` | Background visual (`gyroid.js` portal canvas only). No storage, no indexing, no manifold role. |
+| Schwarz Primitive | `cos(x) + cos(y) + cos(z) = c` | Cheap SDF reference if needed |
+| Schwarz Diamond | `cos(x)cos(y)cos(z) − sin(x)sin(y)sin(z) = 0` | Trigonometric approximation of Zynxy; may be used where a fast SDF is required, but Zynxy is the source of truth |
 
-The canonical JS operator set for working with the Winki surface as a manifold is at **`js/substrates/winki_substrate.js`**. It implements every operator (observe, explode, grad, compare, depth, power, root, project, union, exclude, nestObserve, tile, lattice) as a pure lens — nothing stored, everything derived on read.
+The Schwarz Diamond renderer (`fasttrack/schwarz_diamond_renderer.js`) is scheduled for removal in Phase 2 along with the Winki→Zynxy code rename.
 
 ## How the surfaces and variables map together
 
@@ -64,25 +70,30 @@ The canonical JS operator set for working with the Winki surface as a manifold i
 | **z** (bloom / output) | Manifested current state. Always derived, never independently stored. | $z = x \cdot y \cdot m$ (gather) or $z = (x/y) \cdot m$ (explode) | `js/manifold.js` `_z()` |
 | **m** (manifold / garden) | Full manifold coefficient. Context, weight, and intensity of extraction. | $m = z/(x \cdot y)$ | `_m()` |
 | **r** (resistance) | Traversal resistance $r \ge 1$. At $r = 1$, no resistance (void crossing). | $z = (x \cdot y / r) \cdot m$ | traversal logic |
-| **Gyroid field** | Canonical substrate. Indexer. Joiner. Gather-family geometry. | `sin(x)cos(y)+sin(y)cos(z)+sin(z)cos(x) = c` | `gyroid()` |
-| **Schwarz Diamond field** | Auxiliary lens. Sampled for geometry, gradient, AI inflection. Explode-family geometry. Genesis: `z=xy` rotated into 6 face-positions. Canonical mesh: `winki.glb`. | `cos(x)cos(y)cos(z)−sin(x)sin(y)sin(z) = 0` (fast-eval approximation) | `diamond()`, `diamondGrad()`, `starfighter/assets/models/winki.glb` |
+| **Zynxy substrate** | Canonical substrate. Storage, indexing, joining, geometry, gradient, lensing — all of it. Self-tiling cubic of `z=xy` in the six face positions (two tristars at 90°). | Generated by `z=xy` rotated through the six xyz face positions | `js/substrates/winki_substrate.js` → `WinkiSubstrate` (Phase-2 rename to `ZynxySubstrate`); reference mesh `4DTicTacToe/assets/models/winki.glb` (source only, not runtime) |
+| *Gyroid (deprecated)* | Background visual only; no manifold role. | `sin(x)cos(y)+sin(y)cos(z)+sin(z)cos(x) = c` | `gyroid.js` (portal background canvas) |
+| *Schwarz Diamond (deprecated)* | Fast SDF approximation of Zynxy. Not canonical. | `cos(x)cos(y)cos(z)−sin(x)sin(y)sin(z) = 0` | `diamond()`, `diamondGrad()` (legacy lenses, scheduled for removal) |
 
 ## Rules of use
 
-The Schwartz Diamond MAY appear in:
+**Zynxy** is the canonical substrate. It MAY appear anywhere — storage, indexing, joining, visual mesh generation, force fields, audio / AI / state lenses, tests.
 
-- visual mesh generation (e.g. `manifold_geometry_substrate.js`, `visual_compositor.js`, `schwarz_diamond_renderer.js`)
-- force fields via `∇D` (e.g. `manifold_kernel.js`)
-- audio / AI / state lenses (e.g. `anpc_manifold.js`, `music.js`, `phrase_compositor.js`)
+**Gyroid and Schwarz Diamond** trigonometric forms are fast SDF approximations only. They MAY appear in:
+
+- background visuals (Gyroid → `gyroid.js`)
+- cheap-eval scalar fields where Zynxy evaluation is too expensive
 - tests of the field as a pure math function
 
-The Schwartz Diamond MUST NOT appear in:
+They MUST NOT appear in:
 
 - DB keys, region indexes, storage hashes
 - the persistence layer
 - query routing or join resolution
+- any code path that claims to be canonical
 
-Bright-line test: if you compute it on read, it is a lens (allowed). If you store it or index by it, you are violating Governing Doc §9.4 (not allowed).
+**GLB rule.** Per `AGENTS.md`: GLB files (including `winki.glb`) are source references only. Never load a GLB at runtime; always derive geometry from the substrate equations. Remove the GLB from the deploy artifact once procedural equivalents are verified.
+
+Bright-line test: if you compute it on read **from the Zynxy operators**, it is canonical. If you compute it from a Gyroid/Diamond trig form, it is a deprecated approximation. If you store or index by any of them, you are violating Governing Doc §9.4.
 
 ## Why the Diamond exists at all
 
@@ -112,10 +123,12 @@ The product spec is intentionally silent on substrates and lenses; do not try to
 
 ## Adding a new surface
 
-If you ever need a third TPMS or any new field beyond Gyroid and Diamond:
+There is exactly one canonical substrate: **Zynxy**. Adding a second substrate is a doctrinal change requiring an explicit spec revision.
 
-1. Decide its role first: substrate (would conflict with §9.4 — needs spec amendment) or lens (free to add).
+If you need a new field beyond Zynxy:
+
+1. Decide its role first: substrate (forbidden without spec amendment) or lens (free to add).
 2. If a lens: add a section to this file naming the equation, the role, and the bright-line test for misuse.
 3. If a substrate: stop and request a spec revision before writing code.
 
-Apps and games grow organically from a seed. The substrate stays one. The lenses can multiply.
+Apps and games grow organically from a seed. The substrate stays one (Zynxy). The lenses can multiply.
