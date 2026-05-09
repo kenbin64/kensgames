@@ -33,7 +33,6 @@
       "../fasttrack-game-core.js",
       "../fasttrack-3d.js",
       "../fasttrack-sound.js",
-      "../lobby_client.js",
       "../board_manifold.js",
       "../substrate_manifold.js",
       "../fasttrack_manifold_substrate.js",

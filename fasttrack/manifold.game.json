@@ -23,7 +23,6 @@
     "analytics": "analytics_substrate.js",
     "growth": "growth_substrate.js",
     "seo": "seo_substrate.js",
-    "lobby_client": "lobby_client.js",
     "avatars": "avatars.js"
   },
   "manifold_bridge": {

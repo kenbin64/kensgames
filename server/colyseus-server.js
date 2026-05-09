@@ -4,9 +4,10 @@
  * colyseus-server.js
  *
  * Colyseus game server — runs on port 2567 (default).
- * The Socket.IO lobby (lobby-server.js, port 8765) handles auth + matchmaking.
- * When a game starts, it creates a Colyseus room and hands the roomId back to
- * the game page, which then connects here for live delta-patched state sync.
+ * The lobby (lobby-server.js, port 8765, raw WebSocket via crossws) handles
+ * auth + matchmaking. When a game starts, it creates a Colyseus room and
+ * hands the roomId back to the game page, which then connects here for live
+ * delta-patched state sync.
  *
  * nginx proxy:
  *   wss://kensgames.com/colyseus → ws://127.0.0.1:2567

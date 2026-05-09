@@ -16,7 +16,7 @@ let kickTargetId = null;
 document.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('arcade_user');
     if (!saved) { showNoAccess(); return; }
-    try { currentUser = JSON.parse(saved); } catch(e) { showNoAccess(); return; }
+    try { currentUser = JSON.parse(saved); } catch (e) { showNoAccess(); return; }
     document.getElementById('admin-user').innerHTML = `<span style="color:var(--green)">▶ ${currentUser.username}</span>`;
     connectAdmin();
 });
@@ -35,28 +35,43 @@ function showPanel(role) {
 }
 
 // ── WEBSOCKET ────────────────────────────────────────────────
+// Raw WebSocket — server/lobby-server.js does not speak Socket.IO.
+// Previously used `io()` which would crash silently because
+// js/socket.io.min.js was never loaded by admin.html.
+function adminWsUrl() {
+    return location.protocol === 'https:'
+        ? `wss://${location.host}/ws`
+        : `ws://${location.hostname}:8765`;
+}
+
 function connectAdmin() {
-    ws = io(LOBBY_WS_BASE, {
-        path: '/ws',
-        transports: ['websocket', 'polling'],
-        reconnection: false,
-    });
-    ws.on('connect', () => {
+    try {
+        ws = new WebSocket(adminWsUrl());
+    } catch (err) {
+        console.warn('[Admin] WebSocket open failed', err);
+        setTimeout(connectAdmin, 3000);
+        return;
+    }
+    ws.addEventListener('open', () => {
         // Login first
         send({ type: 'login', username: currentUser.username, password: '' });
-        // Use token-based auth if available
         if (currentUser.token) {
             send({ type: 'auth', token: currentUser.token });
         }
     });
-    ws.on('message', (data) => {
-        try { handleMsg(data); } catch(err) { console.warn(err); }
+    ws.addEventListener('message', (event) => {
+        try { handleMsg(JSON.parse(event.data)); }
+        catch (err) { console.warn('[Admin] parse error', err); }
     });
-    ws.on('disconnect', () => setTimeout(connectAdmin, 3000));
+    ws.addEventListener('close', () => setTimeout(connectAdmin, 3000));
+    ws.addEventListener('error', () => { try { ws.close(); } catch (_) { } });
 }
 
 function send(msg) {
-    if (ws && ws.connected) ws.emit('message', msg);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify(msg)); }
+        catch (err) { console.warn('[Admin] send failed', err); }
+    }
 }
 
 function handleMsg(msg) {

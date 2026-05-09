@@ -367,28 +367,48 @@ function handleGuestJoin(e) {
 }
 
 // ── WEBSOCKET ────────────────────────────────────────────────
+// Raw WebSocket lobby connection. Previously used socket.io (`io()`)
+// against the same URL, but server/lobby-server.js does NOT speak the
+// Socket.IO protocol — that path silently failed (ReferenceError on
+// `io` when js/socket.io.min.js was not loaded; protocol mismatch when
+// it was). Per AGENTS.md: no per-page lobby logic — this whole file is
+// being phased out in favour of js/substrates/multiplayer_panel.js.
+function lobbyWsUrl() {
+    return location.protocol === 'https:'
+        ? `wss://${location.host}/ws`
+        : `ws://${location.hostname}:8765`;
+}
+
 function connectLobby() {
-    ws = io(LOBBY_WS_BASE, {
-        path: '/ws',
-        transports: ['websocket', 'polling'],
-        reconnection: false,
-    });
-    ws.on('connect', () => {
+    try {
+        ws = new WebSocket(lobbyWsUrl());
+    } catch (err) {
+        console.warn('[Arcade] Lobby WebSocket open failed', err);
+        setTimeout(connectLobby, 5000);
+        return;
+    }
+    ws.addEventListener('open', () => {
         console.log('[Arcade] Lobby connected');
         if (currentUser) sendWS({ type: 'auth', token: currentUser.token });
     });
-    ws.on('message', (data) => {
-        try { handleMessage(data); } catch (err) { console.warn('[Arcade] Parse error', err); }
+    ws.addEventListener('message', (event) => {
+        try { handleMessage(JSON.parse(event.data)); }
+        catch (err) { console.warn('[Arcade] Parse error', err); }
     });
-    ws.on('disconnect', () => {
+    ws.addEventListener('close', () => {
         console.log('[Arcade] Lobby disconnected, reconnecting...');
         setTimeout(connectLobby, 3000);
     });
-    ws.on('connect_error', () => { setTimeout(connectLobby, 5000); });
+    ws.addEventListener('error', () => {
+        try { ws.close(); } catch (_) { }
+    });
 }
 
 function sendWS(msg) {
-    if (ws && ws.connected) ws.emit('message', msg);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify(msg)); }
+        catch (err) { console.warn('[Arcade] send failed', err); }
+    }
 }
 
 function handleMessage(msg) {
