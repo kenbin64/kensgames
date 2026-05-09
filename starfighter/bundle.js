@@ -8474,6 +8474,8 @@ const SFMultiplayer = (function () {
     sendPlayerState, sendFire, sendComm, sendGameOver,
     get remotePlayers() { return _mp ? _mp.remotePlayers : new Map(); },
     get isMultiplayer() { return _mp ? _mp.isInGame : false; },
+    // Internal: raw KGMultiplayer accessor for the kernel adapter.
+    get _mp() { return _mp; },
   };
 })();
 

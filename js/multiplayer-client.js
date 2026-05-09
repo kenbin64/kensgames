@@ -454,6 +454,25 @@ class KGMultiplayer {
     });
   }
 
+  /**
+   * Send a server-authoritative kernel action.
+   * Uses the explicit { kernel: {...} } envelope so the lobby's KernelRouter
+   * intercepts and validates it via the per-game GameRules. Plain sendAction()
+   * still falls through to legacy peer relay.
+   *
+   *   mp.sendKernelAction('drop', { col: 2, layer: 0 });
+   *   mp.sendKernelAction('settle_complete');
+   */
+  sendKernelAction(type, payload) {
+    if (!this.connected) return;
+    if (typeof type !== 'string' || !type) return;
+    this._send({
+      type: 'game_action',
+      kernel: { type, payload: payload || {} },
+      seq: ++this._seq,
+    });
+  }
+
   /** Send authoritative game state snapshot (host only) */
   sendGameState(state) {
     if (!this.connected || !this.isHost) return;
@@ -599,6 +618,24 @@ class KGMultiplayer {
         this.gameStarted = false;
         this._emit('game_over', data);
         break;
+
+      case 'kernel_state': {
+        // Server-authoritative game-kernel envelope. Inner payload is one of:
+        //   { type: 'state', state: {…} }
+        //   { type: 'turn',  activePlayerId, settled }
+        //   { type: 'game_over', winner? }
+        //   { type: 'error', error, action? }
+        const inner = data.payload || {};
+        // Always emit the raw envelope for general subscribers
+        this._emit('kernel_state', inner);
+        // Convenience re-emits keyed by inner type
+        if (inner.type) this._emit('kernel_' + inner.type, inner);
+        if (inner.type === 'game_over') {
+          this.gameStarted = false;
+          this._emit('game_over', inner);
+        }
+        break;
+      }
 
       case 'chat':
         this._emit('chat', data);

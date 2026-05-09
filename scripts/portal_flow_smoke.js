@@ -5,7 +5,7 @@
 //
 // Requires the lobby server running on ws://localhost:8765.
 const WebSocket = require('../server/node_modules/ws');
-const URL = 'ws://localhost:8765';
+const URL = process.env.LOBBY_WS_URL || 'ws://localhost:8765/ws';
 
 function mkClient(label) {
   const ws = new WebSocket(URL);
@@ -94,16 +94,72 @@ async function friendFlow(gameId, gameName) {
   console.log('PASS friend ' + gameName + ' (host+guest launched, host_username=' + startedG.session.host_username + ')');
 }
 
+async function fourPlayerFriendFlow(gameId, gameName) {
+  // Host + 3 guests over a private session-code → 4 humans launch together.
+  // Verifies the kernel-targeted games (Starfighter, BB3D-multi) and turn-based
+  // games (FastTrack, 4DTicTacToe, Cubic3D) all support a 4-seat lobby.
+  const host = mkClient('HOST/' + gameId); await host.open();
+  const guests = [
+    mkClient('G1/' + gameId),
+    mkClient('G2/' + gameId),
+    mkClient('G3/' + gameId),
+  ];
+  for (const g of guests) await g.open();
+
+  await asGuest(host, 'Host4');
+  await Promise.all(guests.map((g, i) => asGuest(g, 'Guest' + (i + 1))));
+
+  host.send({ type: 'create_session', game_id: gameId, private: true, max_players: 4 });
+  const sc = await host.waitFor(e => e.type === 'share_code'
+    || (e.type === 'session_created' && e.session && e.session.session_code));
+  const code = sc.code || (sc.session && sc.session.session_code);
+  if (!code) throw new Error('4p: no code received');
+  host.send({ type: 'toggle_ready' });
+
+  for (const g of guests) {
+    g.send({ type: 'join_by_code', code });
+    await g.waitFor(e => e.type === 'session_joined' || e.type === 'session_update' || e.type === 'roster_update');
+    g.send({ type: 'toggle_ready' });
+  }
+
+  // Wait until the host sees 4 ready players in the roster.
+  const readyByUser = {};
+  await host.waitFor(e => {
+    if (e.type === 'ready_update' && e.user_id) readyByUser[e.user_id] = !!e.ready;
+    if (e.type === 'session_update' && e.session && Array.isArray(e.session.players)) {
+      e.session.players.forEach(p => { if (p.user_id) readyByUser[p.user_id] = !!p.ready; });
+    }
+    const ids = Object.keys(readyByUser);
+    return ids.length >= 4 && ids.every(id => readyByUser[id]);
+  }, 8000);
+
+  host.send({ type: 'accept_lobby' });
+  host.send({ type: 'start_game' });
+  const startedH = await host.waitFor(e => e.type === 'game_started', 8000);
+  for (const g of guests) await g.waitFor(e => e.type === 'game_started', 8000);
+
+  if (!startedH.session || startedH.session.players.length !== 4) {
+    throw new Error('4p: expected 4 players, got ' + (startedH.session && startedH.session.players.length));
+  }
+  host.close(); guests.forEach(g => g.close());
+  console.log('PASS 4p ' + gameName + ' (host+3 guests launched)');
+}
+
 (async () => {
   const games = [
     ['fasttrack', 'FastTrack'],
     ['4dtictactoe', '4D TicTacToe'],
     ['starfighter', 'Alien Space Attack'],
     ['brickbreaker3d', 'BrickBreaker 3D'],
+    ['cubic3d', 'Cubic'],
   ];
   for (const [id, name] of games) {
     await soloFlow(id, name);
     await friendFlow(id, name);
+  }
+  // 4-player friend flow — only meaningful for games whose kernel/lobby supports ≥4
+  for (const [id, name] of games) {
+    await fourPlayerFriendFlow(id, name);
   }
   console.log('\nAll universal-flow smoke tests passed.');
   process.exit(0);

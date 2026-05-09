@@ -18,7 +18,10 @@
 
   function toAvatarGlyph(avatarId, fallbackGlyph) {
     if (fallbackGlyph) return String(fallbackGlyph);
-    return AVATAR_EMOJIS[String(avatarId || '')] || '👤';
+    const id = String(avatarId || '');
+    // Emoji characters (non-ASCII) can be used directly as the avatar glyph.
+    if (id && !/^[A-Za-z0-9_\-\s]+$/.test(id)) return id;
+    return AVATAR_EMOJIS[id] || '👤';
   }
 
   function asArray(v) {

@@ -2469,26 +2469,276 @@ async function init3D() {
     // moves, and reshuffles are broadcast to peers via game_action and replayed
     // locally under FastTrackCore's _applying guard.
     const isLiveMpMode = (gameMode === 'private' || gameMode === 'public' || gameMode === 'multiplayer');
-    if (isLiveMpMode && window.KGMultiplayer && (sessionCode || inviteCode)) {
+    const relayCode = (sessionCode || runtimeCode || inviteCode || '').toUpperCase().trim();
+    if (isLiveMpMode && !relayCode) {
+      console.warn('[ft-mp] live multiplayer requested without session code; redirecting to lobby');
+      window.location.replace('/fasttrack/lobby-simple.html');
+      return;
+    }
+    if (isLiveMpMode && window.KGMultiplayer && relayCode) {
       try {
         const mp = new window.KGMultiplayer('fasttrack');
+        let joinIssued = false;
+        let invalidCodeErrors = 0;
+        let lastAppliedSeq = 0;
+        let lastPublishedState = null;
+        let statePublisherTimer = null;
+        let colyseusClient = null;
+        let colyseusRoom = null;
+        let colyseusRoomId = '';
+        let colyseusConnectInFlight = false;
+
+        const resolveColyseusEndpoint = () => {
+          const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${proto}//${location.host}/colyseus`;
+        };
+
+        const decodeSchemaTable = (tableLike) => {
+          const out = {};
+          if (!tableLike) return out;
+          try {
+            if (typeof tableLike.forEach === 'function') {
+              tableLike.forEach((v, k) => {
+                try { out[k] = JSON.parse(v); } catch (_) { out[k] = v; }
+              });
+              return out;
+            }
+            Object.keys(tableLike).forEach((k) => {
+              const v = tableLike[k];
+              try { out[k] = JSON.parse(v); } catch (_) { out[k] = v; }
+            });
+          } catch (_) { /* ignore */ }
+          return out;
+        };
+
+        const applyColyseusState = (schemaState) => {
+          // seq=0 is the empty initial Schema — skip to avoid wiping the local board
+          if (!schemaState || schemaState.seq === 0) return false;
+          if (!window.FastTrackCore || typeof window.FastTrackCore.applyStateSnapshot !== 'function') return false;
+          const snapshot = {
+            players: decodeSchemaTable(schemaState.players),
+            board: decodeSchemaTable(schemaState.board),
+            deck: decodeSchemaTable(schemaState.deck),
+            turn: decodeSchemaTable(schemaState.turn),
+            movement: decodeSchemaTable(schemaState.movement),
+            safeZone: decodeSchemaTable(schemaState.safeZone),
+            meta: decodeSchemaTable(schemaState.meta),
+          };
+          return window.FastTrackCore.applyStateSnapshot(snapshot);
+        };
+
+        const ensureColyseusConnection = async (roomId) => {
+          const nextRoomId = String(roomId || '').trim();
+          if (!nextRoomId) return false;
+          if (!window.Colyseus || !window.Colyseus.Client) return false;
+          if (colyseusConnectInFlight) return false;
+          if (colyseusRoom && colyseusRoomId === nextRoomId) return true;
+
+          colyseusConnectInFlight = true;
+          try {
+            if (!colyseusClient) {
+              colyseusClient = new window.Colyseus.Client(resolveColyseusEndpoint());
+            }
+            if (colyseusRoom && typeof colyseusRoom.leave === 'function') {
+              try { await colyseusRoom.leave(); } catch (_) { /* ignore */ }
+            }
+
+            const room = await colyseusClient.joinById(nextRoomId, {
+              userId: mp.userId || null,
+              username: localStorage.getItem('username') || localStorage.getItem('display_name') || 'Player',
+              avatarId: (() => {
+                try {
+                  const av = JSON.parse(localStorage.getItem('kg_avatar') || 'null');
+                  return av && (av.id || av.emoji) ? String(av.id || av.emoji) : null;
+                } catch (_) { return null; }
+              })(),
+            });
+
+            colyseusRoom = room;
+            colyseusRoomId = nextRoomId;
+
+            const mpBridge = {
+              connected: true,
+              get isHost() { return !!mp.isHost; },
+              userId: mp.userId || null,
+              sendAction(action, payload) {
+                if (!colyseusRoom) return;
+                colyseusRoom.send('game_action', { action, payload: payload || {} });
+              },
+              sendGameState(state) {
+                if (!colyseusRoom) return;
+                const frame = state && state.fasttrack ? state.fasttrack : state;
+                colyseusRoom.send('push_state', { state: frame });
+              }
+            };
+
+            room.onStateChange((st) => {
+              if (!st) return;
+              const seq = Number.isFinite(st.seq) ? st.seq : 0;
+              if (seq && seq <= lastAppliedSeq) return;
+              const ok = applyColyseusState(st);
+              if (ok && seq) lastAppliedSeq = seq;
+            });
+
+            room.onMessage('game_action', (msg) => {
+              if (!msg || !msg.action) return;
+              if (msg.from && mp.userId && String(msg.from) === String(mp.userId)) return;
+              try { window.FastTrackCore.applyRemoteAction(msg.action, msg.payload); }
+              catch (err) { console.warn('[ft-colyseus] applyRemoteAction failed', msg.action, err); }
+            });
+
+            room.onMessage('turn_change', (msg) => {
+              if (!msg || !msg.x) return;
+              try {
+                const isMyTurn = mp.userId && String(msg.x) === String(mp.userId);
+                const statusEl = document.getElementById('game-status');
+                if (statusEl) statusEl.textContent = isMyTurn ? 'Your turn' : 'Opponent turn';
+              } catch (_) { /* ignore */ }
+            });
+
+            room.onLeave(() => {
+              if (colyseusRoom === room) {
+                colyseusRoom = null;
+                colyseusRoomId = '';
+              }
+            });
+
+            window.FastTrackCore.setMultiplayerClient(mpBridge);
+            window.__FT_MP__ = mp;
+            window.__FT_COLYSEUS_ROOM__ = room;
+            if (mpBridge.isHost) {
+              publishAuthoritativeState();
+            }
+            console.log('[ft-colyseus] connected room=' + nextRoomId);
+            return true;
+          } catch (err) {
+            console.warn('[ft-colyseus] connect failed, staying on socket relay', err);
+            return false;
+          } finally {
+            colyseusConnectInFlight = false;
+          }
+        };
+
+        const publishAuthoritativeState = () => {
+          if (!mp || !mp.connected || !mp.isHost) return;
+          if (!window.FastTrackCore || typeof window.FastTrackCore.getStateSnapshot !== 'function') return;
+          try {
+            const snapshot = window.FastTrackCore.getStateSnapshot();
+            const encoded = JSON.stringify(snapshot);
+            if (encoded === lastPublishedState) return;
+            lastPublishedState = encoded;
+            if (colyseusRoom) {
+              colyseusRoom.send('push_state', { state: snapshot });
+            } else {
+              mp.sendGameState({ fasttrack: snapshot });
+            }
+          } catch (err) {
+            console.warn('[ft-mp] publish authoritative state failed', err);
+          }
+        };
+
+        const ensurePublisher = () => {
+          if (statePublisherTimer) return;
+          statePublisherTimer = setInterval(publishAuthoritativeState, 250);
+        };
+        const ensureJoined = () => {
+          if (joinIssued) return;
+          const activeCode = (mp.session && mp.session.session_code ? String(mp.session.session_code) : '').toUpperCase().trim();
+          if (activeCode === relayCode) return;
+          joinIssued = true;
+          mp.joinByCode(relayCode);
+        };
+
+        mp.on('authenticated', ({ userId }) => {
+          try { window.FastTrackCore.setMyUserId(userId || null); } catch (_) { /* ignore */ }
+          ensureJoined();
+        });
+
         mp.on('game_action', (msg) => {
+          if (colyseusRoom) return;
           if (!msg || !msg.action) return;
           // Skip our own echoes — server fans out to all peers including the sender.
           if (msg.from && mp.userId && String(msg.from) === String(mp.userId)) return;
-          try { window.FastTrackCore.applyRemoteAction(msg.action, msg.payload); }
+          try {
+            window.FastTrackCore.applyRemoteAction(msg.action, msg.payload);
+            // Host re-publishes the canonical full state after applying any peer action.
+            publishAuthoritativeState();
+          }
           catch (err) { console.warn('[ft-mp] applyRemoteAction failed', msg.action, err); }
+        });
+        mp.on('game_state', (msg) => {
+          if (colyseusRoom) return;
+          if (!msg || !msg.state) return;
+          const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
+          if (seq && seq <= lastAppliedSeq) return;
+          const frame = msg.state && msg.state.fasttrack ? msg.state.fasttrack : msg.state;
+          const ok = window.FastTrackCore && typeof window.FastTrackCore.applyStateSnapshot === 'function'
+            ? window.FastTrackCore.applyStateSnapshot(frame)
+            : false;
+          if (!ok) return;
+          if (seq) lastAppliedSeq = seq;
         });
         mp.on('session_update', (session) => {
           if (!session) return;
           // Server auto-resumes our seat on guest_login; capture host status so
           // _isHost() reflects reality for reshuffle authority.
           mp.isHost = session.host_id === mp.userId;
+          const activeCode = (session.session_code ? String(session.session_code) : '').toUpperCase().trim();
+          if (activeCode && activeCode === relayCode) {
+            joinIssued = true;
+          }
+          try {
+            window.FastTrackCore.setMyUserId(mp.userId || null);
+            window.FastTrackCore.updateSessionRoster(session.players || []);
+            if (mp.isHost) publishAuthoritativeState();
+          } catch (err) {
+            console.warn('[ft-mp] failed to apply authoritative roster', err);
+          }
+
+          if (session.colyseus_room_id) {
+            ensureColyseusConnection(session.colyseus_room_id);
+          }
+        });
+        mp.on('colyseus_room', (data) => {
+          const roomId = data && data.roomId ? String(data.roomId) : '';
+          if (roomId) ensureColyseusConnection(roomId);
+        });
+        mp.on('pm_game_ready', (data) => {
+          const roomId = data && data.colyseus_room_id ? String(data.colyseus_room_id) : '';
+          if (roomId) ensureColyseusConnection(roomId);
+        });
+        mp.on('error', (message) => {
+          if (!message) return;
+          const m = String(message).toLowerCase();
+          if (m.includes('invalid game code') || m.includes('session not found')) {
+            invalidCodeErrors += 1;
+            const activeCode = (mp.session && mp.session.session_code ? String(mp.session.session_code) : '').toUpperCase().trim();
+            // Retry once before fail-closed redirect to avoid transient reconnect race.
+            if (activeCode === relayCode) return;
+            if (invalidCodeErrors < 2) {
+              joinIssued = false;
+              setTimeout(() => ensureJoined(), 800);
+              return;
+            }
+            console.warn('[ft-mp] session attach failed after retry, redirecting to lobby', message);
+            window.location.replace('/fasttrack/lobby-simple.html');
+          }
         });
         mp.connect();
+        ensurePublisher();
+        // If auth arrives late or session resume fails, issue explicit join retry.
+        setTimeout(() => ensureJoined(), 1200);
+
+        // Try immediate colyseus attach from cached session/runtime data.
+        try {
+          const cachedRoom = (sessionCache && sessionCache.colyseus_room_id) ||
+            (runtimeCache && runtimeCache.session && runtimeCache.session.colyseus_room_id) || '';
+          if (cachedRoom) ensureColyseusConnection(cachedRoom);
+        } catch (_) { /* ignore */ }
+
         window.FastTrackCore.setMultiplayerClient(mp);
         window.__FT_MP__ = mp;
-        console.log('🌐 FastTrack multiplayer relay attached | code=' + (sessionCode || inviteCode));
+        console.log('🌐 FastTrack multiplayer relay attached | code=' + relayCode);
       } catch (err) {
         console.warn('[ft-mp] failed to attach multiplayer relay', err);
       }

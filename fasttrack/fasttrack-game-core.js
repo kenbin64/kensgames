@@ -587,8 +587,105 @@ function shuffleDeck() {
 let _mpClient = null;
 let _applying = false;
 
+// ── Kernel adapter (slice 2 of the per-game GameKernel rollout) ──────────
+// In hybrid mode the host client still owns the deck and broadcasts the popped
+// card to peers via the legacy peer relay. The kernel runs alongside as a
+// server-side validator: it confirms the active player matches the one taking
+// the action and rotates its own turnIdx in lockstep. If the kernel never
+// activates within ~1.5 s of game start (e.g. the lobby's KernelRouter isn't
+// enabled for this gameId), the legacy peer relay continues to be the sole
+// transport — zero behaviour change.
+let _kernelClient = null;
+let _kernelMode = false;
+
+const _SYNC_TABLES = ['players', 'board', 'deck', 'turn', 'movement', 'safeZone', 'meta'];
+
+function _tableToObject(table) {
+  const out = {};
+  const keys = table.keys();
+  for (const key of keys) out[key] = table.get(key);
+  return out;
+}
+
+function _replaceTableFromObject(table, nextObj) {
+  const prevKeys = table.keys();
+  for (const key of prevKeys) table.delete(key);
+  for (const key of Object.keys(nextObj || {})) table.set(key, nextObj[key]);
+}
+
+function getStateSnapshot() {
+  const snapshot = {};
+  for (const name of _SYNC_TABLES) {
+    snapshot[name] = _tableToObject(state[name]);
+  }
+  // JSON copy guarantees plain-serializable payload over socket transport.
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
+function applyStateSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  for (const name of _SYNC_TABLES) {
+    if (!snapshot[name] || typeof snapshot[name] !== 'object') return false;
+  }
+  for (const name of _SYNC_TABLES) {
+    _replaceTableFromObject(state[name], snapshot[name]);
+  }
+  syncPegMatrix();
+  updateUI();
+  renderBoard();
+  return true;
+}
+
 function setMultiplayerClient(client) {
   _mpClient = client || null;
+  // Tear down any previous kernel adapter (e.g. on rematch / new session).
+  if (_kernelClient) { try { _kernelClient.destroy(); } catch (_) { } }
+  _kernelClient = null;
+  _kernelMode = false;
+  if (!client || typeof window === 'undefined' || typeof window.KGKernelClient !== 'function') return;
+  _kernelClient = new window.KGKernelClient({
+    client,
+    myUserId: client.userId != null ? String(client.userId) : null,
+  });
+  _kernelClient.on('active', () => { _kernelMode = true; });
+  _kernelClient.on('legacy', () => { _kernelMode = false; });
+  _kernelClient.on('error', (e) => console.warn('[ft-kernel] rejected', e));
+  // The kernel's `state` envelope is parallel to the host-relayed deck/board,
+  // so we do not consume it for UX; we only read it for audit when needed.
+}
+
+// Map the local FastTrack player index to the kernel's playerId (= ws user_id).
+function _activePlayerKernelId() {
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const p = players[ci];
+  return (p && p.userId != null) ? String(p.userId) : null;
+}
+
+function setMyUserId(userId) {
+  state.meta.set('myUserId', userId || null);
+}
+
+function updateSessionRoster(sessionPlayers) {
+  const incoming = Array.isArray(sessionPlayers) ? sessionPlayers : null;
+  if (!incoming || incoming.length < 2) return;
+  const sorted = incoming.slice().sort((a, b) => {
+    const sa = Number.isFinite(a && a.slot) ? a.slot : Number.MAX_SAFE_INTEGER;
+    const sb = Number.isFinite(b && b.slot) ? b.slot : Number.MAX_SAFE_INTEGER;
+    return sa - sb;
+  });
+  const players = state.players.get('list') || [];
+  if (!players.length) return;
+  for (let i = 0; i < players.length && i < sorted.length; i++) {
+    const sp = sorted[i] || null;
+    if (!sp) continue;
+    players[i].userId = sp.user_id || players[i].userId || null;
+    players[i].isBot = !!sp.is_ai;
+    players[i].name = sp.username || sp.name || players[i].name;
+    players[i].avatar = (sp.avatar && (sp.avatar.emoji || sp.avatar)) || sp.avatar_id || players[i].avatar;
+  }
+  state.players.set('list', players);
+  updateUI();
 }
 
 function _isMpMode() {
@@ -623,6 +720,26 @@ function _broadcast(action, payload) {
   if (!_isMpMode() || _applying) return;
   try { _mpClient.sendAction(action, payload || {}); }
   catch (err) { console.warn('[ft-mp] broadcast failed', action, err); }
+  // Hybrid kernel pass: server-validated turn rotation + audit log.
+  // Only the active player should send draw/play to the kernel; remote peers
+  // receive the same deck mutation via the legacy relay above and would be
+  // rejected as 'not-your-turn'. The host signs the action under its own
+  // userId; the kernel rotates turnIdx upon receipt.
+  if (!_kernelMode || !_kernelClient) return;
+  if (action === 'draw' && _isMyTurn()) {
+    _kernelClient.send('draw', {});
+  } else if (action === 'move' && _isMyTurn()) {
+    // Surface the local extra-turn flag so the server agrees on rotation
+    // even though its own popped card may not match the host's local card.
+    const move = (payload && payload.move) || {};
+    const card = state.deck.get('currentCard') || null;
+    const rules = card ? CARDS[card.value] : null;
+    const extraTurn = !!(rules && rules.extraTurn);
+    _kernelClient.send('play', { extraTurn, move });
+  } else if (action === 'peg_home') {
+    const id = (payload && payload.playerId) || null;
+    if (id) _kernelClient.send('peg_home', { playerId: String(id) });
+  }
 }
 
 // Re-run a peer's action locally under the _applying guard.
@@ -2895,6 +3012,10 @@ window.FastTrackCore = {
   // Multiplayer wiring — set by 3d.html after initGame so the live KGMultiplayer
   // socket can broadcast moves and replay peer actions under the _applying guard.
   setMultiplayerClient,
+  setMyUserId,
+  updateSessionRoster,
+  getStateSnapshot,
+  applyStateSnapshot,
   applyRemoteAction,
 };
 

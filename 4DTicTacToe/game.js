@@ -53,12 +53,19 @@ let vsMode = 'pvp', aiDiff = 'easy';
 let currentPlayer = P1, isGameOver = false, isDropping = false;
 let turnTimer = null, timerLeft = 0;
 // In-game move relay over the live KGMultiplayer socket carried in by the lobby panel.
-// The panel hands us session.client (an authed KGMultiplayer instance) on launch; from then on
-// the local actor commits a move locally (full physics), broadcasts the resolved (gx,gy,gz,p)
-// via game_action, and remote peers apply the same coordinates by calling finishPlacement
-// directly (skipping physics) under the _applying guard so the broadcast does not echo.
+// Two transports, in order of preference:
+//   (a) KERNEL  — server-authoritative GameKernel (drop / settle_complete envelopes,
+//       state broadcast back to all peers). Activates within ~1.5 s of session start
+//       if the lobby has the game-kernel router enabled for '4dtictactoe'.
+//   (b) LEGACY  — peer-to-peer game_action relay (the original implementation):
+//       local actor commits a move locally (full physics), broadcasts the resolved
+//       (gx,gy,gz,p) via game_action, and remote peers re-run finishPlacement under
+//       the _applying guard so the broadcast does not echo. Used as fallback for
+//       sessions where the kernel router never confirms (legacy probe expires).
 const KGSync = {
   online: false, isHost: false, mySlot: 0, client: null, _applying: false, _onAction: null,
+  // Kernel adapter state (slice 1: client wiring of 4DTicTacToe → KGKernelClient).
+  kernel: null, kernelMode: false, _idToSlot: null, _lastBoard: null,
   init(session) {
     this.reset();
     if (!session || !session.client) return;
@@ -72,26 +79,77 @@ const KGSync = {
     this.mySlot = (me && Number.isFinite(+me.slot) && (+me.slot) > 0)
       ? (+me.slot)
       : ((idx >= 0) ? (idx + 1) : 0);
+
+    // Build the kernel-id → client-slot map from the session roster. Server uses
+    // String(user_id) as the playerId; client uses 1..N seat indices everywhere.
+    this._idToSlot = new Map();
+    players.forEach((p, i) => {
+      const slot = (Number.isFinite(+p.slot) && (+p.slot) > 0) ? (+p.slot) : (i + 1);
+      this._idToSlot.set(String(p.user_id), slot);
+    });
+
+    // Legacy peer-relay listener stays armed; it's the fallback transport.
     this._onAction = (data) => {
+      if (this.kernelMode) return;     // kernel is authoritative — ignore peer echoes
       if (!data || data.action !== 'move' || !data.payload) return;
       const { gx, gy, gz, p } = data.payload;
       if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number') return;
       KGSync._applyRemote(gx, gy, gz, p);
     };
     this.client.on('game_action', this._onAction);
+
+    // Stand up the kernel adapter. It probes silently — if no kernel_state
+    // envelope arrives within the probe window, `legacy` fires and we keep
+    // using peer-relay. Otherwise we flip to kernel mode on first envelope.
+    if (typeof window.KGKernelClient === 'function') {
+      const myUserId = (me && me.user_id != null) ? String(me.user_id)
+        : (session.my_user_id != null ? String(session.my_user_id) : null);
+      this.kernel = new window.KGKernelClient({
+        client: this.client,
+        mySlot: this.mySlot,
+        myUserId,
+      });
+      this.kernel.on('active', () => { KGSync.kernelMode = true; });
+      this.kernel.on('legacy', () => { KGSync.kernelMode = false; });
+      this.kernel.on('state', ({ state }) => KGSync._applyKernelState(state));
+      this.kernel.on('gameOver', () => { /* game.js win-check handles UX */ });
+      this.kernel.on('error', (e) => console.warn('[KGSync] kernel rejected action', e));
+    }
   },
   reset() {
     if (this.client && this._onAction) { try { this.client.off('game_action', this._onAction); } catch { /* ignore */ } }
+    if (this.kernel) { try { this.kernel.destroy(); } catch { /* ignore */ } }
     this.online = false; this.isHost = false; this.mySlot = 0;
     this.client = null; this._applying = false; this._onAction = null;
+    this.kernel = null; this.kernelMode = false; this._idToSlot = null; this._lastBoard = null;
   },
   canActLocally() {
     if (!this.online) return true;
+    // When the kernel has confirmed the active player, it is the source of
+    // truth. Before kernel activation (or in legacy mode), fall back to the
+    // slot/turn comparison the lobby gave us at start.
+    if (this.kernelMode && this.kernel) {
+      const k = this.kernel.canActLocally();
+      if (typeof k === 'boolean') return k;
+    }
     if (vsMode === 'ai' && currentPlayer !== P1) return this.isHost; // AI runs on host only
     return this.mySlot !== 0 && this.mySlot === currentPlayer;
   },
   broadcast(gx, gy, gz, p) {
     if (!this.online || this._applying || !this.client) return;
+    // Kernel mode: server validates the drop, broadcasts the resolved state
+    // to all peers, and rotates the turn after every player ack's settle.
+    // We deliberately do NOT also send the legacy `move` payload — the
+    // kernel's `state` echo handles fan-out (each peer's _applyKernelState
+    // re-runs the visual via _applyRemote, which is a no-op for the local
+    // actor whose cell is already filled).
+    if (this.kernelMode && this.kernel) {
+      this.kernel.send('drop', { col: gx, layer: gz });
+      // Local actor's physics has already landed — ack the settle handshake
+      // immediately so the server can advance the turn once every peer ack's.
+      this.kernel.settle();
+      return;
+    }
     try { this.client.sendAction('move', { gx, gy, gz, p }); } catch (e) { console.warn('[KGSync] send fail', e); }
   },
   _applyRemote(gx, gy, gz, p) {
@@ -102,6 +160,38 @@ const KGSync = {
     this._applying = true;
     try { finishPlacement(p, [gx, gy, gz]); }
     finally { this._applying = false; }
+  },
+  // Kernel state diff: compare incoming server board to our last-seen board,
+  // apply any newly-occupied cells via the existing remote-placement path,
+  // and ack the settle handshake so the server can rotate turns.
+  _applyKernelState(state) {
+    if (!state || !Array.isArray(state.board)) return;
+    const board = state.board;          // board[layer][row][col] = playerId | null
+    const last = this._lastBoard;
+    let appliedAny = false;
+    for (let layer = 0; layer < board.length; layer++) {
+      const layerArr = board[layer]; if (!Array.isArray(layerArr)) continue;
+      for (let row = 0; row < layerArr.length; row++) {
+        const rowArr = layerArr[row]; if (!Array.isArray(rowArr)) continue;
+        for (let col = 0; col < rowArr.length; col++) {
+          const cell = rowArr[col];
+          const prev = last && last[layer] && last[layer][row] ? last[layer][row][col] : null;
+          if (cell != null && cell !== prev) {
+            const slot = this._idToSlot ? this._idToSlot.get(String(cell)) : null;
+            if (slot && !BM.getCell(col, row, layer)) {
+              this._applyRemote(col, row, layer, slot);
+              appliedAny = true;
+            }
+          }
+        }
+      }
+    }
+    // Cache a deep-ish snapshot for the next diff. Boards are tiny (≤5³=125
+    // entries) so a structured clone is cheap.
+    this._lastBoard = board.map(l => l.map(r => r.slice()));
+    // If we visually applied a remote piece, we must also ack settle so the
+    // server can rotate the turn. Local actor already settled in broadcast().
+    if (appliedAny && this.kernelMode && this.kernel) this.kernel.settle();
   },
 };
 const canvas = document.getElementById('c');

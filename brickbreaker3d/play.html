@@ -214,6 +214,8 @@
     }
   </style>
   <script src="/js/analytics.js"></script>
+  <script src="/js/kernel-client.js" defer></script>
+  <script src="/js/player-panel.js" defer></script>
 </head>
 
 <body>
@@ -316,6 +318,13 @@
           onMultiplayer: function (session) {
             const count = Math.max(2, Math.min(4, Number((session.players && session.players.length) || 2)));
             const gameMode = 'multi' + count;
+            // Thread the live multiplayer client into the game so the
+            // server-side GameKernel can audit score/lives/level.
+            try {
+              if (session && session.client && typeof window.BBSetMultiplayer === 'function') {
+                window.BBSetMultiplayer(session.client);
+              }
+            } catch (_) { /* non-fatal */ }
             const tryStart = function () {
               if (typeof startGame === 'function') { startGame(gameMode); return; }
               setTimeout(tryStart, 50);

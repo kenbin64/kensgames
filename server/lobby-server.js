@@ -20,7 +20,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const crossws = require('crossws/adapters/node');
+
 
 const Field = require('../js/manifold-field.js');
 const Proj = require('./manifold-projection.js');
@@ -28,6 +28,7 @@ const Proj = require('./manifold-projection.js');
 const PlayerManager = require('./player-manager.js');
 const UserRegistry = require('./user-registry.js');
 const GameObject = require('./game-object.js');
+const KernelRouter = require('./game-kernel/lobby-router.js');
 
 // ── Colyseus room factory (optional; degrades gracefully if not running) ─────
 const COLYSEUS_PORT = parseInt(process.env.COLYSEUS_PORT || '2567', 10);
@@ -337,6 +338,7 @@ function sendAuthoritativeState(ws, s) {
 function leaveCurrentSession(ws, conn) {
   const s = liveSessions.get(conn.session_x_id);
   if (!s) return null;
+  KernelRouter.detachPeer(ws, conn);
   s.players = s.players.filter(p => p.user_id !== conn.user_id);
   s.players.forEach((p, i) => { p.slot = i; });
   ws.leave(s.session_id);
@@ -344,6 +346,7 @@ function leaveCurrentSession(ws, conn) {
   if (s.players.length === 0 || (s.host_id === conn.user_id && s.players.filter(p => !p.is_ai).length === 0)) {
     liveSessions.delete(s.session_id);
     GameObject.remove(s.session_id);
+    KernelRouter.stop(s.session_id);
     broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
     return s;
   }
@@ -539,6 +542,7 @@ handlers.list_sessions = (ws, data) => {
 function joinExisting(ws, conn, s) {
   const isReturningPlayer = !!(s && Array.isArray(s.players) && s.players.some(p => p.user_id === conn.user_id));
   if (isReturningPlayer) {
+    console.log('[joinExisting] Returning player:', conn.user_id, 'to session', s.session_id);
     conn.session_x_id = s.session_id;
     ws.join(s.session_id);
     send(ws, { type: 'session_joined', session: sanitize(s), action: 'rejoined' });
@@ -550,11 +554,19 @@ function joinExisting(ws, conn, s) {
     return;
   }
   if (!hasRenderableProfile(conn)) {
+    console.log('[joinExisting] ERROR: No renderable profile for user:', conn.user_id, 'user:', conn.user);
     return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before joining a game' });
   }
-  if (s.status !== 'waiting') return send(ws, { type: 'error', message: 'Game already started' });
-  if (s.players.length >= s.max_players) return send(ws, { type: 'error', message: 'Game is full' });
+  if (s.status !== 'waiting') {
+    console.log('[joinExisting] ERROR: Game not waiting, status:', s.status);
+    return send(ws, { type: 'error', message: 'Game already started' });
+  }
+  if (s.players.length >= s.max_players) {
+    console.log('[joinExisting] ERROR: Game is full');
+    return send(ws, { type: 'error', message: 'Game is full' });
+  }
   if (conn.session_x_id) leaveCurrentSession(ws, conn);
+  console.log('[joinExisting] New player joining:', conn.user_id, 'to session', s.session_id);
   Proj.bloomPlayer(log, s.x, { user_id: conn.user_id, username: conn.user.username });
   s.players.push({
     user_id: conn.user_id, username: conn.user.username,
@@ -586,9 +598,17 @@ handlers.join_session = (ws, data) => {
 
 handlers.join_by_code = (ws, data) => {
   const conn = connections.get(ws);
-  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
-  const s = sessionByCode(data && data.code);
-  if (!s) return send(ws, { type: 'error', message: 'Invalid game code' });
+  if (!conn) {
+    console.log('[join_by_code] ERROR: No connection for socket', data && data.code);
+    return send(ws, { type: 'error', message: 'Not authenticated' });
+  }
+  const code = String(data && data.code || '').toUpperCase();
+  const s = sessionByCode(code);
+  if (!s) {
+    console.log('[join_by_code] ERROR: Session not found for code:', code);
+    return send(ws, { type: 'error', message: 'Invalid game code' });
+  }
+  console.log('[join_by_code] SUCCESS: Joining session', code, 'for user', conn.user_id);
   joinExisting(ws, conn, s);
 };
 
@@ -772,7 +792,8 @@ handlers.start_game = (ws) => {
   if (!s) return send(ws, { type: 'error', message: 'Not in a game' });
   if (s.status === 'playing') return send(ws, { type: 'error', message: 'Game already launched for this session' });
   if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can start the game' });
-  if (s.players.length < 2) return send(ws, { type: 'error', message: 'Need at least 2 players' });
+  const minNeeded = KernelRouter.isKernelGame(s.game_id) ? KernelRouter.minPlayers(s.game_id) : 2;
+  if (s.players.length < minNeeded) return send(ws, { type: 'error', message: `Need at least ${minNeeded} player${minNeeded === 1 ? '' : 's'}` });
   if (!s.players.every(p => String(p.username || '').trim().length >= 2 && !!normalizeAvatarId(p.avatar_id))) {
     return send(ws, { type: 'error', message: 'Every player must have a name and renderable avatar before launch' });
   }
@@ -783,6 +804,22 @@ handlers.start_game = (ws) => {
   emitGameObject(s);
   Proj.bloomEvent(log, s.x, [0, 0, 0, 0, 1, 1], { kind: 'game_started', session_id: s.session_id, game_id: s.game_id });
   if (!s.is_private) broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
+
+  // Game Kernel: opt-in per gameId. Attaches a GameMaster authoritative for
+  // score/lives/level for the games registered in lobby-router.js.
+  if (KernelRouter.isKernelGame(s.game_id)) {
+    KernelRouter.start(s, {
+      send,
+      broadcastSession,
+      connections,
+      persistAction: (session, action) => {
+        Proj.bloomEvent(log, session.x, [0, 0, 0, 0, 1, 0], {
+          kind: 'kernel_action', session_id: session.session_id,
+          game_id: session.game_id, action_type: action.type, by: action.playerId,
+        });
+      },
+    });
+  }
 
   // Create a Colyseus room for this session (delta-patch state sync engine).
   // Attach roomId to session so PlayerManager can include it in pm_game_ready.
@@ -828,11 +865,15 @@ handlers.player_state = (ws, data) => relay('player_state', ws, data);
 
 // game_action: PM assigns a seq, broadcasts with _pm_seq, tracks acks.
 // Falls back to plain relay for sessions not (yet) PM-managed.
+// Kernel-managed sessions short-circuit here: the GameMaster validates and
+// reduces the action; the lobby's relay is bypassed for those games.
 handlers.game_action = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
   const sessionId = conn.session_x_id;
   if (!sessionId) return;
+  const s = liveSessions.get(sessionId);
+  if (s && KernelRouter.handle(s, ws, data, conn)) return;
   const turnData = Object.assign({ type: 'game_action', from: conn.user_id }, data || {});
   const seq = pm.relayTurn(sessionId, conn.user_id, turnData);
   if (!seq) {
@@ -905,6 +946,7 @@ handlers.game_over = (ws, data) => {
   const s = liveSessions.get(conn.session_x_id);
   if (!s) return;
   s.status = 'ended';
+  KernelRouter.stop(s.session_id);
   Proj.bloomEvent(log, s.x, [-1, 0, 0, 0, 1, 0], { kind: 'game_over', session_id: s.session_id, result: (data && data.result) || null });
   broadcastSession(s, { type: 'game_over', session: sanitize(s), result: (data && data.result) || null });
   liveSessions.delete(s.session_id);
@@ -1259,81 +1301,93 @@ const httpServer = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Not found', hint: 'Use /health, /manifold/frontier, /api/session/bootstrap, /api/players/me, /api/pm/status, /api/gm/log, or WebSocket upgrade' }));
 });
 
-const wsAdapter = crossws({
-  hooks: {
-    open(peer) {
-      activePeers.add(peer);
-      // Keep legacy method names used throughout handlers.
-      peer.join = (topic) => peer.subscribe(topic);
-      peer.leave = (topic) => peer.unsubscribe(topic);
-      console.log(`[Lobby] New connection (total: ${activePeers.size})`);
-      send(peer, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
-    },
+let wsAdapter = null;
+let wsInitPromise = null;
 
-    async message(peer, message) {
-      let data;
-      try {
-        const raw = typeof message.text === 'function' ? message.text() : null;
-        data = raw && typeof raw === 'string' ? JSON.parse(raw) : raw;
-      } catch (_) {
-        return send(peer, { type: 'error', message: 'Invalid message format' });
-      }
-      if (!data || typeof data !== 'object') {
-        return send(peer, { type: 'error', message: 'Invalid message format' });
-      }
-      const handler = handlers[data.type];
-      if (!handler) {
-        console.warn(`[Lobby] Unknown message type: ${data.type}`);
+function initWsAdapter() {
+  if (wsInitPromise) return wsInitPromise;
+  wsInitPromise = (async () => {
+    const crosswsModule = await import('crossws/adapters/node');
+    const crossws = crosswsModule && (crosswsModule.default || crosswsModule);
+    wsAdapter = crossws({
+      hooks: {
+        open(peer) {
+          activePeers.add(peer);
+          // Keep legacy method names used throughout handlers.
+          peer.join = (topic) => peer.subscribe(topic);
+          peer.leave = (topic) => peer.unsubscribe(topic);
+          console.log(`[Lobby] New connection (total: ${activePeers.size})`);
+          send(peer, { type: 'connected', message: 'Welcome to Kensgames Lobby (manifold projection)' });
+        },
+
+        async message(peer, message) {
+          let data;
+          try {
+            const raw = typeof message.text === 'function' ? message.text() : null;
+            data = raw && typeof raw === 'string' ? JSON.parse(raw) : raw;
+          } catch (_) {
+            return send(peer, { type: 'error', message: 'Invalid message format' });
+          }
+          if (!data || typeof data !== 'object') {
+            return send(peer, { type: 'error', message: 'Invalid message format' });
+          }
+          const handler = handlers[data.type];
+          if (!handler) {
+            console.warn(`[Lobby] Unknown message type: ${data.type}`);
+            return;
+          }
+          try { await handler(peer, data); }
+          catch (err) {
+            console.error(`[Lobby] Handler error for ${data.type}:`, err);
+            send(peer, { type: 'error', message: 'Server error' });
+          }
+        },
+
+        close(peer) {
+          const conn = connections.get(peer);
+          if (conn) {
+            const s = liveSessions.get(conn.session_x_id);
+            if (conn.session_x_id) {
+              const replaced = pm.onPlayerDisconnect(conn.user_id, conn.session_x_id);
+              // If PlayerManager replaced this live player with a bot, do not remove
+              // the seat from the session by running leaveCurrentSession().
+              if (!replaced || !s || s.status !== 'playing') {
+                leaveCurrentSession(peer, conn);
+              }
+            } else {
+              leaveCurrentSession(peer, conn);
+            }
+            connections.delete(peer);
+          }
+          activePeers.delete(peer);
+          console.log(`[Lobby] Disconnected (total: ${activePeers.size})`);
+        },
+
+        error(peer, err) {
+          console.error('[Lobby] WebSocket error:', err && err.message ? err.message : err);
+          if (peer) {
+            activePeers.delete(peer);
+            connections.delete(peer);
+          }
+        },
+      },
+    });
+
+    httpServer.on('upgrade', (req, socket, head) => {
+      if (!req.url || !req.url.startsWith('/ws')) {
+        socket.destroy();
         return;
       }
-      try { await handler(peer, data); }
-      catch (err) {
-        console.error(`[Lobby] Handler error for ${data.type}:`, err);
-        send(peer, { type: 'error', message: 'Server error' });
+      if (req.headers.upgrade !== 'websocket') {
+        socket.destroy();
+        return;
       }
-    },
-
-    close(peer) {
-      const conn = connections.get(peer);
-      if (conn) {
-        const s = liveSessions.get(conn.session_x_id);
-        if (conn.session_x_id) {
-          const replaced = pm.onPlayerDisconnect(conn.user_id, conn.session_x_id);
-          // If PlayerManager replaced this live player with a bot, do not remove
-          // the seat from the session by running leaveCurrentSession().
-          if (!replaced || !s || s.status !== 'playing') {
-            leaveCurrentSession(peer, conn);
-          }
-        } else {
-          leaveCurrentSession(peer, conn);
-        }
-        connections.delete(peer);
-      }
-      activePeers.delete(peer);
-      console.log(`[Lobby] Disconnected (total: ${activePeers.size})`);
-    },
-
-    error(peer, err) {
-      console.error('[Lobby] WebSocket error:', err && err.message ? err.message : err);
-      if (peer) {
-        activePeers.delete(peer);
-        connections.delete(peer);
-      }
-    },
-  },
-});
-
-httpServer.on('upgrade', (req, socket, head) => {
-  if (!req.url || !req.url.startsWith('/ws')) {
-    socket.destroy();
-    return;
-  }
-  if (req.headers.upgrade !== 'websocket') {
-    socket.destroy();
-    return;
-  }
-  wsAdapter.handleUpgrade(req, socket, head);
-});
+      wsAdapter.handleUpgrade(req, socket, head);
+    });
+    return wsAdapter;
+  })();
+  return wsInitPromise;
+}
 
 // Cleanup stale waiting sessions every 5 minutes (30-min idle threshold).
 setInterval(() => {
@@ -1349,16 +1403,23 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 if (require.main === module) {
-  httpServer.listen(PORT, () => {
-    console.log('═══════════════════════════════════════════════');
-    console.log('  Kensgames Unified Lobby — manifold projection');
-    console.log(`  HTTP health:  http://0.0.0.0:${PORT}/health`);
-    console.log(`  WebSocket:    ws://0.0.0.0:${PORT}`);
-    console.log(`  Seed log:     ${SEED_LOG} (${log.count()} entries)`);
-    console.log(`  GM log:       ${GM_LOG_FILE}`);
-    console.log(`  Catalog:      ${CATALOG.map(g => g.id).join(', ')}`);
-    console.log('═══════════════════════════════════════════════');
-  });
+  initWsAdapter()
+    .then(() => {
+      httpServer.listen(PORT, () => {
+        console.log('═══════════════════════════════════════════════');
+        console.log('  Kensgames Unified Lobby — manifold projection');
+        console.log(`  HTTP health:  http://0.0.0.0:${PORT}/health`);
+        console.log(`  WebSocket:    ws://0.0.0.0:${PORT}`);
+        console.log(`  Seed log:     ${SEED_LOG} (${log.count()} entries)`);
+        console.log(`  GM log:       ${GM_LOG_FILE}`);
+        console.log(`  Catalog:      ${CATALOG.map(g => g.id).join(', ')}`);
+        console.log('═══════════════════════════════════════════════');
+      });
+    })
+    .catch((err) => {
+      console.error('[Lobby] Failed to initialize crossws adapter:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = { httpServer, io: wsAdapter, wsAdapter, handlers, liveSessions, connections, log, CATALOG, pm };

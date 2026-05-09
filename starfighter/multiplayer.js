@@ -178,6 +178,8 @@ const SFMultiplayer = (function () {
         get remotePlayers() { return _mp ? _mp.remotePlayers : new Map(); },
         get isMultiplayer() { return _mp ? _mp.isInGame : false; },
         get playerCount() { return _mp && _mp.session ? (_mp.session.players || []).length : 1; },
+        // Internal: raw KGMultiplayer accessor for the kernel adapter.
+        get _mp() { return _mp; },
     };
 })();
 

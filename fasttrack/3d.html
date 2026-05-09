@@ -40,11 +40,22 @@
         };
       }
 
+      let runtimeCache = null;
+      let cachedSession = null;
+      try { runtimeCache = JSON.parse(sessionStorage.getItem('kg_fasttrack_runtime') || 'null'); } catch (_) { }
+      try { cachedSession = JSON.parse(sessionStorage.getItem('kg_session') || 'null'); } catch (_) { }
+
+      const runtimeCode = String((runtimeCache && runtimeCache.game && runtimeCache.game.code) || '').toUpperCase();
+      const sessionCode = String((cachedSession && cachedSession.session_code) || '').toUpperCase();
+      const urlCode = String(usp.get('code') || '').toUpperCase();
+      const code = String((kgGame && kgGame.code) || runtimeCode || sessionCode || urlCode || '').toUpperCase();
+
+      if (kgGame && code && !kgGame.code) kgGame.code = code;
+
       // Expose on window so init3D can consume them without re-reading storage
       window.KG_Game = kgGame;
       window.KG_Player = kgPlayer;
 
-      const code = kgGame && kgGame.code;
       const endpoint = code
         ? `/api/session/bootstrap?code=${encodeURIComponent(code)}`
         : `/api/players/me`;
@@ -82,7 +93,13 @@
         }
       } catch (err) {
         console.warn('REST bootstrap failed', err);
-        sessionStorage.removeItem('kg_session');
+        const mode = (kgGame && kgGame.mode) || (runtimeCache && runtimeCache.game && runtimeCache.game.mode) || '';
+        const liveMode = (mode === 'private' || mode === 'public' || mode === 'multiplayer');
+        // In live multiplayer, fail closed only when we have no recoverable room code.
+        if (liveMode && !code) {
+          window.location.replace('/fasttrack/lobby-simple.html');
+          return new Promise(() => { });
+        }
         if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
           window.location.replace('/fasttrack/lobby-simple.html');
           return new Promise(() => { });
@@ -1916,6 +1933,8 @@
     }
   </style>
   <script src="/js/analytics.js"></script>
+  <script src="/js/kernel-client.js" defer></script>
+  <script src="/js/player-panel.js" defer></script>
 </head>
 
 <body>

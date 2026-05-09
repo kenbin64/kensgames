@@ -100,12 +100,17 @@ const AvatarPicker = (() => {
         }
 
         // A valid emoji avatar should not be plain alphabetic text.
-        const looksLikeWord = emoji && /^[A-Za-z\s\-]+$/.test(emoji);
+        const looksLikeWord = emoji && /^[A-Za-z0-9_\s\-]+$/.test(emoji);
         if (!emoji || looksLikeWord) {
             const fixed = findByIdOrName(id, name || emoji);
             if (fixed) {
                 try { localStorage.setItem(KEY, JSON.stringify(fixed)); } catch { /* ignore */ }
                 return fixed;
+            }
+            // Word-id avatar (e.g. 'person_smile') from lobby — treat as valid,
+            // return a generic placeholder so callers don't prompt the wizard.
+            if (id && !RESERVED_BOT_AVATAR_TOKENS.has(id)) {
+                return { id, emoji: '👤', name: id };
             }
             return null;
         }

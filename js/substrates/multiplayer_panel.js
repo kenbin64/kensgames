@@ -1417,11 +1417,30 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
   }
 
   // ── Flow: profile → connect → create / join ───────────────────────
+  function _rawAvatarEmoji() {
+    // AvatarPicker.get() returns null when kg_avatar stores a word-id (e.g.
+    // 'person_smile') because the emoji field fails its alphabetic check.
+    // Fall back to reading the raw stored value so returning players are never
+    // sent back through the picker wizard unnecessarily.
+    try {
+      const raw = JSON.parse(localStorage.getItem('kg_avatar') || 'null');
+      if (!raw) return null;
+      // Prefer a real emoji glyph
+      const emoji = raw.emoji ? String(raw.emoji) : '';
+      if (emoji && !/^[A-Za-z0-9_\-\s]+$/.test(emoji)) return emoji;
+      // Word-id fallback — use a generic stand-in so the wizard is skipped
+      const id = raw.id ? String(raw.id) : '';
+      if (id && !id.includes('robot') && !id.includes('🤖')) return raw.emoji || raw.id || '👤';
+    } catch { /* ignore */ }
+    return null;
+  }
+
   function getProfile() {
     const name = (typeof KGPlayerProfile !== 'undefined' && KGPlayerProfile.getName)
-      ? KGPlayerProfile.getName() : (localStorage.getItem('display_name') || '');
+      ? KGPlayerProfile.getName() : (localStorage.getItem('display_name') || localStorage.getItem('username') || '');
     const av = (typeof AvatarPicker !== 'undefined' && AvatarPicker.get) ? AvatarPicker.get() : null;
-    return { name: name || '', avatarEmoji: av ? av.emoji : null };
+    const avatarEmoji = (av && av.emoji) || _rawAvatarEmoji();
+    return { name: name || '', avatarEmoji: avatarEmoji || null };
   }
 
   function loadProfileDraft() {
@@ -1439,7 +1458,12 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
       localStorage.setItem('display_name', name);
       localStorage.setItem('username', name);
     }
-    localStorage.setItem('kg_avatar', JSON.stringify({ id: _profileAvatarDraft, emoji: _profileAvatarDraft, name: _profileAvatarDraft }));
+    // Only overwrite kg_avatar when the draft contains a real emoji glyph.
+    // If the draft is a word-id (from lobby default), leave whatever is stored.
+    const isRealEmoji = _profileAvatarDraft && !/^[A-Za-z0-9_\-\s]+$/.test(_profileAvatarDraft);
+    if (isRealEmoji) {
+      localStorage.setItem('kg_avatar', JSON.stringify({ id: _profileAvatarDraft, emoji: _profileAvatarDraft, name: _profileAvatarDraft }));
+    }
   }
 
   function ensureClient() {
@@ -1451,7 +1475,13 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
     const connectName = String(_profileNameDraft || prof.name || '').trim();
     const connectAvatar = String(_profileAvatarDraft || prof.avatarEmoji || '').trim();
     _mp = new KGMultiplayer(_opts.gameId, {});
-    _mp.on('authenticated', (a) => { _myUserId = a.userId; });
+    _mp.on('authenticated', (a) => {
+      _myUserId = a.userId;
+      // Re-assert profile after auth to override any server-side fallback name/avatar.
+      if (connectName || connectAvatar) {
+        _mp.updateProfile({ username: connectName, avatar_id: connectAvatar || undefined });
+      }
+    });
     _mp.on('session_update', () => { if (_state !== STATE.LAUNCHING) { _state = STATE.LOBBY; render(); } });
     _mp.on('share_code', () => render());
     _mp.on('game_started', (data) => {
@@ -1809,10 +1839,15 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
       if (code) {
         _mode = 'guest';
         _pendingCode = code;
-        // Guest must enter their own name — never inherit the host's localStorage name.
-        _profileNameDraft = '';
-        _profileAvatarDraft = null;
-        renderGuestWelcome(code);
+        // Returning players already have a saved profile — skip the wizard and
+        // join directly. Only first-time players see the name/avatar wizard.
+        loadProfileDraft();
+        if (_profileNameDraft && _profileAvatarDraft) {
+          clearUrlCode();
+          connectAndJoin(code);
+        } else {
+          renderGuestWelcome(code);
+        }
       } else if (autoMode === 'solo' || autoMode === 'friend') {
         _mode = autoMode;
         clearUrlMode();

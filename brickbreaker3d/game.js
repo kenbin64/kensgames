@@ -6,6 +6,36 @@ let gameActive = false, gamePaused = false;
 let gameMode = 'easy'; // 'easy', 'hard', 'multi2', 'multi3', 'multi4'
 let raycaster, floorPlane;
 
+// ── GameKernel adapter (slice 3 of the per-game kernel rollout) ─────────
+// In hybrid mode the client owns physics; the kernel runs alongside as the
+// authoritative score / lives / level ledger. Activation requires a live
+// MultiplayerClient (set via setMultiplayerClient from play.html) and the
+// presence of window.KGKernelClient. If either is missing the calls are
+// no-ops, so offline solo play continues unchanged.
+let _bbMpClient = null;
+let _bbKernelClient = null;
+let _bbKernelActive = false;
+function setMultiplayerClient(client) {
+    _bbMpClient = client || null;
+    if (_bbKernelClient) { try { _bbKernelClient.destroy(); } catch (_) { } }
+    _bbKernelClient = null;
+    _bbKernelActive = false;
+    if (!client || typeof window === 'undefined' || typeof window.KGKernelClient !== 'function') return;
+    _bbKernelClient = new window.KGKernelClient({
+        client,
+        myUserId: client.userId != null ? String(client.userId) : null,
+    });
+    _bbKernelClient.on('active', () => { _bbKernelActive = true; });
+    _bbKernelClient.on('legacy', () => { _bbKernelActive = false; });
+    _bbKernelClient.on('error', (e) => console.warn('[bb3d-kernel] rejected', e));
+}
+function _bbEmit(type, payload) {
+    if (!_bbKernelActive || !_bbKernelClient) return;
+    try { _bbKernelClient.send(type, payload || {}); }
+    catch (err) { console.warn('[bb3d-kernel] send failed', type, err); }
+}
+if (typeof window !== 'undefined') window.BBSetMultiplayer = setMultiplayerClient;
+
 // Real-time reflections (lightweight, updated intermittently)
 let reflectCubeRT = null;
 let reflectCubeCam = null;
@@ -1051,9 +1081,26 @@ function updateAIPaddles() {
 // Move a paddle to target position (no collision check — that happens in separation pass)
 function movePaddleTo(idx, tx, tz) {
     const p = paddles[idx];
+    const prevX = p.position.x;
     p.position.x = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, tx));
     p.position.z = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, tz));
+
+    // Slot-0 = local player. Emit a throttled `input` envelope to the
+    // multi-paddle GameKernel (paddle: -1..1 = angular intent proxy).
+    // The kernel runs its own authoritative sim in parallel; this is purely
+    // an audit/validation feed and does not influence local rendering.
+    if (idx === 0 && _bbKernelActive && _bbKernelClient) {
+        const dx = p.position.x - prevX;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (!_bbLastInputAt || now - _bbLastInputAt >= 100) {
+            _bbLastInputAt = now;
+            const dir = dx > 0.01 ? 1 : (dx < -0.01 ? -1 : 0);
+            try { _bbKernelClient.send('input', { paddle: dir }); }
+            catch (_) { /* never crash render loop */ }
+        }
+    }
 }
+let _bbLastInputAt = 0;
 
 // Physics-based paddle separation — equal and opposite nudge
 // Runs after ALL paddles have moved. Resolves overlaps with equal push on both.
@@ -1397,6 +1444,7 @@ function animate() {
                 } else {
                     // Solo play: standard life loss
                     players[0].lives--;
+                    _bbEmit('life_lost', {});
                     b.alive = false;
                     b.visible = false;
                     scene.remove(b);
@@ -1468,6 +1516,9 @@ function animate() {
 
                 brick.visible = false;
                 hitBrick = true;
+
+                // Server-authoritative score audit (kernel hybrid mode).
+                _bbEmit('brick_hit', { layer: brick.layer | 0 });
 
                 // Points go to whoever last touched the ball
                 if (typeof b.lastTouchedBy === 'number' && b.lastTouchedBy >= 0 && players[b.lastTouchedBy]) {
@@ -1556,6 +1607,7 @@ function animate() {
             for (let p of players) if (p.score > best.score) best = p;
             endGame(`Player ${best.id + 1} wins with ${best.score} pts!`);
         } else {
+            _bbEmit('level_clear', {});
             endGame('All bricks cleared!');
         }
     }
