@@ -555,6 +555,7 @@
           <button class="btn btn-warm hidden" id="btn-add-bot">＋ Add Bot</button>
           <button class="btn" id="btn-ready">Ready</button>
           <button class="btn btn-lime hidden" id="btn-launch">▶ Launch Game</button>
+          <button class="btn btn-danger hidden" id="btn-cancel-host" title="Cancel this game and remove all players from the room.">⛔ Cancel Game</button>
           <span style="flex:1"></span>
           <button class="btn btn-danger" id="btn-leave">Leave</button>
         </div>
@@ -720,7 +721,13 @@
         mp.on('session_update', (s) => renderRoom(s));
         mp.on('share_code', (c) => setRoomCode(c));
         mp.on('game_started', (d) => onGameStarted(d));
-        mp.on('error', (e) => setMsg('action-msg', (e && e.message) || 'Server error', 'err'));
+        mp.on('error', (e) => {
+          const msg = (e && e.message) || 'Server error';
+          console.warn('[lobby] server error:', msg, e);
+          // Surface in whichever view is visible
+          const inRoomView = !document.getElementById('room-view').classList.contains('hidden');
+          setMsg(inRoomView ? 'room-msg' : 'action-msg', msg, 'err');
+        });
       }
 
       // Public games list
@@ -764,6 +771,7 @@
       }
 
       // Room view
+      let _autoReadiedHost = false;
       function renderRoom(s) {
         if (!s) return;
         if (!inRoom) return;
@@ -779,8 +787,26 @@
 
         const isHost = mp && mp.isHost;
         document.getElementById('btn-add-bot').classList.toggle('hidden', !isHost);
-        const allReady = (s.players || []).length >= 2 && (s.players || []).every(p => p.ready || p.is_ai);
-        document.getElementById('btn-launch').classList.toggle('hidden', !(isHost && allReady));
+        // Host can launch any time 2+ players are seated. Always show the button
+        // to the host — disable it (with a tooltip) until it's launchable so
+        // the host can see what's needed instead of waiting for an invisible
+        // control to appear.
+        const seated = (s.players || []).length;
+        const launchBtn = document.getElementById('btn-launch');
+        if (isHost) {
+          launchBtn.classList.remove('hidden');
+          launchBtn.disabled = seated < 2;
+          launchBtn.title = seated < 2
+            ? 'Add a bot or wait for another player to join (need 2+ players).'
+            : 'Launch the game for everyone in the room.';
+        } else {
+          launchBtn.classList.add('hidden');
+        }
+        launchBtn.textContent = '▶ Launch Game (' + seated + ' player' + (seated === 1 ? '' : 's') + ')';
+        // Hide the per-player Ready button — host gates the launch now.
+        document.getElementById('btn-ready').classList.add('hidden');
+        // Host-only: Cancel Game button
+        document.getElementById('btn-cancel-host').classList.toggle('hidden', !isHost);
 
         const roster = document.getElementById('room-roster');
         roster.innerHTML = (s.players || []).map(p => {
@@ -797,7 +823,12 @@
       function setRoomCode(code) {
         const chip = document.getElementById('room-code');
         chip.classList.remove('hidden');
-        document.getElementById('room-code-text').textContent = code;
+        const url = window.location.origin + '/lobby/?code=' + encodeURIComponent(code);
+        const txt = document.getElementById('room-code-text');
+        txt.textContent = code;
+        txt.dataset.code = code;
+        txt.dataset.url = url;
+        chip.title = 'Invite URL: ' + url + '  \u2014 click \ud83d\udccb to copy.';
       }
       function onGameStarted(d) {
         const sid = d && d.session && (d.session.session_id || d.session.sessionId);
@@ -949,18 +980,40 @@
 
         document.getElementById('btn-add-bot').onclick = () => { if (mp) mp.addBot('medium'); };
         document.getElementById('btn-ready').onclick = () => { if (mp) mp.toggleReady(); };
-        document.getElementById('btn-launch').onclick = () => { if (mp) mp.startGame(); };
+        document.getElementById('btn-launch').onclick = () => {
+          console.log('[lobby] Launch clicked. mp=', !!mp, 'connected=', mp && mp.connected, 'isHost=', mp && mp.isHost, 'session=', mp && mp.session);
+          if (!mp) { setMsg('room-msg', 'Multiplayer client not ready.', 'err'); return; }
+          if (!mp.connected) { setMsg('room-msg', 'Not connected to lobby server. Reconnecting…', 'err'); try { ensureMp(() => mp.startGame()); } catch (e) { } return; }
+          setMsg('room-msg', 'Launching game for all players…', 'ok');
+          try { mp.startGame(); }
+          catch (e) {
+            console.error('[lobby] startGame failed', e);
+            setMsg('room-msg', 'Launch failed: ' + (e && e.message || e), 'err');
+          }
+        };
+        document.getElementById('btn-cancel-host').onclick = () => {
+          if (!mp) return;
+          if (!confirm('Cancel this game and remove all players from the room?')) return;
+          setMsg('room-msg', 'Cancelling game…', 'ok');
+          try { mp.cancelSession && mp.cancelSession(); } catch (e) { console.error('[lobby] cancelSession failed', e); }
+        };
         document.getElementById('btn-leave').onclick = () => {
           if (mp) mp.leave();
           inRoom = false;
+          _autoReadiedHost = false;
           document.getElementById('room-view').classList.add('hidden');
           document.getElementById('lobby-view').classList.remove('hidden');
           document.getElementById('room-code').classList.add('hidden');
           refreshPublic();
         };
         document.getElementById('room-code-copy').onclick = () => {
-          const t = document.getElementById('room-code-text').textContent;
-          navigator.clipboard && navigator.clipboard.writeText(t);
+          const t = document.getElementById('room-code-text');
+          // Prefer copying the full invite URL; fall back to the displayed text.
+          const payload = (t && t.dataset && t.dataset.url) || (t && t.textContent) || '';
+          if (navigator.clipboard && payload) {
+            navigator.clipboard.writeText(payload);
+            setMsg('room-msg', 'Invite URL copied to clipboard.', 'ok');
+          }
         };
       }
 
@@ -972,6 +1025,28 @@
           renderGamePane();
           renderLobbyRoster();
           bind();
+          // If the URL has ?code=XXXXXX, the user followed an invite link —
+          // auto-fill and auto-join that private game.
+          let inviteCode = '';
+          try {
+            const params = new URLSearchParams(window.location.search);
+            inviteCode = (params.get('code') || '').trim().toUpperCase();
+          } catch (e) { }
+          if (inviteCode && /^[A-Z0-9]{4,8}$/.test(inviteCode)) {
+            const inp = document.getElementById('join-code');
+            if (inp) inp.value = inviteCode;
+            try {
+              ensureMp(() => {
+                refreshPublic();
+                // small delay so authentication settles before joinByCode
+                setTimeout(() => { try { joinByCode(); } catch (e) { } }, 50);
+              });
+            } catch (e) {
+              document.getElementById('pub-list').innerHTML =
+                '<div class="status err">Multiplayer server unavailable. Solo still works.</div>';
+            }
+            return;
+          }
           // Best-effort: connect & list public games
           try { ensureMp(() => refreshPublic()); }
           catch (e) {

@@ -371,6 +371,11 @@ class KGMultiplayer {
     this.remotePlayers.clear();
   }
 
+  /** Host-only: cancel and tear down the current session for everyone. */
+  cancelSession() {
+    this._send({ type: 'cancel_session' });
+  }
+
   /** Toggle ready state */
   toggleReady() { this._send({ type: 'toggle_ready' }); }
 
@@ -544,6 +549,26 @@ class KGMultiplayer {
         this.gameStarted = true;
         this.gameUuid = data && data.session && data.session.game_uuid ? data.session.game_uuid : this.gameUuid;
         this._emit('game_started', data);
+        break;
+
+      case 'session_cancelled':
+        this.session = null;
+        this.sessionCode = null;
+        this.isHost = false;
+        this.gameStarted = false;
+        this._emit('session_cancelled', data);
+        break;
+
+      case 'player_reclaimed_seat':
+        if (data.players && this.session) this.session.players = data.players;
+        this._emit('player_reclaimed_seat', data);
+        if (this.session) this._emit('session_update', this.session);
+        break;
+
+      case 'player_replaced_with_bot':
+        if (data.players && this.session) this.session.players = data.players;
+        this._emit('player_replaced_with_bot', data);
+        if (this.session) this._emit('session_update', this.session);
         break;
 
       case 'player_state':

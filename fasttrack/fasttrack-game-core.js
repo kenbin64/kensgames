@@ -790,6 +790,11 @@ function applyRemoteAction(action, payload) {
 // ═══════════════════════════════════════════════════════════════════════════
 function drawCard() {
   if (state.turn.get('phase') !== 'draw') return;
+  // Hard guard: even on a redraw / extra-turn card, the player must wait for
+  // every peg hop and cutscene from the previous play to finish before drawing
+  // again. The phase flips back to 'draw' only after waitForAll, but this is a
+  // defense-in-depth check in case any code path skips that.
+  if (typeof window.isPlayResolving === 'function' && window.isPlayResolving()) return;
   // Multiplayer: only the active player drives the draw locally; remote peers
   // receive the card via applyRemoteAction and replay it under the _applying guard.
   if (!_applying && _isMpMode() && !_isMyTurn()) return;
@@ -1514,13 +1519,18 @@ function showMoveHints() {
   setOptionsPanelVisible(true);
   const vm = state.turn.get('validMoves') || [];
 
+  // Refresh the footer move-cycle toolbar (◀ / ▶ / Confirm) for the new vm.
+  if (typeof window._refreshFastTrackToolbar === 'function') {
+    try { window._refreshFastTrackToolbar(); } catch (e) { /* ignore */ }
+  }
+
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const curPlayer = players[ci] || { name: PLAYER_NAMES[ci] || 'Player', pegs: [] };
 
   if (vm.length === 0) {
-    hintsDiv.innerHTML = '<div class="hint" style="opacity:0.5;">No moves available — passing turn</div>';
-    setTimeout(endTurn, 1200);
+    hintsDiv.innerHTML = '<div class="hint" style="opacity:0.5;">No legal move — turn ends</div>';
+    setTimeout(endTurn, 1600);
     return;
   }
 
@@ -1723,6 +1733,21 @@ function selectSplitPeg(pegIdx) {
   const parsed = Number(pegIdx);
   _splitPegIdx = Number.isFinite(parsed) ? parsed : null;
   _splitStepChoice = null;
+
+  // If exactly one step count is viable for this peg, auto-pick it so the
+  // player only has to confirm the destination next.
+  if (_splitPegIdx != null) {
+    const vm = state.turn.get('validMoves') || [];
+    const stepSet = new Set();
+    for (const m of vm) {
+      if (!m || m.type !== 'split') continue;
+      if (m.pegIdx === _splitPegIdx && m.steps != null) stepSet.add(m.steps);
+      if (m.peg2Idx === _splitPegIdx && m.steps2 != null) stepSet.add(m.steps2);
+    }
+    if (stepSet.size === 1) {
+      _splitStepChoice = [...stepSet][0];
+    }
+  }
   showMoveHints();
 }
 
@@ -1811,6 +1836,9 @@ function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
 
     // Send victim peg back — holding area has 4 slots max
     const pegsInHolding = victimPlayer.pegs.filter(p => p.holeId === 'holding').length;
+    // Tag the cut origin so the renderer can arc the peg out instead of
+    // teleporting it. Cleared by renderBoard once the arc kicks off.
+    vPeg._cutFromHole = holeId;
     if (pegsInHolding >= 4) {
       // Holding full: place on victim's home hole instead
       const victimHome = `home-${victimPlayer.boardPosition}`;
@@ -2240,6 +2268,8 @@ function endTurn() {
 
   state.deck.set('currentCard', null);
   state.players.set('current', next);
+  // Turn boundary: try to restore the next seat from AFK if they returned.
+  _maybeRestoreFromAfk(next);
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(next);
 
   // Disable draw button while camera transitions + avatar blinks
@@ -2506,6 +2536,150 @@ function botTurn() {
 // ═══════════════════════════════════════════════════════════════════════════
 // UI UPDATES — writes to DOM if elements exist
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ─── AFK / Break manager ────────────────────────────────────────────────────
+// At each turn boundary (phase becomes 'draw' for a human), arm a 30s warning
+// and a 60s bot-takeover. The Break button takes over immediately. While the
+// player is "afk", the bot plays for them; their avatar shows 🤖 and a ticking
+// clock appears in the roster. They can click Resume (or the host can disable
+// the feature) to come back at the next turn boundary.
+const _AFK = {
+  warnMs: 30_000,
+  takeoverMs: 60_000,
+  warnTimer: null,
+  takeoverTimer: null,
+  warnedIdx: null,    // player index currently showing the clock
+  startedAt: 0,
+  // map of player index → { name, avatar, isBot, userId, awayBot: true }
+  away: new Map(),
+};
+
+function _hostAllowsReturn() {
+  // Default true. The lobby/host setting is propagated through state.meta.
+  const v = state.meta && state.meta.get && state.meta.get('allowReturn');
+  return v !== false;
+}
+
+function _activeIsLocalHuman() {
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cp = players[ci];
+  if (!cp || cp.isBot) return false;
+  // AFK only matters when there are 2+ humans waiting on each other.
+  // Solo games and human-vs-bots-only games have no AFK enforcement.
+  const humans = players.filter(p => p && !p.isBot).length;
+  if (humans < 2) return false;
+  // Same-screen / solo: every human seat counts as "local". Online MP: only
+  // arm for the seat that belongs to this client.
+  const mode = state.meta.get('gameMode') || 'solo';
+  if (mode === 'private' || mode === 'public' || mode === 'multiplayer') {
+    return _isMyTurn();
+  }
+  return true;
+}
+
+function _clearAfkTimers() {
+  if (_AFK.warnTimer) { clearTimeout(_AFK.warnTimer); _AFK.warnTimer = null; }
+  if (_AFK.takeoverTimer) { clearTimeout(_AFK.takeoverTimer); _AFK.takeoverTimer = null; }
+  if (_AFK.warnedIdx !== null) {
+    _AFK.warnedIdx = null;
+    // Re-render so the clock disappears on next updateUI
+  }
+  _AFK.startedAt = 0;
+}
+
+function armAfkTimer() {
+  _clearAfkTimers();
+  if (state.turn.get('phase') !== 'draw') return;
+  if (state.meta.get('winner') !== null) return;
+  if (!_activeIsLocalHuman()) return;
+  const ci = state.players.get('current') || 0;
+  _AFK.startedAt = Date.now();
+  _AFK.warnTimer = setTimeout(() => {
+    _AFK.warnedIdx = ci;
+    updateUI();
+  }, _AFK.warnMs);
+  _AFK.takeoverTimer = setTimeout(() => {
+    takeBreak('afk');
+  }, _AFK.takeoverMs);
+}
+
+// Swap the active human for a bot. The original identity is stashed in _AFK.away
+// so they can resume at the next turn boundary (if host allows).
+function takeBreak(reason) {
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cp = players[ci];
+  if (!cp || cp.isBot) return;
+  if (!_activeIsLocalHuman()) return;
+  _clearAfkTimers();
+  // Stash original identity for restoration.
+  _AFK.away.set(ci, {
+    name: cp.name,
+    avatar: cp.avatar,
+    isBot: cp.isBot,
+    userId: cp.userId,
+    reason: reason || 'break',
+    at: Date.now(),
+  });
+  cp.name = (cp.name || 'Player') + ' (AFK)';
+  cp.avatar = '🤖';
+  cp.isBot = true;
+  state.players.set('list', players);
+  log(`⏸ ${(_AFK.away.get(ci).name)} stepped away — bot is taking over.`);
+  updateUI();
+  // Drive the bot for the current turn.
+  if (state.turn.get('phase') === 'draw') {
+    setTimeout(botTurn, 400);
+  }
+}
+
+// Restore the human at the next turn boundary if they were away.
+// Called from endTurn() and from the Resume button.
+function _maybeRestoreFromAfk(playerIdx) {
+  if (!_AFK.away.has(playerIdx)) return false;
+  if (!_hostAllowsReturn()) return false;
+  const players = state.players.get('list') || [];
+  const cp = players[playerIdx];
+  if (!cp) return false;
+  const orig = _AFK.away.get(playerIdx);
+  cp.name = orig.name;
+  cp.avatar = orig.avatar;
+  cp.isBot = orig.isBot;
+  cp.userId = orig.userId;
+  _AFK.away.delete(playerIdx);
+  state.players.set('list', players);
+  log(`▶ ${cp.name} returned.`);
+  return true;
+}
+
+// Public hook: player clicked the Resume button (or any UI activity counts).
+function resumeFromAfk() {
+  const ci = state.players.get('current') || 0;
+  // If they're currently away, mark for restore. The actual swap happens at
+  // the next turn boundary (so we don't yank the bot mid-turn).
+  if (_AFK.away.has(ci)) {
+    if (!_hostAllowsReturn()) {
+      log('Host has disabled returning players for this game.');
+      return false;
+    }
+    log('Welcome back — you will resume on your next turn.');
+    return true;
+  }
+  // Not away: just rearm the AFK timer (treat as activity).
+  armAfkTimer();
+  return true;
+}
+
+if (typeof window !== 'undefined') {
+  window.takeBreak = takeBreak;
+  window.resumeFromAfk = resumeFromAfk;
+  window.armAfkTimer = armAfkTimer;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI UPDATES — writes to DOM if elements exist
+// ═══════════════════════════════════════════════════════════════════════════
 function updateUI() {
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
@@ -2516,14 +2690,50 @@ function updateUI() {
     playerListDiv.innerHTML = players.map((p, i) => {
       const onBoard = p.pegs.filter(pg => pg.holeType !== 'holding').length;
       const inSafe = p.pegs.filter(pg => getHoleType(pg.holeId) === 'safezone').length;
+      const showClock = (i === ci) && (_AFK.warnedIdx === ci) && (phase === 'draw') && !p.isBot;
+      const awayBadge = _AFK.away.has(i) ? '<span class="away-chip" title="AFK — bot is playing">AFK</span>' : '';
       return `
         <div class="player-row ${i === ci ? 'active' : ''}">
           <div class="player-color" style="background: ${p.color};"></div>
+          <span class="player-avatar">${p.avatar || ''}</span>
           <span class="player-name">${p.name}</span>
+          ${showClock ? '<span class="afk-clock" title="Idle — bot will take over soon">⏱️</span>' : ''}
+          ${awayBadge}
           ${i === ci ? '<span class="turn-chip">TURN</span>' : ''}
           <span class="player-pegs">${onBoard}/${PEGS_PER_PLAYER} (🏠${inSafe})</span>
         </div>`;
     }).join('');
+  }
+
+  // ── AFK timer arming ────────────────────────────────────────────────
+  // Re-arm only when we cross into a fresh draw phase for a non-bot active
+  // seat. armAfkTimer no-ops if conditions don't match, so it's safe to call.
+  const cpForAfk = players[ci];
+  if (phase === 'draw' && cpForAfk && !cpForAfk.isBot && state.meta.get('winner') === null) {
+    if (!_AFK.warnTimer && !_AFK.takeoverTimer) armAfkTimer();
+  } else {
+    _clearAfkTimers();
+  }
+
+  // ── Break / Resume button visibility ────────────────────────────────
+  const breakBtn = document.getElementById('btn-break');
+  if (breakBtn) {
+    const isLocalActive = _activeIsLocalHuman();
+    const cp = players[ci];
+    const away = !!(cp && _AFK.away.has(ci));
+    if (away) {
+      breakBtn.textContent = '▶ Resume';
+      breakBtn.title = 'Resume — take back control on your next turn';
+      breakBtn.classList.remove('hidden');
+      breakBtn.disabled = !_hostAllowsReturn();
+    } else if (isLocalActive && phase === 'draw') {
+      breakBtn.textContent = '☕ Break';
+      breakBtn.title = 'Take a break — a bot will play your turn(s) until you return';
+      breakBtn.classList.remove('hidden');
+      breakBtn.disabled = false;
+    } else {
+      breakBtn.classList.add('hidden');
+    }
   }
 
   const drawBtn = document.getElementById('draw-btn');
@@ -2532,6 +2742,17 @@ function updateUI() {
     // In multiplayer: only the active player's client enables the draw button.
     const notMyTurn = _isMpMode() && !_isMyTurn();
     drawBtn.disabled = phase !== 'draw' || cp.isBot || notMyTurn;
+  }
+  // The card-area <div> is also a draw shortcut — sync its disabled visual /
+  // pointer state with the button so the player can't queue a second card while
+  // pegs are still hopping or cutscenes are firing (extra-turn / redraw flows).
+  const cardArea = document.getElementById('card-area');
+  if (cardArea) {
+    const cp = players[ci];
+    const notMyTurn = _isMpMode() && !_isMyTurn();
+    const blocked = phase !== 'draw' || cp.isBot || notMyTurn;
+    cardArea.classList.toggle('disabled', blocked);
+    cardArea.setAttribute('aria-disabled', blocked ? 'true' : 'false');
   }
   const gs = document.getElementById('game-status');
   if (gs) {
@@ -2675,11 +2896,12 @@ const CutsceneManager = {
       // Victim hangs head in shame as they get arc'd back to holding
       if (window.triggerPegPose) window.triggerPegPose(victimId, 'shame');
       window.CameraDirector.followCutVictim(victimId, victorId, () => {
-        // Victor reaction fires when camera switches to them
-        this.showCelebrationGraphic('💪 VICTORY POSE! 💪', victorPlayer.color, false);
+        // Victor reaction fires when camera switches to them — full jig + whoo hoo
+        this.showCelebrationGraphic('🕺 WHOO HOO! 🕺', victorPlayer.color, false);
         this.showPegReaction(victorReaction, victorPlayer.color);
-        // Victor jumps around in celebration (more energetic than 'victory')
-        if (window.triggerPegPose) window.triggerPegPose(victorId, 'celebrate');
+        this.spawnFloatingEmojis(['🎉', '✨', '🕺', '💃'], 8);
+        // Victor dances a jig (kicks + spins + arm swings)
+        if (window.triggerPegPose) window.triggerPegPose(victorId, 'jig');
       });
     }
 

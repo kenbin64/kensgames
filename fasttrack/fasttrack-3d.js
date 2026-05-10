@@ -160,7 +160,7 @@ const artClickMeshes = [];  // canvas meshes registered for click → overlay
 // ════════════════════════════════════════════════════════════════
 const GameSettings = {
   cameraMode: 'manual',  // 'manual' (default) or 'auto'
-  musicEnabled: false,
+  musicEnabled: true,
   soundEnabled: true,
   showPegNames: true,
 
@@ -170,7 +170,7 @@ const GameSettings = {
       if (saved) {
         const s = JSON.parse(saved);
         this.cameraMode = s.cameraMode || 'manual';
-        this.musicEnabled = s.musicEnabled ?? false;
+        this.musicEnabled = s.musicEnabled ?? true;
         this.soundEnabled = s.soundEnabled ?? true;
         this.showPegNames = s.showPegNames ?? false;
       }
@@ -401,18 +401,59 @@ const CameraDirector = {
   _settledCallback: null,   // Called once when camera reaches target
   _activePlayerIdx: -1,     // Current player index for auto-focus
 
+  // Default beginning poses for each fixed mode. All chosen to frame the
+  // entire board (BOARD_RADIUS + rails + margin) inside the viewport.
+  // Manual is the canonical default — a 3/4 view that shows the whole board.
+  DEFAULTS: {
+    manual: { pos: [0, 540, 760], look: [0, TABLE_HEIGHT, 0], up: [0, 1, 0] },
+    top: { pos: [0, 900, 0.01], look: [0, TABLE_HEIGHT, 0], up: [0, 0, -1] },
+    angle: { pos: [560, 460, 560], look: [0, TABLE_HEIGHT, 0], up: [0, 1, 0] },
+    // 'auto' has no static pose — it's computed every frame.
+  },
+
   init() {
-    // Start at a 45° elevated position that frames the full board
-    this._pos = new THREE.Vector3(0, 480, 380);
-    this._look = new THREE.Vector3(0, TABLE_HEIGHT, 0);
+    // Start at the manual default — frames the full board.
+    const d = this.DEFAULTS.manual;
+    this._pos = new THREE.Vector3(d.pos[0], d.pos[1], d.pos[2]);
+    this._look = new THREE.Vector3(d.look[0], d.look[1], d.look[2]);
     this._tPos = this._pos.clone();
     this._tLook = this._look.clone();
-    this.mode = GameSettings.cameraMode;
+    if (camera) {
+      camera.up.set(d.up[0], d.up[1], d.up[2]);
+      camera.position.copy(this._pos);
+      camera.lookAt(this._look);
+    }
+    if (controls) controls.target.copy(this._look);
+    // Force manual as the starting mode regardless of stored setting — manual
+    // is the canonical default per UX spec.
+    this.mode = 'manual';
+    GameSettings.cameraMode = 'manual';
+
+    // When the user grabs the OrbitControls (pointerdown / wheel / touch),
+    // any non-manual mode auto-switches to manual so the user has full
+    // control. OrbitControls' 'start' event fires only on user gestures —
+    // it does NOT fire from our internal camera writes.
+    if (controls && !this._userInputBound) {
+      controls.addEventListener('start', () => {
+        if (this.mode !== 'manual') {
+          // Cutscenes lock the camera — never yield mid-cutscene.
+          if (this._cutsceneLock) return;
+          if (typeof setCameraView === 'function') setCameraView('manual');
+          else this.setMode('manual');
+        }
+      });
+      this._userInputBound = true;
+    }
   },
 
   // Set which player is active (called from game-core)
   setActivePlayer(playerIdx) {
     this._activePlayerIdx = playerIdx;
+    // In auto mode, immediately re-aim so the camera glides to the new player
+    // section between turns instead of waiting for the next render frame.
+    if (this.mode === 'auto' && this._followMode == null) {
+      this._computeAutoTarget();
+    }
   },
 
   // Follow a specific peg during its move
@@ -474,8 +515,21 @@ const CameraDirector = {
   },
 
   update(dt) {
-    if (this.mode === 'manual' || !camera) return;
+    if (!camera) return;
 
+    // Manual mode: OrbitControls owns the camera. Mirror its state into
+    // _pos / _look every frame so a later switch to auto/top/angle starts the
+    // smooth lerp from exactly where the user left off (no jump).
+    if (this.mode === 'manual') {
+      this._pos.copy(camera.position);
+      this._look.copy(controls.target);
+      this._tPos.copy(this._pos);
+      this._tLook.copy(this._look);
+      return;
+    }
+
+    // Choose the target. Cutscene follow modes always win, even when the
+    // base mode is 'top'/'angle', so cuts/splits stay continuous.
     if (this._followMode === 'peg' || this._followMode === 'cut-victim' || this._followMode === 'cut-victor') {
       this._computeFollowTarget();
     } else if (this._followMode === 'split') {
@@ -483,6 +537,8 @@ const CameraDirector = {
     } else if (this.mode === 'auto') {
       this._computeAutoTarget();
     }
+    // 'top' and 'angle' are one-shot poses — _tPos/_tLook are set in setMode
+    // and the lerp below carries the camera there smoothly, then holds.
 
     // Smooth interpolation — never jerky
     const f = 1 - Math.pow(1 - this._damping, (dt || 16) / 16);
@@ -505,18 +561,25 @@ const CameraDirector = {
     const peg = pegRegistry.get(this._followPegId);
     if (!peg || !peg.mesh) { this._computeAutoTarget(); return; }
     const pos = peg.mesh.position;
-    // Look directly at the peg — always centered
-    this._tLook.set(pos.x, pos.y, pos.z);
-    // Position camera above and slightly behind — close enough to never lose the peg
-    const height = this._followMode === 'cut-victim' ? 140 : 170;
-    const dist = this._followMode === 'cut-victim' ? 120 : 180;
-    // Offset camera toward board center so we see what's ahead of the peg
-    const angle = Math.atan2(pos.z, pos.x);
-    this._tPos.set(
-      pos.x - Math.cos(angle) * dist * 0.3,
-      pos.y + height,
-      pos.z - Math.sin(angle) * dist * 0.3 + dist * 0.7
-    );
+    // Look at the peg, anchored to table height so framing stays steady as it hops.
+    this._tLook.set(pos.x, TABLE_HEIGHT, pos.z);
+    // Place camera radially OUTSIDE the peg from board center, so the peg sits
+    // between the camera and the board interior — guarantees the peg is always
+    // in front of the camera regardless of which side of the board it's on.
+    const r = Math.hypot(pos.x, pos.z);
+    let ang;
+    if (r > 1) {
+      ang = Math.atan2(pos.z, pos.x);
+    } else {
+      // Peg at center (bullseye / new) — keep current camera angle.
+      ang = Math.atan2(this._tPos.z || this._pos.z, this._tPos.x || this._pos.x);
+      if (!Number.isFinite(ang)) ang = -Math.PI / 2;
+    }
+    // Distance: enough to keep peg + a margin in frame.
+    const isCut = this._followMode === 'cut-victim';
+    const camR = Math.max(320, r + (isCut ? 220 : 260));
+    const height = isCut ? 220 : 280;
+    this._tPos.set(Math.cos(ang) * camR, height, Math.sin(ang) * camR);
   },
 
   _computeSplitTarget() {
@@ -533,82 +596,117 @@ const CameraDirector = {
     this._tPos.set(center.x * 0.2, center.y + height, center.z * 0.2 + dist);
   },
 
-  // Auto target: angle shot with active player's section on the far LEFT
+  // Auto target: smoothly frame the active player's section so all of their
+  // on-board pegs are visible. Pans out as pegs spread further from center.
   _computeAutoTarget() {
     const positions = [];
     const activeIdx = this._activePlayerIdx;
     let boardPosition = 0;
+    let havePlayer = false;
 
-    // Collect only active player's on-board pegs
     if (activeIdx >= 0 && window.FastTrackCore) {
       const players = window.FastTrackCore.state.players.get('list') || [];
       const player = players[activeIdx];
       if (player) {
+        havePlayer = true;
         boardPosition = player.boardPosition || 0;
         for (const peg of player.pegs) {
-          if (peg.holeId !== 'holding') {
-            const regPeg = pegRegistry.get(peg.id);
-            if (regPeg && regPeg.mesh && regPeg.mesh.visible) {
-              positions.push(regPeg.mesh.position.clone());
-            }
+          if (peg.holeId === 'holding') continue;
+          const regPeg = pegRegistry.get(peg.id);
+          if (regPeg && regPeg.mesh && regPeg.mesh.visible) {
+            positions.push(regPeg.mesh.position.clone());
           }
         }
       }
     }
 
-    // Fallback: if no active pegs found, use all visible pegs
+    // Fallback: include all visible pegs so the camera never drifts to nothing.
     if (positions.length === 0) {
       pegRegistry.forEach(peg => {
-        if (peg.mesh && peg.mesh.visible) {
-          positions.push(peg.mesh.position.clone());
-        }
+        if (peg.mesh && peg.mesh.visible) positions.push(peg.mesh.position.clone());
       });
     }
 
-    // Look at board center (slight bias toward peg cluster)
-    this._tLook.set(0, TABLE_HEIGHT, 0);
-
-    // Orbit camera so active player's section is on the far LEFT.
-    // Player's section is at angle θ = (bp/6)*2π - π/6.
-    // To put it on the left of viewport, camera sits at θ - π/2.
-    const playerAngle = (boardPosition / 6) * Math.PI * 2 - Math.PI / 6;
-    const camAngle = playerAngle - Math.PI / 2;
-
-    // Height and distance — pan out if pegs are spread
-    let height = 280;
-    let dist = 380;
-    if (positions.length > 1) {
-      const center = new THREE.Vector3();
-      positions.forEach(p => center.add(p));
-      center.divideScalar(positions.length);
-      let maxSpread = 0;
+    // Compute spread relative to board center (table origin).
+    let maxR = 200;
+    let cx = 0, cz = 0;
+    if (positions.length) {
       for (const p of positions) {
-        const d = p.distanceTo(center);
-        if (d > maxSpread) maxSpread = d;
+        cx += p.x; cz += p.z;
+        const d = Math.hypot(p.x, p.z);
+        if (d > maxR) maxR = d;
       }
-      height = Math.max(280, 220 + maxSpread * 0.5);
-      dist = Math.max(380, 300 + maxSpread * 0.35);
+      cx /= positions.length;
+      cz /= positions.length;
     }
 
-    this._tPos.set(
-      Math.cos(camAngle) * dist,
-      height,
-      Math.sin(camAngle) * dist
+    // The look target sits a bit forward of the board origin, biased toward the
+    // active player's section so the player feels "behind" their own pegs.
+    const sectionAng = (boardPosition / 6) * Math.PI * 2 - Math.PI / 6;
+    const lookBias = havePlayer ? 80 : 0;
+    this._tLook.set(
+      cx * 0.35 + Math.cos(sectionAng) * lookBias,
+      TABLE_HEIGHT,
+      cz * 0.35 + Math.sin(sectionAng) * lookBias
     );
+
+    // Camera sits radially behind the player section, far enough to keep every
+    // on-board peg in frame. Pulls out smoothly when pegs are spread.
+    const camR = Math.max(440, maxR + 280);
+    const height = Math.max(300, 230 + maxR * 0.4);
+    this._tPos.set(
+      Math.cos(sectionAng) * camR,
+      height,
+      Math.sin(sectionAng) * camR
+    );
+    // Auto mode wants relaxed damping so the pan never feels jerky.
+    if (this._followMode == null) this._damping = 0.04;
   },
 
   setMode(mode) {
+    // Sync our internal state with whatever the user / OrbitControls left the
+    // camera at, so the lerp into the new mode starts smoothly from there.
+    if (camera && controls) {
+      this._pos.copy(camera.position);
+      this._look.copy(controls.target);
+    }
+    const prevMode = this.mode;
     this.mode = mode;
-    if (mode === 'top') {
-      camera.up.set(0, 0, -1);
-      this._tPos.set(0, 600, 0);
-      this._tLook.set(0, 0, 0);
+    GameSettings.cameraMode = mode;
+
+    const def = this.DEFAULTS[mode];
+    if (mode === 'manual') {
+      camera.up.set(def.up[0], def.up[1], def.up[2]);
+      // If switching INTO manual from another mode, snap targets to where the
+      // camera currently is so OrbitControls picks up smoothly. If the user
+      // re-presses the Manual button while already in manual, re-snap to the
+      // default board-framing pose.
+      if (prevMode === 'manual') {
+        this._tPos.set(def.pos[0], def.pos[1], def.pos[2]);
+        this._tLook.set(def.look[0], def.look[1], def.look[2]);
+        // For manual we apply directly (no lerp owner) — OrbitControls reads
+        // camera.position / controls.target as ground truth.
+        camera.position.copy(this._tPos);
+        controls.target.copy(this._tLook);
+        this._pos.copy(this._tPos);
+        this._look.copy(this._tLook);
+      }
+      this._damping = 0.035;
+    } else if (mode === 'top') {
+      camera.up.set(def.up[0], def.up[1], def.up[2]);
+      this._tPos.set(def.pos[0], def.pos[1], def.pos[2]);
+      this._tLook.set(def.look[0], def.look[1], def.look[2]);
+      this._damping = 0.06;
     } else if (mode === 'angle') {
+      camera.up.set(def.up[0], def.up[1], def.up[2]);
+      this._tPos.set(def.pos[0], def.pos[1], def.pos[2]);
+      this._tLook.set(def.look[0], def.look[1], def.look[2]);
+      this._damping = 0.06;
+    } else if (mode === 'auto') {
       camera.up.set(0, 1, 0);
-      this._tPos.set(350, 350, 350);
-      this._tLook.set(0, 0, 0);
-    } else {
-      camera.up.set(0, 1, 0);
+      this._damping = 0.04;
+      // Force-recompute so the first frame already has a target.
+      this._computeAutoTarget();
     }
   }
 };
@@ -4449,6 +4547,18 @@ window.waitForAnimations = function (callback) {
   _onAnimsDone = callback;
 };
 
+// True while a play is still resolving — pegs hopping or move barrier raised.
+// Game-core uses this to block the draw button for redraw / extra-turn cards
+// until all motion (and cutscenes that gate on it) has finished.
+window.isPlayResolving = function () {
+  if (_moveBarrier) return true;
+  if (_animatingPegs && _animatingPegs.size > 0) return true;
+  // Cutscenes (CutsceneManager) are flushed inside waitForAll → advanceTurn,
+  // and `phase` only flips back to 'draw' after CutsceneManager.whenDrained.
+  // So `phase !== 'draw'` already covers the cutscene window.
+  return false;
+};
+
 // ════════════════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════════════════
 // PEG POSES — triggered during cutscenes
@@ -4574,6 +4684,37 @@ function triggerPegPose(pegId, poseType) {
       requestAnimationFrame(animateDance);
     }
     animateDance();
+  } else if (poseType === 'jig') {
+    // Victor's celebratory jig — high knee-kicks, full spins, arm-swing tilts.
+    // Used after a successful cut. ~2.2s long, more flamboyant than dance/celebrate.
+    const duration = 2200;
+    const baseY = mesh.position.y;
+    function animateJig() {
+      const t = (performance.now() - startTime) / duration;
+      if (t > 1) {
+        mesh.position.y = baseY;
+        mesh.rotation.x = 0;
+        mesh.rotation.y = 0;
+        mesh.rotation.z = 0;
+        mesh.scale.set(1, 1, 1);
+        return;
+      }
+      // Big kicks — 5 sharp hops with high amplitude
+      const kick = Math.abs(Math.sin(t * Math.PI * 5)) * 26 * (1 - t * 0.25);
+      mesh.position.y = baseY + kick;
+      // Full triple-spin around Y
+      mesh.rotation.y = t * Math.PI * 6;
+      // Arm-swing tilt — alternating Z lean on each kick
+      mesh.rotation.z = Math.sin(t * Math.PI * 10) * 0.28 * (1 - t * 0.4);
+      // Slight forward bow on the beat (knee-up feel)
+      mesh.rotation.x = Math.sin(t * Math.PI * 5) * 0.18 * (1 - t * 0.4);
+      // Squash-and-stretch on the kicks
+      const stretch = 1 + Math.sin(t * Math.PI * 5) * 0.22;
+      const squash = 1 - Math.cos(t * Math.PI * 5) * 0.10;
+      mesh.scale.set(squash, stretch, squash);
+      requestAnimationFrame(animateJig);
+    }
+    animateJig();
   }
 }
 
@@ -4727,8 +4868,30 @@ function renderBoard3D() {
         if (existing) {
           const hole = holeRegistry.get(holdHoleId);
           if (hole) {
-            existing.mesh.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
-            existing.mesh.visible = true;
+            // Cut victim: arc the peg out from the cut hole to its holding slot
+            // instead of teleporting. game-core tags `_cutFromHole` in bumpOccupant.
+            if (peg._cutFromHole && !_animatingPegs.has(pegId)) {
+              const fromHole = holeRegistry.get(peg._cutFromHole);
+              if (fromHole) {
+                // Snap mesh back to the cut hole so the arc starts there visually.
+                existing.mesh.position.set(
+                  fromHole.position.x,
+                  boardY + LINE_HEIGHT + 1,
+                  fromHole.position.z
+                );
+                existing.mesh.visible = true;
+                _animatingPegs.add(pegId);
+                _deferredAnims.push({ pegId, path: null, existing, holeId: holdHoleId });
+              } else {
+                existing.mesh.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
+                existing.mesh.visible = true;
+              }
+              // Clear the tag — one-shot.
+              delete peg._cutFromHole;
+            } else if (!_animatingPegs.has(pegId)) {
+              existing.mesh.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
+              existing.mesh.visible = true;
+            }
           }
         } else {
           createPeg(pegId, pi, holdHoleId, player.boardPosition);
@@ -5371,6 +5534,38 @@ function highlightMovePaths(moves) {
   // second-leg choices pulse as clickable targets.
   _drawCommittedSplitPath(vm, color);
 
+  // ── BUILD COMMIT-DESTINATION SET ──
+  // user_directive_2026-05-10: only holes that are an UNAMBIGUOUS commit
+  // target should pulse. Intermediate path holes and the peg's `from` hole
+  // never commit a move, so they do not pulse — even when they happen to be
+  // unique. A hole pulses iff:
+  //   1. clicking it commits exactly one move (one route through it), AND
+  //   2. that hole is the destination/commit point of that route.
+  // Pegs (peg:N keys) keep pulsing when they are the only commit option
+  // (e.g. only one peg can move, or split-first-peg pick).
+  const commitDests = new Set();
+  vm.forEach((m, i) => {
+    if (!m) return;
+    if (m.type === 'split') {
+      const choice = _getSplitChoice();
+      if (choice && choice.steps != null) {
+        // Stage 2b: second-leg dest is the commit point
+        if (m.pegIdx === choice.pegIdx && m.steps === choice.steps) {
+          commitDests.add(m.dest2);
+        } else if (m.peg2Idx === choice.pegIdx && m.steps2 === choice.steps) {
+          commitDests.add(m.dest);
+        }
+      } else if (choice && choice.steps == null) {
+        // Stage 2a: first-leg dest is the commit point
+        if (m.pegIdx === choice.pegIdx) commitDests.add(m.dest);
+        else if (m.peg2Idx === choice.pegIdx) commitDests.add(m.dest2);
+      }
+      // Stage 1 (no choice yet) — peg halos pulse instead, no dest pulses
+      return;
+    }
+    if (m.dest) commitDests.add(m.dest);
+  });
+
   for (const [key, entries] of index.entries()) {
     if (!Array.isArray(entries) || entries.length !== 1) continue;
     if (key.startsWith('peg:')) {
@@ -5383,7 +5578,9 @@ function highlightMovePaths(moves) {
       if (peg && peg.id) createPegHalo(peg.id, color, { pulsing: true });
       continue;
     }
-    createGlowRing(key, color, true, { pulsing: true });
+    // Only pulse if this hole is also a commit destination of the unique route
+    const isCommitDest = commitDests.has(key);
+    createGlowRing(key, color, isCommitDest, { pulsing: isCommitDest });
   }
 
   function pulseHighlights() {
@@ -5424,6 +5621,16 @@ function highlightSinglePath(moveIdx) {
 // ════════════════════════════════════════════════════════════════
 let _routeIndex = new Map();   // targetKey(holeId|peg:<idx>) -> [entry, ...]
 let _routeIndexHash = '';      // re-build only when valid moves change
+
+// ── Cycle-and-confirm state ────────────────────────────────────
+// The footer toolbar is the primary input. ◀ / ▶ cycle through every
+// legal commit-level entry; ✓ commits. Board clicks are an optional
+// shortcut that simply jumps the cycle to that target.
+let _pendingEntry = null;          // entry currently staged for confirmation
+let _pendingTargetKey = '';        // last clicked target key (for board cycling)
+let _pendingCycleIdx = -1;         // index into entries for that target
+let _moveCycle = [];               // flat ordered list of unique commit-level entries
+let _moveCycleIdx = -1;            // index into _moveCycle
 const _pickRaycaster = (typeof THREE !== 'undefined') ? new THREE.Raycaster() : null;
 const _pickMouse = (typeof THREE !== 'undefined') ? new THREE.Vector2() : null;
 
@@ -5551,8 +5758,32 @@ function _refreshRouteIndex() {
   if (hash !== _routeIndexHash) {
     _routeIndexHash = hash;
     _routeIndex = _buildRouteIndex(vm);
+    // Valid-move set changed (commit, turn end, or split-stage advance):
+    // drop any stale pending confirmation so we don't apply it to a new state.
+    _pendingEntry = null;
+    _pendingTargetKey = '';
+    _pendingCycleIdx = -1;
+    _rebuildMoveCycle();
+    _refreshConfirmBar();
   }
   return _routeIndex;
+}
+
+// Flatten the route index into a unique, ordered list of commit-level entries.
+// Order: index-iteration order (which mirrors validMoves order), de-duped by entryKey.
+function _rebuildMoveCycle() {
+  const seen = new Set();
+  const list = [];
+  for (const arr of _routeIndex.values()) {
+    for (const entry of arr) {
+      const key = _entryKey(entry);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      list.push(entry);
+    }
+  }
+  _moveCycle = list;
+  _moveCycleIdx = -1;
 }
 
 function _entryKey(e) {
@@ -5864,7 +6095,8 @@ function setupBoardPickHandler() {
   const clearHover = () => {
     if (lastHoverKey !== '') {
       lastHoverKey = '';
-      _restoreDefaultHighlight();
+      // Don't disturb a staged preview while a confirmation is pending.
+      if (!_pendingEntry) _restoreDefaultHighlight();
     }
     dom.style.cursor = '';
     _hideHoverTip();
@@ -5878,24 +6110,33 @@ function setupBoardPickHandler() {
     if (idx.size === 0) { clearHover(); return; }
     const target = _pickTargetAtClient(e.clientX, e.clientY);
     const matches = _entriesForTarget(target, idx);
+    const vm = _currentValidMoves();
     if (matches.length === 1) {
       dom.style.cursor = 'pointer';
       const key = _entryKey(matches[0]);
-      const vm = _currentValidMoves();
-      if (lastHoverKey !== key) {
+      // Keep the staged preview in place when a confirmation is pending; just
+      // show the hover tip so the player can still inspect other routes.
+      if (!_pendingEntry && lastHoverKey !== key) {
         lastHoverKey = key;
         _previewEntry(matches[0], vm);
       }
       const desc = _describeEntry(matches[0], vm);
-      if (desc) _showHoverTip(`${desc.text} — click to move`, desc.color, e.clientX, e.clientY);
-      else _hideHoverTip();
+      if (desc) {
+        const tip = _pendingEntry
+          ? `${desc.text} — click to stage (Confirm to commit)`
+          : `${desc.text} — click to stage`;
+        _showHoverTip(tip, desc.color, e.clientX, e.clientY);
+      } else _hideHoverTip();
     } else if (matches.length > 1) {
-      dom.style.cursor = 'help';
-      if (lastHoverKey !== '') {
+      dom.style.cursor = 'pointer';
+      // Cycle hint only — actual cycling happens on click.
+      const desc = _describeEntry(matches[0], vm);
+      const head = desc ? `${desc.text}` : `${matches.length} routes here`;
+      _showHoverTip(`${head} — click to cycle (${matches.length} options)`, desc ? desc.color : null, e.clientX, e.clientY);
+      if (!_pendingEntry && lastHoverKey !== '') {
         lastHoverKey = '';
         _restoreDefaultHighlight();
       }
-      _showHoverTip(`${matches.length} routes overlap here — pick a pulsing unique target`, null, e.clientX, e.clientY);
     } else {
       clearHover();
     }
@@ -5909,14 +6150,163 @@ function setupBoardPickHandler() {
     if (idx.size === 0) return;
     const target = _pickTargetAtClient(e.clientX, e.clientY);
     const matches = _entriesForTarget(target, idx);
-    if (matches.length === 1) {
-      _hideHoverTip();
-      _commitEntry(matches[0]);
+    if (matches.length === 0) return;
+    _hideHoverTip();
+    // Board click is a shortcut — sync the cycle to this target.
+    const tKey = target ? (target.kind === 'peg' ? `peg:${target.pegIdx}` : `hole:${target.holeId}`) : '';
+    let nextIdx = 0;
+    if (tKey === _pendingTargetKey) {
+      nextIdx = (_pendingCycleIdx + 1) % matches.length;
     }
-    // matches.length === 0 (missed) or > 1 (ambiguous) → no-op; the player
-    // can click a more specific hole on the desired route.
+    _pendingTargetKey = tKey;
+    _pendingCycleIdx = nextIdx;
+    const entry = matches[nextIdx];
+    // Sync the master cycle so ◀/▶ continue from here.
+    const cycleIdx = _moveCycle.findIndex(e2 => _entryKey(e2) === _entryKey(entry));
+    if (cycleIdx >= 0) _moveCycleIdx = cycleIdx;
+    _stagePendingEntry(entry);
   });
+
+  // Footer toolbar buttons — primary input on touch and desktop.
+  const okBtn = document.getElementById('ft-confirm-ok');
+  const cancelBtn = document.getElementById('ft-confirm-cancel');
+  const prevBtn = document.getElementById('ft-confirm-prev');
+  const nextBtn = document.getElementById('ft-confirm-next');
+  if (okBtn && !okBtn._wired) {
+    okBtn._wired = true;
+    okBtn.addEventListener('click', () => _commitPendingEntry());
+  }
+  if (cancelBtn && !cancelBtn._wired) {
+    cancelBtn._wired = true;
+    cancelBtn.addEventListener('click', () => _clearPendingEntry(true));
+  }
+  if (prevBtn && !prevBtn._wired) {
+    prevBtn._wired = true;
+    prevBtn.addEventListener('click', () => _stepMoveCycle(-1));
+  }
+  if (nextBtn && !nextBtn._wired) {
+    nextBtn._wired = true;
+    nextBtn.addEventListener('click', () => _stepMoveCycle(+1));
+  }
+  // Initialize the bar state for whatever moves are currently available.
+  _refreshRouteIndex();
+  _refreshConfirmBar();
 }
+
+// ── Confirmation staging ───────────────────────────────────────
+function _stagePendingEntry(entry) {
+  if (!entry) {
+    _pendingEntry = null;
+    _restoreDefaultHighlight();
+    _refreshConfirmBar();
+    return;
+  }
+  _pendingEntry = entry;
+  const vm = _currentValidMoves();
+  // _previewEntry highlights the chosen route — only its destination peg/hole pulses.
+  _previewEntry(entry, vm);
+  _refreshConfirmBar();
+}
+
+function _stepMoveCycle(delta) {
+  if (!_moveCycle.length) return;
+  const n = _moveCycle.length;
+  let i = _moveCycleIdx;
+  if (i < 0) i = (delta > 0) ? 0 : n - 1;
+  else i = (i + delta + n) % n;
+  _moveCycleIdx = i;
+  _pendingTargetKey = '';
+  _pendingCycleIdx = -1;
+  _stagePendingEntry(_moveCycle[i]);
+}
+
+function _refreshConfirmBar() {
+  const bar = document.getElementById('ft-confirm-bar');
+  if (!bar) return;
+  const label = document.getElementById('ft-confirm-label');
+  const okBtn = document.getElementById('ft-confirm-ok');
+  const cancelBtn = document.getElementById('ft-confirm-cancel');
+  const prevBtn = document.getElementById('ft-confirm-prev');
+  const nextBtn = document.getElementById('ft-confirm-next');
+  const total = _moveCycle.length;
+  if (total === 0) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const vm = _currentValidMoves();
+  const hasPick = !!_pendingEntry;
+  const idxLabel = hasPick && _moveCycleIdx >= 0 ? `${_moveCycleIdx + 1}/${total}` : `–/${total}`;
+
+  // Stage prefix for split flow so the player knows what they're choosing.
+  // The cycle's first entry tells us the current stage (all entries in a
+  // refreshed cycle share the same kind family for splits).
+  const choice = _getSplitChoice();
+  let stagePrefix = '';
+  if (_moveCycle.length) {
+    const k = _moveCycle[0].kind;
+    if (k === 'split-first-peg') stagePrefix = 'Split 7 — pick peg: ';
+    else if (k === 'split-first') stagePrefix = `Split 7 — pick steps for peg ${(choice && choice.pegIdx != null) ? (choice.pegIdx + 1) : '?'}: `;
+    else if (k === 'split-second') stagePrefix = 'Split 7 — pick destination: ';
+  }
+
+  let text = `${stagePrefix}Choose move (${idxLabel})`;
+  let color = null;
+  if (hasPick) {
+    const desc = _describeEntry(_pendingEntry, vm);
+    if (desc) {
+      text = `${stagePrefix}${idxLabel} · ${desc.text}`;
+      color = desc.color;
+    }
+  } else {
+    text = `${stagePrefix}Press ▶ to preview moves (${total} legal)`;
+  }
+  if (label) {
+    label.textContent = text;
+    label.style.color = color || '#f6f9ff';
+  }
+  if (okBtn) okBtn.disabled = !hasPick;
+  // Cancel is enabled whenever we have a pick OR a split stage to back out of.
+  if (cancelBtn) {
+    const inSplit = !!(choice && (choice.pegIdx != null || choice.steps != null));
+    cancelBtn.disabled = !hasPick && !inSplit;
+    cancelBtn.title = inSplit ? 'Back to previous split stage' : 'Clear selection';
+  }
+  if (prevBtn) prevBtn.disabled = total < 2;
+  if (nextBtn) nextBtn.disabled = total < 2;
+}
+
+function _clearPendingEntry(restoreHighlights) {
+  _pendingEntry = null;
+  _pendingTargetKey = '';
+  _pendingCycleIdx = -1;
+  _moveCycleIdx = -1;
+  // If we're mid-split, Cancel walks the split state machine back one stage
+  // (steps → peg → no choice) instead of just clearing the preview.
+  const choice = _getSplitChoice();
+  if (choice && (choice.pegIdx != null || choice.steps != null)) {
+    if (choice.steps != null && typeof window.selectSplitSteps === 'function') {
+      // Drop step choice — keep peg.
+      window.selectSplitSteps(NaN); // any non-finite resets _splitStepChoice to null
+    } else if (typeof window.cancelSplitChoice === 'function') {
+      window.cancelSplitChoice();
+    }
+    // showMoveHints() inside the selectors triggers _refreshFastTrackToolbar.
+    return;
+  }
+  if (restoreHighlights) _restoreDefaultHighlight();
+  _refreshConfirmBar();
+}
+
+function _commitPendingEntry() {
+  const entry = _pendingEntry;
+  if (!entry) return;
+  _pendingEntry = null;
+  _moveCycleIdx = -1;
+  _pendingTargetKey = '';
+  _pendingCycleIdx = -1;
+  _commitEntry(entry);
+  // _refreshRouteIndex() on the next tick will rebuild the cycle for the new state.
+}
+window._clearPendingEntry = () => _clearPendingEntry(true);
+window._refreshFastTrackToolbar = () => { _refreshRouteIndex(); _refreshConfirmBar(); };
 
 // ════════════════════════════════════════════════════════════════
 // 🜂 MANIFOLD SUBSTRATE INTEGRATION

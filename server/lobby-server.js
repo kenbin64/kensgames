@@ -234,7 +234,7 @@ function freshSession(sx, gameId, hostUser, isPrivate) {
     max_players: game.maxPlayers || 6,
     recommended_players: game.recommendedPlayers || game.maxPlayers || 4,
     players: [],
-    settings: { lobby_accepted: false },
+    settings: { lobby_accepted: false, allow_return: true },
     // Single authoritative runtime object for this session.
     authoritative: {
       instance_id: crypto.randomUUID(),
@@ -624,6 +624,46 @@ function joinExisting(ws, conn, s) {
     }
     return;
   }
+  // Reclaim-seat: if a bot is occupying the seat that previously belonged to
+  // this returning user, swap the bot back out for the human (subject to host
+  // setting allow_return).
+  const botSeat = (s.players || []).find(p => p && p.is_ai && p.replaced_user_id === conn.user_id);
+  if (botSeat) {
+    if (s.settings && s.settings.allow_return === false) {
+      return send(ws, { type: 'error', message: 'Host has disabled returning players for this game.' });
+    }
+    const idx = s.players.indexOf(botSeat);
+    s.players[idx] = {
+      user_id: conn.user_id,
+      username: conn.user.username,
+      avatar_id: normalizeAvatarId(conn.user.avatar_id),
+      is_host: !!botSeat.is_host,
+      is_ai: false,
+      slot: botSeat.slot,
+      ready: true,
+    };
+    syncGameObjectSession(s);
+    conn.session_x_id = s.session_id;
+    ws.join(s.session_id);
+    send(ws, { type: 'session_joined', session: sanitize(s), action: 'reclaimed' });
+    broadcastSession(s, {
+      type: 'player_reclaimed_seat',
+      session_id: s.session_id,
+      user_id: conn.user_id,
+      username: conn.user.username,
+      removed_bot_id: botSeat.user_id,
+      players: s.players,
+      message: `${conn.user.username} returned and reclaimed their seat.`,
+    });
+    broadcastSession(s, { type: 'session_update', session: sanitize(s), action: 'reclaimed' });
+    if (s.status === 'playing') {
+      // Wire the human back into PlayerManager and re-send authoritative state.
+      pm.registerConnection(conn.user_id, ws);
+      sendAuthoritativeState(ws, s);
+    }
+    emitGameObject(s);
+    return;
+  }
   if (!hasRenderableProfile(conn)) {
     console.log('[joinExisting] ERROR: No renderable profile for user:', conn.user_id, 'user:', conn.user);
     return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before joining a game' });
@@ -754,6 +794,38 @@ handlers.leave_session = (ws) => {
   send(ws, { type: 'left_session' });
 };
 
+// Host-only: tear down the session entirely. Notifies every connected player
+// and removes the lobby/in-game room.
+handlers.cancel_session = (ws) => {
+  const conn = connections.get(ws);
+  if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return send(ws, { type: 'error', message: 'Not in a game' });
+  if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can cancel the game' });
+  const sessionId = s.session_id;
+  // Tell everyone (including host) the room is gone, then tear it down.
+  broadcastSession(s, {
+    type: 'session_cancelled',
+    session_id: sessionId,
+    by: conn.user_id,
+    message: 'Host cancelled the game.',
+  });
+  // Stop kernels / PM / colyseus rooms.
+  try { KernelRouter.stop(sessionId); } catch (e) { }
+  try { pm.cancelSession && pm.cancelSession(sessionId, 'host_cancelled'); } catch (e) { }
+  // Drop every connection's session pointer and leave the ws room.
+  for (const [peer, peerConn] of connections) {
+    if (peerConn.session_x_id === sessionId) {
+      try { peer.leave(sessionId); } catch (e) { }
+      peerConn.session_x_id = null;
+    }
+  }
+  liveSessions.delete(sessionId);
+  GameObject.remove(sessionId);
+  broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: sessionId });
+  send(ws, { type: 'left_session' });
+};
+
 handlers.update_session_settings = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return;
@@ -863,13 +935,15 @@ handlers.start_game = (ws) => {
   if (!s) return send(ws, { type: 'error', message: 'Not in a game' });
   if (s.status === 'playing') return send(ws, { type: 'error', message: 'Game already launched for this session' });
   if (s.host_id !== conn.user_id) return send(ws, { type: 'error', message: 'Only the host can start the game' });
-  const minNeeded = KernelRouter.isKernelGame(s.game_id) ? KernelRouter.minPlayers(s.game_id) : 2;
+  // Minimum players: kernel-game minimum if specified, otherwise 2.
+  const kernelMin = KernelRouter.isKernelGame(s.game_id) ? KernelRouter.minPlayers(s.game_id) : 2;
+  const minNeeded = Math.max(2, kernelMin);
   if (s.players.length < minNeeded) return send(ws, { type: 'error', message: `Need at least ${minNeeded} player${minNeeded === 1 ? '' : 's'}` });
   if (!s.players.every(p => String(p.username || '').trim().length >= 2 && !!normalizeAvatarId(p.avatar_id))) {
     return send(ws, { type: 'error', message: 'Every player must have a name and renderable avatar before launch' });
   }
-  if (!s.players.every(p => p.is_ai || p.ready)) return send(ws, { type: 'error', message: 'All players must be ready' });
-  if (!s.settings.lobby_accepted) return send(ws, { type: 'error', message: 'Host must accept the group before launch' });
+  // Host can start any time once 2+ players are seated — no ready/accept gating.
+  s.settings.lobby_accepted = true;
   s.status = 'playing';
   syncGameObjectSession(s);
   emitGameObject(s);
