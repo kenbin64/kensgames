@@ -555,7 +555,8 @@
           <button class="btn btn-warm hidden" id="btn-add-bot">＋ Add Bot</button>
           <button class="btn" id="btn-ready">Ready</button>
           <button class="btn btn-lime hidden" id="btn-launch">▶ Launch Game</button>
-          <button class="btn btn-danger hidden" id="btn-cancel-host" title="Cancel this game and remove all players from the room.">⛔ Cancel Game</button>
+          <button class="btn btn-danger hidden" id="btn-cancel-host"
+            title="Cancel this game and remove all players from the room.">⛔ Cancel Game</button>
           <span style="flex:1"></span>
           <button class="btn btn-danger" id="btn-leave">Leave</button>
         </div>
@@ -803,8 +804,22 @@
           launchBtn.classList.add('hidden');
         }
         launchBtn.textContent = '▶ Launch Game (' + seated + ' player' + (seated === 1 ? '' : 's') + ')';
-        // Hide the per-player Ready button — host gates the launch now.
-        document.getElementById('btn-ready').classList.add('hidden');
+        // Ready button: shown to non-host human players so they can signal
+        // readiness to the host. Host launches whenever 2+ are seated; the
+        // ready state is informational (rendered as READY/WAITING in roster).
+        const me = mp && (s.players || []).find(p => p.user_id === mp.userId);
+        const readyBtn = document.getElementById('btn-ready');
+        if (me && !me.is_host && !me.is_ai) {
+          readyBtn.classList.remove('hidden');
+          const amReady = !!me.ready;
+          readyBtn.textContent = amReady ? '✓ Ready' : 'Ready Up';
+          readyBtn.classList.toggle('btn-lime', amReady);
+          readyBtn.title = amReady
+            ? 'You are ready. Click to un-ready.'
+            : 'Tell the host you are ready to play.';
+        } else {
+          readyBtn.classList.add('hidden');
+        }
         // Host-only: Cancel Game button
         document.getElementById('btn-cancel-host').classList.toggle('hidden', !isHost);
 
