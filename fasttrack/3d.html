@@ -44,6 +44,15 @@
   <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
   <div id="ft-footer-bg" aria-hidden="true"></div>
 
+  <!-- ── Move-cycle bar — always-visible footer control to toggle through every legal move ── -->
+  <div id="ft-confirm-bar" role="region" aria-label="Choose move" hidden>
+    <button id="ft-confirm-prev" type="button" aria-label="Previous move" title="Previous move">◀</button>
+    <span id="ft-confirm-label">No moves available</span>
+    <button id="ft-confirm-next" type="button" aria-label="Next move" title="Next move">▶</button>
+    <button id="ft-confirm-cancel" type="button" aria-label="Clear selection" title="Clear selection">✕</button>
+    <button id="ft-confirm-ok" type="button" aria-label="Confirm move" title="Confirm move">Confirm ✓</button>
+  </div>
+
   <!-- ── Player strip — top-left ── -->
   <div id="panel-players" class="glass-panel">
     <div id="game-status">Your turn</div>

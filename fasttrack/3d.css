@@ -1821,3 +1821,93 @@
       background: rgba(220, 50, 50, 0.45);
       color: #fff;
     }
+
+/* ─── Confirm-move bar (HR-6.2 fixed control rail) ─── */
+#ft-confirm-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 14px;
+  background: rgba(8, 16, 30, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  color: #f6f9ff;
+}
+#ft-confirm-bar[hidden] { display: none; }
+#ft-confirm-bar #ft-confirm-label {
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.92;
+}
+#ft-confirm-bar button {
+  font: inherit;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f6f9ff;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+#ft-confirm-bar button:hover { background: rgba(255, 255, 255, 0.16); }
+#ft-confirm-bar button:active { transform: scale(0.96); }
+#ft-confirm-bar #ft-confirm-ok {
+  background: linear-gradient(135deg, #1f9d55 0%, #2bb673 100%);
+  border-color: rgba(43, 182, 115, 0.85);
+  font-weight: 600;
+}
+#ft-confirm-bar #ft-confirm-ok:hover {
+  background: linear-gradient(135deg, #2bb673 0%, #3ed089 100%);
+}
+#ft-confirm-bar #ft-confirm-cancel {
+  background: rgba(220, 80, 80, 0.18);
+  border-color: rgba(220, 80, 80, 0.55);
+}
+#ft-confirm-bar #ft-confirm-cancel:hover {
+  background: rgba(220, 80, 80, 0.32);
+}
+
+#ft-confirm-bar #ft-confirm-prev,
+#ft-confirm-bar #ft-confirm-next {
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 12px;
+  background: rgba(80, 140, 220, 0.18);
+  border-color: rgba(120, 170, 230, 0.55);
+}
+#ft-confirm-bar #ft-confirm-prev:hover,
+#ft-confirm-bar #ft-confirm-next:hover {
+  background: rgba(120, 170, 230, 0.32);
+}
+#ft-confirm-bar button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: saturate(0.4);
+}
+@media (max-width: 640px) {
+  #ft-confirm-bar { font-size: 12px; padding: 5px 10px; gap: 6px; }
+  #ft-confirm-bar #ft-confirm-label { max-width: 160px; }
+  #ft-confirm-bar button { padding: 6px 10px; }
+}
+
+/* Card-area disabled state — mirrors #draw-btn:disabled while a play is
+   still resolving (peg hops, cutscenes, redraw window). */
+#card-area.disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: saturate(0.5);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
