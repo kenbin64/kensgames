@@ -364,6 +364,8 @@ function cancelPendingLobbyDisconnect(sessionId, userId) {
 function removePlayerFromWaitingSession(sessionId, userId, username) {
   const s = liveSessions.get(sessionId);
   if (!s) return null;
+  // Never tear down a roster while the game is in progress.
+  if (s.status === 'playing') return null;
   // If the user reconnected onto a different session, do nothing.
   if (!s.players.some(p => p.user_id === userId)) return null;
   s.players = s.players.filter(p => p.user_id !== userId);
@@ -406,6 +408,16 @@ function leaveCurrentSession(ws, conn) {
   const s = liveSessions.get(conn.session_x_id);
   if (!s) return null;
   KernelRouter.detachPeer(ws, conn);
+  // If the game is in progress, do NOT remove the player from the session
+  // roster on disconnect. The session must remain intact for the duration of
+  // play so the game client (which navigates to /<game>/3d.html) can still
+  // bootstrap its roster from /api/session/bootstrap?code=... and for the
+  // player to reconnect mid-game. Just detach this socket; the seat stays.
+  if (s.status === 'playing') {
+    try { ws.leave(s.session_id); } catch (_) { /* ignore */ }
+    conn.session_x_id = null;
+    return s;
+  }
   s.players = s.players.filter(p => p.user_id !== conn.user_id);
   s.players.forEach((p, i) => { p.slot = i; });
   ws.leave(s.session_id);

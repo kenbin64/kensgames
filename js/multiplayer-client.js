@@ -671,8 +671,9 @@ class KGMultiplayer {
         break;
 
       case 'error':
-        console.warn('[KGMultiplayer] Server error:', data.message);
-        this._emit('error', data.message);
+        console.warn('[KGMultiplayer] Server error:', data.message, data);
+        // Emit the full payload so listeners can read .message, .code, .context, etc.
+        this._emit('error', data);
         break;
 
       default:

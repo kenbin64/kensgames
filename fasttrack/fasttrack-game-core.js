@@ -627,9 +627,16 @@ function applyStateSnapshot(snapshot) {
   for (const name of _SYNC_TABLES) {
     if (!snapshot[name] || typeof snapshot[name] !== 'object') return false;
   }
+  // Preserve local-only identity that must NOT be overwritten by the host's
+  // canonical broadcast (otherwise every peer adopts the host's userId and
+  // thinks it is the active player).
+  const localMyUserId = state.meta.get('myUserId');
+  const localGameMode = state.meta.get('gameMode');
   for (const name of _SYNC_TABLES) {
     _replaceTableFromObject(state[name], snapshot[name]);
   }
+  if (localMyUserId != null) state.meta.set('myUserId', localMyUserId);
+  if (localGameMode != null) state.meta.set('gameMode', localGameMode);
   syncPegMatrix();
   updateUI();
   renderBoard();

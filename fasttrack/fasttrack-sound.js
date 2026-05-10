@@ -235,8 +235,18 @@
       workletPath: o.workletPath || '/js/manifold-instrument.worklet.js',
     }).then(() => {
       _bound = true;
-      if (_musicOn && CONDUCTOR) {
-        _startConductor();
+      if (_musicOn) {
+        // Prefer the jazz speakeasy engine if present — live procedural
+        // walking-bass + brushed-drums + ii-V-I comp with verse/chorus/hook.
+        // Falls back to the manifold conductor stream when the jazz module
+        // isn't loaded (e.g. legacy 2D path).
+        const JZ = (typeof window !== 'undefined') ? window.JazzSpeakeasy : null;
+        if (JZ && typeof JZ.start === 'function') {
+          try { JZ.start(audioContext, { gain: 0.5 }); }
+          catch (e) { if (CONDUCTOR) _startConductor(); }
+        } else if (CONDUCTOR) {
+          _startConductor();
+        }
       }
     });
   }
@@ -287,6 +297,8 @@
   function dispose() {
     if (_interval) { clearInterval(_interval); _interval = null; }
     _conductor = null;
+    const JZ = (typeof window !== 'undefined') ? window.JazzSpeakeasy : null;
+    if (JZ && JZ.isRunning && JZ.isRunning()) { try { JZ.stop(); } catch (e) { } }
     _bound = false;
     _game = null;
   }
@@ -294,6 +306,14 @@
   /** Toggle background music without restarting. */
   function setMusic(on) {
     _musicOn = !!on;
+    const JZ = (typeof window !== 'undefined') ? window.JazzSpeakeasy : null;
+    if (JZ) {
+      if (_musicOn && !JZ.isRunning() && _bound) {
+        try { JZ.start(INSTR && INSTR.context ? INSTR.context() : (window.AudioContext ? null : null)); } catch (e) { }
+      } else if (!_musicOn && JZ.isRunning()) {
+        JZ.stop();
+      }
+    }
   }
 
   /** Toggle sound effects without restarting. */

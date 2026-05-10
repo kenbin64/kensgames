@@ -53,6 +53,12 @@
     <button id="ft-confirm-ok" type="button" aria-label="Confirm move" title="Confirm move">Confirm ✓</button>
   </div>
 
+  <!-- ── Big instruction banner — tells the player exactly what to tap next ── -->
+  <div id="ft-instruction-banner" role="status" aria-live="polite" hidden>
+    <span class="ft-ib-icon" aria-hidden="true">👉</span>
+    <span class="ft-ib-text">Tap a glowing peg</span>
+  </div>
+
   <!-- ── Player strip — top-left ── -->
   <div id="panel-players" class="glass-panel">
     <div id="game-status">Your turn</div>
@@ -197,8 +203,14 @@
   <!-- 🜂 SCHWARZ DIAMOND RENDERER — Three.js particle surface, z=x·y driven -->
   <script src="schwarz_diamond_renderer.js?v=20260501"></script>
 
+  <!-- 🜂 JAZZ SPEAKEASY — procedural live music (walking bass + brushed drums + ii-V-I + hook) -->
+  <script src="../js/jazz-speakeasy.js?v=20260510b"></script>
+
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
   <script src="fasttrack-3d.js?v=20260507a"></script>
+
+  <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
+  <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
 
   <!-- Viewport chrome: emoji reactions, settings, replay overlay, leave game. -->
   <script src="3d-ui.js?v=20260509"></script>

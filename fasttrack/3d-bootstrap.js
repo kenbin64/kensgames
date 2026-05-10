@@ -51,7 +51,20 @@ window.KG_BOOTSTRAP_PROMISE = (async function () {
   const code = String((kgGame && kgGame.code) || runtimeCode || sessionCode || urlCode || '').toUpperCase();
   if (kgGame && code && !kgGame.code) kgGame.code = code;
 
-  const mode = (kgGame && kgGame.mode) || 'solo';
+  // If the URL carries ?session= or ?code= (lobby launch), force live mode
+  // even when stale localStorage KG_Game still says 'solo'. Without this,
+  // two browsers launched from the same lobby room each run their own
+  // independent offline game with bots and never rejoin the server session.
+  const urlSession = String(usp.get('session') || '').trim();
+  const urlCode2 = String(usp.get('code') || '').trim();
+  const urlMode = String(usp.get('mode') || '').trim();
+  let mode = (kgGame && kgGame.mode) || 'solo';
+  if (urlMode === 'private' || urlMode === 'public' || urlMode === 'multiplayer') {
+    mode = urlMode;
+  } else if (urlSession || urlCode2) {
+    mode = (mode === 'private' || mode === 'public' || mode === 'multiplayer') ? mode : 'public';
+  }
+  if (kgGame) kgGame.mode = mode;
   const isLive = (mode === 'private' || mode === 'public' || mode === 'multiplayer');
 
   // ── 3. Default an identity for solo / same-screen so we never get stuck ──
@@ -120,14 +133,14 @@ window.KG_BOOTSTRAP_PROMISE = (async function () {
       sessionStorage.setItem('kg_session', JSON.stringify(data.session));
     }
     if (!localStorage.getItem('username') || !localStorage.getItem('kg_avatar')) {
-      window.location.replace('/fasttrack/lobby-simple.html');
+      window.location.replace('/lobby/?game=fasttrack');
       return new Promise(() => { });
     }
   } catch (err) {
     console.warn('REST bootstrap failed', err);
     // Live mode with no recoverable code: bounce to the lobby.
     if (!code) {
-      window.location.replace('/fasttrack/lobby-simple.html');
+      window.location.replace('/lobby/?game=fasttrack');
       return new Promise(() => { });
     }
     // We have a code but the server is unreachable; default an identity and

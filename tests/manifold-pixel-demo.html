@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ManifoldPixel — Address-Grid Demo</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      background: #08070a;
+      color: #cfd;
+      font: 13px/1.5 system-ui, sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    #hud {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 12px;
+      border: 1px solid rgba(120, 255, 200, 0.18);
+    }
+
+    #hud b {
+      color: #8fe;
+    }
+
+    #hud kbd {
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 0 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="hud">
+    <div>🜂 <b>ManifoldPixel</b> — color is the field at an address</div>
+    <div>fps <span id="fps">—</span> · contribs <span id="nc">—</span> · tiles <span id="nt">—</span></div>
+    <div>z = x · y &nbsp;·&nbsp; <kbd>1</kbd> peg <kbd>2</kbd> bullseye <kbd>3</kbd> dust <kbd>0</kbd> none</div>
+  </div>
+
+  <script src="../js/manifold-pixel.js"></script>
+  <script>
+    (function () {
+      const canvas = document.getElementById('cv');
+      const surf = ManifoldPixel.create(canvas, { tile: 32 });
+
+      // Void background (the field's "no contribution" colour).
+      ManifoldPixel.setBackground(0.04, 0.03, 0.06, 1);
+
+      // ── Field contributor: a static "board" disc.
+      //    The disc is queryable at every address — color is what the
+      //    manifold returns at (sx, sy), nothing is "drawn".
+      ManifoldPixel.contribute('board', (a, ctx) => {
+        const cx = ctx.w * 0.5, cy = ctx.h * 0.5;
+        const dx = a.sx - cx, dy = a.sy - cy;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const R = Math.min(ctx.w, ctx.h) * 0.40;
+        if (r > R) return null;
+        const t = 1 - r / R;
+        // z = x · y here is literal: address radius * field falloff.
+        const z = (1 - r / R);
+        return { r: 0.10 + 0.20 * z, g: 0.18 + 0.30 * z, b: 0.24 + 0.10 * z, a: 1, w: 1 };
+      });
+
+      // ── Field contributor: an animated "peg" — moves each frame.
+      //    Tiles it touches are dirty; everything else stays cached.
+      let pegOn = true;
+      ManifoldPixel.contribute('peg', (a, ctx) => {
+        if (!pegOn) return null;
+        const cx = ctx.w * 0.5 + Math.cos(ctx.t * 0.6) * ctx.w * 0.22;
+        const cy = ctx.h * 0.5 + Math.sin(ctx.t * 0.6) * ctx.h * 0.22;
+        const dx = a.sx - cx, dy = a.sy - cy;
+        const r2 = dx * dx + dy * dy;
+        const R = 22;
+        if (r2 > R * R) return null;
+        const z = 1 - Math.sqrt(r2) / R;          // address × radial-modifier
+        return { r: 1.0 * z + 0.4, g: 0.65 * z + 0.2, b: 0.05, a: 1, w: 1 };
+      });
+
+      // ── Field contributor: "bullseye" central glow.
+      let glowOn = true;
+      ManifoldPixel.contribute('bullseye', (a, ctx) => {
+        if (!glowOn) return null;
+        const cx = ctx.w * 0.5, cy = ctx.h * 0.5;
+        const dx = a.sx - cx, dy = a.sy - cy;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const R = 60;
+        if (r > R) return null;
+        const pulse = 0.6 + 0.4 * Math.sin(ctx.t * 2.0);
+        const z = (1 - r / R) * pulse;
+        return { r: 1.0 * z, g: 0.85 * z, b: 0.25 * z, a: z, w: 1 };
+      });
+
+      // ── Field contributor: deterministic "dust" — value-noise field.
+      let dustOn = false;
+      function hash2(x, y) {
+        let h = x * 374761393 + y * 668265263;
+        h = (h ^ (h >> 13)) * 1274126177;
+        return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+      }
+      ManifoldPixel.contribute('dust', (a, ctx) => {
+        if (!dustOn) return null;
+        // Sparse, animated by time-quantised cell — only a few addresses contribute.
+        const cell = 6;
+        const cx = (a.sx / cell) | 0;
+        const cy = (a.sy / cell) | 0;
+        const phase = ((ctx.t * 8) | 0);
+        const v = hash2(cx + phase, cy);
+        if (v < 0.985) return null;
+        return { r: 1, g: 0.95, b: 0.85, a: 0.35, w: 1 };
+      });
+
+      // Keys toggle contributors — proves delta-gating works: turning
+      // a static contributor off makes its tiles dirty exactly once,
+      // then they stay clean.
+      addEventListener('keydown', (e) => {
+        if (e.key === '1') pegOn = !pegOn;
+        if (e.key === '2') glowOn = !glowOn;
+        if (e.key === '3') dustOn = !dustOn;
+        if (e.key === '0') { pegOn = glowOn = dustOn = false; }
+        ManifoldPixel.invalidate();
+      });
+
+      addEventListener('resize', () => surf.resize());
+      surf.start();
+
+      // HUD
+      const fpsEl = document.getElementById('fps');
+      const ncEl = document.getElementById('nc');
+      const ntEl = document.getElementById('nt');
+      setInterval(() => {
+        fpsEl.textContent = surf.state.fps.toFixed(1);
+        ncEl.textContent = ManifoldPixel._internal.contributors.size;
+        ntEl.textContent = surf.state.tilesX * surf.state.tilesY;
+      }, 250);
+    })();
+  </script>
+</body>
+
+</html>

@@ -151,6 +151,9 @@ let scene, camera, renderer, controls;
 let boardGroup, pegGroup;
 const holeRegistry = new Map();
 const pegRegistry = new Map();
+// Expose registries on window for the x-code HUD overlay (read-only consumers).
+window.holeRegistry = holeRegistry;
+window.pegRegistry = pegRegistry;
 let boardMesh = null;
 let dustMotes = null;  // atmospheric dust particle system
 const artClickMeshes = [];  // canvas meshes registered for click → overlay
@@ -339,11 +342,33 @@ const ManifoldAudio = {
   startMusic() {
     if (!this.ctx || !GameSettings.musicEnabled || this.musicPlaying) return;
     this.musicPlaying = true; this._bar = 0; this._beat = 0;
+    // 🜂 Jazz Speakeasy engine — procedural walking bass + brushed drums +
+    // ii-V-I comp chords + bebop melody with verse/chorus/hook form.
+    // Falls back to the manifold-pluck scheduler when the module isn't loaded.
+    if (window.JazzSpeakeasy && typeof window.JazzSpeakeasy.start === 'function') {
+      try {
+        window.JazzSpeakeasy.start(this.ctx, {
+          gain: 0.6,
+          destination: this._rtGain || this.masterGain,
+        });
+        // Make sure the music bus is audible — the slider scales it from here.
+        if (this._rtGain) {
+          this._rtGain.gain.setTargetAtTime(0.9, this.ctx.currentTime, 0.05);
+        }
+        console.log('🎷 Jazz Speakeasy engine started');
+        return;
+      } catch (e) {
+        console.warn('JazzSpeakeasy.start failed, falling back to pluck scheduler', e);
+      }
+    }
     this._scheduleBeat();
     console.log('🎶 Manifold music started (BPM ' + this.BPM + ')');
   },
   stopMusic() {
     this.musicPlaying = false;
+    if (window.JazzSpeakeasy && window.JazzSpeakeasy.isRunning && window.JazzSpeakeasy.isRunning()) {
+      try { window.JazzSpeakeasy.stop(); } catch (e) { }
+    }
     if (this._musicTimer) { clearTimeout(this._musicTimer); this._musicTimer = null; }
   },
   _scheduleBeat() {
@@ -362,6 +387,10 @@ const ManifoldAudio = {
   // ── Ragtime ambience — Pluck-driven pad on the rt bus, slider scaled ──
   startRagtimeAmbience() {
     if (!this.ctx || this._rtTimer) return;
+    // Skip the ambient pad when the Jazz Speakeasy engine is running — the
+    // full band already covers the same sonic space and stacking both
+    // produces mud.
+    if (window.JazzSpeakeasy && window.JazzSpeakeasy.isRunning && window.JazzSpeakeasy.isRunning()) return;
     this._rtBar = 0; this._rtBeat = 0;
     this._scheduleRtBeat();
     console.log('🎹 Ragtime ambience started — manifold-driven');
@@ -2291,6 +2320,8 @@ async function init3D() {
   fitVerticalFovToAspect(camera);
   camera.position.set(0, 480, 380);
   camera.lookAt(0, TABLE_HEIGHT, 0);
+  // Expose for x-code HUD overlay (read-only).
+  window.ftCamera = camera;
 
   // Renderer — photo-realistic PBR
   renderer = new THREE.WebGLRenderer({
@@ -2443,9 +2474,14 @@ async function init3D() {
     const sessionCode = String((sessionCache && sessionCache.session_code) || '').toUpperCase();
     const sameInviteSession = !inviteCode || ((sessionCode && inviteCode === sessionCode) || (runtimeCode && inviteCode === runtimeCode));
     const runtimeHasRoster = runtimePlayers.length >= 2;
-    const hasRemoteHumans = sessionPlayers.filter(p => p && !p.is_ai).length >= 2;
-    const useRuntimeRoster = gameMode === 'private' && sameInviteSession && runtimeHasRoster;
-    const useSessionRoster = !useRuntimeRoster && gameMode === 'private' && sameInviteSession && hasRemoteHumans;
+    const hasSessionRoster = sessionPlayers.length >= 2;
+    // Live multiplayer: private, public, or generic 'multiplayer' all share the
+    // same launch path — read the roster the lobby gave us. The previous gate
+    // accepted only 'private', which silently dropped public games into a
+    // 2-player solo+bot game per browser.
+    const isLiveMode = (gameMode === 'private' || gameMode === 'public' || gameMode === 'multiplayer');
+    const useRuntimeRoster = isLiveMode && sameInviteSession && runtimeHasRoster;
+    const useSessionRoster = !useRuntimeRoster && isLiveMode && sameInviteSession && hasSessionRoster;
 
     // Same-screen: read full roster from runtime or ft_session_players
     let sameScreenPlayers = [];
@@ -2570,7 +2606,7 @@ async function init3D() {
     const relayCode = (sessionCode || runtimeCode || inviteCode || '').toUpperCase().trim();
     if (isLiveMpMode && !relayCode) {
       console.warn('[ft-mp] live multiplayer requested without session code; redirecting to lobby');
-      window.location.replace('/fasttrack/lobby-simple.html');
+      window.location.replace('/lobby/?game=fasttrack');
       return;
     }
     if (isLiveMpMode && window.KGMultiplayer && relayCode) {
@@ -2705,7 +2741,7 @@ async function init3D() {
             window.__FT_MP__ = mp;
             window.__FT_COLYSEUS_ROOM__ = room;
             if (mpBridge.isHost) {
-              publishAuthoritativeState();
+              publishAuthoritativeState(true);
             }
             console.log('[ft-colyseus] connected room=' + nextRoomId);
             return true;
@@ -2717,13 +2753,13 @@ async function init3D() {
           }
         };
 
-        const publishAuthoritativeState = () => {
+        const publishAuthoritativeState = (force = false) => {
           if (!mp || !mp.connected || !mp.isHost) return;
           if (!window.FastTrackCore || typeof window.FastTrackCore.getStateSnapshot !== 'function') return;
           try {
             const snapshot = window.FastTrackCore.getStateSnapshot();
             const encoded = JSON.stringify(snapshot);
-            if (encoded === lastPublishedState) return;
+            if (!force && encoded === lastPublishedState) return;
             lastPublishedState = encoded;
             if (colyseusRoom) {
               colyseusRoom.send('push_state', { state: snapshot });
@@ -2788,7 +2824,9 @@ async function init3D() {
           try {
             window.FastTrackCore.setMyUserId(mp.userId || null);
             window.FastTrackCore.updateSessionRoster(session.players || []);
-            if (mp.isHost) publishAuthoritativeState();
+            // Always force republish on session_update so late-joining peers
+            // get the canonical deck/board even if state hasn't mutated.
+            if (mp.isHost) publishAuthoritativeState(true);
           } catch (err) {
             console.warn('[ft-mp] failed to apply authoritative roster', err);
           }
@@ -2819,7 +2857,7 @@ async function init3D() {
               return;
             }
             console.warn('[ft-mp] session attach failed after retry, redirecting to lobby', message);
-            window.location.replace('/fasttrack/lobby-simple.html');
+            window.location.replace('/lobby/?game=fasttrack');
           }
         });
         mp.connect();
@@ -2843,16 +2881,27 @@ async function init3D() {
     }
   }
 
-  // Start animation
-  animate3D();
-
   // 🜂 Expose Three.js scene for Schwarz Diamond renderer and any substrate lens
   window.FT3DScene = scene;
   window.FT3DCamera = camera;
   window.FT3DRenderer = renderer;
 
-  // Notify Schwarz Diamond renderer (and any other manifold substrates) that 3D is ready
-  window.dispatchEvent(new Event('ft3d:ready'));
+  // Pre-compile every shader/material in the scene and force a real first
+  // frame BEFORE dismissing the loader. Without this, ft3d:ready fires while
+  // the WebGL pipeline is still compiling on the next render() call, and the
+  // user sees the loader fade into a black canvas for ~1–2 s.
+  try { renderer.compile(scene, camera); } catch (e) { console.warn('renderer.compile failed', e); }
+  try { renderer.render(scene, camera); } catch (e) { console.warn('initial render failed', e); }
+
+  // Start animation loop AFTER the first frame is on screen.
+  animate3D();
+
+  // Notify Schwarz Diamond renderer (and any other manifold substrates) that
+  // 3D is ready. Defer one rAF so the browser commits the first frame to the
+  // compositor before the loader begins fading out.
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('ft3d:ready'));
+  });
 
   // Wire painting click handler
   _buildArtOverlay();
@@ -3149,8 +3198,11 @@ function setupLighting() {
   keyLight.position.set(0, ROOM_HEIGHT - 50, 0);
   keyLight.target.position.set(0, TABLE_HEIGHT, 0);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.width = 4096;
-  keyLight.shadow.mapSize.height = 4096;
+  // 2048² shadow map: visually indistinguishable from 4096² at this scene
+  // scale, but ~4× cheaper to allocate, clear, and render on first frame —
+  // the dominant cost of init3D. PCFSoft hides any residual aliasing.
+  keyLight.shadow.mapSize.width = 2048;
+  keyLight.shadow.mapSize.height = 2048;
   keyLight.shadow.camera.left = -400;
   keyLight.shadow.camera.right = 400;
   keyLight.shadow.camera.top = 400;
@@ -5422,8 +5474,10 @@ function createGlowRing(holeId, color, isDestination, opts = {}) {
   if (!hole) return null;
 
   const pulsing = opts.pulsing !== false;
-  const radius = isDestination ? 11.5 : 9.5;
-  const thickness = isDestination ? 2.8 : 2.2;
+  // user_directive_2026-05-10: destination rings now larger + thicker so the
+  // landable holes pop visibly over the route trail. Trail rings stay subtle.
+  const radius = isDestination ? 14.5 : 9.5;
+  const thickness = isDestination ? 3.6 : 2.2;
   const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 40);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
@@ -5466,6 +5520,36 @@ function createGlowRing(holeId, color, isDestination, opts = {}) {
   boardGroup.add(disc);
   highlightMeshes.push(disc);
 
+  // user_directive_2026-05-10: downward-pointing arrow above every landable
+  // hole — gives the player an unambiguous "tap here" affordance. Only on
+  // commit destinations (isDestination + pulsing) so trail rings stay quiet.
+  if (isDestination) {
+    const arrowH = 14;
+    const arrowR = 7;
+    const coneGeo = new THREE.ConeGeometry(arrowR, arrowH, 4);
+    // Cone defaults point +Y; rotate to point -Y (downward at the hole).
+    coneGeo.rotateX(Math.PI);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -6,
+      polygonOffsetUnits: -6
+    });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    const baseY = hole.position.y + 36;
+    cone.position.set(hole.position.x, baseY, hole.position.z);
+    cone.renderOrder = 11;
+    cone.userData.isDestination = true;
+    cone.userData.isArrow = true;
+    cone.userData.pulsing = pulsing;
+    cone.userData.baseY = baseY;
+    boardGroup.add(cone);
+    highlightMeshes.push(cone);
+  }
+
   return ring;
 }
 
@@ -5473,14 +5557,23 @@ function createPegHalo(pegId, color, opts = {}) {
   const peg = pegRegistry.get(pegId);
   if (!peg || !peg.mesh) return null;
   const pulsing = opts.pulsing !== false;
-  const radius = 12;
-  const thickness = 2.8;
-  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 40);
+  // user_directive_2026-05-10: selected-peg halo is the primary visual cue for
+  // split-7 stage 1 (and any single-peg-pick) — much larger ring, brighter
+  // material, plus an outer aura ring and a vertical beacon so the chosen peg
+  // reads instantly across the whole board.
+  const px = peg.mesh.position.x;
+  const pz = peg.mesh.position.z;
+  const ringY = boardGroup.position.y + LINE_HEIGHT + 0.6;
+
+  // Inner ring (bright primary halo)
+  const radius = 20;
+  const thickness = 4.0;
+  const ringGeo = new THREE.RingGeometry(radius - thickness, radius, 48);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
-    opacity: pulsing ? 0.9 : 0.6,
+    opacity: pulsing ? 1.0 : 0.7,
     side: THREE.DoubleSide,
     depthWrite: false,
     polygonOffset: true,
@@ -5488,13 +5581,59 @@ function createPegHalo(pegId, color, opts = {}) {
     polygonOffsetUnits: -4
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.position.set(peg.mesh.position.x, boardGroup.position.y + LINE_HEIGHT + 0.6, peg.mesh.position.z);
+  ring.position.set(px, ringY, pz);
   ring.renderOrder = 10;
   ring.userData.isDestination = true;
   ring.userData.isDisc = false;
   ring.userData.pulsing = pulsing;
   boardGroup.add(ring);
   highlightMeshes.push(ring);
+
+  // Outer aura ring (wider, dimmer, counter-pulses for a "breathing" feel)
+  const outerR = 32;
+  const outerT = 3.0;
+  const auraGeo = new THREE.RingGeometry(outerR - outerT, outerR, 48);
+  auraGeo.rotateX(-Math.PI / 2);
+  const auraMat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3
+  });
+  const aura = new THREE.Mesh(auraGeo, auraMat);
+  aura.position.set(px, ringY + 0.2, pz);
+  aura.renderOrder = 10;
+  aura.userData.isDestination = false; // counter-pulses
+  aura.userData.isDisc = false;
+  aura.userData.pulsing = pulsing;
+  boardGroup.add(aura);
+  highlightMeshes.push(aura);
+
+  // Vertical beacon — a tall thin cylinder rising from the peg so the chosen
+  // peg is obvious even when the camera is tilted away.
+  const beamGeo = new THREE.CylinderGeometry(1.4, 0.6, 80, 12, 1, true);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.set(px, ringY + 40, pz);
+  beam.renderOrder = 11;
+  beam.userData.isDestination = true; // pulses in sync with the primary ring
+  beam.userData.isDisc = true;        // disc-style opacity curve (subtle)
+  beam.userData.pulsing = pulsing;
+  beam.userData.isBeam = true;
+  boardGroup.add(beam);
+  highlightMeshes.push(beam);
+
   return ring;
 }
 
@@ -5587,15 +5726,30 @@ function highlightMovePaths(moves) {
     const t = performance.now() * 0.0046;
     for (const mesh of highlightMeshes) {
       if (!mesh.userData.pulsing) continue;
-      if (mesh.userData.isDisc) {
+      if (mesh.userData.isBeam) {
+        // Vertical beacon — gentle pulse, never fully off.
+        mesh.material.opacity = 0.42 + Math.sin(t * 2.1) * 0.22;
+        const sy = 1 + Math.sin(t * 2.1) * 0.06;
+        mesh.scale.set(1, sy, 1);
+      } else if (mesh.userData.isArrow) {
+        // Downward arrow — bobs vertically + pulses opacity so the "tap here"
+        // hint reads unmistakably across the board.
+        mesh.material.opacity = 0.85 + Math.sin(t * 2.4) * 0.15;
+        const baseY = mesh.userData.baseY != null ? mesh.userData.baseY : mesh.position.y;
+        mesh.position.y = baseY + Math.sin(t * 2.4) * 5;
+      } else if (mesh.userData.isDisc) {
         mesh.material.opacity = mesh.userData.isDestination
-          ? 0.18 + Math.sin(t * 2.1) * 0.12
-          : 0.12 + Math.sin(t * 2.1) * 0.08;
+          ? 0.22 + Math.sin(t * 2.1) * 0.16
+          : 0.14 + Math.sin(t * 2.1) * 0.10;
+      } else if (mesh.userData.isDestination) {
+        // Destination ring — strong throb so landable holes pop.
+        mesh.material.opacity = 0.9 + Math.sin(t * 2.1) * 0.22;
+        const scale = 1 + Math.sin(t * 1.8) * 0.22;
+        mesh.scale.set(scale, 1, scale);
       } else {
-        mesh.material.opacity = mesh.userData.isDestination
-          ? 0.84 + Math.sin(t * 2.1) * 0.16
-          : 0.58 + Math.sin(t * 2.1) * 0.20;
-        const scale = 1 + Math.sin(t * 1.8) * 0.12;
+        // Trail / aura ring — counter-phase so the destination "breathes" out.
+        mesh.material.opacity = 0.5 + Math.sin(t * 2.1 + Math.PI) * 0.22;
+        const scale = 1 + Math.sin(t * 1.8 + Math.PI) * 0.12;
         mesh.scale.set(scale, 1, scale);
       }
     }
@@ -5765,8 +5919,31 @@ function _refreshRouteIndex() {
     _pendingCycleIdx = -1;
     _rebuildMoveCycle();
     _refreshConfirmBar();
+    // user_directive_2026-05-10: if there's exactly one legal option, skip the
+    // confirm bar and just play it. This chains through forced split sub-stages
+    // (1 peg → 1 steps → 1 dest all auto-execute). Deferred via queueMicrotask
+    // so we don't recurse inside the current refresh call.
+    _maybeAutoCommitSingle();
   }
   return _routeIndex;
+}
+
+// Auto-commit when the move cycle collapses to a single legal entry. Guarded
+// with a re-entrancy flag so a chain of forced choices doesn't re-enter the
+// scheduler before the previous tick has flushed.
+let _autoCommitScheduled = false;
+function _maybeAutoCommitSingle() {
+  if (_autoCommitScheduled) return;
+  if (!_moveCycle || _moveCycle.length !== 1) return;
+  _autoCommitScheduled = true;
+  const targetEntry = _moveCycle[0];
+  queueMicrotask(() => {
+    _autoCommitScheduled = false;
+    // Verify the entry is still the sole option (state may have shifted).
+    if (!_moveCycle || _moveCycle.length !== 1) return;
+    if (_entryKey(_moveCycle[0]) !== _entryKey(targetEntry)) return;
+    _commitEntry(targetEntry);
+  });
 }
 
 // Flatten the route index into a unique, ordered list of commit-level entries.
@@ -5859,6 +6036,13 @@ function _restoreDefaultHighlight() {
 
 function _commitEntry(entry) {
   if (!entry) return;
+  // ── x-code commit burst ──
+  try {
+    if (window.FastTrackXcodeHUD && window.FastTrackXcodeHUD.emitCommitBurst) {
+      const path = _resolveEntryHolePath(entry);
+      if (path && path.length >= 2) window.FastTrackXcodeHUD.emitCommitBurst(path);
+    }
+  } catch (e) { /* tolerate */ }
   if (entry.kind === 'move' || entry.kind === 'split-second') {
     if (typeof window.executeMove === 'function') window.executeMove(entry.moveIdx);
     return;
@@ -5872,6 +6056,35 @@ function _commitEntry(entry) {
     if (typeof window.selectSplitSteps === 'function') window.selectSplitSteps(entry.steps);
     // showMoveHints (called by the selectors) re-highlights candidates for us.
   }
+}
+
+// Resolve [fromHoleId, ...via, destHoleId] for the x-code commit-burst overlay.
+function _resolveEntryHolePath(entry) {
+  const core = window.FastTrackCore;
+  if (!core || !entry) return null;
+  const players = core.state.players.get('list') || [];
+  const ci = core.state.players.get('current') || 0;
+  const me = players[ci];
+  if (!me) return null;
+  const vm = core.state.turn.get('validMoves') || [];
+  if (entry.kind === 'move' || entry.kind === 'split-second') {
+    const mv = vm[entry.moveIdx]; if (!mv) return null;
+    const peg = me.pegs[mv.pegIdx]; if (!peg) return null;
+    const path = [peg.holeId];
+    if (Array.isArray(mv.path)) for (const id of mv.path) if (id && id !== peg.holeId) path.push(id);
+    if (mv.dest && mv.dest !== path[path.length - 1]) path.push(mv.dest);
+    return path;
+  }
+  if (entry.kind === 'split-first') {
+    const peg = me.pegs[entry.pegIdx]; if (!peg) return null;
+    const mv = vm.find(m => m.type === 'split' && m.pegIdx === entry.pegIdx && m.steps === entry.steps);
+    if (!mv) return null;
+    const path = [peg.holeId];
+    if (Array.isArray(mv.path)) for (const id of mv.path) if (id && id !== peg.holeId) path.push(id);
+    if (mv.dest && mv.dest !== path[path.length - 1]) path.push(mv.dest);
+    return path;
+  }
+  return null;
 }
 
 function _pegIdxForPegId(pegId) {
@@ -6197,11 +6410,13 @@ function setupBoardPickHandler() {
 function _stagePendingEntry(entry) {
   if (!entry) {
     _pendingEntry = null;
+    if (window.FastTrackXcodeHUD) window.FastTrackXcodeHUD.setPendingEntry(null);
     _restoreDefaultHighlight();
     _refreshConfirmBar();
     return;
   }
   _pendingEntry = entry;
+  if (window.FastTrackXcodeHUD) window.FastTrackXcodeHUD.setPendingEntry(entry);
   const vm = _currentValidMoves();
   // _previewEntry highlights the chosen route — only its destination peg/hole pulses.
   _previewEntry(entry, vm);
@@ -6220,6 +6435,65 @@ function _stepMoveCycle(delta) {
   _stagePendingEntry(_moveCycle[i]);
 }
 
+// user_directive_2026-05-10: Big top-of-viewport instruction banner. Tells the
+// player exactly what to tap next, in plain language, at every stage. This is
+// the primary "the board is interactive" affordance for new players.
+function _refreshInstructionBanner() {
+  const banner = document.getElementById('ft-instruction-banner');
+  if (!banner) return;
+  const textEl = banner.querySelector('.ft-ib-text');
+  const iconEl = banner.querySelector('.ft-ib-icon');
+
+  let visible = false;
+  let text = '';
+  let icon = '👉';
+  let accent = '#00c8ff';
+
+  try {
+    const core = window.FastTrackCore;
+    const isHumanTurn = (() => {
+      if (!core || !core.state) return false;
+      const players = core.state.players.get('list') || [];
+      const ci = core.state.players.get('current') || 0;
+      const p = players[ci];
+      return !!(p && !p.isBot);
+    })();
+
+    if (isHumanTurn && _moveCycle && _moveCycle.length > 0) {
+      visible = true;
+      const players = core.state.players.get('list') || [];
+      const ci = core.state.players.get('current') || 0;
+      const p = players[ci];
+      if (p && p.color) accent = p.color;
+
+      const kind = _moveCycle[0].kind;
+      const total = _moveCycle.length;
+      if (kind === 'split-first-peg') {
+        text = total > 1 ? 'Tap a glowing peg to split your 7' : 'Splitting your 7…';
+      } else if (kind === 'split-first') {
+        text = total > 1 ? 'Tap a glowing hole — first half of your 7' : 'Placing first half…';
+      } else if (kind === 'split-second') {
+        text = total > 1 ? 'Tap a glowing hole — second half of your 7' : 'Placing second half…';
+      } else {
+        text = total > 1 ? 'Tap a glowing peg or hole to choose your move' : 'Playing your move…';
+      }
+    }
+  } catch (err) { /* never let UI hint code break the game loop */ }
+
+  if (visible) {
+    if (textEl) textEl.textContent = text;
+    if (iconEl) iconEl.textContent = icon;
+    banner.style.setProperty('--ft-ib-accent', accent);
+    banner.hidden = false;
+    requestAnimationFrame(() => banner.classList.add('visible'));
+  } else {
+    banner.classList.remove('visible');
+    setTimeout(() => {
+      if (!banner.classList.contains('visible')) banner.hidden = true;
+    }, 250);
+  }
+}
+
 function _refreshConfirmBar() {
   const bar = document.getElementById('ft-confirm-bar');
   if (!bar) return;
@@ -6229,8 +6503,9 @@ function _refreshConfirmBar() {
   const prevBtn = document.getElementById('ft-confirm-prev');
   const nextBtn = document.getElementById('ft-confirm-next');
   const total = _moveCycle.length;
-  if (total === 0) { bar.hidden = true; return; }
-  bar.hidden = false;
+  // user_directive_2026-05-10: keep the big instruction banner in sync with
+  // the confirm bar — it tells the player what to tap next at every stage.
+  _refreshInstructionBanner();
   const vm = _currentValidMoves();
   const hasPick = !!_pendingEntry;
   const idxLabel = hasPick && _moveCycleIdx >= 0 ? `${_moveCycleIdx + 1}/${total}` : `–/${total}`;

@@ -278,12 +278,12 @@
       // Skip confirm if game is already over (replay overlay already shown)
       const replayOpen = document.getElementById('replay-overlay').classList.contains('open');
       if (replayOpen || confirm('Leave this game?')) {
-        window.location.href = '/fasttrack/lobby-simple.html';
+        window.location.href = '/lobby/?game=fasttrack';
       }
     }
 
     function leaveFromReplay() {
-      window.location.href = '/fasttrack/lobby-simple.html';
+      window.location.href = '/lobby/?game=fasttrack';
     }
 
     function playAgain() {

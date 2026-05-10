@@ -40,7 +40,10 @@ const DEFAULTS = {
   // Grace window after a ws close before replacing a human with a bot.
   // Lobby→game page navigation always closes the lobby ws; the 3d page
   // immediately reconnects via guest_login resume and calls registerConnection.
-  disconnectGraceMs: 8000,
+  // Heavy 3D pages (Three.js + audio + manifolds + WS handshake) can easily
+  // need 10–20 s on cold load over a slow connection, so we keep this generous.
+  // Mid-game freezes are still caught by the shorter ack/heal timeouts above.
+  disconnectGraceMs: 45000,
 };
 
 const LOG_DIR = path.join(__dirname, '..', 'state');

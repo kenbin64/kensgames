@@ -848,15 +848,40 @@
       function onGameStarted(d) {
         const sid = d && d.session && (d.session.session_id || d.session.sessionId);
         const code = d && d.session && (d.session.session_code || d.session.sessionCode);
+        const isPrivate = !!(d && d.session && (d.session.is_private || d.session.isPrivate));
+        const mode = isPrivate ? 'private' : 'public';
         const g = GAMES[selectedId] || { url: '/' };
+        const sessionPlayers = (d && d.session && Array.isArray(d.session.players)) ? d.session.players : [];
         // Persist guest token so the game page reconnects as the same identity
         try {
           if (mp && mp._guestId) localStorage.setItem('kg_guest_token', mp._guestId);
           if (sid) localStorage.setItem('kg_session_id', sid);
           if (code) localStorage.setItem('kg_session_code', code);
+          // Hand the resolved roster to the game page so initGame() doesn't
+          // fall back to local humanName + random bots (which produces a
+          // different deck/board on every browser before the host snapshot
+          // arrives). The host snapshot still overrides board/deck later.
+          if (sessionPlayers.length >= 2) {
+            sessionStorage.setItem('ft_session_players', JSON.stringify(sessionPlayers));
+            sessionStorage.setItem('kg_fasttrack_runtime', JSON.stringify({
+              game: { code: code || null, mode },
+              players: sessionPlayers,
+              session: {
+                session_id: sid || null,
+                session_code: code || null,
+                my_user_id: (mp && mp.userId) || null,
+              }
+            }));
+          }
+          // Stamp KG_Game so the bootstrap reads live-multiplayer mode (not solo)
+          const prev = (function () { try { return JSON.parse(localStorage.getItem('KG_Game') || '{}') || {}; } catch (_) { return {}; } })();
+          localStorage.setItem('KG_Game', JSON.stringify(Object.assign({}, prev, {
+            x: 'fasttrack:' + (sid || code || Date.now()),
+            mode, code: code || prev.code || null, session_id: sid || prev.session_id || null,
+          })));
         } catch (e) { }
         const sep = g.url.includes('?') ? '&' : '?';
-        window.location.href = g.url + sep + 'session=' + encodeURIComponent(sid || '') + (code ? ('&code=' + encodeURIComponent(code)) : '');
+        window.location.href = g.url + sep + 'mode=' + mode + '&session=' + encodeURIComponent(sid || '') + (code ? ('&code=' + encodeURIComponent(code)) : '');
       }
 
       // Lobby roster (presence) — uses session_list but listing players is weak;
