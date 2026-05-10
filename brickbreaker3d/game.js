@@ -53,13 +53,35 @@ let wallImpacts = [];
 const IMPACT_LIFETIME = 0.42;     // seconds before the ring is removed
 const IMPACT_GROW = 3.4;          // final radius multiplier over lifetime
 
-const BRICK_COLORS = { red: 0xcc2222, orange: 0xcc7700, yellow: 0xbbbb00, green: 0x22aa22 };
-const PLAYER_COLORS = [0x00ccff, 0xff3366, 0x39ff14, 0xffaa00]; // cyan, pink, green, orange
-const COLORS = { cyan: 0x00ffff, dark: 0x0a0a1a };
-let PHI = 1.618;
-let BALL_RADIUS = 1;
-let PADDLE_RADIUS = 4.5;
-let PADDLE_THICKNESS = 0.85;
+// ─────────────────────────────────────────────────────────────────
+// MANIFOLD-DERIVED CONSTANTS
+//
+// Every numeric constant below comes from a single seed (1/φ by
+// default) walked through the recursive ladder defined in
+// manifold_seed.js — "x is the seed, xy is the expression, x/y is
+// the bloom, z is the next x in the higher plane".
+//
+// If the seed module isn't loaded (e.g. running this file in
+// isolation), we fall back to the original hand-tuned values so the
+// game still boots.  Production loads manifold_seed.js first.
+// ─────────────────────────────────────────────────────────────────
+const __SEED_K = (typeof window !== 'undefined' && window.BBSeed && window.BBSeed.k) || {};
+const __pick = (key, fallback) => (key in __SEED_K ? __SEED_K[key] : fallback);
+
+const BRICK_COLORS = __SEED_K.brickColors || {
+    red: 0xcc2222, orange: 0xcc7700, yellow: 0xbbbb00, green: 0x22aa22
+};
+const PLAYER_COLORS = __SEED_K.playerColors || [0x00ccff, 0xff3366, 0x39ff14, 0xffaa00];
+const CHROME = __SEED_K.chromeColors || {
+    cyan: 0x00ffff, dark: 0x0a0a1a, floor: 0x0b1025,
+    wall: 0x88ccff, glowA: 0xff00ff, glowB: 0x8a2be2
+};
+const STAR_COLORS = __SEED_K.starColors || [0x00ffff, 0x39ff14, 0xbf00ff, 0xffee00, 0xffffff];
+const COLORS = { cyan: CHROME.cyan, dark: CHROME.dark };
+let PHI = __pick('phi', 1.618);
+let BALL_RADIUS = __pick('ballRadius', 1);
+let PADDLE_RADIUS = __pick('paddleRadius', 4.5);
+let PADDLE_THICKNESS = __pick('paddleThickness', 0.85);
 const PADDLE_BEVEL = 0.94; // top radius ratio to create a subtle bevel
 const MOBILE_INPUT = {
     enabled: (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''))
@@ -78,37 +100,35 @@ const MOBILE_INPUT = {
     tiltNeutralBeta: null,
 };
 
-// Ball speeds (PHI-scaled — golden-ratio kick over the previous baseline so
-// rallies feel snappier without breaking paddle reaction time).
-let SPEED_EASY = 0.25 * PHI;   // ≈ 0.405
-let SPEED_HARD = 0.4 * PHI;    // ≈ 0.647
-let SPEED_MULTI = 0.3 * PHI;   // ≈ 0.485
+// Ball speeds (φ-scaled — coefficients come from the seed ladder).
+let SPEED_EASY = __pick('speedEasyPhi', 0.25) * PHI;
+let SPEED_HARD = __pick('speedHardPhi', 0.4) * PHI;
+let SPEED_MULTI = __pick('speedMultiPhi', 0.3) * PHI;
 
-// Ball dynamics (pseudo-physics)
-// NOTE: Units are per-frame; tuned to keep the existing “feel” while adding arch + chaos.
-const GRAVITY = 0.00075;              // downward acceleration (adds an arc)
-const FREE_FLIGHT_DRAG = 0.99935;     // slow energy bleed (walls/ceiling restore)
-let MIN_BALL_SPEED = 0.22 * PHI;    // ≈ 0.356 — scaled with base speeds so clamps don't pinch
-let MAX_BALL_SPEED = 0.85 * PHI;    // ≈ 1.375 — scaled with base speeds so clamps don't pinch
-const WALL_BOOST = 1.035;
-const CEILING_BOOST = 1.06;
-const WALL_BOOST_ADD = 0.004;
-const CEILING_BOOST_ADD = 0.006;
-const BRICK_ABSORB_BASE = 0.968;      // bricks absorb energy
-const BRICK_ABSORB_SPEED_FACTOR = 0.08; // more energy => more absorption
-const BRICK_DEFLECT = 0.030;          // random nudge on brick hits
-const WALL_DEFLECT = 0.012;           // small random nudge on wall/ceiling hits
-const TURBULENCE_DECAY = 0.987;
-const TURBULENCE_MAX = 0.08;
-const TURBULENCE_BRICK_ADD = 0.022;
-const TURBULENCE_WALL_ADD = 0.010;
+// Ball dynamics (pseudo-physics) — ALL derived from the seed.
+const GRAVITY = __pick('gravity', 0.00075);
+const FREE_FLIGHT_DRAG = __pick('freeFlightDrag', 0.99935);
+let MIN_BALL_SPEED = __pick('minBallSpeedPhi', 0.22) * PHI;
+let MAX_BALL_SPEED = __pick('maxBallSpeedPhi', 0.85) * PHI;
+const WALL_BOOST = __pick('wallBoost', 1.035);
+const CEILING_BOOST = __pick('ceilingBoost', 1.06);
+const WALL_BOOST_ADD = __pick('wallBoostAdd', 0.004);
+const CEILING_BOOST_ADD = __pick('ceilingBoostAdd', 0.006);
+const BRICK_ABSORB_BASE = __pick('brickAbsorbBase', 0.968);
+const BRICK_ABSORB_SPEED_FACTOR = __pick('brickAbsorbSpeedFactor', 0.08);
+const BRICK_DEFLECT = __pick('brickDeflect', 0.030);
+const WALL_DEFLECT = __pick('wallDeflect', 0.012);
+const TURBULENCE_DECAY = __pick('turbulenceDecay', 0.987);
+const TURBULENCE_MAX = __pick('turbulenceMax', 0.08);
+const TURBULENCE_BRICK_ADD = __pick('turbulenceBrickAdd', 0.022);
+const TURBULENCE_WALL_ADD = __pick('turbulenceWallAdd', 0.010);
 
-const PADDLE_LAUNCH_EASY = 0.34;
-const PADDLE_LAUNCH_HARD = 0.42;
-const PADDLE_LAUNCH_MULTI = 0.38;
+const PADDLE_LAUNCH_EASY = __pick('paddleLaunchEasy', 0.34);
+const PADDLE_LAUNCH_HARD = __pick('paddleLaunchHard', 0.42);
+const PADDLE_LAUNCH_MULTI = __pick('paddleLaunchMulti', 0.38);
 const FINAL_LAYER_INDEX = 0;
-const FINAL_LAYER_SPEED_MULT = 1.618; // speed up by 61.8% once per ball
-const PADDLE_SHRINK_FACTOR = 0.618;
+const FINAL_LAYER_SPEED_MULT = __pick('finalLayerSpeedMult', 1.618);
+const PADDLE_SHRINK_FACTOR = __pick('paddleShrinkFactor', 0.618);
 
 function fib1to4(n) {
     // Fibonacci starting at F1=1, F2=1
@@ -121,9 +141,9 @@ function fib1to4(n) {
     }
 }
 // Spin physics constants
-const MAGNUS_STRENGTH = 0.002;  // how much spin curves the ball per frame
-const SPIN_DECAY = 0.998;       // spin friction per frame (slow decay)
-const SPIN_TRANSFER = 0.3;     // how much tangential collision force becomes spin
+const MAGNUS_STRENGTH = __pick('magnusStrength', 0.002);  // how much spin curves the ball per frame
+const SPIN_DECAY = __pick('spinDecay', 0.998);            // spin friction per frame (slow decay)
+const SPIN_TRANSFER = __pick('spinTransfer', 0.3);        // how much tangential collision force becomes spin
 
 function clampBallEnergyAndSpeed(ball) {
     if (!ball || !ball.velocity) return;
@@ -625,7 +645,7 @@ function createFloor() {
     const geo = new THREE.PlaneGeometry(ARENA_WIDTH - 0.2, ARENA_WIDTH - 0.2);
     // Opaque, semi-reflective floor
     const mat = new THREE.MeshPhysicalMaterial({
-        color: 0x0b1025,
+        color: CHROME.floor,
         metalness: 0.15,
         roughness: 0.22,
         clearcoat: 1.0,
@@ -646,7 +666,7 @@ function createStarfield() {
     const starGeo = new THREE.BufferGeometry();
     const positions = [];
     const colors = [];
-    const starColors = [0x00ffff, 0x39ff14, 0xbf00ff, 0xffee00, 0xffffff];
+    const starColors = STAR_COLORS;
 
     for (let i = 0; i < 500; i++) {
         positions.push(
@@ -665,11 +685,11 @@ function createStarfield() {
     scene.add(new THREE.Points(starGeo, starMat));
 
     // Glows in background
-    const pinkGlow = new THREE.PointLight(0xff00ff, 2, 150);
+    const pinkGlow = new THREE.PointLight(CHROME.glowA, 2, 150);
     pinkGlow.position.set(-20, 20, -70);
     scene.add(pinkGlow);
 
-    const purpleGlow = new THREE.PointLight(0x8a2be2, 2, 150);
+    const purpleGlow = new THREE.PointLight(CHROME.glowB, 2, 150);
     purpleGlow.position.set(30, -10, -70);
     scene.add(purpleGlow);
 }
@@ -688,7 +708,7 @@ function createArenaWalls() {
 
     // Glassy wall panels
     const glassMat = new THREE.MeshPhysicalMaterial({
-        color: 0x88ccff,
+        color: CHROME.wall,
         transparent: true,
         opacity: 0.14,
         roughness: 0.08,
@@ -1666,11 +1686,12 @@ async function loadManifoldParams() {
         if (typeof p.reflection_resolution === 'number') REFLECTION_RES = p.reflection_resolution;
         if (typeof p.reflection_update_every === 'number') REFLECTION_UPDATE_EVERY = p.reflection_update_every;
         // Speeds are PHI-scaled — recompute against the (possibly updated) PHI.
-        SPEED_EASY = (p.speed_easy_phi ?? 0.25) * PHI;
-        SPEED_HARD = (p.speed_hard_phi ?? 0.4) * PHI;
-        SPEED_MULTI = (p.speed_multi_phi ?? 0.3) * PHI;
-        MIN_BALL_SPEED = (p.min_ball_speed_phi ?? 0.22) * PHI;
-        MAX_BALL_SPEED = (p.max_ball_speed_phi ?? 0.85) * PHI;
+        // Fallbacks come from the manifold seed, NOT from hand-picked literals.
+        SPEED_EASY = (p.speed_easy_phi ?? __pick('speedEasyPhi', 0.25)) * PHI;
+        SPEED_HARD = (p.speed_hard_phi ?? __pick('speedHardPhi', 0.4)) * PHI;
+        SPEED_MULTI = (p.speed_multi_phi ?? __pick('speedMultiPhi', 0.3)) * PHI;
+        MIN_BALL_SPEED = (p.min_ball_speed_phi ?? __pick('minBallSpeedPhi', 0.22)) * PHI;
+        MAX_BALL_SPEED = (p.max_ball_speed_phi ?? __pick('maxBallSpeedPhi', 0.85)) * PHI;
     } catch (e) {
         console.warn('[brickbreaker3d] manifold params load failed; using defaults', e);
     }

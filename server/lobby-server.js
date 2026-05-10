@@ -280,7 +280,12 @@ function broadcastSession(s, data, exclude) {
   if (!s || !s.session_id) return;
   for (const [peer, conn] of connections.entries()) {
     if (!conn || conn.session_x_id !== s.session_id) continue;
-    if (exclude && peer.id === exclude.id) continue;
+    // Compare peer references directly. Avoid touching `peer.id`, which on the
+    // crossws Node adapter lazily generates a UUID via the global `crypto`
+    // object — that throws "crypto is not defined" under some Node 18 ESM
+    // module-scope conditions and was the actual cause of "Server error" on
+    // join_by_code (handler error → generic error sent to client).
+    if (exclude && peer === exclude) continue;
     send(peer, data);
   }
 }
@@ -333,6 +338,68 @@ function sendAuthoritativeState(ws, s) {
     players: serializePlayers(s),
     updated_at: s.authoritative.updated_at,
   });
+}
+
+// Pending grace-period removals for sockets that closed while a session was
+// in the 'waiting' state. Keyed by `${sessionId}|${userId}`. If the user
+// reconnects (via guest_login resume) before the timer fires, the removal
+// is cancelled so a brief disconnect does not destroy the lobby session.
+const pendingLobbyDisconnects = new Map();
+const LOBBY_DISCONNECT_GRACE_MS = 60 * 1000;
+
+function pendingDisconnectKey(sessionId, userId) { return `${sessionId}|${userId}`; }
+
+function cancelPendingLobbyDisconnect(sessionId, userId) {
+  const key = pendingDisconnectKey(sessionId, userId);
+  const entry = pendingLobbyDisconnects.get(key);
+  if (!entry) return false;
+  clearTimeout(entry.timer);
+  pendingLobbyDisconnects.delete(key);
+  return true;
+}
+
+// Remove a player from a waiting session by user_id, without requiring a live
+// websocket. Mirrors leaveCurrentSession's seat-removal logic for the deferred
+// (post-disconnect) path.
+function removePlayerFromWaitingSession(sessionId, userId, username) {
+  const s = liveSessions.get(sessionId);
+  if (!s) return null;
+  // If the user reconnected onto a different session, do nothing.
+  if (!s.players.some(p => p.user_id === userId)) return null;
+  s.players = s.players.filter(p => p.user_id !== userId);
+  s.players.forEach((p, i) => { p.slot = i; });
+  if (s.players.length === 0 || (s.host_id === userId && s.players.filter(p => !p.is_ai).length === 0)) {
+    liveSessions.delete(s.session_id);
+    GameObject.remove(s.session_id);
+    KernelRouter.stop(s.session_id);
+    broadcastAll({ type: 'lobby_update', action: 'session_removed', session_id: s.session_id });
+    return s;
+  }
+  if (s.host_id === userId) {
+    const newHost = s.players.find(p => !p.is_ai);
+    if (newHost) { s.host_id = newHost.user_id; s.host_username = newHost.username; newHost.is_host = true; }
+  }
+  syncGameObjectSession(s);
+  broadcastSession(s, {
+    type: 'player_left', username: username || 'Player',
+    players: s.players.map(p => ({
+      user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+    }))
+  });
+  emitGameObject(s);
+  return s;
+}
+
+function scheduleLobbyDisconnect(sessionId, userId, username) {
+  const key = pendingDisconnectKey(sessionId, userId);
+  if (pendingLobbyDisconnects.has(key)) return; // already scheduled
+  const timer = setTimeout(() => {
+    pendingLobbyDisconnects.delete(key);
+    removePlayerFromWaitingSession(sessionId, userId, username);
+  }, LOBBY_DISCONNECT_GRACE_MS);
+  if (timer.unref) timer.unref();
+  pendingLobbyDisconnects.set(key, { timer, sessionId, userId, username });
 }
 
 function leaveCurrentSession(ws, conn) {
@@ -458,6 +525,10 @@ handlers.guest_login = (ws, data) => {
   send(ws, { type: 'auth_success', action: 'guest_login', user, user_id: userId, username });
   for (const s of liveSessions.values()) {
     if (s.players.some(p => p.user_id === userId)) {
+      // Cancel any pending lobby-disconnect grace timer for this user/session
+      // so a quick reconnect (page navigation, network blip) does not later
+      // remove them from a waiting lobby they have just rejoined.
+      cancelPendingLobbyDisconnect(s.session_id, userId);
       connections.get(ws).session_x_id = s.session_id;
       ws.join(s.session_id);
       send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
@@ -1352,7 +1423,21 @@ function initWsAdapter() {
               // If PlayerManager replaced this live player with a bot, do not remove
               // the seat from the session by running leaveCurrentSession().
               if (!replaced || !s || s.status !== 'playing') {
-                leaveCurrentSession(peer, conn);
+                if (s && s.status === 'waiting') {
+                  // Lobby grace period: allow brief reconnects (page nav, mobile
+                  // network blips) before tearing down a waiting session. The
+                  // host losing the socket would otherwise immediately destroy
+                  // the lobby and invalidate any outstanding invite codes.
+                  const sessionId = conn.session_x_id;
+                  const userId = conn.user_id;
+                  const username = conn.user && conn.user.username;
+                  try { KernelRouter.detachPeer(peer, conn); } catch (_) { /* ignore */ }
+                  try { peer.leave(sessionId); } catch (_) { /* ignore */ }
+                  conn.session_x_id = null;
+                  scheduleLobbyDisconnect(sessionId, userId, username);
+                } else {
+                  leaveCurrentSession(peer, conn);
+                }
               }
             } else {
               leaveCurrentSession(peer, conn);

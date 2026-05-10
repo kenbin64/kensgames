@@ -1043,15 +1043,23 @@ function calculateValidMoves() {
       // ── PENULTIMATE FT HOLE → BULLSEYE CHOICE ──
       // rules.json :: BULL_ENTRY_PENULTIMATE (z=18) — !FT peg may divert to
       //               bullseye when penult lands on `ft-*` (clockwise only).
-      // rules.json :: BULL_ENTRY_1STEP_FT     (z=12) — FT peg may also divert
-      //               (no `!peg.onFasttrack` guard).
+      // rules.json :: BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL (user_directive_2026-05-09)
+      //               while traversing the FT inner ring, the final hop may
+      //               NEVER be the bullseye. Only a 1-move card from a peg
+      //               sitting on an ft-* hole may enter the bullseye.
       // rules.json :: BULL_NO_BACKWARD        (z=24) — `!rules.noFastTrack`.
       // rules.json :: BULL_MAX_ONE_PEG        (z=30) — bullseye occupancy check.
       // rules.json :: FT_RING_PASS_RELAX      (z=72) — own pegs on `ft-*`
       //               intermediates are passable; penult itself must be free.
-      if (dir === 'clockwise' && !rules.noFastTrack &&
-        !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps - 1) {
+      // rules.json :: BULL_PENULT_REACHABLE   (user_directive_2026-05-09)
+      //               bullseye divert may only be offered when the regular
+      //               full-step continuation is ALSO reachable AND the
+      //               regular path itself was not blocked. Both alternatives
+      //               must be genuine choices.
+      if (dir === 'clockwise' && !rules.noFastTrack && !peg.onFasttrack &&
+        !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps) {
         const penultimate = trackSeq[steps - 2];
+        const finalHole = trackSeq[steps - 1];
         if (penultimate && penultimate.startsWith('ft-')) {
           let bullPathBlocked = false;
           for (let s = 0; s < steps - 1; s++) {
@@ -1063,6 +1071,10 @@ function calculateValidMoves() {
               }
             }
           }
+          // Penultimate ft-* itself must be unoccupied by own peg
+          // (so peg can pivot to bullseye from it). Opponent on penult is OK.
+          const penultOcc = state.board.get(penultimate);
+          if (penultOcc && penultOcc.playerIdx === ci) bullPathBlocked = true;
           if (!bullPathBlocked) {
             const bullOcc = state.board.get('bullseye');
             if (!bullOcc || bullOcc.playerIdx !== ci) {
@@ -1136,7 +1148,12 @@ function calculateValidMoves() {
     // and ONLY when the peg is currently sitting on an ft-* hole.
     // Traversing the fast track does NOT grant a free jump to bullseye; the peg
     // must stop on an ft-* hole and then draw a 1-move card.
-    if (peg.onFasttrack && peg.holeId.startsWith('ft-') && rules.movement === 1) {
+    // rules.json :: BULL_NO_FROM_OWN_FT (user_directive_2026-05-09) — entering
+    //               bullseye from the player's own-color ft-{bp} hole is
+    //               considered backward and is not allowed; only foreign ft-*
+    //               holes count as a forward bullseye entry.
+    if (peg.onFasttrack && peg.holeId.startsWith('ft-') && rules.movement === 1 &&
+      peg.holeId !== `ft-${bp}`) {
       const occ = state.board.get('bullseye');
       if (!occ || occ.playerIdx !== ci) {
         moves.push({ type: 'enterBullseye', pegIdx: pi, dest: 'bullseye', from: peg.holeId, path: ['bullseye'] });
@@ -1308,6 +1325,44 @@ function calculateValidMoves() {
   // pegs may PASS own pegs on `ft-*` holes — only landing is forbidden, and
   // that's already enforced upstream in the move generator. Forced-exit
   // alternatives are still surfaced by the FT EXIT OPTIONS block.
+
+  // ── WIN-HOLE OVERSHOOT GUARD ──
+  // rules.json :: WIN_NO_OVERSHOOT (user_directive_2026-05-09)
+  // Once the player's safe zone is full (4 pegs in safe), the last peg must
+  // land EXACTLY on the winning hole (home-{bp}) AND must have traversed the
+  // track first (peg.eligibleForSafeZone === true). Traversal triggers are
+  // ONLY: passing/touching the safe-zone entrance (outer-{bp}-2) or the
+  // player's own FT hole (ft-{bp}). Passing the winning hole itself
+  // (home-{bp}) — including a Card 4 backward that lands one hole away from
+  // safe entry — is NOT a traversal. Without traversal the peg cannot land
+  // on the winning hole; it must lap forward to safe entry first.
+  // It is never legal for the last peg to traverse past the winning hole —
+  // no lapping, no skipping past home-{bp}.
+  {
+    const _bp = player.boardPosition;
+    const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
+    const _safeFull = _inSafe >= SAFE_ZONE_SIZE;
+    if (_safeFull) {
+      const _winHole = `home-${_bp}`;
+      moves = moves.filter(m => {
+        // Bullseye / FT-ring / safezone-internal moves don't touch the winning hole
+        if (m.type === 'enterBullseye' || m.type === 'exitBullseye' ||
+          m.type === 'enterFastTrack' || m.type === 'exitFastTrack' ||
+          m.type === 'enter') return true;
+        const _p = m.path || [];
+        const _hits = _p.indexOf(_winHole);
+        // path doesn't touch winning hole → fine (peg is mid-lap)
+        if (_hits === -1) return true;
+        // path lands EXACTLY on winning hole as final step → legal only if
+        // the moving peg has officially traversed the track
+        if (_hits === _p.length - 1 && m.dest === _winHole) {
+          const _movingPeg = player.pegs[m.pegIdx];
+          return !!(_movingPeg && _movingPeg.eligibleForSafeZone);
+        }
+        return false; // overshoot — drop the move
+      });
+    }
+  }
 
   // ── FASTTRACK PRIORITY RULE ──
   // If any of the player's pegs are on FastTrack, they MUST move a FT peg.

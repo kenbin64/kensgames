@@ -260,11 +260,30 @@
         <div id="challenge-slot"></div>
 
         <div class="btn-row" id="btn-row">
-            <a class="btn btn-primary" id="play-btn" href="3d.html"
-                onclick="if(window.FTAnalytics)FTAnalytics.ctaClick('play_page_play_now')">
-                ▶ Play Now
+            <a class="btn btn-primary" id="play-btn" href="3d.html?mode=solo&players=2"
+                onclick="if(window.FTAnalytics)FTAnalytics.ctaClick('play_page_play_solo')">
+                ▶ Play Solo (vs bots)
             </a>
-            <a class="btn btn-secondary" href="3d.html?demo=1"
+            <label style="display:inline-flex;align-items:center;gap:8px;color:#cbd0e8;font-size:14px;">
+                Bots:
+                <select id="bot-count"
+                    onchange="(function(s){var n=document.getElementById('play-btn');var u=new URL(n.href,location.href);u.searchParams.set('players',String(parseInt(s.value,10)+1));n.href=u.pathname+u.search;})(this)"
+                    style="padding:6px 10px;border-radius:8px;background:rgba(20,30,55,0.85);color:#fff;border:1px solid rgba(255,255,255,0.18);">
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+                <select id="bot-difficulty"
+                    onchange="(function(s){var n=document.getElementById('play-btn');var u=new URL(n.href,location.href);u.searchParams.set('difficulty',s.value);n.href=u.pathname+u.search;})(this)"
+                    style="padding:6px 10px;border-radius:8px;background:rgba(20,30,55,0.85);color:#fff;border:1px solid rgba(255,255,255,0.18);">
+                    <option value="easy">Easy</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </label>
+            <a class="btn btn-secondary" href="3d.html?mode=solo&demo=1"
                 onclick="if(window.FTAnalytics)FTAnalytics.ctaClick('play_page_watch_demo')">
                 👁 Watch Live Demo
             </a>

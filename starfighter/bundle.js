@@ -6726,24 +6726,10 @@ const SFAudio = (function () {
   let _thrustLevel = 0;       // current smoothed thrust intensity 0..1
   let _strafeHissNodes = null; // lateral/vertical RCS hiss nodes
 
-  // ── Sample-based audio (explosion shockwaves) ──
-  const _sampleBuffers = {};   // name → AudioBuffer
-  let shockwaveGain = null;    // dedicated gain node (muted by default)
-
-  const SAMPLE_MANIFEST = [
-    { name: 'shockwave_a', url: 'assets/sound/freesound_community-medium-explosion-40472.mp3' },
-    { name: 'shockwave_b', url: 'assets/sound/soundreality-explosion-fx-343683.mp3' },
-  ];
-
-  function _loadSamples() {
-    SAMPLE_MANIFEST.forEach(({ name, url }) => {
-      fetch(url)
-        .then(r => r.arrayBuffer())
-        .then(buf => ctx.decodeAudioData(buf))
-        .then(decoded => { _sampleBuffers[name] = decoded; })
-        .catch(() => { });  // silent fail — procedural fallback still works
-    });
-  }
+  // ── Manifold-driven explosion bursts (replaces stored .mp3 shockwave samples) ──
+  // No sample buffers, no fetch, no .mp3 — every shockwave is the manifold field
+  // walked at audio rate via ManifoldInstrument.Burst. Same observation → same
+  // waveform; the only audio asset weight is the kernel itself.
 
   function init() {
     if (initialized) return;
@@ -6752,12 +6738,15 @@ const SFAudio = (function () {
     masterGain.gain.value = 0.6;
     masterGain.connect(ctx.destination);
 
-    // Shockwave channel — muted by default
-    shockwaveGain = ctx.createGain();
-    shockwaveGain.gain.value = 0;
-    shockwaveGain.connect(masterGain);
+    // Bind ManifoldInstrument worklet for live realtime voices when
+    // available; offline PCM render through BufferSource is the fallback.
+    if (window.ManifoldInstrument && window.ManifoldInstrument.bind) {
+      window.ManifoldInstrument.bind(ctx, {
+        workletPath: '/js/manifold-instrument.worklet.js',
+        masterGain: 0.6, destination: masterGain,
+      }).catch(() => { /* worklet optional — offline render still routes */ });
+    }
 
-    _loadSamples();
     _initVoiceCache();
     initialized = true;
   }
@@ -7198,16 +7187,24 @@ const SFAudio = (function () {
     crunch.stop(t + 0.3);
   }
 
-  // Nearby shockwave — sample-based, muted by default
-  // Randomly picks one of two explosion recordings.
-  // Control volume with setShockwaveVolume(0..1).
+  // Nearby shockwave — manifold burst. The parent x is seeded from the SpaceManifold
+  // field at the listener's position so the same shockwave at the same point is the
+  // same waveform every time (observation, not playback).
   function _playShockwave(t) {
-    const keys = Object.keys(_sampleBuffers);
-    if (keys.length === 0) return;           // samples not yet loaded
-    const buf = _sampleBuffers[keys[Math.floor(Math.random() * keys.length)]];
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(shockwaveGain);
+    if (!window.ManifoldInstrument) return;
+    const SM = window.SpaceManifold;
+    const px = (Math.random() - 0.5) * 4000;
+    const py = (Math.random() - 0.5) * 4000;
+    const pz = px * py * 0.001;              // z = xy projection
+    const field = (SM && SM.diamond) ? SM.diamond(px, py, pz) : 0;
+    const energy = 0.55 + Math.min(0.4, Math.abs(field) * 0.4);
+    const x = { seed: [0xCAFE, px | 0, py | 0, pz | 0, field], dim: 0 };
+    const rendered = window.ManifoldInstrument.Burst(x, energy, { sampleRate: ctx.sampleRate });
+    if (!rendered || !rendered.pcm) return;
+    const buf = ctx.createBuffer(1, rendered.pcm.length, rendered.sr || ctx.sampleRate);
+    buf.getChannelData(0).set(rendered.pcm);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    src.connect(masterGain);
     src.start(t);
   }
 
@@ -8178,9 +8175,10 @@ const SFAudio = (function () {
     if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v));
   }
 
-  function setShockwaveVolume(v) {
-    if (shockwaveGain) shockwaveGain.gain.value = Math.max(0, Math.min(1, v));
-  }
+  // Legacy shim — shockwaves are no longer a separate gain bus; they ride the
+  // master mix like every other manifold-rendered voice. Kept as a no-op so any
+  // pre-existing UI binding doesn't throw.
+  function setShockwaveVolume(_v) { /* no-op: manifold bursts route through masterGain */ }
 
   // ══════════════════════════════════════
   // ENGINE THRUST RUMBLE — continuous, volume/pitch tied to throttle

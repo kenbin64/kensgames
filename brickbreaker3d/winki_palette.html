@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>The Winki Palette</title>
+  <style>
+    body {
+      background: #000;
+      color: #ddd;
+      font-family: ui-monospace, monospace;
+      margin: 0;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 400;
+      opacity: 0.7;
+      margin: 0 0 6px;
+    }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 400;
+      opacity: 0.5;
+      margin: 18px 0 6px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sw {
+      width: 140px;
+      height: 80px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px 10px;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.04);
+      font-size: 11px;
+    }
+
+    .sw b {
+      display: block;
+      opacity: 0.95;
+    }
+
+    .sw small {
+      opacity: 0.6;
+    }
+
+    canvas {
+      background: #000;
+      image-rendering: pixelated;
+      border: 1px solid #222;
+      border-radius: 8px;
+    }
+
+    .saddle {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      margin-top: 24px;
+    }
+
+    .legend {
+      font-size: 12px;
+      line-height: 1.8;
+      opacity: 0.75;
+      max-width: 360px;
+    }
+
+    .legend strong {
+      color: #fff;
+    }
+
+    .legend code {
+      background: #181818;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>z = x · y &nbsp;over [-1, 1]² &nbsp;— the whole winki</h1>
+
+  <h2>chrome</h2>
+  <div class="row" id="chrome"></div>
+  <h2>bricks</h2>
+  <div class="row" id="bricks"></div>
+  <h2>players (one per quadrant)</h2>
+  <div class="row" id="players"></div>
+  <h2>stars</h2>
+  <div class="row" id="stars"></div>
+
+  <div class="saddle">
+    <canvas id="saddle" width="320" height="320"></canvas>
+    <div class="legend">
+      <strong>The painting on the left IS the manifold.</strong><br>
+      Every pixel is <code>interpret.winkiRGB(x, y)</code> at that
+      coordinate, with x ∈ [-1, 1] left-to-right and y ∈ [-1, 1]
+      bottom-to-top.<br><br>
+      Q1 (NE) — cream/amber peak<br>
+      Q2 (NW) — deep red valley<br>
+      Q3 (SW) — spring green peak<br>
+      Q4 (SE) — violet valley<br>
+      cross at origin — pure greys / blacks<br><br>
+      Every chrome / brick / player / star above is a single point on
+      this painting. They look related because they <em>are</em>
+      related — they are samples of the same surface.
+    </div>
+  </div>
+
+  <script src="brickbreaker_manifold_substrate.js"></script>
+  <script src="manifold_seed.js"></script>
+  <script>
+    const k = window.BBSeed.k;
+    const I = window.BBManifoldSubstrate.interpret;
+    const fmt = v => '#' + v.toString(16).padStart(6, '0');
+
+    function swatch(label, hex, sub) {
+      return `<div class="sw" style="background:${hex}; color:${parseInt(hex.slice(1), 16) > 0x808080 ? '#000' : '#fff'};">
+      <b>${label}</b><small>${hex}${sub ? ' · ' + sub : ''}</small></div>`;
+    }
+    function fillRow(id, items) {
+      document.getElementById(id).innerHTML = items.map(([n, v, s]) =>
+        swatch(n, fmt(v), s)).join('');
+    }
+
+    fillRow('chrome', Object.entries(k.chromeColors).map(([n, v]) => [n, v]));
+    fillRow('bricks', Object.entries(k.brickColors).map(([n, v]) => [n, v]));
+    fillRow('players', k.playerColors.map((v, i) => ['Q' + (i + 1), v]));
+    fillRow('stars', k.starColors.map((v, i) => ['star ' + i, v]));
+
+    // Paint the saddle
+    const cv = document.getElementById('saddle');
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(cv.width, cv.height);
+    for (let py = 0; py < cv.height; py++) {
+      const y = 1 - 2 * (py / (cv.height - 1));    // top = +1, bottom = -1
+      for (let px = 0; px < cv.width; px++) {
+        const x = -1 + 2 * (px / (cv.width - 1));
+        const c = I.winkiRGB(x, y, 1.0);
+        const i = (py * cv.width + px) * 4;
+        img.data[i] = c.r;
+        img.data[i + 1] = c.g;
+        img.data[i + 2] = c.b;
+        img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  </script>
+</body>
+
+</html>
