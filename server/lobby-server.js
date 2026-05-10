@@ -595,7 +595,7 @@ handlers.create_session = (ws, data) => {
   if (data && data.settings) Object.assign(s.settings, data.settings);
   s.players.push({
     user_id: conn.user_id, username: conn.user.username,
-    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: false
+    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: true
   });
   syncGameObjectSession(s);
   liveSessions.set(s.session_id, s);
@@ -752,7 +752,7 @@ handlers.matchmake = (ws, data) => {
   const s = freshSession(sx, gameId, conn.user, false);
   s.players.push({
     user_id: conn.user_id, username: conn.user.username,
-    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: false
+    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: true
   });
   syncGameObjectSession(s);
   liveSessions.set(s.session_id, s);
