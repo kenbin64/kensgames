@@ -1523,6 +1523,21 @@ window.getCardRules = function (rank) { return state.cards.get(rank) || null; };
 function showMoveHints() {
   const hintsDiv = document.getElementById('move-hints');
   if (!hintsDiv) return;
+
+  // In networked multiplayer, only the active player sees the move
+  // mechanics (instructions, glowing destinations, split selector).
+  // Peers just watch the pegs move once executeMove broadcasts.
+  if (_isMpMode() && !_isMyTurn()) {
+    hintsDiv.innerHTML = '';
+    setOptionsPanelVisible(false);
+    if (window.clearMovePathHighlights) {
+      try { window.clearMovePathHighlights(); } catch (_) { }
+    } else if (window.highlightMovePaths) {
+      try { window.highlightMovePaths([]); } catch (_) { }
+    }
+    return;
+  }
+
   setOptionsPanelVisible(true);
   const vm = state.turn.get('validMoves') || [];
 
@@ -2308,11 +2323,21 @@ function endTurn() {
   const startBlink = () => {
     const gameMode = state.meta.get('gameMode') || 'solo';
     const isSameScreen = gameMode === 'same-screen';
+    const mpMode = _isMpMode();
 
     // Show turn indicator for:
     // - All players in same-screen mode (so everyone knows whose turn it is)
-    // - Only non-bot players in other modes
-    const shouldShowIndicator = isSameScreen || !players[next].isBot;
+    // - In networked MP, only the LOCAL active player (peers must not see
+    //   the active player's mechanics — only the pegs moving)
+    // - In solo, only non-bot players (existing behavior)
+    let shouldShowIndicator;
+    if (isSameScreen) {
+      shouldShowIndicator = true;
+    } else if (mpMode) {
+      shouldShowIndicator = _isMyTurn();
+    } else {
+      shouldShowIndicator = !players[next].isBot;
+    }
 
     if (shouldShowIndicator) {
       const indicatorText = isSameScreen ? `${players[next].name}'s Turn` : players[next].name;
