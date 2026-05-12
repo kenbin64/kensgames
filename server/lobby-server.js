@@ -29,6 +29,7 @@ const PlayerManager = require('./player-manager.js');
 const UserRegistry = require('./user-registry.js');
 const GameObject = require('./game-object.js');
 const KernelRouter = require('./game-kernel/lobby-router.js');
+const { ForkTable } = require('./fork-table.js');
 
 // ── Colyseus room factory (optional; degrades gracefully if not running) ─────
 const COLYSEUS_PORT = parseInt(process.env.COLYSEUS_PORT || '2567', 10);
@@ -218,6 +219,22 @@ const activePeers = new Set();    // connected peers (authenticated or not)
 
 // ── Player Manager (single authority for all active sessions) ───────────────
 const pm = new PlayerManager(connections, liveSessions, send, broadcastSession);
+
+// ── Fork Table (dining-philosophers mutex) ─────────────────────────────────
+// Single-flight guard for create / join / end / replay / turn. Prevents
+// double-clicks from spawning duplicate games and ensures stale game data is
+// flushed exactly once. See server/fork-table.js for the global acquire order.
+const forks = new ForkTable();
+const FORK_TTL = {
+  create: 3000,   // create_session is fast; 3s is plenty
+  join: 2000,
+  end: 30000,     // ended sessions linger 30s for replay grace period
+  replay: 5000,
+  turn: 350,      // per-action debounce; collapses double-clicks
+};
+function denyFork(ws, fork, key, holder) {
+  send(ws, { type: 'fork_denied', fork, key: String(key), holder, message: `Another ${fork} request is in flight.` });
+}
 
 function freshSession(sx, gameId, hostUser, isPrivate) {
   const game = CATALOG_BY_ID[gameId] || { name: gameId, maxPlayers: 6, recommendedPlayers: 4 };
@@ -591,31 +608,38 @@ handlers.update_player_info = handlers.update_profile;
 handlers.create_session = (ws, data) => {
   const conn = connections.get(ws);
   if (!conn) return send(ws, { type: 'error', message: 'Not authenticated' });
-  if (!hasRenderableProfile(conn)) {
-    return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before creating a game' });
+  // Single-flight guard: a single user cannot spawn two sessions in parallel.
+  const lock = forks.acquire('create', conn.user_id, conn.user_id, FORK_TTL.create);
+  if (!lock.ok) return denyFork(ws, 'create', conn.user_id, lock.holder);
+  try {
+    if (!hasRenderableProfile(conn)) {
+      return send(ws, { type: 'error', message: 'Player profile requires a name and renderable avatar before creating a game' });
+    }
+    if (conn.session_x_id) leaveCurrentSession(ws, conn);
+    const gameId = (data && data.game_id) || 'fasttrack';
+    if (!CATALOG_BY_ID[gameId]) return send(ws, { type: 'error', message: 'Unknown game: ' + gameId });
+    const isPrivate = !!(data && data.private);
+    const mode = (data && data.mode) || (isPrivate ? 'private' : 'public');
+    const sx = Proj.bloomSession(log, gameId, mode, conn.user_id, { is_private: isPrivate });
+    const s = freshSession(sx, gameId, conn.user, isPrivate);
+    if (data && typeof data.max_players === 'number') {
+      s.max_players = Math.min(Math.max(data.max_players, 2), s.max_players);
+    }
+    if (data && data.settings) Object.assign(s.settings, data.settings);
+    s.players.push({
+      user_id: conn.user_id, username: conn.user.username,
+      avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: true
+    });
+    syncGameObjectSession(s);
+    liveSessions.set(s.session_id, s);
+    conn.session_x_id = s.session_id;
+    ws.join(s.session_id);
+    send(ws, { type: 'session_created', session: sanitize(s) });
+    emitGameObject(s);
+    if (!isPrivate) broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
+  } finally {
+    forks.release('create', conn.user_id, conn.user_id);
   }
-  if (conn.session_x_id) leaveCurrentSession(ws, conn);
-  const gameId = (data && data.game_id) || 'fasttrack';
-  if (!CATALOG_BY_ID[gameId]) return send(ws, { type: 'error', message: 'Unknown game: ' + gameId });
-  const isPrivate = !!(data && data.private);
-  const mode = (data && data.mode) || (isPrivate ? 'private' : 'public');
-  const sx = Proj.bloomSession(log, gameId, mode, conn.user_id, { is_private: isPrivate });
-  const s = freshSession(sx, gameId, conn.user, isPrivate);
-  if (data && typeof data.max_players === 'number') {
-    s.max_players = Math.min(Math.max(data.max_players, 2), s.max_players);
-  }
-  if (data && data.settings) Object.assign(s.settings, data.settings);
-  s.players.push({
-    user_id: conn.user_id, username: conn.user.username,
-    avatar_id: normalizeAvatarId(conn.user.avatar_id), is_host: true, is_ai: false, slot: 0, ready: true
-  });
-  syncGameObjectSession(s);
-  liveSessions.set(s.session_id, s);
-  conn.session_x_id = s.session_id;
-  ws.join(s.session_id);
-  send(ws, { type: 'session_created', session: sanitize(s) });
-  emitGameObject(s);
-  if (!isPrivate) broadcastAll({ type: 'lobby_update', action: 'session_created', session_id: s.session_id });
 };
 
 handlers.list_sessions = (ws, data) => {
@@ -1029,14 +1053,22 @@ handlers.game_action = (ws, data) => {
   if (!conn) return;
   const sessionId = conn.session_x_id;
   if (!sessionId) return;
+  // Per-session turn fork: collapses double-clicks and out-of-order action
+  // bursts. Holder = userId; very short TTL so legitimate fast play is fine.
+  const turn = forks.acquire('turn', sessionId, conn.user_id, FORK_TTL.turn);
+  if (!turn.ok) return denyFork(ws, 'turn', sessionId, turn.holder);
   const s = liveSessions.get(sessionId);
-  if (s && KernelRouter.handle(s, ws, data, conn)) return;
+  if (s && KernelRouter.handle(s, ws, data, conn)) {
+    forks.release('turn', sessionId, conn.user_id);
+    return;
+  }
   const turnData = Object.assign({ type: 'game_action', from: conn.user_id }, data || {});
   const seq = pm.relayTurn(sessionId, conn.user_id, turnData);
   if (!seq) {
     // Session not PM-managed (e.g. spectator mode or pre-ready) — direct relay
     relay('game_action', ws, data);
   }
+  forks.release('turn', sessionId, conn.user_id);
 };
 
 // game_state: update PM's lastGoodState snapshot, then relay normally.
@@ -1102,13 +1134,79 @@ handlers.game_over = (ws, data) => {
   if (!conn) return;
   const s = liveSessions.get(conn.session_x_id);
   if (!s) return;
+  // End fork: ensure game_over fires exactly once per session even if multiple
+  // peers (or a host reconnect) emit it. Held for the full grace window so
+  // late stragglers are silently rejected.
+  const lock = forks.acquire('end', s.session_id, 'server', FORK_TTL.end);
+  if (!lock.ok) return; // already ending — silently swallow duplicate
   s.status = 'ended';
+  s.ended_at = Date.now();
+  s.last_result = (data && data.result) || null;
   KernelRouter.stop(s.session_id);
-  Proj.bloomEvent(log, s.x, [-1, 0, 0, 0, 1, 0], { kind: 'game_over', session_id: s.session_id, result: (data && data.result) || null });
-  broadcastSession(s, { type: 'game_over', session: sanitize(s), result: (data && data.result) || null });
-  liveSessions.delete(s.session_id);
-  for (const [cws, cconn] of connections) {
-    if (cconn.session_x_id === s.session_id) cconn.session_x_id = null;
+  Proj.bloomEvent(log, s.x, [-1, 0, 0, 0, 1, 0], { kind: 'game_over', session_id: s.session_id, result: s.last_result });
+  broadcastSession(s, { type: 'game_over', session: sanitize(s), result: s.last_result, replay_grace_ms: FORK_TTL.end });
+  // Retain the session for FORK_TTL.end so the host can press Replay.
+  // After the grace window, flush state and detach all peers.
+  setTimeout(() => {
+    if (!liveSessions.has(s.session_id)) return; // already replayed/disposed
+    if (s.status !== 'ended') return; // promoted back to playing via replay
+    // Flush authoritative state so no stale data can leak into anything else
+    s.authoritative = null;
+    liveSessions.delete(s.session_id);
+    for (const [cws, cconn] of connections) {
+      if (cconn.session_x_id === s.session_id) cconn.session_x_id = null;
+    }
+    forks.release('end', s.session_id, 'server');
+  }, FORK_TTL.end).unref?.();
+};
+
+// Host-only: reset the just-ended session and deal a fresh game with the
+// same seated players. Available only during the 30s grace window after
+// game_over fires.
+handlers.replay_game = (ws) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const s = liveSessions.get(conn.session_x_id);
+  if (!s) return send(ws, { type: 'error', message: 'No session to replay' });
+  if (s.host_id !== conn.user_id) {
+    return send(ws, { type: 'error', message: 'Only the host can start a replay' });
+  }
+  if (s.status !== 'ended') {
+    return send(ws, { type: 'error', message: 'Replay is only available immediately after a game ends' });
+  }
+  const lock = forks.acquire('replay', s.session_id, conn.user_id, FORK_TTL.replay);
+  if (!lock.ok) return denyFork(ws, 'replay', s.session_id, lock.holder);
+  try {
+    // Flush all stale game state before re-arming. Players keep their seats;
+    // everything else is wiped.
+    s.authoritative = null;
+    s.last_result = null;
+    s.ended_at = null;
+    s.status = 'playing';
+    s.settings.lobby_accepted = true;
+    syncGameObjectSession(s);
+    emitGameObject(s);
+    Proj.bloomEvent(log, s.x, [0, 0, 0, 0, 1, 1], { kind: 'game_replay', session_id: s.session_id, game_id: s.game_id });
+    broadcastSession(s, { type: 'replay_started', session: sanitize(s) });
+
+    if (KernelRouter.isKernelGame(s.game_id)) {
+      KernelRouter.start(s, {
+        send,
+        broadcastSession,
+        connections,
+        persistAction: (session, action) => {
+          Proj.bloomEvent(log, session.x, [0, 0, 0, 0, 1, 0], {
+            kind: 'kernel_action', session_id: session.session_id,
+            game_id: session.game_id, action_type: action.type, by: action.playerId,
+          });
+        },
+      });
+    }
+    pm.startSession(s.session_id);
+  } finally {
+    forks.release('replay', s.session_id, conn.user_id);
+    // The end-fork retainer can now release: this session is alive again.
+    forks.release('end', s.session_id, 'server');
   }
 };
 
@@ -1503,6 +1601,9 @@ function initWsAdapter() {
         close(peer) {
           const conn = connections.get(peer);
           if (conn) {
+            // Drop any forks this peer was holding so a crashed client cannot
+            // stall the table for the next request.
+            try { forks.releaseAllFor(conn.user_id); } catch (_) { /* ignore */ }
             const s = liveSessions.get(conn.session_x_id);
             if (conn.session_x_id) {
               const replaced = pm.onPlayerDisconnect(conn.user_id, conn.session_x_id);

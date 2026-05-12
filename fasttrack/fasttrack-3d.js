@@ -2449,7 +2449,10 @@ async function init3D() {
 
     const gameMode = (kgGame?.mode) || usp.get('mode') || storedCfg.mode || 'solo';
     const inviteCode = ((kgGame?.code) || usp.get('code') || storedCfg.code || '').toUpperCase();
-    const playerCount_raw = (kgGame?.playerCount) || usp.get('players') || storedCfg.playerCount || '2';
+    // URL ?players= must beat cached KG_Game.playerCount so a fresh launch
+    // from play.html (or a direct link) reflects the user's current pick
+    // instead of whatever was stored from the previous game.
+    const playerCount_raw = usp.get('players') || (kgGame?.playerCount) || storedCfg.playerCount || '2';
 
     let sessionCache = null;
     try {
@@ -5520,31 +5523,33 @@ function createGlowRing(holeId, color, isDestination, opts = {}) {
   boardGroup.add(disc);
   highlightMeshes.push(disc);
 
-  // user_directive_2026-05-10: downward-pointing arrow above every landable
-  // hole — gives the player an unambiguous "tap here" affordance. Only on
-  // commit destinations (isDestination + pulsing) so trail rings stay quiet.
+  // user_directive_2026-05-10c: bright RED downward-pointing tapered arrow
+  // hovering directly over each commit destination, tip nearly touching the
+  // hole. Bobs vertically + pulses opacity so "tap here" reads instantly.
   if (isDestination) {
-    const arrowH = 14;
-    const arrowR = 7;
-    const coneGeo = new THREE.ConeGeometry(arrowR, arrowH, 4);
-    // Cone defaults point +Y; rotate to point -Y (downward at the hole).
+    const arrowH = 22;
+    const arrowR = 9;
+    const coneGeo = new THREE.ConeGeometry(arrowR, arrowH, 6);
+    // Cone defaults: apex at +Y/2, base at -Y/2. Rotate X by PI so the apex
+    // (tip) points DOWN at the hole. After rotation, apex is at local -Y/2.
     coneGeo.rotateX(Math.PI);
     const coneMat = new THREE.MeshBasicMaterial({
-      color,
+      color: 0xff2030,                  // unmistakable red
       transparent: true,
       opacity: 0.95,
+      depthTest: false,                 // render on top of board geometry
       depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -6,
-      polygonOffsetUnits: -6
     });
     const cone = new THREE.Mesh(coneGeo, coneMat);
-    const baseY = hole.position.y + 36;
+    // Position cone so its tip sits ~6u above the hole surface; bob anim
+    // adds ±5u so the tip kisses the hole at the bottom of each cycle.
+    const tipClearance = 6;
+    const baseY = hole.position.y + tipClearance + arrowH / 2;
     cone.position.set(hole.position.x, baseY, hole.position.z);
-    cone.renderOrder = 11;
+    cone.renderOrder = 50;              // above all other highlight layers
     cone.userData.isDestination = true;
     cone.userData.isArrow = true;
-    cone.userData.pulsing = pulsing;
+    cone.userData.pulsing = true;
     cone.userData.baseY = baseY;
     boardGroup.add(cone);
     highlightMeshes.push(cone);
@@ -5674,14 +5679,11 @@ function highlightMovePaths(moves) {
   _drawCommittedSplitPath(vm, color);
 
   // ── BUILD COMMIT-DESTINATION SET ──
-  // user_directive_2026-05-10: only holes that are an UNAMBIGUOUS commit
-  // target should pulse. Intermediate path holes and the peg's `from` hole
-  // never commit a move, so they do not pulse — even when they happen to be
-  // unique. A hole pulses iff:
-  //   1. clicking it commits exactly one move (one route through it), AND
-  //   2. that hole is the destination/commit point of that route.
-  // Pegs (peg:N keys) keep pulsing when they are the only commit option
-  // (e.g. only one peg can move, or split-first-peg pick).
+  // user_directive_2026-05-10b: when there is a choice, every choice glows
+  // by default. The cycle/confirm toolbar narrows the highlight to one when
+  // the player steps through previews. A hole/peg is a "choice" if clicking
+  // it would stage a commit-level entry (regardless of whether multiple
+  // routes share it).
   const commitDests = new Set();
   vm.forEach((m, i) => {
     if (!m) return;
@@ -5705,21 +5707,26 @@ function highlightMovePaths(moves) {
     if (m.dest) commitDests.add(m.dest);
   });
 
+  // Pegs that can be picked (split-first-peg or single-peg routes). Any peg
+  // that appears as the commitable peg in any entry should halo.
+  const commitPegIdxs = new Set();
   for (const [key, entries] of index.entries()) {
-    if (!Array.isArray(entries) || entries.length !== 1) continue;
-    if (key.startsWith('peg:')) {
-      const pegIdx = Number(key.slice(4));
-      const players = (window.FastTrackCore && window.FastTrackCore.state)
-        ? window.FastTrackCore.state.players.get('list') || [] : [];
-      const ci = (window.FastTrackCore && window.FastTrackCore.state)
-        ? window.FastTrackCore.state.players.get('current') || 0 : 0;
-      const peg = players[ci] && players[ci].pegs ? players[ci].pegs[pegIdx] : null;
-      if (peg && peg.id) createPegHalo(peg.id, color, { pulsing: true });
-      continue;
-    }
-    // Only pulse if this hole is also a commit destination of the unique route
-    const isCommitDest = commitDests.has(key);
-    createGlowRing(key, color, isCommitDest, { pulsing: isCommitDest });
+    if (!key.startsWith('peg:') || !Array.isArray(entries) || !entries.length) continue;
+    commitPegIdxs.add(Number(key.slice(4)));
+  }
+
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ci = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+  const curPegs = (players[ci] && players[ci].pegs) ? players[ci].pegs : [];
+
+  for (const pegIdx of commitPegIdxs) {
+    const peg = curPegs[pegIdx];
+    if (peg && peg.id) createPegHalo(peg.id, color, { pulsing: true });
+  }
+  for (const holeId of commitDests) {
+    createGlowRing(holeId, color, true, { pulsing: true });
   }
 
   function pulseHighlights() {
@@ -6503,6 +6510,19 @@ function _refreshConfirmBar() {
   const prevBtn = document.getElementById('ft-confirm-prev');
   const nextBtn = document.getElementById('ft-confirm-next');
   const total = _moveCycle.length;
+  // Show the bar whenever the move cycle has any entries; hide otherwise.
+  // (Bots clear validMoves before they animate, so this never lights up
+  // during a bot turn.)
+  const shouldShow = total > 0;
+  if (shouldShow) {
+    bar.removeAttribute('hidden');
+    bar.hidden = false;
+    bar.style.display = 'flex';
+  } else {
+    bar.setAttribute('hidden', '');
+    bar.hidden = true;
+    bar.style.display = 'none';
+  }
   // user_directive_2026-05-10: keep the big instruction banner in sync with
   // the confirm bar — it tells the player what to tap next at every stage.
   _refreshInstructionBanner();

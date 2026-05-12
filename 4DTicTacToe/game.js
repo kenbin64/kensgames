@@ -1089,7 +1089,8 @@ function updateOrientBtn() {
   const btn = document.getElementById('btn-orient');
   if (!btn) return;
   btn.hidden = isUpright();
-} to the nearest column center on the currently - up face.
+}
+// Snap the aim point to the nearest column center on the currently-up face.
 // Returns { latA, latB, faceIdx } so the caller can use topFaceWorldPos() for a clean drop.
 // Without this, balls released between passages bounce off the top of a gyroid wall and roll
 // down the outside of the cube instead of falling through a column.

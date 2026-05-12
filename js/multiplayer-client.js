@@ -478,6 +478,12 @@ class KGMultiplayer {
     });
   }
 
+  /** Host-only: request a replay of the just-ended session with the same seats. */
+  sendReplayRequest() {
+    if (!this.connected) return;
+    this._send({ type: 'replay_game' });
+  }
+
   /** Send authoritative game state snapshot (host only) */
   sendGameState(state) {
     if (!this.connected || !this.isHost) return;

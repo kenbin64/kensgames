@@ -67,10 +67,11 @@ echo -e "${YELLOW}[3/5] Deploying files...${NC}"
 mkdir -p "$DEPLOY_PATH"
 
 # Sync full static site (all games + shared JS/CSS/assets).
-# Trade-secret excludes (HR-53 in docs/HARD_RULES.md): docs/, dist/, the
-# portal-level manifold config, every per-game manifold.game.json, and
-# all repo-level *.md files (AGENTS.md, README.md, etc.) are vault
-# material and must not reach the public web root.
+# Excludes are operational only (source-of-truth dirs, build scratch, repo
+# docs). Compiled manifest artifacts (manifold.portal.json,
+# manifold.game.json, rules.json) are runtime-required and ARE deployed —
+# the trade-secret directive in docs/HARD_RULES.md is a documentation rule,
+# not a deployment restriction.
 rsync -a \
     --exclude '.git/' \
     --exclude '.github/' \
@@ -87,8 +88,6 @@ rsync -a \
     --exclude 'docs/' \
     --exclude 'dist/' \
     --exclude 'proposals/' \
-    --exclude 'manifold.portal.json' \
-    --exclude 'manifold.game.json' \
     --exclude '*.md' \
     "$SRC_BASE/" "$DEPLOY_PATH/"
 

@@ -7,7 +7,7 @@
   <title>FastTrack 3D — Manifold Gaming</title>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <!-- X-Dimensional bootstrap: resolves KG_Game / KG_Player before init3D. -->
-  <script src="3d-bootstrap.js"></script>
+  <script src="3d-bootstrap.js?v=20260510l"></script>
 
   <!-- X-Dimensional Session Bridge (loads before game init) -->
   <script src="/js/dimensional-session-bridge.js"></script>
@@ -120,6 +120,8 @@
       <h2>🏆 Game Over</h2>
       <p id="replay-winner">A new round awaits.</p>
       <button id="btn-replay-again" onclick="playAgain()">↻ Play Again</button>
+      <p id="replay-wait" style="display:none;color:#9fb;font-size:.9em;margin:.5em 0;">Waiting for the host to start a
+        replay…</p>
       <button id="btn-replay-leave" onclick="leaveFromReplay()">✕ Leave Game</button>
     </div>
   </div>
@@ -192,7 +194,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260506a"></script>
+  <script src="fasttrack-game-core.js?v=20260510i"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
@@ -207,7 +209,7 @@
   <script src="../js/jazz-speakeasy.js?v=20260510b"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260507a"></script>
+  <script src="fasttrack-3d.js?v=20260510l"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>

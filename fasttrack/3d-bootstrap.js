@@ -30,6 +30,16 @@ window.KG_BOOTSTRAP_PROMISE = (async function () {
   } else if (usp.has('mode') && !kgGame.mode) {
     kgGame.mode = usp.get('mode');
   }
+  // Explicit URL params for solo launches must override stale cached values.
+  // Without this, a previously-cached KG_Game.playerCount sticks across every
+  // new launch and ?players=N from play.html is silently ignored.
+  if (usp.has('players')) {
+    const n = parseInt(usp.get('players'), 10);
+    if (Number.isFinite(n) && n >= 2 && n <= 6) kgGame.playerCount = n;
+  }
+  if (usp.has('difficulty')) {
+    kgGame.aiDifficulty = usp.get('difficulty');
+  }
 
   if (!kgPlayer && usp.has('name')) {
     kgPlayer = {
