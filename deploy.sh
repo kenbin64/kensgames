@@ -195,6 +195,33 @@ done
 echo -e "${GREEN}✓ All required files verified${NC}"
 
 # =========================================
+# CLOUDFLARE CACHE PURGE
+# =========================================
+# Purges the Cloudflare edge cache so a fresh deploy is visible to all users.
+# Requires CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN in the environment
+# (or in /etc/kensgames.env). Skipped silently if either is unset.
+
+if [ -z "$CLOUDFLARE_ZONE_ID" ] && [ -f /etc/kensgames.env ]; then
+    set -a; . /etc/kensgames.env; set +a
+fi
+
+if [ -n "$CLOUDFLARE_ZONE_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+    echo -e "${YELLOW}[CF] Purging Cloudflare cache for zone $CLOUDFLARE_ZONE_ID...${NC}"
+    CF_RESP=$(curl -sS -X POST \
+        "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+        -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        --data '{"purge_everything":true}' || true)
+    if echo "$CF_RESP" | grep -q '"success":true'; then
+        echo -e "${GREEN}✓ Cloudflare cache purged${NC}"
+    else
+        echo -e "${RED}⚠ Cloudflare purge failed: $CF_RESP${NC}"
+    fi
+else
+    echo -e "${YELLOW}[CF] Skipped — set CLOUDFLARE_ZONE_ID + CLOUDFLARE_API_TOKEN to enable${NC}"
+fi
+
+# =========================================
 # DEPLOYMENT COMPLETE
 # =========================================
 
