@@ -6475,7 +6475,22 @@ function _refreshInstructionBanner() {
 
       const kind = _moveCycle[0].kind;
       const total = _moveCycle.length;
-      if (kind === 'split-first-peg') {
+
+      // user_directive_2026-05-12: once a move has been staged (Confirm
+      // button is live), swap the "tap a glowing…" prompt for the
+      // confirm-move description so the player knows exactly what they
+      // are about to commit.
+      if (_pendingEntry) {
+        const desc = _describeEntry(_pendingEntry, _currentValidMoves());
+        if (desc && desc.text) {
+          text = `Confirm move: ${desc.text}`;
+          icon = '✓';
+          if (desc.color) accent = desc.color;
+        } else {
+          text = 'Confirm move';
+          icon = '✓';
+        }
+      } else if (kind === 'split-first-peg') {
         text = total > 1 ? 'Tap a glowing peg to split your 7' : 'Splitting your 7…';
       } else if (kind === 'split-first') {
         text = total > 1 ? 'Tap a glowing hole — first half of your 7' : 'Placing first half…';

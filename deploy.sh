@@ -195,11 +195,41 @@ done
 echo -e "${GREEN}✓ All required files verified${NC}"
 
 # =========================================
+# CACHE BUST — rewrite ?v=… on every deploy
+# =========================================
+# Guarantees browsers re-fetch our JS/CSS/HTML scripts after a deploy even
+# when Cloudflare creds aren't configured. We rewrite every ?v=<token>
+# query string in deployed HTML files to a single per-deploy build stamp,
+# and write /version.txt so clients can detect the new build.
+
+BUILD_STAMP="$TIMESTAMP"
+if command -v git >/dev/null 2>&1 && [ -d "$REPO_PATH/.git" ]; then
+    GIT_SHA=$(git -C "$REPO_PATH" rev-parse --short HEAD 2>/dev/null || true)
+    [ -n "$GIT_SHA" ] && BUILD_STAMP="${TIMESTAMP}-${GIT_SHA}"
+fi
+
+echo -e "${YELLOW}[cache-bust] Stamping HTML asset references with v=${BUILD_STAMP}${NC}"
+
+# Rewrite ?v=<anything> → ?v=<BUILD_STAMP> on all script/link tags.
+# Only operates on deployed HTML, never on source.
+HTML_COUNT=0
+while IFS= read -r -d '' html; do
+    sed -i -E "s/(\\.(js|css|json|html))\\?v=[^\"'> )]+/\\1?v=${BUILD_STAMP}/g" "$html"
+    HTML_COUNT=$((HTML_COUNT + 1))
+done < <(find "$DEPLOY_PATH" -type f -name '*.html' -print0)
+
+# Drop a /version.txt marker for clients/CDN smoke tests.
+echo "$BUILD_STAMP" > "$DEPLOY_PATH/version.txt"
+
+echo -e "${GREEN}✓ Cache-bust applied to ${HTML_COUNT} HTML files (build ${BUILD_STAMP})${NC}"
+
+# =========================================
 # CLOUDFLARE CACHE PURGE
 # =========================================
-# Purges the Cloudflare edge cache so a fresh deploy is visible to all users.
-# Requires CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN in the environment
-# (or in /etc/kensgames.env). Skipped silently if either is unset.
+# Purges the Cloudflare edge cache so the fresh deploy is visible to all
+# users worldwide. Requires CLOUDFLARE_ZONE_ID + CLOUDFLARE_API_TOKEN in
+# the env or in /etc/kensgames.env. If creds are missing, the cache-bust
+# step above still forces clients to re-fetch.
 
 if [ -z "$CLOUDFLARE_ZONE_ID" ] && [ -f /etc/kensgames.env ]; then
     set -a; . /etc/kensgames.env; set +a
@@ -215,10 +245,13 @@ if [ -n "$CLOUDFLARE_ZONE_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ]; then
     if echo "$CF_RESP" | grep -q '"success":true'; then
         echo -e "${GREEN}✓ Cloudflare cache purged${NC}"
     else
-        echo -e "${RED}⚠ Cloudflare purge failed: $CF_RESP${NC}"
+        echo -e "${RED}⚠ Cloudflare purge FAILED: $CF_RESP${NC}"
+        echo -e "${RED}  → Edge cache may still serve stale assets. Check token scope (Zone.Cache Purge) and zone id.${NC}"
     fi
 else
-    echo -e "${YELLOW}[CF] Skipped — set CLOUDFLARE_ZONE_ID + CLOUDFLARE_API_TOKEN to enable${NC}"
+    echo -e "${YELLOW}[CF] ⚠ Cloudflare purge SKIPPED — CLOUDFLARE_ZONE_ID + CLOUDFLARE_API_TOKEN not set${NC}"
+    echo -e "${YELLOW}     Cache-bust ?v=${BUILD_STAMP} will still force browsers to re-fetch.${NC}"
+    echo -e "${YELLOW}     To enable edge purge, populate /etc/kensgames.env (chmod 600).${NC}"
 fi
 
 # =========================================

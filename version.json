@@ -1,11 +1,11 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-12T14:30:00Z",
-  "build_sha": "release-v0.5.5",
+  "build_utc": "2026-05-12T15:00:00Z",
+  "build_sha": "release-v0.5.6",
   "x_dimensional_governance": true,
   "status": "live"
 }
