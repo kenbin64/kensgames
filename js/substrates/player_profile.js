@@ -40,6 +40,7 @@ const KGPlayerProfile = (() => {
     safeLocalStorageSet(NAME_KEY, cleaned);
     // Back-compat: many games still read `username` first. Keep both in sync.
     safeLocalStorageSet(USERNAME_KEY, cleaned);
+    pushProfileToServer({ displayName: cleaned });
   }
 
   function getAvatar() {
@@ -55,6 +56,90 @@ const KGPlayerProfile = (() => {
   function hasName() {
     return !!getName();
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Cross-device persistence — syncs the local profile against /api/profile
+  // when a site auth token is present. Guests stay on localStorage only.
+  // ═════════════════════════════════════════════════════════════════════════
+
+  function getAuthToken() {
+    const t = safeLocalStorageGet('user_token');
+    if (!t || /^guest-/i.test(t)) return null;
+    return t;
+  }
+
+  let _pushTimer = null;
+  let _pendingPatch = null;
+
+  function pushProfileToServer(patch) {
+    const token = getAuthToken();
+    if (!token || !patch) return;
+    _pendingPatch = Object.assign(_pendingPatch || {}, patch);
+    if (_pushTimer) return;
+    _pushTimer = setTimeout(() => {
+      const body = _pendingPatch;
+      _pendingPatch = null;
+      _pushTimer = null;
+      try {
+        fetch('/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+          body: JSON.stringify(body),
+          credentials: 'omit',
+          cache: 'no-store',
+        }).catch(() => { /* offline / guest — fine */ });
+      } catch { /* ignore */ }
+    }, 250);
+  }
+
+  function pullProfileFromServer() {
+    const token = getAuthToken();
+    if (!token) return Promise.resolve(null);
+    return fetch('/api/profile', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token },
+      credentials: 'omit',
+      cache: 'no-store',
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || !data.success) return null;
+        // Server is authoritative for signed-in users — mirror into
+        // localStorage so all the legacy `localStorage.getItem('username')`
+        // call sites keep working without code changes.
+        if (data.displayName) {
+          safeLocalStorageSet(NAME_KEY, String(data.displayName).slice(0, 20));
+          safeLocalStorageSet(USERNAME_KEY, String(data.username || data.displayName).slice(0, 20));
+        } else if (data.username) {
+          safeLocalStorageSet(USERNAME_KEY, String(data.username).slice(0, 20));
+        }
+        if (data.avatar && data.avatar.id && data.avatar.emoji) {
+          try {
+            localStorage.setItem('kg_avatar', JSON.stringify({
+              id: String(data.avatar.id),
+              emoji: String(data.avatar.emoji),
+              name: String(data.avatar.name || data.avatar.id),
+            }));
+            window.dispatchEvent(new CustomEvent('kg-avatar-changed', { detail: data.avatar }));
+          } catch { /* ignore */ }
+        }
+        try {
+          window.dispatchEvent(new CustomEvent('kg-profile-synced', { detail: data }));
+        } catch { /* ignore */ }
+        return data;
+      })
+      .catch(() => null);
+  }
+
+  // Mirror avatar changes (from AvatarPicker.save) up to the server.
+  window.addEventListener('kg-avatar-changed', (ev) => {
+    const av = ev && ev.detail;
+    if (!av || !av.id || !av.emoji) return;
+    pushProfileToServer({ avatar: { id: av.id, emoji: av.emoji, name: av.name || av.id } });
+  });
 
   function buildNameModal() {
     if (document.getElementById('kg-name-modal')) return;
@@ -273,6 +358,7 @@ const KGPlayerProfile = (() => {
     editAvatar,
     renderBadge,
     autoAttach,
+    sync: pullProfileFromServer,
   };
 })();
 
@@ -280,5 +366,7 @@ const KGPlayerProfile = (() => {
 window.KGPlayerProfile = KGPlayerProfile;
 
 document.addEventListener('DOMContentLoaded', () => {
-  KGPlayerProfile.autoAttach();
+  // Pull authoritative profile from server first (no-op for guests), then
+  // attach the badge so it renders the freshly-synced name + avatar.
+  KGPlayerProfile.sync().then(() => KGPlayerProfile.autoAttach());
 });

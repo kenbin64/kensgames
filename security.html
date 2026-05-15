@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script src="/js/session-identity.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security &amp; Disclaimer &#183; KensGames</title>
+  <meta name="description"
+    content="KensGames security claim and disclaimer. Player data is stored as encrypted coordinates protected by AES-256-GCM, HMAC-SHA256 substrate signing, bcrypt password hashing and TLS 1.3 transport.">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --neon-cyan: #00FFFF;
+      --neon-pink: #FF00FF;
+      --neon-yellow: #FFE800;
+      --neon-purple: #9900FF;
+      --neon-green: #00FF41;
+      --bg-dark: #04040C;
+      --bg-card: rgba(4, 4, 20, 0.94);
+      --text: #E0E0FF;
+      --text-muted: #8888AA;
+      --font-arcade: 'Orbitron', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      background-image:
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    nav {
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+    }
+
+    nav .logo {
+      font-family: var(--font-arcade);
+      font-size: 18px;
+      letter-spacing: 3px;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      text-shadow: 0 0 8px var(--neon-cyan);
+    }
+
+    nav a.back {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    nav a.back:hover {
+      color: var(--neon-pink);
+    }
+
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    .eyebrow {
+      font-family: var(--font-arcade);
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--neon-yellow);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      font-family: var(--font-arcade);
+      font-size: 42px;
+      letter-spacing: 2px;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+      margin-bottom: 8px;
+    }
+
+    .lede {
+      font-size: 17px;
+      color: var(--text);
+      line-height: 1.75;
+      margin: 24px 0 36px;
+      padding: 18px 22px;
+      border-left: 3px solid var(--neon-yellow);
+      background: rgba(255, 232, 0, 0.04);
+    }
+
+    h2 {
+      font-family: var(--font-arcade);
+      font-size: 15px;
+      letter-spacing: 3px;
+      color: var(--neon-pink);
+      text-transform: uppercase;
+      margin: 40px 0 14px;
+    }
+
+    p {
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      font-size: 15px;
+      line-height: 1.85;
+    }
+
+    ul {
+      color: var(--text-muted);
+      margin: 0 0 18px 22px;
+      font-size: 15px;
+      line-height: 1.85;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    code {
+      color: var(--neon-yellow);
+      background: rgba(255, 232, 0, 0.08);
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.92em;
+    }
+
+    .primitives {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      border-radius: 6px;
+      padding: 22px 26px;
+      margin: 18px 0 28px;
+    }
+
+    .primitives h3 {
+      font-family: var(--font-arcade);
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--neon-cyan);
+      margin-bottom: 14px;
+      text-transform: uppercase;
+    }
+
+    .primitives ul {
+      margin-left: 20px;
+    }
+
+    .disclaimer {
+      margin-top: 48px;
+      background: rgba(255, 0, 255, 0.04);
+      border: 1px solid rgba(255, 0, 255, 0.30);
+      border-radius: 6px;
+      padding: 22px 26px;
+    }
+
+    .disclaimer h2 {
+      margin-top: 0;
+      color: var(--neon-pink);
+    }
+
+    .disclaimer p {
+      color: var(--text);
+    }
+
+    .meta {
+      margin-top: 40px;
+      font-family: var(--font-arcade);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-family: var(--font-arcade);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(0, 255, 255, 0.1);
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      main {
+        padding: 40px 18px 60px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <nav>
+    <a class="logo" href="/">KENSGAMES</a>
+    <a class="back" href="/">&#8592; Back to Portal</a>
+  </nav>
+
+  <main>
+    <div class="eyebrow">&#9632; Security &amp; Disclaimer &#9632;</div>
+    <h1>The Fort Knox of Game Data</h1>
+
+    <p class="lede">
+      KensGames stores almost nothing about you, encrypts what little it does store with the same primitives
+      used by banks and government systems, and refuses to ship the meaning of that data to your device. The
+      result is a service where a successful breach yields ciphertext indexed against geometry, not a database
+      of personal records.
+    </p>
+
+    <h2>Cryptographic Primitives In Use</h2>
+    <div class="primitives">
+      <h3>What protects your data right now</h3>
+      <ul>
+        <li><strong>AES&#8209;256&#8209;GCM</strong> for player coordinates. NIST&#8209;approved authenticated
+          encryption with a fresh 96&#8209;bit IV per write and a verified authentication tag on every read.</li>
+        <li><strong>HMAC&#8209;SHA256</strong> substrate signatures. Any tampered substrate is rejected before
+          a lens is allowed to read it.</li>
+        <li><strong>bcrypt</strong> password hashing at cost 12. Plaintext passwords are never written to disk
+          and never logged.</li>
+        <li><strong>Constant&#8209;time comparison</strong> (<code>crypto.timingSafeEqual</code>) on
+          verification codes to neutralise timing side&#8209;channels.</li>
+        <li><strong>WebAuthn passkeys</strong> as the primary authentication path on supported devices,
+          removing the password from the threat model entirely.</li>
+        <li><strong>TLS 1.3</strong> on all client traffic via HTTPS and WSS.</li>
+      </ul>
+    </div>
+
+    <h2>What An Attacker Actually Has To Do</h2>
+    <p>To recover anything meaningful from KensGames an attacker needs three independent things at the same time:
+      the encrypted manifold, the specific lens program that interprets it, and the keys that unlock both the
+      coordinate cipher and the substrate signature. Possessing only one or two of those yields geometry, not
+      data. There is no asset library to ransack, no per&#8209;game database of personal records, no plaintext
+      save files and no shipped 3D model archive. The total payload of the playable site is roughly 120 MB of
+      which 7.3 MB is code, and that code is projection logic, not user records.</p>
+
+    <h2>What A Worst&#8209;Case Breach Looks Like</h2>
+    <p>A worst&#8209;case server compromise that lifts the database leaves the attacker with AES&#8209;GCM
+      ciphertext keyed to opaque coordinate identifiers. Without the encryption key, the ciphertext cannot be
+      decrypted. Without the matching lens, even a decrypted coordinate resolves only to a position on a surface
+      with no semantic meaning attached. Without the substrate signing key, any attempt to forge or replay state
+      is rejected at verification.</p>
+
+    <h2>What This Claim Is Not</h2>
+    <p>It is not a claim that KensGames is unbreakable. No system is. It is not a claim that the cryptography
+      itself is novel, and deliberately so, because novel cryptography is how breaches happen. It is not a
+      claim that a sufficiently determined attacker with full client&#8209;side debugger access cannot
+      reverse&#8209;engineer a public lens. Lenses that carry trust&#8209;bearing logic are run on the server
+      for exactly that reason.</p>
+
+    <h2>What This Claim Is</h2>
+    <p>The surface area of "what is worth stealing" has been deliberately collapsed by architecture, not by
+      promises. Standard, audited, peer&#8209;reviewed cryptography protects what little remains. The
+      combination of a small, encrypted, geometry&#8209;native data model and a server&#8209;authoritative lens
+      boundary makes a successful exfiltration both expensive to achieve and low&#8209;value when achieved.
+      That is the practical meaning of "Fort Knox" in this context. Not a vault that cannot be opened, but a
+      vault that, when opened, contains very little a thief can spend.</p>
+
+    <h2>Honest Caveats &amp; Current Work</h2>
+    <ul>
+      <li>Encryption&#8209;at&#8209;rest keys are environment&#8209;variable held today. Migration to a sealed
+        key store with per&#8209;user data keys derived via HKDF is in progress.</li>
+      <li>Anti&#8209;replay nonces on authenticated coordinate updates are being added so old ciphertexts cannot
+        be resubmitted.</li>
+      <li>A formal threat model document is being written to accompany this page and to govern future game
+        additions.</li>
+      <li>Per&#8209;game substrate isolation, where each game's substrate is signed with a distinct HMAC subkey
+        derived from the game id, is planned.</li>
+    </ul>
+
+    <div class="disclaimer">
+      <h2>Disclaimer</h2>
+      <p>The information on this page describes the security architecture and cryptographic primitives in use
+        on KensGames as of the build referenced in <a href="/version.json"
+          style="color:var(--neon-cyan);text-decoration:none">version.json</a>. It is provided for
+        transparency and is not a warranty, guarantee, or contractual commitment. KensGames is operated by an
+        independent creator and the service is provided "as is" without warranties of any kind, express or
+        implied, including but not limited to merchantability, fitness for a particular purpose, or
+        non&#8209;infringement. Use of the service is at your own risk. The operator does not accept liability
+        for damages arising from use of, or inability to use, the service, including loss of data, loss of
+        progress, or loss of access to player accounts.</p>
+      <p>If you believe you have discovered a security vulnerability, please report it privately by email rather
+        than disclosing it publicly. Coordinated disclosure is appreciated and will be acknowledged.</p>
+    </div>
+
+    <div class="meta">Document version 1.0 &#183; Last reviewed 2026</div>
+  </main>
+
+  <footer>&#9632; KENSGAMES &#9632; SECURITY &amp; DISCLAIMER &#9632;</footer>
+</body>
+
+</html>

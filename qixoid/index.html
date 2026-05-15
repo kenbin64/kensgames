@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script src="/js/session-identity.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qixoid &#183; 3D Qix on a Torus &#183; KensGames</title>
+  <meta name="description"
+    content="Qixoid is a modern 3D take on the 1981 arcade classic Qix. Claim 75 percent of a torus surface while dodging the Qix.">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <link rel="stylesheet" href="/lib/fonts/fonts.css">
+  <style>
+    :root {
+      --neon-cyan: #00FFFF;
+      --neon-pink: #FF00FF;
+      --neon-yellow: #FFE800;
+      --neon-purple: #9900FF;
+      --neon-green: #00FF41;
+      --bg-dark: #04040C;
+      --text: #E0E0FF;
+      --text-muted: #8888AA;
+      --font-arcade: 'Orbitron', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 14px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-arcade);
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+      pointer-events: none;
+      z-index: 5;
+      background: linear-gradient(180deg, rgba(4, 4, 12, 0.85), rgba(4, 4, 12, 0));
+    }
+
+    #hud .left,
+    #hud .right,
+    #hud .center {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    #hud .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #hud .stat-val {
+      font-size: 22px;
+      color: var(--neon-yellow);
+      text-shadow: 0 0 10px rgba(255, 232, 0, 0.6);
+    }
+
+    #hud .stat-lbl {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      letter-spacing: 2px;
+    }
+
+    #hud a.back {
+      pointer-events: auto;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      font-size: 11px;
+      padding: 6px 10px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+    }
+
+    #hud a.back:hover {
+      color: var(--neon-pink);
+      border-color: var(--neon-pink);
+    }
+
+    #footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 22px;
+      font-family: var(--font-arcade);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      text-align: center;
+      z-index: 5;
+      background: linear-gradient(0deg, rgba(4, 4, 12, 0.85), rgba(4, 4, 12, 0));
+    }
+
+    #footer .key {
+      color: var(--neon-cyan);
+      margin: 0 4px;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(4, 4, 12, 0.85);
+      z-index: 10;
+      pointer-events: auto;
+    }
+
+    #overlay.hidden {
+      display: none;
+    }
+
+    #overlay .panel {
+      background: rgba(8, 8, 24, 0.95);
+      border: 2px solid var(--neon-cyan);
+      padding: 32px 40px;
+      text-align: center;
+      max-width: 460px;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+    }
+
+    #overlay h1 {
+      font-family: var(--font-arcade);
+      font-size: 36px;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 14px rgba(0, 255, 255, 0.6);
+      margin-bottom: 8px;
+      letter-spacing: 4px;
+    }
+
+    #overlay .sub {
+      color: var(--neon-yellow);
+      font-family: var(--font-arcade);
+      font-size: 11px;
+      letter-spacing: 3px;
+      margin-bottom: 22px;
+    }
+
+    #overlay p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }
+
+    #overlay .keys {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 14px;
+      text-align: left;
+      margin: 18px auto;
+      max-width: 320px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    #overlay .keys b {
+      font-family: var(--font-arcade);
+      color: var(--neon-cyan);
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    #overlay button {
+      background: transparent;
+      border: 2px solid var(--neon-yellow);
+      color: var(--neon-yellow);
+      padding: 12px 32px;
+      font-family: var(--font-arcade);
+      letter-spacing: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 14px;
+      box-shadow: 0 0 14px rgba(255, 232, 0, 0.3);
+      transition: all .15s;
+    }
+
+    #overlay button:hover {
+      background: rgba(255, 232, 0, 0.1);
+      transform: scale(1.04);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div class="left">
+      <a class="back" href="/">&#8592; PORTAL</a>
+    </div>
+    <div class="center">
+      <div class="stat">
+        <div class="stat-val" id="hud-claimed">0%</div>
+        <div class="stat-lbl">Claimed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="hud-target">75%</div>
+        <div class="stat-lbl">Target</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="hud-lives">3</div>
+        <div class="stat-lbl">Lives</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="hud-score">0</div>
+        <div class="stat-lbl">Score</div>
+      </div>
+    </div>
+    <div class="right" style="font-size:11px;color:var(--text-muted)">QIXOID v0.1</div>
+  </div>
+
+  <div id="footer">
+    <span class="key">WASD</span> or <span class="key">Arrows</span> to move
+    &#9632; <span class="key">Hold Space</span> to stake into unclaimed
+    &#9632; <span class="key">Mouse drag</span> to rotate
+  </div>
+
+  <div id="overlay">
+    <div class="panel">
+      <h1>QIXOID</h1>
+      <div class="sub">3D QIX ON A TORUS</div>
+      <p>Claim territory on the surface of a torus. Stake out into unclaimed cells, then return to safe ground to
+        fence off the smaller side. Avoid the magenta Qix at all times. Capture 75 percent to win.</p>
+      <div class="keys">
+        <b>WASD / &#8593;&#8595;&#8592;&#8594;</b><span>Move along the grid</span>
+        <b>Hold SPACE</b><span>Stake out from claimed land</span>
+        <b>Mouse</b><span>Rotate the torus</span>
+      </div>
+      <button id="start-btn">&#9654; PLAY</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="game.js"></script>
+</body>
+
+</html>

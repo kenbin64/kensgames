@@ -65,6 +65,20 @@ function getOrCreateUserCoordinate(username, authMethod = 1) {
 }
 
 /**
+ * Read user from manifold by userId (slow scan; manifold is small)
+ */
+function readUserFromManifoldById(userId) {
+  const target = String(userId || '');
+  if (!target) return null;
+  for (const key in manifoldData) {
+    if (!key.startsWith('user-')) continue;
+    const u = manifoldData[key];
+    if (u && String(u.userId) === target) return u;
+  }
+  return null;
+}
+
+/**
  * Read user from manifold by username
  */
 function readUserFromManifold(username) {
@@ -96,104 +110,6 @@ function writeUserToManifold(username, userData) {
   };
   return manifoldData[coordinateKey];
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ENDPOINT: GET /api/auth/access-session
-// ═══════════════════════════════════════════════════════════════════════════
-// If the request is already authenticated by Cloudflare Access, mint a
-// KensGames JWT token and return it so game pages don't require a second login.
-//
-// Cloudflare Access typically injects identity headers such as:
-//   - cf-access-authenticated-user-email
-//   - cf-access-authenticated-user-id
-//
-// If those headers are missing (e.g., local dev), this endpoint returns 401.
-
-function sanitizeUsernameFromEmail(email) {
-  const local = String(email || '').split('@')[0] || '';
-  const cleaned = local
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 24);
-
-  if (cleaned.length >= 3) return cleaned;
-  return `player_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-app.get('/api/auth/access-session', async (req, res) => {
-  try {
-    const emailHeader = req.headers['cf-access-authenticated-user-email']
-      || req.headers['cf-access-authenticated-user-email'.toLowerCase()]
-      || req.headers['cf-access-user-email']
-      || req.headers['x-authenticated-user-email'];
-
-    const idHeader = req.headers['cf-access-authenticated-user-id']
-      || req.headers['cf-access-authenticated-user-id'.toLowerCase()]
-      || req.headers['x-authenticated-user-id'];
-
-    const email = (emailHeader ? String(emailHeader).trim().toLowerCase() : '');
-    if (!email || !email.includes('@')) {
-      return res.status(401).json({ success: false, error: 'Not authenticated via Access' });
-    }
-
-    // If a KensGames account already exists for this email, reuse it.
-    let userData = readUserFromManifoldByEmail(email);
-
-    let username;
-    if (userData && userData.username) {
-      username = userData.username;
-    } else {
-      username = sanitizeUsernameFromEmail(email);
-
-      // Ensure uniqueness if a different account already uses the derived username.
-      const existingByName = readUserFromManifold(username);
-      if (existingByName && existingByName.email && existingByName.email !== email) {
-        username = `${username.slice(0, 18)}_${Math.random().toString(36).slice(2, 6)}`;
-      }
-
-      // Create a passwordless account bound to Access identity.
-      const userCoord = getOrCreateUserCoordinate(username, 3);
-      userData = writeUserToManifold(username, {
-        ...userCoord,
-        username,
-        email,
-        displayName: userCoord.displayName || username,
-        emailVerified: true,
-        status: 'active',
-        accessUserId: idHeader ? String(idHeader) : undefined,
-      });
-    }
-
-    // Create session token
-    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const token = authHandler.generateToken(userData.userId, sessionId);
-
-    const session = {
-      id: sessionId,
-      token: token,
-      createdAt: Date.now(),
-      lastActivityAt: Date.now(),
-      method: 'access',
-    };
-
-    const sessions = userData.sessions || [];
-    sessions.push(session);
-    writeUserToManifold(username, { sessions, lastLoginAt: Date.now() });
-
-    return res.status(200).json({
-      success: true,
-      token,
-      userId: userData.userId,
-      username,
-      displayName: userData.displayName || username,
-      email,
-    });
-  } catch (error) {
-    console.error('Access session error:', error);
-    return res.status(500).json({ success: false, error: 'Access session failed' });
-  }
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ENDPOINT: POST /api/auth/register
@@ -377,8 +293,83 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ENDPOINT: GET /api/auth/validate
+// ═══════════════════════════════════════════════════════════════════════════// ENDPOINT: GET /api/profile  /  PUT /api/profile
+// ═════════════════════════════════════════════════════════════════════════
+// Cross-device persistence for player display name + avatar.
+// Bound to the user account via Bearer token. Guests (no token) get 401
+// and fall back to localStorage-only.
+
+function _profileFromToken(req) {
+  const raw = req.headers.authorization || '';
+  const token = raw.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return { error: 'No token provided', status: 401 };
+  const decoded = authHandler.verifyToken(token);
+  if (decoded.error) return { error: decoded.error, status: 401 };
+  const user = readUserFromManifoldById(decoded.userId);
+  if (!user) return { error: 'User not found', status: 404 };
+  return { user };
+}
+
+app.get('/api/profile', (req, res) => {
+  const ctx = _profileFromToken(req);
+  if (ctx.error) return res.status(ctx.status).json({ success: false, error: ctx.error });
+  const u = ctx.user;
+  return res.status(200).json({
+    success: true,
+    userId: u.userId,
+    username: u.username,
+    displayName: u.displayName || u.username,
+    avatar: u.avatar || null,
+  });
+});
+
+app.put('/api/profile', express.json(), (req, res) => {
+  const ctx = _profileFromToken(req);
+  if (ctx.error) return res.status(ctx.status).json({ success: false, error: ctx.error });
+  const u = ctx.user;
+  const patch = {};
+
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'displayName')) {
+    const dn = String(req.body.displayName || '').trim().slice(0, 32);
+    if (dn.length < 2) {
+      return res.status(400).json({ success: false, error: 'displayName must be ≥2 chars' });
+    }
+    patch.displayName = dn;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'avatar')) {
+    const av = req.body.avatar;
+    if (av === null) {
+      patch.avatar = null;
+    } else if (av && typeof av === 'object') {
+      patch.avatar = {
+        id: String(av.id || '').slice(0, 64),
+        emoji: String(av.emoji || '').slice(0, 8),
+        name: String(av.name || '').slice(0, 32),
+      };
+      if (!patch.avatar.id || !patch.avatar.emoji) {
+        return res.status(400).json({ success: false, error: 'avatar requires id + emoji' });
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'avatar must be object or null' });
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return res.status(400).json({ success: false, error: 'nothing to update' });
+  }
+
+  const updated = writeUserToManifold(u.username, patch);
+  return res.status(200).json({
+    success: true,
+    userId: updated.userId,
+    username: updated.username,
+    displayName: updated.displayName || updated.username,
+    avatar: updated.avatar || null,
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════// ENDPOINT: GET /api/auth/validate
 // ═══════════════════════════════════════════════════════════════════════════
 
 app.get('/api/auth/validate', (req, res) => {

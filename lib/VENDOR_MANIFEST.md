@@ -16,7 +16,7 @@ To roll back any library: copy from `.originals/` back to the working directory.
 |---|---|
 | **File** | `three/three.min.js` |
 | **Version** | r128 (0.128.0) |
-| **CDN source** | `https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js` |
+| **CDN source** | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` |
 | **Size** | 603,445 bytes |
 | **SHA256** | `9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2` |
 
@@ -34,7 +34,7 @@ To roll back any library: copy from `.originals/` back to the working directory.
 |---|---|
 | **File** | `fontawesome/css/all.min.css` |
 | **Version** | 6.5.1 |
-| **CDN source** | `https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css` |
+| **CDN source** | `https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css` |
 | **Size** | 102,641 bytes |
 | **SHA256** | `c22cfb6520a7fdbb738632834019acf47c78b1279462c0eb4cb83bae83ecb5a7` |
 
@@ -60,7 +60,7 @@ To roll back any library: copy from `.originals/` back to the working directory.
 |---|---|
 | **File** | `jquery/jquery.min.js` |
 | **Version** | 3.7.1 |
-| **CDN source** | `https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js` |
+| **CDN source** | `https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js` |
 | **Size** | 87,533 bytes |
 | **SHA256** | `fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a` |
 
@@ -69,7 +69,7 @@ To roll back any library: copy from `.originals/` back to the working directory.
 |---|---|
 | **File** | `bootstrap/css/bootstrap.min.css` |
 | **Version** | 5.3.3 |
-| **CDN source** | `https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css` |
+| **CDN source** | `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css` |
 | **Size** | 232,803 bytes |
 | **SHA256** | `3c8f27e6009ccfd710a905e6dcf12d0ee3c6f2ac7da05b0572d3e0d12e736fc8` |
 
@@ -78,7 +78,7 @@ To roll back any library: copy from `.originals/` back to the working directory.
 |---|---|
 | **File** | `bootstrap/js/bootstrap.bundle.min.js` |
 | **Version** | 5.3.3 |
-| **CDN source** | `https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js` |
+| **CDN source** | `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js` |
 | **Size** | 80,721 bytes |
 | **SHA256** | `0833b2e9c3a26c258476c46266e6877fc75218625162e0460be9a3a098a61c6c` |
 

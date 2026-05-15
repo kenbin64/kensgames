@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const { execSync } = require('child_process');
 const targets = [
-  'require_auth', 'access_session_bridge', 'access_status',
+  'require_auth',
   'auth_portal_substrate', 'auth_substrate.js', 'auth_ui.js',
   'assets/js/auth.js', '/login', '/register', '/forgot-password',
   '/reset-password', '/verify-email', '/lobby/', 'user_token', '/api/auth',

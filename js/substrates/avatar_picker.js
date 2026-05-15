@@ -118,7 +118,14 @@ const AvatarPicker = (() => {
         return { id: id || `custom_${emoji}`, emoji, name: name || emoji };
     }
     function has() { return !!get(); }
-    function save(avatar) { localStorage.setItem(KEY, JSON.stringify(avatar)); }
+    function save(avatar) {
+        try { localStorage.setItem(KEY, JSON.stringify(avatar)); } catch { /* ignore */ }
+        // Notify higher-level substrates (e.g. KGPlayerProfile) so they can
+        // mirror the change to the server when the user is signed in.
+        try {
+            window.dispatchEvent(new CustomEvent('kg-avatar-changed', { detail: avatar }));
+        } catch { /* ignore */ }
+    }
 
     function buildModal() {
         if (document.getElementById('av-modal')) return;

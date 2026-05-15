@@ -3,6 +3,7 @@
 
 <head>
   <script src="/js/session-identity.js"></script>
+  <script src="/js/kg-game-cache.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lobby &mdash; KensGames</title>
@@ -723,6 +724,22 @@
         mp.on('session_update', (s) => renderRoom(s));
         mp.on('share_code', (c) => setRoomCode(c));
         mp.on('game_started', (d) => onGameStarted(d));
+        // Host cancellation / game completion → wipe cached runtime so the
+        // next launch (here or in a sibling tab) cannot resurrect the dead
+        // session from stale localStorage / sessionStorage.
+        mp.on('session_cancelled', (d) => {
+          try { window.KGGameCache && KGGameCache.purgeRuntime('session_cancelled'); } catch (_) { }
+          inRoom = false;
+          _autoReadiedHost = false;
+          try { document.getElementById('room-view').classList.add('hidden'); } catch (_) { }
+          try { document.getElementById('lobby-view').classList.remove('hidden'); } catch (_) { }
+          try { document.getElementById('room-code').classList.add('hidden'); } catch (_) { }
+          setMsg('action-msg', (d && d.reason === 'host_cancelled') ? 'Host cancelled the game.' : 'Game cancelled.', 'err');
+          try { refreshPublic(); } catch (_) { }
+        });
+        mp.on('game_over', () => {
+          try { window.KGGameCache && KGGameCache.purgeRuntime('game_over'); } catch (_) { }
+        });
         mp.on('error', (e) => {
           const msg = (e && e.message) || 'Server error';
           console.warn('[lobby] server error:', msg, e);
@@ -1036,9 +1053,16 @@
           if (!mp) return;
           if (!confirm('Cancel this game and remove all players from the room?')) return;
           setMsg('room-msg', 'Cancelling game…', 'ok');
+          // Purge cached runtime immediately on the host side — the
+          // session_cancelled broadcast will purge on peers.
+          try { window.KGGameCache && KGGameCache.purgeRuntime('host_cancel_click'); } catch (_) { }
           try { mp.cancelSession && mp.cancelSession(); } catch (e) { console.error('[lobby] cancelSession failed', e); }
         };
         document.getElementById('btn-leave').onclick = () => {
+          // Leaving a room = no game in progress here anymore. Drop runtime
+          // cache so a refresh / re-entry doesn't auto-resume into the
+          // session we just abandoned.
+          try { window.KGGameCache && KGGameCache.purgeRuntime('leave_room'); } catch (_) { }
           if (mp) mp.leave();
           inRoom = false;
           _autoReadiedHost = false;

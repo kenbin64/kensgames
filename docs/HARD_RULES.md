@@ -231,10 +231,11 @@ scaffolding has password tables/columns, mark them deprecated and migrate.
 cookies. JWT signing key lives in `JWT_SECRET` (already referenced in the
 VPS AGENTS.md §7).
 
-**HR-17.3.** **Cloudflare Turnstile** gates the passkey-registration and
-magic-link-request endpoints (abuse protection only — not an auth provider).
-Cloudflare Workers / Pages MAY host the auth API; this is an implementation
-choice, not a requirement.
+**HR-17.3.** A CAPTCHA / proof-of-work abuse-protection layer gates the
+passkey-registration and magic-link-request endpoints. The choice of
+provider is an implementation detail; it is **not** an auth provider and
+no feature may depend on a specific vendor.
+
 
 **HR-17.4.** Guest sessions (per HR-13) are persisted as an anonymous
 identity in `localStorage` + a signed `guest_id` cookie. At the post-match
@@ -670,7 +671,8 @@ here.
 - 2026-05-03 — HR-17 resolved by user delegation to industry standards:
   passkeys-first (WebAuthn/FIDO2), OAuth fallback (Google/Discord/Apple),
   email magic-link universal fallback. Zero passwords system-wide.
-  Cloudflare Turnstile for abuse protection. Added HR-17.1–17.5.
+  Vendor-neutral CAPTCHA / proof-of-work for abuse protection.
+  Added HR-17.1–17.5.
 - 2026-05-03 — Added §5 "Game Manager (Runtime)" (`HR-21`–`HR-26`) on user
   reminder. Extends the shared-service rule (`HR-18`) from the wizard to the
   runtime manager. Updated `HR-18` to cite both. Renumbered Compliance

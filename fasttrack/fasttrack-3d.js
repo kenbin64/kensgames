@@ -2776,7 +2776,14 @@ async function init3D() {
 
         const ensurePublisher = () => {
           if (statePublisherTimer) return;
-          statePublisherTimer = setInterval(publishAuthoritativeState, 250);
+          // Delta-only broadcast: every move/draw/turn_advance already goes
+          // out as a `game_action` delta and peers replay it under the
+          // _applying guard with full local hop animations. Sending a
+          // full-state snapshot on a tight 250 ms cadence was teleporting
+          // peer pegs mid-hop. Keep the periodic publisher only as a slow
+          // catch-up safety net (5 s) — `lastPublishedState` dedupe means
+          // it usually emits nothing.
+          statePublisherTimer = setInterval(publishAuthoritativeState, 5000);
         };
         const ensureJoined = () => {
           if (joinIssued) return;
@@ -2797,18 +2804,72 @@ async function init3D() {
           // Skip our own echoes — server fans out to all peers including the sender.
           if (msg.from && mp.userId && String(msg.from) === String(mp.userId)) return;
           try {
+            // Delta-only: applyRemoteAction replays the move locally with
+            // full hop animation. Do NOT immediately re-broadcast a full
+            // state snapshot — that snapshot would race the peer's own
+            // in-flight hop animation and yank pegs to authoritative
+            // positions, producing chaotic motion. The periodic 5 s
+            // catch-up publisher (with dedupe) is sufficient.
             window.FastTrackCore.applyRemoteAction(msg.action, msg.payload);
-            // Host re-publishes the canonical full state after applying any peer action.
-            publishAuthoritativeState();
           }
           catch (err) { console.warn('[ft-mp] applyRemoteAction failed', msg.action, err); }
         });
+        // Pending snapshot buffer — if a snapshot arrives while peg-hop
+        // animations (or the renderBoard barrier) are in flight, applying
+        // it would teleport pegs mid-hop and produce visually chaotic
+        // movement. Keep only the latest pending frame and replay it once
+        // animations drain.
+        let _pendingSnapshotFrame = null;
+        let _pendingSnapshotSeq = 0;
+        let _pendingSnapshotScheduled = false;
+        const flushPendingSnapshot = () => {
+          _pendingSnapshotScheduled = false;
+          const frame = _pendingSnapshotFrame;
+          const seq = _pendingSnapshotSeq;
+          _pendingSnapshotFrame = null;
+          _pendingSnapshotSeq = 0;
+          if (!frame) return;
+          // Re-check the barrier in case more animations started while we
+          // were waiting; if so, re-defer.
+          if (typeof window.isPlayResolving === 'function' && window.isPlayResolving()) {
+            _pendingSnapshotFrame = frame;
+            _pendingSnapshotSeq = seq;
+            if (!_pendingSnapshotScheduled && typeof window.waitForAnimations === 'function') {
+              _pendingSnapshotScheduled = true;
+              window.waitForAnimations(flushPendingSnapshot);
+            }
+            return;
+          }
+          try {
+            const ok = window.FastTrackCore && typeof window.FastTrackCore.applyStateSnapshot === 'function'
+              ? window.FastTrackCore.applyStateSnapshot(frame)
+              : false;
+            if (ok && seq) lastAppliedSeq = seq;
+          } catch (err) {
+            console.warn('[ft-mp] deferred snapshot apply failed', err);
+          }
+        };
         mp.on('game_state', (msg) => {
           if (colyseusRoom) return;
           if (!msg || !msg.state) return;
           const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
           if (seq && seq <= lastAppliedSeq) return;
           const frame = msg.state && msg.state.fasttrack ? msg.state.fasttrack : msg.state;
+          // Defer apply if local hop animations / renderBoard barrier are
+          // still in flight — applying mid-hop yanks pegs to authoritative
+          // positions and looks chaotic. Always keep only the LATEST frame.
+          if (typeof window.isPlayResolving === 'function' && window.isPlayResolving()) {
+            // Only overwrite the pending buffer if this snapshot is newer.
+            if (!_pendingSnapshotSeq || seq === 0 || seq > _pendingSnapshotSeq) {
+              _pendingSnapshotFrame = frame;
+              _pendingSnapshotSeq = seq;
+            }
+            if (!_pendingSnapshotScheduled && typeof window.waitForAnimations === 'function') {
+              _pendingSnapshotScheduled = true;
+              window.waitForAnimations(flushPendingSnapshot);
+            }
+            return;
+          }
           const ok = window.FastTrackCore && typeof window.FastTrackCore.applyStateSnapshot === 'function'
             ? window.FastTrackCore.applyStateSnapshot(frame)
             : false;
@@ -2845,6 +2906,25 @@ async function init3D() {
         mp.on('pm_game_ready', (data) => {
           const roomId = data && data.colyseus_room_id ? String(data.colyseus_room_id) : '';
           if (roomId) ensureColyseusConnection(roomId);
+        });
+        // Host cancelled the session (or the server tore it down). Drop all
+        // cached runtime so a refresh / re-launch can't resurrect the dead
+        // game, then bounce back to the lobby.
+        mp.on('session_cancelled', (data) => {
+          try { window.KGGameCache && KGGameCache.purgeRuntime('mp_session_cancelled'); } catch (_) { }
+          try {
+            const reason = (data && data.reason) ? String(data.reason) : 'cancelled';
+            const msg = (reason === 'host_cancelled')
+              ? 'The host cancelled this game.'
+              : 'This game was cancelled.';
+            if (typeof window.alert === 'function') window.alert(msg);
+          } catch (_) { }
+          try { window.location.replace('/lobby/?game=fasttrack'); } catch (_) { }
+        });
+        // Game completed (winner declared by some peer / the server). Wipe
+        // cached runtime everywhere so the next launch starts clean.
+        mp.on('game_over', () => {
+          try { window.KGGameCache && KGGameCache.purgeRuntime('mp_game_over'); } catch (_) { }
         });
         mp.on('error', (message) => {
           if (!message) return;

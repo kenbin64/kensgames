@@ -1,0 +1,33 @@
+{
+  "manifold": "qixoid",
+  "name": "Qixoid",
+  "version": "0.1.0",
+  "status": "production",
+  "dimension": {
+    "x": 1,
+    "y": 5,
+    "z": 5,
+    "_note": "z = x*y = 1 player * 5 min avg session = 5"
+  },
+  "entry": "index.html",
+  "substrates": {
+    "game": "game.js"
+  },
+  "tagline": "3D Qix on a torus",
+  "description": "A modern 3D take on the 1981 arcade classic Qix. Claim territory on the surface of a torus while a chaotic Qix entity hunts your unfinished stake. Capture 75 percent of the surface to win.",
+  "controls": {
+    "ArrowKeys/WASD": "move along the grid",
+    "Space": "stake into unclaimed territory",
+    "Mouse drag": "rotate the torus"
+  },
+  "manifold_bridge": {
+    "entry_var": "window.__MANIFOLD__",
+    "schema_version": "1.0",
+    "exposes": [
+      "claimedPercent",
+      "lives",
+      "score",
+      "qixPosition"
+    ]
+  }
+}

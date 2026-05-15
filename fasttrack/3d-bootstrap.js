@@ -116,6 +116,49 @@ window.KG_BOOTSTRAP_PROMISE = (async function () {
   }
 
   // ── 4. Live multiplayer: try to bootstrap from the server ──
+  // Fast path — the lobby's onGameStarted handler already wrote the resolved
+  // roster + my identity to sessionStorage before navigating. Trust that and
+  // resolve immediately so init3D() is not blocked on a network round-trip
+  // (this is what made guest boards stall on a black screen for several
+  // seconds while the server caught up to the join).
+  const cachedRosterReady =
+    code &&
+    runtimeCache &&
+    runtimeCache.game &&
+    String(runtimeCache.game.code || '').toUpperCase() === code &&
+    Array.isArray(runtimeCache.players) &&
+    runtimeCache.players.length >= 2;
+  const cachedSessionReady =
+    code &&
+    cachedSession &&
+    String(cachedSession.session_code || '').toUpperCase() === code &&
+    Array.isArray(cachedSession.players) &&
+    cachedSession.players.length >= 2;
+  const haveLocalIdentity = !!(localStorage.getItem('username') && localStorage.getItem('kg_avatar'));
+
+  if (haveLocalIdentity && (cachedRosterReady || cachedSessionReady)) {
+    ensureLocalIdentity();
+    window.KG_Player = kgPlayer;
+    // Refresh the server view in the background so any late-joining peers /
+    // server-side state changes still reach this client, but do NOT block the
+    // 3D scene from initialising.
+    (async () => {
+      try {
+        const ep = `/api/session/bootstrap?code=${encodeURIComponent(code)}`;
+        let res = await fetch(ep);
+        if (!res.ok && (res.status === 400 || res.status === 404)) {
+          res = await fetch(`/ws/api/session/bootstrap?code=${encodeURIComponent(code)}`);
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.session) {
+          sessionStorage.setItem('kg_session', JSON.stringify(data.session));
+        }
+      } catch (_) { /* background refresh — silent */ }
+    })();
+    return;
+  }
+
   const endpoint = code
     ? `/api/session/bootstrap?code=${encodeURIComponent(code)}`
     : `/api/players/me`;

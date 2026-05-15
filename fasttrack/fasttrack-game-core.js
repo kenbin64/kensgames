@@ -378,6 +378,9 @@ function initGame(playerCount = 2, config = {}) {
     : playerCount;
   state.players.set('count', effectiveCount);
   state.players.set('current', 0);
+  // Reset host-authoritative turn-rotation counters for the new game.
+  _turnSeq = 0;
+  _lastAppliedTurnSeq = 0;
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(0);
 
   // ─── Card Matrix (substrate) ───
@@ -509,16 +512,27 @@ function initGame(playerCount = 2, config = {}) {
     const enableFirstTurn = () => {
       dismissYourTurnPopup();
       if (firstPlayer && firstPlayer.isBot) {
-        setTimeout(botTurn, 400);
+        // In MP, only the host (game manager) drives bot turns.
+        if (!_isMpMode() || _isHost()) setTimeout(botTurn, 400);
       } else {
-        if (drawBtn) drawBtn.disabled = false;
+        // In MP, only enable the draw button for the local active player.
+        // Otherwise a peer can click draw and play on the active player's
+        // behalf (turn-skip bug).
+        if (drawBtn && (!_isMpMode() || _isMyTurn())) drawBtn.disabled = false;
       }
     };
 
     const startBlink = () => {
-      // Show "Your turn" popup for human players
+      // Show "Your turn" popup for human players — in networked MP, only
+      // for the LOCAL active player so peers don't see another player's
+      // turn-start banner.
       if (firstPlayer && !firstPlayer.isBot) {
-        showYourTurnPopup(firstPlayer.name, firstPlayer.color);
+        const mpMode = _isMpMode();
+        const showFirstPopup = mpMode ? _isMyTurn() : true;
+        if (showFirstPopup) {
+          showYourTurnPopup(firstPlayer.name, firstPlayer.color);
+          setTimeout(dismissYourTurnPopup, 1500);
+        }
       }
       if (window.blinkPlayerMarker) {
         window.blinkPlayerMarker(0, enableFirstTurn);
@@ -587,6 +601,16 @@ function shuffleDeck() {
 let _mpClient = null;
 let _applying = false;
 
+// ── Game Manager (host-authoritative turn control) ────────────────────────
+// The host is the sole authority on `state.players.current`. Non-host peers
+// never advance current locally; their endTurn() instead asks the host to
+// advance via a 'turn_request' relay. The host's endTurn() advances and
+// broadcasts a 'turn_advance' message. All clients (including the host) only
+// commit turn rotation when applying a 'turn_advance' with a fresh seq.
+// In solo / same-screen / non-MP modes, every endTurn advances directly.
+let _turnSeq = 0;
+let _lastAppliedTurnSeq = 0;
+
 // ── Kernel adapter (slice 2 of the per-game GameKernel rollout) ──────────
 // In hybrid mode the host client still owns the deck and broadcasts the popped
 // card to peers via the legacy peer relay. The kernel runs alongside as a
@@ -649,6 +673,23 @@ function setMultiplayerClient(client) {
   if (_kernelClient) { try { _kernelClient.destroy(); } catch (_) { } }
   _kernelClient = null;
   _kernelMode = false;
+  // BUGFIX (turn-rotation): setMultiplayerClient is only ever invoked when a
+  // real network session is being attached (see fasttrack-3d.js — never in
+  // solo). If state.meta.gameMode somehow leaked through as 'solo' (stale
+  // KG_Game cache, missing URL params, lobby handoff regression), the
+  // _isMpMode() guard returned false and endTurn() / drawCard() ran the
+  // local-only branch — host advanced to slot 1 with NO turn_advance
+  // broadcast and never gated their own UI, so host played every seat.
+  // Force the game mode into a live MP value the moment a real client
+  // attaches so the rotation + broadcast path is always taken.
+  try {
+    if (client && state && state.meta) {
+      const cur = state.meta.get('gameMode');
+      if (cur !== 'private' && cur !== 'public' && cur !== 'multiplayer') {
+        state.meta.set('gameMode', 'multiplayer');
+      }
+    }
+  } catch (_) { /* state may not be initialised yet — initGame will read this later */ }
   if (!client || typeof window === 'undefined' || typeof window.KGKernelClient !== 'function') return;
   _kernelClient = new window.KGKernelClient({
     client,
@@ -696,12 +737,26 @@ function updateSessionRoster(sessionPlayers) {
 }
 
 function _isMpMode() {
+  // Belt-and-suspenders: a real KGMultiplayer client is only ever attached
+  // in live MP (see setMultiplayerClient comment). If one is present, treat
+  // this as MP regardless of state.meta.gameMode — that string has too many
+  // legacy paths that can leak 'solo' into a networked game and silently
+  // disable the turn_advance broadcast.
+  if (_mpClient) return true;
   const mode = state.meta.get('gameMode');
-  return _mpClient && (mode === 'private' || mode === 'public' || mode === 'multiplayer');
+  return mode === 'private' || mode === 'public' || mode === 'multiplayer';
 }
 
 function _myUserId() {
-  return state.meta.get('myUserId') || (_mpClient && _mpClient.userId) || null;
+  const meta = state.meta.get('myUserId');
+  if (meta) return meta;
+  if (_mpClient && _mpClient.userId) return _mpClient.userId;
+  // game_manager.js stashes the resolved id here during lobby handoff.
+  try {
+    const stash = (typeof sessionStorage !== 'undefined') && sessionStorage.getItem('ft_my_user_id');
+    if (stash) return stash;
+  } catch (_) { }
+  return null;
 }
 
 function _activePlayerUserId() {
@@ -715,7 +770,34 @@ function _isMyTurn() {
   if (!_isMpMode()) return true;
   const me = _myUserId();
   const active = _activePlayerUserId();
-  return me && active && String(me) === String(active);
+  if (me && active) return String(me) === String(active);
+  // Degraded fallback: lobby handoff didn't stash my_user_id (or the player
+  // roster lacks user_id). Identify "me" by username match against the local
+  // identity so the active player still sees their own turn UI instead of
+  // being locked out forever (regression observed v0.5.5: turn 1 popup
+  // shows from initGame's direct call but every subsequent turn's popup,
+  // hints and instructions get gated off because _isMyTurn returned false).
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const ap = players[ci];
+  if (!ap) return true;
+  let myName = '';
+  try {
+    myName = (typeof localStorage !== 'undefined' && localStorage.getItem('username')) || '';
+  } catch (_) { myName = ''; }
+  if (myName && ap.name && String(myName).trim() === String(ap.name).trim()) return true;
+  // BUGFIX (turn-skip): if the active player has a resolvable identity
+  // (userId or a name distinct from ours) and we don't match, this is NOT
+  // our turn — even if our own userId hasn't resolved yet. Returning true
+  // here let the local player draw + play on the active peer's behalf
+  // (e.g. on game start before `authenticated` fires), causing the peer's
+  // turn to "flash" and snap back to us. Lock the UI in that case.
+  if (active) return false;
+  if (myName && ap.name && String(myName).trim() !== String(ap.name).trim()) return false;
+  // Truly cannot identify either side — fall through to the permissive
+  // fallback so the active tab isn't permanently locked out.
+  if (!me) return true;
+  return false;
 }
 
 function _isHost() {
@@ -784,6 +866,20 @@ function applyRemoteAction(action, payload) {
         if (!cards) break;
         state.deck.set('cards', cards.slice());
         state.deck.set('discard', []);
+        break;
+      }
+      case 'turn_advance': {
+        // Authoritative turn rotation broadcast by the player who just
+        // ended their turn (or by the host on behalf of a bot).
+        // Idempotent via seq.
+        const from = payload && Number.isFinite(payload.from) ? payload.from : null;
+        const next = payload && Number.isFinite(payload.next) ? payload.next : null;
+        const seq = payload && Number.isFinite(payload.seq) ? payload.seq : 0;
+        if (from === null || next === null) break;
+        if (seq && seq <= _lastAppliedTurnSeq) break;
+        _lastAppliedTurnSeq = seq || _lastAppliedTurnSeq;
+        if (seq > _turnSeq) _turnSeq = seq;
+        _applyTurnAdvance(from, next, seq);
         break;
       }
     }
@@ -1551,17 +1647,30 @@ function showMoveHints() {
   const curPlayer = players[ci] || { name: PLAYER_NAMES[ci] || 'Player', pegs: [] };
 
   if (vm.length === 0) {
-    hintsDiv.innerHTML = '<div class="hint" style="opacity:0.5;">No legal move — turn ends</div>';
-    setTimeout(endTurn, 1600);
+    // No timers: require an explicit click to end the turn so MP stays in
+    // sync (the click triggers the standard executeMove/endTurn broadcast
+    // path on the active player only).
+    hintsDiv.innerHTML = '<button id="ft-end-turn-btn" class="hint" style="cursor:pointer;font-weight:600;">No legal move — End Turn</button>';
+    const btn = document.getElementById('ft-end-turn-btn');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (_isMpMode() && !_isMyTurn()) return;
+        // Mark this as a "discard" move so endTurn runs once via the normal
+        // executeMove broadcast path. With validMoves empty there is no real
+        // move to play, so call endTurn directly and rely on the host's
+        // snapshot publisher to propagate the new current to peers.
+        endTurn();
+      }, { once: true });
+    }
     return;
   }
 
-  // If there is exactly one legal move, auto-play it without requiring a click.
+  // If there is exactly one legal move, highlight it and wait for the player
+  // to confirm via the toolbar (no auto-play timer).
   if (vm.length === 1) {
     const autoText = summarizeMoveForHint(vm[0], curPlayer, ci);
-    hintsDiv.innerHTML = `<div class="hint hint-auto" style="opacity:0.85;cursor:default;">${escapeHtml(autoText)} — auto-playing</div>`;
+    hintsDiv.innerHTML = `<div class="hint" style="opacity:0.9;">${escapeHtml(autoText)} — press ▶ then Confirm</div>`;
     if (window.highlightSinglePath) window.highlightSinglePath(0);
-    setTimeout(() => executeMove(0), 220);
     return;
   }
 
@@ -2243,6 +2352,20 @@ function executeMove(moveIdx) {
       const winnerName = getCurrentPlayerName();
       const gs = document.getElementById('game-status');
       if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
+      // Game is over — drop cached runtime so a refresh / re-launch from
+      // any tab cannot resurrect the dead session. Identity is preserved
+      // so the player doesn't have to re-enter their name + avatar.
+      try {
+        if (typeof window !== 'undefined' && window.KGGameCache) {
+          window.KGGameCache.purgeRuntime('game_winner');
+        }
+      } catch (_) { /* ignore */ }
+      // Tell the lobby + peers the game is over so they can purge too.
+      try {
+        if (_mpClient && typeof _mpClient.sendGameOver === 'function' && _isHost()) {
+          _mpClient.sendGameOver('win', winnerName, null, `${winnerName} wins!`);
+        }
+      } catch (_) { /* ignore */ }
       if (typeof window !== 'undefined' && window.showReplayPrompt && !window._replayPromptShown) {
         window._replayPromptShown = true;
         // Defer so any in-flight cutscene/animation can play first
@@ -2261,7 +2384,8 @@ function executeMove(moveIdx) {
       const players = state.players.get('list') || [];
       const ci = state.players.get('current') || 0;
       if (players[ci] && players[ci].isBot) {
-        setTimeout(botTurn, 800);
+        // In MP, only the host (game manager) drives bot turns.
+        if (!_isMpMode() || _isHost()) setTimeout(botTurn, 800);
       }
     } else {
       endTurn();
@@ -2288,6 +2412,56 @@ function endTurn() {
   const ci = state.players.get('current') || 0;
   const next = (ci + 1) % players.length;
 
+  // ── Game Manager: active-player-authoritative turn rotation in MP ──────
+  // The ACTIVE PLAYER's own client is the sole authority on advancing past
+  // their own turn (they always know "it's my turn" reliably via _isMyTurn,
+  // independent of unreliable `mp.isHost` flags). Other clients wait for the
+  // 'turn_advance' broadcast and apply it idempotently via seq.
+  // Bots don't have a client of their own — the host drives bot turn ends.
+  if (_isMpMode()) {
+    const cur = players[ci];
+    const curIsBot = !!(cur && cur.isBot);
+    const shouldAdvance = curIsBot ? _isHost() : _isMyTurn();
+    if (shouldAdvance) {
+      _applyTurnAdvance(ci, next, ++_turnSeq);
+      _broadcast('turn_advance', { from: ci, next, seq: _turnSeq });
+    } else {
+      // Inactive client: just clean local UI; wait for the active client's
+      // 'turn_advance' broadcast to commit the rotation.
+      _localTurnUiCleanup();
+    }
+    return;
+  }
+
+  // Solo / same-screen: original local advance.
+  _applyTurnAdvance(ci, next, ++_turnSeq);
+}
+
+// Wipe the in-progress turn's local UI (card / hints / draw button) without
+// touching state.players.current. Used by non-host peers in endTurn().
+function _localTurnUiCleanup() {
+  state.deck.set('currentCard', null);
+  state.turn.set('phase', 'draw');
+  state.turn.set('validMoves', []);
+  const cardEl = document.getElementById('current-card');
+  if (cardEl) cardEl.innerHTML = '<div class="card-back"></div>';
+  const infoEl = document.getElementById('card-info');
+  if (infoEl) infoEl.textContent = 'Draw a card';
+  const hintsDiv = document.getElementById('move-hints');
+  if (hintsDiv) hintsDiv.innerHTML = '';
+  setOptionsPanelVisible(false);
+  const drawBtn = document.getElementById('draw-btn');
+  if (drawBtn) drawBtn.disabled = true;
+  updateUI();
+}
+
+// The single canonical turn-advance routine. Called locally on the host when
+// it ends a turn, and on every peer (including the host) when a 'turn_advance'
+// message is applied. Idempotent: a stale seq is rejected by the caller.
+function _applyTurnAdvance(fromCi, next, seq) {
+  const players = state.players.get('list') || [];
+  if (!players.length) return;
+
   state.deck.set('currentCard', null);
   state.players.set('current', next);
   // Turn boundary: try to restore the next seat from AFK if they returned.
@@ -2313,10 +2487,12 @@ function endTurn() {
   // Gate: wait for camera to settle, THEN blink avatar 3 times, THEN enable turn
   const enableTurn = () => {
     dismissYourTurnPopup();
-    if (players[next].isBot) {
-      setTimeout(botTurn, 400);
+    if (players[next] && players[next].isBot) {
+      // In MP, only the host should drive bot turns to avoid every peer
+      // racing to broadcast the same draw/move pair.
+      if (!_isMpMode() || _isHost()) botTurn();
     } else {
-      if (drawBtn) drawBtn.disabled = false;
+      if (drawBtn && (!_isMpMode() || _isMyTurn())) drawBtn.disabled = false;
     }
   };
 
@@ -2622,18 +2798,11 @@ function _clearAfkTimers() {
 
 function armAfkTimer() {
   _clearAfkTimers();
-  if (state.turn.get('phase') !== 'draw') return;
-  if (state.meta.get('winner') !== null) return;
-  if (!_activeIsLocalHuman()) return;
-  const ci = state.players.get('current') || 0;
-  _AFK.startedAt = Date.now();
-  _AFK.warnTimer = setTimeout(() => {
-    _AFK.warnedIdx = ci;
-    updateUI();
-  }, _AFK.warnMs);
-  _AFK.takeoverTimer = setTimeout(() => {
-    takeBreak('afk');
-  }, _AFK.takeoverMs);
+  // user_directive: "there should be no timers at all" — AFK warn / auto
+  // takeover are disabled. Players can still hit the explicit Break button
+  // (takeBreak) to hand off to a bot manually; the manual takeover path
+  // below is preserved.
+  return;
 }
 
 // Swap the active human for a bot. The original identity is stashed in _AFK.away
@@ -2783,7 +2952,15 @@ function updateUI() {
     const cp = players[ci];
     const notMyTurn = _isMpMode() && !_isMyTurn();
     const blocked = phase !== 'draw' || cp.isBot || notMyTurn;
-    cardArea.classList.toggle('disabled', blocked);
+    // Always block clicks when not in a fresh draw window, but ONLY apply
+    // the dim/desaturate visual when the deck is showing its face-back
+    // (no active card). While a card is face-up we want it brightly
+    // legible for the entire turn so every peer can see what the active
+    // player drew — the card itself signals "can't draw again" already.
+    const hasActiveCard = !!state.deck.get('currentCard');
+    const visuallyDim = blocked && !hasActiveCard;
+    cardArea.classList.toggle('disabled', visuallyDim);
+    cardArea.classList.toggle('locked', blocked && hasActiveCard);
     cardArea.setAttribute('aria-disabled', blocked ? 'true' : 'false');
   }
   const gs = document.getElementById('game-status');

@@ -292,15 +292,33 @@ function leaveFromReplay() {
 // fresh name + avatar entry. Persistent guest tokens (kg_guest_*) and
 // user preferences are preserved.
 function clearTransientIdentity() {
+  // Prefer the centralised purge helper so every game/lobby clears the
+  // same set of runtime keys. Fall back to inline cleanup for older pages
+  // that haven't been rebuilt with /js/kg-game-cache.js yet.
+  try {
+    if (window.KGGameCache && typeof KGGameCache.purgeRuntime === 'function') {
+      KGGameCache.purgeRuntime('fasttrack_exit');
+      // Also drop the player-display fields that are FastTrack-exit-specific
+      // and intentionally NOT in the shared runtime list (so a mid-session
+      // game-over doesn't force re-entry of name + avatar).
+      try { localStorage.removeItem('username'); } catch (_) { }
+      try { localStorage.removeItem('display_name'); } catch (_) { }
+      try { localStorage.removeItem('kg_avatar'); } catch (_) { }
+      return;
+    }
+  } catch (_) { /* fall through to legacy path */ }
   try {
     const keys = [
       'fasttrack_player_name', 'fasttrack_player_avatar',
       'KG_Game', 'KG_Player', 'fasttrack-lobby',
       'username', 'display_name', 'kg_avatar',
+      'kg_session_id', 'kg_session_code',
     ];
     keys.forEach(k => { try { localStorage.removeItem(k); } catch (_) { } });
     try { sessionStorage.removeItem('kg_session'); } catch (_) { }
     try { sessionStorage.removeItem('kg_fasttrack_runtime'); } catch (_) { }
+    try { sessionStorage.removeItem('ft_session_players'); } catch (_) { }
+    try { sessionStorage.removeItem('ft_my_user_id'); } catch (_) { }
   } catch (_) { /* ignore */ }
 }
 

@@ -100,6 +100,14 @@
 
 <body>
   <main class="wrap">
+    <div class="challenge-badge" role="note" aria-label="Build challenge">
+      <span class="cb-pill">30-MINUTE CHALLENGE</span>
+      <span class="cb-text">Two production-grade websites &mdash; designed, built, and deployed live in under 30 minutes
+        by
+        <strong>Kenneth Bingham</strong> using <strong>VS Code</strong> &amp; <strong>Helix AI</strong>, an LLM
+        agent enhanced with Kenneth's <em>Manifold &amp; X-Dimensional directives</em>.</span>
+    </div>
+
     <h1>TTLRecall Speed Launch</h1>
     <p>Two world-class immersive websites deployed together in one bundle.</p>
     <section class="grid">
@@ -116,7 +124,114 @@
         <a class="cta alt" href="/fundwave/">Open FundWave</a>
       </article>
     </section>
+
+    <section class="how" aria-labelledby="how-title">
+      <h2 id="how-title">How the AI is enhanced</h2>
+      <p class="how-lead">Helix AI was given a strict directive stack authored by Kenneth Bingham. Every artifact it
+        produces obeys these axioms, which is what makes a 30-minute dual-site deploy reliable instead of
+        improvisational:</p>
+      <ul class="how-list">
+        <li><strong>Manifold = Expression + Attributes + Substrate.</strong> Every page, component, and dataset is
+          declared as a manifold &mdash; what it <em>is</em>, what it <em>has</em>, and what it <em>runs on</em>
+          &mdash; so generation is deterministic instead of free-form.</li>
+        <li><strong>z = x &middot; y, the universal access rule.</strong> Identity/seed (<code>x</code>) times
+          modifiers/nutrients (<code>y</code>) yields the manifested state (<code>z</code>). The compiler refuses
+          to ship anything where this doesn't balance.</li>
+        <li><strong>Recursion only between dimensions, never within.</strong> Layers compose; they don't
+          self-loop. This eliminates the runaway-agent failure mode.</li>
+        <li><strong>Seven-layer Fibonacci ladder</strong> [1, 1, 2, 3, 5, 8, 13] governs scale, timing, and tuning
+          &mdash; so spacing, motion, and density feel intentional everywhere.</li>
+        <li><strong>Compile, then deploy.</strong> The Manifold Compiler validates the registry first; only
+          axiom-clean builds reach the VPS via the Helix deployment agent.</li>
+      </ul>
+      <p class="sig">&mdash; Built by <strong>Kenneth Bingham</strong> &middot; <span class="mono">Manifold
+          Framework</span> &middot; <span class="mono">Helix AI on VS Code</span></p>
+    </section>
   </main>
+
+  <style>
+    .challenge-badge {
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      flex-wrap: wrap;
+      padding: .9rem 1.1rem;
+      margin-bottom: 1.6rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(34, 211, 238, .10), rgba(16, 185, 129, .08));
+    }
+
+    .cb-pill {
+      flex: 0 0 auto;
+      font-size: .68rem;
+      letter-spacing: .18em;
+      font-weight: 800;
+      padding: .35rem .6rem;
+      border-radius: 999px;
+      background: var(--a);
+      color: #06101f;
+    }
+
+    .cb-text {
+      flex: 1 1 320px;
+      color: var(--text);
+      font-size: .95rem;
+      line-height: 1.45;
+    }
+
+    .cb-text strong {
+      color: #fff;
+    }
+
+    .how {
+      margin-top: 2.4rem;
+      padding: 1.4rem 1.4rem 1.6rem;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .01));
+    }
+
+    .how h2 {
+      margin: 0 0 .4rem;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: 1.35rem;
+      color: #fff;
+    }
+
+    .how-lead {
+      margin: 0 0 1rem;
+    }
+
+    .how-list {
+      margin: 0 0 1.1rem;
+      padding-left: 1.1rem;
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .how-list li {
+      margin-bottom: .55rem;
+    }
+
+    .how-list code {
+      background: rgba(34, 211, 238, .12);
+      padding: 0 .3rem;
+      border-radius: 4px;
+      font-size: .9em;
+    }
+
+    .sig {
+      margin: 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .mono {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: var(--a);
+    }
+  </style>
 </body>
 
 </html>

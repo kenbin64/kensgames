@@ -486,6 +486,7 @@ function makeManifoldLattice() {
   // so the grid shimmers with all 4 colors — no single cell dominates.
   if (typeof WinkiSubstrate !== 'undefined') {
     const wfData = WinkiSubstrate.makeFullWireframe(SADDLE_HALF, 12);
+    const _wfT = new THREE.Vector3();
     for (let cx = 0; cx < G; cx++) {
       for (let cy = 0; cy < G; cy++) {
         for (let cz = 0; cz < G; cz++) {
@@ -494,8 +495,8 @@ function makeManifoldLattice() {
           geo.setAttribute('position', new THREE.BufferAttribute(wfData.positions.slice(), 3));
           const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
           const wfCell = new THREE.LineSegments(geo, mat);
-          saddleCellCenter(cx, cy, cz, _t);
-          wfCell.position.copy(_t);
+          saddleCellCenter(cx, cy, cz, _wfT);
+          wfCell.position.copy(_wfT);
           group.add(wfCell);
         }
       }

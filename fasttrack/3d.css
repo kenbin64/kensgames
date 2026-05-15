@@ -2026,3 +2026,13 @@ textarea,
   filter: saturate(0.5);
   transition: opacity 0.15s ease, filter 0.15s ease;
 }
+
+/* Card-area locked state — the deck is non-interactive (a card is already
+   face-up for the active player), but the card stays brightly legible for
+   every viewer for the entire duration of the turn. No dim, no desaturate. */
+#card-area.locked {
+  pointer-events: none;
+  cursor: default;
+  opacity: 1;
+  filter: none;
+}

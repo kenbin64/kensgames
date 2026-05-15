@@ -106,11 +106,29 @@ const SFInput = (function () {
             }
 
             if (e.code === 'Escape') mouseLookActive = false;
+
+            // ── Hotkey dispatcher: any visible button with [data-hotkey="<KeyCode>"]
+            //    can be activated by its key. Lets every on-screen button be
+            //    pressed without the mouse. Skip when typing in a text field.
+            const tag = (e.target && e.target.tagName) || '';
+            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !(e.target && e.target.isContentEditable)) {
+                const hkBtn = document.querySelector('button[data-hotkey="' + e.code + '"]');
+                if (hkBtn && hkBtn.offsetParent !== null && !hkBtn.disabled) {
+                    e.preventDefault();
+                    if (document.pointerLockElement) document.exitPointerLock();
+                    hkBtn.click();
+                    lastInputDevice = 'keyboard';
+                }
+            }
         });
         window.addEventListener('keyup', e => {
             // Don't register key-up for keys that were never set (button-focused bypass)
             keys[e.code] = false;
         });
+
+        // ── Gamepad UI navigator: SELECT (8) cycles focus through visible
+        //    buttons, START (9) activates the focused one. Lets every on-screen
+        //    button be reached without a mouse. Polled in update() loop below.
 
         // Pointer Lock API for precise FPS-style mouse steering
         document.addEventListener('mousedown', e => {

@@ -3560,6 +3560,20 @@ const SF3D = (function () {
   const _activeIds = new Set();  // reused every frame — no allocation
   let _frameTime = 0;  // cached performance.now() per frame
 
+  // ── X-Code painter ─────────────────────────────────────────────────────
+  // Manifold model: m = xyz. Viewport is the frustum slice of m the human
+  // sees; delta is the subset whose state changed since last paint; x-code
+  // is the per-frame paint queue the renderer executes — analogous to a
+  // 3D printer's g-code. Capping paint ops per frame turns the post-launch
+  // shader-compile burst into a smooth ramp instead of a stutter.
+  const XCode = {
+    budgetPerFrame: 2,   // max NEW meshes (shader compiles) per frame
+    _used: 0,
+    beginFrame() { this._used = 0; },
+    canPaint() { return this._used < this.budgetPerFrame; },
+    paint() { this._used++; }
+  };
+
   // ── GLB model cache: loaded once, cloned per entity ──
   const glbModels = {};    // { modelName: THREE.Group }
   // LOD levels: [{ path, distance }] — distance is the camera distance at which
@@ -6004,6 +6018,7 @@ const SF3D = (function () {
     // Update pooled particle system
     _updateParticles(0.016);
     _frameTime = performance.now();  // cache once per frame
+    XCode.beginFrame();              // reset per-frame paint budget
 
     // Update Camera to Player Position/Rotation
     if (state.player) {
@@ -6081,8 +6096,21 @@ const SF3D = (function () {
 
       let mesh = entityMeshes.get(e.id);
       if (!mesh) {
+        // X-Code budget: defer fresh shader compiles to a later frame so the
+        // first post-launch wave doesn't burn one giant compile pass. While
+        // we wait, paint the entity as its glowing dot so the player still
+        // sees it on the viewport.
+        if (!XCode.canPaint()) {
+          _tmpSphere.center.copy(e.position);
+          _tmpSphere.radius = 10;
+          if (_viewFrustum.intersectsSphere(_tmpSphere)) {
+            _showAsDot(e.id, e.type, e.position);
+          }
+          continue;
+        }
         mesh = createEntityMesh(e.type, e.owner);
         entityMeshes.set(e.id, mesh);
+        XCode.paint();
       }
 
       // Viewport-first culling: skip transform writes when the entity is offscreen.
@@ -8598,33 +8626,61 @@ const Starfighter = (function () {
       _initLaunchBayBriefingUI();
       _showLaunchBayBriefing(true);
       _updateLaunchBayBriefing();
+      _speakLaunchBriefing();
     } else {
       _showLaunchBayBriefing(false);
     }
   }
 
+  // ── Launch-bay briefing: no buttons; any key or middle-click launches ──
+  // The historical LAUNCH NOW / MINIMIZE buttons forced a button-hunt before
+  // every sortie. The bay-ready phase now accepts any keypress (excluding
+  // typing in form fields) or mouse-wheel click as the launch commit, and
+  // the briefing pane only displays informational text + auto-launch ETA.
   function _initLaunchBayBriefingUI() {
     const root = document.getElementById('launch-bay-briefing');
     if (!root || root.dataset.bound === '1') return;
 
     const launchNowBtn = document.getElementById('sfb-launch-now');
-    if (launchNowBtn) {
-      launchNowBtn.addEventListener('click', () => {
-        if (state.phase !== 'bay-ready' || !state.running || state.paused) return;
-        if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
-        _beginLaunchSequence();
-      });
-    }
-
     const muteBtn = document.getElementById('sfb-mute-brief');
-    if (muteBtn) {
-      muteBtn.addEventListener('click', () => {
-        const muted = root.classList.toggle('muted');
-        muteBtn.innerText = muted ? 'SHOW BRIEF' : 'MINIMIZE';
-      });
-    }
+    if (launchNowBtn) launchNowBtn.style.display = 'none';
+    if (muteBtn) muteBtn.style.display = 'none';
+
+    const _isTypingTarget = (t) => !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable));
+    const _commitLaunch = (ev) => {
+      if (state.phase !== 'bay-ready' || !state.running || state.paused) return;
+      if (ev && _isTypingTarget(ev.target)) return;
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
+      _beginLaunchSequence();
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (state.phase !== 'bay-ready') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      _commitLaunch(e);
+    });
+    document.addEventListener('mousedown', (e) => {
+      if (state.phase !== 'bay-ready') return;
+      if (e.button === 1 || (e.button === 0 && root.contains(e.target))) _commitLaunch(e);
+    });
 
     root.dataset.bound = '1';
+  }
+
+  // Speak the bay-ready briefing through the PA-processed TTS chain. Wave
+  // copy stays terse so the auto-launch timer doesn't out-run the line.
+  function _speakLaunchBriefing() {
+    if (!window.SFAudio || !SFAudio.speak) return;
+    const wave = state.wave || 1;
+    const callsign = _cs();
+    const objective = (typeof _scenarioObjectiveLabel === 'function' && _scenarioObjectiveLabel())
+      || state._sortieObjectiveText
+      || 'Clear all hostiles in sector.';
+    const text = wave === 1
+      ? `${callsign}, launch control. First sortie. ${objective}. Auto-launch standing by.`
+      : `${callsign}, sortie ${wave}. ${objective}. Press any key to launch.`;
+    try { SFAudio.speak(text); } catch (_) { /* TTS unavailable — pane still readable */ }
   }
 
   function _showLaunchBayBriefing(show) {
@@ -9937,7 +9993,10 @@ const Starfighter = (function () {
 
   function _configureRandomSortieScenario(wave) {
     _resetSortieScenario();
-    if (wave === 3 || wave === 6 || wave >= 7) return;
+    // Canonical sorties 1–7 (scenarios.json) are fully tuned by
+    // _sortieChallengeProfile and must not be overridden by the random
+    // variant pool below. Variants resume in endless mode (sortie 8+).
+    if (wave <= 7) return;
 
     const pool = [
       {
@@ -10254,6 +10313,8 @@ const Starfighter = (function () {
     takeDamage(amt) {
       // Medical frigate and fuel tanker are indestructible support vessels
       if (this.type === 'tanker' || this.type === 'medic') return;
+      // Beacon barrier — any ship under the invuln buff ignores incoming damage.
+      if (this._invulnUntilT && this._invulnUntilT > performance.now() / 1000) return;
 
       if (this.shields > 0) {
         // ── Inverse-square shield degradation ──────────────────────────────
@@ -10790,16 +10851,12 @@ const Starfighter = (function () {
     }
     _setPauseButtonUI(false);
 
-    // First wave: offer tutorial if player hasn't declined permanently
-    if (state.wave === 1 && !localStorage.getItem('sf_no_tutorial')) {
-      _showTutorialPrompt();
-    } else {
-      // Auto-start launch sequence
-      setTimeout(() => {
-        if (window.SFInput && SFInput.enterImmersive) SFInput.enterImmersive();
-        _beginLaunchSequence();
-      }, 1500);
-    }
+    // Auto-launch every sortie. The launch-bay briefing pane handles wave-1
+    // orientation through the spoken brief; the tutorial overlay is still
+    // reachable from the help button. Wave-1 gets a slightly longer window
+    // so the spoken briefing has room to land before the cutscene starts.
+    const _autoLaunchMs = (state.wave === 1) ? 6000 : 4000;
+    _scheduleAutoLaunch(_autoLaunchMs);
   }
 
   // ── Tutorial Prompt: first-game "Want a tutorial?" overlay ──
@@ -11703,6 +11760,63 @@ const Starfighter = (function () {
     }, delay);
   }
 
+  // ── Per-sortie challenge profile ──────────────────────────────────────
+  // Tunes encounter shape so each canonical sortie (scenarios.json) feels
+  // calibrated to its arsenal — sortie 1 is solvable with lasers alone,
+  // sortie 2 demands quick-thrust, sortie 4 forces EMP via bomber load,
+  // sortie 5 is the dreadnought boss fight, etc. Sorties 8+ return null
+  // and fall through to pure manifold scaling (post-campaign endless).
+  function _sortieChallengeProfile(wave) {
+    const P = {
+      1: { // First Combat — laser only, gunnery test
+        budgetBase: 10, budgetSpread: 3,
+        typeWeights: { enemy: 1.0, interceptor: 0, bomber: 0 },
+        predatorCount: 0, allowBaseship: false, forceDreadnought: false,
+        statOpts: { training: true, speedScale: 0.82, hullMult: 0.85 },
+      },
+      2: { // Full Throttle — interceptors demand mouse-wheel quick thrust
+        budgetBase: 14, budgetSpread: 4,
+        typeWeights: { enemy: 0.5, interceptor: 0.5, bomber: 0 },
+        predatorCount: 0, allowBaseship: false, forceDreadnought: false,
+        statOpts: { speedScale: 1.10, hullMult: 0.95 },
+      },
+      3: { // Asteroid Run — fewer dogfights; asteroid pressure dominates
+        budgetBase: 8, budgetSpread: 3,
+        typeWeights: { enemy: 0.8, interceptor: 0.2, bomber: 0 },
+        predatorCount: 0, allowBaseship: false, forceDreadnought: false,
+        statOpts: { hullMult: 1.0 },
+      },
+      4: { // Mercy Flight — bombers force EMP; sustained fire forces armor
+        budgetBase: 18, budgetSpread: 4,
+        typeWeights: { enemy: 0.3, interceptor: 0.2, bomber: 0.5 },
+        predatorCount: 0, allowBaseship: false, forceDreadnought: false,
+        statOpts: { hullMult: 1.05 },
+        bomberOpts: { hullMult: 1.20 },
+        // TODO: spawn rescue_shuttle / medical_frigate assets per scenarios.json
+      },
+      5: { // Dreadnought — boss + escort screen; combined arms required
+        budgetBase: 8, budgetSpread: 2,
+        typeWeights: { enemy: 0.4, interceptor: 0.4, bomber: 0.2 },
+        predatorCount: 0, allowBaseship: false, forceDreadnought: true,
+        statOpts: { hullMult: 1.0 },
+        dreadnoughtOpts: { hullMult: 1.25, wave: 1 },
+      },
+      6: { // Into the Labyrinth — predators in tight gyroid passages
+        budgetBase: 4, budgetSpread: 2,
+        typeWeights: { enemy: 1.0, interceptor: 0, bomber: 0 },
+        predatorCount: 4, allowBaseship: false, forceDreadnought: false,
+        statOpts: { hullMult: 1.10 },
+      },
+      7: { // The Throne Room — guards + queen (queen handled elsewhere)
+        budgetBase: 6, budgetSpread: 2,
+        typeWeights: { enemy: 0.5, interceptor: 0.5, bomber: 0 },
+        predatorCount: 1, allowBaseship: false, forceDreadnought: false,
+        statOpts: { hullMult: 1.10 },
+      },
+    };
+    return P[wave] || null;
+  }
+
   const MANIFOLD_ARCHETYPES = {
     enemy: { x: 1.1, y: 1.25, waveX: 0.08, waveY: 0.14, hullBase: 30, hullWave: 5, hullField: 4, speedBase: 160, speedWave: 10, speedField: 10, shieldsBase: 0, shieldsWave: 0, shieldsField: 0 },
     interceptor: { x: 1.45, y: 1.7, waveX: 0.1, waveY: 0.16, hullBase: 60, hullWave: 8, hullField: 6, speedBase: 320, speedWave: 15, speedField: 15, shieldsBase: 30, shieldsWave: 5, shieldsField: 5 },
@@ -11726,9 +11840,11 @@ const Starfighter = (function () {
     const gradMag = Math.sqrt(gradRaw.x * gradRaw.x + gradRaw.y * gradRaw.y + gradRaw.z * gradRaw.z);
 
     const trainingScale = o.training ? 0.45 : 1.0;
-    const hull = Math.max(1, Math.round((arch.hullBase + (wave * arch.hullWave) + (field * arch.hullField)) * trainingScale));
+    const hullMult = (typeof o.hullMult === 'number') ? o.hullMult : 1.0;
+    const shieldMult = (typeof o.shieldMult === 'number') ? o.shieldMult : 1.0;
+    const hull = Math.max(1, Math.round((arch.hullBase + (wave * arch.hullWave) + (field * arch.hullField)) * trainingScale * hullMult));
     const maxSpeed = Math.max(10, Math.round((arch.speedBase + (wave * arch.speedWave) + (Math.min(1.5, gradMag * 0.02) * arch.speedField)) * (o.speedScale || 1)));
-    const shields = Math.max(0, Math.round((arch.shieldsBase + (wave * arch.shieldsWave) + (field * arch.shieldsField)) * trainingScale));
+    const shields = Math.max(0, Math.round((arch.shieldsBase + (wave * arch.shieldsWave) + (field * arch.shieldsField)) * trainingScale * shieldMult));
 
     return {
       hull,
@@ -11975,6 +12091,11 @@ const Starfighter = (function () {
 
       _configureRandomSortieScenario(w);
 
+      // Per-sortie challenge profile — see _sortieChallengeProfile() for the
+      // canonical sortie-by-sortie tuning. Null for sorties 8+ (endless mode
+      // falls through to pure manifold scaling below).
+      const sortieProfile = _sortieChallengeProfile(w);
+
       if (w === 3) {
         _spawnAsteroidSortie();
         spawnSupportAndWingmen();
@@ -11989,8 +12110,11 @@ const Starfighter = (function () {
       const _mzA = _mx * _my * _my;                       // asymmetric manifold (escalation)
 
       // ── Enemy budget: total enemies this wave ──
-      // Wave 1: ~4–6 enemies. Wave 4: ~18–26. Wave 8+: 36+
-      const budget = Math.round(2 + w * 3.5 + _mzA * w * 5);
+      // Sorties 1–7 use the per-sortie profile; sortie 8+ falls back to
+      // manifold scaling (wave 1: ~4–6, wave 4: ~18–26, wave 8+: 36+).
+      const budget = sortieProfile
+        ? Math.round(sortieProfile.budgetBase + Math.random() * sortieProfile.budgetSpread)
+        : Math.round(2 + w * 3.5 + _mzA * w * 5);
 
       // ── Cluster count: grows with wave + chaos ──
       // Wave 1: 2. Wave 2–3: 2–3. Wave 4–5: 3–4. Wave 6+: up to 6.
@@ -12001,8 +12125,9 @@ const Starfighter = (function () {
       const canInterceptor = w >= 2;
       const canBomber = w >= 3;
 
-      // Type weights — manifold asymmetric factor biases toward harder types at higher waves
-      const typeWeights = {
+      // Type weights — sortie profile authoritative for sorties 1–7;
+      // manifold asymmetric factor biases composition for endless mode.
+      const typeWeights = sortieProfile ? sortieProfile.typeWeights : {
         enemy: 1.0,
         interceptor: canInterceptor ? (0.25 + _mzL * 0.45) : 0,
         bomber: canBomber ? (0.15 + _mzA * 0.35) : 0,
@@ -12046,42 +12171,61 @@ const Starfighter = (function () {
         };
 
         const { id, label } = nextLabel();
-        const opts = w === 1 ? { training: true, speedScale: 0.82 } : {};
+        // Sortie profile statOpts (training/speedScale/hullMult/shieldMult)
+        // override the legacy wave-1 training shorthand. Per-type opts (e.g.
+        // bomberOpts) layer on top so sortie 4 bombers inherit hullMult 1.20.
+        const baseOpts = sortieProfile
+          ? Object.assign({}, sortieProfile.statOpts || {})
+          : (w === 1 ? { training: true, speedScale: 0.82 } : {});
+        const typeOpts = (sortieProfile && sortieProfile[chosenType + 'Opts']) || null;
+        const opts = typeOpts ? Object.assign({}, baseOpts, typeOpts) : baseOpts;
         _spawnCluster(id, label, pos.x, pos.y, pos.z, chosenType, count, w, opts);
       }
 
       // ── Solo hunters (roaming, not in clusters) ──
-      // Predators: wave 4+, count driven by asymmetric manifold
-      if (w >= 4) {
-        const predCount = Math.min(3, 1 + Math.floor(_mzA * (w - 3) * 1.8));
-        for (let i = 0; i < predCount; i++) {
-          const r = 7500 + Math.random() * 3000;
-          const theta = Math.random() * Math.PI * 2;
-          const phi = Math.acos(Math.random() * 2 - 1);
-          const pred = new Entity('predator', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
-          const pp = deriveCombatProfile('predator', w);
-          pred.hull = pp.hull; pred.shields = pp.shields; pred.maxSpeed = pp.maxSpeed;
-          pred._manifoldDerivation = pp.trace; pred.radius = dim('entity.predator.radius');
-          pred._turnRate = 0.4; pred._plasmaTimer = 0; pred._plasmaCooldown = dim('enemy.predator.plasmaCooldown');
-          pred._consumeTarget = null; pred._consuming = false; pred._consumeTimer = 0; pred._eggTimer = 8 + Math.random() * 5;
-          state.entities.push(pred);
-        }
+      // Predators: sortie profile predatorCount overrides the manifold gate
+      // for sorties 1–7; endless mode (8+) keeps the original w>=4 formula.
+      const predCount = sortieProfile
+        ? (sortieProfile.predatorCount | 0)
+        : (w >= 4 ? Math.min(3, 1 + Math.floor(_mzA * (w - 3) * 1.8)) : 0);
+      for (let i = 0; i < predCount; i++) {
+        const r = 7500 + Math.random() * 3000;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(Math.random() * 2 - 1);
+        const pred = new Entity('predator', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        const predOpts = (sortieProfile && sortieProfile.predatorOpts)
+          || (sortieProfile && sortieProfile.statOpts)
+          || {};
+        const pp = deriveCombatProfile('predator', w, predOpts);
+        pred.hull = pp.hull; pred.shields = pp.shields; pred.maxSpeed = pp.maxSpeed;
+        pred._manifoldDerivation = pp.trace; pred.radius = dim('entity.predator.radius');
+        pred._turnRate = 0.4; pred._plasmaTimer = 0; pred._plasmaCooldown = dim('enemy.predator.plasmaCooldown');
+        pred._consumeTarget = null; pred._consuming = false; pred._consumeTimer = 0; pred._eggTimer = 8 + Math.random() * 5;
+        state.entities.push(pred);
       }
 
       // ── Alien capital ships ──
-      // Alien baseship (torpedo objective): wave 3+, probability scales with manifold
-      if (w >= 3) {
-        const baseChance = 0.55 + _mzL * 0.4;    // 55–95% depending on manifold
+      // Alien baseship: sortie profile gates explicitly; endless mode keeps
+      // the legacy w>=3 probabilistic spawn.
+      const baseshipAllowed = sortieProfile ? !!sortieProfile.allowBaseship : (w >= 3);
+      if (baseshipAllowed) {
+        const baseChance = sortieProfile ? 1.0 : (0.55 + _mzL * 0.4);
         if (Math.random() < baseChance) spawnAlienBaseship();
       }
 
-      // Dreadnought boss: wave 6+, escalating frequency
-      if (w >= 6 && (w === 6 || (w - 6) % Math.max(2, Math.round(5 - _mzA * 2)) === 0)) {
+      // Dreadnought boss: sortie 5 forces the spawn (canonical "Dreadnought"
+      // sortie); endless mode keeps the w>=6 escalating-frequency cadence.
+      const dreadnoughtForced = !!(sortieProfile && sortieProfile.forceDreadnought);
+      const dreadnoughtCadence = !sortieProfile && w >= 6
+        && (w === 6 || (w - 6) % Math.max(2, Math.round(5 - _mzA * 2)) === 0);
+      if (dreadnoughtForced || dreadnoughtCadence) {
         const r = 9000 + Math.random() * 3000;
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(Math.random() * 2 - 1);
         const dn = new Entity('dreadnought', r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
-        const dp = deriveCombatProfile('dreadnought', w - 5);
+        const dreadOpts = (sortieProfile && sortieProfile.dreadnoughtOpts) || {};
+        const dreadWave = (typeof dreadOpts.wave === 'number') ? dreadOpts.wave : Math.max(1, w - 5);
+        const dp = deriveCombatProfile('dreadnought', dreadWave, dreadOpts);
         dn.hull = dp.hull; dn.shields = dp.shields; dn.maxSpeed = dp.maxSpeed;
         dn._manifoldDerivation = dp.trace; dn.radius = dim('entity.dreadnought.radius');
         dn._turretCooldown = 0; dn._turretInterval = dim('enemy.dreadnought.turretInterval');
@@ -12608,14 +12752,14 @@ const Starfighter = (function () {
           cdEl.style.fontSize = '2em';
           cdEl.style.color = '#00ff88';
 
-          // Auto-dock when close enough or timer expires
+          // Auto-dock when close enough or timer expires — instant dock into launch bay
           if (distToBase < 400 || state.autopilotTimer >= 15.0) {
-            _setPhase('landing');
-            state.landingTimer = 0;
             state.autopilotActive = false;
             cdEl.style.display = 'none';
             SFAnnouncer.onDock();
             state.score += 500 * state.wave;
+            completeLanding();
+            return;
           }
         } else {
           // Manual approach — allow player input
@@ -12636,11 +12780,11 @@ const Starfighter = (function () {
             landPrompt.style.color = '#00ff00';
 
             if (window.SFInput && SFInput.isKeyDown('Space')) {
-              _setPhase('landing');
-              state.landingTimer = 0;
               landPrompt.style.display = 'none';
               SFAnnouncer.onDock();
               state.score += 500 * state.wave;
+              completeLanding();
+              return;
             }
           } else {
             const landPrompt = document.getElementById('countdown-display');
@@ -14563,7 +14707,10 @@ const Starfighter = (function () {
     // Block player firing inside the bay / countdown / tutorial
     if (ownerType === 'player' && state.phase !== 'combat') return;
     const now = performance.now() / 1000;
-    if (ownerType === 'player' && now - _lastFireTime < 1 / dim('weapon.laser.fireRate')) return;
+    // Beacon overcharge: halves cooldown for the buff window.
+    const oc = (source && source._overchargeUntilT && source._overchargeUntilT > now) ? 1 : 0;
+    const rateMul = oc ? 2 : 1;
+    if (ownerType === 'player' && now - _lastFireTime < 1 / (dim('weapon.laser.fireRate') * rateMul)) return;
     if (ownerType === 'player') {
       _lastFireTime = now;
       const cost = dim('weapon.laser.fuelCost') * (state._sortieBuff ? state._sortieBuff.fuelCostScale : 1);
@@ -14589,7 +14736,7 @@ const Starfighter = (function () {
     l.radius = dim('weapon.laser.radius');
     l.maxAge = dim('weapon.laser.maxAge') || 2;
     l._spawnTime = state.elapsed;
-    l.damage = dim('weapon.laser.damage') * (state._sortieBuff ? state._sortieBuff.laserDamageScale : 1);
+    l.damage = dim('weapon.laser.damage') * (state._sortieBuff ? state._sortieBuff.laserDamageScale : 1) * (oc ? 2 : 1);
     state.entities.push(l);
     if (ownerType === 'player') state.missionStats.shotsFired++;
     if (window.SF3D) SF3D.spawnLaser(l);
@@ -14637,7 +14784,8 @@ const Starfighter = (function () {
   function fireMachineGun(source, ownerType) {
     if (ownerType === 'player' && state.phase !== 'combat') return;
     const now = performance.now() / 1000;
-    const gunRate = dim('weapon.gun.fireRate') * (state._sortieBuff ? state._sortieBuff.gunFireRateScale : 1);
+    const oc = (source && source._overchargeUntilT && source._overchargeUntilT > now) ? 1 : 0;
+    const gunRate = dim('weapon.gun.fireRate') * (state._sortieBuff ? state._sortieBuff.gunFireRateScale : 1) * (oc ? 2 : 1);
     if (ownerType === 'player' && now - _lastGunFireTime < 1 / gunRate) return;
     if (ownerType === 'player') {
       _lastGunFireTime = now;
@@ -14665,7 +14813,7 @@ const Starfighter = (function () {
     g.radius = dim('weapon.gun.radius');
     g.maxAge = dim('weapon.gun.maxAge') || 1.5;
     g._spawnTime = state.elapsed;
-    g.damage = dim('weapon.gun.damage');
+    g.damage = dim('weapon.gun.damage') * (oc ? 2 : 1);
     state.entities.push(g);
     if (window.SF3D) SF3D.spawnLaser(g); // reuse laser visual, tinted differently
     if (window.SFAudio) SFAudio.playSound('laser'); // TODO: distinct gun sound
@@ -14680,9 +14828,14 @@ const Starfighter = (function () {
     if (ownerType === 'player' && now - _lastPulseFireTime < 1 / dim('weapon.pulse.fireRate')) return;
     if (ownerType === 'player') {
       _lastPulseFireTime = now;
-      const cost = dim('weapon.pulse.fuelCost');
-      if (source.fuel < cost) return;
-      source.fuel -= cost;
+      // Beacon EMP charge consumes one charge instead of fuel.
+      if (source._beaconEMPCharges && source._beaconEMPCharges > 0) {
+        source._beaconEMPCharges--;
+      } else {
+        const cost = dim('weapon.pulse.fuelCost');
+        if (source.fuel < cost) return;
+        source.fuel -= cost;
+      }
     }
 
     // Spherical EMP burst — stun all enemies within range
@@ -15349,74 +15502,70 @@ const Starfighter = (function () {
     radarScene.add(radarForwardMarker);
 
     // ── 3D FOV Pyramid — shows camera viewport as a clipped pyramid inside the sphere ──
-    // Built from ship position toward forward (-Z), matching camera FOV
-    // Clipped to the sphere surface so it reads as a 3D volume
-    const camFOV = 75;
-    const aspect = 16 / 9;
-    const halfV = THREE.MathUtils.degToRad(camFOV / 2);
-    const halfH = Math.atan(Math.tan(halfV) * aspect);
-    const wedgeLen = 0.92; // distance from apex to sphere edge
-    const farHalfW = Math.tan(halfH) * wedgeLen;
-    const farHalfH = Math.tan(halfV) * wedgeLen;
-    // Pyramid apex at origin of group (will be positioned at ship marker)
-    const fz = -wedgeLen;
-    const apex = new THREE.Vector3(0, 0, 0);
-    const ftr = new THREE.Vector3(farHalfW, farHalfH, fz);
-    const ftl = new THREE.Vector3(-farHalfW, farHalfH, fz);
-    const fbl = new THREE.Vector3(-farHalfW, -farHalfH, fz);
-    const fbr = new THREE.Vector3(farHalfW, -farHalfH, fz);
-
-    // Clip far corners to sphere surface (radius 1.0 from world origin)
-    // Since the group sits at shipOff, clamp so no corner exceeds sphere
-    [ftr, ftl, fbl, fbr].forEach(v => {
-      const worldPos = v.clone();
-      worldPos.z += SHIP_OFFSET; // account for group position
-      const len = worldPos.length();
-      if (len > 0.98) {
-        worldPos.multiplyScalar(0.98 / len);
-        v.copy(worldPos);
-        v.z -= SHIP_OFFSET;
-      }
-    });
-
+    // Built from ship position toward forward (-Z), matching the live camera FOV/aspect
+    // so blips highlighted by the viewport rule line up with the on-screen frustum.
     radarFovCone = new THREE.Group();
     radarFovCone.position.set(0, 0, SHIP_OFFSET);
     radarScene.add(radarFovCone);
 
-    // Wireframe edges — bright green, clearly visible
-    const wedgeEdgeGeo = new THREE.BufferGeometry().setFromPoints([
-      apex, ftr, apex, ftl, apex, fbl, apex, fbr,  // 4 edges from apex
-      ftr, ftl, ftl, fbl, fbl, fbr, fbr, ftr       // far rectangle
-    ]);
     const wedgeEdgeMat = new THREE.LineBasicMaterial({
       color: 0x00ff88, transparent: true, opacity: 0.5
     });
+    const wedgeEdgeGeo = new THREE.BufferGeometry();
+    wedgeEdgeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(16 * 3), 3));
     radarFovEdges = new THREE.LineSegments(wedgeEdgeGeo, wedgeEdgeMat);
     radarFovCone.add(radarFovEdges);
 
-    // Semi-transparent pyramid faces — visible 3D volume
-    const wedgeFaceGeo = new THREE.BufferGeometry();
-    const verts = new Float32Array([
-      // top face
-      apex.x, apex.y, apex.z, ftl.x, ftl.y, ftl.z, ftr.x, ftr.y, ftr.z,
-      // bottom face
-      apex.x, apex.y, apex.z, fbr.x, fbr.y, fbr.z, fbl.x, fbl.y, fbl.z,
-      // left face
-      apex.x, apex.y, apex.z, fbl.x, fbl.y, fbl.z, ftl.x, ftl.y, ftl.z,
-      // right face
-      apex.x, apex.y, apex.z, ftr.x, ftr.y, ftr.z, fbr.x, fbr.y, fbr.z,
-      // far cap: two triangles
-      ftr.x, ftr.y, ftr.z, ftl.x, ftl.y, ftl.z, fbl.x, fbl.y, fbl.z,
-      ftr.x, ftr.y, ftr.z, fbl.x, fbl.y, fbl.z, fbr.x, fbr.y, fbr.z,
-    ]);
-    wedgeFaceGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    wedgeFaceGeo.computeVertexNormals();
     const wedgeFaceMat = new THREE.MeshBasicMaterial({
       color: 0x00ff88, transparent: true, opacity: 0.08,
       side: THREE.DoubleSide, depthWrite: false
     });
+    const wedgeFaceGeo = new THREE.BufferGeometry();
+    wedgeFaceGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18 * 3), 3));
     radarFovFaces = new THREE.Mesh(wedgeFaceGeo, wedgeFaceMat);
     radarFovCone.add(radarFovFaces);
+
+    // Populate the pre-allocated edge / face buffers for the FOV pyramid.
+    // Apex is at the group origin (which sits at SHIP_OFFSET); base lies
+    // 0.92 units forward (-Z) with corners derived from a 75° vertical FOV
+    // and a 1.5 aspect ratio (matches range-tick layout above).
+    {
+      const halfH = Math.tan(THREE.MathUtils.degToRad(75 / 2));
+      const halfW = halfH * 1.5;
+      const depth = -0.92;
+      const apex = [0, 0, 0];
+      // Base corners: TL, TR, BR, BL
+      const c = [
+        [-halfW, halfH, depth],
+        [halfW, halfH, depth],
+        [halfW, -halfH, depth],
+        [-halfW, -halfH, depth],
+      ];
+      // 8 line segments (16 verts): 4 apex→corner, 4 base edges
+      const edgeVerts = [
+        ...apex, ...c[0], ...apex, ...c[1],
+        ...apex, ...c[2], ...apex, ...c[3],
+        ...c[0], ...c[1], ...c[1], ...c[2],
+        ...c[2], ...c[3], ...c[3], ...c[0],
+      ];
+      const edgePos = wedgeEdgeGeo.attributes.position.array;
+      for (let i = 0; i < edgeVerts.length && i < edgePos.length; i++) edgePos[i] = edgeVerts[i];
+      wedgeEdgeGeo.attributes.position.needsUpdate = true;
+      // 6 triangles (18 verts): 4 side faces + 2 base triangles
+      const faceVerts = [
+        ...apex, ...c[0], ...c[1],   // top
+        ...apex, ...c[1], ...c[2],   // right
+        ...apex, ...c[2], ...c[3],   // bottom
+        ...apex, ...c[3], ...c[0],   // left
+        ...c[0], ...c[1], ...c[2],   // base tri 1
+        ...c[0], ...c[2], ...c[3],   // base tri 2
+      ];
+      const facePos = wedgeFaceGeo.attributes.position.array;
+      for (let i = 0; i < faceVerts.length && i < facePos.length; i++) facePos[i] = faceVerts[i];
+      wedgeFaceGeo.attributes.position.needsUpdate = true;
+      wedgeEdgeGeo.computeBoundingSphere();
+      wedgeFaceGeo.computeBoundingSphere();
+    }
 
     // ── Range Ticks inside FOV Cone ──
     // Small perpendicular marks at 1/3 and 2/3 distance along each FOV edge
@@ -15695,7 +15844,9 @@ const Starfighter = (function () {
     }
 
     // Base marker — transform world direction into ship-local space
-    if (state.baseship) {
+    // Guard radarBaseMarker: initRadar may have populated radarSphere but failed
+    // before creating the base-marker mesh on a slow / interrupted boot.
+    if (state.baseship && state.baseship.position && radarBaseMarker) {
       const baseRel = state.baseship.position.clone().sub(pPos);
       const baseDist = baseRel.length();
       if (baseDist > 1) {
@@ -15937,6 +16088,20 @@ const Starfighter = (function () {
 
       blip.material.transparent = true;
       blip.material.opacity = fadeAlpha;
+
+      // ── Enemy fighters blink red on radar (threat emphasis) ──
+      if (c.type === 'enemy' || c.type === 'interceptor' || c.type === 'predator') {
+        const blinkPhase = (performance.now() * 0.006) % (Math.PI * 2);
+        const blinkOn = Math.sin(blinkPhase) > 0;
+        if (blinkOn) {
+          blip.material.color.setHex(0xff5544);            // bright red flash
+          blip.material.opacity = Math.min(1.0, fadeAlpha + 0.45);
+          blip.scale.multiplyScalar(1.25);
+        } else {
+          blip.material.color.setHex(0x880000);            // dim red between flashes
+          blip.material.opacity = Math.max(0.25, fadeAlpha * 0.55);
+        }
+      }
 
       // Viewport indicator: highlight only if contact is truly inside camera frustum
       // (both horizontal and vertical half-angles, not vertical-only dot test).

@@ -221,6 +221,14 @@
   </style>
   <script src="/js/kernel-client.js" defer></script>
   <script src="/js/player-panel.js" defer></script>
+  <script src="music_manifold.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"
+    }
+  }
+  </script>
 </head>
 
 <body>
@@ -259,7 +267,11 @@
         <b>Space</b> Hard drop<br>
         <b>Shift</b> Soft drop<br>
         <b>P</b> Pause<br>
-        <b>Drag</b> Orbit cam<br>
+        <b>F</b> Fullscreen<br>
+        <b>Mouse</b> Move piece<br>
+        <b>Click</b> Hard drop<br>
+        <b>R-Click</b> Rotate Y<br>
+        <b>Shift+Drag</b> Orbit cam<br>
         <b>Scroll</b> Zoom
       </div>
     </div>
@@ -267,9 +279,10 @@
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+    import { Reflector } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/objects/Reflector.js';
 
     // ── CONSTANTS ────────────────────────────────────────────────────
-    const COLS = 4, DEPTH = 4, ROWS = 20;
+    const COLS = 7, DEPTH = 7, ROWS = 21;
     const BLOCK = 0.90;       // visual block size (gap = 0.10)
     const SPAWN_Y = ROWS - 2; // top of well minus 1
     const LOCK_DELAY = 0.50;  // seconds to auto-lock after landing
@@ -392,8 +405,8 @@
     // Well center for camera targeting
     const wellCenter = new THREE.Vector3(COLS / 2, ROWS / 2, DEPTH / 2);
 
-    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 280);
-    camera.position.set(wellCenter.x + 9, wellCenter.y + 5, wellCenter.z + 14);
+    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 320);
+    camera.position.set(wellCenter.x + 14, wellCenter.y + 7, wellCenter.z + 22);
     camera.lookAt(wellCenter);
 
     // Lights
@@ -422,14 +435,10 @@
 
       // Outer wireframe
       const outerGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(COLS, ROWS, DEPTH));
-      wellGroup.add(Object.assign(
-        new THREE.LineSegments(outerGeo,
-          new THREE.LineBasicMaterial({ color: 0x1e3555, transparent: true, opacity: 0.75 })),
-        { position: { x: COLS / 2, y: ROWS / 2, z: DEPTH / 2, clone: () => new THREE.Vector3(COLS / 2, ROWS / 2, DEPTH / 2) } }
-      ));
-      // Simple position set
-      const outerMesh = wellGroup.children[0];
+      const outerMesh = new THREE.LineSegments(outerGeo,
+        new THREE.LineBasicMaterial({ color: 0x1e3555, transparent: true, opacity: 0.75 }));
       outerMesh.position.set(COLS / 2, ROWS / 2, DEPTH / 2);
+      wellGroup.add(outerMesh);
 
       // Grid lines on the 4 walls
       const gridMat = new THREE.LineBasicMaterial({ color: 0x0d1e30, transparent: true, opacity: 0.40 });
@@ -451,14 +460,42 @@
         line([new THREE.Vector3(COLS, 0, z), new THREE.Vector3(COLS, ROWS, z)]);
       }
 
-      // Floor
-      const floor = new THREE.Mesh(
+      // Reflective glass floor — gives the BrickBreaker3D look (objects above
+      // bounce off it). Reflector renders the scene from below per frame; cheap
+      // at this resolution because the well is small.
+      const reflector = new Reflector(
         new THREE.PlaneGeometry(COLS, DEPTH),
-        new THREE.MeshBasicMaterial({ color: 0x080e1c, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+        { textureWidth: 512, textureHeight: 512, color: 0x223044 }
       );
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.set(COLS / 2, 0.01, DEPTH / 2);
-      wellGroup.add(floor);
+      reflector.rotation.x = -Math.PI / 2;
+      reflector.position.set(COLS / 2, 0.001, DEPTH / 2);
+      wellGroup.add(reflector);
+      // Tint pane on top of the reflector so the reflection is dimmed and tinted.
+      const tint = new THREE.Mesh(
+        new THREE.PlaneGeometry(COLS, DEPTH),
+        new THREE.MeshBasicMaterial({ color: 0x040814, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+      );
+      tint.rotation.x = -Math.PI / 2;
+      tint.position.set(COLS / 2, 0.012, DEPTH / 2);
+      wellGroup.add(tint);
+
+      // Glass wall panes — four faintly-tinted transparent panels framing the
+      // play volume so the well reads as a glass aquarium rather than a wire box.
+      const wallMat = new THREE.MeshPhysicalMaterial({
+        color: 0x3a6fb0, transparent: true, opacity: 0.06,
+        roughness: 0.02, metalness: 0.0,
+        transmission: 0.85, ior: 1.4,
+        clearcoat: 1.0, clearcoatRoughness: 0.05,
+        side: THREE.DoubleSide, depthWrite: false,
+      });
+      // +X / -X walls (DEPTH × ROWS)
+      const wxGeo = new THREE.PlaneGeometry(DEPTH, ROWS);
+      const wxA = new THREE.Mesh(wxGeo, wallMat); wxA.rotation.y = Math.PI / 2; wxA.position.set(0, ROWS / 2, DEPTH / 2); wellGroup.add(wxA);
+      const wxB = new THREE.Mesh(wxGeo, wallMat); wxB.rotation.y = -Math.PI / 2; wxB.position.set(COLS, ROWS / 2, DEPTH / 2); wellGroup.add(wxB);
+      // +Z / -Z walls (COLS × ROWS)
+      const wzGeo = new THREE.PlaneGeometry(COLS, ROWS);
+      const wzA = new THREE.Mesh(wzGeo, wallMat); wzA.position.set(COLS / 2, ROWS / 2, 0); wellGroup.add(wzA);
+      const wzB = new THREE.Mesh(wzGeo, wallMat); wzB.rotation.y = Math.PI; wzB.position.set(COLS / 2, ROWS / 2, DEPTH); wellGroup.add(wzB);
     }
     buildWell();
 
@@ -478,19 +515,34 @@
 
     // ── BLOCK MATERIALS ──────────────────────────────────────────────
     const BLOCK_GEO = new THREE.BoxGeometry(BLOCK, BLOCK, BLOCK);
+    const BLOCK_EDGES = new THREE.EdgesGeometry(BLOCK_GEO);
     const matCache = new Map();
 
-    function getBlockMat(colorHex, emissiveHex, alpha = 1.0) {
+    // Glassy semi-transparent block. Each cube of every piece gets one of these,
+    // so a 3-in-a-row I-piece reads as three discrete glassy cubes (per spec).
+    function getBlockMat(colorHex, emissiveHex, alpha = 0.55) {
       const k = `${colorHex}-${emissiveHex}-${alpha.toFixed(2)}`;
       if (!matCache.has(k)) {
         matCache.set(k, new THREE.MeshPhysicalMaterial({
-          color: colorHex, emissive: emissiveHex, emissiveIntensity: 0.65,
-          metalness: 0.20, roughness: 0.10,
-          clearcoat: 0.95, clearcoatRoughness: 0.06,
-          transparent: alpha < 1, opacity: alpha,
+          color: colorHex, emissive: emissiveHex, emissiveIntensity: 0.85,
+          metalness: 0.05, roughness: 0.06,
+          clearcoat: 1.0, clearcoatRoughness: 0.04,
+          transmission: 0.55, ior: 1.45,
+          transparent: true, opacity: alpha,
+          depthWrite: false,
         }));
       }
       return matCache.get(k);
+    }
+    const edgeMatCache = new Map();
+    function getEdgeMat(colorHex, alpha = 0.95) {
+      const k = `${colorHex}-${alpha.toFixed(2)}`;
+      if (!edgeMatCache.has(k)) {
+        edgeMatCache.set(k, new THREE.LineBasicMaterial({
+          color: colorHex, transparent: true, opacity: alpha,
+        }));
+      }
+      return edgeMatCache.get(k);
     }
 
     // ── SCENE GROUPS ─────────────────────────────────────────────────
@@ -502,10 +554,18 @@
 
     function blockPos(x, y, z) { return new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5); }
 
+    // Build one glassy cube + its bright wireframe so every appendage of a piece
+    // reads as a distinct cubic unit (per spec: each cube counted separately).
     function buildBlockMesh(x, y, z, colorHex, emissiveHex, alpha) {
+      const group = new THREE.Group();
       const m = new THREE.Mesh(BLOCK_GEO, getBlockMat(colorHex, emissiveHex, alpha));
-      m.position.copy(blockPos(x, y, z));
-      return m;
+      m.renderOrder = 2;
+      group.add(m);
+      const edges = new THREE.LineSegments(BLOCK_EDGES, getEdgeMat(colorHex, Math.min(0.95, alpha + 0.4)));
+      edges.renderOrder = 3;
+      group.add(edges);
+      group.position.copy(blockPos(x, y, z));
+      return group;
     }
 
     function renderActive(p) {
@@ -648,14 +708,22 @@
       lines += cleared.length;
       score += (LINE_SCORES[Math.min(cleared.length, 4)] * level);
       level = Math.floor(lines / 10) + 1;
+      if (window.MusicManifold) MusicManifold.setIntensity(level);
       updateHUD();
     }
 
     function lockPiece() {
       const [col, emi] = PIECE_COLORS[piece.type];
-      pieceCells(piece).forEach(([x, y, z]) => {
-        if (y >= 0 && y < ROWS) { board[y][x][z] = col; addBoardBlock(x, y, z, col, emi); }
+      const cells = pieceCells(piece);
+      const pieceSize = cells.length; // each appendage = 1 cube, even when contiguous
+      let placed = 0;
+      cells.forEach(([x, y, z]) => {
+        if (y >= 0 && y < ROWS) { board[y][x][z] = col; addBoardBlock(x, y, z, col, emi); placed++; }
       });
+      // Per-cube placement bonus: each cube scores `pieceSize` (a 4-cube piece
+      // earns 4 per cube → 16 total; a 1-cube piece earns 1).
+      score += placed * pieceSize;
+      updateHUD();
       sfx.lock();
       checkLines();
     }
@@ -671,6 +739,7 @@
 
     function endGame() {
       state = 'gameover';
+      if (window.MusicManifold) MusicManifold.stop();
       sfx.over();
       renderActive(null);
       const ov = document.getElementById('overlay');
@@ -695,6 +764,7 @@
       document.getElementById('pause-pill').classList.remove('vis');
       document.getElementById('overlay-score').style.display = 'none';
       spawnNext();
+      if (window.MusicManifold) { MusicManifold.setIntensity(level); MusicManifold.start(level); }
     }
 
     // ── INPUT ────────────────────────────────────────────────────────
@@ -704,21 +774,50 @@
       keys[e.code] = true;
 
       if (e.code === 'KeyP') {
-        if (state === 'playing') { state = 'paused'; document.getElementById('pause-pill').classList.add('vis'); }
-        else if (state === 'paused') { state = 'playing'; document.getElementById('pause-pill').classList.remove('vis'); }
+        if (state === 'playing') { state = 'paused'; document.getElementById('pause-pill').classList.add('vis'); if (window.MusicManifold) MusicManifold.pause(); }
+        else if (state === 'paused') { state = 'playing'; document.getElementById('pause-pill').classList.remove('vis'); if (window.MusicManifold) MusicManifold.resume(); }
+        return;
+      }
+      if (e.code === 'KeyM' && window.MusicManifold) {
+        MusicManifold.toggleMute();
+        return;
+      }
+      if (e.code === 'KeyF') {
+        const root = document.documentElement;
+        if (document.fullscreenElement) {
+          (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+        } else {
+          (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => { });
+        }
         return;
       }
       if (state !== 'playing' || !piece) return;
 
+      // Map screen-relative arrow directions to world (X,Z) using camera azimuth
+      // so "left" on the keyboard always means "left on screen" no matter how
+      // the user has orbited the camera. Snap to the nearest cardinal axis.
+      function camAxes() {
+        const fx = Math.sin(orbitTheta), fz = Math.cos(orbitTheta);
+        const rx = Math.cos(orbitTheta), rz = -Math.sin(orbitTheta);
+        const right = (Math.abs(rx) >= Math.abs(rz))
+          ? { dx: Math.sign(rx) || 1, dz: 0 }
+          : { dx: 0, dz: Math.sign(rz) || 1 };
+        const fwd = (Math.abs(fx) >= Math.abs(fz))
+          ? { dx: -Math.sign(fx) || 1, dz: 0 }
+          : { dx: 0, dz: -Math.sign(fz) || 1 };
+        return { right, fwd };
+      }
+
       let np;
-      if (e.code === 'ArrowLeft') {
-        np = { ...piece, x: piece.x - 1 }; if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
-      } else if (e.code === 'ArrowRight') {
-        np = { ...piece, x: piece.x + 1 }; if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
-      } else if (e.code === 'ArrowUp') {
-        np = { ...piece, z: piece.z - 1 }; if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
-      } else if (e.code === 'ArrowDown' && !e.shiftKey) {
-        np = { ...piece, z: piece.z + 1 }; if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'ArrowUp' || (e.code === 'ArrowDown' && !e.shiftKey)) {
+        const { right, fwd } = camAxes();
+        let dx = 0, dz = 0;
+        if (e.code === 'ArrowRight') { dx = right.dx; dz = right.dz; }
+        else if (e.code === 'ArrowLeft') { dx = -right.dx; dz = -right.dz; }
+        else if (e.code === 'ArrowUp') { dx = fwd.dx; dz = fwd.dz; }
+        else if (e.code === 'ArrowDown') { dx = -fwd.dx; dz = -fwd.dz; }
+        np = { ...piece, x: piece.x + dx, z: piece.z + dz };
+        if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
       } else if (e.code === 'KeyA') {
         np = tryRotate(piece, 'y', -1); if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
       } else if (e.code === 'KeyD') {
@@ -758,7 +857,8 @@
       camera.lookAt(wellCenter);
     }
 
-    canvas.addEventListener('pointerdown', e => { orbitDrag = true; orbitLX = e.clientX; orbitLY = e.clientY; });
+    // Orbit camera with Shift+drag (or middle button). Plain drag belongs to the
+    // piece-control mouse handlers below.
     window.addEventListener('pointermove', e => {
       if (!orbitDrag) return;
       orbitTheta -= (e.clientX - orbitLX) * 0.007;
@@ -768,9 +868,75 @@
     });
     window.addEventListener('pointerup', () => { orbitDrag = false; });
     canvas.addEventListener('wheel', e => {
-      orbitR = Math.max(7, Math.min(50, orbitR + e.deltaY * 0.028));
+      orbitR = Math.max(10, Math.min(80, orbitR + e.deltaY * 0.035));
       applyOrbit();
     }, { passive: true });
+
+    // ── MOUSE PIECE CONTROL ─────────────────────────────────────────
+    // Hover above the well to slide the active piece under the cursor; click to
+    // hard-drop; right-click to rotate around Y; Shift+drag to orbit camera.
+    const mouseRay = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+    function pickColumn(ev) {
+      const rect = canvas.getBoundingClientRect();
+      mouseNDC.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseNDC.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      mouseRay.setFromCamera(mouseNDC, camera);
+      const py = (piece ? piece.y : SPAWN_Y) + 0.5;
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -py);
+      const hit = new THREE.Vector3();
+      if (!mouseRay.ray.intersectPlane(plane, hit)) return null;
+      return { x: Math.floor(hit.x), z: Math.floor(hit.z) };
+    }
+    function moveTo(targetX, targetZ) {
+      if (!piece) return;
+      const cells = getCells(piece.type, piece.ry, piece.rx);
+      const maxX = Math.max(...cells.map(c => c[0]));
+      const maxZ = Math.max(...cells.map(c => c[2]));
+      const nx = Math.max(0, Math.min(COLS - 1 - maxX, targetX - Math.floor(maxX / 2)));
+      const nz = Math.max(0, Math.min(DEPTH - 1 - maxZ, targetZ - Math.floor(maxZ / 2)));
+      if (nx === piece.x && nz === piece.z) return;
+      const np = { ...piece, x: nx, z: nz };
+      if (isValid(np)) { piece = np; renderActive(piece); }
+    }
+    let mouseDownAt = null;
+    canvas.addEventListener('pointermove', e => {
+      if (state !== 'playing' || orbitDrag) return;
+      const cell = pickColumn(e);
+      if (cell) moveTo(cell.x, cell.z);
+    });
+    canvas.addEventListener('pointerdown', e => {
+      if (e.shiftKey || e.button === 1) {
+        orbitDrag = true; orbitLX = e.clientX; orbitLY = e.clientY;
+        canvas.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      if (e.button === 2) return;
+      mouseDownAt = { x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener('pointerup', e => {
+      if (orbitDrag) { orbitDrag = false; canvas.releasePointerCapture?.(e.pointerId); return; }
+      if (state !== 'playing' || !piece || !mouseDownAt) { mouseDownAt = null; return; }
+      const dx = e.clientX - mouseDownAt.x, dy = e.clientY - mouseDownAt.y;
+      const moved = Math.hypot(dx, dy);
+      mouseDownAt = null;
+      if (moved > 6) return;
+      const d = hardDropDist(piece);
+      score += d * 2;
+      piece = { ...piece, y: piece.y - d };
+      updateHUD();
+      sfx.drop();
+      lockPiece();
+      piece = null;
+      spawnNext();
+    });
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (state !== 'playing' || !piece) return;
+      const np = tryRotate(piece, 'y', 1);
+      if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
+    });
 
     // ── RESIZE ───────────────────────────────────────────────────────
     function onResize() {
@@ -834,8 +1000,18 @@
 
     // ── START BUTTON ─────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', () => {
+      // Enter fullscreen on the user gesture (browsers require it).
+      const root = document.documentElement;
+      const req = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+      if (req && !document.fullscreenElement) {
+        try { req.call(root).catch(() => { }); } catch (e) { /* ignore */ }
+      }
       if (state === 'menu' || state === 'gameover') startGame();
     });
+
+    // Re-fit canvas whenever fullscreen state flips.
+    document.addEventListener('fullscreenchange', () => setTimeout(onResize, 60));
+    document.addEventListener('webkitfullscreenchange', () => setTimeout(onResize, 60));
   </script>
 
   <!-- ── Leave Game button ── -->

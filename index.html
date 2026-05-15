@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <script src="/js/session-identity.js"></script>
+    <script src="/js/session-identity.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KensGames — World Class Arcade Portal</title>
@@ -347,7 +347,7 @@
            ══════════════════════════════════════ */
         .hero {
             position: relative;
-            padding: 70px 40px 80px;
+            padding: 24px 40px 80px;
             overflow: hidden;
             border-bottom: 2px solid rgba(255, 0, 255, 0.3);
             background:
@@ -487,10 +487,27 @@
 
         .hero p {
             max-width: 700px;
-            margin: 0 0 30px;
-            font-size: 16px;
+            margin: 0 0 18px;
+            font-size: 15px;
             color: var(--text-muted);
-            line-height: 1.8;
+            line-height: 1.7;
+        }
+
+        .hero p.hero-lede {
+            font-size: 16px;
+            color: var(--text);
+            border-left: 2px solid var(--neon-cyan);
+            padding-left: 14px;
+            margin-bottom: 22px;
+        }
+
+        .hero p.hero-lede.hero-lede-alt {
+            border-left-color: var(--neon-yellow);
+        }
+
+        .hero p strong {
+            color: var(--neon-cyan);
+            font-weight: 700;
         }
 
         .arcade-wall {
@@ -1431,7 +1448,7 @@
             }
 
             .hero {
-                padding: 50px 20px 40px;
+                padding: 18px 20px 40px;
             }
 
             .hero-layout {
@@ -1508,6 +1525,7 @@
                 <li><a href="/about.html">About</a></li>
                 <li><a href="#creator">Creator</a></li>
                 <li><a href="#manifold">Manifold</a></li>
+                <li><a href="/security.html">Security</a></li>
                 <li><a href="#tos">Terms</a></li>
             </ul>
             <div class="nav-auth">
@@ -1548,11 +1566,46 @@
 
         <div class="hero-layout">
             <div class="hero-copy">
-                <div class="hero-eyebrow">&#9655; Insert Coin To Continue &#9655;</div>
                 <h1>KENS<span class="accent">GAMES</span></h1>
-                <div class="hero-sub">World Class Arcade Portal &mdash; Est. 2026</div>
-                <p>A new breed of arcade gaming where every game, every score, and every player exists in a unified
-                    geometric space &mdash; built end-to-end by an independent creator.</p>
+                <div class="hero-sub">World Class Arcade Portal, Est. 2026</div>
+                <p class="hero-lede"><strong>KensGames is a proof of concept disguised as an arcade.</strong> The thesis
+                    is simple. Data does not have to live in bits and bytes. It can live in shapes. A mathematical
+                    expression, evaluated on a substrate, behaves like a Stradivarius. The instrument does not contain
+                    the music. It contains the capacity to play music when the right hand reads it. Curves, surfaces and
+                    waveforms hold information the same way, and the right lens lifts color, sound, text, rules and
+                    gameplay back out.</p>
+                <p>That is the entire engine under this portal. Every game shares one geometric core called a manifold.
+                    Small lens programs read that core and project it as a board, a cockpit, a soundtrack or a
+                    multiplayer match. There is no library of 3D models shipped to your device, no audio files streaming
+                    in the background and no per-game rule database. The shape is the data, and the shape is queried in
+                    place.</p>
+                <p>The numbers back the pitch. The complete playable site is roughly <strong>120 MB</strong>, of which
+                    the actual code, every lens, every rule set, every page, totals <strong>7.3 MB</strong>. Five
+                    distinct games, multiplayer, AI opponents and procedural audio all run from that footprint, in a
+                    browser, with no install.</p>
+                <p>Is it groundbreaking? In the narrow sense, yes. Treating geometry as the canonical store and treating
+                    renderers, audio engines and game logic as lenses over a single manifold is not how mainstream
+                    engines are built today. If the pattern holds at scale, it implies a different shape for software in
+                    general. Worlds, datasets, simulations and media could be distributed as compact expressions instead
+                    of gigabytes of baked assets, with fidelity decided at read time by the lens rather than at bake
+                    time by the publisher. That is a meaningful shift in how digital content is authored, shipped and
+                    preserved. KensGames is the first public, playable test of the idea. Pick a cabinet below and try
+                    the proof yourself.</p>
+                <p class="hero-lede hero-lede-alt"><strong>The Fort Knox of game data.</strong> A traditional breach
+                    walks off with gigabytes of profiles, save files and asset libraries. Here there is almost nothing
+                    to walk off with. Player state is stored as encrypted coordinates under
+                    <strong>AES&#8209;256&#8209;GCM</strong>,
+                    substrates are integrity&#8209;signed with <strong>HMAC&#8209;SHA256</strong>, passwords are
+                    <strong>bcrypt</strong> hashed at cost 12 and authentication is moving to passkeys. Every
+                    cryptographic primitive in use here is the same one banks, governments and signal&#8209;intelligence
+                    agencies rely on. Reading anything meaningful out of a stolen copy of the site requires the
+                    manifold, the specific lens that interprets it, and the keys that unlock both. Miss any one of the
+                    three and the loot decrypts into geometry with no meaning attached. That is not a promise that
+                    nothing can ever go wrong. It is a deliberate collapse of the surface area of what is even worth
+                    stealing. <a href="/security.html"
+                        style="color:var(--neon-yellow);text-decoration:none;border-bottom:1px solid rgba(255,232,0,0.4)">Read
+                        the security claim &amp; disclaimer &#9654;</a>
+                </p>
                 <div class="hero-cta">
                     <a class="btn-play" href="#games"
                         style="text-decoration:none;display:inline-flex;align-items:center">&#9654; PLAY NOW</a>
@@ -1561,9 +1614,10 @@
                         href="/fasttrack/" onclick="event.preventDefault();goToGame('/fasttrack/');">FASTTRACK
                         &#9654;</a>
                 </div>
-                <div class="hero-note">Play in browser &nbsp;&#9632;&nbsp; Bots or friends &nbsp;&#9632;&nbsp;
-                    Code or link to invite &nbsp;&#9632;&nbsp; <a href="#creator"
-                        style="color:var(--neon-yellow);text-decoration:none">Art &amp; merch &#9654;</a></div>
+                <div class="hero-note">Play instantly in your browser &nbsp;&#9632;&nbsp; Solo against smart bots or
+                    live with friends &nbsp;&#9632;&nbsp; Invite by room code or share link &nbsp;&#9632;&nbsp; <a
+                        href="#creator" style="color:var(--neon-yellow);text-decoration:none">Browse the art &amp; merch
+                        shop &#9654;</a></div>
             </div>
 
             <div class="arcade-wall" aria-label="Arcade consoles">
@@ -1631,6 +1685,38 @@
                     <div class="console-foot">
                         <div class="mini"></div>
                         <button class="go" onclick="goToGame('/brickbreaker3d/')">PLAY &#9654;</button>
+                    </div>
+                </div>
+
+                <div class="console" role="group" aria-label="Cubic console"
+                    style="border-color: rgba(241,198,68,0.32)">
+                    <div class="console-head">
+                        <div class="console-title">Cubic</div>
+                        <div class="console-tag">3D Tetris</div>
+                    </div>
+                    <div class="console-screen">
+                        <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.png"
+                            src="/cubic3d/assets/cubic.png" alt="Cubic" loading="lazy" decoding="async"
+                            fetchpriority="low" />
+                    </div>
+                    <div class="console-foot">
+                        <div class="mini"></div>
+                        <button class="go" onclick="goToGame('/cubic3d/lobby.html')">PLAY &#9654;</button>
+                    </div>
+                </div>
+
+                <div class="console" role="group" aria-label="Qixoid console"
+                    style="border-color: rgba(255,102,0,0.32)">
+                    <div class="console-head">
+                        <div class="console-title">Qixoid</div>
+                        <div class="console-tag">3D Qix on a torus</div>
+                    </div>
+                    <div class="console-screen"
+                        style="background:radial-gradient(ellipse at 50% 55%, rgba(255,102,0,0.35) 0%, rgba(0,0,0,0) 55%), radial-gradient(ellipse at 50% 50%, rgba(0,255,255,0.18) 0%, rgba(0,0,0,0) 60%), repeating-linear-gradient(90deg, rgba(0,255,255,0.08) 0 1px, transparent 1px 14px), repeating-linear-gradient(0deg, rgba(255,0,255,0.06) 0 1px, transparent 1px 14px), #04040c;display:flex;align-items:center;justify-content:center;font-family:var(--font-arcade);color:var(--neon-yellow);text-shadow:0 0 10px rgba(255,232,0,0.6);font-size:13px;letter-spacing:3px">
+                        CLAIM&nbsp;THE&nbsp;TORUS</div>
+                    <div class="console-foot">
+                        <div class="mini"></div>
+                        <button class="go" onclick="goToGame('/qixoid/')">PLAY &#9654;</button>
                     </div>
                 </div>
             </div>
@@ -1757,6 +1843,28 @@
                             solo against the AI, pass-and-play locally, or challenge a friend online.</div>
                     </div>
                     <button class="btn-green" onclick="goToGame('/4DTicTacToe/')">PLAY 4D TICTACTOE &#9654;</button>
+                </div>
+            </div>
+
+            <div class="game-card">
+                <div class="game-image" style="background:linear-gradient(135deg,#2d2410,#0f0c04);">
+                    <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.png" src="/cubic3d/assets/cubic.png"
+                        alt="Cubic" loading="lazy" decoding="async" fetchpriority="low">
+                    <span class="game-badge badge-live">&#9679; LIVE</span>
+                </div>
+                <div class="game-info">
+                    <div>
+                        <div class="game-title">Cubic</div>
+                        <div class="game-meta">
+                            <span class="game-tag">Solo</span>
+                            <span class="game-tag">Puzzle</span>
+                            <span class="game-tag">3D Tetris</span>
+                        </div>
+                        <div class="game-description">Tetris reimagined in three dimensions. Polycubes tumble through a
+                            transparent well &mdash; rotate, slide, and slot them into clearing planes before the stack
+                            chokes the chamber. Solo blitz mode with combo scoring.</div>
+                    </div>
+                    <button class="btn-green" onclick="goToGame('/cubic3d/lobby.html')">PLAY CUBIC &#9654;</button>
                 </div>
             </div>
 
@@ -2336,12 +2444,9 @@
         } catch (e) { console.warn('[arcade-symbols]', e); }
 
         // ── KGPlay — unified play workflow for every Play button ─────────────
-        // Step 1 (portal): profile gate — name + avatar in one panel, only if missing.
-        // Step 2 (lobby):  KGMultiplayerPanel owns Solo-vs-AI / Invite-Friends,
-        //                  the 1–4 player roster (humans + bots), the host panel
-        //                  shown to the creator, and the invitee panel shown to
-        //                  guests who land via a share code.
-        // Persistence: localStorage (cross-session) + Manifold.write (in-session)
+        // Profile gate is delegated to the shared KGPlayerProfile / AvatarPicker
+        // substrates so the portal, lobby, and games all use the same modal.
+        // After the profile is set, we redirect to the game's lobby route.
         window.KGPlay = (function () {
             const REGISTRY = {
                 fasttrack: { name: 'FastTrack', lobby: '/lobby/?game=fasttrack' },
@@ -2357,189 +2462,42 @@
                 '/brickbreaker3d/': 'brickbreaker3d',
                 '/cubic3d/': 'cubic3d',
             };
-            const AVATARS = ['🚀', '👾', '🤖', '🛸', '⭐', '🌙', '🐉', '🦊', '🦅', '🦈', '🥷', '🧙', '🦸', '🎮', '🕹️', '👑', '⚡', '🔥', '🌌', '🪐'];
 
-            function getName() { try { return (localStorage.getItem('display_name') || localStorage.getItem('username') || '').trim() || null; } catch { return null; } }
-            function getAvatar() { try { return JSON.parse(localStorage.getItem('kg_avatar') || 'null'); } catch { return null; } }
-            function hasProfile() { return !!(getName() && getAvatar()); }
-
-            function saveProfile(name, emoji) {
-                const cleaned = String(name || '').trim().slice(0, 20);
-                const av = { id: 'emoji_' + emoji, emoji, name: emoji };
-                try {
-                    localStorage.setItem('display_name', cleaned);
-                    localStorage.setItem('username', cleaned);
-                    localStorage.setItem('kg_avatar', JSON.stringify(av));
-                } catch { /* ignore */ }
-                if (window.Manifold && typeof Manifold.write === 'function') {
-                    try { Manifold.write({ x: 1, y: 1, region: 'players.local' }, { name: cleaned, avatar: av, ts: Date.now() }); } catch { /* ignore */ }
+            function getName() {
+                if (window.KGPlayerProfile && KGPlayerProfile.getName) return KGPlayerProfile.getName();
+                try { return (localStorage.getItem('display_name') || localStorage.getItem('username') || '').trim() || null; } catch { return null; }
+            }
+            function getAvatar() {
+                if (window.KGPlayerProfile && KGPlayerProfile.getAvatar) return KGPlayerProfile.getAvatar();
+                try { return JSON.parse(localStorage.getItem('kg_avatar') || 'null'); } catch { return null; }
+            }
+            function hasProfile() {
+                if (window.KGPlayerProfile && KGPlayerProfile.hasName && KGPlayerProfile.hasAvatar) {
+                    return KGPlayerProfile.hasName() && KGPlayerProfile.hasAvatar();
                 }
+                return !!(getName() && getAvatar());
             }
 
-            function injectStyles() {
-                if (document.getElementById('kg-play-styles')) return;
-                const style = document.createElement('style');
-                style.id = 'kg-play-styles';
-                style.textContent = `
-                    #kg-play-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
-                        background:rgba(2,2,12,0.92);backdrop-filter:blur(6px);font-family:'Orbitron',monospace;
-                        padding:12px;overflow-y:auto;}
-                    #kg-play-overlay.open{display:flex;}
-                    .kg-play-card{position:relative;max-width:520px;width:100%;max-height:calc(100dvh - 24px);
-                        overflow-y:auto;background:rgba(4,4,20,0.97);border:2px solid #00FFFF;border-radius:8px;
-                        padding:18px 18px 16px;color:#e8e8ff;
-                        box-shadow:0 0 18px rgba(0,255,255,0.35),0 0 36px rgba(153,0,255,0.22),inset 0 0 24px rgba(0,255,65,0.04);}
-                    .kg-play-card h2{font-size:15px;letter-spacing:2px;color:#00FFFF;margin:0 0 4px;
-                        text-transform:uppercase;text-shadow:0 0 12px rgba(0,255,255,0.6);}
-                    .kg-play-sub{font-size:10px;color:#9aa;letter-spacing:2px;margin-bottom:12px;}
-                    .kg-play-step{font-size:9px;color:#9900FF;letter-spacing:3px;margin-bottom:6px;
-                        text-transform:uppercase;text-shadow:0 0 8px rgba(153,0,255,0.5);}
-                    .kg-play-label{display:block;font-size:10px;color:#00FF41;letter-spacing:2px;
-                        margin:10px 0 5px;text-transform:uppercase;text-shadow:0 0 6px rgba(0,255,65,0.4);}
-                    .kg-play-input{width:100%;padding:10px 12px;background:rgba(0,255,255,0.06);
-                        border:1px solid rgba(0,255,255,0.25);border-radius:4px;color:#E0E0FF;font-size:14px;
-                        letter-spacing:1px;outline:none;font-family:inherit;}
-                    .kg-play-input:focus{border-color:#00FFFF;box-shadow:0 0 8px rgba(0,255,255,0.4);}
-                    .kg-play-avgrid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;margin-top:4px;}
-                    .kg-play-avbtn{font-size:20px;padding:5px 0;background:rgba(0,255,255,0.04);
-                        border:1.5px solid rgba(153,0,255,0.22);border-radius:4px;cursor:pointer;
-                        transition:all 150ms;color:#fff;font-family:inherit;line-height:1;}
-                    .kg-play-avbtn:hover{background:rgba(153,0,255,0.18);border-color:#9900FF;
-                        box-shadow:0 0 8px rgba(153,0,255,0.4);}
-                    .kg-play-avbtn.sel{background:rgba(0,255,255,0.22);border-color:#00FFFF;
-                        box-shadow:0 0 12px rgba(0,255,255,0.55);}
-                    .kg-play-confirm{width:100%;margin-top:14px;padding:13px;background:#00FF41;color:#04040C;
-                        border:none;border-radius:3px;font-family:inherit;font-size:13px;letter-spacing:2px;
-                        cursor:pointer;text-transform:uppercase;font-weight:900;
-                        box-shadow:0 0 16px rgba(0,255,65,0.6),0 0 32px rgba(0,255,65,0.25);}
-                    .kg-play-confirm:disabled{opacity:0.35;cursor:not-allowed;box-shadow:none;background:#333;color:#777;}
-                    .kg-play-close{position:absolute;top:8px;right:8px;background:transparent;color:#9900FF;
-                        border:1.5px solid #9900FF;border-radius:50%;width:30px;height:30px;font-size:15px;
-                        cursor:pointer;font-family:inherit;box-shadow:0 0 8px rgba(153,0,255,0.4);
-                        display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}
-                    .kg-play-close:hover{background:#9900FF;color:#04041a;}
-                    @media (max-width:520px){
-                        .kg-play-card{padding:14px 14px 12px;border-radius:6px;}
-                        .kg-play-card h2{font-size:14px;}
-                        .kg-play-avgrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;}
-                        .kg-play-avbtn{font-size:24px;padding:8px 0;}
-                        .kg-play-label{margin:8px 0 4px;}
-                    }
-                    @media (max-height:520px){
-                        .kg-play-card{padding:10px 14px;}
-                        .kg-play-sub{display:none;}
-                        .kg-play-avgrid{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;}
-                        .kg-play-avbtn{font-size:18px;padding:3px 0;}
-                        .kg-play-confirm{padding:10px;margin-top:10px;}
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-
-            function ensureOverlay() {
-                let el = document.getElementById('kg-play-overlay');
-                if (el) return el;
-                injectStyles();
-                el = document.createElement('div');
-                el.id = 'kg-play-overlay';
-                el.innerHTML = '<div class="kg-play-card" id="kg-play-card"></div>';
-                document.body.appendChild(el);
-                el.addEventListener('click', (e) => { if (e.target === el) close(); });
-                return el;
-            }
-
-            function close() {
-                const el = document.getElementById('kg-play-overlay');
-                if (el) el.classList.remove('open');
-            }
-
-            function renderProfileStep(def, onDone) {
-                const el = ensureOverlay();
-                const card = el.querySelector('#kg-play-card');
-                const existingName = getName() || '';
-                let pickedEmoji = (getAvatar() && getAvatar().emoji) || null;
-                // Build via DOM rather than innerHTML to keep input value safe.
-                card.textContent = '';
-                const closeBtn = document.createElement('button');
-                closeBtn.className = 'kg-play-close';
-                closeBtn.setAttribute('aria-label', 'Close');
-                closeBtn.textContent = '✕';
-                closeBtn.addEventListener('click', close);
-                const step = document.createElement('div');
-                step.className = 'kg-play-step';
-                step.textContent = '▸ Profile · ' + def.name;
-                const h2 = document.createElement('h2');
-                h2.textContent = 'Pick a name & avatar';
-                const sub = document.createElement('div');
-                sub.className = 'kg-play-sub';
-                sub.textContent = 'Stored on this device · No signup · Used in every game';
-                const nameLabel = document.createElement('label');
-                nameLabel.className = 'kg-play-label';
-                nameLabel.htmlFor = 'kg-play-name';
-                nameLabel.textContent = 'Display Name';
-                const nameInput = document.createElement('input');
-                nameInput.id = 'kg-play-name';
-                nameInput.className = 'kg-play-input';
-                nameInput.maxLength = 20;
-                nameInput.placeholder = 'Pilot, Ace, Nova…';
-                nameInput.value = existingName;
-                const avLabel = document.createElement('label');
-                avLabel.className = 'kg-play-label';
-                avLabel.textContent = 'Avatar';
-                const grid = document.createElement('div');
-                grid.className = 'kg-play-avgrid';
-                AVATARS.forEach(em => {
-                    const b = document.createElement('button');
-                    b.type = 'button';
-                    b.className = 'kg-play-avbtn' + (em === pickedEmoji ? ' sel' : '');
-                    b.textContent = em;
-                    b.addEventListener('click', () => {
-                        pickedEmoji = em;
-                        grid.querySelectorAll('.kg-play-avbtn').forEach(x => x.classList.remove('sel'));
-                        b.classList.add('sel');
-                        revalidate();
-                    });
-                    grid.appendChild(b);
-                });
-                const saveBtn = document.createElement('button');
-                saveBtn.className = 'kg-play-confirm';
-                saveBtn.textContent = 'Save & Play ▸';
-                saveBtn.disabled = true;
-                function revalidate() {
-                    saveBtn.disabled = !(nameInput.value.trim().length >= 2 && !!pickedEmoji);
-                }
-                nameInput.addEventListener('input', revalidate);
-                nameInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !saveBtn.disabled) saveBtn.click();
-                });
-                saveBtn.addEventListener('click', () => {
-                    if (saveBtn.disabled) return;
-                    saveProfile(nameInput.value, pickedEmoji);
-                    onDone();
-                });
-                card.append(closeBtn, step, h2, sub, nameLabel, nameInput, avLabel, grid, saveBtn);
-                el.classList.add('open');
-                setTimeout(() => nameInput.focus(), 30);
-                revalidate();
-            }
-
-            function gotoLobby(def) {
-                window.location.href = def.lobby;
-            }
+            function gotoLobby(def) { window.location.href = def.lobby; }
 
             function start(pathOrKey) {
                 const key = PATH_TO_KEY[pathOrKey] || pathOrKey;
                 const def = REGISTRY[key];
                 if (!def) { window.location.href = pathOrKey; return; }
-                if (hasProfile()) {
-                    gotoLobby(def);
+                if (hasProfile()) { gotoLobby(def); return; }
+                if (window.KGPlayerProfile && KGPlayerProfile.ensure) {
+                    KGPlayerProfile.ensure(true, () => gotoLobby(def));
                 } else {
-                    renderProfileStep(def, () => gotoLobby(def));
+                    // Substrate not loaded — go straight to the lobby, which has
+                    // its own profile gate.
+                    gotoLobby(def);
                 }
             }
 
-            return { start, close, hasProfile, getName, getAvatar, saveProfile, REGISTRY };
+            return { start, hasProfile, getName, getAvatar, REGISTRY };
         })();
+
+
 
         // Backwards-compat shim for inline onclick="goToGame('/path/')" handlers.
         function goToGame(path) {

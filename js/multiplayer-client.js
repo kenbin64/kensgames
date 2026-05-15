@@ -53,7 +53,13 @@ class KGMultiplayer {
     const h = location.hostname;
     const secure = location.protocol === 'https:';
     if (h === 'localhost' || h === '127.0.0.1') return 'ws://' + h + ':8765/ws';
-    return (secure ? 'wss://' : 'ws://') + location.host + '/ws';
+    // Some apex→www redirects (e.g. CDN/edge) break WebSocket handshakes
+    // because browsers do not follow 301s on WS upgrade. Force www.<root>
+    // when on the bare apex so the upgrade reaches nginx + lobby-server
+    // directly.
+    let host = location.host;
+    if (h === 'kensgames.com') host = 'www.kensgames.com';
+    return (secure ? 'wss://' : 'ws://') + host + '/ws';
   }
 
   connect(auth) {

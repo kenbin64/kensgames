@@ -82,7 +82,50 @@ const SFEnhance = (function () {
   const POWERUP_LIFETIME_S = 28;
   const POWERUP_SPAWN_MIN_S = 5.5;
   const POWERUP_SPAWN_MAX_S = 9.0;
-  const POWERUP_TYPES = ['shield', 'hull', 'fuel', 'torpedo'];
+  // Beacon roster — tier rises with risk/reward:
+  //   0 common (close, safe)   1 uncommon (medium)
+  //   2 rare (far)             3 legendary (very far, near hostile cluster)
+  const POWERUP_TYPES = [
+    'shield', 'hull', 'fuel',                    // tier 0
+    'torpedo', 'emp', 'overcharge', 'repair',    // tier 1
+    'invuln', 'megaammo',                        // tier 2
+    'nuke'                                       // tier 3
+  ];
+  const POWERUP_TIER = {
+    shield: 0, hull: 0, fuel: 0,
+    torpedo: 1, emp: 1, overcharge: 1, repair: 1,
+    invuln: 2, megaammo: 2,
+    nuke: 3
+  };
+  // Per-type beacon colors (hex) — drives core, pillar, halo, and PointLight tint.
+  const POWERUP_COLOR = {
+    shield: 0x33ccff, hull: 0xff7733, fuel: 0x44ff88,
+    torpedo: 0xffdd33, emp: 0xcc66ff, overcharge: 0xff3366,
+    repair: 0x66ff99,
+    invuln: 0xffffff, megaammo: 0xff9933,
+    nuke: 0xff2222
+  };
+  const POWERUP_LABEL = {
+    shield: 'SHIELD +35', hull: 'HULL +24', fuel: 'ENERGY +30',
+    torpedo: 'TORPEDO +1', emp: 'EMP CHARGE', overcharge: 'OVERCHARGE 8s',
+    repair: 'REPAIR DRONE 10s',
+    invuln: 'BARRIER 6s', megaammo: 'FULL REARM',
+    nuke: 'OMEGA STRIKE'
+  };
+  // Spawn-radius bands per tier (units from player).
+  const POWERUP_TIER_RADIUS = [
+    [450, 800],
+    [800, 1400],
+    [1500, 2400],
+    [2400, 3600]
+  ];
+  // Weighted picker: legendary is rare, common is frequent.
+  const POWERUP_TIER_WEIGHTS = [50, 30, 15, 5];
+  const OVERCHARGE_DURATION_S = 8;
+  const REPAIR_DURATION_S = 10;
+  const REPAIR_RATE = 5;        // hull per second while active
+  const INVULN_DURATION_S = 6;
+  const NUKE_RADIUS = 1500;
   const RADAR_SCALE = 2.0 * 0.618;
   const DIAG_INTERVAL_S = 3;
 
@@ -1989,35 +2032,157 @@ const SFEnhance = (function () {
     }
   }
 
+  // Lighted beacon: capsule core, vertical light pillar, halo ring, point light.
   function _createPowerupMesh(type) {
     const g = new THREE.Group();
-    const color = type === 'shield' ? 0x33ccff : type === 'hull' ? 0xff7733 : type === 'fuel' ? 0x44ff88 : 0xffdd33;
+    const color = POWERUP_COLOR[type] || 0xffffff;
+
+    // Capsule (pill) core — Three.js r128+ ships CapsuleGeometry; fall back to a
+    // lathe-built capsule for older builds.
+    let coreGeo;
+    if (THREE.CapsuleGeometry) {
+      coreGeo = new THREE.CapsuleGeometry(11, 22, 6, 16);
+    } else {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * 11, -11 + Math.sin(a) * 11)); }
+      pts.push(new THREE.Vector2(11, 11));
+      for (let i = 0; i <= 8; i++) { const a = (i / 8) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * 11, 11 + Math.sin(a) * 11)); }
+      coreGeo = new THREE.LatheGeometry(pts, 16);
+    }
     const core = new THREE.Mesh(
-      new THREE.OctahedronGeometry(18, 0),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending })
+      coreGeo,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })
     );
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(24, 2.5, 8, 24),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending })
-    );
-    ring.rotation.x = Math.PI * 0.5;
     g.add(core);
-    g.add(ring);
+
+    // Vertical light pillar — translucent cylinder reaches far above & below.
+    const pillarH = 1800;
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.2, 2.2, pillarH, 8, 1, true),
+      new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.18,
+        blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+      })
+    );
+    g.add(pillar);
+
+    // Halo ring (equatorial, twice as wide as core).
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(26, 1.6, 6, 28),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    halo.rotation.x = Math.PI * 0.5;
+    g.add(halo);
+
+    // Outer faint shell — gives the pill a soft glow envelope.
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(20, 16, 12),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.10, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    g.add(shell);
+
+    // PointLight — radius scaled so it lights nearby asteroids/ships.
+    const light = new THREE.PointLight(color, 1.4, 320, 2);
+    g.add(light);
+
+    // Floating label sprite — billboards toward camera automatically.
+    const label = _createBeaconLabel(POWERUP_LABEL[type] || type, color);
+    if (label) { label.position.set(0, 56, 0); g.add(label); }
+
+    g.userData.beaconCore = core;
+    g.userData.beaconHalo = halo;
+    g.userData.beaconLight = light;
+    g.userData.beaconLabel = label;
+    g.userData.beaconColor = color;
     return g;
+  }
+
+  // Build a CanvasTexture-backed Sprite reading the beacon's name. The sprite
+  // auto-faces the camera in Three.js, so the player always sees the label
+  // regardless of approach angle.
+  function _createBeaconLabel(text, colorHex) {
+    if (typeof document === 'undefined') return null;
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 128;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return null;
+    const hex = '#' + ('000000' + colorHex.toString(16)).slice(-6);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.font = 'bold 56px "Orbitron", "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Outer glow halo behind the text for legibility against any starfield.
+    ctx.shadowColor = hex; ctx.shadowBlur = 24;
+    ctx.fillStyle = hex;
+    ctx.fillText(text, cv.width / 2, cv.height / 2);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, cv.width / 2, cv.height / 2);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthTest: false, depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(140, 35, 1);
+    sp.renderOrder = 999;
+    return sp;
+  }
+
+  // Pick a tier (0..3) using POWERUP_TIER_WEIGHTS, then pick a random type
+  // from that tier. Higher tiers are rarer and spawn farther / more dangerous.
+  function _pickBeaconTypeByTier() {
+    let total = 0; for (let i = 0; i < POWERUP_TIER_WEIGHTS.length; i++) total += POWERUP_TIER_WEIGHTS[i];
+    let r = Math.random() * total, tier = 0;
+    for (let i = 0; i < POWERUP_TIER_WEIGHTS.length; i++) {
+      r -= POWERUP_TIER_WEIGHTS[i];
+      if (r <= 0) { tier = i; break; }
+    }
+    const inTier = POWERUP_TYPES.filter(t => POWERUP_TIER[t] === tier);
+    return inTier.length ? inTier[(Math.random() * inTier.length) | 0] : POWERUP_TYPES[0];
+  }
+
+  // Find a hostile cluster centroid for legendary placement. Falls back to
+  // a far-orbit position if no hostiles are present.
+  function _hostileClusterPosition(state) {
+    if (!state || !state.entities) return null;
+    const ents = state.entities;
+    const HOSTILE = { enemy: 1, interceptor: 1, bomber: 1, predator: 1, dreadnought: 1, 'alien-baseship': 1 };
+    let cx = 0, cy = 0, cz = 0, n = 0;
+    for (let i = 0; i < ents.length; i++) {
+      const e = ents[i];
+      if (!e || e.markedForDeletion || !e.position) continue;
+      if (HOSTILE[e.type]) { cx += e.position.x; cy += e.position.y; cz += e.position.z; n++; }
+    }
+    if (n === 0) return null;
+    return { x: cx / n, y: cy / n, z: cz / n };
   }
 
   function _spawnPowerupNearPlayer(state) {
     if (!_scene || !state || !state.player || !state.player.position) return;
     if (_powerups.length >= POWERUP_MAX) return;
     const p = state.player.position;
+    const type = _pickBeaconTypeByTier();
+    const tier = POWERUP_TIER[type] | 0;
+    const band = POWERUP_TIER_RADIUS[tier] || POWERUP_TIER_RADIUS[0];
+    const r = band[0] + Math.random() * (band[1] - band[0]);
     const ang = Math.random() * Math.PI * 2;
-    const r = 550 + Math.random() * 1300;
-    const y = p.y + (Math.random() - 0.5) * 350;
-    const type = POWERUP_TYPES[(Math.random() * POWERUP_TYPES.length) | 0];
+
+    let cx = p.x, cy = p.y, cz = p.z;
+    // Legendary tier biases toward a hostile cluster — earn it by entering harm's way.
+    if (tier === 3) {
+      const hub = _hostileClusterPosition(state);
+      if (hub) { cx = hub.x; cy = hub.y; cz = hub.z; }
+    }
+    const y = cy + (Math.random() - 0.5) * 350;
     const mesh = _createPowerupMesh(type);
-    mesh.position.set(p.x + Math.cos(ang) * r, y, p.z + Math.sin(ang) * r);
+    mesh.position.set(cx + Math.cos(ang) * r, y, cz + Math.sin(ang) * r);
     _scene.add(mesh);
-    _powerups.push({ type, mesh, age: 0, phase: Math.random() * Math.PI * 2, spin: 0.7 + Math.random() * 1.1, baseY: y });
+    _powerups.push({
+      type, mesh, age: 0, phase: Math.random() * Math.PI * 2,
+      spin: 0.7 + Math.random() * 1.1, baseY: y, tier
+    });
   }
 
   function _applyPowerup(ship, type) {
@@ -2040,7 +2205,95 @@ const SFEnhance = (function () {
       ship.fuel = Math.min(maxFuel, ship.fuel + 30);
     } else if (type === 'torpedo' && typeof ship.torpedoes === 'number') {
       ship.torpedoes = Math.min(12, ship.torpedoes + 1);
+    } else if (type === 'emp') {
+      ship._beaconEMPCharges = ((ship._beaconEMPCharges | 0) + 1);
+    } else if (type === 'overcharge') {
+      const now = performance.now() / 1000;
+      const base = (ship._overchargeUntilT && ship._overchargeUntilT > now) ? ship._overchargeUntilT : now;
+      ship._overchargeUntilT = base + OVERCHARGE_DURATION_S;
+    } else if (type === 'repair') {
+      const now = performance.now() / 1000;
+      const base = (ship._repairUntilT && ship._repairUntilT > now) ? ship._repairUntilT : now;
+      ship._repairUntilT = base + REPAIR_DURATION_S;
+      ship._repairRate = REPAIR_RATE;
+    } else if (type === 'invuln') {
+      const now = performance.now() / 1000;
+      const base = (ship._invulnUntilT && ship._invulnUntilT > now) ? ship._invulnUntilT : now;
+      ship._invulnUntilT = base + INVULN_DURATION_S;
+    } else if (type === 'megaammo') {
+      if (typeof ship.torpedoes === 'number') ship.torpedoes = 12;
+      ship._beaconEMPCharges = ((ship._beaconEMPCharges | 0) + 5);
+    } else if (type === 'nuke') {
+      _detonateOmegaStrike(ship);
     }
+  }
+
+  // Iterates every entity around the activator and forces lethal damage on
+  // hostiles within NUKE_RADIUS. Uses the entity's own takeDamage so kill
+  // attribution and explosion FX flow through the normal pipeline.
+  function _detonateOmegaStrike(ship) {
+    if (!ship || !ship.position) return;
+    const st = (window.Starfighter && window.Starfighter.getState) ? Starfighter.getState() : null;
+    if (!st || !st.entities) return;
+    const HOSTILE = { enemy: 1, interceptor: 1, bomber: 1, predator: 1, dreadnought: 1, 'alien-baseship': 1, asteroid: 1, egg: 1, youngling: 1 };
+    const r2 = NUKE_RADIUS * NUKE_RADIUS;
+    let count = 0;
+    for (let i = 0; i < st.entities.length; i++) {
+      const e = st.entities[i];
+      if (!e || e.markedForDeletion || !e.position || !HOSTILE[e.type]) continue;
+      const dx = e.position.x - ship.position.x;
+      const dy = e.position.y - ship.position.y;
+      const dz = e.position.z - ship.position.z;
+      if (dx * dx + dy * dy + dz * dz > r2) continue;
+      if (typeof e.takeDamage === 'function') { e.takeDamage(99999); count++; }
+    }
+    if (window.SF3D && SF3D.spawnEMPBurst) SF3D.spawnEMPBurst(ship.position, NUKE_RADIUS);
+    if (window.SF3D && SF3D.spawnExplosion) SF3D.spawnExplosion(ship.position);
+    if (window.SFAudio && SFAudio.playSound) SFAudio.playSound('shockwave');
+    return count;
+  }
+
+  // Self-contained pickup toast — shows the beacon name briefly mid-screen
+  // so the player gets confirmation of what they just collected.
+  let _toastEl = null, _toastClearT = 0;
+  function _showBeaconToast(type) {
+    if (typeof document === 'undefined') return;
+    const colorHex = '#' + ('000000' + (POWERUP_COLOR[type] || 0xffffff).toString(16)).slice(-6);
+    const label = POWERUP_LABEL[type] || String(type).toUpperCase();
+    if (!_toastEl) {
+      _toastEl = document.createElement('div');
+      _toastEl.id = 'sfenhance-beacon-toast';
+      _toastEl.style.cssText = [
+        'position:fixed', 'left:50%', 'top:34%', 'transform:translate(-50%,-50%)',
+        'z-index:10000', 'pointer-events:none',
+        'font:bold 26px Orbitron,"Courier New",monospace', 'letter-spacing:2px',
+        'padding:10px 22px', 'border-radius:6px',
+        'background:rgba(0,0,0,0.55)', 'opacity:0',
+        'transition:opacity 220ms ease-out'
+      ].join(';');
+      document.body.appendChild(_toastEl);
+    }
+    _toastEl.textContent = label;
+    _toastEl.style.color = colorHex;
+    _toastEl.style.border = '1px solid ' + colorHex;
+    _toastEl.style.textShadow = '0 0 12px ' + colorHex;
+    _toastEl.style.boxShadow = '0 0 22px ' + colorHex;
+    _toastEl.style.opacity = '1';
+    _toastClearT = performance.now() / 1000 + 1.6;
+    if (_toastEl._timer) clearTimeout(_toastEl._timer);
+    _toastEl._timer = setTimeout(() => { if (_toastEl) _toastEl.style.opacity = '0'; }, 1400);
+  }
+
+  // Frame tick for repair-drone regen — pulled out so _updatePowerups stays readable.
+  function _tickRepairDrone(ship, dt) {
+    if (!ship || typeof ship.hull !== 'number') return;
+    const now = performance.now() / 1000;
+    if (!ship._repairUntilT || ship._repairUntilT <= now) return;
+    let maxHull = 100;
+    try {
+      if (window.SpaceManifold && SpaceManifold.dim) maxHull = SpaceManifold.dim('player.hull') || 100;
+    } catch (_) { }
+    ship.hull = Math.min(maxHull, ship.hull + (ship._repairRate || REPAIR_RATE) * dt);
   }
 
   function _updatePowerups(dt, state) {
@@ -2058,14 +2311,21 @@ const SFEnhance = (function () {
       if (!e || e.markedForDeletion || !e.position) continue;
       if (e.type === 'player' || e.type === 'wingman' || e.type === 'ally') pickupShips.push(e);
     }
+    // Repair-drone regen ticks even after pickup, until the buff window expires.
+    for (let i = 0; i < pickupShips.length; i++) _tickRepairDrone(pickupShips[i], dt);
 
     for (let i = _powerups.length - 1; i >= 0; i--) {
       const p = _powerups[i];
       p.age += dt;
       p.phase += dt;
       p.mesh.rotation.y += dt * p.spin;
-      p.mesh.rotation.x += dt * 0.35;
+      // Halo counter-rotates so the pillar stays vertical while the ring spins.
+      const halo = p.mesh.userData && p.mesh.userData.beaconHalo;
+      if (halo) halo.rotation.z += dt * 1.4;
       p.mesh.position.y = p.baseY + Math.sin(p.phase * 1.8) * 14;
+      // Pulse the PointLight intensity ── visible from a distance.
+      const lt = p.mesh.userData && p.mesh.userData.beaconLight;
+      if (lt) lt.intensity = 1.1 + Math.sin(p.phase * 3.4) * 0.55;
 
       let collected = false;
       for (let si = 0; si < pickupShips.length; si++) {
@@ -2077,6 +2337,7 @@ const SFEnhance = (function () {
         const rr = POWERUP_PICKUP_R + sr;
         if ((dx * dx + dy * dy + dz * dz) > rr * rr) continue;
         _applyPowerup(s, p.type);
+        if (s.type === 'player') _showBeaconToast(p.type);
         if (window.SF3D && SF3D.spawnImpactEffect) SF3D.spawnImpactEffect(p.mesh.position, 0x88ffcc);
         if (window.SFAudio && SFAudio.playSound) SFAudio.playSound('hud_power_up');
         collected = true;
