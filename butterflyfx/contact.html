@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact – ButterflyFX.us</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="carousel.css">
+</head>
+
+<body>
+  <canvas id="spiral-bg"></canvas>
+  <div class="content">
+    <header>
+      <h1>Contact</h1>
+      <h2>Let’s Build the Future Together</h2>
+    </header>
+    <section class="contact">
+      <h3>Consulting Inquiries</h3>
+      <p>Email: <a href="mailto:kenneth.bingham.w@gmail.com">kenneth.bingham.w@gmail.com</a></p>
+      <p>LinkedIn: <a href="#" id="linkedin-link">LinkedIn</a></p>
+      <p>For consulting or project inquiries, please reach out via email, LinkedIn, or use the form below. I respond
+        within 24 hours.</p>
+      <form class="contact-form" action="mailto:kenneth.bingham.w@gmail.com" method="POST" enctype="text/plain">
+        <label for="name">Name:</label><br>
+        <input type="text" id="name" name="name" required><br>
+        <label for="email">Your Email:</label><br>
+        <input type="email" id="email" name="email" required><br>
+        <label for="message">Message:</label><br>
+        <textarea id="message" name="message" rows="5" required></textarea><br>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+    <footer>
+      <p>&copy; 2026 Kenneth Bingham · ButterflyFX.us</p>
+    </footer>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="spiral.js"></script>
+</body>
+
+</html>
