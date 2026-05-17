@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ButterflyFX.us – AI & Software Consulting</title>
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background: #f7f9fa;
+      color: #1a1a1a;
+      font-family: 'Inter', 'Lato', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background: #fff;
+      box-shadow: 0 2px 16px #e0e6ed44;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2em 2.5em;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo img {
+      height: 44px;
+      width: 44px;
+      margin-right: 1.2em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2em;
+    }
+
+    .nav-link {
+      color: #118ab2;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.13em;
+      padding: 0.5em 1.2em;
+      border-radius: 2em;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .nav-link.active,
+    .nav-link:hover {
+      background: #118ab2;
+      color: #fff;
+    }
+
+    .cta-btn {
+      background: #ffd166;
+      color: #1a1a1a;
+      font-weight: 700;
+      border: none;
+      border-radius: 2em;
+      padding: 0.7em 2.2em;
+      font-size: 1.13em;
+      margin-left: 2em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .cta-btn:hover {
+      background: #06d6a0;
+      color: #fff;
+    }
+
+    .hero {
+      max-width: 900px;
+      margin: 4em auto 2.5em auto;
+      padding: 3.5em 2em 2.5em 2em;
+      background: #fff;
+      border-radius: 2.5em;
+      box-shadow: 0 4px 32px #e0e6ed55;
+      text-align: center;
+    }
+
+    .hero-title {
+      font-size: 2.8em;
+      font-weight: 800;
+      color: #118ab2;
+      margin-bottom: 0.3em;
+      letter-spacing: 0.01em;
+    }
+
+    .hero-sub {
+      font-size: 1.4em;
+      color: #1a1a1a;
+      margin-bottom: 1.2em;
+      font-weight: 500;
+    }
+
+    .hero-desc {
+      font-size: 1.18em;
+      color: #444;
+      margin-bottom: 2.2em;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+
+    .section {
+      max-width: 900px;
+      margin: 2.5em auto;
+      padding: 2.5em 2em;
+      background: #fff;
+      border-radius: 1.5em;
+      box-shadow: 0 2px 16px #e0e6ed33;
+    }
+
+    .section-title {
+      font-size: 1.7em;
+      color: #118ab2;
+      font-weight: 700;
+      margin-bottom: 1em;
+    }
+
+    .section-content {
+      font-size: 1.13em;
+      color: #222;
+      line-height: 1.7;
+    }
+
+    .footer {
+      background: #f7f9fa;
+      color: #888;
+      text-align: center;
+      padding: 2em 0 1em 0;
+      font-size: 1em;
+      margin-top: 4em;
+    }
+
+    @media (max-width: 700px) {
+
+      .navbar,
+      .hero,
+      .section {
+        padding-left: 1em;
+        padding-right: 1em;
+      }
+
+      .hero {
+        padding-top: 2em;
+        padding-bottom: 2em;
+      }
+
+      .section {
+        padding-top: 1.2em;
+        padding-bottom: 1.2em;
+      }
+
+      .nav-links {
+        gap: 0.7em;
+      }
+
+      .cta-btn {
+        margin-left: 0.7em;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="nav-logo">
+      <a href="index.html" aria-label="ButterflyFX Home">
+        <img src="assets/butterfly.png" alt="Butterfly Logo"
+          style="height:36px;width:36px;margin-right:0.5em;vertical-align:middle;" />
+        <img src="assets/logo.svg" alt="ButterflyFX Logo" style="height:44px;width:44px;vertical-align:middle;" />
+      </a>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link active">Home</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="services.html" class="nav-link">Services</a>
+      <a href="projects.html" class="nav-link">Projects</a>
+      <a href="blog.html" class="nav-link">Blog</a>
+      <a href="contact.html" class="nav-link">Contact</a>
+      <a href="directive.html" class="nav-link">AI Directive</a>
+      <a href="mailto:kenneth.bingham.w@gmail.com" class="cta-btn">Contact</a>
+    </div>
+  </nav>
+  <section class="hero">
+    <img src="kennethbingham.jpg" alt="Kenneth Bingham" class="hero-photo" />
+    <div class="hero-title">ButterflyFX</div>
+    <div class="hero-sub">AI & Software Consulting</div>
+    <div class="hero-desc">AI, dimensional programming, and modern software solutions for ambitious teams and founders.
+      Technical depth, clear communication, and a passion for building what’s next.</div>
+    <a href="services.html" class="cta-btn">Our Services</a>
+    <style>
+      .hero-photo {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 50%;
+        box-shadow: 0 2px 16px #118ab244, 0 1.5px 0 #ffd16655;
+        margin-bottom: 1.2em;
+        border: 4px solid #fff;
+        background: #e0e6ed;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    </style>
+  </section>
+  <section class="section">
+    <div class="section-title">The Service Includes</div>
+    <div class="section-content">
+      <p>At ButterflyFX, I teach a method called <strong>dimensional programming</strong> — a way of organizing systems,
+        data, and logic using geometry instead of traditional code structures. It’s not a new programming language. It
+        works with any language, any framework, any stack.</p>
+      <p>Think of it as a new mental model for building AI‑driven systems.</p>
+      <h4>Manifolds: Geometry That Is the Data</h4>
+      <p>A <strong>manifold</strong> is a geometric surface that naturally encodes relationships. Instead of storing
+        data in tables, objects, or files, dimensional programming treats the shape itself as the information.</p>
+      <ul>
+        <li>A <strong>point</strong> represents a state</li>
+        <li>A <strong>line</strong> represents a relationship</li>
+        <li>A <strong>surface</strong> represents a system</li>
+        <li>A <strong>volume</strong> represents a full decision space</li>
+      </ul>
+      <p>You don’t compute the data — you observe it on the manifold.</p>
+      <h4>Dimensional Programming: A Framework for Thinking</h4>
+      <p>Dimensional programming is a way to design systems where:</p>
+      <ul>
+        <li>State drives behavior</li>
+        <li>Geometry replaces storage</li>
+        <li>AI handles the heavy math</li>
+        <li>Developers focus on meaning, not mechanics</li>
+      </ul>
+      <p>You don’t need to understand the calculus behind manifolds.<br>
+        You don’t need to derive equations.<br>
+        You don’t need to visualize 7‑dimensional surfaces.</p>
+      <p>AI does the math. You think about the results.</p>
+      <p>This frees teams from low‑level implementation details and lets them focus on:</p>
+      <ul>
+        <li>system behavior</li>
+        <li>relationships</li>
+        <li>constraints</li>
+        <li>outcomes</li>
+        <li>user experience</li>
+        <li>business logic</li>
+      </ul>
+      <h4>Why This Matters</h4>
+      <p>Dimensional programming gives organizations:</p>
+      <ul>
+        <li>clearer system architecture</li>
+        <li>more adaptive AI behavior</li>
+        <li>faster iteration</li>
+        <li>reduced complexity</li>
+        <li>a unified conceptual model for teams</li>
+      </ul>
+      <p>It’s a way to build systems that are dynamic, reactive, and state‑aware — the way real life works.</p>
+    </div>
+  </section>
+  <section class="section">
+    <div class="section-title">Why Work With ButterflyFX?</div>
+    <div class="section-content">
+      <ul>
+        <li>Direct, jargon-free communication and clear deliverables</li>
+        <li>Modern, scalable, and maintainable solutions</li>
+        <li>Personalized, hands-on approach for every client</li>
+        <li>Up-to-date with the latest in AI and software best practices</li>
+        <li>Driven by curiosity, integrity, and a commitment to quality</li>
+      </ul>
+    </div>
+  </section>
+  <footer class="footer">
+    &copy; 2026 Kenneth Bingham · ButterflyFX.us
+  </footer>
+</body>
+
+</html>
