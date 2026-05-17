@@ -13,26 +13,81 @@
   <canvas id="spiral-bg"></canvas>
   <div class="content">
     <header>
+      <a href="index.html" class="back-btn" aria-label="Back to Home">&larr; Back to Home</a>
       <h1>Services & Consulting</h1>
       <h2>What I Offer</h2>
     </header>
-    <section class="services">
-      <ul>
-        <li>AI-assisted software development and platform engineering</li>
-        <li>Custom reasoning directive and workflow design</li>
-        <li>Codebase modernization, refactoring, and automation</li>
-        <li>Technical audits and explainability reviews</li>
-        <li>Training and workshops on AI programming and prompt engineering</li>
-        <li>Consulting for teams and organizations seeking to integrate AI into their workflows</li>
-      </ul>
-      <p>Contact me for a free consultation or to discuss your project needs.</p>
+    <section class="services-grid">
+      <div class="service-card" tabindex="0" onclick="showService('ai-dev')">
+        <div class="service-title">AI-Assisted Software Development</div>
+        <div class="service-short">Modern platforms, automation, and custom AI features.</div>
+      </div>
+      <div class="service-card" tabindex="0" onclick="showService('reasoning')">
+        <div class="service-title">Reasoning Directive & Workflow Design</div>
+        <div class="service-short">Custom logic, decision flows, and explainable AI.</div>
+      </div>
+      <div class="service-card" tabindex="0" onclick="showService('modernization')">
+        <div class="service-title">Codebase Modernization & Automation</div>
+        <div class="service-short">Refactoring, automation, and future-proofing.</div>
+      </div>
+      <div class="service-card" tabindex="0" onclick="showService('audit')">
+        <div class="service-title">Technical Audits & Explainability</div>
+        <div class="service-short">In-depth reviews, risk analysis, and clarity.</div>
+      </div>
+      <div class="service-card" tabindex="0" onclick="showService('training')">
+        <div class="service-title">AI Training & Workshops</div>
+        <div class="service-short">Hands-on learning for teams and leaders.</div>
+      </div>
+      <div class="service-card" tabindex="0" onclick="showService('consulting')">
+        <div class="service-title">AI Integration Consulting</div>
+        <div class="service-short">Strategy, implementation, and support.</div>
+      </div>
     </section>
+    <section id="service-details" class="service-details" style="display:none;"></section>
     <footer>
       <p>&copy; 2026 Kenneth Bingham · ButterflyFX.us</p>
     </footer>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script src="spiral.js"></script>
+  <script>
+    const serviceInfo = {
+      'ai-dev': {
+        title: 'AI-Assisted Software Development',
+        details: `<ul><li>Custom AI features and automation for your platform</li><li>End-to-end software engineering with modern best practices</li><li>Rapid prototyping and scalable deployment</li></ul>`
+      },
+      'reasoning': {
+        title: 'Reasoning Directive & Workflow Design',
+        details: `<ul><li>Design of custom logic and decision flows</li><li>Explainable AI and transparent reasoning</li><li>Workflow automation and optimization</li></ul>`
+      },
+      'modernization': {
+        title: 'Codebase Modernization & Automation',
+        details: `<ul><li>Refactoring legacy code for maintainability</li><li>Automated testing and CI/CD setup</li><li>Performance and security improvements</li></ul>`
+      },
+      'audit': {
+        title: 'Technical Audits & Explainability',
+        details: `<ul><li>In-depth code and architecture reviews</li><li>Risk analysis and compliance checks</li><li>Clear, actionable reports for stakeholders</li></ul>`
+      },
+      'training': {
+        title: 'AI Training & Workshops',
+        details: `<ul><li>Hands-on training for teams and leaders</li><li>Workshops on AI, prompt engineering, and dimensional programming</li><li>Custom curriculum for your needs</li></ul>`
+      },
+      'consulting': {
+        title: 'AI Integration Consulting',
+        details: `<ul><li>Strategy and roadmap for AI adoption</li><li>Implementation support and best practices</li><li>Ongoing guidance and troubleshooting</li></ul>`
+      }
+    };
+    function showService(key) {
+      const details = document.getElementById('service-details');
+      if (!serviceInfo[key]) return;
+      details.innerHTML = `<div class='details-card glass'><h3>${serviceInfo[key].title}</h3>${serviceInfo[key].details}<button onclick='hideService()' class='cta-btn' style='margin-top:1.2em;'>Close</button></div>`;
+      details.style.display = 'block';
+      details.scrollIntoView({ behavior: 'smooth' });
+    }
+    function hideService() {
+      document.getElementById('service-details').style.display = 'none';
+    }
+  </script>
 </body>
 
 </html>

@@ -12,25 +12,44 @@
 <body>
   <canvas id="spiral-bg"></canvas>
   <div class="content">
+    <nav class="navbar">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="services.html">Services</a>
+      <a href="projects.html">Projects</a>
+      <a href="https://kensgames.com" target="_blank" rel="noopener">KensGames</a>
+      <a href="method.html">Method</a>
+      <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Blog</a>
+      <a href="contact.html" class="active">Contact</a>
+    </nav>
     <header>
       <h1>Contact</h1>
       <h2>Let’s Build the Future Together</h2>
     </header>
-    <section class="contact">
-      <h3>Consulting Inquiries</h3>
-      <p>Email: <a href="mailto:kenneth.bingham.w@gmail.com">kenneth.bingham.w@gmail.com</a></p>
-      <p>LinkedIn: <a href="#" id="linkedin-link">LinkedIn</a></p>
-      <p>For consulting or project inquiries, please reach out via email, LinkedIn, or use the form below. I respond
-        within 24 hours.</p>
-      <form class="contact-form" action="mailto:kenneth.bingham.w@gmail.com" method="POST" enctype="text/plain">
-        <label for="name">Name:</label><br>
-        <input type="text" id="name" name="name" required><br>
-        <label for="email">Your Email:</label><br>
-        <input type="email" id="email" name="email" required><br>
-        <label for="message">Message:</label><br>
-        <textarea id="message" name="message" rows="5" required></textarea><br>
+    <section class="contact glass" style="max-width:480px;margin:0 auto 2em auto;">
+      <h3>Consulting & Collaboration</h3>
+      <p>Email: <a href="mailto:kenneth.bingham.w@gmail.com" id="email-link">kenneth.bingham.w@gmail.com</a> <button
+          id="copy-email" aria-label="Copy email"
+          style="margin-left:0.5em;padding:0.2em 0.8em;font-size:0.95em;">Copy</button></p>
+      <p>LinkedIn: <a href="https://www.linkedin.com/in/kennethbingham/" target="_blank"
+          rel="noopener">linkedin.com/in/kennethbingham</a></p>
+      <p>Blog: <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack – @kbingh</a></p>
+      <p style="font-size:1.08em;">For consulting, workshops, or project inquiries, please reach out by email or
+        LinkedIn. I respond within 24 hours.</p>
+      <form class="contact-form" autocomplete="off"
+        onsubmit="event.preventDefault(); document.getElementById('form-success').style.display='block'; this.reset();">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required>
+        <label for="email">Your Email:</label>
+        <input type="email" id="email" name="email" required>
+        <label for="message">Message:</label>
+        <textarea id="message" name="message" rows="5" required></textarea>
         <button type="submit">Send</button>
+        <div id="form-success" style="display:none;color:#06d6a0;margin-top:1em;">Thank you! Your message was received
+          (demo only).</div>
       </form>
+      <p style="font-size:0.98em;color:#ffd166;margin-top:1.2em;">Your information is kept private and used only to
+        respond to your inquiry.</p>
     </section>
     <footer>
       <p>&copy; 2026 Kenneth Bingham · ButterflyFX.us</p>
@@ -38,6 +57,14 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
   <script src="spiral.js"></script>
+  <script>
+    document.getElementById('copy-email').onclick = function () {
+      const email = document.getElementById('email-link').textContent;
+      navigator.clipboard.writeText(email);
+      this.textContent = 'Copied!';
+      setTimeout(() => { this.textContent = 'Copy'; }, 1200);
+    };
+  </script>
 </body>
 
 </html>
