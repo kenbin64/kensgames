@@ -276,33 +276,21 @@ function saddleCellQuaternion(_cx, _cy, _cz, out) {
   // handles continuity between adjacent chambers. Identity quaternion for every cell.
   return out.set(0, 0, 0, 1);
 }
-// Saddle field in cell-local coords — delegated to WinkiSubstrate (the manifold IS the source).
-// x = position on the surface, y = scale modifier (SADDLE_HALF normalises to unit cell).
-// z = x·y is the signed distance; grad(x) is the analytic surface normal.
-// The substrate observes; the game never re-derives.
+// Saddle field in cell-local coords. The visual lattice (_makeWinkiGeo) always renders the
+// +W face surface z = x·y/h, so collision MUST use the same +W analytic formula or the ball
+// passes through the visible walls. (Routing through WinkiSubstrate.faceOf picks ±V faces
+// when |y| dominates, whose saddle = -(z·x) is degenerate along the column-centre axis the
+// ball falls through — that's why the ball was sinking straight down.)
+// f(x,y,z) = z - xy/h. |grad f| = sqrt(1 + x²/h² + y²/h²) ≥ 1 everywhere, no singularities.
 function saddleSignedDistance(lx, ly, lz) {
-  if (typeof WinkiSubstrate !== 'undefined') {
-    // Normalise to the unit cell [-1,+1] so WinkiSubstrate works in its own coords.
-    const h = SADDLE_HALF;
-    const u = lx / h, v = ly / h, w = lz / h;
-    // face +W: observed value = -(u·v) in unit coords → scale back to cell space
-    const raw = WinkiSubstrate.observe([u, v, w], 1.0) * h;
-    const g = WinkiSubstrate.grad([u, v, w]);
-    const gMag = Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) || 1;
-    return (lz - raw) / gMag;
-  }
-  // Fallback (substrate not loaded yet)
   const h = SADDLE_HALF;
   const f = lz - (lx * ly) / h;
   const gMag = Math.sqrt(1 + (lx * lx + ly * ly) / (h * h));
   return f / gMag;
 }
 function saddleGrad(lx, ly, lz, out) {
-  if (typeof WinkiSubstrate !== 'undefined') {
-    const h = SADDLE_HALF;
-    const g = WinkiSubstrate.grad([lx / h, ly / h, lz / h]);
-    return out.set(g[0], g[1], g[2]);
-  }
+  // ∂f/∂(x,y,z) for f = z - xy/h. The +1 in z is critical: without it the membrane has no
+  // vertical normal component and a vertically-falling ball never collides.
   const h = SADDLE_HALF;
   return out.set(-ly / h, -lx / h, 1);
 }
@@ -1031,15 +1019,32 @@ function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
   if (ax === 0) _spawnLocal.x = slabComp;
   else if (ax === 1) _spawnLocal.y = slabComp;
   else _spawnLocal.z = slabComp;
-  // Snap in-plane coords to the nearest chamber centre: chamber k spans
-  // [-GY_HALF + k*SADDLE_CELL, -GY_HALF + (k+1)*SADDLE_CELL], centre at -GY_HALF + (k+0.5)*SADDLE_CELL.
-  const _snap = v => {
-    let k = Math.floor((v + GY_HALF) / SADDLE_CELL);
+  // Snap in-plane coords to a saddle quadrant inside the chosen chamber. Chamber k spans
+  // [-GY_HALF + k*SADDLE_CELL, -GY_HALF + (k+1)*SADDLE_CELL]. Snapping to chamber CENTRE
+  // lands the ball on the saddle singularity (z=xy passes through the origin from all 4
+  // quadrants), so the collider can't pick a 'home side' and the wall normal is purely
+  // horizontal -- a vertical fall is tangential and never collides. By offsetting to a
+  // quadrant corner (±OFF_FRAC * SADDLE_HALF), the ball enters on a definite side of the
+  // membrane with a wall normal that has a vertical component, so gravity drives it INTO
+  // the wall and the saddle deflects it sideways into the next chamber down.
+  // The sign pair (sx, sz) is chosen so (sx * sz) is negative, guaranteeing a nonzero
+  // signed distance at spawn (surface value = sz - sx at y=+h is ±2*OFF, never zero).
+  // Deterministic per-column hash gives consistent drop patterns (same column → same path).
+  const OFF_FRAC = 0.45;
+  const off = SADDLE_HALF * OFF_FRAC;
+  const _snapQuadrant = (vRaw, axisLabel) => {
+    let k = Math.floor((vRaw + GY_HALF) / SADDLE_CELL);
     if (k < 0) k = 0; else if (k > G - 1) k = G - 1;
-    return -GY_HALF + (k + 0.5) * SADDLE_CELL;
+    const centre = -GY_HALF + (k + 0.5) * SADDLE_CELL;
+    // Deterministic ±1 from column index + axis label so adjacent chambers alternate
+    // and the two in-plane axes get opposite signs (sx*sz < 0 ⇒ nonzero spawn distance).
+    const h = (k * 73856093) ^ (axisLabel.charCodeAt(0) * 19349663);
+    const sign = ((h >>> (axisLabel === inA ? 0 : 4)) & 1) ? 1 : -1;
+    const flipForB = (axisLabel === inB) ? -1 : 1;
+    return centre + sign * flipForB * off;
   };
-  _spawnLocal[inA] = _snap(_spawnLocal[inA]);
-  _spawnLocal[inB] = _snap(_spawnLocal[inB]);
+  _spawnLocal[inA] = _snapQuadrant(_spawnLocal[inA], inA);
+  _spawnLocal[inB] = _snapQuadrant(_spawnLocal[inB], inB);
   const dSpawn = _saddleSignedAt(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z);
   const side = dSpawn >= 0 ? 1 : -1;
   const v0 = -1;                                   // m/s downward in world
@@ -1940,7 +1945,8 @@ function openMultiplayerPanel() {
     minPlayers: 2,
     maxPlayers: 4,
     inviteCode,
-    onLaunch: ({ session, players, playerCount, launchMode }) => {
+    onLaunch: (payload) => {
+      const { session, players, playerCount, launchMode } = payload || {};
       PLAYERS = Array.isArray(players) ? players : [];
       numPlayers = Math.max(1, Math.min(4, playerCount));
       vsMode = launchMode === 'ai' ? 'ai' : 'pvp';
@@ -1948,9 +1954,17 @@ function openMultiplayerPanel() {
         const pl = PLAYERS[i] || null;
         setPlayerIdentity(i + 1, (pl && pl.username) || ('PLAYER ' + (i + 1)), avatarFor(pl, i + 1));
       }
-      KGSync.init(session);
+      // Local-solo payload has no nested session; only init sync for real multiplayer.
+      if (session && typeof KGSync !== 'undefined' && KGSync.init) {
+        try { KGSync.init(session); } catch (_) { /* ignore */ }
+      }
       try { KGMultiplayerPanel.unmount(); } catch { /* ignore */ }
-      overlay.style.display = 'none';
+      if (overlay) {
+        overlay.style.display = 'none';
+        // Defensive: also clear the host so no stale lobby card can paint
+        // on top of the game canvas if something re-renders later.
+        if (host) host.innerHTML = '';
+      }
       startGame();
     },
   });
@@ -2019,9 +2033,54 @@ function _consumeLaunchRuntime() {
       startGame();
     },
     onMissing() {
-      openMultiplayerPanel();
+      // No persisted runtime — jump straight into a default solo game
+      // (1 human + 1 AI bot) instead of forcing the user through the
+      // lobby wizard. The wizard is still reachable via the NEW MATCH
+      // button on the result overlay.
+      _autoStartDefaultSolo();
     },
   });
+}
+
+// Default first-run experience: spin up a 2-player human-vs-AI match
+// without ever showing the lobby wizard. Honors the player's stored
+// identity (name + avatar) so they never have to re-enter it.
+function _autoStartDefaultSolo() {
+  let storedName = '';
+  let storedAvatar = '';
+  try {
+    storedName = (localStorage.getItem('display_name')
+      || localStorage.getItem('username')
+      || '').trim();
+  } catch (_) { /* ignore */ }
+  try {
+    const raw = localStorage.getItem('kg_avatar');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      storedAvatar = (parsed && (parsed.emoji || parsed.id)) || '';
+    }
+  } catch (_) { /* ignore */ }
+
+  const human = {
+    user_id: 'local-human-' + Date.now(),
+    username: storedName || 'You',
+    avatar: storedAvatar || '🎮',
+    is_ai: false,
+    is_host: true,
+  };
+  const bot = {
+    user_id: 'local-ai-bot-0',
+    username: 'Bot 1',
+    avatar: '🤖',
+    is_ai: true,
+    is_host: false,
+  };
+  PLAYERS = [human, bot];
+  numPlayers = 2;
+  vsMode = 'ai';
+  setPlayerIdentity(1, human.username, human.avatar);
+  setPlayerIdentity(2, bot.username, bot.avatar);
+  startGame();
 }
 
 function rematch() { document.getElementById('result-overlay').classList.remove('show'); resetGame(false); Audio4D.startMusic(); }
@@ -2067,7 +2126,10 @@ Promise.all([manifestReady, glbReady]).then(() => {
   setTimeout(finishPreload, 400);
   setTimeout(() => {
     try {
-      if (!_consumeLaunchRuntime()) openMultiplayerPanel();
+      // consumeRuntime's onMissing handler now auto-starts a default
+      // solo game, so there's no need for a fallback openMultiplayerPanel
+      // call here — that would have mounted the wizard a second time.
+      _consumeLaunchRuntime();
     } catch (e) {
       console.warn('[4D] panel autostart failed', e);
     }
