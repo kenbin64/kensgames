@@ -5,7 +5,7 @@
   <script src="/js/session-identity.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cubic Lobby &mdash; KensGames</title>
+  <title>4D TicTacToe Lobby &mdash; KensGames</title>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
@@ -127,7 +127,6 @@
         <li><a href="/fasttrack/lobby.html">FastTrack</a></li>
         <li><a href="/starfighter/lobby.html">Alien Attack</a></li>
         <li><a href="/brickbreaker3d/lobby.html">BrickBreaker 3D</a></li>
-        <li><a href="/4DTicTacToe/index.html?setup=1">4D TicTacToe</a></li>
       </ul>
       <div class="arc-nav-right" id="nav-avatar"></div>
     </div>
@@ -140,7 +139,7 @@
       </div>
       <div>
         <div class="player-name" id="p-name">Player</div>
-        <div class="player-meta">3D Tetris &bull; Solo, Local &amp; Online</div>
+        <div class="player-meta">4D Strategy &bull; Solo, Local &amp; Online</div>
       </div>
     </div>
     <div id="mp-panel-host"></div>
@@ -153,7 +152,7 @@
   <script src="/js/substrates/game_manager.js?v=20260507d"></script>
   <script>
     if (window.KGGameManager && typeof window.KGGameManager.loadRules === 'function') {
-      window.KGGameManager.loadRules('cubic3d').catch(() => { });
+      window.KGGameManager.loadRules('4dtictactoe').catch(() => { });
     }
   </script>
   <script src="/js/multiplayer-client.js?v=20260507c"></script>
@@ -170,16 +169,16 @@
     if (!AvatarPicker.has()) AvatarPicker.show(() => location.reload(), true);
 
     KGGameSetup.mount('#mp-panel-host', {
-      gameId: 'cubic3d',
-      gameName: 'Cubic',
+      gameId: '4dtictactoe',
+      gameName: '4D TicTacToe',
       minPlayers: 1,
       maxPlayers: 4,
-      gamePath: '/cubic3d/index.html',
+      gamePath: '/4DTicTacToe/index.html',
       onLaunch: (summary) => {
         window.KGGameSetup.launchTo(summary, {
-          gameId: 'cubic3d',
-          gameName: 'Cubic',
-          gamePath: '/cubic3d/index.html',
+          gameId: '4dtictactoe',
+          gameName: '4D TicTacToe',
+          gamePath: '/4DTicTacToe/index.html',
         });
       },
     });
