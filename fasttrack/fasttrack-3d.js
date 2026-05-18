@@ -44,50 +44,50 @@ const COLOR_NAMES = ['Yellow', 'Blue', 'Red', 'Purple', 'Orange', 'Green'];
 const ART_PLACEHOLDERS = [
   // ── Back wall (faces +Z, viewed from default camera position) ──
   {
-    wall: 'back', x: -300, y: 280, width: 220, height: 165, file: 'bridge.png',
+    wall: 'back', x: -300, y: 280, width: 220, height: 165, file: 'bridge.webp',
     title: 'The Bridge', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2021',
     storeUrl: 'https://fineartamerica.com/featured/enchanted-forest-bridge-kenneth-bingham.html'
   },
   {
-    wall: 'back', x: 300, y: 280, width: 220, height: 165, file: 'chess.png',
+    wall: 'back', x: 300, y: 280, width: 220, height: 165, file: 'chess.webp',
     title: 'Two Men Playing Chess In Park', artist: 'Ken Bingham', medium: 'Acrylic on Canvas', year: '2020',
     storeUrl: 'https://fineartamerica.com/featured/two-men-playing-chess-in-park-kenneth-bingham.html'
   },
   // ── Left wall ──
   {
-    wall: 'left', x: -220, y: 260, width: 200, height: 150, file: 'DrivingTheHerd.png',
+    wall: 'left', x: -220, y: 260, width: 200, height: 150, file: 'DrivingTheHerd.webp',
     title: 'Driving The Herd', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2019',
     storeUrl: 'https://fineartamerica.com/featured/cowboy-leading-cattle-through-desert-kenneth-bingham.html'
   },
   {
-    wall: 'left', x: 120, y: 260, width: 200, height: 150, file: 'lighthouse.png',
+    wall: 'left', x: 120, y: 260, width: 200, height: 150, file: 'lighthouse.webp',
     title: 'The Lighthouse', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2022',
     storeUrl: 'https://fineartamerica.com/featured/lighthouse-illuminating-stormy-sea-kenneth-bingham.html'
   },
   // ── Right wall — spread apart to leave room for neon sign in center ──
   {
-    wall: 'right', x: -220, y: 260, width: 200, height: 150, file: 'parrot.png',
+    wall: 'right', x: -220, y: 260, width: 200, height: 150, file: 'parrot.webp',
     title: 'The Parrot', artist: 'Ken Bingham', medium: 'Acrylic', year: '2026',
     storeUrl: 'https://fineartamerica.com/featured/tropical-paradise-with-parrot-kenneth-bingham.html'
   },
   {
-    wall: 'right', x: 280, y: 260, width: 200, height: 150, file: 'pigs.png',
+    wall: 'right', x: 280, y: 260, width: 200, height: 150, file: 'pigs.webp',
     title: 'The Pigs', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2018',
     storeUrl: 'https://fineartamerica.com/featured/three-little-pigs-in-overalls-kenneth-bingham.html'
   },
   // ── Front wall (orbit camera to see) ──
   {
-    wall: 'front', x: -300, y: 280, width: 220, height: 165, file: 'voyage.png',
+    wall: 'front', x: -300, y: 280, width: 220, height: 165, file: 'voyage.webp',
     title: 'The Voyage', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2020',
     storeUrl: 'https://fineartamerica.com/featured/ship-at-sea-near-majestic-mountain-kenneth-bingham.html'
   },
   {
-    wall: 'front', x: 0, y: 280, width: 220, height: 165, file: 'bear.png',
+    wall: 'front', x: 0, y: 280, width: 220, height: 165, file: 'bear.webp',
     title: 'Bear Catching Fish', artist: 'Ken Bingham', medium: 'Oil on Canvas', year: '2023',
     storeUrl: 'https://fineartamerica.com/featured/bear-catching-fish-in-rapids-kenneth-bingham.html'
   },
   {
-    wall: 'front', x: 300, y: 280, width: 220, height: 165, file: 'rainedout.png',
+    wall: 'front', x: 300, y: 280, width: 220, height: 165, file: 'rainedout.webp',
     title: 'Rained Out', artist: 'Ken Bingham', medium: 'Watercolor', year: '2023',
     storeUrl: 'https://fineartamerica.com/featured/baseball-player-on-rainy-field-kenneth-bingham.html'
   },
@@ -983,7 +983,7 @@ function createBilliardRoom() {
   // re-flagged with needsUpdate when the source image arrives).
   const WAINSCOT_TOP = 130;  // must match WAINSCOT_H below
   const brickH = ROOM_HEIGHT - WAINSCOT_TOP;
-  const brickUrl = 'assets/images/art/' + encodeURIComponent('Brick texture.png');
+  const brickUrl = 'assets/images/art/' + encodeURIComponent('Brick texture.webp');
   new THREE.TextureLoader().load(brickUrl, (brickTex) => {
     brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping;
     brickTex.colorSpace = THREE.SRGBColorSpace;
@@ -1457,7 +1457,7 @@ function createBilliardRoom() {
   // ── NEON SIGN IMAGE — right wall, between the two paintings ────
   {
     const neonImgLoader = new THREE.TextureLoader();
-    const neonImgTex = neonImgLoader.load('assets/images/art/fastTrack_neon.png');
+    const neonImgTex = neonImgLoader.load('assets/images/art/fastTrack_neon.webp');
     neonImgTex.colorSpace = THREE.SRGBColorSpace;
 
     // Sign dimensions — fits the ~300 unit gap comfortably
@@ -3212,7 +3212,7 @@ function _showArtOverlay(art) {
   // Image source: manifold ART_DATA base64, else direct file path
   const dataUrl = (typeof ART_DATA !== 'undefined') && ART_DATA[art.file];
   document.getElementById('ago-img').src = dataUrl || `assets/images/art/${art.file}`;
-  document.getElementById('ago-title').textContent = art.title || art.file.replace('.png', '');
+  document.getElementById('ago-title').textContent = art.title || art.file.replace(/\.(png|webp|jpe?g)$/i, '');
   document.getElementById('ago-details').textContent =
     `${art.artist || 'Unknown'}  ·  ${art.medium || ''}  ·  ${art.year || ''}`;
 
