@@ -298,20 +298,18 @@ function clearTransientIdentity() {
   try {
     if (window.KGGameCache && typeof KGGameCache.purgeRuntime === 'function') {
       KGGameCache.purgeRuntime('fasttrack_exit');
-      // Also drop the player-display fields that are FastTrack-exit-specific
-      // and intentionally NOT in the shared runtime list (so a mid-session
-      // game-over doesn't force re-entry of name + avatar).
-      try { localStorage.removeItem('username'); } catch (_) { }
-      try { localStorage.removeItem('display_name'); } catch (_) { }
-      try { localStorage.removeItem('kg_avatar'); } catch (_) { }
+      // Identity (username / display_name / kg_avatar) is preserved by design
+      // — see /js/kg-game-cache.js header. Wiping it here forced the portal
+      // and game lobbies to re-prompt the user on every exit/replay.
       return;
     }
   } catch (_) { /* fall through to legacy path */ }
   try {
+    // Identity keys (username, display_name, kg_avatar) are intentionally
+    // omitted — they persist across exits as a user preference.
     const keys = [
       'fasttrack_player_name', 'fasttrack_player_avatar',
       'KG_Game', 'KG_Player', 'fasttrack-lobby',
-      'username', 'display_name', 'kg_avatar',
       'kg_session_id', 'kg_session_code',
     ];
     keys.forEach(k => { try { localStorage.removeItem(k); } catch (_) { } });
