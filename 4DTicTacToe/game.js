@@ -352,7 +352,7 @@ function _winkiInstancedMesh(geo) {
     envMap, envMapIntensity: 1.2,
     side: THREE.FrontSide,
     transparent: true,
-    opacity: 0.36,
+    opacity: 0.18,
     depthWrite: false
   });
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
