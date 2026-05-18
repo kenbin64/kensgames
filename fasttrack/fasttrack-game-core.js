@@ -407,11 +407,15 @@ function hasOwnPegOnHole(player, holeId, excludePegId = null) {
 }
 
 function canAdvanceFastTrackStep(player, fromFtIdx, toFtIdx, movingPeg) {
+  // rules.json :: FT_RING_PASS_RELAX (z=72) — only the destination matters
+  // for FT-ring traversal. Own pegs sitting on the regular outer/home/side
+  // segment of any bypassed pocket do NOT block the FT step (they aren't on
+  // the FT path at all). Earlier guard here mistakenly inspected the bypass
+  // segment and silently suppressed legal FT moves; user_directive_2026-05-18.
   if (hasOwnPegOnHole(player, `ft-${toFtIdx}`, movingPeg && movingPeg.id)) {
     return false;
   }
-  const skippedRegularSegment = getFastTrackBypassSegment(fromFtIdx);
-  return !skippedRegularSegment.some(holeId => hasOwnPegOnHole(player, holeId, movingPeg && movingPeg.id));
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
