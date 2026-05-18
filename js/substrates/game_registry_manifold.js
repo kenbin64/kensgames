@@ -25,7 +25,7 @@ const GameRegistryManifold = (() => {
       version: '2.1.0',
       entryPoint: '/fasttrack/lobby.html',
       icon: '/fasttrack/assets/images/ftLogo.png',
-      thumbnail: '/fasttrack/assets/images/billiard_theme.png',
+      thumbnail: '/fasttrack/assets/images/billiard_theme.webp',
 
       // Dimensional positioning
       manifold: {

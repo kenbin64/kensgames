@@ -127,7 +127,7 @@ img {
       rgba(7, 6, 10, 0.42) 45%,
       rgba(7, 6, 10, 0.70) 80%,
       rgba(7, 6, 10, 0.90) 100%),
-    url('/assets/images/fasttrack_lobby.png') center / cover no-repeat;
+    url('/assets/images/fasttrack_lobby.webp') center / cover no-repeat;
   pointer-events: none;
 }
 

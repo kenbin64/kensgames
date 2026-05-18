@@ -1568,43 +1568,18 @@
             <div class="hero-copy">
                 <h1>KENS<span class="accent">GAMES</span></h1>
                 <div class="hero-sub">World Class Arcade Portal, Est. 2026</div>
-                <p class="hero-lede"><strong>KensGames is a proof of concept disguised as an arcade.</strong> The thesis
-                    is simple. Data does not have to live in bits and bytes. It can live in shapes. A mathematical
-                    expression, evaluated on a substrate, behaves like a Stradivarius. The instrument does not contain
-                    the music. It contains the capacity to play music when the right hand reads it. Curves, surfaces and
-                    waveforms hold information the same way, and the right lens lifts color, sound, text, rules and
-                    gameplay back out.</p>
-                <p>That is the entire engine under this portal. Every game shares one geometric core called a manifold.
-                    Small lens programs read that core and project it as a board, a cockpit, a soundtrack or a
-                    multiplayer match. There is no library of 3D models shipped to your device, no audio files streaming
-                    in the background and no per-game rule database. The shape is the data, and the shape is queried in
-                    place.</p>
-                <p>The numbers back the pitch. The complete playable site is roughly <strong>120 MB</strong>, of which
-                    the actual code, every lens, every rule set, every page, totals <strong>7.3 MB</strong>. Five
-                    distinct games, multiplayer, AI opponents and procedural audio all run from that footprint, in a
-                    browser, with no install.</p>
-                <p>Is it groundbreaking? In the narrow sense, yes. Treating geometry as the canonical store and treating
-                    renderers, audio engines and game logic as lenses over a single manifold is not how mainstream
-                    engines are built today. If the pattern holds at scale, it implies a different shape for software in
-                    general. Worlds, datasets, simulations and media could be distributed as compact expressions instead
-                    of gigabytes of baked assets, with fidelity decided at read time by the lens rather than at bake
-                    time by the publisher. That is a meaningful shift in how digital content is authored, shipped and
-                    preserved. KensGames is the first public, playable test of the idea. Pick a cabinet below and try
-                    the proof yourself.</p>
-                <p class="hero-lede hero-lede-alt"><strong>The Fort Knox of game data.</strong> A traditional breach
-                    walks off with gigabytes of profiles, save files and asset libraries. Here there is almost nothing
-                    to walk off with. Player state is stored as encrypted coordinates under
-                    <strong>AES&#8209;256&#8209;GCM</strong>,
-                    substrates are integrity&#8209;signed with <strong>HMAC&#8209;SHA256</strong>, passwords are
-                    <strong>bcrypt</strong> hashed at cost 12 and authentication is moving to passkeys. Every
-                    cryptographic primitive in use here is the same one banks, governments and signal&#8209;intelligence
-                    agencies rely on. Reading anything meaningful out of a stolen copy of the site requires the
-                    manifold, the specific lens that interprets it, and the keys that unlock both. Miss any one of the
-                    three and the loot decrypts into geometry with no meaning attached. That is not a promise that
-                    nothing can ever go wrong. It is a deliberate collapse of the surface area of what is even worth
-                    stealing. <a href="/security.html"
-                        style="color:var(--neon-yellow);text-decoration:none;border-bottom:1px solid rgba(255,232,0,0.4)">Read
-                        the security claim &amp; disclaimer &#9654;</a>
+                <p class="hero-lede">
+                    Five browser games — multiplayer, AI opponents, procedural audio — running from a
+                    <strong>7.3&nbsp;MB</strong> code footprint. No installs, no downloads, no asset libraries.
+                    Geometry is computed at runtime instead of shipped.
+                </p>
+                <p>
+                    Player state is encrypted with <strong>AES‑256‑GCM</strong>, content is signed with
+                    <strong>HMAC‑SHA256</strong>, passwords are <strong>bcrypt</strong> (cost 12), and auth is moving
+                    to passkeys.
+                    <a href="/security.html"
+                        style="color:var(--neon-yellow);text-decoration:none;border-bottom:1px solid rgba(255,232,0,0.4)">Security
+                        details &#9654;</a>
                 </p>
                 <div class="hero-cta">
                     <a class="btn-play" href="#games"
@@ -1614,10 +1589,9 @@
                         href="/fasttrack/" onclick="event.preventDefault();goToGame('/fasttrack/');">FASTTRACK
                         &#9654;</a>
                 </div>
-                <div class="hero-note">Play instantly in your browser &nbsp;&#9632;&nbsp; Solo against smart bots or
-                    live with friends &nbsp;&#9632;&nbsp; Invite by room code or share link &nbsp;&#9632;&nbsp; <a
-                        href="#creator" style="color:var(--neon-yellow);text-decoration:none">Browse the art &amp; merch
-                        shop &#9654;</a></div>
+                <div class="hero-note">Play instantly in your browser &nbsp;&#9632;&nbsp; Solo vs. bots or live with
+                    friends &nbsp;&#9632;&nbsp; Invite by room code &nbsp;&#9632;&nbsp; <a href="#creator"
+                        style="color:var(--neon-yellow);text-decoration:none">Art &amp; merch shop &#9654;</a></div>
             </div>
 
             <div class="arcade-wall" aria-label="Arcade consoles">
@@ -1627,8 +1601,8 @@
                         <div class="console-tag">2–4 players</div>
                     </div>
                     <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.png"
-                            src="/assets/images/fasttrack_lobby.png" alt="FastTrack" loading="eager" decoding="async"
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.webp"
+                            src="/assets/images/fasttrack_lobby.webp" alt="FastTrack" loading="eager" decoding="async"
                             fetchpriority="high" />
                     </div>
                     <div class="console-foot">
@@ -1644,8 +1618,8 @@
                         <div class="console-tag">1&ndash;4 players</div>
                     </div>
                     <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/logo/manifold.png"
-                            src="/assets/images/logo/manifold.png" alt="4D TicTacToe" loading="lazy" decoding="async"
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/logo/manifold.webp"
+                            src="/assets/images/logo/manifold.webp" alt="4D TicTacToe" loading="lazy" decoding="async"
                             fetchpriority="low" />
                     </div>
                     <div class="console-foot">
@@ -1661,8 +1635,8 @@
                         <div class="console-tag">first-person 3D</div>
                     </div>
                     <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.png"
-                            src="/assets/images/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.webp"
+                            src="/assets/images/starfighter_landing.webp" alt="Alien Space Attack" loading="lazy"
                             decoding="async" fetchpriority="low" />
                     </div>
                     <div class="console-foot">
@@ -1678,8 +1652,8 @@
                         <div class="console-tag">solo &amp; multiplayer</div>
                     </div>
                     <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                            src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.webp"
+                            src="/assets/images/brickbreaker3D_landing.webp" alt="BrickBreaker 3D" loading="lazy"
                             decoding="async" fetchpriority="low" />
                     </div>
                     <div class="console-foot">
@@ -1695,8 +1669,8 @@
                         <div class="console-tag">3D Tetris</div>
                     </div>
                     <div class="console-screen">
-                        <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.png"
-                            src="/cubic3d/assets/cubic.png" alt="Cubic" loading="lazy" decoding="async"
+                        <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.webp"
+                            src="/cubic3d/assets/cubic.webp" alt="Cubic" loading="lazy" decoding="async"
                             fetchpriority="low" />
                     </div>
                     <div class="console-foot">
@@ -1743,8 +1717,8 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a2d0a,#0a1a05);">
-                    <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.png"
-                        src="/assets/images/fasttrack_lobby.png" alt="FastTrack lobby" loading="lazy" decoding="async"
+                    <img data-imgatlas="auto" data-pngsrc="/assets/images/fasttrack_lobby.webp"
+                        src="/assets/images/fasttrack_lobby.webp" alt="FastTrack lobby" loading="lazy" decoding="async"
                         fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
@@ -1766,12 +1740,12 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#1a0a2d,#0a0518);">
-                    <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.png"
-                        src="/assets/images/brickbreaker3D_landing.png" alt="BrickBreaker 3D" loading="lazy"
+                    <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_landing.webp"
+                        src="/assets/images/brickbreaker3D_landing.webp" alt="BrickBreaker 3D" loading="lazy"
                         decoding="async" fetchpriority="low">
                     <div class="thumb-strip" aria-hidden="true">
-                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_lobby.png"
-                            src="/assets/images/brickbreaker3D_lobby.png" alt="BrickBreaker 3D lobby" loading="lazy"
+                        <img data-imgatlas="auto" data-pngsrc="/assets/images/brickbreaker3D_lobby.webp"
+                            src="/assets/images/brickbreaker3D_lobby.webp" alt="BrickBreaker 3D lobby" loading="lazy"
                             decoding="async" fetchpriority="low">
                     </div>
                     <span class="game-badge badge-live">&#9679; LIVE</span>
@@ -1794,8 +1768,8 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#0a1a2d,#020814);">
-                    <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.png"
-                        src="/assets/images/starfighter_landing.png" alt="Alien Space Attack" loading="lazy"
+                    <img data-imgatlas="auto" data-pngsrc="/assets/images/starfighter_landing.webp"
+                        src="/assets/images/starfighter_landing.webp" alt="Alien Space Attack" loading="lazy"
                         decoding="async" fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
@@ -1825,8 +1799,8 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#0a0a2d,#04040c);">
-                    <img data-imgatlas="auto" data-pngsrc="/assets/images/logo/manifold.png"
-                        src="/assets/images/logo/manifold.png" alt="4D TicTacToe" loading="lazy" decoding="async"
+                    <img data-imgatlas="auto" data-pngsrc="/assets/images/logo/manifold.webp"
+                        src="/assets/images/logo/manifold.webp" alt="4D TicTacToe" loading="lazy" decoding="async"
                         fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
@@ -1848,7 +1822,7 @@
 
             <div class="game-card">
                 <div class="game-image" style="background:linear-gradient(135deg,#2d2410,#0f0c04);">
-                    <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.png" src="/cubic3d/assets/cubic.png"
+                    <img data-imgatlas="auto" data-pngsrc="/cubic3d/assets/cubic.webp" src="/cubic3d/assets/cubic.webp"
                         alt="Cubic" loading="lazy" decoding="async" fetchpriority="low">
                     <span class="game-badge badge-live">&#9679; LIVE</span>
                 </div>
