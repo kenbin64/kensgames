@@ -107,6 +107,9 @@ function ingestArt() {
     // Skip if already ingested (delta cache — O(1) check)
     if (table.has(`${key}|img`)) {
       console.log(`🎨 Manifold cache hit: ${key}`);
+      // Still attempt to apply to any meshes that registered before the
+      // cache hit was checked.
+      _applyArtTextureToMeshes(key);
       return resolve();
     }
     const dataUrl = typeof ART_DATA !== 'undefined' && ART_DATA[key];
@@ -118,6 +121,11 @@ function ingestArt() {
       table.set(`${key}|width`, img.naturalWidth);
       table.set(`${key}|height`, img.naturalHeight);
       console.log(`🎨 Ingested onto manifold: ${key} (${img.naturalWidth}×${img.naturalHeight})`);
+      // user_directive_2026-05-18 — art now ingests in the background while
+      // the board renders. Retro-apply the texture to any canvas meshes
+      // already in the scene as each image lands, so paintings pop in
+      // progressively instead of blocking startup for ~50MB of PNG.
+      _applyArtTextureToMeshes(key);
       resolve();
     };
     img.onerror = () => {
@@ -127,6 +135,27 @@ function ingestArt() {
     img.src = src;
   }));
   return Promise.all(promises);
+}
+
+// Retro-apply an ingested art texture to any artClickMesh already in the scene.
+// Called from ingestArt's onload handler so paintings appear as their image
+// arrives, without blocking init3D on the full download.
+function _applyArtTextureToMeshes(artFile) {
+  if (!Array.isArray(artClickMeshes) || artClickMeshes.length === 0) return;
+  const tex = materialiseArtTexture(artFile);
+  if (!tex) return;
+  for (const mesh of artClickMeshes) {
+    if (!mesh || !mesh.userData || !mesh.userData.artInfo) continue;
+    if (mesh.userData.artInfo.file !== artFile) continue;
+    const mat = mesh.material;
+    if (!mat) continue;
+    mat.map = tex;
+    mat.color.set(0xffffff);
+    mat.emissive = new THREE.Color(0xffffff);
+    mat.emissiveMap = tex;
+    mat.emissiveIntensity = 0.35;
+    mat.needsUpdate = true;
+  }
 }
 
 /**
@@ -2392,8 +2421,11 @@ async function init3D() {
     });
   } catch (_) { }
 
-  // Ingest art images onto the manifold, then create the room
-  try { await ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
+  // Ingest art images onto the manifold, then create the room.
+  // user_directive_2026-05-18 — DO NOT await. The art set is ~50MB of PNG;
+  // awaiting it stalled init3D for up to 20 seconds behind a black screen.
+  // ingestArt() now applies each texture to its canvas mesh as it lands.
+  try { ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
   createBilliardRoom();
 
   // Lighting (billiard table lamp style)
