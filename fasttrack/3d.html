@@ -15,7 +15,7 @@
   <script src="/js/dimensional-session-bridge.js"></script>
 
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
-  <link rel="stylesheet" href="3d.css?v=20260509">
+  <link rel="stylesheet" href="3d.css?v=20260518i">
   <script src="/js/analytics.js"></script>
   <script src="/js/kernel-client.js" defer></script>
   <script src="/js/player-panel.js" defer></script>
@@ -45,6 +45,49 @@
 
   <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
   <div id="ft-footer-bg" aria-hidden="true"></div>
+
+  <!-- ── Peg control bar — 5 peg buttons (per-peg nickname) + Confirm.
+       Replaces text-based move hints / instruction banner. JS in 3d-ui.js
+       maps clicks onto the engine's move-cycle staging (peg → cycle moves
+       → confirm). Centered between #panel-action (left) and #panel-cam
+       (right) so neither is covered (HR-6.2). ── -->
+  <div id="ft-peg-bar" role="region" aria-label="Choose peg and move">
+    <div id="ft-peg-buttons">
+      <button type="button" class="peg-btn" id="peg-btn-0" data-peg-idx="0" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-1" data-peg-idx="1" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-2" data-peg-idx="2" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-3" data-peg-idx="3" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-4" data-peg-idx="4" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+    </div>
+    <button type="button" id="ft-peg-confirm" class="peg-confirm-btn" disabled aria-label="Confirm move"
+      title="Confirm move">
+      <span class="peg-confirm-check">✔</span>
+      <span class="peg-confirm-label">Confirm</span>
+    </button>
+  </div>
+
+  <!-- ── Help tip — small pill above the peg bar explaining how to play.
+       Sits clear of the peg buttons AND their floating nicknames so it
+       never covers them. Dismissible (✕) and remembered in localStorage. ── -->
+  <div id="ft-peg-help" role="note" aria-label="How to play">
+    <span class="ft-peg-help-text">Tap a <b>peg name</b> to toggle its choices — then hit <b>Confirm ✔</b>.</span>
+    <button type="button" id="ft-peg-help-close" aria-label="Dismiss help">✕</button>
+  </div>
 
   <!-- ── Move-cycle bar — always-visible footer control to toggle through every legal move ── -->
   <div id="ft-confirm-bar" role="region" aria-label="Choose move" hidden>
@@ -101,11 +144,65 @@
   <!-- ── Music toggle — always visible, top-right ── -->
   <button id="btn-music-toggle" onclick="toggleMusic()" title="Toggle Music" aria-label="Toggle Music">🎵</button>
 
+  <!-- ── Camera mode — round icon top-right, opens a small popup ── -->
+  <button id="btn-camera-toggle" type="button"
+    onclick="(function(){var p=document.getElementById('camera-panel');if(p){p.classList.toggle('open');}}).call(this)"
+    title="Camera" aria-label="Camera mode" aria-haspopup="true" aria-controls="camera-panel">🎥</button>
+  <div id="camera-panel" role="menu" aria-label="Camera mode">
+    <button type="button" role="menuitem" class="cam-pop-btn active" data-cam="manual"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual'); document.getElementById('camera-panel').classList.remove('open');">Manual</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="top"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top'); document.getElementById('camera-panel').classList.remove('open');">Top</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="angle"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle'); document.getElementById('camera-panel').classList.remove('open');">Angle</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="auto"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto'); document.getElementById('camera-panel').classList.remove('open');">Auto</button>
+  </div>
+
   <!-- ── Leave Game — always visible, top-right next to gear ── -->
   <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
 
   <!-- ── Settings gear — top-right ── -->
   <button id="btn-settings" onclick="toggleSettings()" title="Settings">⚙</button>
+
+  <!-- ── Hamburger (mobile only) — collapses the top-right buttons ── -->
+  <button id="btn-hamburger" type="button"
+    onclick="(function(){var m=document.getElementById('hamburger-menu');if(m)m.classList.toggle('open');}).call(this)"
+    title="Menu" aria-label="Menu" aria-haspopup="true" aria-controls="hamburger-menu">☰</button>
+  <div id="hamburger-menu" role="menu" aria-label="Game menu">
+    <div class="hm-section-label">Camera</div>
+    <div class="hm-cam-row">
+      <button type="button" role="menuitem" class="hm-cam-btn active" data-cam="manual"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual');">Manual</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="top"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top');">Top</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="angle"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle');">Angle</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="auto"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto');">Auto</button>
+    </div>
+    <div class="hm-divider"></div>
+    <button type="button" role="menuitem" id="hm-break"
+      onclick="var b=document.getElementById('btn-break'); if(b){document.getElementById('hamburger-menu').classList.remove('open'); b.click();}">
+      <span class="hm-icon">☕</span><span class="hm-label">Break</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleMusic();">
+      <span class="hm-icon">🎵</span><span class="hm-label">Music</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleSettings();">
+      <span class="hm-icon">⚙</span><span class="hm-label">Settings</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleEmojiPanel && toggleEmojiPanel();">
+      <span class="hm-icon">🙂</span><span class="hm-label">Emoji</span>
+    </button>
+    <button type="button" role="menuitem" class="hm-danger"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); exitGame();">
+      <span class="hm-icon">✕</span><span class="hm-label">Leave Game</span>
+    </button>
+  </div>
 
   <!-- ── Emoji reactions: hidden tray, opened by button (desktop) ── -->
   <div id="emoji-ui" aria-label="Emoji reactions">
@@ -172,9 +269,9 @@
     </div>
   </div>
 
-  <!-- ── Game log — collapsible, top-right ── -->
-  <div id="panel-log" class="glass-panel" onclick="this.classList.toggle('expanded')">
-    <div id="log-toggle">▾ Log</div>
+  <!-- Game log retained off-DOM only; rendered to hidden node so engine writes don't crash -->
+  <div id="panel-log" hidden aria-hidden="true" style="display:none !important;">
+    <div id="log-toggle"></div>
     <div id="game-log"></div>
   </div>
 
@@ -196,7 +293,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260510i"></script>
+  <script src="fasttrack-game-core.js?v=20260518d"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
@@ -211,13 +308,43 @@
   <script src="../js/jazz-speakeasy.js?v=20260510b"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260510l"></script>
+  <script src="fasttrack-3d.js?v=20260518a"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
 
   <!-- Viewport chrome: emoji reactions, settings, replay overlay, leave game. -->
-  <script src="3d-ui.js?v=20260509"></script>
+  <script src="3d-ui.js?v=20260517b"></script>
+
+  <!-- Anchor the card panel flush against the bottom of the player panel. -->
+  <script>
+    (function () {
+      function anchorCardPanel() {
+        var p = document.getElementById('panel-players');
+        var c = document.getElementById('panel-action');
+        if (!p || !c) return;
+        var r = p.getBoundingClientRect();
+        // 8px from the left viewport edge, 6px below the player panel bottom.
+        c.style.setProperty('top', Math.round(r.bottom + 6) + 'px', 'important');
+        c.style.setProperty('left', '8px', 'important');
+      }
+      var ro;
+      function start() {
+        anchorCardPanel();
+        var p = document.getElementById('panel-players');
+        if (p && 'ResizeObserver' in window) {
+          ro = new ResizeObserver(anchorCardPanel);
+          ro.observe(p);
+        }
+        window.addEventListener('resize', anchorCardPanel);
+        // Re-anchor periodically in case player list mutates without resize.
+        setInterval(anchorCardPanel, 750);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+      } else { start(); }
+    })();
+  </script>
 </body>
 
 </html>

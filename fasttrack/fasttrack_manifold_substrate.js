@@ -124,6 +124,36 @@
   };
 
   // ════════════════════════════════════════════════════════════════
+  // LENS 5 — RuleLens: rule_x × rule_y → rule_z (substrate-driven rule evaluation)
+  // ════════════════════════════════════════════════════════════════
+  // Usage: RuleLens.focus({x: 3, y: 2, context: {...}}) for MOV_NO_LAND_OWN
+  // Returns the result of the rule assertion from the substrate
+  const RuleLens = {
+    focus({ x, y, context }) {
+      // Find the rule in the substrate (assume MI.rules is loaded from fasttrack.rules.json)
+      const rule = (MI.rules?.find?.(r => r.x === x && r.y === y)) || null;
+      if (!rule || !rule.assertion) {
+        console.warn('RuleLens: Rule not found for', x, y);
+        return null;
+      }
+      // Evaluate the assertion in the provided context (safe eval)
+      try {
+        // The assertion is a JS expression using 'context' as scope
+        // Example: '!context.landsOnOwnPeg'
+        // eslint-disable-next-line no-new-func
+        const fn = new Function('context', `return (${rule.assertion});`);
+        return fn(context);
+      } catch (e) {
+        console.error('RuleLens: Error evaluating rule', rule, e);
+        return null;
+      }
+    }
+  };
+
+  // Expose RuleLens globally for use in game logic
+  window.FastTrackRuleLens = RuleLens;
+
+  // ════════════════════════════════════════════════════════════════
   // LENS 5 — LogicLens: advance_delta × strategic_value → move_score
   // z = x · y IS the AI priority.  No other scoring formula needed.
   // ════════════════════════════════════════════════════════════════

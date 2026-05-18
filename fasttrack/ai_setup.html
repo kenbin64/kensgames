@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <script src="/js/session-identity.js"></script>
+    <script src="/js/session-identity.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fast Track — Play vs Bots | Choose Difficulty &amp; Theme</title>
@@ -901,6 +901,9 @@
             var playerName = document.getElementById('player-name').value.trim() || 'Player';
             localStorage.setItem('fasttrack_player_name', playerName);
             localStorage.setItem('fasttrack_player_avatar', selectedAvatar);
+            // Also set keys used by 3d-bootstrap.js to prevent double prompts
+            localStorage.setItem('username', playerName);
+            localStorage.setItem('kg_avatar', JSON.stringify({ id: selectedAvatar, emoji: selectedAvatar }));
 
             // Save sound & camera preferences to localStorage
             var musicOn = document.getElementById('setup-music-toggle').checked;

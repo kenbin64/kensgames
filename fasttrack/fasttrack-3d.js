@@ -453,10 +453,19 @@ const CameraDirector = {
       camera.lookAt(this._look);
     }
     if (controls) controls.target.copy(this._look);
-    // Force manual as the starting mode regardless of stored setting — manual
-    // is the canonical default per UX spec.
-    this.mode = 'manual';
-    GameSettings.cameraMode = 'manual';
+    // Mobile/small viewports default to 'auto' (camera follows the action) —
+    // the board is too small to navigate manually with a thumb. Desktop keeps
+    // 'manual' as canonical default. Either way, the user can switch from the
+    // hamburger camera row and a touch/drag yields immediate manual control
+    // (Catan-Universe style — auto resumes after a short idle).
+    const isSmallScreen = (typeof window !== 'undefined') &&
+      (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches);
+    const startMode = isSmallScreen ? 'auto' : 'manual';
+    this.mode = startMode;
+    GameSettings.cameraMode = startMode;
+    this._mobileAutoResume = isSmallScreen;   // re-engage auto after idle
+    this._autoResumeMs = 6000;                // 6s of no touch = resume auto
+    this._autoResumeTimer = null;
 
     // When the user grabs the OrbitControls (pointerdown / wheel / touch),
     // any non-manual mode auto-switches to manual so the user has full
@@ -464,12 +473,32 @@ const CameraDirector = {
     // it does NOT fire from our internal camera writes.
     if (controls && !this._userInputBound) {
       controls.addEventListener('start', () => {
+        // Cutscenes lock the camera — never yield mid-cutscene.
+        if (this._cutsceneLock) return;
         if (this.mode !== 'manual') {
-          // Cutscenes lock the camera — never yield mid-cutscene.
-          if (this._cutsceneLock) return;
           if (typeof setCameraView === 'function') setCameraView('manual');
           else this.setMode('manual');
         }
+        // Cancel any pending auto-resume while the user is actively touching.
+        if (this._autoResumeTimer) {
+          clearTimeout(this._autoResumeTimer);
+          this._autoResumeTimer = null;
+        }
+      });
+      // After the user releases, on mobile schedule a return to auto so the
+      // camera resumes following the action — like Catan Universe.
+      controls.addEventListener('end', () => {
+        if (!this._mobileAutoResume) return;
+        if (this._cutsceneLock) return;
+        if (this._autoResumeTimer) clearTimeout(this._autoResumeTimer);
+        this._autoResumeTimer = setTimeout(() => {
+          this._autoResumeTimer = null;
+          if (this._cutsceneLock) return;
+          if (this.mode === 'manual') {
+            if (typeof setCameraView === 'function') setCameraView('auto');
+            else this.setMode('auto');
+          }
+        }, this._autoResumeMs);
       });
       this._userInputBound = true;
     }
@@ -2355,6 +2384,13 @@ async function init3D() {
   // Initialize CameraDirector with mode from settings
   CameraDirector.init();
   console.log(`📷 Camera mode: ${CameraDirector.mode}`);
+  // Sync hamburger camera-row active state to whatever init() chose
+  // (mobile → 'auto', desktop → 'manual'). Done after DOM is ready.
+  try {
+    document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-cam') === CameraDirector.mode);
+    });
+  } catch (_) { }
 
   // Ingest art images onto the manifold, then create the room
   try { await ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
@@ -2374,13 +2410,39 @@ async function init3D() {
   pegGroup.name = 'pegGroup';
   scene.add(pegGroup);
 
-  // Create hexagonal billiard table
-  createHexBilliardTable();
 
-  // Create FastTrack board on table
-  createHexagonBoard();
-  createRainbowBorder();
-  createGameElements();
+  // Create hexagonal billiard table
+  createBilliardRoom && createBilliardRoom();
+
+  // ── FEATURE FLAG: Procedural vs. Legacy Board Mesh ──
+  // Set window.FT_USE_PROCEDURAL_BOARD = true in console or before load to enable procedural SDF board
+  if (window.FT_USE_PROCEDURAL_BOARD) {
+    // Load procedural mesh (requires js/procedural_fasttrack.js and THREE.MarchingCubes)
+    if (window.createFastTrackBoardMesh && typeof THREE !== 'undefined' && typeof THREE.MarchingCubes === 'function') {
+      const mat = new THREE.MeshStandardMaterial({ color: 0x0e7a24, roughness: 0.92, metalness: 0.0 });
+      const procBoard = window.createFastTrackBoardMesh({ size: 12, resolution: 64, level: 0, material: mat });
+      if (procBoard) {
+        procBoard.name = 'proceduralBoardMesh';
+        procBoard.position.y = 0; // Table height handled by boardGroup
+        boardGroup.add(procBoard);
+        window.boardMesh = procBoard;
+        console.log('[FT3D] Procedural FastTrack board mesh enabled.');
+      } else {
+        console.warn('[FT3D] Procedural mesh creation failed, falling back to legacy.');
+        createHexagonBoard();
+      }
+    } else {
+      console.warn('[FT3D] Procedural mesh dependencies missing, falling back to legacy.');
+      createHexagonBoard();
+    }
+    createRainbowBorder();
+    createGameElements();
+  } else {
+    // Legacy mesh path (default)
+    createHexagonBoard();
+    createRainbowBorder();
+    createGameElements();
+  }
 
   // Atmospheric dust motes
   createDustMotes();
@@ -4686,11 +4748,9 @@ window.waitForAnimations = function (callback) {
 // Game-core uses this to block the draw button for redraw / extra-turn cards
 // until all motion (and cutscenes that gate on it) has finished.
 window.isPlayResolving = function () {
-  if (_moveBarrier) return true;
+  // Only block if there are real peg animations in progress
   if (_animatingPegs && _animatingPegs.size > 0) return true;
-  // Cutscenes (CutsceneManager) are flushed inside waitForAll → advanceTurn,
-  // and `phase` only flips back to 'draw' after CutsceneManager.whenDrained.
-  // So `phase !== 'draw'` already covers the cutscene window.
+  // Ignore _moveBarrier for instant feedback; only use for true cutscenes
   return false;
 };
 
@@ -5092,19 +5152,50 @@ function renderBoard3D() {
     }
   });
 
-  // Optional peg labels (off by default to avoid occluding the board).
-  if (GameSettings.showPegNames) {
+  // Peg name labels.
+  //
+  // Rule (user_directive_2026-05-18 "turn on the next peg nickname once a
+  // card is pulled that can activate it"):
+  //   ALWAYS show a floating nickname over any peg that has at least one
+  //   legal move with the currently drawn card — including pegs still in
+  //   holding that an Ace / 6 / Joker can spawn out. This lets the player
+  //   match the on-board (or in-home) peg with its button in the peg-bar
+  //   before the move is even confirmed.
+  //   Additionally, when GameSettings.showPegNames is on, label every
+  //   on-board peg (legacy behaviour).
+  {
     const pegNameMap = {};
-    players.forEach(player => {
-      for (const peg of player.pegs) {
-        if (peg.holeId !== 'holding') {
-          pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
-        }
+    // (a) ALWAYS-on: pegs eligible under the current validMoves.
+    const validMoves = core.state.turn.get('validMoves') || [];
+    const curIdx = core.state.players.get('current') || 0;
+    const curPlayer = players[curIdx];
+    if (curPlayer && Array.isArray(curPlayer.pegs) && validMoves.length) {
+      const eligibleIdx = new Set();
+      for (const m of validMoves) {
+        if (!m) continue;
+        if (Number.isFinite(m.pegIdx)) eligibleIdx.add(m.pegIdx);
+        if (Number.isFinite(m.peg2Idx)) eligibleIdx.add(m.peg2Idx);
       }
-    });
-    showPegNames(pegNameMap);
-  } else {
-    hidePegNames();
+      eligibleIdx.forEach(i => {
+        const peg = curPlayer.pegs[i];
+        if (peg) pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
+      });
+    }
+    // (b) Legacy opt-in: label every on-board peg for all players.
+    if (GameSettings.showPegNames) {
+      players.forEach(player => {
+        for (const peg of player.pegs) {
+          if (peg.holeId !== 'holding') {
+            pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
+          }
+        }
+      });
+    }
+    if (Object.keys(pegNameMap).length > 0) {
+      showPegNames(pegNameMap);
+    } else {
+      hidePegNames();
+    }
   }
 
   // Lower animation barrier — if no anims were started, this fires _onAnimsDone immediately
@@ -5465,33 +5556,14 @@ function onWindowResize() {
   if (!renderer || !camera) return;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  // Always inset the rendered viewport so the board sits in the gap between
-  // the fixed top header (#panel-players) and the fixed bottom rail
-  // (#panel-action / #panel-options / #panel-cam). HR-6.2.
-  const topPanel = document.getElementById('panel-players');
-  const actionPanel = document.getElementById('panel-action');
-  const optionsPanel = document.getElementById('panel-options');
-  const camPanel = document.getElementById('panel-cam');
-  const footerBg = document.getElementById('ft-footer-bg');
-  const topH = topPanel ? Math.round(topPanel.getBoundingClientRect().height) : 0;
-  const visibleH = (el) => {
-    if (!el) return 0;
-    const cs = window.getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
-    return Math.round(el.getBoundingClientRect().height);
-  };
-  const botH = Math.max(
-    visibleH(actionPanel),
-    visibleH(optionsPanel),
-    visibleH(camPanel),
-    visibleH(footerBg)
-  );
-  const viewH = Math.max(h - topH - botH, 100);
+  // HR-6.2: UI controls float over the peripheries of the board.
+  // The renderer draws the FULL viewport — no reserved bottom/top
+  // void. Any letterbox at the bottom would violate the no-cover
+  // rule by leaving dead space where the board should be.
   renderer.setSize(w, h);
-  renderer.setScissorTest(true);
-  renderer.setViewport(0, botH, w, viewH);
-  renderer.setScissor(0, botH, w, viewH);
-  camera.aspect = w / viewH;
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, w, h);
+  camera.aspect = w / h;
   fitVerticalFovToAspect(camera);
   camera.updateProjectionMatrix();
 }
@@ -5499,10 +5571,15 @@ function onWindowResize() {
 function setCameraView(mode) {
   CameraDirector.setMode(mode);
 
-  // Update button states
+  // Update button states — legacy on-board buttons …
   document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active'));
   const activeBtn = document.querySelector(`.cam-btn[onclick*="${mode}"]`);
   if (activeBtn) activeBtn.classList.add('active');
+
+  // … and the hamburger camera row.
+  document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-cam') === mode);
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -6022,8 +6099,16 @@ let _autoCommitScheduled = false;
 function _maybeAutoCommitSingle() {
   if (_autoCommitScheduled) return;
   if (!_moveCycle || _moveCycle.length !== 1) return;
-  _autoCommitScheduled = true;
   const targetEntry = _moveCycle[0];
+  // user_directive_2026-05-18 — NEVER auto-commit a terminal move on behalf
+  // of a human. Even with only one legal play the player must press Confirm,
+  // otherwise it feels like the game skipped their turn (turn ends before
+  // they got to look at the board / acknowledge the move). Only intermediate
+  // split-7 sub-stages (peg pick, then steps pick) auto-advance — those are
+  // forced-choice plumbing, not the actual play.
+  const k = targetEntry && targetEntry.kind;
+  if (k !== 'split-first-peg' && k !== 'split-first') return;
+  _autoCommitScheduled = true;
   queueMicrotask(() => {
     _autoCommitScheduled = false;
     // Verify the entry is still the sole option (state may have shifted).
@@ -6736,6 +6821,20 @@ window.showPegNames = showPegNames;
 window.hidePegNames = hidePegNames;
 window.updatePlayerMarkers = updatePlayerMarkers;
 window.blinkPlayerMarker = blinkPlayerMarker;
+
+// ── Minimal bridge for the peg control bar (3d-ui.js) ──────────
+// Exposes accessors over the move-cycle staging state so the
+// peg-button footer can drive the same engine path the (now hidden)
+// confirm-bar / instruction-banner used. Additive only — no engine
+// behavior change.
+window.FastTrack3D = {
+  getMoveCycle: () => _moveCycle.slice(),
+  getPendingEntry: () => _pendingEntry,
+  stagePendingEntry: (entry) => _stagePendingEntry(entry),
+  commitPendingEntry: () => _commitPendingEntry(),
+  clearPendingEntry: (restore) => _clearPendingEntry(restore !== false),
+  getSplitChoice: _getSplitChoice,
+};
 
 async function startInit3D() {
   try {

@@ -326,6 +326,20 @@ function clearTransientIdentity() {
 // asks the server to recycle the session; guests wait for the server
 // broadcast and reload to pick up the fresh game state.
 function playAgain() {
+  // user_directive_2026-05-18: winner of this game opens the next one.
+  // Stash the winner's display name; fasttrack-game-core.initGame()
+  // reads (and clears) this key when seeding state.players.current.
+  try {
+    const core = window.FastTrackCore;
+    if (core && core.state) {
+      const winnerIdx = core.state.meta.get('winner');
+      const list = core.state.players.get('list') || [];
+      if (Number.isInteger(winnerIdx) && list[winnerIdx] && list[winnerIdx].name) {
+        localStorage.setItem('ft.rematchWinnerName', list[winnerIdx].name);
+      }
+    }
+  } catch (e) { console.warn('rematch winner stash failed', e); }
+
   const mp = window.__FT_MP__ || null;
   const isMp = !!(mp && mp.connected && mp.session);
   const isHost = !!(isMp && mp.isHost);
@@ -456,3 +470,388 @@ if (location.search.includes('dev')) {
     if (panel) panel.style.display = '';
   });
 }
+
+// ────────────────────────────────────────────────────────────────
+// PEG CONTROL BAR — non-text gameplay input.
+// 5 horizontal peg buttons (each labeled with its peg nickname) +
+// a single Confirm button. Replaces the text-based instruction
+// banner / confirm bar / move-hints panel.
+//
+// Wiring:
+//   - Reads current player + pegs from FastTrackCore.state.
+//   - Reads the engine's move-cycle from window.FastTrack3D.getMoveCycle().
+//   - A peg button is "active" iff that peg has at least one entry
+//     in the current move-cycle (i.e. a legal move with this card).
+//   - Click a peg → cycle through that peg's move-cycle entries,
+//     staging each via FastTrack3D.stagePendingEntry() so the board
+//     lights up exactly as it did from the (now hidden) prev/next
+//     button path.
+//   - Click Confirm → FastTrack3D.commitPendingEntry().
+// All state is derived; this file owns no gameplay state of its own.
+// ────────────────────────────────────────────────────────────────
+(function initPegControlBar() {
+  const PEG_COUNT = 5;
+  // Per-peg cycle index — which of this peg's legal moves is currently staged.
+  const pegCycleIdx = new Array(PEG_COUNT).fill(-1);
+  let lastSignature = '';
+  // Tracks only the *shape* of the move-cycle (peg/cycle-content, NOT pending).
+  // We reset pegCycleIdx only when the shape changes; reseting on every
+  // pending-change broke the "click same peg to toggle to next choice" loop.
+  let lastShapeSignature = '';
+  let lastSelectedPegIdx = -1;
+
+  function getCore() { return window.FastTrackCore || null; }
+  function getBridge() { return window.FastTrack3D || null; }
+
+  function getCurrentPlayer() {
+    const core = getCore();
+    if (!core || !core.state) return null;
+    const list = core.state.players.get('list') || [];
+    const ci = core.state.players.get('current') || 0;
+    return list[ci] || null;
+  }
+
+  function isHumanTurn() {
+    const p = getCurrentPlayer();
+    return !!(p && !p.isBot);
+  }
+
+  // ── Location → icon mapping (user_directive_2026-05-18) ─────────────
+  // Each peg button shows a glyph that reflects WHERE that peg currently
+  // sits on the board, so the player can read the whole roster at a
+  // glance. Matches getHoleType() in fasttrack-game-core.js.
+  //   holding   → 📦  (in the holding/staging area)
+  //   home-*    → 🏠  (winner/home hole, has not entered play)
+  //   bullseye  → 🎯  (centre target)
+  //   safezone  → 🛡️  (private safe lane)
+  //   ft-*      → ⚡  (fast-track loop)
+  //   else      → ●   (on the open rim)
+  function pegLocationIcon(peg) {
+    if (!peg) return '●';
+    const id = peg.holeId || '';
+    if (peg.holeType === 'holding' || (!id)) return '📦';
+    if (id === 'bullseye') return '🎯';
+    if (id.startsWith('safe-')) return '🛡️';
+    if (id.startsWith('ft-')) return '⚡';
+    if (id.startsWith('home-')) return '🏠';
+    return '●';
+  }
+
+  // Pick black or white text for legibility against the peg's color.
+  // Uses W3C relative-luminance approximation on a #RRGGBB hex string.
+  function complementaryTextColor(hex) {
+    if (!hex || typeof hex !== 'string') return '#fff';
+    let h = hex.trim();
+    if (h[0] === '#') h = h.slice(1);
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length !== 6) return '#fff';
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return lum > 0.55 ? '#111' : '#fff';
+  }
+
+  // Return entries from the move-cycle that originate from the given pegIdx.
+  // Covers regular moves, 7-split first-peg picks, and split-first leg picks.
+  function entriesForPeg(cycle, pegIdx) {
+    if (!Array.isArray(cycle)) return [];
+    const core = getCore();
+    const validMoves = (core && core.state)
+      ? core.state.turn.get('validMoves') || [] : [];
+    const out = [];
+    for (const e of cycle) {
+      if (!e) continue;
+      // Direct pegIdx tag (split-first-peg, split-first).
+      if (e.pegIdx === pegIdx) { out.push(e); continue; }
+      // Regular moves carry moveIdx → look up the underlying move.
+      if (e.kind === 'move' && Number.isFinite(e.moveIdx)) {
+        const m = validMoves[e.moveIdx];
+        if (m && (m.pegIdx === pegIdx || m.peg2Idx === pegIdx)) {
+          out.push(e);
+        }
+      } else if (e.kind === 'split-second' && Number.isFinite(e.moveIdx)) {
+        const m = validMoves[e.moveIdx];
+        if (m && (m.pegIdx === pegIdx || m.peg2Idx === pegIdx)) {
+          out.push(e);
+        }
+      }
+    }
+    return out;
+  }
+
+  // Help-pill visibility helper — hidden during bot turns and once the
+  // player has dismissed it (localStorage key below).
+  const HELP_DISMISS_KEY = 'ft.pegHelp.dismissed.v1';
+  function _setHelpVisible(visible) {
+    const pill = document.getElementById('ft-peg-help');
+    if (!pill) return;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(HELP_DISMISS_KEY) === '1'; } catch (_) { /* private mode */ }
+    pill.hidden = !visible || dismissed;
+  }
+
+  function refreshPegBar() {
+    const bar = document.getElementById('ft-peg-bar');
+    if (!bar) return;
+    const bridge = getBridge();
+    const player = getCurrentPlayer();
+    const humanTurn = isHumanTurn();
+    // Skip ALL work during bot turns (was the main source of perceived
+    // clunkiness — 6 Hz DOM thrash with no input possible).
+    if (!humanTurn) {
+      _setHelpVisible(false);
+      if (lastSignature !== '0') {
+        lastSignature = '0';
+        lastShapeSignature = '';
+        for (let i = 0; i < PEG_COUNT; i++) {
+          const btn = document.getElementById('peg-btn-' + i);
+          if (!btn) continue;
+          btn.disabled = true;
+          btn.classList.remove('active', 'selected');
+          pegCycleIdx[i] = -1;
+        }
+        const cbtn = document.getElementById('ft-peg-confirm');
+        if (cbtn) cbtn.disabled = true;
+      }
+      return;
+    }
+    _setHelpVisible(true);
+    const cycle = bridge ? bridge.getMoveCycle() : [];
+    const pending = bridge ? bridge.getPendingEntry() : null;
+    const confirmBtn = document.getElementById('ft-peg-confirm');
+
+    // Shape signature — covers everything that affects WHICH pegs are active
+    // and the contents of their cycle entries. Excludes `pending`.
+    let shapeSig = '1';
+    if (player && Array.isArray(player.pegs)) {
+      for (let i = 0; i < PEG_COUNT; i++) {
+        const peg = player.pegs[i];
+        shapeSig += '|' + (peg ? (peg.nickname || 'Peg ' + (i + 1)) : '-')
+          + ':' + (peg ? (peg.holeId || 'holding') : '-');
+      }
+    }
+    shapeSig += '|cycle=' + cycle.length;
+    // Include a per-entry tag so cycle-content changes (different cards, split
+    // stage changes) reset the per-peg index even when the length matches.
+    for (let i = 0; i < cycle.length; i++) {
+      const e = cycle[i];
+      shapeSig += '#' + (e ? (e.kind + ':' + (e.moveIdx ?? '') + ':' + (e.pegIdx ?? '') + ':' + (e.steps ?? '')) : '_');
+    }
+    shapeSig += '|color=' + (player ? (player.color || '') : '');
+
+    const pendingSig = pending
+      ? (pending.kind + ':' + (pending.pegIdx ?? '') + ':' + (pending.moveIdx ?? '') + ':' + (pending.steps ?? ''))
+      : '';
+    const sig = shapeSig + '||pending=' + pendingSig;
+    if (sig === lastSignature) return;
+    lastSignature = sig;
+
+    // Reset per-peg cycle indices ONLY when the cycle shape has changed.
+    // (Previously this ran on every pending change, which broke per-peg
+    // toggling: each stage→refresh wiped the index back to -1 so clicking
+    // the same peg again always re-staged option 0.)
+    if (shapeSig !== lastShapeSignature) {
+      lastShapeSignature = shapeSig;
+      for (let i = 0; i < PEG_COUNT; i++) pegCycleIdx[i] = -1;
+    }
+
+    // Which peg (if any) does the staged entry belong to?
+    let selectedPegIdx = -1;
+    if (pending) {
+      for (let i = 0; i < PEG_COUNT; i++) {
+        const ents = entriesForPeg(cycle, i);
+        if (ents.some(e => e === pending)) { selectedPegIdx = i; break; }
+      }
+    }
+    lastSelectedPegIdx = selectedPegIdx;
+
+    for (let i = 0; i < PEG_COUNT; i++) {
+      const btn = document.getElementById('peg-btn-' + i);
+      if (!btn) continue;
+      const peg = player && Array.isArray(player.pegs) ? player.pegs[i] : null;
+      const nick = peg ? (peg.nickname || ('Peg ' + (i + 1))) : ('Peg ' + (i + 1));
+      const nickEl = btn.querySelector('.peg-nickname');
+      if (nickEl) nickEl.textContent = nick;
+      const color = (player && player.color) ? player.color : '#88a';
+      btn.style.setProperty('--peg-color', color);
+
+      // user_directive_2026-05-18 — button background = peg owner's color,
+      // text in a complementary shade, and the glyph reflects the peg's
+      // current board location.
+      const textColor = complementaryTextColor(color);
+      btn.style.backgroundColor = color;
+      btn.style.color = textColor;
+      const glyphEl = btn.querySelector('.peg-glyph');
+      if (glyphEl) {
+        glyphEl.textContent = pegLocationIcon(peg);
+        glyphEl.style.color = textColor;
+      }
+      // Nickname is a floating dark pill above the button (its own bg);
+      // leave its color alone so the white-on-dark readout is preserved.
+
+      const ents = humanTurn ? entriesForPeg(cycle, i) : [];
+      const active = ents.length > 0;
+      btn.disabled = !active;
+      btn.classList.toggle('active', active);
+      btn.classList.toggle('selected', active && i === selectedPegIdx);
+    }
+
+    if (confirmBtn) {
+      confirmBtn.disabled = !pending;
+    }
+  }
+
+  // user_directive_2026-05-18 — short (≤3 word) strategic tag for the
+  // currently-staged choice. Surfaced via the center toast whenever the
+  // player toggles peg choices, so they understand the flavor of each
+  // candidate without reading hint text. Kept terse on purpose.
+  function entryTag(entry, player) {
+    if (!entry || !entry.type) return '';
+    const t = entry.type;
+    const core = window.FastTrackCore;
+    const board = core && core.state && core.state.board;
+    const ci = core && core.state && core.state.players && core.state.players.get('current');
+    // Detect capture: a 'move' (or 'split' half) whose destination holds an opponent peg.
+    function destHasOpponent(dest) {
+      if (!dest || !board || ci == null) return false;
+      const occ = board.get(dest);
+      return !!(occ && occ.playerIdx !== ci);
+    }
+    switch (t) {
+      case 'enter': return 'Enter board';
+      case 'enterFastTrack': return 'Hit fast track';
+      case 'enterBullseye': return 'Bullseye!';
+      case 'exitFastTrack': return destHasOpponent(entry.dest) ? 'Cut + exit FT' : 'Exit fast track';
+      case 'exitBullseye': return 'Leave bullseye';
+      case 'move': {
+        if (destHasOpponent(entry.dest)) return 'Cut peg!';
+        const dest = entry.dest || '';
+        if (dest.startsWith('safe-')) return 'Enter safe zone';
+        if (dest === 'bullseye') return 'Bullseye!';
+        if (dest.startsWith('ft-')) return 'Hit fast track';
+        return '';
+      }
+      case 'split': {
+        // Card-7 split half — pick whichever flavor is most salient.
+        if (destHasOpponent(entry.dest)) return 'Cut + split';
+        const dest = entry.dest || '';
+        if (dest.startsWith('safe-')) return 'Split → safe';
+        if (dest === 'bullseye') return 'Split → bull';
+        if (dest.startsWith('ft-')) return 'Split → FT';
+        return 'Split move';
+      }
+      default: return '';
+    }
+  }
+
+  function handlePegClick(pegIdx) {
+    const bridge = getBridge();
+    if (!bridge || !isHumanTurn()) return;
+    const cycle = bridge.getMoveCycle();
+    const ents = entriesForPeg(cycle, pegIdx);
+    if (!ents.length) return;
+    // If a different peg was selected, start this peg fresh; otherwise advance.
+    let idx;
+    if (lastSelectedPegIdx !== pegIdx) {
+      idx = 0;
+    } else {
+      const prev = pegCycleIdx[pegIdx];
+      idx = (prev < 0) ? 0 : (prev + 1) % ents.length;
+    }
+    pegCycleIdx[pegIdx] = idx;
+    bridge.stagePendingEntry(ents[idx]);
+    // Flash a 3-word strategic tag so the player understands the staged
+    // choice at a glance. Uses the same center-toast surface as the
+    // turn/redraw/no-legal-move alerts (pointer-events:none, top of view).
+    try {
+      const core = window.FastTrackCore;
+      const player = core && core.state && core.state.players &&
+        (core.state.players.get('list') || [])[core.state.players.get('current')];
+      const tag = entryTag(ents[idx], player);
+      if (tag && typeof window.showCenterToast === 'function') {
+        const accent = (player && player.color) || '#ffd633';
+        window.showCenterToast(tag, accent, 1100);
+      }
+    } catch (_) { /* ignore */ }
+    // Force a re-render so the selected styling updates immediately.
+    lastSignature = '';
+    refreshPegBar();
+  }
+
+  function handleConfirmClick() {
+    const bridge = getBridge();
+    if (!bridge) return;
+    const pending = bridge.getPendingEntry();
+    if (!pending) return;
+    bridge.commitPendingEntry();
+    for (let i = 0; i < PEG_COUNT; i++) pegCycleIdx[i] = -1;
+    lastSignature = '';
+    refreshPegBar();
+  }
+
+  function wirePegBar() {
+    for (let i = 0; i < PEG_COUNT; i++) {
+      const btn = document.getElementById('peg-btn-' + i);
+      if (btn && !btn._pegWired) {
+        btn._pegWired = true;
+        btn.addEventListener('click', () => handlePegClick(i));
+      }
+    }
+    const confirmBtn = document.getElementById('ft-peg-confirm');
+    if (confirmBtn && !confirmBtn._pegWired) {
+      confirmBtn._pegWired = true;
+      confirmBtn.addEventListener('click', handleConfirmClick);
+    }
+  }
+
+  function wireHelpPill() {
+    const closeBtn = document.getElementById('ft-peg-help-close');
+    if (!closeBtn || closeBtn.dataset.wired === '1') return;
+    closeBtn.dataset.wired = '1';
+    closeBtn.addEventListener('click', () => {
+      try { localStorage.setItem(HELP_DISMISS_KEY, '1'); } catch (_) { /* ignore */ }
+      const pill = document.getElementById('ft-peg-help');
+      if (pill) pill.hidden = true;
+    });
+  }
+
+  function bootPegBar() {
+    wirePegBar();
+    wireHelpPill();
+    refreshPegBar();
+    // Poll at 6 Hz — cheap, fires only when signature changes.
+    setInterval(refreshPegBar, 160);
+    window.addEventListener('ft3d:ready', refreshPegBar);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootPegBar);
+  } else {
+    bootPegBar();
+  }
+})();
+
+// ─── Hamburger Break/Resume sync ─────────────────────────────────────
+// Mirrors the engine-managed #btn-break (label, hidden state) onto the
+// hamburger menu's #hm-break item so the menu always reflects the
+// current option (Break vs Resume) and hides when neither applies.
+(function syncHamburgerBreak() {
+  const apply = () => {
+    const src = document.getElementById('btn-break');
+    const dst = document.getElementById('hm-break');
+    if (!src || !dst) return;
+    const hidden = src.classList.contains('hidden') || src.disabled;
+    dst.style.display = hidden ? 'none' : '';
+    const txt = (src.textContent || '').trim();
+    const isResume = /resume/i.test(txt);
+    const icon = dst.querySelector('.hm-icon');
+    const label = dst.querySelector('.hm-label');
+    if (icon) icon.textContent = isResume ? '▶' : '☕';
+    if (label) label.textContent = isResume ? 'Resume' : 'Break';
+    dst.title = src.title || (isResume ? 'Resume' : 'Take a break');
+  };
+  apply();
+  setInterval(apply, 320);
+  window.addEventListener('ft3d:ready', apply);
+})();

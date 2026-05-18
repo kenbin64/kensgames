@@ -902,9 +902,10 @@ textarea,
     max-width: none;
     width: 100%;
     border-radius: 0;
-    /* leaves room on the left for #panel-action (card+draw) and on the
-           right for the music/leave/settings/emoji buttons. */
-    padding: 6px 200px 6px 168px;
+    /* Card now lives at bottom-left and #game-status is hidden, so the
+       header strip starts flush at the far left. Right padding still
+       reserves space for the music/camera/leave/settings round icons. */
+    padding: 6px 200px 6px 12px;
     transform: none;
     display: flex;
     flex-wrap: nowrap;
@@ -2035,4 +2036,1848 @@ textarea,
   cursor: default;
   opacity: 1;
   filter: none;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PEG CONTROL BAR — non-text gameplay control (HR-6.2 fixed rail)
+   5 peg buttons (per-peg nickname) + Confirm. Replaces the
+   text-based instruction banner, confirm bar, and move-hints panel.
+   Centered between #panel-action (bottom-left) and #panel-cam
+   (bottom-right) so neither is covered.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Hide legacy text-based controls — peg bar is the canonical input. */
+#ft-confirm-bar,
+#ft-instruction-banner,
+#panel-options {
+  display: none !important;
+}
+
+#ft-peg-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 220;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(8, 16, 30, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  font-family: 'Inter', system-ui, sans-serif;
+  pointer-events: auto;
+  max-width: calc(100vw - 360px);
+  /* leave room for panel-action + panel-cam */
+}
+
+#ft-peg-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+}
+
+#ft-peg-bar .peg-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 64px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 30, 50, 0.55);
+  color: #f6f9ff;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+#ft-peg-bar .peg-btn .peg-glyph {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--peg-color, #88a);
+  text-shadow: 0 0 8px var(--peg-color, transparent);
+}
+
+#ft-peg-bar .peg-btn .peg-nickname {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active = peg is in play AND has legal moves with the current card. */
+#ft-peg-bar .peg-btn.active {
+  background: rgba(30, 60, 100, 0.7);
+  border-color: var(--peg-color, #6cf);
+  box-shadow:
+    0 0 12px var(--peg-color, #6cf),
+    inset 0 0 8px rgba(255, 255, 255, 0.08);
+}
+
+#ft-peg-bar .peg-btn.active:hover {
+  transform: translateY(-1px);
+  background: rgba(40, 80, 130, 0.8);
+}
+
+/* Selected = currently staged peg whose move is previewed on the board. */
+#ft-peg-bar .peg-btn.selected {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.35) 0%,
+      rgba(255, 165, 0, 0.35) 100%);
+  border-color: #ffd54a;
+  box-shadow:
+    0 0 18px #ffd54a,
+    inset 0 0 10px rgba(255, 215, 0, 0.25);
+  color: #fffbe6;
+}
+
+#ft-peg-bar .peg-btn.selected .peg-glyph {
+  text-shadow: 0 0 12px #ffd54a;
+}
+
+#ft-peg-bar .peg-btn[disabled],
+#ft-peg-bar .peg-btn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+  filter: saturate(0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(20, 20, 30, 0.4);
+  box-shadow: none;
+}
+
+#ft-peg-bar .peg-confirm-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(43, 182, 115, 0.85);
+  background: linear-gradient(135deg, #1f9d55 0%, #2bb673 100%);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: transform 0.1s ease, background 0.15s ease,
+    box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+#ft-peg-bar .peg-confirm-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2bb673 0%, #3ed089 100%);
+  box-shadow: 0 0 16px rgba(62, 208, 137, 0.6);
+}
+
+#ft-peg-bar .peg-confirm-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+#ft-peg-bar .peg-confirm-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: saturate(0.4);
+}
+
+#ft-peg-bar .peg-confirm-check {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 760px) {
+  #ft-peg-bar {
+    bottom: 6px;
+    padding: 6px 10px;
+    gap: 6px;
+    max-width: calc(100vw - 20px);
+  }
+
+  #ft-peg-bar .peg-btn {
+    min-width: 48px;
+    padding: 4px 6px;
+  }
+
+  #ft-peg-bar .peg-btn .peg-glyph {
+    font-size: 18px;
+  }
+
+  #ft-peg-bar .peg-btn .peg-nickname {
+    font-size: 9px;
+    max-width: 56px;
+  }
+
+  #ft-peg-bar .peg-confirm-btn {
+    padding: 8px 12px;
+  }
+
+  #ft-peg-bar .peg-confirm-label {
+    display: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE FIT — keep the 3D board visible on phones.
+   The footer chrome (peg bar, card panel, cam panel) is restacked
+   so it never piles vertically on top of itself. Peg bar gets its
+   own row at bottom:0; card panel sits just above it as a thin
+   chip strip; cam panel becomes a slim icon row above that. The
+   board canvas is full-viewport behind everything, so collapsing
+   the chrome reveals more board.
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 760px) {
+
+  /* Peg bar — own row, full-width, slim. Confirm collapses to ✔ only
+     (peg-confirm-label already hidden on small screens above). */
+  #ft-peg-bar {
+    left: 4px;
+    right: 4px;
+    bottom: 0;
+    transform: none;
+    width: auto;
+    max-width: none;
+    padding: 4px 6px;
+    gap: 4px;
+    border-radius: 14px 14px 0 0;
+    justify-content: center;
+    z-index: 230;
+  }
+
+  #ft-peg-buttons {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 4px;
+    justify-content: space-between;
+  }
+
+  #ft-peg-bar .peg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 64px;
+    padding: 4px 2px;
+    border-radius: 10px;
+    gap: 0;
+  }
+
+  #ft-peg-bar .peg-btn .peg-glyph {
+    font-size: 16px;
+  }
+
+  #ft-peg-bar .peg-btn .peg-nickname {
+    font-size: 9px;
+    max-width: 60px;
+  }
+
+  #ft-peg-bar .peg-confirm-btn {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    margin-left: 2px;
+    border-radius: 999px;
+  }
+
+  #ft-peg-bar .peg-confirm-check {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+
+  /* Card / draw panel — collapse to a thin chip strip just above the
+     peg bar so it doesn't eat board real-estate. Keeps draw + card
+     readout reachable without dominating the screen. */
+  #panel-action {
+    bottom: 56px;
+    left: 4px;
+    right: auto;
+    width: auto;
+    max-width: 56vw;
+    padding: 3px 6px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    z-index: 90;
+    background: rgba(8, 16, 30, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 12px;
+  }
+
+  #panel-action #card-area {
+    transform: scale(0.7);
+    transform-origin: left center;
+    max-width: 70px;
+    padding: 0;
+  }
+
+  #panel-action #current-card {
+    font-size: 1.3em;
+  }
+
+  #panel-action #card-info {
+    font-size: 0.7em;
+    line-height: 1.1;
+    max-width: 90px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #panel-action #draw-btn {
+    padding: 6px 10px;
+    font-size: 0.8em;
+    min-height: 32px;
+  }
+
+  /* Camera panel — slim icon-pill row above the card panel, never
+     covered by peg bar or card chip. */
+  #panel-cam {
+    left: auto;
+    right: 4px;
+    bottom: 56px;
+    top: auto;
+    padding: 2px 4px;
+    gap: 2px;
+    background: rgba(8, 16, 30, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 999px;
+    display: flex;
+    flex-direction: row;
+    z-index: 95;
+  }
+
+  #panel-cam .cam-btn {
+    font-size: 0.7em;
+    padding: 4px 7px;
+    min-width: 0;
+  }
+
+  /* Game log out of the way — peg bar already owns the bottom strip. */
+  #panel-log {
+    right: 6px;
+    bottom: 100px;
+    width: 130px;
+    max-height: 20px;
+  }
+
+  #panel-log.expanded {
+    max-height: 180px;
+  }
+
+  /* Footer band must clear the peg bar so it doesn't visually compete. */
+  #ft-footer-bg {
+    height: 50px;
+  }
+}
+
+@media (max-width: 420px) {
+
+  /* Very narrow phones — squeeze the peg row further. */
+  #ft-peg-bar .peg-btn {
+    max-width: 52px;
+  }
+
+  #ft-peg-bar .peg-btn .peg-nickname {
+    font-size: 8px;
+    max-width: 48px;
+  }
+
+  #panel-action {
+    max-width: 50vw;
+  }
+
+  #panel-action #card-area {
+    transform: scale(0.6);
+    max-width: 56px;
+  }
+
+  #panel-action #card-info {
+    max-width: 70px;
+    font-size: 0.65em;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PLAYER STRIP — only show humans + the currently active player.
+   Bots are hidden unless it's their turn, so the top-left strip
+   doesn't pile up with 5 bot rows. Applies on all viewports.
+   ════════════════════════════════════════════════════════════════ */
+#player-list .player-row.is-bot:not(.active) {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TURN LIGHT (user_directive_2026-05-18)
+   Every player row carries a small round indicator on the far left.
+   ON  — bright amber, pulsing — when it is that player's turn.
+   OFF — dim grey, low opacity — for everyone else (including bots).
+   Non-active human rows are also globally dimmed so the active row
+   pops as the obvious focal point.
+   ════════════════════════════════════════════════════════════════ */
+#player-list .player-row .turn-light {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(180, 190, 210, 0.18);
+  border: 1px solid rgba(180, 190, 210, 0.35);
+  box-shadow: none;
+  transition: background 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+  opacity: 0.55;
+}
+
+#player-list .player-row.active .turn-light {
+  background: #ffd633;
+  border-color: #fff2a8;
+  box-shadow:
+    0 0 6px rgba(255, 214, 51, 0.95),
+    0 0 14px rgba(255, 214, 51, 0.55),
+    inset 0 0 4px rgba(255, 255, 255, 0.7);
+  opacity: 1;
+  animation: turnLightPulse 1.15s ease-in-out infinite;
+}
+
+/* user_directive_2026-05-18: bright YELLOW only when it is a HUMAN's turn.
+   A bot's active row keeps a subdued blue tint so players can see "bot is
+   playing" without the dramatic yellow glow that signals "your move". */
+#player-list .player-row.is-bot.active .turn-light {
+  background: rgba(120, 170, 230, 0.55);
+  border-color: rgba(170, 210, 255, 0.7);
+  box-shadow: 0 0 4px rgba(120, 170, 230, 0.55);
+  opacity: 0.85;
+  animation: none;
+}
+
+@keyframes turnLightPulse {
+
+  0%,
+  100% {
+    box-shadow:
+      0 0 5px rgba(255, 214, 51, 0.7),
+      0 0 10px rgba(255, 214, 51, 0.4),
+      inset 0 0 3px rgba(255, 255, 255, 0.6);
+  }
+
+  50% {
+    box-shadow:
+      0 0 9px rgba(255, 214, 51, 1),
+      0 0 18px rgba(255, 214, 51, 0.75),
+      inset 0 0 5px rgba(255, 255, 255, 0.85);
+  }
+}
+
+/* Dim the non-active human rows so the active glow stands out. */
+#player-list .player-row.is-human:not(.active) {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+
+#player-list .player-row.is-human:not(.active):hover {
+  opacity: 0.85;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   FOOTER TAB-PANEL UNIFICATION
+   Camera state buttons + draw card adopt the same pill/tab look as
+   the peg buttons. Log panel is removed entirely.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Kill log panel everywhere. */
+#panel-log {
+  display: none !important;
+}
+
+/* ── Camera state buttons → peg-style pills ── */
+#panel-cam {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+#panel-cam .cam-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 30, 50, 0.55);
+  color: #f6f9ff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#panel-cam .cam-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(40, 80, 130, 0.8);
+}
+
+#panel-cam .cam-btn.active {
+  background: rgba(30, 60, 100, 0.7);
+  border-color: #6cf;
+  box-shadow: 0 0 12px #6cf, inset 0 0 8px rgba(255, 255, 255, 0.08);
+  color: #eaf6ff;
+}
+
+/* ── Draw-card panel → peg-style pill ── */
+#panel-action {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+#panel-action #card-area {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 30, 50, 0.55);
+  color: #f6f9ff;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 0;
+  min-width: 0;
+  width: auto;
+  height: auto;
+}
+
+#panel-action #card-area:hover {
+  transform: translateY(-1px);
+  background: rgba(40, 80, 130, 0.8);
+}
+
+#panel-action #card-label {
+  display: none;
+}
+
+#panel-action #current-card {
+  width: 22px;
+  height: 30px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+#panel-action #current-card .card-back,
+#panel-action #current-card .card-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+#panel-action #card-info {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#panel-action #draw-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(43, 182, 115, 0.85);
+  background: linear-gradient(135deg, #1f9d55 0%, #2bb673 100%);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+#panel-action #draw-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(43, 182, 115, 0.65);
+}
+
+#panel-action #draw-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: saturate(0.4);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HAMBURGER MENU (mobile only)
+   On small screens the individual top-right buttons (music, gear,
+   leave, emoji) collapse into a single ☰ button. Tapping it slides
+   open a vertical menu of the same actions. Every panel keeps a
+   reserved spot: nothing covers anything else.
+   ════════════════════════════════════════════════════════════════ */
+
+#btn-hamburger {
+  display: none;
+  /* desktop: hidden, individual icons visible */
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 260;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 30, 50, 0.78);
+  color: #f6f9ff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+#btn-hamburger:hover {
+  background: rgba(40, 80, 130, 0.85);
+}
+
+#hamburger-menu {
+  display: none;
+  position: fixed;
+  top: 56px;
+  right: 10px;
+  z-index: 259;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  min-width: 160px;
+  background: rgba(10, 20, 35, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+#hamburger-menu.open {
+  display: flex;
+}
+
+#hamburger-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(20, 30, 50, 0.6);
+  color: #f6f9ff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+#hamburger-menu button:hover {
+  background: rgba(40, 80, 130, 0.8);
+}
+
+#hamburger-menu button.hm-danger {
+  border-color: rgba(220, 80, 80, 0.6);
+  color: #ffd6d6;
+}
+
+#hamburger-menu button.hm-danger:hover {
+  background: rgba(130, 30, 30, 0.7);
+}
+
+#hamburger-menu .hm-icon {
+  font-size: 18px;
+  min-width: 22px;
+  text-align: center;
+}
+
+#hamburger-menu .hm-label {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 760px) {
+
+  /* Show the hamburger; hide the individual top-right icons + emoji UI. */
+  #btn-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #btn-music-toggle,
+  #btn-leave-game,
+  #btn-settings,
+  #emoji-ui {
+    display: none !important;
+  }
+
+  /* Keep the top-left player strip from colliding with the hamburger. */
+  #panel-players {
+    max-width: calc(100vw - 64px);
+    /* leave room for ☰ */
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Camera controls inside hamburger (mobile)
+   ════════════════════════════════════════════════════════════════ */
+#hamburger-menu .hm-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 4px 6px 2px;
+}
+
+#hamburger-menu .hm-cam-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+}
+
+#hamburger-menu .hm-cam-btn {
+  flex: 1 1 0;
+  padding: 8px 4px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(20, 30, 50, 0.6);
+  color: #f6f9ff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#hamburger-menu .hm-cam-btn.active {
+  background: rgba(30, 60, 100, 0.85);
+  border-color: #6cf;
+  box-shadow: 0 0 10px #6cf, inset 0 0 6px rgba(255, 255, 255, 0.08);
+  color: #eaf6ff;
+}
+
+#hamburger-menu .hm-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 760px) {
+
+  /* Hide the on-board cam pill — camera lives in hamburger now. */
+  #panel-cam {
+    display: none !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Card panel — larger so the drawn card is easy to read.
+   ════════════════════════════════════════════════════════════════ */
+#panel-action {
+  padding: 6px 8px;
+  gap: 8px;
+}
+
+#panel-action #card-area {
+  padding: 8px 12px;
+  gap: 10px;
+}
+
+#panel-action #current-card {
+  width: 44px;
+  height: 60px;
+}
+
+#panel-action #card-info {
+  font-size: 16px;
+  max-width: 220px;
+}
+
+#panel-action #draw-btn {
+  padding: 12px 20px;
+  font-size: 15px;
+}
+
+@media (max-width: 760px) {
+  #panel-action #current-card {
+    width: 38px;
+    height: 52px;
+  }
+
+  #panel-action #card-info {
+    font-size: 14px;
+    max-width: 160px;
+  }
+
+  #panel-action #draw-btn {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  #panel-action #current-card {
+    width: 32px;
+    height: 44px;
+  }
+
+  #panel-action #card-info {
+    font-size: 12px;
+    max-width: 110px;
+  }
+
+  #panel-action #draw-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CARD = DECK = BUTTON. No separate Draw button.
+   The card display itself is the click target. We grow it large
+   enough that it's unmistakably a deck of cards.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Drop the redundant Draw button + the in-panel Break button — Break
+   lives in the hamburger menu now. */
+#panel-action #draw-btn {
+  display: none !important;
+}
+
+#panel-action #btn-break {
+  display: none !important;
+}
+
+/* Make the card big and deck-like. Layered shadow gives a "stack" cue. */
+#panel-action #current-card {
+  width: 72px;
+  height: 100px;
+  position: relative;
+  box-shadow:
+    2px 2px 0 rgba(255, 255, 255, 0.18),
+    4px 4px 0 rgba(255, 255, 255, 0.12),
+    6px 6px 0 rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+}
+
+#panel-action #current-card .card-back,
+#panel-action #current-card .card-face {
+  border-radius: 8px;
+}
+
+#panel-action #card-area {
+  padding: 8px 14px;
+}
+
+#panel-action #card-info {
+  font-size: 18px;
+  max-width: 260px;
+}
+
+/* Hover/active feedback on the card itself — reinforces clickability. */
+#panel-action #card-area:not(.disabled):not(.locked):hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 18px rgba(108, 204, 255, 0.6);
+  border-color: #6cf;
+}
+
+#panel-action #card-area.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#panel-action #card-area.locked {
+  cursor: default;
+}
+
+@media (max-width: 760px) {
+  #panel-action #current-card {
+    width: 60px;
+    height: 84px;
+  }
+
+  #panel-action #card-info {
+    font-size: 15px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 420px) {
+  #panel-action #current-card {
+    width: 50px;
+    height: 70px;
+  }
+
+  #panel-action #card-info {
+    font-size: 13px;
+    max-width: 120px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Card panel: invisible chrome, slightly larger deck.
+   Only the card stack + its info text are visible — no pill,
+   no border, no glass background.
+   ════════════════════════════════════════════════════════════════ */
+#panel-action {
+  background: transparent !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 10px;
+}
+
+#panel-action #card-area {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+#panel-action #card-area:not(.disabled):not(.locked):hover {
+  background: transparent !important;
+  border: none !important;
+  /* Keep the lift + glow on the card itself so it still feels clickable. */
+}
+
+/* Bump deck size a touch. */
+#panel-action #current-card {
+  width: 88px;
+  height: 122px;
+}
+
+@media (max-width: 760px) {
+  #panel-action #current-card {
+    width: 72px;
+    height: 100px;
+  }
+}
+
+@media (max-width: 420px) {
+  #panel-action #current-card {
+    width: 60px;
+    height: 84px;
+  }
+}
+
+/* Drop a soft text-shadow on card-info so it stays legible without a panel. */
+#panel-action #card-info {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DRAWN CARD FACE — solid white, big rank + suit, readable on phones.
+   The face is rendered by _drawCardCommit() as:
+     <div class="card-face red|black" data-suit="…">
+       <span class="cf-rank">5</span><span class="cf-suit">♠</span>
+     </div>
+   The back-of-deck (#current-card .card-back) is unaffected.
+   ════════════════════════════════════════════════════════════════ */
+#current-card .card-face {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  color: #111;
+  border: 1.5px solid #c8a84e;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.95);
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+  font-weight: 800;
+  text-shadow: none;
+  /* Override the parent #current-card's text-shadow/filter. */
+  filter: none;
+}
+
+#current-card .card-face.red {
+  color: #c41e3a;
+}
+
+#current-card .card-face.black {
+  color: #111;
+}
+
+#current-card .card-face .cf-rank {
+  font-size: 38px;
+  letter-spacing: -0.02em;
+}
+
+#current-card .card-face .cf-suit {
+  font-size: 30px;
+  margin-top: -4px;
+}
+
+/* Mobile: scale rank/suit to fit the smaller deck. */
+@media (max-width: 760px) {
+  #current-card .card-face .cf-rank {
+    font-size: 32px;
+  }
+
+  #current-card .card-face .cf-suit {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 420px) {
+  #current-card .card-face .cf-rank {
+    font-size: 26px;
+  }
+
+  #current-card .card-face .cf-suit {
+    font-size: 22px;
+  }
+}
+
+/* Kill the outer text-shadow/filter when face-up so the white face stays
+   crisp (those styles were designed for the older textContent rendering). */
+#current-card:has(.card-face) {
+  text-shadow: none;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+/* Active-player chip already says whose turn it is in the player row;
+   the top-of-panel status line is redundant. */
+#panel-players #game-status {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FULL-WIDTH FOOTER RAIL  (revised)
+   The bar holds ONLY the 5 peg buttons, spanning the entire bottom.
+   Card-deck floats ABOVE the bar at the left; Confirm floats ABOVE
+   the bar at the right.  Nicknames sit beneath each peg glyph.
+   All actionable buttons get a gold outline for visibility.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-bar {
+  left: 8px !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  transform: none !important;
+  max-width: none !important;
+  width: auto !important;
+  padding: 4px 14px !important;
+  border-radius: 18px !important;
+  gap: 10px !important;
+  overflow: visible !important;
+  /* allow confirm to float above */
+}
+
+#ft-peg-buttons {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  width: 100%;
+  gap: 8px !important;
+}
+
+#ft-peg-bar .peg-btn {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  padding: 3px 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  border: 2px solid #d4af37 !important;
+  border-radius: 10px !important;
+  /* gold outline */
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .25), 0 2px 8px rgba(0, 0, 0, .45) !important;
+}
+
+#ft-peg-bar .peg-btn .peg-glyph {
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+#ft-peg-bar .peg-btn .peg-nickname {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  max-width: none !important;
+  display: block !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100%;
+  text-align: center;
+  opacity: .95;
+}
+
+/* Confirm — same size/shape as peg buttons.
+   Disabled: neutral. Enabled ("active"): solid gold w/ dark text. */
+#ft-peg-bar .peg-confirm-btn {
+  position: absolute !important;
+  right: 4px !important;
+  bottom: 0 !important;
+  top: auto !important;
+  margin: 0 !important;
+  /* Match peg-btn geometry */
+  width: auto !important;
+  min-width: 72px !important;
+  padding: 3px 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  border: 2px solid #d4af37 !important;
+  border-radius: 10px !important;
+  background: rgba(20, 30, 50, 0.55) !important;
+  background-image: none !important;
+  color: #f6f9ff !important;
+  font: inherit !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  text-shadow: none !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .25), 0 4px 14px rgba(0, 0, 0, .45) !important;
+  z-index: 230;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+#ft-peg-bar .peg-confirm-btn .peg-confirm-check {
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+#ft-peg-bar .peg-confirm-btn .peg-confirm-label {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  display: block !important;
+  text-align: center;
+  width: 100%;
+  opacity: .95;
+}
+
+/* Confirm ENABLED = staged-and-ready. Solid gold w/ near-black text. */
+#ft-peg-bar .peg-confirm-btn:not(:disabled) {
+  background: #d4af37 !important;
+  background-image: linear-gradient(180deg, #f0cc55 0%, #d4af37 55%, #a8862a 100%) !important;
+  color: #1a1306 !important;
+  border-color: #fff3a8 !important;
+  box-shadow: 0 0 0 1px rgba(255, 230, 130, .45), 0 0 14px rgba(212, 175, 55, .65), 0 4px 14px rgba(0, 0, 0, .55) !important;
+}
+
+#ft-peg-bar .peg-confirm-btn:not(:disabled) .peg-confirm-check,
+#ft-peg-bar .peg-confirm-btn:not(:disabled) .peg-confirm-label {
+  color: #1a1306 !important;
+  text-shadow: 0 1px 0 rgba(255, 240, 180, .55) !important;
+}
+
+#ft-peg-bar .peg-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background-image: linear-gradient(180deg, #ffe27a 0%, #e6c24a 55%, #b8932f 100%) !important;
+}
+
+#ft-peg-bar .peg-confirm-btn:disabled {
+  background: rgba(20, 20, 30, 0.4) !important;
+  background-image: none !important;
+  color: rgba(246, 249, 255, .35) !important;
+  border-color: rgba(212, 175, 55, .35) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+
+/* Card deck — pinned to the UPPER-LEFT, just under the player
+   header strip. The bottom row is now exclusively for peg buttons. */
+#panel-action {
+  position: fixed !important;
+  top: 56px !important;
+  left: 12px !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 230 !important;
+  width: auto !important;
+  max-width: 100px !important;
+  padding: 4px 6px !important;
+  transform: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+#panel-action #card-area {
+  padding: 2px 4px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  border-radius: 8px !important;
+}
+
+#panel-action #card-label {
+  display: none !important;
+}
+
+#panel-action #card-info {
+  display: none !important;
+}
+
+#panel-action #current-card {
+  font-size: 1em !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+}
+
+#panel-action #current-card .card-back {
+  width: 34px !important;
+  height: 48px !important;
+  border-width: 2px !important;
+}
+
+#panel-action #current-card .card-face {
+  min-width: 38px !important;
+  min-height: 48px !important;
+  padding: 4px 6px !important;
+  border-radius: 6px !important;
+}
+
+#panel-action #current-card .card-face .cf-rank {
+  font-size: 20px !important;
+}
+
+#panel-action #current-card .card-face .cf-suit {
+  font-size: 16px !important;
+}
+
+#current-card {
+  outline: 2px solid #d4af37 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .2), 0 4px 12px rgba(0, 0, 0, .55) !important;
+}
+
+@media (max-width: 760px) {
+  #ft-peg-bar {
+    padding: 0 88px 0 8px !important;
+    gap: 6px !important;
+  }
+
+  #ft-peg-bar .peg-btn {
+    padding: 2px 4px !important;
+  }
+
+  #ft-peg-bar .peg-btn .peg-glyph {
+    font-size: 17px !important;
+  }
+
+  #ft-peg-bar .peg-btn .peg-nickname {
+    font-size: 9px !important;
+  }
+
+  #ft-peg-bar .peg-confirm-btn {
+    padding: 2px 6px !important;
+    min-width: 64px !important;
+  }
+
+  #panel-action {
+    max-width: 88px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #ft-peg-bar {
+    gap: 4px !important;
+    padding: 0 70px 0 6px !important;
+  }
+
+  #ft-peg-bar .peg-btn {
+    padding: 2px 2px !important;
+  }
+
+  #ft-peg-bar .peg-btn .peg-glyph {
+    font-size: 15px !important;
+  }
+
+  #ft-peg-bar .peg-btn .peg-nickname {
+    font-size: 8px !important;
+  }
+
+  #ft-peg-bar .peg-confirm-btn {
+    padding: 2px 4px !important;
+    min-width: 56px !important;
+  }
+
+  #panel-action {
+    max-width: 72px !important;
+  }
+
+  #panel-action #current-card .card-back {
+    width: 28px !important;
+    height: 40px !important;
+  }
+
+  #panel-action #current-card .card-face {
+    min-width: 32px !important;
+    min-height: 40px !important;
+  }
+
+  #panel-action #current-card .card-face .cf-rank {
+    font-size: 16px !important;
+  }
+
+  #panel-action #current-card .card-face .cf-suit {
+    font-size: 13px !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TOASTS — larger and easier to read.
+   ════════════════════════════════════════════════════════════════ */
+.emoji-toast {
+  font-size: 18px !important;
+  padding: 14px 18px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55) !important;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+#emoji-feed {
+  max-width: min(420px, 92vw) !important;
+  gap: 10px !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STRIP PEG-BAR PANEL CHROME — KEEP BOARD UNCOVERED
+   The peg-bar must be invisible (no background/border/shadow) and
+   no taller than its buttons. Padding-left reserves the card-deck
+   slot, padding-right reserves the confirm-button slot, so the
+   peg buttons never overlap either floating control.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-bar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 120px 0 12px !important;
+  /* right=confirm slot; card moved to top-right so no left reservation needed */
+  pointer-events: none !important;
+}
+
+#ft-peg-bar>* {
+  pointer-events: auto;
+}
+
+@media (max-width: 760px) {
+  #ft-peg-bar {
+    padding: 0 96px 0 8px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #ft-peg-bar {
+    padding: 0 78px 0 6px !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CAMERA TOGGLE — round icon top-right, matches music/leave/gear.
+   Replaces the on-board #panel-cam (Manual/Top/Angle/Auto) which
+   covered the play field.
+   ════════════════════════════════════════════════════════════════ */
+#btn-camera-toggle {
+  position: fixed;
+  top: 12px;
+  right: 144px;
+  z-index: 50;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(8, 20, 30, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 180, 255, 0.28);
+  color: rgba(160, 220, 255, 0.80);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+#btn-camera-toggle:hover {
+  background: rgba(0, 80, 120, 0.55);
+  color: #fff;
+  border-color: rgba(0, 220, 255, 0.6);
+  transform: scale(1.06);
+}
+
+#camera-panel {
+  position: fixed;
+  top: 56px;
+  right: 144px;
+  z-index: 60;
+  background: rgba(8, 10, 24, 0.94);
+  border: 1px solid rgba(80, 220, 255, 0.28);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+
+#camera-panel.open {
+  display: flex;
+}
+
+#camera-panel .cam-pop-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6f4ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+#camera-panel .cam-pop-btn:hover {
+  background: rgba(0, 180, 255, 0.18);
+  border-color: rgba(80, 220, 255, 0.5);
+}
+
+#camera-panel .cam-pop-btn.active {
+  background: rgba(0, 200, 255, 0.28);
+  border-color: rgba(120, 235, 255, 0.7);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* On mobile the round icons collapse into the hamburger — keep this
+   icon and its popup hidden there too. */
+@media (max-width: 760px) {
+
+  #btn-camera-toggle,
+  #camera-panel {
+    display: none !important;
+  }
+}
+
+/* The old on-board camera panel must NEVER cover the board. */
+#panel-cam {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PEG-BUTTON ACTIVATION COLORS
+   Active = the peg's own color fills the background; the dot and
+   nickname switch to a complementary near-white with a dark halo
+   so they stay legible against any peg hue.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-bar .peg-btn.active {
+  background: var(--peg-color, #6cf) !important;
+  border-color: #fff3a8 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 130, .4),
+    0 0 14px var(--peg-color, #6cf),
+    inset 0 0 8px rgba(0, 0, 0, .25) !important;
+  color: #ffffff !important;
+}
+
+#ft-peg-bar .peg-btn.active .peg-glyph {
+  color: #ffffff !important;
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, .55),
+    0 1px 2px rgba(0, 0, 0, .7) !important;
+}
+
+#ft-peg-bar .peg-btn.active .peg-nickname {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .65) !important;
+  opacity: 1 !important;
+}
+
+/* Selected (staged) stays gold-tinted to distinguish from merely-active. */
+#ft-peg-bar .peg-btn.selected {
+  background: linear-gradient(135deg, #f0cc55 0%, #d4af37 100%) !important;
+  border-color: #fff3a8 !important;
+  color: #1a1306 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 130, .55),
+    0 0 18px #d4af37,
+    inset 0 0 8px rgba(255, 240, 180, .25) !important;
+}
+
+#ft-peg-bar .peg-btn.selected .peg-glyph,
+#ft-peg-bar .peg-btn.selected .peg-nickname {
+  color: #1a1306 !important;
+  text-shadow: 0 1px 0 rgba(255, 240, 180, .55) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HR-6.2: Footer black band REMOVED.
+   The #ft-footer-bg strip was covering the bottom of the play
+   field. The peg buttons and confirm sit directly on the viewport;
+   no decorative band is needed.
+   ════════════════════════════════════════════════════════════════ */
+#ft-footer-bg {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HARD RULE (HR-6.2) ENFORCEMENT — KILL ALL LEFTOVER BOTTOM PANELS
+   The only bottom-of-viewport UI is #ft-peg-bar. Every other
+   floating panel (debug metrics, log pill, hint pill, old confirm
+   bar, dev hud) is hidden so nothing can cover the play field.
+   ════════════════════════════════════════════════════════════════ */
+#panel-options,
+#panel-metrics,
+#panel-log,
+#ft-confirm-bar,
+#ft-instruction-banner,
+#ft-footer-bg,
+#fasttrack-hud,
+#fasttrack-3d-hud,
+#fasttrack-xcode-hud {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PEG BUTTONS — opaque filled tiles with gold outline.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-bar .peg-btn {
+  background: #0e1422 !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .25), 0 2px 8px rgba(0, 0, 0, .55) !important;
+}
+
+#ft-peg-bar .peg-btn:hover:not(:disabled):not(.active):not(.selected) {
+  background: #182336 !important;
+}
+
+#ft-peg-bar .peg-confirm-btn:disabled {
+  background: #0e1422 !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .25), 0 2px 8px rgba(0, 0, 0, .55) !important;
+}
+
+/* Footer band stays fully hidden — buttons float directly on the
+   board, no rail, no border, no void. */
+#ft-footer-bg {
+  display: none !important;
+}
+
+/* Disabled peg buttons stay tinted with the owner's peg color so the
+   player can still read the roster — they're just dimmed to communicate
+   "no legal move with this peg right now". (user_directive_2026-05-18) */
+#ft-peg-bar .peg-btn[disabled],
+#ft-peg-bar .peg-btn:disabled {
+  opacity: 0.7 !important;
+  filter: brightness(0.65) saturate(0.85) !important;
+  /* DO NOT force background here — inline style from JS carries the
+     per-peg color and must survive the disabled state. */
+  border-color: rgba(212, 175, 55, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .18), 0 2px 8px rgba(0, 0, 0, .55) !important;
+}
+
+/* Confirm button visible in disabled state too. */
+#ft-peg-bar .peg-confirm-btn:disabled {
+  opacity: 0.85 !important;
+  filter: none !important;
+  background: #0e1422 !important;
+  color: #f6f9ff !important;
+  border-color: rgba(212, 175, 55, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, .2), 0 2px 8px rgba(0, 0, 0, .55) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PEG NICKNAMES — float as little toasts ABOVE each button so the
+   button itself shows only the dot. Toast matches peg color.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-bar .peg-btn {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+#ft-peg-bar .peg-btn .peg-nickname {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 4px) !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100% + 16px) !important;
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  background: rgba(8, 12, 24, 0.85) !important;
+  color: #f6f9ff !important;
+  border: 1px solid var(--peg-color, rgba(212, 175, 55, 0.55)) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .55) !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  z-index: 2;
+}
+
+/* Centre the dot now that the label is outside. */
+#ft-peg-bar .peg-btn .peg-glyph {
+  font-size: 22px !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CARD PANEL (user_directive_2026-05-18)
+   HARD RULE: buttons/forms must never cover other buttons or forms.
+   The player panel lives top-left and grows downward with each
+   added player row, so the card panel was anchored at top:140
+   and overlapped it. Relocate the card to the TOP-RIGHT corner,
+   tucked under the icon strip (music/leave/gear/cam at top:12,
+   ~36px tall), so it can never overlap the player panel.
+
+   Also: only the word "DRAW" appears, painted ON the card itself
+   via ::after. The legacy #card-info text label and #draw-btn
+   button are hidden — clicking the card itself draws.
+   ════════════════════════════════════════════════════════════════ */
+#panel-action {
+  position: fixed !important;
+  top: 56px !important;
+  /* clears 36px icon row + 8px gap */
+  right: 12px !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 230 !important;
+  width: auto !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  display: block !important;
+  /* don't lay out hidden children */
+}
+
+/* Hide the standalone label/button — card itself is the draw control. */
+#panel-action #card-label,
+#panel-action #card-info,
+#panel-action #draw-btn {
+  display: none !important;
+}
+
+#panel-action #card-area {
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  display: block !important;
+  width: 60px !important;
+  height: 84px !important;
+}
+
+#panel-action #current-card {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+  width: 60px !important;
+  height: 84px !important;
+  display: block !important;
+}
+
+#panel-action #current-card .card-back,
+#panel-action #current-card .card-face {
+  width: 60px !important;
+  height: 84px !important;
+  min-width: 60px !important;
+  min-height: 84px !important;
+  max-width: 60px !important;
+  max-height: 84px !important;
+  padding: 4px 4px !important;
+  border-width: 2px !important;
+  border-radius: 6px !important;
+  box-sizing: border-box !important;
+}
+
+#panel-action #current-card .card-face .cf-rank {
+  font-size: 22px !important;
+  line-height: 1 !important;
+}
+
+#panel-action #current-card .card-face .cf-suit {
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+/* "DRAW" label PAINTED ON the card back (only while the card back
+   is showing, i.e. before a card is drawn this turn). Centered. */
+#panel-action #card-area {
+  position: relative !important;
+}
+
+#panel-action #current-card:has(.card-back)::after {
+  content: "DRAW";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  color: #fff8d8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(255, 214, 51, 0.55);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   TEXT-FREE GAMEPLAY MODE (user_directive_2026-05-18)
+   The peg-button bar + Confirm button is now the SOLE gameplay
+   input. The legacy text-based move-cycle bar and "Tap a glowing…"
+   instruction banner are kept in the DOM only as engine state
+   proxies — they must never render. !important overrides any
+   inline display:flex applied by _refreshConfirmBar.
+   ──────────────────────────────────────────────────────────────── */
+#ft-confirm-bar,
+#ft-instruction-banner,
+#ft-hover-tip {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PEG-BAR HELP TIP — small dismissible pill floating ABOVE the peg
+   bar (and above the floating nickname toasts) so it never covers
+   the buttons or their labels. Auto-hides once the user dismisses
+   it (localStorage). Auto-hides during bot turns via [hidden].
+   Anchored bottom-centre; max-width keeps it from overlapping the
+   left/right edge controls.
+   ════════════════════════════════════════════════════════════════ */
+#ft-peg-help {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  /* clears peg bar (~46px) + nickname pill (~24px) + 8px gap */
+  transform: translateX(-50%);
+  z-index: 45;
+  /* above board, below modal overlays */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 7px 10px 7px 14px;
+  background: rgba(10, 16, 30, 0.92);
+  color: #f6f9ff;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(212, 175, 55, 0.18);
+  font-size: 12.5px;
+  line-height: 1.25;
+  pointer-events: auto;
+  animation: ft-peg-help-pulse 2.4s ease-in-out infinite;
+}
+
+#ft-peg-help[hidden] {
+  display: none !important;
+}
+
+#ft-peg-help .ft-peg-help-text {
+  white-space: normal;
+  text-align: center;
+}
+
+#ft-peg-help .ft-peg-help-text b {
+  color: #ffd86b;
+  font-weight: 700;
+}
+
+#ft-peg-help-close {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6f9ff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#ft-peg-help-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes ft-peg-help-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(212, 175, 55, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(212, 175, 55, 0.45);
+  }
+}
+
+/* On narrow screens the peg bar grows a row taller — lift the tip. */
+@media (max-width: 540px) {
+  #ft-peg-help {
+    bottom: 104px;
+    font-size: 11.5px;
+    padding: 6px 8px 6px 12px;
+  }
 }

@@ -57,45 +57,113 @@ function assignBotName() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// "YOUR TURN" POPUP — shown for human players, auto-dismissed
+// CENTER TOAST SYSTEM (user_directive_2026-05-18)
+// Lightweight, transient pop-overs anchored to the upper-center of the
+// viewport. Used for:
+//   • "Your turn"     — when a new turn starts
+//   • "Redraw!"       — when an extra-turn card lands
+//   • "No legal move" — when validMoves is empty and the turn will pass
+// Toasts are pointer-events:none so they NEVER block the board, the peg
+// bar, or any panel. They auto-dismiss after ~1.8s and gracefully replace
+// each other so we never stack a tower of pop-ups.
 // ═══════════════════════════════════════════════════════════════════════════
-let _turnPopup = null;
-function showYourTurnPopup(playerName, playerColor) {
-  dismissYourTurnPopup(); // clear any lingering popup
+let _centerToastEl = null;
+let _centerToastTimer = null;
+let _centerToastReflow = null;
+let _lastNoLegalMoveTurnStamp = null; // dedupe across updateUI re-renders
+
+function _ensureCenterToastEl() {
+  if (_centerToastEl && document.body.contains(_centerToastEl)) return _centerToastEl;
   const el = document.createElement('div');
-  el.id = 'your-turn-popup';
-  el.innerHTML = `<span style="font-size:1.8em;display:block;margin-bottom:6px;">🎲</span><span style="font-size:1.1em;display:block;letter-spacing:0.04em;">YOUR TURN</span><b style="font-size:1.3em;display:block;margin-top:4px;">${playerName}</b>`;
+  el.id = 'ft-center-toast';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  // All styles inline so we don't rely on CSS shipping order.
   Object.assign(el.style, {
-    position: 'fixed', top: '50%', left: '50%',
-    transform: 'translate(-50%, -50%) scale(0.7)',
-    padding: '28px 52px', borderRadius: '18px',
-    background: 'rgba(4,6,22,0.96)', color: '#fff',
-    fontSize: '1.1em', fontFamily: "'Orbitron','Segoe UI', sans-serif",
-    fontWeight: '700', textAlign: 'center',
-    border: `2.5px solid ${playerColor || '#00b4ff'}`,
-    boxShadow: `0 0 40px ${playerColor || '#00b4ff'}88, 0 12px 40px rgba(0,0,0,0.8)`,
-    zIndex: '9999', pointerEvents: 'none',
-    opacity: '0', transition: 'opacity 0.35s ease, transform 0.35s ease',
-    textShadow: `0 0 16px ${playerColor || '#00b4ff'}`,
-    minWidth: '240px',
+    position: 'fixed',
+    top: '14%',
+    left: '50%',
+    transform: 'translate(-50%, -8px) scale(0.96)',
+    padding: '10px 20px',
+    fontSize: '20px',
+    fontWeight: '800',
+    letterSpacing: '0.5px',
+    color: '#fff8d8',
+    background: 'rgba(8, 12, 24, 0.82)',
+    border: '2px solid rgba(212, 175, 55, 0.8)',
+    borderRadius: '14px',
+    boxShadow: '0 6px 26px rgba(0,0,0,0.55), 0 0 18px rgba(212,175,55,0.35)',
+    textShadow: '0 0 10px rgba(255,215,90,0.45)',
+    pointerEvents: 'none',
+    zIndex: '9000',
+    opacity: '0',
+    transition: 'opacity 180ms ease, transform 180ms ease',
+    whiteSpace: 'nowrap',
+    maxWidth: '90vw',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    fontFamily: 'inherit'
   });
   document.body.appendChild(el);
-  // Trigger entrance animation
-  requestAnimationFrame(() => {
-    el.style.opacity = '1';
-    el.style.transform = 'translate(-50%, -50%) scale(1)';
-  });
-  _turnPopup = el;
+  _centerToastEl = el;
+  return el;
 }
 
-function dismissYourTurnPopup() {
-  if (!_turnPopup) return;
-  const el = _turnPopup;
-  _turnPopup = null;
-  el.style.opacity = '0';
-  el.style.transform = 'translate(-50%, -50%) scale(0.7)';
-  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+function showCenterToast(text, accentColor, durationMs) {
+  if (typeof document === 'undefined') return;
+  const el = _ensureCenterToastEl();
+  if (_centerToastTimer) { clearTimeout(_centerToastTimer); _centerToastTimer = null; }
+  el.textContent = text;
+  if (accentColor) {
+    el.style.borderColor = accentColor;
+    el.style.boxShadow = `0 6px 26px rgba(0,0,0,0.55), 0 0 18px ${accentColor}66`;
+  }
+  // Force a reflow so the transition runs even on rapid successive toasts.
+  // (Reading offsetWidth is the canonical reflow trigger.)
+  void el.offsetWidth;
+  el.style.opacity = '1';
+  el.style.transform = 'translate(-50%, 0) scale(1)';
+  const dur = typeof durationMs === 'number' ? durationMs : 1800;
+  _centerToastTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, -8px) scale(0.96)';
+  }, dur);
 }
+
+function dismissCenterToast() {
+  if (_centerToastTimer) { clearTimeout(_centerToastTimer); _centerToastTimer = null; }
+  if (!_centerToastEl) return;
+  _centerToastEl.style.opacity = '0';
+  _centerToastEl.style.transform = 'translate(-50%, -8px) scale(0.96)';
+}
+
+// Back-compat shims for old call sites. These now emit the new center
+// toast instead of doing nothing.
+let _turnPopup = null;
+let _turnPopupReflow = null;
+function _positionDrawPrompt(_el) { /* legacy no-op */ }
+function showYourTurnPopup(playerName, playerColor) {
+  if (!playerName) return;
+  // New turn => clear the no-legal-move dedupe so a stuck NEXT turn can toast.
+  _lastNoLegalMoveTurnStamp = null;
+  showCenterToast(`${playerName} — Your Turn`, playerColor || '#ffd633', 1800);
+}
+function dismissYourTurnPopup() {
+  // Legacy callers used to clear the floating draw-prompt; route to the
+  // generic dismiss so any active center toast clears too.
+  dismissCenterToast();
+}
+
+function showRedrawToast(playerName, playerColor) {
+  const who = playerName ? `${playerName}: ` : '';
+  showCenterToast(`${who}Redraw! 🎴`, playerColor || '#7ad9ff', 2000);
+}
+
+function showNoLegalMoveToast(playerName, playerColor) {
+  const who = playerName ? `${playerName}: ` : '';
+  showCenterToast(`${who}No legal move — turn ends`, playerColor || '#ff9a7a', 2200);
+}
+
 
 function getBalancedBoardPosition(idx, count) {
   if (count === 2) return [0, 3][idx];
@@ -123,6 +191,16 @@ const PEG_FUNNY_NAMES = [
 const _usedPegNames = new Set();
 
 function assignPegNickname() {
+  // Log all peg nicknames after assignment for debugging
+  if (typeof window !== 'undefined') {
+    setTimeout(() => {
+      if (window.state && window.state.players) {
+        const players = window.state.players.get('list') || [];
+        const allNicknames = players.flatMap((pl, pi) => (pl.pegs || []).map((peg, pj) => ({ player: pi, peg: pj, nickname: peg.nickname, id: peg.id })));
+        console.log('[FT3D] All peg nicknames after assignment:', allNicknames);
+      }
+    }, 1000);
+  }
   const available = PEG_FUNNY_NAMES.filter(n => !_usedPegNames.has(n));
   if (available.length === 0) {
     // Fallback: all names used, pick random with suffix
@@ -377,6 +455,9 @@ function initGame(playerCount = 2, config = {}) {
     ? sessionPlayers.length
     : playerCount;
   state.players.set('count', effectiveCount);
+  // Provisional — final starting seat is chosen AFTER the roster is built
+  // (so winner-name lookup can match against the new roster). See the
+  // "Starting-player selection" block lower in this function.
   state.players.set('current', 0);
   // Reset host-authoritative turn-rotation counters for the new game.
   _turnSeq = 0;
@@ -487,6 +568,41 @@ function initGame(playerCount = 2, config = {}) {
   }
   state.players.set('list', players);
 
+  // ── Starting-player selection (user_directive_2026-05-18) ──────────
+  // Priority:
+  //   1. Explicit override via config.startingPlayer (host-authoritative MP).
+  //   2. `ft.rematchWinnerName` written by Play-Again — winner of the
+  //      previous game opens the next one. One-shot, cleared on use.
+  //   3. Otherwise a uniformly-random seat so games don't always start at #1.
+  //
+  // Note for MP: each client computes independently; the host's choice is
+  // broadcast via the existing _turnSeq mechanism shortly after, so any
+  // initial divergence is reconciled by host authority within one tick.
+  (function pickStartingSeat() {
+    let startingIdx = -1;
+    const explicit = Number.isInteger(config.startingPlayer) ? config.startingPlayer : -1;
+    if (explicit >= 0 && explicit < effectiveCount) {
+      startingIdx = explicit;
+    } else {
+      let rematchName = null;
+      try { rematchName = localStorage.getItem('ft.rematchWinnerName'); } catch (_) { /* ignore */ }
+      try { localStorage.removeItem('ft.rematchWinnerName'); } catch (_) { /* ignore */ }
+      if (rematchName) {
+        const target = String(rematchName).trim().toLowerCase();
+        for (let i = 0; i < players.length; i++) {
+          if (String(players[i].name || '').trim().toLowerCase() === target) {
+            startingIdx = i;
+            break;
+          }
+        }
+      }
+      if (startingIdx < 0) startingIdx = Math.floor(Math.random() * effectiveCount);
+    }
+    state.players.set('current', startingIdx);
+    if (window.CameraDirector) window.CameraDirector.setActivePlayer(startingIdx);
+    log(`Starting player: ${players[startingIdx]?.name || `Seat ${startingIdx + 1}`}`);
+  })();
+
   // ─── Peg Matrix (substrate) ───
   // peg(id) | color | position(hole) | state
   syncPegMatrix();
@@ -506,15 +622,22 @@ function initGame(playerCount = 2, config = {}) {
   setTimeout(() => {
     if (window.updatePlayerMarkers) window.updatePlayerMarkers();
 
+    // user_directive_2026-05-18 — use the ACTUAL starting seat (chosen
+    // randomly or via rematch-winner stash above), not hardcoded index 0.
+    // Otherwise when a bot is picked as first player, botTurn() never
+    // fires and the game stalls waiting on a human at seat 0.
     const players0 = state.players.get('list') || [];
-    const firstPlayer = players0[0];
+    const startIdx = state.players.get('current') || 0;
+    const firstPlayer = players0[startIdx];
 
     const enableFirstTurn = () => {
-      dismissYourTurnPopup();
       if (firstPlayer && firstPlayer.isBot) {
+        // Bot's turn — dismiss the prompt; bot will drive itself.
+        dismissYourTurnPopup();
         // In MP, only the host (game manager) drives bot turns.
         if (!_isMpMode() || _isHost()) setTimeout(botTurn, 400);
       } else {
+        // Human turn: leave the DRAW CARD prompt up until they draw.
         // In MP, only enable the draw button for the local active player.
         // Otherwise a peer can click draw and play on the active player's
         // behalf (turn-skip bug).
@@ -531,11 +654,12 @@ function initGame(playerCount = 2, config = {}) {
         const showFirstPopup = mpMode ? _isMyTurn() : true;
         if (showFirstPopup) {
           showYourTurnPopup(firstPlayer.name, firstPlayer.color);
-          setTimeout(dismissYourTurnPopup, 1500);
+          // Popup persists until the player draws a card (drawCard() calls
+          // dismissYourTurnPopup). No auto-timeout.
         }
       }
       if (window.blinkPlayerMarker) {
-        window.blinkPlayerMarker(0, enableFirstTurn);
+        window.blinkPlayerMarker(startIdx, enableFirstTurn);
       } else {
         enableFirstTurn();
       }
@@ -651,16 +775,22 @@ function applyStateSnapshot(snapshot) {
   for (const name of _SYNC_TABLES) {
     if (!snapshot[name] || typeof snapshot[name] !== 'object') return false;
   }
+  // Debug: Log incoming snapshot and local state
+  console.log('[SYNC] Applying state snapshot:', JSON.stringify(snapshot));
   // Preserve local-only identity that must NOT be overwritten by the host's
   // canonical broadcast (otherwise every peer adopts the host's userId and
   // thinks it is the active player).
   const localMyUserId = state.meta.get('myUserId');
   const localGameMode = state.meta.get('gameMode');
+  console.log('[SYNC] Local myUserId before:', localMyUserId, 'gameMode:', localGameMode);
   for (const name of _SYNC_TABLES) {
     _replaceTableFromObject(state[name], snapshot[name]);
+    // Debug: Log each table after replacement
+    console.log(`[SYNC] Table '${name}' after sync:`, JSON.stringify(state[name]));
   }
   if (localMyUserId != null) state.meta.set('myUserId', localMyUserId);
   if (localGameMode != null) state.meta.set('gameMode', localGameMode);
+  console.log('[SYNC] Local myUserId after:', state.meta.get('myUserId'), 'gameMode:', state.meta.get('gameMode'));
   syncPegMatrix();
   updateUI();
   renderBoard();
@@ -673,6 +803,8 @@ function setMultiplayerClient(client) {
   if (_kernelClient) { try { _kernelClient.destroy(); } catch (_) { } }
   _kernelClient = null;
   _kernelMode = false;
+  // Debug: Log multiplayer client set and mode
+  console.log('[SYNC] setMultiplayerClient called. Client:', _mpClient);
   // BUGFIX (turn-rotation): setMultiplayerClient is only ever invoked when a
   // real network session is being attached (see fasttrack-3d.js — never in
   // solo). If state.meta.gameMode somehow leaked through as 'solo' (stale
@@ -717,6 +849,8 @@ function setMyUserId(userId) {
 function updateSessionRoster(sessionPlayers) {
   const incoming = Array.isArray(sessionPlayers) ? sessionPlayers : null;
   if (!incoming || incoming.length < 2) return;
+  // Debug: Log roster update
+  console.log('[SYNC] updateSessionRoster called. Players:', JSON.stringify(sessionPlayers));
   const sorted = incoming.slice().sort((a, b) => {
     const sa = Number.isFinite(a && a.slot) ? a.slot : Number.MAX_SAFE_INTEGER;
     const sb = Number.isFinite(b && b.slot) ? b.slot : Number.MAX_SAFE_INTEGER;
@@ -875,8 +1009,12 @@ function applyRemoteAction(action, payload) {
         const from = payload && Number.isFinite(payload.from) ? payload.from : null;
         const next = payload && Number.isFinite(payload.next) ? payload.next : null;
         const seq = payload && Number.isFinite(payload.seq) ? payload.seq : 0;
+        console.log('[TURN] applyRemoteAction: turn_advance received. from:', from, 'next:', next, 'seq:', seq, 'lastApplied:', _lastAppliedTurnSeq, 'turnSeq:', _turnSeq);
         if (from === null || next === null) break;
-        if (seq && seq <= _lastAppliedTurnSeq) break;
+        if (seq && seq <= _lastAppliedTurnSeq) {
+          console.log('[TURN] applyRemoteAction: turn_advance seq too old, ignoring.');
+          break;
+        }
         _lastAppliedTurnSeq = seq || _lastAppliedTurnSeq;
         if (seq > _turnSeq) _turnSeq = seq;
         _applyTurnAdvance(from, next, seq);
@@ -932,7 +1070,17 @@ function _drawCardCommit(card) {
   _splitStepChoice = null;
 
   const cardEl = document.getElementById('current-card');
-  if (cardEl) cardEl.textContent = card.display;
+  if (cardEl) {
+    const disp = String(card.display || card.value || '');
+    // Extract suit symbol (♠♥♦♣) — last char by convention. Falls back gracefully.
+    const m = disp.match(/([\u2660\u2665\u2666\u2663])/);
+    const suit = m ? m[1] : '';
+    const rank = suit ? disp.replace(suit, '') : disp;
+    const isRed = suit === '♥' || suit === '♦';
+    cardEl.innerHTML = `<div class="card-face ${isRed ? 'red' : 'black'}" data-suit="${suit}">
+      <span class="cf-rank">${rank}</span><span class="cf-suit">${suit}</span>
+    </div>`;
+  }
   const infoEl = document.getElementById('card-info');
   if (infoEl) infoEl.textContent = getCardDescription(card.value);
 
@@ -1140,10 +1288,19 @@ function calculateValidMoves() {
         if (!blocked) {
           moves.push({ type: 'move', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
 
-          // rules.json :: FT_ENTRY_EXACT (z=8) — exact landing on ft-* clockwise grants FT.
-          // rules.json :: FT_NO_BACKWARD_ENTRY (z=16) — !rules.noFastTrack guard (Card 4).
-          if (dir === 'clockwise' && dest.startsWith('ft-') && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
-            moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
+          // FT entry: Only allow if moving forward (clockwise), not already on FT, not mustExitFasttrack, not a noFastTrack card, and only from player's own FT entry point
+          if (
+            dir === 'clockwise' &&
+            dest.startsWith('ft-') &&
+            !peg.onFasttrack &&
+            !rules.noFastTrack &&
+            !peg.mustExitFasttrack &&
+            peg.holeId === `home-${bp}` // Only allow entry from own home hole
+          ) {
+            // Only allow entry to player's own FT entry hole
+            if (dest === `ft-${bp}`) {
+              moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
+            }
           }
         }
       }
@@ -1168,7 +1325,12 @@ function calculateValidMoves() {
         !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps) {
         const penultimate = trackSeq[steps - 2];
         const finalHole = trackSeq[steps - 1];
-        if (penultimate && penultimate.startsWith('ft-')) {
+        if (penultimate && penultimate.startsWith('ft-')
+          // user_directive_2026-05-18 — bullseye entry forbidden when the
+          // launching ft-* is the player's OWN ft-{bp}. This mirrors
+          // BULL_NO_FROM_OWN_FT for the 1-step rule and stops the
+          // exit-bullseye → own-FT → re-enter-bullseye no-op loop.
+          && penultimate !== `ft-${bp}`) {
           let bullPathBlocked = false;
           for (let s = 0; s < steps - 1; s++) {
             const h = trackSeq[s];
@@ -1197,16 +1359,15 @@ function calculateValidMoves() {
       }
 
       // ── FT EXIT OPTIONS ──
-      // A peg on FastTrack can exit only at legal ft-* checkpoints reachable
-      // before it would violate the no-pass-own-peg rule. Reaching your own
-      // ft-{bp} hole is a forced exit boundary.
+      // Peg on FastTrack can only exit at their own FT exit (ft-{bp})
       if (peg.onFasttrack && dir === 'clockwise') {
         const maxExitStep = Math.min(steps, trackSeq.length);
         for (let s = 0; s < maxExitStep; s++) {
           const h = trackSeq[s];
           const occ = state.board.get(h);
           if (occ && occ.playerIdx === ci) break;
-          if (h.startsWith('ft-')) {
+          // Only allow exit to player's own FT exit hole
+          if (h === `ft-${bp}`) {
             moves.push({
               type: 'exitFastTrack', pegIdx: pi, dest: h,
               steps: s + 1, from: peg.holeId,
@@ -1217,39 +1378,8 @@ function calculateValidMoves() {
       }
 
       // ── FT RING TRAVERSAL (peg sitting on an ft-* hole, not in FT mode) ──
-      // Clockwise only. The path stops at the first forced exit boundary:
-      // either the player's own ft-{bp} hole or the last safe ft hole before
-      // bypassing one of that player's own pegs on the regular track.
-      if (dir === 'clockwise' && getHoleType(peg.holeId) === 'fasttrack' && !peg.onFasttrack && !rules.noFastTrack && !peg.mustExitFasttrack) {
-        const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
-        const ftSeq = [];
-        let currentFt = ftIdx;
-        for (let fi = 1; fi <= 6; fi++) {
-          const next = (ftIdx + fi) % 6;
-          if (!canAdvanceFastTrackStep(player, currentFt, next, peg)) break;
-          ftSeq.push(`ft-${next}`);
-          currentFt = next;
-          if (next === bp) break;
-        }
-        if (ftSeq.length >= steps) {
-          const ftDest = ftSeq[steps - 1];
-          let ftBlocked = false;
-          for (let s = 0; s < steps; s++) {
-            const h = ftSeq[s];
-            const occ = state.board.get(h);
-            // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates passable
-            if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
-              ftBlocked = true; break;
-            }
-          }
-          // rules.json :: MOV_NO_LAND_OWN (z=6) — destination occupancy check
-          const ftDestOcc = state.board.get(ftDest);
-          if (ftDestOcc && ftDestOcc.playerIdx === ci) ftBlocked = true;
-          if (!ftBlocked) {
-            moves.push({ type: 'enterFastTrack', pegIdx: pi, dest: ftDest, steps, from: peg.holeId, path: ftSeq.slice(0, steps) });
-          }
-        }
-      }
+      // Only allow FT entry from own home hole, not by backing up or traversing from other FT holes
+      // (No FT entry from other FT holes)
     }
 
     // ENTER BULLSEYE from FastTrack — ONLY on a 1-move card (A, J, Q, K, JOKER)
@@ -1276,12 +1406,21 @@ function calculateValidMoves() {
   // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are passable.
   // Three variants per (a, b, pi1, pi2): STANDARD | BULL-LEFT | BULL-RIGHT.
   if (rules.isWild && rules.movement === 7) {
+    // user_directive_2026-05-18: "the 7 split can only happen when there are
+    // 2 to n pegs ON THE BOARD. if there is only 1 peg a 7 is just another
+    // number." Pegs in holding, bullseye, the home/winner hole, and the
+    // private safe zone do NOT count as split-eligible — they're either
+    // not on the open board or physically can't absorb a meaningful split
+    // half. With <2 split-eligible pegs the engine skips the split block
+    // entirely and the regular 7-step move generated above stands alone.
     const activePegs = [];
     for (let pi = 0; pi < player.pegs.length; pi++) {
       const peg = player.pegs[pi];
-      if (peg.holeType !== 'holding' && peg.holeId !== 'bullseye') {
-        activePegs.push(pi);
-      }
+      if (peg.holeType === 'holding') continue;
+      if (peg.holeType === 'safezone') continue;
+      if (peg.holeId === 'bullseye') continue;
+      if (peg.holeId === `home-${bp}`) continue;
+      activePegs.push(pi);
     }
     if (activePegs.length >= 2) {
       const _ownFt = `ft-${bp}`;
@@ -1637,10 +1776,14 @@ function showMoveHints() {
   setOptionsPanelVisible(true);
   const vm = state.turn.get('validMoves') || [];
 
-  // Refresh the footer move-cycle toolbar (◀ / ▶ / Confirm) for the new vm.
+  // Refresh the move card bar (new UI)
   if (typeof window._refreshFastTrackToolbar === 'function') {
     try { window._refreshFastTrackToolbar(); } catch (e) { /* ignore */ }
   }
+  // Dispatch a custom event for move updates (for card bar)
+  try {
+    window.dispatchEvent(new Event('ft3d:moveUpdate'));
+  } catch (_) { }
 
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
@@ -1651,6 +1794,18 @@ function showMoveHints() {
     // sync (the click triggers the standard executeMove/endTurn broadcast
     // path on the active player only).
     hintsDiv.innerHTML = '<button id="ft-end-turn-btn" class="hint" style="cursor:pointer;font-weight:600;">No legal move — End Turn</button>';
+    // user_directive_2026-05-18 — center-toast the no-legal-move state so
+    // the player understands the End Turn button isn't a punishment.
+    // Dedupe by (currentPlayer, currentCard) so updateUI re-renders don't
+    // re-fire the toast every frame.
+    try {
+      const card = state.deck.get('currentCard');
+      const stamp = `${ci}|${card && card.id}|${card && card.value}`;
+      if (stamp !== _lastNoLegalMoveTurnStamp) {
+        _lastNoLegalMoveTurnStamp = stamp;
+        showNoLegalMoveToast(curPlayer.name, curPlayer.color);
+      }
+    } catch (_) { /* ignore */ }
     const btn = document.getElementById('ft-end-turn-btn');
     if (btn) {
       btn.addEventListener('click', () => {
@@ -2078,16 +2233,24 @@ function executeMove(moveIdx) {
       break;
     }
 
-    case 'enterFastTrack':
-      peg.onFasttrack = true;
-      peg.fasttrackEntryHole = move.from || peg.holeId;
-      peg.mood = 'EXCITED';
-      placePeg(peg, move.dest, ci);
-      log(`${getCurrentPlayerName()} entered FastTrack → ${move.dest}! ⚡`);
-      _deferredCutscenes.push(['fasttrack', {
-        peg, playerColor: player.color, playerName: player.name, playerId: ci
-      }]);
+    case 'enterFastTrack': {
+      // Only allow FT entry if moving from own home hole to own FT entry
+      const bp = player.boardPosition;
+      if (peg.holeId === `home-${bp}` && move.dest === `ft-${bp}`) {
+        peg.onFasttrack = true;
+        peg.fasttrackEntryHole = move.from || peg.holeId;
+        peg.mood = 'EXCITED';
+        placePeg(peg, move.dest, ci);
+        log(`${getCurrentPlayerName()} entered FastTrack → ${move.dest}! ⚡`);
+        _deferredCutscenes.push(['fasttrack', {
+          peg, playerColor: player.color, playerName: player.name, playerId: ci
+        }]);
+      } else {
+        // Illegal FT entry attempt, ignore
+        log(`❌ Illegal FastTrack entry attempt from ${peg.holeId} to ${move.dest}`);
+      }
       break;
+    }
 
     case 'exitFastTrack':
       peg.onFasttrack = false;
@@ -2377,6 +2540,14 @@ function executeMove(moveIdx) {
     const rules = CARDS[card.value];
     if (rules.extraTurn) {
       log(`${getCurrentPlayerName()} gets another turn!`);
+      // user_directive_2026-05-18 — surface the extra turn as a center toast
+      // so the player sees WHY the draw phase is reopening.
+      try {
+        const players = state.players.get('list') || [];
+        const ci = state.players.get('current') || 0;
+        const cp = players[ci];
+        showRedrawToast(cp && cp.name, cp && cp.color);
+      } catch (_) { /* ignore */ }
       state.deck.set('currentCard', null);
       state.turn.set('phase', 'draw');
       updateUI();
@@ -2422,12 +2593,13 @@ function endTurn() {
     const cur = players[ci];
     const curIsBot = !!(cur && cur.isBot);
     const shouldAdvance = curIsBot ? _isHost() : _isMyTurn();
+    console.log('[TURN] endTurn called. ci:', ci, 'next:', next, 'curIsBot:', curIsBot, 'shouldAdvance:', shouldAdvance, 'isHost:', _isHost(), 'isMyTurn:', _isMyTurn());
     if (shouldAdvance) {
+      console.log('[TURN] Advancing turn locally and broadcasting turn_advance. seq:', _turnSeq + 1);
       _applyTurnAdvance(ci, next, ++_turnSeq);
       _broadcast('turn_advance', { from: ci, next, seq: _turnSeq });
     } else {
-      // Inactive client: just clean local UI; wait for the active client's
-      // 'turn_advance' broadcast to commit the rotation.
+      console.log('[TURN] Not advancing turn locally. Waiting for turn_advance broadcast.');
       _localTurnUiCleanup();
     }
     return;
@@ -2443,8 +2615,9 @@ function _localTurnUiCleanup() {
   state.deck.set('currentCard', null);
   state.turn.set('phase', 'draw');
   state.turn.set('validMoves', []);
-  const cardEl = document.getElementById('current-card');
-  if (cardEl) cardEl.innerHTML = '<div class="card-back"></div>';
+  // Card face stays visible from the previous draw until the next player
+  // draws their card — it represents the in-progress turn's value the
+  // entire time. We deliberately do NOT flip it back to the deck here.
   const infoEl = document.getElementById('card-info');
   if (infoEl) infoEl.textContent = 'Draw a card';
   const hintsDiv = document.getElementById('move-hints');
@@ -2460,7 +2633,11 @@ function _localTurnUiCleanup() {
 // message is applied. Idempotent: a stale seq is rejected by the caller.
 function _applyTurnAdvance(fromCi, next, seq) {
   const players = state.players.get('list') || [];
-  if (!players.length) return;
+  if (!players.length) {
+    console.warn('[TURN] _applyTurnAdvance: No players in list! fromCi:', fromCi, 'next:', next, 'seq:', seq);
+    return;
+  }
+  console.log('[TURN] _applyTurnAdvance called. fromCi:', fromCi, 'next:', next, 'seq:', seq, 'players:', players.map(p => p && p.name));
 
   state.deck.set('currentCard', null);
   state.players.set('current', next);
@@ -2475,8 +2652,8 @@ function _applyTurnAdvance(fromCi, next, seq) {
   state.turn.set('phase', 'draw');
   state.turn.set('validMoves', []);
 
-  const cardEl = document.getElementById('current-card');
-  if (cardEl) cardEl.innerHTML = '<div class="card-back"></div>';
+  // Card face stays visible from the previous draw until the next player
+  // draws — represents the in-progress turn's value for its full duration.
   const infoEl = document.getElementById('card-info');
   if (infoEl) infoEl.textContent = 'Draw a card';
   const hintsDiv = document.getElementById('move-hints');
@@ -2486,12 +2663,14 @@ function _applyTurnAdvance(fromCi, next, seq) {
 
   // Gate: wait for camera to settle, THEN blink avatar 3 times, THEN enable turn
   const enableTurn = () => {
-    dismissYourTurnPopup();
     if (players[next] && players[next].isBot) {
+      // Bot's turn — dismiss the prompt; bot will drive itself.
+      dismissYourTurnPopup();
       // In MP, only the host should drive bot turns to avoid every peer
       // racing to broadcast the same draw/move pair.
       if (!_isMpMode() || _isHost()) botTurn();
     } else {
+      // Human turn: leave the DRAW CARD prompt up until they draw.
       if (drawBtn && (!_isMpMode() || _isMyTurn())) drawBtn.disabled = false;
     }
   };
@@ -2502,25 +2681,29 @@ function _applyTurnAdvance(fromCi, next, seq) {
     const mpMode = _isMpMode();
 
     // Show turn indicator for:
-    // - All players in same-screen mode (so everyone knows whose turn it is)
+    // - Same-screen mode: only HUMAN players (bots drive themselves; popping
+    //   a "Ken's Turn" banner on every bot turn is just noise).
     // - In networked MP, only the LOCAL active player (peers must not see
-    //   the active player's mechanics — only the pegs moving)
-    // - In solo, only non-bot players (existing behavior)
+    //   the active player's mechanics — only the pegs moving) AND only when
+    //   that local active player is a human.
+    // - In solo, only non-bot players.
+    const activeIsBot = !!(players[next] && players[next].isBot);
     let shouldShowIndicator;
-    if (isSameScreen) {
+    if (activeIsBot) {
+      shouldShowIndicator = false;
+    } else if (isSameScreen) {
       shouldShowIndicator = true;
     } else if (mpMode) {
       shouldShowIndicator = _isMyTurn();
     } else {
-      shouldShowIndicator = !players[next].isBot;
+      shouldShowIndicator = true;
     }
 
     if (shouldShowIndicator) {
       const indicatorText = isSameScreen ? `${players[next].name}'s Turn` : players[next].name;
       showYourTurnPopup(indicatorText, players[next].color);
-
-      // Auto-dismiss after 1.5-2 seconds
-      setTimeout(dismissYourTurnPopup, 1500);
+      // Popup persists until the active player draws a card (drawCard() calls
+      // dismissYourTurnPopup). No auto-timeout.
     }
 
     if (window.blinkPlayerMarker) {
@@ -2546,12 +2729,59 @@ function getCurrentPlayerName() {
 // BOT AI
 // ═══════════════════════════════════════════════════════════════════════════
 function botTurn() {
+  // ── HARD GUARD (user_directive_2026-05-18: "bots taking over human turns")
+  // botTurn() is reached via several scheduled paths (setTimeout from
+  // initial-turn, extra-turn, AFK takeover) which capture state at SCHEDULE
+  // time, not FIRE time. If state.players.current advances or the seat at
+  // `current` is no longer a bot by the time the timer fires, the original
+  // checks at the call sites are stale and the bot would play on the human's
+  // behalf. Re-verify here; bail (no-op) if it isn't a bot's turn anymore.
+  {
+    const _players = state.players.get('list') || [];
+    const _ci = state.players.get('current') || 0;
+    const _cur = _players[_ci];
+    if (!_cur || !_cur.isBot) {
+      console.warn('[BOT] botTurn() suppressed — current player is not a bot.',
+        { ci: _ci, name: _cur && _cur.name, isBot: _cur && _cur.isBot });
+      return;
+    }
+    // In MP, only the host drives bot turns; double-check here too.
+    if (_isMpMode() && !_isHost()) {
+      console.warn('[BOT] botTurn() suppressed — not the host in MP mode.');
+      return;
+    }
+  }
   log(`${getCurrentPlayerName()} is thinking...`);
   setTimeout(() => {
+    // ── Inner re-verify: between the "thinking" log and actually drawing,
+    // another setTimeout cycle has elapsed. State could have shifted again
+    // (snapshot apply, manual takeBreak/resume, etc.). Re-verify.
+    const _players2 = state.players.get('list') || [];
+    const _ci2 = state.players.get('current') || 0;
+    const _cur2 = _players2[_ci2];
+    if (!_cur2 || !_cur2.isBot) {
+      console.warn('[BOT] botTurn() inner phase suppressed — current player is no longer a bot.',
+        { ci: _ci2, name: _cur2 && _cur2.name });
+      return;
+    }
     drawCard();
     setTimeout(() => {
+      // ── Third re-verify before executing the bot's move.
+      const _players3 = state.players.get('list') || [];
+      const _ci3 = state.players.get('current') || 0;
+      const _cur3 = _players3[_ci3];
+      if (!_cur3 || !_cur3.isBot) {
+        console.warn('[BOT] botTurn() move phase suppressed — current player is no longer a bot.',
+          { ci: _ci3, name: _cur3 && _cur3.name });
+        return;
+      }
       const vm = state.turn.get('validMoves') || [];
-      if (vm.length === 0) return;
+      if (vm.length === 0) {
+        // No valid moves: end turn so game can continue
+        log('🤖 Bot has no valid moves, ending turn.');
+        endTurn();
+        return;
+      }
 
       const players = state.players.get('list') || [];
       const ci = state.players.get('current') || 0;
@@ -2617,7 +2847,13 @@ function botTurn() {
         }
         else if (m.type === 'exitFastTrack') score += 20;
         else if (m.type === 'enter') score += 30;
-        else if (m.type === 'exitBullseye') score += 40;
+        else if (m.type === 'exitBullseye') {
+          // user_directive_2026-05-18 — exiting the bullseye is almost
+          // always a regression: the peg is already "scored" and safe.
+          // Penalize heavily so the bot only chooses this when no other
+          // legal move exists with the J/Q/K (forced play).
+          score -= 80;
+        }
         else if (m.type === 'move') {
           // Check if destination has an opponent (capture opportunity)
           const occ = state.board.get(m.dest);
@@ -2886,6 +3122,24 @@ function updateUI() {
   const ci = state.players.get('current') || 0;
   const phase = state.turn.get('phase');
 
+  // Ensure the DRAW CARD prompt and Draw button are correctly armed whenever
+  // it's the local human's draw phase. Safety net for code paths (extra-turn
+  // cards, snapshot apply, etc.) that may have left the button disabled or
+  // the popup dismissed. The popup remains until drawCard() runs.
+  try {
+    const cp = players[ci];
+    const myTurn = !_isMpMode() || _isMyTurn();
+    const inDraw = phase === 'draw' && state.meta.get('winner') === null;
+    const humanDraw = cp && !cp.isBot && inDraw && myTurn;
+    const drawBtnEl = document.getElementById('draw-btn');
+    if (humanDraw) {
+      if (!_turnPopup) showYourTurnPopup(cp.name, cp.color);
+      if (drawBtnEl && drawBtnEl.disabled) drawBtnEl.disabled = false;
+    } else {
+      if (_turnPopup) dismissYourTurnPopup();
+    }
+  } catch (_) { /* never let UI helpers break updateUI */ }
+
   const playerListDiv = document.getElementById('player-list');
   if (playerListDiv) {
     playerListDiv.innerHTML = players.map((p, i) => {
@@ -2893,8 +3147,14 @@ function updateUI() {
       const inSafe = p.pegs.filter(pg => getHoleType(pg.holeId) === 'safezone').length;
       const showClock = (i === ci) && (_AFK.warnedIdx === ci) && (phase === 'draw') && !p.isBot;
       const awayBadge = _AFK.away.has(i) ? '<span class="away-chip" title="AFK — bot is playing">AFK</span>' : '';
+      const rowCls = [
+        'player-row',
+        i === ci ? 'active' : '',
+        p.isBot ? 'is-bot' : 'is-human',
+      ].filter(Boolean).join(' ');
       return `
-        <div class="player-row ${i === ci ? 'active' : ''}">
+        <div class="${rowCls}">
+          <span class="turn-light" aria-label="${i === ci ? 'Your turn' : 'Waiting'}" title="${i === ci ? `${p.name} — TURN` : `${p.name} — waiting`}"></span>
           <div class="player-color" style="background: ${p.color};"></div>
           <span class="player-avatar">${p.avatar || ''}</span>
           <span class="player-name">${p.name}</span>
@@ -3509,3 +3769,7 @@ window.FastTrackCore = {
 window.drawCard = drawCard;
 window.executeMove = executeMove;
 window.initGame = initGame;
+// user_directive_2026-05-18 — surface the center-toast so the peg-bar UI
+// can flash short strategic tags ("Cut peg!", "Hit fast track", etc.)
+// when the player toggles choices.
+window.showCenterToast = showCenterToast;
