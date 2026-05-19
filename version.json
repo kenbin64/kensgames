@@ -1,12 +1,12 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.15",
+  "version": "0.5.16",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-19T03:00:00Z",
-  "build_sha": "release-v0.5.15",
+  "build_utc": "2026-05-18T18:00:00Z",
+  "build_sha": "release-v0.5.16",
   "x_dimensional_governance": true,
   "status": "live",
-  "notes": "Stuck-turn safety net: (1) new always-visible ⏭ Pass button in the action panel — discards the current card and ends the player's turn, routed through the normal MP turn-advance broadcast so multiplayer stays in sync; (2) stuck-turn watchdog polls every 2s and auto-passes after ~12s when the active human player has no legal moves and the End-Turn hint failed to surface. Implements rules.json CARD_NO_LEGAL_MOVE (discard card, end turn, no extra-turn award) as an unconditional escape hatch so the game can never freeze on a wedged turn."
+  "notes": "FastTrack stuck-peg fix: pegs that landed on an ft-* hole via a regular move (instead of the explicit enterFastTrack choice) had peg.onFasttrack=false, so on subsequent cards getTrackSequence skipped the FT-ring branch and returned an empty sequence — the peg silently had no legal forward moves while teammates continued on the main track. Two-part fix: (1) the move handler now auto-sets peg.onFasttrack=true whenever a peg lands on any ft-* hole (and the card was not noFastTrack), so geometry and the flag stay in sync; (2) getTrackSequence's forward-FT branch no longer gates on peg.onFasttrack — any peg whose holeId is an ft-* hole moving forward is offered the FT ring (geometry is authoritative)."
 }

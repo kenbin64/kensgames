@@ -1143,7 +1143,14 @@ function getTrackSequence(peg, player, direction) {
   }
 
   // FastTrack forward (inner ring)
-  if (type === 'fasttrack' && peg.onFasttrack) {
+  // bugfix_2026-05-18 (v0.5.16): drop the `peg.onFasttrack` guard. Geometry
+  // is authoritative — any peg whose holeId is an `ft-*` hole moving
+  // forward MUST travel the FT ring; there is no perimeter path leaving an
+  // ft-* hole. Previously, a peg that landed on ft-* via a regular `move`
+  // (rather than the explicit `enterFastTrack` choice) had onFasttrack=false
+  // and this branch was skipped, then perimeter lookup returned empty,
+  // freezing all of that peg's future moves.
+  if (type === 'fasttrack') {
     const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
     let currentFt = ftIdx;
     for (let i = 1; i <= 6; i++) {
@@ -2246,10 +2253,19 @@ function executeMove(moveIdx) {
       }
       // FT landing cutscene — when regular move lands on an FT hole
       // No fanfare for: bullseye exit pegs, or card 4 (backward — no FT status awarded)
+      // bugfix_2026-05-18 (v0.5.16): also set peg.onFasttrack = true here.
+      // Geometry is authoritative — if the peg now sits on an ft-* hole and
+      // the card was not a noFastTrack card, the peg IS on the fast track.
+      // Without this flip, the peg becomes stuck: getTrackSequence used to
+      // require peg.onFasttrack to traverse the inner ring, so the peg had
+      // no legal forward moves on subsequent cards ("continues on main
+      // track" symptom reported 2026-05-18).
       {
         const card = state.deck.get('currentCard');
         const cardNoFT = card && CARDS[card.value] && CARDS[card.value].noFastTrack;
         if (getHoleType(move.dest) === 'fasttrack' && !peg.onFasttrack && !peg.mustExitFasttrack && !cardNoFT) {
+          peg.onFasttrack = true;
+          peg.fasttrackEntryHole = move.from || peg.holeId;
           _deferredCutscenes.push(['fasttrack', {
             peg, playerColor: player.color, playerName: player.name, playerId: ci
           }]);
