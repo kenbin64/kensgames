@@ -616,8 +616,8 @@
     }
   </script>
   <script src="/js/multiplayer-client.js?v=20260507c"></script>
-  <script src="/js/substrates/multiplayer_panel.js?v=20260504d"></script>
-  <script src="/js/substrates/game_setup.js?v=20260430"></script>
+  <script src="/js/substrates/multiplayer_panel.js?v=20260516a"></script>
+  <script src="/js/substrates/game_setup.js?v=20260516a"></script>
   <script>
     let username = localStorage.getItem('username') || 'Pilot';
     const av = AvatarPicker.get();
@@ -681,8 +681,8 @@
     }
 
     Promise.resolve()
-      .then(() => loadScriptOnce('/js/substrates/multiplayer_panel.js?v=20260504d', () => !!window.KGMultiplayerPanel))
-      .then(() => loadScriptOnce('/js/substrates/game_setup.js?v=20260430', () => !!window.KGGameSetup))
+      .then(() => loadScriptOnce('/js/substrates/multiplayer_panel.js?v=20260516a', () => !!window.KGMultiplayerPanel))
+      .then(() => loadScriptOnce('/js/substrates/game_setup.js?v=20260516a', () => !!window.KGGameSetup))
       .then(() => mountGameSetup())
       .catch((err) => {
         console.error(err);

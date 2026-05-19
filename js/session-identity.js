@@ -24,21 +24,19 @@
       return;
     }
 
-    // Identity keys to purge. Add new keys here as games introduce them.
+    // Session-scoped state to purge. Player identity (name + avatar) is
+    // INTENTIONALLY OMITTED: it must be entered once and then persist across
+    // every game in the portal. Only wipe transient session/runtime payloads
+    // here so a fresh tab always starts a fresh match — never a fresh
+    // identity prompt.
     var IDENTITY_KEYS = [
-      'username',
-      'display_name',
-      'kg_avatar',
       'kg_guest_id',
       'kg_guest_token',
       'kg_session_id',
       'kg_session_code',
       'KG_Game',
-      'KG_Player',
       'kg_session',
       'kg_fasttrack_runtime',
-      'fasttrack_player_name',
-      'fasttrack_player_avatar',
       'fasttrack-lobby'
     ];
 

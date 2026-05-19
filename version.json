@@ -1,12 +1,12 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-18T19:39:18Z",
-  "build_sha": "release-v0.5.8",
+  "build_utc": "2026-05-18T20:30:00Z",
+  "build_sha": "release-v0.5.9",
   "x_dimensional_governance": true,
   "status": "live",
-  "notes": "4D ball collision fix: +W analytic everywhere, off-axis spawn, saddle mesh opacity 0.18"
+  "notes": "Starfighter: cockpit diamond-pad + throttle, brighter scene lighting (sun/earth/moon/hemi fill), rotating wheel baseship, larger flashing red enemy radar blips, phone radar sized 156/140"
 }

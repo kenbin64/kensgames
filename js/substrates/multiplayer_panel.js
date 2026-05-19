@@ -806,9 +806,12 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
         renderAvatarStep({ guest: false });
       } else {
         saveProfileDraft();
-        // Same-screen mode: build roster locally without server
-        if (act === 'same-screen') {
+        // Same-screen and solo are fully local — no server/WS needed.
+        // Routing solo here avoids the entire 'Disconnected from server'
+        // class of errors during single-player + bots play.
+        if (act === 'same-screen' || _mode === 'solo') {
           buildLocalLobby();
+          if (_mode === 'solo') autoFillSoloBots();
         } else {
           connectAndCreate(act === 'friend');
         }
@@ -876,8 +879,9 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
       if (isGuest) {
         clearUrlCode();
         connectAndJoin(_pendingCode);
-      } else if (_mode === 'same-screen') {
+      } else if (_mode === 'same-screen' || _mode === 'solo') {
         buildLocalLobby();
+        if (_mode === 'solo') autoFillSoloBots();
       } else if (_mode === 'browse') {
         startBrowse();
       } else if (_mode) {
@@ -1581,8 +1585,22 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
     if (mp.userId) join(); else mp.on('authenticated', join);
   }
 
+  function autoFillSoloBots() {
+    // For solo mode: pre-add the requested number of AI bots so the
+    // user lands in a ready-to-launch roster without manual clicks.
+    if (!_mp || !_mp.session || typeof _mp.addBot !== 'function') return;
+    const want = Math.max(0, _soloBotsWanted != null ? _soloBotsWanted : (_opts.soloDefaultBots || 1));
+    const minP = Math.max(1, _opts.minPlayers || 2);
+    const target = Math.max(minP, 1 + want);
+    let guard = 8;
+    while (_mp.session.players.length < target && guard-- > 0) {
+      _mp.addBot();
+    }
+  }
+
   function buildLocalLobby() {
-    // Same-screen mode: create a local session for the roster builder
+    // Local-only lobby: used for 'same-screen' and 'solo' modes.
+    // No WebSocket is opened; the roster is a plain in-memory mock.
     // Users can add 1-4 players (mix of humans and AI bots)
     _state = STATE.LOBBY;
     const prof = getProfile();
@@ -1688,35 +1706,49 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
       my_user_id: humanUserId,
       is_host: true,
       players: players,
-      mode: 'same-screen',
+      mode: _mode === 'solo' ? 'solo' : 'same-screen',
       hasRemoteHumans: false,
       playerCount: players.length,
-      launchMode: 'same-screen',
+      // launchMode drives downstream game logic (e.g. 4D uses 'ai' to
+      // set vsMode = 'ai'). Solo + bots is an AI match by definition.
+      launchMode: _mode === 'solo' ? 'ai' : 'same-screen',
     };
 
     try { root.KGSession = launchPayload; } catch { /* ignore */ }
 
-    // Watchdog: if onLaunch doesn't navigate within 3s, force it
-    const navGuard = setTimeout(() => {
+    // Inline launch (no gamePath): host page (e.g. 4D index.html) handles
+    // onLaunch by calling unmount() + starting the game in place. We must
+    // NOT force-navigate in that case — doing so would yank the user out
+    // of the running game (or re-mount the lobby on top of it).
+    const hasGamePath = !!(_opts && _opts.gamePath);
+
+    // Watchdog: if onLaunch doesn't navigate within 3s, force it.
+    // Only meaningful when a gamePath was provided.
+    const navGuard = hasGamePath ? setTimeout(() => {
       if (_state === STATE.LAUNCHING) {
         console.warn('[KGMultiplayerPanel] navGuard firing – forcing navigation');
-        window.location.href = _opts.gamePath || '/fasttrack/3d.html';
+        window.location.href = _opts.gamePath;
       }
-    }, 3000);
+    }, 3000) : null;
 
     try {
-      _opts.onLaunch && _opts.onLaunch(launchPayload);
-      clearTimeout(navGuard);
-      // onLaunch should navigate; if still here after a tick, force it
-      setTimeout(() => {
-        if (_state === STATE.LAUNCHING) {
-          window.location.href = _opts.gamePath || '/fasttrack/3d.html';
-        }
-      }, 100);
+      _opts && _opts.onLaunch && _opts.onLaunch(launchPayload);
+      if (navGuard) clearTimeout(navGuard);
+      // onLaunch should navigate (or unmount + run inline); only force a
+      // fallback navigation if a gamePath is configured.
+      if (hasGamePath) {
+        setTimeout(() => {
+          if (_state === STATE.LAUNCHING && _opts && _opts.gamePath) {
+            window.location.href = _opts.gamePath;
+          }
+        }, 100);
+      }
     } catch (e) {
-      clearTimeout(navGuard);
+      if (navGuard) clearTimeout(navGuard);
       console.error('[KGMultiplayerPanel] launchSameScreen threw:', e);
-      window.location.href = _opts.gamePath || '/fasttrack/3d.html';
+      if (hasGamePath && _opts && _opts.gamePath) {
+        window.location.href = _opts.gamePath;
+      }
     }
   }
 
@@ -1852,7 +1884,13 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
         _mode = autoMode;
         clearUrlMode();
         saveProfileDraft();
-        connectAndCreate(autoMode === 'friend');
+        // Solo is local-only — don't open a WebSocket.
+        if (autoMode === 'solo') {
+          buildLocalLobby();
+          autoFillSoloBots();
+        } else {
+          connectAndCreate(true);
+        }
       } else {
         render();
       }
@@ -1861,6 +1899,13 @@ body.kg-mp-rail-on{padding-bottom:var(--kg-rail-h,48px) !important;box-sizing:bo
     unmount() {
       try { _mp && _mp.leave(); _mp && _mp.disconnect(); } catch { /* ignore */ }
       _mp = null; _myUserId = null; _localEditPlayerId = null;
+      // Reset state so any deferred timers (navGuard, post-launch retry)
+      // that check _state see CHOOSE and bail out instead of force-navigating
+      // or re-rendering the lobby on top of a now-running game.
+      _state = STATE.CHOOSE;
+      _step = null;
+      _mode = null;
+      _launchingNow = false;
       if (_root) _root.innerHTML = '';
       _root = null; _opts = null;
       clearRail();

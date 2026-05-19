@@ -4133,6 +4133,619 @@
       }, 340);
     })();
   </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SF-DIAMOND-PAD — right-edge diamond firing pad (touch + small-screen)
+       ───────────────────────────────────────────────────────────────────
+       Self-contained patch: works regardless of SFInput.isMobile detection.
+       Activates on viewport ≤ 980px OR touch devices. Replaces the legacy
+       mob-btn-group with a thumb-friendly 5-button diamond on the right edge.
+       Also hides clutter buttons that are unreachable during pointer-lock.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <style>
+    /* ── RIGHT COCKPIT PANEL ──
+       Right edge hosts controls (diamond combat pad + throttle lever).
+       Left edge hosts radar. Center stays clear for the battle. */
+    #sf-diamond-pad {
+      position: fixed;
+      right: 8px;
+      top: 14px;
+      width: 196px;
+      height: 196px;
+      z-index: 220;
+      pointer-events: none;
+      /* container is transparent; buttons opt in */
+      display: none;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body.sf-pad-on #sf-diamond-pad {
+      display: block;
+    }
+
+    /* Show on small viewports (laptops with shrunken window too) */
+    @media (max-width: 980px) {
+      #sf-diamond-pad {
+        display: block;
+      }
+    }
+
+    /* Show on any touch device */
+    @media (hover: none) and (pointer: coarse) {
+      #sf-diamond-pad {
+        display: block;
+      }
+    }
+
+    .sf-pad-btn {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 255, 255, 0.45);
+      background: radial-gradient(circle at 35% 30%, rgba(0, 60, 90, 0.85), rgba(0, 12, 24, 0.92));
+      color: #0ff;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-align: center;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      box-shadow: 0 0 14px rgba(0, 255, 255, 0.18), inset 0 0 18px rgba(0, 255, 255, 0.06);
+      text-shadow: 0 0 6px rgba(0, 255, 255, 0.7);
+      transition: transform 0.06s ease, box-shadow 0.12s ease, background 0.12s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .sf-pad-btn:active,
+    .sf-pad-btn.held {
+      transform: scale(0.94);
+      background: radial-gradient(circle at 35% 30%, rgba(0, 200, 255, 0.55), rgba(0, 40, 80, 0.95));
+      box-shadow: 0 0 22px rgba(0, 255, 255, 0.5), inset 0 0 18px rgba(0, 255, 255, 0.25);
+    }
+
+    .sf-pad-btn .sf-pad-key {
+      display: block;
+      font-size: 8px;
+      opacity: 0.55;
+      margin-top: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Diamond positions (container 196×196, btn 64×64) */
+    .sf-pad-top {
+      left: 66px;
+      top: 0;
+    }
+
+    .sf-pad-left {
+      left: 0;
+      top: 66px;
+    }
+
+    .sf-pad-right {
+      left: 132px;
+      top: 66px;
+      width: 72px;
+      height: 72px;
+    }
+
+    .sf-pad-bot {
+      left: 66px;
+      top: 132px;
+    }
+
+    .sf-pad-center {
+      left: 78px;
+      top: 78px;
+      width: 40px;
+      height: 40px;
+      font-size: 9px;
+    }
+
+    /* Color-coded by function */
+    #sf-pad-fire {
+      border-color: rgba(120, 255, 140, 0.7);
+      color: #9fff9f;
+      text-shadow: 0 0 8px rgba(120, 255, 140, 0.8);
+      background: radial-gradient(circle at 35% 30%, rgba(20, 90, 30, 0.9), rgba(0, 30, 10, 0.95));
+    }
+
+    #sf-pad-torp {
+      border-color: rgba(255, 180, 80, 0.7);
+      color: #ffcb88;
+      text-shadow: 0 0 8px rgba(255, 180, 80, 0.8);
+      background: radial-gradient(circle at 35% 30%, rgba(90, 50, 10, 0.9), rgba(40, 20, 0, 0.95));
+    }
+
+    #sf-pad-lock {
+      border-color: rgba(255, 140, 60, 0.7);
+      color: #ffa860;
+      text-shadow: 0 0 8px rgba(255, 140, 60, 0.7);
+    }
+
+    #sf-pad-ab {
+      border-color: rgba(255, 255, 80, 0.7);
+      color: #ffff80;
+      text-shadow: 0 0 8px rgba(255, 255, 80, 0.7);
+    }
+
+    #sf-pad-boost {
+      border-color: rgba(100, 180, 255, 0.7);
+      color: #6bbcff;
+      text-shadow: 0 0 6px rgba(100, 180, 255, 0.7);
+    }
+
+    /* Compact desktop mode (large screens with touch pad shown via toggle) */
+    @media (min-width: 981px) and (hover: hover) and (pointer: fine) {
+      body:not(.sf-pad-on) #sf-diamond-pad {
+        display: none;
+      }
+    }
+
+    /* Phone: anchor diamond pad to upper-right corner (radar is bottom-left,
+       throttle is right-edge mid/lower — keep diamond pad clear of both) */
+    @media (max-width: 600px) {
+      #sf-diamond-pad {
+        right: 6px;
+        top: 6px;
+        width: 184px;
+        height: 184px;
+      }
+
+      .sf-pad-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 10px;
+      }
+
+      .sf-pad-right {
+        width: 68px;
+        height: 68px;
+      }
+
+      .sf-pad-top {
+        left: 62px;
+        top: 0;
+      }
+
+      .sf-pad-left {
+        left: 0;
+        top: 62px;
+      }
+
+      .sf-pad-right {
+        left: 124px;
+        top: 60px;
+      }
+
+      .sf-pad-bot {
+        left: 62px;
+        top: 124px;
+      }
+
+      .sf-pad-center {
+        left: 74px;
+        top: 74px;
+        width: 36px;
+        height: 36px;
+      }
+    }
+
+    /* ── Retire all legacy on-screen combat buttons ──
+       The diamond pad + hotkeys (G/C/F/P/L/F5) now cover every action.
+       The old buttons were clunky, overlapping, and (in pointer-lock)
+       unreachable. Hide them entirely. Gauges/indicators that *show
+       state* are kept but made non-interactive. */
+    #rescue-btn,
+    #cm-deploy-btn,
+    #sf-frigate-btn,
+    #console-buttons,
+    #mob-btn-group,
+    #training-skip-btn {
+      display: none !important;
+    }
+
+    /* Keep countermeasure gauge visible as a status indicator only */
+    #cm-gauge-container {
+      pointer-events: none !important;
+      opacity: 0.7;
+    }
+
+    /* Shrink/relocate radar on small screens so it doesn't dominate,
+       but keep it big enough to actually read enemy positions. */
+    @media (max-width: 600px) {
+      #radar-overlay {
+        width: 156px !important;
+        height: 156px !important;
+        bottom: 60px !important;
+        left: 6px !important;
+        opacity: 0.92;
+      }
+    }
+
+    @media (max-width: 420px) {
+      #radar-overlay {
+        width: 140px !important;
+        height: 140px !important;
+      }
+    }
+  </style>
+
+  <div id="sf-diamond-pad" aria-label="Combat controls">
+    <button type="button" id="sf-pad-torp" class="sf-pad-btn sf-pad-top" title="Fire Torpedo">TORP<span
+        class="sf-pad-key">F</span></button>
+    <button type="button" id="sf-pad-lock" class="sf-pad-btn sf-pad-left" title="Lock target">LOCK<span
+        class="sf-pad-key">T</span></button>
+    <button type="button" id="sf-pad-fire" class="sf-pad-btn sf-pad-right" title="Fire Laser (hold)">FIRE<span
+        class="sf-pad-key">LMB</span></button>
+    <button type="button" id="sf-pad-ab" class="sf-pad-btn sf-pad-bot" title="Afterburner (hold)">AB<span
+        class="sf-pad-key">⇧</span></button>
+    <button type="button" id="sf-pad-boost" class="sf-pad-btn sf-pad-center" title="Boost">BST</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SF-THROTTLE — cockpit throttle lever, bottom-left corner.
+       Sits flush against the cockpit edge so it doesn't block the central
+       space-battle view. Drives state.player.throttle directly.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div id="sf-throttle" aria-label="Throttle lever" title="Drag = throttle">
+    <div class="sf-thr-frame">
+      <div class="sf-thr-label sf-thr-label-top">MAX</div>
+      <div class="sf-thr-track">
+        <div class="sf-thr-fill"></div>
+        <div class="sf-thr-detent" style="bottom:25%"></div>
+        <div class="sf-thr-detent" style="bottom:50%"></div>
+        <div class="sf-thr-detent" style="bottom:75%"></div>
+        <div class="sf-thr-handle"></div>
+      </div>
+      <div class="sf-thr-label sf-thr-label-bot">THR</div>
+    </div>
+  </div>
+
+  <style>
+    #sf-throttle {
+      position: fixed;
+      right: 8px;
+      bottom: 72px;
+      /* clear of #sf-rail, hugs right cockpit edge */
+      width: 46px;
+      height: 240px;
+      z-index: 60;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-family: 'Courier New', monospace;
+    }
+
+    .sf-thr-frame {
+      width: 100%;
+      height: 100%;
+      border: 1px solid rgba(0, 255, 255, 0.35);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(0, 24, 40, 0.85), rgba(0, 10, 20, 0.92));
+      box-shadow: inset 0 0 14px rgba(0, 255, 255, 0.1), 0 0 12px rgba(0, 255, 255, 0.15);
+      padding: 14px 6px 14px 6px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sf-thr-label {
+      color: rgba(0, 255, 255, 0.55);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-align: center;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .sf-thr-track {
+      position: relative;
+      width: 14px;
+      flex: 1;
+      margin: 4px 0;
+      background: rgba(0, 30, 50, 0.85);
+      border: 1px solid rgba(0, 200, 255, 0.25);
+      border-radius: 7px;
+      overflow: visible;
+    }
+
+    .sf-thr-fill {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 0%;
+      background: linear-gradient(0deg, #4f8 0%, #2cf 60%, #f84 90%, #f44 100%);
+      border-radius: 7px 7px 0 0;
+      transition: height 0.06s linear;
+      box-shadow: 0 0 8px rgba(0, 255, 200, 0.4);
+    }
+
+    .sf-thr-detent {
+      position: absolute;
+      left: -3px;
+      right: -3px;
+      height: 1px;
+      background: rgba(0, 255, 255, 0.25);
+      pointer-events: none;
+    }
+
+    .sf-thr-handle {
+      position: absolute;
+      left: -8px;
+      right: -8px;
+      bottom: 0%;
+      height: 18px;
+      margin-bottom: -9px;
+      background: linear-gradient(180deg, #0cf, #036);
+      border: 1px solid rgba(180, 240, 255, 0.7);
+      border-radius: 4px;
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+      cursor: grab;
+      pointer-events: none;
+      /* parent track captures pointer */
+    }
+
+    #sf-throttle.dragging .sf-thr-handle {
+      background: linear-gradient(180deg, #fff, #0af);
+    }
+
+    /* Phone tweak — right edge, just above the rail */
+    @media (max-width: 600px) {
+      #sf-throttle {
+        right: 6px;
+        bottom: 58px;
+        width: 48px;
+        height: 200px;
+      }
+    }
+
+    /* In landscape phone with tiny height, scale down further */
+    @media (max-width: 900px) and (max-height: 480px) {
+      #sf-throttle {
+        height: 168px;
+        bottom: 50px;
+      }
+    }
+  </style>
+
+  <script>
+    (function () {
+      'use strict';
+      // ── Wire diamond pad buttons directly to Starfighter API ──
+      // Independent of SFInput.isMobile so it works on resized desktop windows.
+      var pad = document.getElementById('sf-diamond-pad');
+      if (!pad) return;
+
+      function SF() { return window.Starfighter; }
+      function player() {
+        var s = SF() && SF().getState && SF().getState();
+        return s && s.player;
+      }
+      function inCombat() {
+        var sf = SF();
+        if (!sf || !sf.getPhase) return true;
+        var p = sf.getPhase();
+        return p !== 'bay-ready' && p !== 'launching' && p !== 'docking' && p !== 'briefing';
+      }
+
+      // Tap-only buttons (single fire)
+      function bindTap(id, fn) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var fire = function (e) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          if (!inCombat()) return;
+          try { fn(); } catch (err) { console.warn('[sf-pad]', id, err); }
+        };
+        el.addEventListener('touchstart', fire, { passive: false });
+        el.addEventListener('mousedown', function (e) {
+          // ignore right/middle clicks
+          if (e.button !== 0) return;
+          fire(e);
+        });
+        // Prevent context menu / focus stealing
+        el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      }
+
+      // Hold buttons (auto-repeat fire / sustained state)
+      function bindHold(id, opts) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var holding = false;
+        var timer = null;
+
+        function start(e) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          if (!inCombat()) return;
+          if (holding) return;
+          holding = true;
+          el.classList.add('held');
+          if (opts.onStart) { try { opts.onStart(); } catch (_) { } }
+          if (opts.repeatMs) {
+            // Initial fire + repeat
+            try { opts.onTick && opts.onTick(); } catch (_) { }
+            timer = setInterval(function () {
+              if (!holding) return;
+              try { opts.onTick && opts.onTick(); } catch (_) { }
+            }, opts.repeatMs);
+          }
+        }
+        function end(e) {
+          if (!holding) return;
+          holding = false;
+          el.classList.remove('held');
+          if (timer) { clearInterval(timer); timer = null; }
+          if (opts.onEnd) { try { opts.onEnd(); } catch (_) { } }
+        }
+
+        el.addEventListener('touchstart', start, { passive: false });
+        el.addEventListener('touchend', end, { passive: false });
+        el.addEventListener('touchcancel', end, { passive: false });
+        el.addEventListener('mousedown', function (e) {
+          if (e.button !== 0) return;
+          start(e);
+        });
+        // Release anywhere
+        window.addEventListener('mouseup', end);
+        window.addEventListener('blur', end);
+        el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      }
+
+      // ── Wire each diamond button ──
+      // FIRE: hold to auto-repeat laser (fire-rate is gated inside fireLaser)
+      bindHold('sf-pad-fire', {
+        repeatMs: 80,
+        onTick: function () { var sf = SF(); if (sf && sf.fireLaser) sf.fireLaser(); }
+      });
+
+      // TORP: single tap
+      bindTap('sf-pad-torp', function () {
+        var sf = SF(); if (sf && sf.fireTorpedo) sf.fireTorpedo();
+      });
+
+      // LOCK: single tap
+      bindTap('sf-pad-lock', function () {
+        var sf = SF(); if (sf && sf.tryLockOnTarget) sf.tryLockOnTarget();
+      });
+
+      // BOOST: single tap (cooldown-gated inside activateBoost)
+      bindTap('sf-pad-boost', function () {
+        var p = player(); if (p && typeof p.activateBoost === 'function') p.activateBoost();
+      });
+
+      // AB: hold to engage afterburner (directly mutate the per-frame flag)
+      bindHold('sf-pad-ab', {
+        onStart: function () { var p = player(); if (p) p.afterburnerActive = true; },
+        onEnd: function () { var p = player(); if (p) p.afterburnerActive = false; }
+      });
+
+      // ── Optional: expose toggle on desktop large screens ──
+      // Press backslash (\) to show/hide the pad as a non-touch control aid.
+      window.addEventListener('keydown', function (e) {
+        if (e.code === 'Backslash' && !e.repeat) {
+          document.body.classList.toggle('sf-pad-on');
+        }
+      });
+
+      // ── Phase-aware visibility: dim the pad when not in combat ──
+      function syncVisibility() {
+        var combat = inCombat();
+        pad.style.opacity = combat ? '1' : '0.35';
+        pad.style.pointerEvents = combat ? '' : 'none';
+        if (thr) {
+          thr.style.opacity = combat ? '1' : '0.35';
+          thr.style.pointerEvents = combat ? 'auto' : 'none';
+        }
+      }
+      setInterval(syncVisibility, 500);
+
+      // ════════════════════════════════════════════════════════════
+      // THROTTLE LEVER — drag along vertical track to set throttle.
+      // While dragged, throttle is locked to slider value every RAF
+      // (beats input.js's mobile auto-decay).  On release the value
+      // sticks on desktop; on mobile it decays back to idle per the
+      // existing input loop \u2014 same behaviour as releasing the nav sphere.
+      // ════════════════════════════════════════════════════════════
+      var thr = document.getElementById('sf-throttle');
+      var track = thr && thr.querySelector('.sf-thr-track');
+      var fill = thr && thr.querySelector('.sf-thr-fill');
+      var handle = thr && thr.querySelector('.sf-thr-handle');
+      var thrVal = 0;          // 0..1
+      var dragging = false;
+      var rafId = 0;
+
+      function setThrUi(v) {
+        v = Math.max(0, Math.min(1, v));
+        thrVal = v;
+        var pct = (v * 100).toFixed(1) + '%';
+        if (fill) fill.style.height = pct;
+        if (handle) handle.style.bottom = pct;
+      }
+
+      function pointerY(e) {
+        if (e.touches && e.touches.length) return e.touches[0].clientY;
+        if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientY;
+        return e.clientY;
+      }
+
+      function updateFromEvent(e) {
+        if (!track) return;
+        var r = track.getBoundingClientRect();
+        var y = pointerY(e);
+        var v = 1 - (y - r.top) / r.height;
+        setThrUi(v);
+      }
+
+      function rafApply() {
+        var p = player();
+        if (p) p.throttle = thrVal;
+        if (dragging) rafId = requestAnimationFrame(rafApply);
+      }
+
+      function thrStart(e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (!inCombat()) return;
+        dragging = true;
+        thr.classList.add('dragging');
+        updateFromEvent(e);
+        cancelAnimationFrame(rafId);
+        rafApply();
+      }
+      function thrMove(e) {
+        if (!dragging) return;
+        if (e) { e.preventDefault(); }
+        updateFromEvent(e);
+      }
+      function thrEnd(e) {
+        if (!dragging) return;
+        dragging = false;
+        thr.classList.remove('dragging');
+        cancelAnimationFrame(rafId);
+        // Leave throttle latched at thrVal — "cruise control" on desktop.
+        // input.js mobile decay will gradually pull it down on touch devices.
+      }
+
+      if (thr && track) {
+        track.addEventListener('pointerdown', function (e) {
+          try { track.setPointerCapture && track.setPointerCapture(e.pointerId); } catch (_) { }
+          thrStart(e);
+        });
+        track.addEventListener('pointermove', thrMove);
+        track.addEventListener('pointerup', thrEnd);
+        track.addEventListener('pointercancel', thrEnd);
+        // Touch fallback for browsers without pointer events
+        track.addEventListener('touchstart', thrStart, { passive: false });
+        track.addEventListener('touchmove', thrMove, { passive: false });
+        track.addEventListener('touchend', thrEnd, { passive: false });
+        // Cleanup
+        window.addEventListener('blur', thrEnd);
+
+        // Continuously reflect actual player throttle when NOT dragging
+        // so keyboard W/S and mobile auto-decay stay in sync visually.
+        setInterval(function () {
+          if (dragging) return;
+          var p = player();
+          if (!p) return;
+          var cur = Math.max(0, Math.min(1, p.throttle || 0));
+          if (Math.abs(cur - thrVal) > 0.005) setThrUi(cur);
+        }, 120);
+      }
+    })();
+  </script>
 </body>
 
 </html>

@@ -212,6 +212,20 @@
             gameName: opts && opts.gameName,
             mode: modeMap[summary.launchMode] || 'solo',
           });
+          // Mark the URL with ?launch=1 so a page reload re-runs
+          // consumeRuntime() and resumes the same session (otherwise
+          // reload falls into onMissing() and re-opens the wizard,
+          // which is what users perceive as the "old lobby" returning).
+          // Safe even when the game launched inline (no navigation):
+          // consumeRuntime() reads the persisted runtime and dispatches
+          // onSolo/onMultiplayer with the cached config.
+          try {
+            const u = new URL(root.location.href);
+            if (u.searchParams.get('launch') !== '1') {
+              u.searchParams.set('launch', '1');
+              root.history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+            }
+          } catch (_) { /* ignore */ }
           if (manager && setupFlow && typeof manager.finalizeSetupFlow === 'function') {
             manager.finalizeSetupFlow(setupFlow, 'launch', {
               launchMode: summary.launchMode,
@@ -293,12 +307,13 @@
       return false;
     }
 
-    // Clean URL — prevents re-triggering on refresh.
-    try {
-      params.delete('launch');
-      const q = params.toString();
-      root.history.replaceState(null, '', root.location.pathname + (q ? ('?' + q) : '') + root.location.hash);
-    } catch { /* ignore */ }
+    // Keep ?launch=1 in the URL on purpose: when the user reloads the
+    // game page we want consumeRuntime() to re-trigger and resume the
+    // same session (solo, ai, or local co-op) instead of dropping the
+    // player back into the wizard. The persisted runtime in storage
+    // is the source of truth; re-running this handler with the same
+    // runtime is idempotent for onSolo, and for onMultiplayer the
+    // KGMultiplayer reconnect path handles rejoin separately.
 
     const players = Array.isArray(runtime.players) ? runtime.players : [];
     const humanCount = players.filter(function (p) { return !p.is_ai; }).length;

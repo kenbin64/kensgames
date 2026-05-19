@@ -3952,25 +3952,39 @@ const SF3D = (function () {
     // ── Sun direction — all lighting derives from this ──
     const SUN_POS = new THREE.Vector3(200000, 100000, 80000);
     const EARTH_POS = new THREE.Vector3(-15000, -55000, -25000);
+    const MOON_POS = new THREE.Vector3(60000, -20000, -90000);
 
-    // Ambient — very dim base so deep-shadow side isn't pitch black
-    const ambient = new THREE.AmbientLight(0x060610, 0.08);
+    // Ambient — Earth-orbit space is far from pitch black: lots of
+    // scattered light from Earth, Moon, sun corona and bright starfield.
+    const ambient = new THREE.AmbientLight(0x223344, 0.55);
     scene.add(ambient);
+
+    // Hemisphere fill — bluish from "up" (Earth glow), warmish from "down"
+    // (sun-lit cloud tops / nebulae). Lifts shadow-side detail on every ship.
+    const hemiFill = new THREE.HemisphereLight(0x88aaff, 0xffaa66, 0.45);
+    scene.add(hemiFill);
 
     // Primary sun directional light — intense (space has no atmosphere to soften)
     // Cockpit visor filter (toneMappingExposure) tames this to a viewable level
-    const sunLight = new THREE.DirectionalLight(0xfff5e0, 5.0);
+    const sunLight = new THREE.DirectionalLight(0xfff5e0, 7.5);
     sunLight.position.copy(SUN_POS);
     scene.add(sunLight);
 
     // ── Earth-shine — blue reflected light from the Earth's day side ──
     const earthShineDir = EARTH_POS.clone().normalize();
-    const earthShine = new THREE.DirectionalLight(0x4488cc, 0.6);
+    const earthShine = new THREE.DirectionalLight(0x6aa8ff, 2.2);
     earthShine.position.copy(earthShineDir.clone().multiplyScalar(-1)); // light FROM Earth toward scene
     scene.add(earthShine);
 
-    // Very subtle fill from opposite sun (scattered starlight / nebula)
-    const fillLight = new THREE.DirectionalLight(0x0a0a1a, 0.08);
+    // ── Moon-shine — soft silver bounce, opposite the Earth-shine quadrant ──
+    const moonShineDir = MOON_POS.clone().normalize();
+    const moonShine = new THREE.DirectionalLight(0xd8e4ff, 0.9);
+    moonShine.position.copy(moonShineDir.clone().multiplyScalar(-1));
+    scene.add(moonShine);
+
+    // Subtle fill from opposite sun (scattered starlight / nebula) — keeps
+    // the deep-shadow side from collapsing into a black silhouette.
+    const fillLight = new THREE.DirectionalLight(0x3344aa, 0.6);
     fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
     scene.add(fillLight);
 
@@ -12569,6 +12583,17 @@ const Starfighter = (function () {
     // Cap dt to prevent physics explosions on lag
     const safeDt = Math.min(dt, 0.1);
 
+    // ── Baseship slow autonomous spin (carrier rotates on its long axis
+    // for artificial gravity).  Runs in every phase including pause/respawn
+    // so the ship is always visibly alive in the scene. ──
+    if (state.baseship && state.baseship.quaternion) {
+      const _spinRate = 0.04; // rad/sec ≈ 1 full turn / 2.6 min
+      const _spinDt = Math.min(dt, 0.1);
+      if (!state._baseshipSpinQ) state._baseshipSpinQ = new THREE.Quaternion();
+      state._baseshipSpinQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), _spinRate * _spinDt);
+      state.baseship.quaternion.multiply(state._baseshipSpinQ);
+    }
+
     try {
       _syncHudVisibilityFromPhase();
 
@@ -16002,29 +16027,32 @@ const Starfighter = (function () {
       const fadeAlpha = PERSISTENCE * (1.0 - sweepFrac);
 
       // IFF color + size coding (GDD §6 — canonical blip palette)
-      // ── Enemy fighters (small red) ──────────────────────────────────────
+      // Enemy pulse — alternates bright red / dim red ~3 Hz so hostiles
+      // are unmistakable on the radar even on tiny phone screens.
+      const _enemyPulse = 0.55 + 0.45 * Math.abs(Math.sin(performance.now() * 0.012));
+      // ── Enemy fighters (LARGE flashing red) ────────────────────────────
       if (c.type === 'enemy') {
-        blip.material.color.setHex(0xff2200);   // red fighter
-        blip.scale.setScalar(1.0);
+        blip.material.color.setHex(0xff0000);
+        blip.scale.setScalar(1.9 * _enemyPulse + 0.6);
       } else if (c.type === 'interceptor') {
-        blip.material.color.setHex(0xff2200);   // red fighter
-        blip.scale.setScalar(0.9);
+        blip.material.color.setHex(0xff1100);
+        blip.scale.setScalar(1.8 * _enemyPulse + 0.5);
       } else if (c.type === 'predator') {
-        blip.material.color.setHex(0xff2200);   // red fighter (large alien)
-        blip.scale.setScalar(1.3);
-        // ── Enemy capitals (large orange) ───────────────────────────────────
+        blip.material.color.setHex(0xff0033);
+        blip.scale.setScalar(2.4 * _enemyPulse + 0.7);
+        // ── Enemy capitals (large pulsing orange) ──────────────────────────
       } else if (c.type === 'bomber') {
-        blip.material.color.setHex(0xff6600);   // orange medium ship
-        blip.scale.setScalar(1.6);
+        blip.material.color.setHex(0xff5500);
+        blip.scale.setScalar(2.4 * _enemyPulse + 0.8);
       } else if (c.type === 'dreadnought') {
-        blip.material.color.setHex(0xff5500);   // orange capital
-        blip.scale.setScalar(2.6);
+        blip.material.color.setHex(0xff4400);
+        blip.scale.setScalar(3.4 * _enemyPulse + 1.0);
       } else if (c.type === 'alien-baseship') {
-        blip.material.color.setHex(0xff4400);   // orange enemy baseship
-        blip.scale.setScalar(2.2);
+        blip.material.color.setHex(0xff3300);
+        blip.scale.setScalar(3.0 * _enemyPulse + 0.9);
       } else if (c.type === 'alien-base' || c.type === 'hive') {
-        blip.material.color.setHex(0xff5500);   // orange enemy structure
-        blip.scale.setScalar(3.0);
+        blip.material.color.setHex(0xff4400);
+        blip.scale.setScalar(3.6 * _enemyPulse + 1.0);
         // ── Friendly fighters (small green) ─────────────────────────────────
       } else if (c.type === 'wingman') {
         blip.material.color.setHex(0x00ff44);   // green friendly fighter

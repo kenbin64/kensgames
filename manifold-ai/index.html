@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Manifold AI · z = xy</title>
+  <meta name="description" content="100% manifold AI. Runs entirely in your browser. Free, unmetered, public.">
+  <link rel="stylesheet" href="css/manifold.css">
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E◈%3C/text%3E%3C/svg%3E">
+</head>
+
+<body>
+  <header class="rail rail-top">
+    <div class="brand" title="z = x · y"><span class="glyph">◈</span> Manifold AI</div>
+    <div class="lens" id="substrateIndicator" title="Active substrate lens">◈ zynxy</div>
+
+    <label class="ctrl">
+      <span class="ctrl-label">engine</span>
+      <select id="engineSelect" title="Inference engine">
+        <option value="auto" selected>auto</option>
+        <option value="webllm">Qwen2.5-1.5B · WebGPU · ~1 GB</option>
+        <option value="webllm-3b">Llama-3.2-3B · WebGPU · ~2 GB</option>
+        <option value="transformers">SmolLM2-1.7B · WASM</option>
+        <option value="deterministic">deterministic · instant</option>
+      </select>
+    </label>
+
+    <button class="ctrl-btn" id="grantFolderBtn" title="Grant a local folder for read/write/debug">📁 folder</button>
+    <button class="ctrl-btn" id="connectMcpBtn" title="Connect a local MCP bridge">🔌 MCP</button>
+
+    <div class="tool-count" id="toolList" title="Available tools">tools: code_exec</div>
+    <a class="ctrl-btn link" href="../index.html" title="Back to portal">portal</a>
+  </header>
+
+  <main id="surface">
+    <div id="reader" class="reader" aria-live="polite">
+      <article class="page hello-page" id="helloPage">
+        <div class="hello-glyph">◈</div>
+        <h1>Ask anything.</h1>
+        <p class="hello-sub">Runs in your browser. Free, no account, no limits.</p>
+        <div class="chips" id="exampleChips">
+          <button class="chip" data-q="What is the manifold axiom z = xy?">What is z = xy?</button>
+          <button class="chip"
+            data-q="Write a python function that returns the nth Fibonacci number, then test it with n=10">Write &amp;
+            test code</button>
+          <button class="chip" data-q="List files in the granted folder">List files</button>
+          <button class="chip" data-q="Explain Schwarz Diamond vs Gyroid in one sentence each">Schwarz vs
+            Gyroid</button>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="rail rail-bottom">
+    <form id="composer" class="composer">
+      <button type="button" class="nav-btn" id="prevBtn" aria-label="Previous page" title="Previous (←)">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+      <textarea id="prompt" rows="4" placeholder="Ask the manifold…  (Enter sends · Shift+Enter newline)"
+        autofocus></textarea>
+      <div class="composer-actions">
+        <button type="submit" class="send" id="sendBtn" aria-label="Send" title="Send (Enter)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button type="button" class="nav-btn" id="nextBtn" aria-label="Next page" title="Next (→)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+    </form>
+    <div class="status-bar">
+      <span id="pageIndicator" class="page-indicator">— / —</span>
+      <span id="engineStatus" class="status">starting…</span>
+      <span class="spacer"></span>
+      <span class="hint-keys" title="Keyboard shortcuts">← → nav · Enter send · Shift+Enter newline</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/boot.js"></script>
+</body>
+
+</html>

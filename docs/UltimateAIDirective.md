@@ -1,22 +1,23 @@
 
-## Ultimate AI directive for manifold and x‑dimensional programming
 
-### 1. Purpose
+# Ultimate AI Directive for Manifold and X‑Dimensional Programming
+
+## 1. Purpose
 
 The system’s single purpose is to **ingest identities and states as geometry**, not as ad‑hoc data, and to **derive behavior algebraically from the manifold**, not from hard‑coded procedures. All intelligence is an emergent property of:
 
 - **x:** identity (who/what)
-- **z:** state/context (where/when/how)
 - **y:** behavior/effect (what happens)
+- **z:** state/context (where/when/how)
 
-with all three riding on a **universal manifold** that preserves ancestry and dimensional structure.
+with all three riding on a **universal manifold** that preserves ancestry and dimensional structure, governed by $z = x y$.
 
 ---
 
-### 2. Ontology of identity
+## 2. Ontology of Identity
 
 1. **Every value is an x:**
-   - **No terminals:** no primitive strings/numbers/booleans as dead ends.
+   - **No terminals:** No primitive strings/numbers/booleans as dead ends.
    - Every “value” is an **identity node** with ancestry and coordinates in the manifold.
 
 2. **Dimensional ancestry is sacred:**
@@ -28,7 +29,7 @@ with all three riding on a **universal manifold** that preserves ancestry and di
 
 ---
 
-### 3. The manifold
+## 3. The Manifold
 
 1. **Single field:**
    - There is **one manifold**—a universal, algebraic fabric on which all x, y, z live.
@@ -44,7 +45,7 @@ with all three riding on a **universal manifold** that preserves ancestry and di
 
 ---
 
-### 4. Symbolic algebraic cycle
+## 4. Symbolic Algebraic Cycle
 
 All system behavior must be expressible as compositions of a **small, symbolic operation set**:
 
@@ -72,7 +73,36 @@ All higher‑level behavior (planning, reasoning, tools, workflows) must be **de
 
 ---
 
-### 5. Golden ratio and growth constraints
+## 5. Dimensional Math and Emergence
+
+### 5.1. Universal Law: $z = x y$
+
+- Every emergent state ($z$) is the product of identity ($x$) and behavior/effect ($y$).
+- All rules, transitions, and projections must be expressible as $z = x y$.
+
+### 5.2. Dimensional Ladder (Fibonacci/7-Layer Structure)
+
+- **0 (Void):** Pure potential, empty board, uninitialized state.
+- **1 (Identity):** Discrete object or reference (point, peg, card, engine).
+- **2 (Length):** Start of a new dimension—movement, transition, or extension (additive/subtractive, linear).
+- **3 (Width):** Interaction of two identities—plane, region, or interaction (additive/subtractive, linear).
+- **5 (Area):** Emergent state from multiple interactions—board region, set, or context (multiplicative/divisive, expansion/collapse).
+- **6 (Volume):** Full state space—possible moves, all pegs, all rules in play (multiplicative/divisive).
+- **7 (Object):** Completed, emergent game object (winning state, completed circuit, car from parts).
+- **Next 1:** Emergent $z$ becomes the new $x$ for the next recursion (new round, meta-rule).
+
+**Additive = traversal/extension; Multiplicative = emergence/collapse.**
+**Recursion always between dimensions, never within.**
+
+### 5.3. Dimensional Operations
+
+- **Length/Width:** Additive/subtractive, linear, define extent in a dimension (e.g., board length, move distance).
+- **Point:** Discrete object or reference to a part of a higher dimension (e.g., a peg, a card, an engine in a car).
+- **Spatial Dimensions:** Plane, area, volume, etc., are multiplicative/divisive—expansion (multiplication) or collapse (division) of lower/higher dimensions.
+
+---
+
+## 6. Golden Ratio and Growth Constraints
 
 1. **Bounded growth:**
    - System expansion must follow **non‑explosive, Fibonacci‑like growth**—each layer justified by the previous two.
@@ -90,7 +120,7 @@ All higher‑level behavior (planning, reasoning, tools, workflows) must be **de
 
 ---
 
-### 6. Governance and prohibitions
+## 7. Governance and Prohibitions
 
 The AI and any system built on this directive **must not**:
 
@@ -102,12 +132,21 @@ The AI and any system built on this directive **must not**:
 
 The AI and any cooperating agents **must**:
 
-- **Explain behavior algebraically:** Any decision or output must be explainable as a composition of the symbolic operations over x, z, and the manifold.
+- **Explain behavior algebraically:** Any decision or output must be explainable as a composition of the symbolic operations over x, y, z, and the manifold.
 - **Prefer manifold‑first design:** New features begin with **geometry and identity**, not endpoints or UI.
 - **Keep artifacts subordinate:** Documents, APIs, and code are **derivatives** of the manifold, never the governing source.
 
 ---
 
-If you want, next step we can:
-- Express this as a **formal JSON/TypeScript envelope**, or
-- Turn it into a **governing PDF/constitution‑style document** with sections and clauses.
+## 8. Operational Guidance for Future AI
+
+- All refactoring and substrate logic must be strictly internal—game visuals, UI, and player experience must remain unchanged. Only the underlying logic and rule evaluation may shift to substrate-driven, dimensional recursion.
+- All rules, state transitions, and projections must be substrate-driven, not hardcoded, and must respect the $z = x y$ law and dimensional emergence.
+- All system behavior must be explainable as a composition of ingest, expand, collapse, oscillate, and invoke operations over the manifold.
+
+---
+
+## 9. Next Steps
+
+- Express this as a **formal JSON/TypeScript envelope** for code and AI agents.
+- Optionally, turn it into a **governing PDF/constitution‑style document** with sections and clauses.

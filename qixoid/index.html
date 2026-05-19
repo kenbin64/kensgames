@@ -5,9 +5,9 @@
   <script src="/js/session-identity.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Qixoid &#183; 3D Qix on a Torus &#183; KensGames</title>
+  <title>Qixoid &#183; 3D Qix on a Snail Shell &#183; KensGames</title>
   <meta name="description"
-    content="Qixoid is a modern 3D take on the 1981 arcade classic Qix. Claim 75 percent of a torus surface while dodging the Qix.">
+    content="Qixoid is a modern 3D take on the 1981 arcade classic Qix. Claim 80 percent of a parametric snail shell while dodging the Qix — bigger fills pay disproportionately more.">
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <style>
@@ -227,8 +227,12 @@
         <div class="stat-lbl">Claimed</div>
       </div>
       <div class="stat">
-        <div class="stat-val" id="hud-target">75%</div>
+        <div class="stat-val" id="hud-target">80%</div>
         <div class="stat-lbl">Target</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="hud-stake">—</div>
+        <div class="stat-lbl">Risk</div>
       </div>
       <div class="stat">
         <div class="stat-val" id="hud-lives">3</div>
@@ -239,25 +243,31 @@
         <div class="stat-lbl">Score</div>
       </div>
     </div>
-    <div class="right" style="font-size:11px;color:var(--text-muted)">QIXOID v0.1</div>
+    <div class="right" style="font-size:11px;color:var(--text-muted)">QIXOID v0.4</div>
   </div>
 
   <div id="footer">
     <span class="key">WASD</span> or <span class="key">Arrows</span> to move
     &#9632; <span class="key">Hold Space</span> to stake into unclaimed
-    &#9632; <span class="key">Mouse drag</span> to rotate
+    &#9632; <span class="key">LMB drag</span> rotate shell (all directions)
+    &#9632; <span class="key">RMB drag</span> pan
+    &#9632; <span class="key">Wheel</span> zoom
   </div>
 
   <div id="overlay">
     <div class="panel">
       <h1>QIXOID</h1>
-      <div class="sub">3D QIX ON A TORUS</div>
-      <p>Claim territory on the surface of a torus. Stake out into unclaimed cells, then return to safe ground to
-        fence off the smaller side. Avoid the magenta Qix at all times. Capture 75 percent to win.</p>
+      <div class="sub">3D QIX ON A SNAIL SHELL</div>
+      <p>Claim territory on a parametric snail shell. Stake out from claimed land into the void, then return to safe
+        ground to fence off the smaller side. Avoid the magenta Qix — if it touches your unfinished filament, you lose a
+        life. <b>Bigger fills pay disproportionately more.</b></p>
       <div class="keys">
-        <b>WASD / &#8593;&#8595;&#8592;&#8594;</b><span>Move along the grid</span>
-        <b>Hold SPACE</b><span>Stake out from claimed land</span>
-        <b>Mouse</b><span>Rotate the torus</span>
+        <b>WASD / ARROWS</b><span>Walk along the shell surface</span>
+        <b>HOLD SPACE</b><span>Stake out (filament becomes live)</span>
+        <b>LMB DRAG</b><span>Rotate the shell in any direction</span>
+        <b>RMB DRAG</b><span>Pan the view</span>
+        <b>WHEEL / MMB</b><span>Zoom in / out</span>
+        <b>C</b><span>Toggle inside / outside camera</span>
       </div>
       <button id="start-btn">&#9654; PLAY</button>
     </div>

@@ -22,8 +22,11 @@
   const V_MAX = Math.PI * 4;
   const SHELL_SCALE = 3.0;       // ~6-unit shell
   const QIX_COUNT = 3;
+  const QIX_TENTACLES = 6;        // tentacles per Qix
+  const QIX_TENTACLE_SEGS = 14;   // segments per tentacle
+  const QIX_TENTACLE_REACH = 1.1; // world-space reach in shell units
   const BLOB_COUNT = 14;
-  const WIN_PCT = 75;
+  const WIN_PCT = 80;
 
   // Palette: cyan / green / purple / amber
   const PALETTE = [
@@ -65,13 +68,16 @@
   const hudClaimed = document.getElementById('hud-claimed');
   const hudLives = document.getElementById('hud-lives');
   const hudScore = document.getElementById('hud-score');
+  const hudStake = document.getElementById('hud-stake');
   const footer = document.getElementById('footer');
   if (footer) {
     footer.innerHTML =
-      '<span class="key">MOVE</span> mouse to walk &#9632; ' +
-      '<span class="key">HOLD LMB</span> to stake &#9632; ' +
-      '<span class="key">RMB</span> orbit &#9632; ' +
-      '<span class="key">C</span> inside / outside view';
+      '<span class="key">LMB DRAG</span> rotate &#9632; ' +
+      '<span class="key">RMB DRAG</span> pan &#9632; ' +
+      '<span class="key">WHEEL</span> zoom &#9632; ' +
+      '<span class="key">G</span> Whorl grid &#9632; ' +
+      '<span class="key">WASD/Arrows</span> paint edge &#9632; ' +
+      '<span class="key">C</span> inside view';
   }
 
   // ─── Three.js bootstrap ──────────────────────────────────────────────────
@@ -92,20 +98,28 @@
   renderer.toneMappingExposure = 1.15;
   stage.appendChild(renderer.domElement);
 
-  // OrbitControls — right-button rotate so left button is free for staking.
+  // OrbitControls — used only for zooming (wheel/middle) and panning the view
+  // (right button). LEFT button rotates the SHELL ITSELF (handled below) so
+  // the player sees the model move, not the camera orbit around it.
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  controls.enableRotate = false;                // shell drag does rotation
+  controls.enablePan = true;
+  controls.enableZoom = true;
+  controls.screenSpacePanning = true;
+  controls.panSpeed = 0.9;
+  controls.zoomSpeed = 0.9;
   controls.minDistance = 0.1;
   controls.maxDistance = 40;
   controls.mouseButtons = {
-    LEFT: null,
+    LEFT: null,                                 // reserved for shell drag
     MIDDLE: THREE.MOUSE.DOLLY,
-    RIGHT: THREE.MOUSE.ROTATE,
+    RIGHT: THREE.MOUSE.PAN,
   };
   controls.touches = {
-    ONE: null,
-    TWO: THREE.TOUCH.DOLLY_ROTATE,
+    ONE: null,                                  // reserved for shell drag
+    TWO: THREE.TOUCH.DOLLY_PAN,
   };
 
   // ─── Lighting ────────────────────────────────────────────────────────────
@@ -203,8 +217,14 @@
     emissiveIntensity: 0.45,
     envMapIntensity: 1.0,
   });
+  // World group — everything that lives ON the shell goes in here so a single
+  // rotation moves the shell, its glow, the claimed overlay, blobs, player
+  // and the Qix together. Lights stay in world space.
+  const world = new THREE.Group();
+  scene.add(world);
+
   const shell = new THREE.Mesh(shellGeom, shellMaterial);
-  scene.add(shell);
+  world.add(shell);
 
   // Inner additive glow gives the lava-lamp interior its colored haze.
   const glowMat = new THREE.MeshBasicMaterial({
@@ -217,7 +237,7 @@
   });
   const glow = new THREE.Mesh(shellGeom, glowMat);
   glow.scale.setScalar(0.96);
-  scene.add(glow);
+  world.add(glow);
 
   // ─── Lava-lamp blobs ─────────────────────────────────────────────────────
   const blobs = [];
@@ -232,7 +252,7 @@
       depthWrite: false,
     });
     const m = new THREE.Mesh(blobGeo, mat);
-    scene.add(m);
+    world.add(m);
     blobs.push({
       mesh: m,
       mat: mat,
@@ -248,44 +268,112 @@
     });
   }
 
-  // ─── Qix entities ────────────────────────────────────────────────────────
+  // ─── Qix entities (meandering plasmas with writhing tentacles) ───────────
   const qixGroup = new THREE.Group();
-  scene.add(qixGroup);
+  world.add(qixGroup);
   const qix = [];
   const QIX_COLORS = [0xff00ff, 0xff3377, 0xff00aa];
+  const QIX_PUFFS = 6; // sphere puffs per cloud
   for (let i = 0; i < QIX_COUNT; i++) {
     const color = QIX_COLORS[i % QIX_COLORS.length];
-    const trailLen = 28;
-    const trailGeo = new THREE.BufferGeometry();
-    trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(trailLen * 3), 3));
-    const trailMat = new THREE.LineBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-    });
-    const trail = new THREE.Line(trailGeo, trailMat);
-    qixGroup.add(trail);
-    const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 12, 10),
-      new THREE.MeshBasicMaterial({
+
+    // Cloud-like core: several offset puff spheres that drift and breathe
+    // independently around a shared centroid. Together they read as a
+    // soft amorphous plasma rather than a solid ball.
+    const puffs = [];
+    for (let p = 0; p < QIX_PUFFS; p++) {
+      const mat = new THREE.MeshBasicMaterial({
         color: color,
         blending: THREE.AdditiveBlending,
         transparent: true,
-        opacity: 1,
-      })
-    );
-    qixGroup.add(head);
+        opacity: 0.55,
+      });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), mat);
+      qixGroup.add(mesh);
+      puffs.push({
+        mesh: mesh,
+        mat: mat,
+        // each puff orbits the centroid on its own little path
+        phase: Math.random() * Math.PI * 2,
+        freq: 0.6 + Math.random() * 1.8,
+        radius: 0.08 + Math.random() * 0.22,
+        sizeBase: 0.18 + Math.random() * 0.18,
+        sizePhase: Math.random() * Math.PI * 2,
+        sizeFreq: 0.7 + Math.random() * 2.0,
+        // axes of orbit (random unit vector pair)
+        ax: Math.random() * Math.PI * 2,
+        ay: Math.random() * Math.PI * 2,
+      });
+    }
+
+    // Soft outer halo
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: color,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      opacity: 0.22,
+    });
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), haloMat);
+    qixGroup.add(halo);
+
+    // Writhing tentacles: each is a polyline of QIX_TENTACLE_SEGS points.
+    const tentacles = [];
+    for (let t = 0; t < QIX_TENTACLES; t++) {
+      const tGeo = new THREE.BufferGeometry();
+      const tPos = new Float32Array(QIX_TENTACLE_SEGS * 3);
+      tGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+      const tMat = new THREE.LineBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+      });
+      const line = new THREE.Line(tGeo, tMat);
+      qixGroup.add(line);
+
+      // Glowing tip
+      const tipMat = new THREE.MeshBasicMaterial({
+        color: color,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 1.0,
+      });
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), tipMat);
+      qixGroup.add(tip);
+
+      tentacles.push({
+        geo: tGeo,
+        pos: tPos,
+        line: line,
+        tip: tip,
+        tipMat: tipMat,
+        // randomized motion params per tentacle
+        phase: Math.random() * Math.PI * 2,
+        freq: 1.2 + Math.random() * 2.0,
+        twist: 0.6 + Math.random() * 1.8,
+        baseAngle: (t / QIX_TENTACLES) * Math.PI * 2,
+        wobble: 0.4 + Math.random() * 0.9,
+        // last computed tip cell — used for filament collision
+        tipI: -1,
+        tipJ: -1,
+      });
+    }
+
     qix.push({
       u: Math.random() * U_MAX,
       v: 0.5 * V_MAX + (Math.random() - 0.5) * V_MAX * 0.4,
       du: (Math.random() - 0.5) * 1.5,
       dv: (Math.random() - 0.5) * 2.5,
-      head: head,
-      trail: trail,
-      trailGeo: trailGeo,
-      trailLen: trailLen,
-      history: [],
+      puffs: puffs,
+      halo: halo,
+      haloMat: haloMat,
+      tentacles: tentacles,
+      // Slow stretch envelope drives global size: 0 = compact ball,
+      // 1 = sprawling cloud. Multiple sin waves + occasional spike.
+      stretchPhase: Math.random() * Math.PI * 2,
+      stretchSpike: 0,        // brief 0..1 spike, decays
+      nextSpikeAt: 2 + Math.random() * 4, // seconds until next spike
+      stretch: 0.5,           // current 0..1 envelope
     });
   }
 
@@ -312,7 +400,7 @@
   });
   const claimedMesh = new THREE.Mesh(claimedGeo, claimedMat);
   claimedMesh.frustumCulled = false;
-  scene.add(claimedMesh);
+  world.add(claimedMesh);
   let claimedDirty = true;
 
   function rebuildClaimedMesh(time) {
@@ -375,13 +463,16 @@
     lastOnClaimed: true,
     lives: 3,
     score: 0,
+    lastFillCells: 0,
+    lastFillAward: 0,
+    lastFillFlashUntil: 0,
   };
 
   const playerMesh = new THREE.Mesh(
     new THREE.ConeGeometry(0.16, 0.42, 10),
     new THREE.MeshBasicMaterial({ color: 0xffffff })
   );
-  scene.add(playerMesh);
+  world.add(playerMesh);
 
   const stakeGeo = new THREE.BufferGeometry();
   const STAKE_MAX = 512;
@@ -397,7 +488,7 @@
       blending: THREE.AdditiveBlending,
     })
   );
-  scene.add(stakeLine);
+  world.add(stakeLine);
 
   function refreshStakeLine() {
     const len = Math.min(player.stakePath.length, STAKE_MAX);
@@ -415,6 +506,34 @@
     }
     stakeGeo.setDrawRange(0, len);
     stakeGeo.attributes.position.needsUpdate = true;
+
+    // Filament heats up as the stake grows: yellow → orange → red.
+    // The longer the stake, the more visible the risk.
+    const t = Math.min(1, len / 80);
+    const r = 1.0;
+    const g = 1.0 - t * 0.85;
+    const b = 0.6 - t * 0.6;
+    stakeLine.material.color.setRGB(r, Math.max(0, g), Math.max(0, b));
+    stakeLine.material.opacity = 0.85 + t * 0.15;
+
+    // Live risk readout in the HUD: roughly what closing the stake right
+    // now would award if the smaller side has ~ this many cells.
+    if (hudStake) {
+      if (len < 2) {
+        hudStake.textContent = '—';
+        hudStake.style.color = '';
+      } else {
+        // Heuristic: assume the enclosed pocket is ~ len cells; payouts use
+        // the same power curve as closeStake().
+        const projected = 100 + Math.round(Math.pow(len, 1.4) * 5);
+        hudStake.textContent = '+' + projected;
+        // Color the readout the same temperature as the filament.
+        const cr = Math.round(255);
+        const cg = Math.round(Math.max(0, g) * 255);
+        const cb = Math.round(Math.max(0, b) * 255);
+        hudStake.style.color = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+      }
+    }
   }
 
   function startStake() {
@@ -465,9 +584,17 @@
       // fall back to opposite side if right side was already enclosed.
       filledR = floodFill(mid.i - px, mid.j - py);
     }
-    player.score += 100 + filledR * 5;
+    // Risk-rewarding payout: power curve so big fills pay disproportionately
+    // more than small ones. 10 cells ≈ +225, 50 cells ≈ +1265, 200 cells ≈ +7340.
+    const fillBonus = Math.round(Math.pow(filledR, 1.4) * 5);
+    const award = 100 + fillBonus;
+    player.score += award;
+    player.lastFillCells = filledR;
+    player.lastFillAward = award;
+    player.lastFillFlashUntil = performance.now() + 1400;
     player.stakePath = [];
     stakeGeo.setDrawRange(0, 0);
+    if (hudStake) { hudStake.textContent = '—'; hudStake.style.color = ''; }
     claimedDirty = true;
     updateHUD();
   }
@@ -499,21 +626,38 @@
   // ─── Mouse / raycast ─────────────────────────────────────────────────────
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
-  let mouseDown = false;
+  let stakeHeld = false;          // Space-bar held to stake
+  let dragging = false;           // LMB held to rotate the shell
+  let dragLastX = 0, dragLastY = 0;
+  const SHELL_ROT_SPEED = 0.008;  // radians per pixel
   let cursorCell = null;
 
   renderer.domElement.addEventListener('pointermove', (e) => {
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    if (dragging) {
+      const dx = e.clientX - dragLastX;
+      const dy = e.clientY - dragLastY;
+      dragLastX = e.clientX;
+      dragLastY = e.clientY;
+      // Rotate the world group: horizontal drag = yaw, vertical drag = pitch.
+      world.rotation.y += dx * SHELL_ROT_SPEED;
+      world.rotation.x += dy * SHELL_ROT_SPEED;
+    }
   });
   renderer.domElement.addEventListener('pointerdown', (e) => {
-    if (e.button === 0) mouseDown = true;
+    if (e.button === 0) {
+      dragging = true;
+      dragLastX = e.clientX;
+      dragLastY = e.clientY;
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) { }
+    }
   });
   window.addEventListener('pointerup', (e) => {
     if (e.button === 0) {
-      mouseDown = false;
-      if (player.staking) closeStake();
+      dragging = false;
+      try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) { }
     }
   });
   renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -555,7 +699,7 @@
       Math.floor(player.v / V_MAX * V_STEPS)));
     const onClaimed = !!claimed[pi][pj];
 
-    if (mouseDown) {
+    if (stakeHeld) {
       if (!player.staking && !onClaimed && player.lastOnClaimed) {
         startStake();
       }
@@ -566,6 +710,9 @@
           addToStake(pi, pj);
         }
       }
+    } else if (player.staking) {
+      // Space released while still staking — close the loop.
+      closeStake();
     }
     player.lastOnClaimed = onClaimed;
 
@@ -578,9 +725,65 @@
   }
 
   // ─── Qix update ──────────────────────────────────────────────────────────
-  function updateQix(dt) {
+  // Each Qix is a meandering plasma core with QIX_TENTACLES writhing arms.
+  // The core wanders on the (u,v) shell; tentacles wave in 3-space around it
+  // and their tips are pulled back onto the shell so they can collide with
+  // an in-progress filament.
+  let qixTime = 0;
+  const _qHead = new THREE.Vector3();
+  const _qN = new THREE.Vector3();
+  const _qT1 = new THREE.Vector3();
+  const _qT2 = new THREE.Vector3();
+  const _qOff = new THREE.Vector3();
+  const _qSeg = new THREE.Vector3();
+
+  // Build a tangent frame at (u,v) by sampling neighbours on the shell.
+  function tangentFrame(u, v, outT1, outT2, outN) {
+    const eps = 0.01;
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    surfacePoint(u, v, a);
+    surfacePoint(u + eps, v, b);
+    surfacePoint(u, v + eps, c);
+    outT1.copy(b).sub(a).normalize();
+    outT2.copy(c).sub(a).normalize();
+    surfaceNormal(u, v, outN);
+  }
+
+  // Project a world-space point back to the nearest (u,v) cell on the shell.
+  // Cheap approximation: search a small (u,v) neighbourhood around the head.
+  function nearestCell(worldP, cu, cv, outIJ) {
+    let best = Infinity;
+    let bi = 0, bj = 0;
     const tmp = new THREE.Vector3();
+    const RU = 4, RV = 6;
+    const ci = Math.floor(cu / U_MAX * U_STEPS);
+    const cj = Math.floor(cv / V_MAX * V_STEPS);
+    for (let di = -RU; di <= RU; di++) {
+      for (let dj = -RV; dj <= RV; dj++) {
+        const i = ((ci + di) % U_STEPS + U_STEPS) % U_STEPS;
+        const j = cj + dj;
+        if (j < 0 || j >= V_STEPS) continue;
+        const u = ((i + 0.5) / U_STEPS) * U_MAX;
+        const v = ((j + 0.5) / V_STEPS) * V_MAX;
+        surfacePoint(u, v, tmp);
+        const d = tmp.distanceToSquared(worldP);
+        if (d < best) { best = d; bi = i; bj = j; }
+      }
+    }
+    outIJ.i = bi;
+    outIJ.j = bj;
+  }
+
+  const _ij = { i: 0, j: 0 };
+
+  function updateQix(dt) {
+    qixTime += dt;
+    let hit = false;
+
     for (const q of qix) {
+      // Meander the plasma core
       q.du += (Math.random() - 0.5) * 2.4 * dt;
       q.dv += (Math.random() - 0.5) * 4.0 * dt;
       q.du = Math.max(-2.0, Math.min(2.0, q.du));
@@ -590,31 +793,120 @@
       if (q.v < 0) { q.v = 0; q.dv = Math.abs(q.dv); }
       if (q.v > V_MAX) { q.v = V_MAX; q.dv = -Math.abs(q.dv); }
 
-      surfacePoint(q.u, q.v, tmp);
-      q.head.position.copy(tmp);
-      q.history.unshift(tmp.x); q.history.unshift(tmp.y); q.history.unshift(tmp.z);
-      if (q.history.length > q.trailLen * 3) q.history.length = q.trailLen * 3;
-      const arr = q.trailGeo.attributes.position.array;
-      for (let k = 0; k < q.trailLen; k++) {
-        const o = Math.min(k * 3, q.history.length - 3);
-        arr[k * 3 + 0] = q.history[o + 0] || 0;
-        arr[k * 3 + 1] = q.history[o + 1] || 0;
-        arr[k * 3 + 2] = q.history[o + 2] || 0;
-      }
-      q.trailGeo.attributes.position.needsUpdate = true;
+      surfacePoint(q.u, q.v, _qHead);
+      q.halo.position.copy(_qHead);
 
-      // collide with active stake path
-      if (player.staking && player.stakePath.length) {
-        const qi = Math.floor(q.u / U_MAX * U_STEPS) % U_STEPS;
-        const qj = Math.floor(q.v / V_MAX * V_STEPS);
+      // ── Stretch envelope: 0 = compact ball, 1 = sprawling cloud ────────
+      // Two slow sin waves blended; occasional spike makes it suddenly bloom.
+      q.stretchPhase += dt;
+      const slow = 0.5 + 0.5 * Math.sin(q.stretchPhase * 0.4);
+      const wob = 0.5 + 0.5 * Math.sin(q.stretchPhase * 1.1 + 1.7);
+      let env = 0.45 * slow + 0.25 * wob; // 0..0.7
+      q.nextSpikeAt -= dt;
+      if (q.nextSpikeAt <= 0) {
+        q.stretchSpike = 1.0;
+        q.nextSpikeAt = 2.5 + Math.random() * 5.0;
+      }
+      q.stretchSpike *= Math.exp(-dt * 0.9);
+      env += q.stretchSpike * 0.5;
+      q.stretch = Math.min(1, env);                          // 0..1
+      const cloudScale = 0.5 + q.stretch * 1.5;              // 0.5..2.0
+
+      // Halo follows stretch
+      q.halo.scale.setScalar(0.7 + q.stretch * 1.6);
+      q.haloMat.opacity = 0.12 + q.stretch * 0.28;
+
+      // Tangent frame for tentacle waving and puff drift
+      tangentFrame(q.u, q.v, _qT1, _qT2, _qN);
+
+      // ── Drive cloud puffs ──────────────────────────────────────────────
+      for (const P of q.puffs) {
+        const a = P.ax + qixTime * P.freq * 0.6;
+        const b = P.ay + qixTime * P.freq * 0.4;
+        const r = P.radius * cloudScale;
+        // Position on a noisy lissajous around centroid in the tangent frame
+        const lx = Math.sin(a) * r;
+        const ly = Math.cos(b) * r;
+        const lz = Math.sin(a + b) * r * 0.6;
+        _qSeg.copy(_qHead)
+          .addScaledVector(_qT1, lx)
+          .addScaledVector(_qT2, ly)
+          .addScaledVector(_qN, lz);
+        P.mesh.position.copy(_qSeg);
+        const breathe = 0.7 + 0.5 * Math.sin(qixTime * P.sizeFreq + P.sizePhase);
+        P.mesh.scale.setScalar(P.sizeBase * breathe * (0.7 + cloudScale * 0.6));
+        P.mat.opacity = 0.45 + 0.25 * breathe;
+      }
+
+      // Head cell for collision (use centroid)
+      const qi = Math.floor(q.u / U_MAX * U_STEPS) % U_STEPS;
+      const qj = Math.max(0, Math.min(V_STEPS - 1,
+        Math.floor(q.v / V_MAX * V_STEPS)));
+
+      // Drive tentacles — reach grows with the stretch envelope
+      for (const T of q.tentacles) {
+        const arr = T.pos;
+        const ang = T.baseAngle + qixTime * T.twist * 0.4;
+        const dirX = Math.cos(ang);
+        const dirY = Math.sin(ang);
+        const reachMax = QIX_TENTACLE_REACH * (0.55 + q.stretch * 1.1);
+        for (let s = 0; s < QIX_TENTACLE_SEGS; s++) {
+          const t = s / (QIX_TENTACLE_SEGS - 1);
+          const reach = reachMax * t;
+          const wobAmp = T.wobble * (0.6 + q.stretch * 0.8);
+          const wob = Math.sin(qixTime * T.freq + T.phase + t * Math.PI * 2.4)
+            * wobAmp * t;
+          const lx = dirX * reach + (-dirY) * wob * 0.35;
+          const ly = dirY * reach + (dirX) * wob * 0.35;
+          const lz = Math.sin(t * Math.PI) * 0.18
+            + Math.cos(qixTime * T.freq * 0.5 + T.phase) * 0.05 * t;
+          _qSeg.copy(_qHead)
+            .addScaledVector(_qT1, lx)
+            .addScaledVector(_qT2, ly)
+            .addScaledVector(_qN, lz);
+          arr[s * 3 + 0] = _qSeg.x;
+          arr[s * 3 + 1] = _qSeg.y;
+          arr[s * 3 + 2] = _qSeg.z;
+        }
+        T.geo.attributes.position.needsUpdate = true;
+
+        // Glowing tip mesh sits on the last segment
+        const lastIdx = (QIX_TENTACLE_SEGS - 1) * 3;
+        T.tip.position.set(arr[lastIdx], arr[lastIdx + 1], arr[lastIdx + 2]);
+        T.tip.scale.setScalar(0.7 + q.stretch * 0.8);
+        T.tipMat.opacity = 0.7 + 0.3 * Math.sin(qixTime * T.freq * 1.3 + T.phase);
+
+        // Collide tentacle TIP cell against active stake path
+        if (player.staking && player.stakePath.length && !hit) {
+          _qOff.set(arr[lastIdx], arr[lastIdx + 1], arr[lastIdx + 2]);
+          nearestCell(_qOff, q.u, q.v, _ij);
+          T.tipI = _ij.i; T.tipJ = _ij.j;
+          for (const cell of player.stakePath) {
+            const di = ((cell.i - T.tipI + U_STEPS) % U_STEPS);
+            const wrap = Math.min(di, U_STEPS - di);
+            if (wrap <= 1 && Math.abs(cell.j - T.tipJ) <= 1) {
+              hit = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // Collide cloud core against active stake path — radius grows with stretch
+      if (player.staking && player.stakePath.length && !hit) {
+        const coreR = 1 + Math.floor(q.stretch * 1.5); // 1..2 cells
         for (const cell of player.stakePath) {
-          if (cell.i === qi && cell.j === qj) {
-            playerHit();
-            return;
+          const di = ((cell.i - qi + U_STEPS) % U_STEPS);
+          const wrap = Math.min(di, U_STEPS - di);
+          if (wrap <= coreR && Math.abs(cell.j - qj) <= coreR) {
+            hit = true;
+            break;
           }
         }
       }
     }
+
+    if (hit) playerHit();
   }
 
   function playerHit() {
@@ -680,7 +972,19 @@
     const pct = Math.floor(100 * claimedCount / totalCells);
     if (hudClaimed) hudClaimed.textContent = pct + '%';
     if (hudLives) hudLives.textContent = player.lives;
-    if (hudScore) hudScore.textContent = player.score;
+
+    // Score area flashes the bonus from the last fill so the risk
+    // payoff is felt visually for ~1.4 s after closing a big stake.
+    if (hudScore) {
+      const flashing = performance.now() < player.lastFillFlashUntil;
+      if (flashing && player.lastFillAward > 0) {
+        hudScore.textContent = player.score + '  (+' + player.lastFillAward + ')';
+        hudScore.style.color = (player.lastFillCells > 60) ? '#ff4080' : '';
+      } else {
+        hudScore.textContent = player.score;
+        hudScore.style.color = '';
+      }
+    }
     window.__MANIFOLD__.claimedPercent = pct;
     window.__MANIFOLD__.lives = player.lives;
     window.__MANIFOLD__.score = player.score;
@@ -767,6 +1071,310 @@
   }
   window.addEventListener('keydown', (e) => {
     if (e.key === 'c' || e.key === 'C') toggleCamera();
+    if (e.code === 'Space') { stakeHeld = true; e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') { stakeHeld = false; e.preventDefault(); }
+  });
+
+  // ─── Whorl mode: edge-painting grid ──────────────────────────────────────
+  // A coarse grid of vertices laid on the shell surface. The player snaps to
+  // a vertex, steps with arrows / WASD to a neighbour, and the traversed edge
+  // is painted. Press G to toggle Whorl mode on/off.
+  const GU = 16;                       // vertex columns around u (wraps)
+  const GV = 32;                       // vertex rows along v (clamped)
+  const EDGE_OFFSET = 0.12;            // lift painted edges off the surface
+
+  // Edge state lookups: separate maps for u-edges and v-edges so we can flip
+  // them independently when painted.
+  // uEdge[i][j] = edge from vertex (i,j) to ((i+1)%GU, j)
+  // vEdge[i][j] = edge from vertex (i,j) to (i, j+1)
+  const uEdge = [], vEdge = [];
+  for (let i = 0; i < GU; i++) {
+    uEdge.push(new Uint8Array(GV + 1));
+    vEdge.push(new Uint8Array(GV));
+  }
+
+  // Build a single LineSegments mesh for the entire grid; we recolor segments
+  // in-place when an edge is painted. Two segments per cell-edge.
+  function gridVertexPos(i, j, out) {
+    const u = (i / GU) * U_MAX;
+    const v = (j / GV) * V_MAX;
+    return surfacePoint(u, v, out);
+  }
+  function gridVertexLifted(i, j, out, tmpN) {
+    gridVertexPos(i, j, out);
+    const u = (i / GU) * U_MAX;
+    const v = (j / GV) * V_MAX;
+    surfaceNormal(u, v, tmpN);
+    out.addScaledVector(tmpN, EDGE_OFFSET);
+    return out;
+  }
+
+  const totalEdges = GU * (GV + 1) + GU * GV;  // u-edges + v-edges
+  const gridGeo = new THREE.BufferGeometry();
+  const gridPos = new Float32Array(totalEdges * 2 * 3);
+  const gridCol = new Float32Array(totalEdges * 2 * 3);
+  gridGeo.setAttribute('position', new THREE.BufferAttribute(gridPos, 3));
+  gridGeo.setAttribute('color', new THREE.BufferAttribute(gridCol, 3));
+  const gridMat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const gridMesh = new THREE.LineSegments(gridGeo, gridMat);
+  gridMesh.visible = false;
+  world.add(gridMesh);
+
+  // Per-segment offsets so we can index into the attribute arrays.
+  // u-edges first: segIdx = i*(GV+1) + j
+  // v-edges next:  segIdx = GU*(GV+1) + i*GV + j
+  const U_BASE = 0;
+  const V_BASE = GU * (GV + 1);
+
+  const COL_OPEN = new THREE.Color(0x224466);
+  const COL_PAINTED = new THREE.Color(0xffe800);
+  function writeSegColor(segIdx, color) {
+    const p = segIdx * 6;
+    gridCol[p + 0] = color.r; gridCol[p + 1] = color.g; gridCol[p + 2] = color.b;
+    gridCol[p + 3] = color.r; gridCol[p + 4] = color.g; gridCol[p + 5] = color.b;
+    gridGeo.attributes.color.needsUpdate = true;
+  }
+  function writeSegPos(segIdx, a, b) {
+    const p = segIdx * 6;
+    gridPos[p + 0] = a.x; gridPos[p + 1] = a.y; gridPos[p + 2] = a.z;
+    gridPos[p + 3] = b.x; gridPos[p + 4] = b.y; gridPos[p + 5] = b.z;
+  }
+  (function buildGrid() {
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    for (let i = 0; i < GU; i++) {
+      for (let j = 0; j <= GV; j++) {
+        gridVertexLifted(i, j, a, n);
+        gridVertexLifted((i + 1) % GU, j, b, n);
+        writeSegPos(U_BASE + i * (GV + 1) + j, a, b);
+        writeSegColor(U_BASE + i * (GV + 1) + j, COL_OPEN);
+      }
+    }
+    for (let i = 0; i < GU; i++) {
+      for (let j = 0; j < GV; j++) {
+        gridVertexLifted(i, j, a, n);
+        gridVertexLifted(i, j + 1, b, n);
+        writeSegPos(V_BASE + i * GV + j, a, b);
+        writeSegColor(V_BASE + i * GV + j, COL_OPEN);
+      }
+    }
+    gridGeo.attributes.position.needsUpdate = true;
+  })();
+
+  // Vertex cursor — a small bright sphere snapped to grid vertices.
+  const cursor = {
+    i: 0, j: Math.floor(GV / 2),
+    mesh: new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffe800 })
+    ),
+  };
+  cursor.mesh.visible = false;
+  world.add(cursor.mesh);
+  function placeCursor() {
+    const p = new THREE.Vector3(), n = new THREE.Vector3();
+    gridVertexLifted(cursor.i, cursor.j, p, n);
+    cursor.mesh.position.copy(p);
+  }
+  placeCursor();
+
+  let whorlMode = false;
+  function toggleWhorl() {
+    whorlMode = !whorlMode;
+    gridMesh.visible = whorlMode;
+    cursor.mesh.visible = whorlMode;
+    whorlFillMesh.visible = whorlMode;
+    if (whorlMode) { playerMesh.visible = false; updateWhorlHUD(); }
+    else playerMesh.visible = true;
+  }
+
+  function paintUEdge(i, j) {
+    if (uEdge[i][j]) return;
+    uEdge[i][j] = 1;
+    writeSegColor(U_BASE + i * (GV + 1) + j, COL_PAINTED);
+  }
+  function paintVEdge(i, j) {
+    if (vEdge[i][j]) return;
+    vEdge[i][j] = 1;
+    writeSegColor(V_BASE + i * GV + j, COL_PAINTED);
+  }
+
+  function stepCursor(di, dj) {
+    if (!whorlMode) return;
+    const ni = ((cursor.i + di) % GU + GU) % GU;          // wrap u
+    const nj = Math.max(0, Math.min(GV, cursor.j + dj));  // clamp v
+    if (ni === cursor.i && nj === cursor.j) return;       // hit v boundary
+    if (di !== 0) {
+      // u-edge: from min(i,ni) outgoing, but with wrap we use cursor.i if di>0
+      const ei = di > 0 ? cursor.i : ni;
+      paintUEdge(ei, cursor.j);
+    } else {
+      const ej = dj > 0 ? cursor.j : nj;
+      paintVEdge(cursor.i, ej);
+    }
+    cursor.i = ni; cursor.j = nj;
+    placeCursor();
+    runClosure();
+  }
+
+  // ─── Closure / flood fill ───────────────────────────────────────────────
+  // closedCell[i][j] = 1 once enclosed by painted edges.
+  const closedCell = [];
+  for (let i = 0; i < GU; i++) closedCell.push(new Uint8Array(GV));
+  let closedCount = 0;
+  const TOTAL_CELLS = GU * GV;
+
+  // Pre-allocate a closed-cell mesh — 6 verts per cell, vertex coloured.
+  const whorlFillGeo = new THREE.BufferGeometry();
+  const whorlFillPos = new Float32Array(TOTAL_CELLS * 6 * 3);
+  const whorlFillCol = new Float32Array(TOTAL_CELLS * 6 * 3);
+  whorlFillGeo.setAttribute('position', new THREE.BufferAttribute(whorlFillPos, 3));
+  whorlFillGeo.setAttribute('color', new THREE.BufferAttribute(whorlFillCol, 3));
+  whorlFillGeo.setDrawRange(0, 0);
+  const whorlFillMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const whorlFillMesh = new THREE.Mesh(whorlFillGeo, whorlFillMat);
+  whorlFillMesh.frustumCulled = false;
+  whorlFillMesh.visible = false;
+  world.add(whorlFillMesh);
+
+  // HUD percent / score reuse Qixoid's elements when in Whorl mode.
+  const PHI = 1.6180339887;
+  function whorlScore(p) { return Math.floor(1000 * Math.pow(p, PHI)); }
+
+  function rebuildWhorlFill() {
+    const c00 = new THREE.Vector3(), c10 = new THREE.Vector3();
+    const c01 = new THREE.Vector3(), c11 = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    let p = 0, c = 0;
+    for (let i = 0; i < GU; i++) {
+      for (let j = 0; j < GV; j++) {
+        if (!closedCell[i][j]) continue;
+        gridVertexLifted(i, j, c00, n);
+        gridVertexLifted((i + 1) % GU, j, c10, n);
+        gridVertexLifted(i, j + 1, c01, n);
+        gridVertexLifted((i + 1) % GU, j + 1, c11, n);
+        // shrink slightly toward centroid so painted edges remain visible
+        const cx = (c00.x + c10.x + c01.x + c11.x) * 0.25;
+        const cy = (c00.y + c10.y + c01.y + c11.y) * 0.25;
+        const cz = (c00.z + c10.z + c01.z + c11.z) * 0.25;
+        const k = 0.92;
+        const corners = [c00, c10, c01, c11];
+        for (let q = 0; q < 4; q++) {
+          corners[q].x = cx + (corners[q].x - cx) * k;
+          corners[q].y = cy + (corners[q].y - cy) * k;
+          corners[q].z = cz + (corners[q].z - cz) * k;
+        }
+        // color: phi-cycled palette pulled from existing palette
+        const phase = ((j / GV) * PALETTE.length) % PALETTE.length;
+        const a = PALETTE[Math.floor(phase) % PALETTE.length];
+        const b = PALETTE[(Math.floor(phase) + 1) % PALETTE.length];
+        const tt = phase - Math.floor(phase);
+        const cr = a.r * (1 - tt) + b.r * tt;
+        const cg = a.g * (1 - tt) + b.g * tt;
+        const cb = a.b * (1 - tt) + b.b * tt;
+        const order = [c00, c01, c10, c10, c01, c11];
+        for (let k2 = 0; k2 < 6; k2++) {
+          whorlFillPos[p++] = order[k2].x;
+          whorlFillPos[p++] = order[k2].y;
+          whorlFillPos[p++] = order[k2].z;
+          whorlFillCol[c++] = cr;
+          whorlFillCol[c++] = cg;
+          whorlFillCol[c++] = cb;
+        }
+      }
+    }
+    whorlFillGeo.setDrawRange(0, p / 3);
+    whorlFillGeo.attributes.position.needsUpdate = true;
+    whorlFillGeo.attributes.color.needsUpdate = true;
+    whorlFillGeo.computeBoundingSphere();
+  }
+
+  // Flood fill from the v=0 and v=GV boundaries through OPEN cells, treating
+  // painted edges as walls. Any open cell not reached is enclosed → close it.
+  function runClosure() {
+    const visited = [];
+    for (let i = 0; i < GU; i++) visited.push(new Uint8Array(GV));
+    const stack = [];
+    // Seed from both v-boundaries; any cell already closed acts as a wall.
+    for (let i = 0; i < GU; i++) {
+      if (!closedCell[i][0]) { visited[i][0] = 1; stack.push(i, 0); }
+      if (!closedCell[i][GV - 1]) {
+        if (!visited[i][GV - 1]) { visited[i][GV - 1] = 1; stack.push(i, GV - 1); }
+      }
+    }
+    while (stack.length) {
+      const j = stack.pop();
+      const i = stack.pop();
+      // neighbour −j across uEdge[i][j]
+      if (j > 0 && !visited[i][j - 1] && !closedCell[i][j - 1] && !uEdge[i][j]) {
+        visited[i][j - 1] = 1; stack.push(i, j - 1);
+      }
+      // neighbour +j across uEdge[i][j+1]
+      if (j < GV - 1 && !visited[i][j + 1] && !closedCell[i][j + 1] && !uEdge[i][j + 1]) {
+        visited[i][j + 1] = 1; stack.push(i, j + 1);
+      }
+      // neighbour −i across vEdge[i][j]
+      const im = (i - 1 + GU) % GU;
+      if (!visited[im][j] && !closedCell[im][j] && !vEdge[i][j]) {
+        visited[im][j] = 1; stack.push(im, j);
+      }
+      // neighbour +i across vEdge[(i+1)%GU][j]
+      const ip = (i + 1) % GU;
+      if (!visited[ip][j] && !closedCell[ip][j] && !vEdge[ip][j]) {
+        visited[ip][j] = 1; stack.push(ip, j);
+      }
+    }
+    // Any unvisited, currently open cell is enclosed.
+    let newlyClosed = 0;
+    for (let i = 0; i < GU; i++) {
+      for (let j = 0; j < GV; j++) {
+        if (!closedCell[i][j] && !visited[i][j]) {
+          closedCell[i][j] = 1;
+          newlyClosed++;
+        }
+      }
+    }
+    if (newlyClosed > 0) {
+      closedCount += newlyClosed;
+      rebuildWhorlFill();
+      updateWhorlHUD();
+    }
+  }
+
+  function updateWhorlHUD() {
+    if (!whorlMode) return;
+    const p = closedCount / TOTAL_CELLS;
+    const pct = (p * 100).toFixed(0);
+    if (hudClaimed) hudClaimed.textContent = pct + '%';
+    if (hudScore) hudScore.textContent = String(whorlScore(p));
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'g' || e.key === 'G') { toggleWhorl(); return; }
+    if (!whorlMode) return;
+    switch (e.key) {
+      case 'ArrowRight': case 'd': case 'D': stepCursor(+1, 0); break;
+      case 'ArrowLeft': case 'a': case 'A': stepCursor(-1, 0); break;
+      case 'ArrowUp': case 'w': case 'W': stepCursor(0, +1); break;
+      case 'ArrowDown': case 's': case 'S': stepCursor(0, -1); break;
+      default: return;
+    }
+    e.preventDefault();
   });
 
   // ─── Resize ──────────────────────────────────────────────────────────────
@@ -792,14 +1400,20 @@
     }
     updateBlobs(dt, t);
 
+    // Keep the score-bonus flash visible for the full ~1.4s window.
+    if (player.lastFillFlashUntil > now) {
+      updateHUD();
+    } else if (player.lastFillFlashUntil > 0 && player.lastFillFlashUntil <= now) {
+      player.lastFillFlashUntil = 0;
+      updateHUD();
+    }
+
     if (claimedDirty) {
       rebuildClaimedMesh(t);
       claimedDirty = false;
     }
 
-    // Slow drift of the shell for the lava-lamp feel.
-    shell.rotation.y = t * 0.04;
-    glow.rotation.y = t * 0.04;
+    // Shell rotation is now driven entirely by the user's LMB drag — no auto-spin.
 
     controls.update();
     renderer.render(scene, camera);

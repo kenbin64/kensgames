@@ -1,7 +1,7 @@
 {
   "manifold": "qixoid",
   "name": "Qixoid",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "status": "production",
   "dimension": {
     "x": 1,
@@ -13,12 +13,13 @@
   "substrates": {
     "game": "game.js"
   },
-  "tagline": "3D Qix on a torus",
-  "description": "A modern 3D take on the 1981 arcade classic Qix. Claim territory on the surface of a torus while a chaotic Qix entity hunts your unfinished stake. Capture 75 percent of the surface to win.",
+  "tagline": "3D Qix on a snail shell",
+  "description": "A modern 3D take on the 1981 arcade classic Qix. Claim territory on the surface of a parametric snail shell while meandering plasma Qix entities — each with writhing tentacles — hunt your unfinished filament. If a tentacle or core touches your live filament, the fill is destroyed and you lose a life. Bigger fills pay disproportionately more. Capture 80 percent of the surface to win.",
   "controls": {
-    "ArrowKeys/WASD": "move along the grid",
-    "Space": "stake into unclaimed territory",
-    "Mouse drag": "rotate the torus"
+    "Mouse": "walk along the snail shell",
+    "Hold LMB": "stake out a filament (live and dangerous)",
+    "RMB drag": "rotate the shell",
+    "C": "toggle inside / outside camera"
   },
   "manifold_bridge": {
     "entry_var": "window.__MANIFOLD__",
