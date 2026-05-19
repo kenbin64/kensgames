@@ -2932,6 +2932,44 @@ textarea,
   display: none !important;
 }
 
+/* Pass-turn safety button (user_directive_2026-05-19) — always visible inside
+   the action panel so a stuck player can manually end their turn. */
+#panel-action #btn-pass-turn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff8d8;
+  background: linear-gradient(180deg, rgba(140, 60, 80, 0.85), rgba(80, 24, 40, 0.92));
+  border: 1.5px solid rgba(255, 154, 122, 0.85);
+  border-radius: 10px;
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 120, 90, 0.25);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+#panel-action #btn-pass-turn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, rgba(170, 75, 95, 0.92), rgba(95, 30, 50, 0.95));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 140, 105, 0.45);
+}
+
+#panel-action #btn-pass-turn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 760px) {
+  #panel-action #btn-pass-turn {
+    margin-left: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
 /* Make the card big and deck-like. Layered shadow gives a "stack" cue. */
 #panel-action #current-card {
   width: 72px;

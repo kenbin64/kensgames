@@ -2604,6 +2604,125 @@ function executeMove(moveIdx) {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PASS TURN — universal safety-net (user_directive_2026-05-19)
+// ─────────────────────────────────────────────────────────────────────────
+// If for any reason the game appears stuck on the current player's turn
+// (no legal moves detected but the "End Turn" hint never appeared, a split
+// stuck in mid-selection, a broken validMoves pipeline, etc.), the player
+// can force their turn to end via the always-visible "⏭ Pass" button or
+// the watchdog auto-trigger. Per rules.json (CARD_NO_LEGAL_MOVE):
+//   legalMoves.length === 0 ==> discard(card); endTurn(); extraTurn = false
+// We apply the same outcome unconditionally on pass: clear the card, clear
+// any split-pick state, then route through the normal endTurn() so MP
+// turn-advance broadcasts fire on the correct path.
+// ═══════════════════════════════════════════════════════════════════════════
+function passTurn(reason) {
+  try {
+    // In MP, only the active player may pass their own turn (or the host
+    // for a bot that's wedged). Mirrors the endTurn() authority check.
+    if (_isMpMode()) {
+      const players = state.players.get('list') || [];
+      const ci = state.players.get('current') || 0;
+      const cur = players[ci];
+      const curIsBot = !!(cur && cur.isBot);
+      const allowed = curIsBot ? _isHost() : _isMyTurn();
+      if (!allowed) {
+        console.warn('[PASS] Ignored — not active player and not host-for-bot.');
+        return;
+      }
+    }
+    // Clear in-progress split selection so the next turn starts fresh.
+    if (typeof _splitPegIdx !== 'undefined') _splitPegIdx = null;
+    if (typeof _splitStepChoice !== 'undefined') _splitStepChoice = null;
+    // Clear any lingering highlights & the toast dedupe key.
+    if (window.clearHighlights) try { window.clearHighlights(); } catch (_) { }
+    _lastNoLegalMoveTurnStamp = null;
+    // Clear the in-progress card and validMoves so endTurn / next-player UI
+    // is reset and no stale move can be replayed.
+    try { state.deck.set('currentCard', null); } catch (_) { }
+    try { state.turn.set('validMoves', []); } catch (_) { }
+    try { state.turn.set('phase', 'draw'); } catch (_) { }
+    const players = state.players.get('list') || [];
+    const ci = state.players.get('current') || 0;
+    const curPlayer = players[ci] || {};
+    showCenterToast(
+      `${curPlayer.name || 'Player'}: turn passed${reason ? ' (' + reason + ')' : ''}`,
+      curPlayer.color || '#ff9a7a',
+      1800
+    );
+    log(`⏭ ${curPlayer.name || 'Player'} passed their turn${reason ? ' (' + reason + ')' : ''}.`);
+    endTurn();
+  } catch (err) {
+    console.error('[PASS] passTurn() failed:', err);
+    // Last-ditch: try to advance turn anyway so the game doesn't freeze.
+    try { endTurn(); } catch (_) { }
+  }
+}
+if (typeof window !== 'undefined') window.passTurn = passTurn;
+
+// ── STUCK-TURN WATCHDOG ─────────────────────────────────────────────────
+// Polls every 2s. If the current player is human (not bot), it's their
+// turn (or solo/same-screen), validMoves is empty, AND no card draw is
+// pending (phase !== 'draw'), we count down ~12s of inactivity before
+// auto-passing. Resets whenever phase/validMoves change.
+let _stuckWatchdogTimer = null;
+let _stuckSinceMs = 0;
+let _stuckLastSig = '';
+const STUCK_AUTO_PASS_MS = 12000;
+function _stuckSig() {
+  try {
+    const ci = state.players.get('current') || 0;
+    const phase = state.turn.get('phase');
+    const vmLen = (state.turn.get('validMoves') || []).length;
+    const card = state.deck.get('currentCard');
+    return `${ci}|${phase}|${vmLen}|${card && card.id}`;
+  } catch (_) { return ''; }
+}
+function _stuckWatchdogTick() {
+  try {
+    const players = state.players.get('list') || [];
+    const ci = state.players.get('current') || 0;
+    const cur = players[ci];
+    if (!cur || cur.isBot) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
+    if (_isMpMode() && !_isMyTurn()) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
+    const phase = state.turn.get('phase');
+    const vm = state.turn.get('validMoves') || [];
+    const card = state.deck.get('currentCard');
+    // Only consider "stuck" when a card has been drawn and no legal moves exist.
+    if (!card || vm.length > 0 || phase === 'draw') {
+      _stuckSinceMs = 0;
+      _stuckLastSig = _stuckSig();
+      return;
+    }
+    const sig = _stuckSig();
+    if (sig !== _stuckLastSig) {
+      _stuckLastSig = sig;
+      _stuckSinceMs = Date.now();
+      return;
+    }
+    if (!_stuckSinceMs) _stuckSinceMs = Date.now();
+    if (Date.now() - _stuckSinceMs >= STUCK_AUTO_PASS_MS) {
+      console.warn('[WATCHDOG] Stuck turn detected — auto-passing.');
+      _stuckSinceMs = 0;
+      _stuckLastSig = '';
+      passTurn('auto');
+    }
+  } catch (_) { /* ignore */ }
+}
+function _ensureStuckWatchdog() {
+  if (_stuckWatchdogTimer) return;
+  _stuckWatchdogTimer = setInterval(_stuckWatchdogTick, 2000);
+}
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _ensureStuckWatchdog, { once: true });
+  } else {
+    _ensureStuckWatchdog();
+  }
+}
+
+
 function endTurn() {
   // Clear any lingering path highlights
   if (window.clearHighlights) window.clearHighlights();

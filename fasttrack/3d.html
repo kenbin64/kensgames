@@ -134,6 +134,13 @@
     <button id="btn-break" class="hidden"
       onclick="(function(){ var b=document.getElementById('btn-break'); if (b.textContent.indexOf('Resume')>=0) { window.resumeFromAfk && window.resumeFromAfk(); } else { window.takeBreak && window.takeBreak('manual'); } })()">☕
       Break</button>
+    <!-- Pass Turn safety button (user_directive_2026-05-19): always available
+         escape hatch if the game gets stuck on the current player's turn
+         (no legal moves not auto-detected, split selection wedged, etc.).
+         Per rules.json CARD_NO_LEGAL_MOVE this discards the card and ends
+         the turn with no extra-turn award. -->
+    <button id="btn-pass-turn" title="Pass this turn (use if stuck)" aria-label="Pass this turn"
+      onclick="if (window.passTurn) window.passTurn('manual');">⏭ Pass</button>
   </div>
 
   <!-- ── Move options panel — separate so choices never hide selected card ── -->
