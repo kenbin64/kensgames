@@ -1,12 +1,12 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-19T01:00:00Z",
-  "build_sha": "release-v0.5.13",
+  "build_utc": "2026-05-19T02:00:00Z",
+  "build_sha": "release-v0.5.14",
   "x_dimensional_governance": true,
   "status": "live",
-  "notes": "Fast Track entry-choice bugfix: a peg that LANDS on its own ft-{bp} hole now correctly gets both options (continue on the outer rim OR jump to the inner fast-track ring). Previous build required the peg to be sitting at its own home hole to enter FT — geometrically unreachable from clockwise movement (75 steps away) — so the FT-entry choice was effectively never offered. Combined with v0.5.12's auto-commit-on-single-choice, this silently kept pegs on the main track every time they hit FT."
+  "notes": "Card-7 split: bullseye now ALWAYS appears as a destination choice when geometrically legal. Previously the FT-peg-stays-on-FT constraint rejected any split half whose path ended in 'bullseye' (because bullseye isn't an 'ft-*' hole), silently dropping every variant where an FT peg reached the win circle in its half. Reaching bullseye IS completing the fast track, not leaving it — now treated as a valid FT terminus."
 }

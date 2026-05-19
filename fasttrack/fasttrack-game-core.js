@@ -1482,17 +1482,35 @@ function calculateValidMoves() {
       //   1. If the player has N FT pegs, the split must include min(N,2)
       //      of them as either peg1 or peg2 (can't substitute a non-FT peg
       //      while an FT peg is still available to use).
-      //   2. Each FT peg involved in the split must keep its half ENTIRELY
-      //      on the FT ring — every position in its path starts with 'ft-'.
-      //      Landing on own ft-{bp} counts as completion (still on FT).
-      //      Leaving FT mid-split (to outer rim, safe, or bullseye) is
-      //      forbidden — that's "leaving FT" which would lose FT for all.
+      //   2. Each FT peg involved in the split must keep its half on the FT
+      //      ring OR finish at bullseye. Every intermediate position must
+      //      start with 'ft-'; the final position may be either an 'ft-*'
+      //      hole (still on FT — landing on own ft-{bp} counts as completion)
+      //      or 'bullseye' (FT journey COMPLETED — bullseye IS the goal of
+      //      fast track, so reaching it is not "leaving", it is finishing).
+      //      Going to outer rim or safe zone mid-split is still forbidden —
+      //      that's a true mid-FT abort that would lose FT for all.
       //   3. Untouched FT pegs (when player has 3+ FT pegs) keep FT status.
       //   4. Partial FT movement is legal — peg2 with only 2 steps left on
       //      the ring may move 2 (doesn't have to complete).
+      // user_directive_2026-05-19 — "bullseye should always be a choice if it
+      //   is a legal move". Previously `_isAllFT` rejected any path ending
+      //   in 'bullseye' because 'bullseye' doesn't start with 'ft-', which
+      //   silently dropped every split variant where an FT peg reached
+      //   bullseye in its half. That's now allowed as terminal-only.
       const _ftPegCount = player.pegs.filter(p => p.onFasttrack).length;
-      const _isAllFT = (path) =>
-        Array.isArray(path) && path.every(h => typeof h === 'string' && h.startsWith('ft-'));
+      const _isAllFT = (path) => {
+        if (!Array.isArray(path) || path.length === 0) return false;
+        for (let i = 0; i < path.length; i++) {
+          const h = path[i];
+          if (typeof h !== 'string') return false;
+          if (h.startsWith('ft-')) continue;
+          // bullseye is permitted only as the FINAL hop (FT completion).
+          if (h === 'bullseye' && i === path.length - 1) continue;
+          return false;
+        }
+        return true;
+      };
       const _ftRuleOK = (path1, path2, peg1, peg2) => {
         if (_ftPegCount === 0) return true;
         const ftInSplit = (peg1.onFasttrack ? 1 : 0) + (peg2.onFasttrack ? 1 : 0);
