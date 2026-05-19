@@ -1292,19 +1292,23 @@ function calculateValidMoves() {
         if (!blocked) {
           moves.push({ type: 'move', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
 
-          // FT entry: Only allow if moving forward (clockwise), not already on FT, not mustExitFasttrack, not a noFastTrack card, and only from player's own FT entry point
+          // FT entry: offer the inner-ring jump whenever the peg LANDS on its
+          // own ft-${bp} hole going clockwise. Starting position doesn't
+          // matter — Bambi (or anyone) can hit FT from any outer-rim hole.
+          // The peg must not already be on FT, the card must not be a
+          // noFastTrack card, and the peg must not be flagged mustExitFasttrack.
+          // bugfix_2026-05-19: previous code required peg.holeId === `home-${bp}`
+          // which is geometrically unreachable from clockwise motion (own home
+          // is 9 holes PAST own ft-${bp}, requiring a 75-step move), so the
+          // FT-entry choice was effectively never generated.
           if (
             dir === 'clockwise' &&
-            dest.startsWith('ft-') &&
+            dest === `ft-${bp}` &&
             !peg.onFasttrack &&
             !rules.noFastTrack &&
-            !peg.mustExitFasttrack &&
-            peg.holeId === `home-${bp}` // Only allow entry from own home hole
+            !peg.mustExitFasttrack
           ) {
-            // Only allow entry to player's own FT entry hole
-            if (dest === `ft-${bp}`) {
-              moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
-            }
+            moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
           }
         }
       }
@@ -2238,9 +2242,12 @@ function executeMove(moveIdx) {
     }
 
     case 'enterFastTrack': {
-      // Only allow FT entry if moving from own home hole to own FT entry
+      // bugfix_2026-05-19: FT entry is legal whenever the destination is the
+      // player's own ft-${bp} hole and the peg is not already on FT. Removed
+      // the spurious `peg.holeId === home-${bp}` gate (see calculateValidMoves
+      // for full reasoning).
       const bp = player.boardPosition;
-      if (peg.holeId === `home-${bp}` && move.dest === `ft-${bp}`) {
+      if (move.dest === `ft-${bp}` && !peg.onFasttrack) {
         peg.onFasttrack = true;
         peg.fasttrackEntryHole = move.from || peg.holeId;
         peg.mood = 'EXCITED';

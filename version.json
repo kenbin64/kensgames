@@ -1,12 +1,12 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.12",
+  "version": "0.5.13",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-19T00:00:00Z",
-  "build_sha": "release-v0.5.12",
+  "build_utc": "2026-05-19T01:00:00Z",
+  "build_sha": "release-v0.5.13",
   "x_dimensional_governance": true,
   "status": "live",
-  "notes": "Fast Track UX overhaul: removed downward cone arrows and vertical peg beacons (the 'rays of light' that got in the way) — pulsing halo rings are now the sole peg/destination cue; clicking a destination hole stages and (if unambiguous or re-clicked) commits a move directly; single-choice moves (including card-7 splits with only one combination) auto-commit without requiring a Confirm press; on desktop the peg button bar is hidden entirely (board clicks are primary input); on phones the bar becomes a full-width docked tab panel and the card deck floats 5px directly above it"
+  "notes": "Fast Track entry-choice bugfix: a peg that LANDS on its own ft-{bp} hole now correctly gets both options (continue on the outer rim OR jump to the inner fast-track ring). Previous build required the peg to be sitting at its own home hole to enter FT — geometrically unreachable from clockwise movement (75 steps away) — so the FT-entry choice was effectively never offered. Combined with v0.5.12's auto-commit-on-single-choice, this silently kept pegs on the main track every time they hit FT."
 }
