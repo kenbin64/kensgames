@@ -4179,6 +4179,13 @@
       }
     }
 
+    /* Always show on desktop too — user can use it instead of keyboard. */
+    @media (min-width: 981px) and (hover: hover) and (pointer: fine) {
+      #sf-diamond-pad {
+        display: block;
+      }
+    }
+
     .sf-pad-btn {
       position: absolute;
       width: 64px;
@@ -4286,8 +4293,10 @@
 
     /* Compact desktop mode (large screens with touch pad shown via toggle) */
     @media (min-width: 981px) and (hover: hover) and (pointer: fine) {
+
+      /* Always shown above; keep rule as no-op anchor in case of override. */
       body:not(.sf-pad-on) #sf-diamond-pad {
-        display: none;
+        display: block;
       }
     }
 
@@ -4343,27 +4352,29 @@
     /* ── Retire all legacy on-screen combat buttons ──
        The diamond pad + hotkeys (G/C/F/P/L/F5) now cover every action.
        The old buttons were clunky, overlapping, and (in pointer-lock)
-       unreachable. Hide them entirely. Gauges/indicators that *show
-       state* are kept but made non-interactive. */
+       unreachable. Hide them entirely AND strip them from the DOM in JS
+       below to make sure they cannot bleed through other layers. */
     #rescue-btn,
     #cm-deploy-btn,
     #sf-frigate-btn,
     #console-buttons,
+    #console-buttons *,
     #mob-btn-group,
-    #training-skip-btn {
-      display: none !important;
-    }
-
-    /* Keep countermeasure gauge visible as a status indicator only */
+    #mob-btn-group *,
+    #training-skip-btn,
     #cm-gauge-container {
+      display: none !important;
+      visibility: hidden !important;
       pointer-events: none !important;
-      opacity: 0.7;
+      opacity: 0 !important;
     }
 
     /* Radar retired — gets in the way of the battle scene. Enemies are
        now visible directly via the brightened scene lighting + on-HUD
        target lock cues. */
-    #radar-overlay { display: none !important; }
+    #radar-overlay {
+      display: none !important;
+    }
   </style>
 
   <div id="sf-diamond-pad" aria-label="Combat controls">
@@ -4511,6 +4522,22 @@
   <script>
     (function () {
       'use strict';
+      // ── Strip retired combat buttons from the DOM entirely ──
+      // Belt + suspenders: CSS hides them, this rips them out so they
+      // can never bleed through other layers or steal pointer events.
+      function stripLegacy() {
+        var ids = ['rescue-btn', 'cm-deploy-btn', 'sf-frigate-btn',
+          'console-buttons', 'mob-btn-group', 'training-skip-btn',
+          'cm-gauge-container'];
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+      stripLegacy();
+      // Re-strip if game code re-injects them later.
+      setInterval(stripLegacy, 2000);
+
       // ── Wire diamond pad buttons directly to Starfighter API ──
       // Independent of SFInput.isMobile so it works on resized desktop windows.
       var pad = document.getElementById('sf-diamond-pad');
@@ -4521,29 +4548,33 @@
         var s = SF() && SF().getState && SF().getState();
         return s && s.player;
       }
-      function inCombat() {
-        var sf = SF();
-        if (!sf || !sf.getPhase) return true;
-        var p = sf.getPhase();
-        return p !== 'bay-ready' && p !== 'launching' && p !== 'docking' && p !== 'briefing';
+
+      // Release pointer-lock if active so subsequent clicks register on UI.
+      function unlockPointer() {
+        try {
+          if (document.pointerLockElement && document.exitPointerLock) {
+            document.exitPointerLock();
+          }
+        } catch (_) { }
       }
 
-      // Tap-only buttons (single fire)
+      // Tap-only buttons (single fire). Uses pointerdown — one path for
+      // mouse + touch + pen — and stops propagation so the underlying
+      // canvas doesn't re-engage pointer-lock on the same gesture.
       function bindTap(id, fn) {
         var el = document.getElementById(id);
         if (!el) return;
         var fire = function (e) {
-          if (e) { e.preventDefault(); e.stopPropagation(); }
-          if (!inCombat()) return;
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          }
+          unlockPointer();
           try { fn(); } catch (err) { console.warn('[sf-pad]', id, err); }
         };
+        el.addEventListener('pointerdown', fire, { passive: false });
         el.addEventListener('touchstart', fire, { passive: false });
-        el.addEventListener('mousedown', function (e) {
-          // ignore right/middle clicks
-          if (e.button !== 0) return;
-          fire(e);
-        });
-        // Prevent context menu / focus stealing
         el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
       }
 
@@ -4555,14 +4586,17 @@
         var timer = null;
 
         function start(e) {
-          if (e) { e.preventDefault(); e.stopPropagation(); }
-          if (!inCombat()) return;
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          }
+          unlockPointer();
           if (holding) return;
           holding = true;
           el.classList.add('held');
           if (opts.onStart) { try { opts.onStart(); } catch (_) { } }
           if (opts.repeatMs) {
-            // Initial fire + repeat
             try { opts.onTick && opts.onTick(); } catch (_) { }
             timer = setInterval(function () {
               if (!holding) return;
@@ -4570,7 +4604,7 @@
             }, opts.repeatMs);
           }
         }
-        function end(e) {
+        function end() {
           if (!holding) return;
           holding = false;
           el.classList.remove('held');
@@ -4578,15 +4612,13 @@
           if (opts.onEnd) { try { opts.onEnd(); } catch (_) { } }
         }
 
+        el.addEventListener('pointerdown', start, { passive: false });
+        el.addEventListener('pointerup', end);
+        el.addEventListener('pointercancel', end);
+        el.addEventListener('pointerleave', end);
         el.addEventListener('touchstart', start, { passive: false });
         el.addEventListener('touchend', end, { passive: false });
         el.addEventListener('touchcancel', end, { passive: false });
-        el.addEventListener('mousedown', function (e) {
-          if (e.button !== 0) return;
-          start(e);
-        });
-        // Release anywhere
-        window.addEventListener('mouseup', end);
         window.addEventListener('blur', end);
         el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
       }
@@ -4619,23 +4651,17 @@
         onEnd: function () { var p = player(); if (p) p.afterburnerActive = false; }
       });
 
-      // ── Optional: expose toggle on desktop large screens ──
-      // Press backslash (\) to show/hide the pad as a non-touch control aid.
+      // Backslash key still toggles the pad off (visual aid)
       window.addEventListener('keydown', function (e) {
         if (e.code === 'Backslash' && !e.repeat) {
-          document.body.classList.toggle('sf-pad-on');
+          document.body.classList.toggle('sf-pad-off');
         }
       });
 
       // ── Phase-aware visibility: dim the pad when not in combat ──
       function syncVisibility() {
-        var combat = inCombat();
-        pad.style.opacity = combat ? '1' : '0.35';
-        pad.style.pointerEvents = combat ? '' : 'none';
-        if (thr) {
-          thr.style.opacity = combat ? '1' : '0.35';
-          thr.style.pointerEvents = combat ? 'auto' : 'none';
-        }
+        pad.style.opacity = '1';
+        if (thr) thr.style.opacity = '1';
       }
       setInterval(syncVisibility, 500);
 
@@ -4684,7 +4710,7 @@
 
       function thrStart(e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }
-        if (!inCombat()) return;
+        unlockPointer();
         dragging = true;
         thr.classList.add('dragging');
         updateFromEvent(e);
