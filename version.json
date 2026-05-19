@@ -1,12 +1,12 @@
 {
   "product": "kens-games",
   "track": "mvp",
-  "version": "0.5.11",
+  "version": "0.5.12",
   "release_channel": "production",
   "delta_level": "delta-1",
-  "build_utc": "2026-05-18T22:30:00Z",
-  "build_sha": "release-v0.5.11",
+  "build_utc": "2026-05-19T00:00:00Z",
+  "build_sha": "release-v0.5.12",
   "x_dimensional_governance": true,
   "status": "live",
-  "notes": "Starfighter UI cleanup: legacy combat buttons stripped from DOM (no more ghost overlays); diamond-pad rewired with unified pointerdown + pointer-lock auto-release so taps register on desktop and mobile; combat-phase gating removed so buttons always fire"
+  "notes": "Fast Track UX overhaul: removed downward cone arrows and vertical peg beacons (the 'rays of light' that got in the way) — pulsing halo rings are now the sole peg/destination cue; clicking a destination hole stages and (if unambiguous or re-clicked) commits a move directly; single-choice moves (including card-7 splits with only one combination) auto-commit without requiring a Confirm press; on desktop the peg button bar is hidden entirely (board clicks are primary input); on phones the bar becomes a full-width docked tab panel and the card deck floats 5px directly above it"
 }

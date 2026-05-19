@@ -5712,37 +5712,9 @@ function createGlowRing(holeId, color, isDestination, opts = {}) {
   boardGroup.add(disc);
   highlightMeshes.push(disc);
 
-  // user_directive_2026-05-10c: bright RED downward-pointing tapered arrow
-  // hovering directly over each commit destination, tip nearly touching the
-  // hole. Bobs vertically + pulses opacity so "tap here" reads instantly.
-  if (isDestination) {
-    const arrowH = 22;
-    const arrowR = 9;
-    const coneGeo = new THREE.ConeGeometry(arrowR, arrowH, 6);
-    // Cone defaults: apex at +Y/2, base at -Y/2. Rotate X by PI so the apex
-    // (tip) points DOWN at the hole. After rotation, apex is at local -Y/2.
-    coneGeo.rotateX(Math.PI);
-    const coneMat = new THREE.MeshBasicMaterial({
-      color: 0xff2030,                  // unmistakable red
-      transparent: true,
-      opacity: 0.95,
-      depthTest: false,                 // render on top of board geometry
-      depthWrite: false,
-    });
-    const cone = new THREE.Mesh(coneGeo, coneMat);
-    // Position cone so its tip sits ~6u above the hole surface; bob anim
-    // adds ±5u so the tip kisses the hole at the bottom of each cycle.
-    const tipClearance = 6;
-    const baseY = hole.position.y + tipClearance + arrowH / 2;
-    cone.position.set(hole.position.x, baseY, hole.position.z);
-    cone.renderOrder = 50;              // above all other highlight layers
-    cone.userData.isDestination = true;
-    cone.userData.isArrow = true;
-    cone.userData.pulsing = true;
-    cone.userData.baseY = baseY;
-    boardGroup.add(cone);
-    highlightMeshes.push(cone);
-  }
+  // user_directive_2026-05-19: cone arrows above destinations removed —
+  // they read as "rays of light" that got in the way of the board view.
+  // The pulsing ring halo alone is the destination cue now.
 
   return ring;
 }
@@ -5807,26 +5779,9 @@ function createPegHalo(pegId, color, opts = {}) {
   boardGroup.add(aura);
   highlightMeshes.push(aura);
 
-  // Vertical beacon — a tall thin cylinder rising from the peg so the chosen
-  // peg is obvious even when the camera is tilted away.
-  const beamGeo = new THREE.CylinderGeometry(1.4, 0.6, 80, 12, 1, true);
-  const beamMat = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.55,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const beam = new THREE.Mesh(beamGeo, beamMat);
-  beam.position.set(px, ringY + 40, pz);
-  beam.renderOrder = 11;
-  beam.userData.isDestination = true; // pulses in sync with the primary ring
-  beam.userData.isDisc = true;        // disc-style opacity curve (subtle)
-  beam.userData.pulsing = pulsing;
-  beam.userData.isBeam = true;
-  boardGroup.add(beam);
-  highlightMeshes.push(beam);
+  // user_directive_2026-05-19: vertical peg beacon cylinder removed — was
+  // perceived as an in-the-way "ray of light". The pulsing inner + outer
+  // rings (above) are the sole peg-selection cue now.
 
   return ring;
 }
@@ -6132,14 +6087,10 @@ function _maybeAutoCommitSingle() {
   if (_autoCommitScheduled) return;
   if (!_moveCycle || _moveCycle.length !== 1) return;
   const targetEntry = _moveCycle[0];
-  // user_directive_2026-05-18 — NEVER auto-commit a terminal move on behalf
-  // of a human. Even with only one legal play the player must press Confirm,
-  // otherwise it feels like the game skipped their turn (turn ends before
-  // they got to look at the board / acknowledge the move). Only intermediate
-  // split-7 sub-stages (peg pick, then steps pick) auto-advance — those are
-  // forced-choice plumbing, not the actual play.
-  const k = targetEntry && targetEntry.kind;
-  if (k !== 'split-first-peg' && k !== 'split-first') return;
+  // user_directive_2026-05-19 — when there is only ONE legal play, just
+  // execute it. Includes terminal moves (previous safeguard reverted per
+  // user feedback: "do not require any button pushing when there is only
+  // 1 choice"). Card-7 split sub-stages also auto-advance through this.
   _autoCommitScheduled = true;
   queueMicrotask(() => {
     _autoCommitScheduled = false;
@@ -6581,7 +6532,15 @@ function setupBoardPickHandler() {
     // Sync the master cycle so ◀/▶ continue from here.
     const cycleIdx = _moveCycle.findIndex(e2 => _entryKey(e2) === _entryKey(entry));
     if (cycleIdx >= 0) _moveCycleIdx = cycleIdx;
+    // user_directive_2026-05-19 — "for simple things the player should be
+    // able to push destination holes". Unambiguous click (only one route
+    // through this target) commits immediately. Multi-route clicks stage;
+    // re-clicking the same target after it's already staged commits.
+    const isReclick = _pendingEntry && _entryKey(_pendingEntry) === _entryKey(entry);
     _stagePendingEntry(entry);
+    if (matches.length === 1 || isReclick) {
+      _commitPendingEntry();
+    }
   });
 
   // Footer toolbar buttons — primary input on touch and desktop.
