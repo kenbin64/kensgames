@@ -3,20 +3,22 @@
   "_meta": {
     "id": "fasttrack",
     "name": "FastTrack",
-    "version": "3.0.0",
-    "compiled": "2026-04-25",
+    "version": "3.1.0",
+    "compiled": "2026-05-20",
     "axiom": "z = x * y",
     "supersedes": [
       "fasttrack/fasttrack_unified_rules (v2.0)",
       "fasttrack/fasttrack_game_spec.json (v1.0.0)",
       "fasttrack/board_manifold.js RULE_POINTS (inline)",
       "fasttrack/rules_substrate.js (DSL registry)",
-      "fasttrack/card_logic_substrate.js _cardDefinitions"
+      "fasttrack/card_logic_substrate.js _cardDefinitions",
+      "fasttrack/Fasttrack_game_rules.json (v3.0.0)"
     ],
     "notes": [
       "Single source of truth. Engine consumers must read this file and not encode parallel registries.",
       "Geometry was previously wrong in every source: outer track has 14 holes per wedge (84 total), not 36 or 72.",
-      "Variants 5-card-draw and 2-dice are intentionally omitted in 3.0.0 \u2014 awaiting authoritative rules."
+      "Variants 5-card-draw and 2-dice are intentionally omitted in 3.0.0 \u2014 awaiting authoritative rules.",
+      "v3.1.0 (2026-05-20) folds user_directive_2026-05-20 (AI_DIRECTIVE_RULES_CLARIFICATION.md v2): bullseye now cuttable (single-occupancy); FT-ring own-peg passing removed (Option A retired); redraw cards trigger extra turn even when forfeited for no legal moves; Card-7 split FT-priority constraints relaxed to two-different-pegs only; bullseye penultimate-entry restricted to pegs already on FT; bullseye exit fallback removed (blocked = illegal); FT loss on non-FT move evaluated per-draw; new rules FT_NO_SECOND_LAP, BULL_NO_REENTRY, TURN_PLAYER_CHOICE, TURN_AUTO_PLAY, SPLIT_ANTI_TUNNELING added."
     ]
   },
   "axes": {
@@ -98,7 +100,9 @@
       "naming": "center",
       "position": "exact_geometric_center",
       "max_pegs": 1,
-      "safe_from_cuts": true
+      "safe_from_cuts": false,
+      "cut_semantics": "single-occupancy: arrival of any peg cuts the resident peg back to holding (or home if holding full), regardless of color (own or opponent). No two pegs ever coexist at center.",
+      "no_reentry_after_exit": true
     }
   },
   "setup": {
@@ -473,13 +477,14 @@
       "y": 4,
       "z": 20,
       "category": "cut",
-      "desc": "Cannot cut pegs in holding, bullseye, or safe zone.",
-      "assertion": "destRules.canBeCut === true",
+      "desc": "Cannot cut pegs in holding or safe zone. Bullseye IS cuttable per single-occupancy rule: any arriving peg displaces the resident peg back to holding (home fallback if holding full). This applies whether arrival is own or opponent and whether by direct entry from FT or by bullseye-exit landing reroute.",
+      "assertion": "destRules.canBeCut === true || destHole === 'center'",
       "provenance": [
         "unified_rules",
         "rules_substrate.CUT_002",
         "board_manifold.R_CUT_SAFE_ZONES",
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.bullseye_cuttable"
       ]
     },
     {
@@ -514,10 +519,11 @@
       "y": 3,
       "z": 18,
       "category": "bullseye_entry",
-      "desc": "Peg not on FT may enter bullseye only if penultimate step lands on an FT hole and final step lands on bullseye, clockwise.",
-      "assertion": "!peg.onFasttrack ==> path.length>=2 && path[-2].startsWith('ft-') && path[-1]==='center' && !movingBackward",
+      "desc": "DEPRECATED in v3.1.0. Bullseye entry requires the peg to ALREADY be on a FT hole at the start of the move; multi-step paths from outer rim that pass through a FT hole into bullseye are NOT a legal entry route. See BULL_ENTRY_1STEP_FT and BULL_ENTRY_FROM_FT.",
+      "assertion": "!peg.onFasttrack ==> illegal_bullseye_entry",
       "provenance": [
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.bullseye_entry_requires_peg_starts_on_ft"
       ]
     },
     {
@@ -583,12 +589,13 @@
       "y": 3,
       "z": 21,
       "category": "bullseye_exit",
-      "desc": "If own FT hole is occupied by own peg, walk counter-clockwise through FT ring to first FT hole not occupied by own peg.",
-      "assertion": "while ownPegOn(target): target = ftRing.prev(target)",
+      "desc": "REMOVED in v3.1.0. No CCW fallback. If own FT hole / own home-stretch entrance is occupied by an own peg, the bullseye-exit move is illegal (own pegs block per MOV_NO_LAND_OWN). Player must select a different legal move; if none, forfeit the J/Q/K card per TURN_NO_LEGAL_MOVE.",
+      "assertion": "ownPegOn(exitTarget) ==> illegal",
       "provenance": [
         "unified_rules.bullseye.if_own_ft_occupied",
         "game_spec.json",
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.bullseye_exit_no_fallback"
       ]
     },
     {
@@ -703,12 +710,13 @@
       "y": 7,
       "z": 56,
       "category": "fasttrack",
-      "desc": "Any move that does not traverse FT with an FT peg ends FT status for ALL of that player's FT pegs at end of turn.",
-      "assertion": "moved_non_ft_peg && player.had_ft_pegs ==> at_end_of_turn: all_player_ft_pegs.onFasttrack = false",
+      "desc": "Any single DRAW in which the player has FT pegs but chooses to move a non-FT peg (or splits without using all available FT pegs per CARD_7_SPLIT scope) immediately ends FT status for ALL of that player's FT pegs. Evaluated per-draw (atomic event), NOT deferred to end-of-turn. A turn may contain multiple draws when redraw cards are played; each draw is evaluated independently.",
+      "assertion": "per_draw: moved_non_ft_peg && player.had_ft_pegs_at_draw_start ==> all_player_ft_pegs.onFasttrack = false",
       "provenance": [
         "unified_rules.fasttrack.losing_fasttrack.on_non_ft_move",
         "rules_substrate.SPECIAL_003",
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.per_draw_not_per_turn"
       ]
     },
     {
@@ -803,10 +811,11 @@
       "y": 6,
       "z": 54,
       "category": "safezone",
-      "desc": "When all 4 own safe-zone holes are filled, the 5th peg may move from outer-{p}-8 (or backward-4 past it) directly to home/winner ONLY as exact-landing winning move.",
-      "assertion": "safeZoneFull && peg.completedCircuit && exactLanding(home) ==> WIN",
+      "desc": "When all 4 own safe-zone holes are filled by own pegs, the 5th peg may move from outer-{p}-8 directly to home/winner ONLY as an exact-landing CLOCKWISE winning move (the safe zone branch is bypassed because all four slots are filled). Backward-4 winning is NOT permitted (would require a second lap past home, forbidden by FT_NO_SECOND_LAP).",
+      "assertion": "safeZoneFull && peg.completedCircuit && !movingBackward && exactLanding(home) ==> WIN",
       "provenance": [
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.no_backward_4_winning_move"
       ]
     },
     {
@@ -909,13 +918,14 @@
       "y": 4,
       "z": 44,
       "category": "turn",
-      "desc": "If no legal move exists, discard the card and end turn. No extra turn awarded.",
-      "assertion": "legalMoves.length === 0 ==> discard(card); endTurn(); extraTurn = false",
+      "desc": "If no legal move exists, discard the card. Extra turn is determined by CARD_REDRAW_SET membership ONLY — NOT by whether a legal move was played. A forfeited redraw card (A, 6, J, Q, K, Joker) still grants the redraw and the turn continues; a forfeited non-redraw card ends the turn.",
+      "assertion": "legalMoves.length === 0 ==> discard(card); extraTurn = (card.rank in CARD_REDRAW_SET); if (!extraTurn) endTurn()",
       "provenance": [
         "unified_rules",
         "game_spec.json",
         "rules_substrate.TURN_003",
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.redraw_triggers_regardless_of_forfeit"
       ]
     },
     {
@@ -924,14 +934,15 @@
       "y": 5,
       "z": 55,
       "category": "turn",
-      "desc": "Cards A, 6, J, Q, K, Joker grant an extra turn ONLY if a legal move was made.",
-      "assertion": "card.rank in ['A','6','J','Q','K','JOKER'] && playedLegalMove ==> extraTurn = true",
+      "desc": "Cards A, 6, J, Q, K, Joker grant an extra turn (redraw) whenever played, regardless of whether a legal move was executed or the card was forfeited for having no legal moves. Membership in CARD_REDRAW_SET is the sole condition.",
+      "assertion": "card.rank in ['A','6','J','Q','K','JOKER'] ==> extraTurn = true",
       "provenance": [
         "unified_rules",
         "game_spec.json",
         "rules_substrate.SPECIAL_001",
         "card_logic_substrate.grantsExtraTurn",
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.redraw_on_forfeit_too"
       ]
     },
     {
@@ -1045,11 +1056,12 @@
       "y": 21,
       "z": 42,
       "category": "card",
-      "desc": "Card 7 split with FT pegs (refined): (1) if the player has N FT pegs, the split must include min(N,2) of them — non-FT pegs cannot substitute while FT pegs are still available; (2) each FT peg used in the split must keep its half on the FT ring OR finish at bullseye — every intermediate position starts with 'ft-' and the final position is either an 'ft-*' hole (landing on own ft-{bp} counts as completion, still on FT) or 'bullseye' (FT journey COMPLETED — bullseye is the goal of fast track, reaching it is finishing, not leaving). Going to outer rim or safe zone mid-split is forbidden and would lose FT for all; (3) untouched FT pegs (when player has 3+ FT pegs) keep FT status; (4) partial FT movement is legal — peg2 with only 2 steps left on the ring may move 2 without completing; (5) FT-ring passing relax: own pegs may PASS each other on `ft-*` holes during the split — only landing on a same-color peg is forbidden (Option A); (6) user_directive_2026-05-19 — bullseye must ALWAYS appear as a split choice when geometrically legal; previously the FT-peg-terminus rule silently rejected bullseye-ending halves.",
-      "assertion": "isSplit && ft_peg_count >= 1 ==> ft_pegs_in_split >= min(ft_peg_count,2) && all_ft_paths_in_split.every(h => h.startsWith('ft-'))",
+      "desc": "Card 7 split semantics (v3.1.0): split is between exactly 2 DIFFERENT pegs, each half >=1, both halves must be individually legal moves, both clockwise, and every position visited by an FT peg during its half must start with 'ft-' OR be 'center' (bullseye) — moving an FT peg onto outer rim or safe zone mid-split is a voluntary FT exit and triggers FT loss per FT_LOSS_VOLUNTARY_EXIT. NO FT-peg-priority rule: the player may choose any two of their pegs (FT or non-FT) for the split. If splitting moves a non-FT peg while FT pegs exist, FT_LOSS_ON_NON_FT_MOVE fires for the player. Bullseye-ending halves are always offered when geometrically legal. FT-ring own-peg passing is FORBIDDEN per FT_RING_PASS_RELAX v3.1.0.",
+      "assertion": "isSplit ==> split.pegs.length===2 && split.pegs[0]!==split.pegs[1] && split.a>=1 && split.b>=1 && split.a+split.b===7 && all_legal(split) && (peg.onFasttrack ? path.every(h => h.startsWith('ft-') || h==='center') : true)",
       "provenance": [
-        "unified_rules.card_7.ft_peg_must_use_all_available_ft_pegs_and_stay_on_ft",
-        "user_directive_2026-04-25"
+        "unified_rules.card_7",
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20.card_7_no_ft_priority_constraint"
       ]
     },
     {
@@ -1058,10 +1070,11 @@
       "y": 9,
       "z": 72,
       "category": "fasttrack",
-      "desc": "On the FT ring (`ft-*` holes), own pegs may pass each other — the standard 'cannot pass own peg' rule is suspended for `ft-*` intermediate steps. The destination is still checked: a peg cannot land on its own peg. Applies to all card-driven movement (single-peg moves, FT exit options, enterFastTrack ring traversal, bullseye-via-penultimate routes, AND Card 7 split halves).",
-      "assertion": "path_step.startsWith('ft-') && step_index < path.length - 1 ==> own_peg_in_step_is_passable",
+      "desc": "REMOVED in v3.1.0. 'Option A' (own pegs may pass each other on the FT ring) is retired. Own pegs now block universally on the FT ring exactly as on the outer rim and safe zone: a peg cannot pass OR land on another peg of its own color, no exceptions. Applies to all card-driven movement including single-peg moves, FT exit options, enterFastTrack ring traversal, and Card 7 split halves. Only OPPONENT pegs are passable (and cuttable on landing).",
+      "assertion": "path_step.startsWith('ft-') && pegOn(path_step).color === actingPeg.color ==> illegal",
       "provenance": [
-        "user_directive_2026-04-25.option_a_ft_passing_relax"
+        "user_directive_2026-04-25.option_a_ft_passing_relax",
+        "user_directive_2026-05-20.option_a_retired_own_pegs_block_universally"
       ]
     },
     {
@@ -1107,6 +1120,66 @@
         "rules_substrate.SPECIAL_001",
         "card_logic_substrate.grantsExtraTurn",
         "user_directive_2026-04-25"
+      ]
+    },
+    {
+      "id": "FT_NO_SECOND_LAP",
+      "x": 8,
+      "y": 10,
+      "z": 80,
+      "category": "fasttrack",
+      "desc": "No peg may complete a second lap of the outer track OR a second lap of the FT ring. Once a peg has armed (completedCircuit=true) by touching/passing outer-{p}-8, it must enter its safe zone on its next legal arrival at outer-{p}-8 (or take the 5th-peg path per SAFE_PASS_TO_HOME). Once an FT peg passes its own ft-{p} hole, it must exit there to home-stretch; the engine forbids overshoot. Cards that would cause a second lap are illegal moves and (if no alternative exists) trigger TURN_NO_LEGAL_MOVE.",
+      "assertion": "(peg.completedCircuit && passesAgain('outer-'+p+'-8') && !entersSafe) ==> illegal; (peg.onFasttrack && passes(ownFtHole) && !exits) ==> illegal",
+      "provenance": [
+        "user_directive_2026-05-20.F1_F4_R17"
+      ]
+    },
+    {
+      "id": "BULL_NO_REENTRY",
+      "x": 6,
+      "y": 6,
+      "z": 36,
+      "category": "bullseye_entry",
+      "desc": "Once a peg has exited the bullseye via J/Q/K, it may NOT re-enter the bullseye in the same game. Bullseye is a one-time visit per peg. Engine must track per-peg `bullseyeVisited` flag; arrival logic must reject any future bullseye entry for that peg.",
+      "assertion": "peg.bullseyeVisited === true ==> illegal_bullseye_entry",
+      "provenance": [
+        "user_directive_2026-05-20.F2_bullseye_no_reentry"
+      ]
+    },
+    {
+      "id": "TURN_PLAYER_CHOICE",
+      "x": 11,
+      "y": 7,
+      "z": 77,
+      "category": "turn",
+      "desc": "When a drawn card has multiple legal moves (multiple pegs eligible, or dual-function cards such as 6/A/Joker that can either release from holding OR move an existing peg), the player CHOOSES which move to make. The engine must NOT auto-pick a release, auto-pick the lexicographically-first peg, or auto-pick the 'optimal' move. Only when exactly one legal move exists (see TURN_AUTO_PLAY) may the engine resolve without player input.",
+      "assertion": "legalMoves.length > 1 ==> player.input_required",
+      "provenance": [
+        "user_directive_2026-05-20.R18_no_forced_releases_player_choice"
+      ]
+    },
+    {
+      "id": "TURN_AUTO_PLAY",
+      "x": 11,
+      "y": 8,
+      "z": 88,
+      "category": "turn",
+      "desc": "When exactly one legal move exists for the drawn card, the engine may auto-execute it without further player input (no UI prompt), then proceed to extra_turn_check. This applies to Card-7 split decisions only when there is exactly one legal (a,b)+(pegA,pegB) tuple. Combined with TURN_PLAYER_CHOICE: legalMoves==0 -> forfeit per TURN_NO_LEGAL_MOVE; legalMoves==1 -> auto; legalMoves>1 -> prompt player.",
+      "assertion": "legalMoves.length === 1 ==> engine.auto_execute(legalMoves[0])",
+      "provenance": [
+        "user_directive_2026-05-20.R21_auto_execute_unique_move"
+      ]
+    },
+    {
+      "id": "SPLIT_ANTI_TUNNELING",
+      "x": 2,
+      "y": 25,
+      "z": 50,
+      "category": "card",
+      "desc": "Card-7 split anti-tunneling: a split (a,b) on pegs (P1,P2) is illegal if its only effect (vs a direct 7-on-one-peg) is to bypass an own-peg blockade that a direct 7 could not legally cross. Formally: if P1 is blocked at distance k<7 by an own peg, the split (k-1, 8-k) on (P1, P2) is permitted ONLY when P2's b-step has its own independent tactical justification (lands on opponent for cut, lands legally in safe zone, completes arming, enters bullseye, etc.). The engine must reject splits whose sole purpose is to evade MOV_NO_PASS_OWN. This rule also forbids using the split to move an FT peg off the ring just to dodge an own FT-blockade.",
+      "assertion": "isSplit && split_evades_own_blockade(P1) && !split_has_independent_justification(P2) ==> illegal",
+      "provenance": [
+        "user_directive_2026-05-20.R12_anti_tunneling"
       ]
     }
   ],
