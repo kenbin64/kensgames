@@ -286,3 +286,33 @@ test('fasttrack: FastTrack stretch overshoot blocked by own peg in stretch is il
 // covered by v3.2.0 are: (a) own peg ON ft-{toIdx} (canAdvanceFastTrackStep),
 // (b) own peg in own stretch when path crosses own ft-{bp} (above test).
 
+test('fasttrack: solo mode always starts with a HUMAN seat (user_directive_2026-05-20c)', () => {
+    // Regression: previously pickStartingSeat picked uniformly from ALL
+    // seats, so in solo (1 human + N-1 bots) the human waited through
+    // 0..N-1 consecutive bot turns before ever playing — perceived as
+    // "AI plays continuously, human turn never comes". Solo MUST start
+    // with the human.
+    const { run } = loadCore();
+    for (let trial = 0; trial < 30; trial++) {
+        const startingIdx = run(`
+            initGame(4, { launchMode: 'solo' });
+            state.players.get('current');
+        `);
+        const startIsBot = run(`
+            (state.players.get('list')[${startingIdx}] || {}).isBot
+        `);
+        assert.equal(startIsBot, false,
+            `solo trial ${trial}: starting seat ${startingIdx} must be human`);
+    }
+});
+
+test('fasttrack: explicit startingPlayer config overrides solo human-only default', () => {
+    // Host-authoritative MP still gets to pick any seat.
+    const { run } = loadCore();
+    const startingIdx = run(`
+        initGame(4, { launchMode: 'solo', startingPlayer: 2 });
+        state.players.get('current');
+    `);
+    assert.equal(startingIdx, 2);
+});
+

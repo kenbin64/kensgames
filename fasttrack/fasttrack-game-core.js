@@ -577,7 +577,14 @@ function initGame(playerCount = 2, config = {}) {
   //   1. Explicit override via config.startingPlayer (host-authoritative MP).
   //   2. `ft.rematchWinnerName` written by Play-Again — winner of the
   //      previous game opens the next one. One-shot, cleared on use.
-  //   3. Otherwise a uniformly-random seat so games don't always start at #1.
+  //   3. Solo mode: start with a HUMAN seat. In solo there is exactly one
+  //      human (seat 0 by convention); randomising over all seats produced
+  //      0..N-1 consecutive bot turns before the human ever played, which
+  //      manifested as "AI plays continuously, human turn never comes"
+  //      (user_directive_2026-05-20c). Pick a uniformly-random HUMAN seat
+  //      so this remains correct if the seat-0 invariant ever changes.
+  //   4. Otherwise (live MP / same-screen) a uniformly-random seat so games
+  //      don't always start at #1.
   //
   // Note for MP: each client computes independently; the host's choice is
   // broadcast via the existing _turnSeq mechanism shortly after, so any
@@ -600,7 +607,22 @@ function initGame(playerCount = 2, config = {}) {
           }
         }
       }
-      if (startingIdx < 0) startingIdx = Math.floor(Math.random() * effectiveCount);
+      if (startingIdx < 0) {
+        const launchMode = config.launchMode || 'solo';
+        if (launchMode === 'solo') {
+          // Restrict to human seats. Fallback to seat 0 if none flagged
+          // human (defensive — should not happen in solo).
+          const humanSeats = [];
+          for (let i = 0; i < players.length; i++) {
+            if (!players[i].isBot) humanSeats.push(i);
+          }
+          startingIdx = humanSeats.length > 0
+            ? humanSeats[Math.floor(Math.random() * humanSeats.length)]
+            : 0;
+        } else {
+          startingIdx = Math.floor(Math.random() * effectiveCount);
+        }
+      }
     }
     state.players.set('current', startingIdx);
     if (window.CameraDirector) window.CameraDirector.setActivePlayer(startingIdx);
