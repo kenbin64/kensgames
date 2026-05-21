@@ -161,8 +161,8 @@ jobs:
             --exclude='node_modules/' \
             --exclude='*.sh' \
             --exclude='*.pdf' \
-            --exclude='*.md' \
             --include='LICENSE.md' \
+            --exclude='*.md' \
             --exclude='manifold.portal.json' \
             --exclude='dist/' \
             --exclude='tests/' \
