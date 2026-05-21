@@ -286,24 +286,54 @@ test('fasttrack: FastTrack stretch overshoot blocked by own peg in stretch is il
 // covered by v3.2.0 are: (a) own peg ON ft-{toIdx} (canAdvanceFastTrackStep),
 // (b) own peg in own stretch when path crosses own ft-{bp} (above test).
 
-test('fasttrack: solo mode always starts with a HUMAN seat (user_directive_2026-05-20c)', () => {
+test('fasttrack: solo mode always starts with THE HUMAN (deterministic, user_directive_2026-05-20c)', () => {
     // Regression: previously pickStartingSeat picked uniformly from ALL
     // seats, so in solo (1 human + N-1 bots) the human waited through
-    // 0..N-1 consecutive bot turns before ever playing — perceived as
-    // "AI plays continuously, human turn never comes". Solo MUST start
-    // with the human.
+    // 0..N-1 consecutive bot turns before ever playing. Solo has exactly
+    // one human — they ALWAYS go first.
     const { run } = loadCore();
     for (let trial = 0; trial < 30; trial++) {
-        const startingIdx = run(`
-            initGame(4, { launchMode: 'solo' });
-            state.players.get('current');
+        const { startingIdx, humanIdx } = run(`
+            (function () {
+                initGame(4, { launchMode: 'solo' });
+                const list = state.players.get('list');
+                return {
+                    startingIdx: state.players.get('current'),
+                    humanIdx: list.findIndex(p => !p.isBot)
+                };
+            })()
         `);
-        const startIsBot = run(`
-            (state.players.get('list')[${startingIdx}] || {}).isBot
+        assert.equal(startingIdx, humanIdx,
+            `solo trial ${trial}: starting seat ${startingIdx} must equal the human seat ${humanIdx}`);
+    }
+});
+
+test('fasttrack: multi-human roster picks a random HUMAN seat (never a bot)', () => {
+    // Same-screen / live MP with 2+ humans: random among humans, never a bot.
+    const { run } = loadCore();
+    const seen = new Set();
+    for (let trial = 0; trial < 40; trial++) {
+        const { startingIdx, startIsBot } = run(`
+            (function () {
+                initGame(4, {
+                    launchMode: 'same-screen',
+                    sessionPlayers: [
+                        { username: 'H1', is_ai: false },
+                        { username: 'H2', is_ai: false },
+                        { username: 'B1', is_ai: true },
+                        { username: 'B2', is_ai: true }
+                    ]
+                });
+                const list = state.players.get('list');
+                const ci = state.players.get('current');
+                return { startingIdx: ci, startIsBot: !!list[ci].isBot };
+            })()
         `);
         assert.equal(startIsBot, false,
-            `solo trial ${trial}: starting seat ${startingIdx} must be human`);
+            `multi-human trial ${trial}: starting seat ${startingIdx} must be human`);
+        seen.add(startingIdx);
     }
+    assert.ok(seen.size >= 2, `expected random pick across human seats, only saw ${[...seen]}`);
 });
 
 test('fasttrack: explicit startingPlayer config overrides solo human-only default', () => {

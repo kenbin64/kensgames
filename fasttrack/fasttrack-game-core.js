@@ -577,14 +577,14 @@ function initGame(playerCount = 2, config = {}) {
   //   1. Explicit override via config.startingPlayer (host-authoritative MP).
   //   2. `ft.rematchWinnerName` written by Play-Again — winner of the
   //      previous game opens the next one. One-shot, cleared on use.
-  //   3. Solo mode: start with a HUMAN seat. In solo there is exactly one
-  //      human (seat 0 by convention); randomising over all seats produced
-  //      0..N-1 consecutive bot turns before the human ever played, which
-  //      manifested as "AI plays continuously, human turn never comes"
-  //      (user_directive_2026-05-20c). Pick a uniformly-random HUMAN seat
-  //      so this remains correct if the seat-0 invariant ever changes.
-  //   4. Otherwise (live MP / same-screen) a uniformly-random seat so games
-  //      don't always start at #1.
+  //   3. Solo (exactly one human seat): that human ALWAYS goes first
+  //      (deterministic). The original randomisation was for multi-human
+  //      games; in solo it just made the human wait through 0..N-1 bot
+  //      turns before ever playing (user_directive_2026-05-20c).
+  //   4. Multi-human (same-screen / live MP with ≥2 humans): uniformly
+  //      random among the HUMAN seats, so games don't always open on the
+  //      same human and no human ever waits behind a bot at game start.
+  //   5. All-bot roster (dev observer): uniformly random over all seats.
   //
   // Note for MP: each client computes independently; the host's choice is
   // broadcast via the existing _turnSeq mechanism shortly after, so any
@@ -608,17 +608,18 @@ function initGame(playerCount = 2, config = {}) {
         }
       }
       if (startingIdx < 0) {
-        const launchMode = config.launchMode || 'solo';
-        if (launchMode === 'solo') {
-          // Restrict to human seats. Fallback to seat 0 if none flagged
-          // human (defensive — should not happen in solo).
-          const humanSeats = [];
-          for (let i = 0; i < players.length; i++) {
-            if (!players[i].isBot) humanSeats.push(i);
-          }
-          startingIdx = humanSeats.length > 0
-            ? humanSeats[Math.floor(Math.random() * humanSeats.length)]
-            : 0;
+        // user_directive_2026-05-20c: solo (single human) → human ALWAYS
+        // goes first. Random pick only when there is more than one human
+        // (same-screen / live MP with multiple humans). All-bot rosters
+        // (dev-observer) still random.
+        const humanSeats = [];
+        for (let i = 0; i < players.length; i++) {
+          if (!players[i].isBot) humanSeats.push(i);
+        }
+        if (humanSeats.length === 1) {
+          startingIdx = humanSeats[0];
+        } else if (humanSeats.length > 1) {
+          startingIdx = humanSeats[Math.floor(Math.random() * humanSeats.length)];
         } else {
           startingIdx = Math.floor(Math.random() * effectiveCount);
         }
