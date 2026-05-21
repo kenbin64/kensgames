@@ -1,0 +1,118 @@
+{
+  "name": "starfighter-desktop",
+  "productName": "Starfighter",
+  "version": "1.0.0",
+  "description": "Starfighter — ButterflyFx Space Combat Game",
+  "author": {
+    "name": "Kenneth Bingham",
+    "email": "kenetics.art@gmail.com"
+  },
+  "license": "SEE LICENSE IN ../../LICENSE.md",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl",
+    "make": "electron-forge make"
+  },
+  "build": {
+    "appId": "com.butterflyfx.starfighter",
+    "productName": "Starfighter",
+    "copyright": "© 2026 Kenneth Bingham / ButterflyFx",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**",
+      "../index.html",
+      "../bundle.js",
+      "../input.js",
+      "../hud.js",
+      "../intro.js",
+      "../3d.js",
+      "../audio/**",
+      "../assets/**",
+      "../scenarios.json",
+      "../codex_data.js",
+      "!../assets/models/optimized/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.games",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Game"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "electron": "^31.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.0.0"
+  },
+  "optionalDependencies": {
+    "greenworks": "^0.15.0"
+  }
+}

@@ -37,10 +37,10 @@ starfighter/starfighter.bundle.js.gz
 starfighter/index.html.gz
 starfighter/index.src.html
 starfighter/nginx_starfighter.conf
-4DTicTacToe/assets/models/*.glb
 
-# Electron/desktop build outputs and wrappers — not needed in GitHub
+# Electron/desktop build OUTPUTS only — source (main.js/preload.js/package.json) is tracked
 starfighter/downloads/
 downloads/
-starfighter/electron/
+starfighter/electron/dist/
+starfighter/electron/node_modules/
 starfighter/native/
