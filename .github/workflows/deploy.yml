@@ -155,15 +155,23 @@ jobs:
           rsync -avz --delete \
             --exclude='.git/' \
             --exclude='.github/' \
+            --exclude='.gitattributes' \
+            --exclude='.gitignore' \
             --exclude='engine/' \
             --exclude='node_modules/' \
             --exclude='*.sh' \
             --exclude='*.pdf' \
+            --exclude='*.md' \
+            --include='LICENSE.md' \
             --exclude='manifold.portal.json' \
             --exclude='dist/' \
             --exclude='tests/' \
             --exclude='scripts/' \
+            --exclude='docs/' \
             --exclude='state/' \
+            --exclude='bench/' \
+            --exclude='src/' \
+            --exclude='pyproject.toml' \
             --exclude='fasttrack/' \
             --exclude='brickbreaker3d/' \
             --exclude='4DTicTacToe/' \
@@ -181,6 +189,9 @@ jobs:
           rsync -avz --delete \
             --exclude='*.test.js' \
             --exclude='*.sh' \
+            --exclude='*.md' \
+            --exclude='tests/' \
+            --exclude='docs/' \
             --exclude='node_modules/' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no" \
             fasttrack/ \
@@ -216,9 +227,13 @@ jobs:
           rsync -avz --delete \
             --exclude='*.test.js' \
             --exclude='*.sh' \
+            --exclude='*.md' \
+            --exclude='*.pdf' \
             --exclude='tests/' \
+            --exclude='docs/' \
             --exclude='electron/' \
             --exclude='downloads/' \
+            --exclude='native/' \
             -e "ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no" \
             starfighter/ \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.DEPLOY_PATH }}/starfighter/
