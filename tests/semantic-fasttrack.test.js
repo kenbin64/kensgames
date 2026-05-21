@@ -346,3 +346,93 @@ test('fasttrack: explicit startingPlayer config overrides solo human-only defaul
     assert.equal(startingIdx, 2);
 });
 
+test('fasttrack: FT peg cannot reach bullseye via multi-hop 7-split traversal (user_directive_2026-05-20d)', () => {
+    // rules.json :: BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL — an FT peg may
+    // reach bullseye ONLY via the 1-hit rule. Previously the 7-split
+    // generator emitted split halves where an FT peg traversed N>=2 ring
+    // hops and landed at bullseye (final hop), which is illegal.
+    const { run } = loadCore();
+    const result = run(`
+        (function () {
+            initGame(2, { launchMode: 'solo' });
+            state.players.set('current', 0);
+            const players = state.players.get('list');
+            for (const pl of players) {
+                for (const peg of pl.pegs) {
+                    if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                    peg.holeId = 'holding'; peg.holeType = 'holding';
+                    peg.onFasttrack = false; peg.mustExitFasttrack = false;
+                }
+            }
+            const player = players[0];
+            const bp = player.boardPosition;
+            // Two FT pegs: one 2 hops from bullseye via ring, one anywhere on the ring.
+            // (bp + 4) % 6 → 2 ring hops forward reaches (bp + 6) % 6 = bp, then
+            // _bullPath would try to terminate at bullseye via FT traversal.
+            const movePeg = player.pegs[0];
+            const otherPeg = player.pegs[1];
+            placePeg(movePeg, 'ft-' + ((bp + 4) % 6), 0);
+            movePeg.onFasttrack = true;
+            placePeg(otherPeg, 'ft-' + ((bp + 1) % 6), 0);
+            otherPeg.onFasttrack = true;
+            state.deck.set('currentCard', { value: '7' });
+            calculateValidMoves();
+            const vm = state.turn.get('validMoves') || [];
+            return {
+                bp,
+                splitBullseyeHops: vm
+                    .filter(m => m.type === 'split')
+                    .map(m => ({
+                        dest: m.dest, steps: m.steps, pathLast: (m.path || []).slice(-1)[0],
+                        dest2: m.dest2, steps2: m.steps2, path2Last: (m.path2 || []).slice(-1)[0]
+                    }))
+                    .filter(m =>
+                        (m.dest === 'bullseye' && m.steps > 1) ||
+                        (m.dest2 === 'bullseye' && m.steps2 > 1))
+            };
+        })()
+    `);
+    assert.equal(result.splitBullseyeHops.length, 0,
+        `no split variant may put an FT peg into bullseye via multi-hop traversal, got ${JSON.stringify(result.splitBullseyeHops)}`);
+});
+
+test('fasttrack: FT peg 1-hit jump to bullseye remains legal (7-split scenario A)', () => {
+    // Sanity: the legal path (peg sits on ft-*, 1-step jump to bullseye) is
+    // still offered as one half of a 7-split (1+6).
+    const { run } = loadCore();
+    const result = run(`
+        (function () {
+            initGame(2, { launchMode: 'solo' });
+            state.players.set('current', 0);
+            const players = state.players.get('list');
+            for (const pl of players) {
+                for (const peg of pl.pegs) {
+                    if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                    peg.holeId = 'holding'; peg.holeType = 'holding';
+                    peg.onFasttrack = false; peg.mustExitFasttrack = false;
+                }
+            }
+            const player = players[0];
+            const bp = player.boardPosition;
+            // FT peg on a non-own ft-*: legal 1-hit jump to bullseye.
+            const ftPeg = player.pegs[0];
+            placePeg(ftPeg, 'ft-' + ((bp + 1) % 6), 0);
+            ftPeg.onFasttrack = true;
+            // Second peg in holding can't split, so put one on the rim.
+            const rimPeg = player.pegs[1];
+            placePeg(rimPeg, 'outer-' + ((bp + 3) % 6) + '-2', 0);
+            state.deck.set('currentCard', { value: '7' });
+            calculateValidMoves();
+            const vm = state.turn.get('validMoves') || [];
+            return {
+                anyOneStepFTToBullseye: vm.some(m =>
+                    m.type === 'split' &&
+                    ((m.dest === 'bullseye' && m.steps === 1) ||
+                     (m.dest2 === 'bullseye' && m.steps2 === 1)))
+            };
+        })()
+    `);
+    assert.equal(result.anyOneStepFTToBullseye, true,
+        '1-hit FT→bullseye must still be emitted as a 7-split half');
+});
+

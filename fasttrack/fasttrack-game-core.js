@@ -1388,6 +1388,7 @@ function calculateValidMoves() {
       //               regular path itself was not blocked. Both alternatives
       //               must be genuine choices.
       if (dir === 'clockwise' && !rules.noFastTrack && !peg.onFasttrack &&
+        !peg.holeId.startsWith('ft-') &&
         !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps) {
         const penultimate = trackSeq[steps - 2];
         const finalHole = trackSeq[steps - 1];
@@ -1497,20 +1498,27 @@ function calculateValidMoves() {
       };
 
       // Helper: build bullseye route for half of length n. Returns path or null.
-      // Conditions: n >= 2, seq[n-2] is an FT hole, no own pegs blocking path
-      // (penult must be free; FT-ring relax allows passing through own pegs on
-      // earlier `ft-*` intermediates).
-      // _bullPath(seq, n, fromHole) — returns path to bullseye using n steps, or null.
-      // Two legal scenarios:
-      //   A) n=1 and the peg is already sitting on an ft-* hole (1-step direct jump).
-      //   B) n>=2 and the penultimate step (seq[n-2]) is an ft-* hole (clockwise arrival).
-      const _bullPath = (seq, n, fromHole) => {
+      // Conditions (rules.json :: BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL,
+      //               user_directive_2026-05-20d):
+      //   A) n=1 and the peg is already sitting on an ft-* hole — the 1-hit
+      //      jump from FT to bullseye. Legal regardless of peg.onFasttrack.
+      //   B) n>=2 and the penultimate step is an ft-* hole AND the peg
+      //      DID NOT START on an ft-* hole (i.e. it is approaching from the
+      //      outside track clockwise). An FT-ring peg (holeId startsWith
+      //      'ft-') may NEVER reach bullseye via multi-hop traversal — only
+      //      via the 1-hit rule above. Geometry, not the .onFasttrack flag,
+      //      is authoritative: a peg on an ft-* hole IS on the ring even if
+      //      the engine has stripped its .onFasttrack flag during a recalc
+      //      pass (see FT priority + strip logic at end of calculateValidMoves).
+      const _bullPath = (seq, n, fromHole, peg) => {
         if (n === 1) {
           // Scenario A: direct 1-step jump from ft-* hole to bullseye
           if (!fromHole || !fromHole.startsWith('ft-')) return null;
           return ['bullseye'];
         }
         if (n < 2 || seq.length < n) return null;
+        // Scenario B forbidden for any peg sitting on the FT ring.
+        if (fromHole && fromHole.startsWith('ft-')) return null;
         const penult = seq[n - 2];
         if (!penult || !penult.startsWith('ft-')) return null;
         for (let s = 0; s < n - 1; s++) {
@@ -1540,20 +1548,21 @@ function calculateValidMoves() {
       //   3. Untouched FT pegs (when player has 3+ FT pegs) keep FT status.
       //   4. Partial FT movement is legal — peg2 with only 2 steps left on
       //      the ring may move 2 (doesn't have to complete).
-      // user_directive_2026-05-19 — "bullseye should always be a choice if it
-      //   is a legal move". Previously `_isAllFT` rejected any path ending
-      //   in 'bullseye' because 'bullseye' doesn't start with 'ft-', which
-      //   silently dropped every split variant where an FT peg reached
-      //   bullseye in its half. That's now allowed as terminal-only.
+      // user_directive_2026-05-20d — supersedes the 2026-05-19 leniency.
+      //   An FT peg may reach bullseye ONLY via the 1-hit rule (n=1 jump
+      //   from an ft-* hole). It may NEVER reach bullseye by traversing
+      //   the FT ring across multiple hops. Therefore 'bullseye' is a
+      //   legal terminal for an FT peg's half ONLY when path.length === 1.
       const _ftPegCount = player.pegs.filter(p => p.onFasttrack).length;
       const _isAllFT = (path) => {
         if (!Array.isArray(path) || path.length === 0) return false;
+        // Single-hop bullseye jump — legal 1-hit completion from an ft-* hole.
+        if (path.length === 1 && path[0] === 'bullseye') return true;
         for (let i = 0; i < path.length; i++) {
           const h = path[i];
           if (typeof h !== 'string') return false;
           if (h.startsWith('ft-')) continue;
-          // bullseye is permitted only as the FINAL hop (FT completion).
-          if (h === 'bullseye' && i === path.length - 1) continue;
+          // Multi-hop paths may NOT terminate at bullseye for an FT peg.
           return false;
         }
         return true;
@@ -1599,8 +1608,8 @@ function calculateValidMoves() {
 
             const aReachable = _rimReachable(seq1, a);
             const bReachable = _rimReachable(seq2, b);
-            const path1Bull = _bullPath(seq1, a, peg1.holeId);
-            const path2Bull = _bullPath(seq2, b, peg2.holeId);
+            const path1Bull = _bullPath(seq1, a, peg1.holeId, peg1);
+            const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
             const bullOK = _bullFree();
 
             // VARIANT 1: STANDARD (rim/FT both halves)
