@@ -3,7 +3,7 @@
   "_meta": {
     "id": "fasttrack",
     "name": "FastTrack",
-    "version": "3.3.0",
+    "version": "3.3.1",
     "compiled": "2026-05-20",
     "axiom": "z = x * y",
     "supersedes": [
@@ -20,7 +20,8 @@
       "Variants 5-card-draw and 2-dice are intentionally omitted in 3.0.0 \u2014 awaiting authoritative rules.",
       "v3.1.0 (2026-05-20) folds user_directive_2026-05-20 (AI_DIRECTIVE_RULES_CLARIFICATION.md v2): bullseye now cuttable (single-occupancy); FT-ring own-peg passing removed (Option A retired); redraw cards trigger extra turn even when forfeited for no legal moves; Card-7 split FT-priority constraints relaxed to two-different-pegs only; bullseye penultimate-entry restricted to pegs already on FT; bullseye exit fallback removed (blocked = illegal); FT loss on non-FT move evaluated per-draw; new rules FT_NO_SECOND_LAP, BULL_NO_REENTRY, TURN_PLAYER_CHOICE, TURN_AUTO_PLAY, SPLIT_ANTI_TUNNELING added.",
       "v3.2.0 (2026-05-20) folds user_directive_2026-05-20b: FT_NO_PASS_OWN_FT semantics inverted. An FT peg no longer auto-stops at own ft-{bp}; the peg consumes the FULL card value, exiting through own ft-{bp} into the home stretch (safe-{bp}-{1..4}) for any leftover hops. Engine: getTrackSequence FT-forward extended past own ft-{bp} into the stretch; calculateValidMoves now re-types the FT-exit move as 'exitFastTrack'; old truncating FT-exit loop retired. Tests updated.",
-      "v3.3.0 (2026-05-20) folds user_directive_2026-05-20e: FT_EXIT_ANY_HOLE replaces FT_NO_PASS_OWN_FT. Player choice expanded \u2014 a peg geometrically on any ft-* hole with card value N gets min(N,D)+1 stopping options where k = 0..min(N,D) is the number of inner-ring hops before LEAVING the ring back onto the outer rim; remaining N-k hops are spent clockwise on the outer rim. Reaching own ft-{bp} (k=D) FORCES exit into the home stretch consuming N-D hops there (only blocked by own peg in stretch). Engine: calculateValidMoves grows a dedicated _ftForward branch enumerating all leave-at-k options; v3.2.0 consume-full-card-on-ring semantics retired. 1-hit bullseye jump (movement===1 from foreign ft-*) remains as a separate option."
+      "v3.3.0 (2026-05-20) folds user_directive_2026-05-20e: FT_EXIT_ANY_HOLE replaces FT_NO_PASS_OWN_FT. Player choice expanded \u2014 a peg geometrically on any ft-* hole with card value N gets min(N,D)+1 stopping options where k = 0..min(N,D) is the number of inner-ring hops before LEAVING the ring back onto the outer rim; remaining N-k hops are spent clockwise on the outer rim. Reaching own ft-{bp} (k=D) FORCES exit into the home stretch consuming N-D hops there (only blocked by own peg in stretch). Engine: calculateValidMoves grows a dedicated _ftForward branch enumerating all leave-at-k options; v3.2.0 consume-full-card-on-ring semantics retired. 1-hit bullseye jump (movement===1 from foreign ft-*) remains as a separate option.",
+      "v3.3.1 (2026-05-20) extends FT_EXIT_ANY_HOLE into Card 7 split halves (user_directive_2026-05-20e). Engine: the _enumerateFtExitOptions helper is hoisted to calculateValidMoves scope and reused by the 7-split via a _halfOptions(peg, n) helper. When a split half value n is assigned to an FT peg, the half enumerates min(n,D)+1 stopping options (cartesian product with the other peg's options) instead of being forced to consume the full half on the ring. The CARD_7_FT_HANDOFF all-FT-path constraint is retired (an FT peg may now legitimately leave the ring mid-split; FT status loss is still evaluated downstream by FT_LOSS_VOLUNTARY_EXIT). FT peg cardinality rule preserved: if the player has N FT pegs, the split must use min(N,2) of them. 1-hit FT\u2192bullseye preserved; multi-hop FT\u2192bullseye still gated by BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL."
     ]
   },
   "axes": {
@@ -1060,12 +1061,13 @@
       "y": 21,
       "z": 42,
       "category": "card",
-      "desc": "Card 7 split semantics (v3.1.0): split is between exactly 2 DIFFERENT pegs, each half >=1, both halves must be individually legal moves, both clockwise, and every position visited by an FT peg during its half must start with 'ft-' OR be 'center' (bullseye) — moving an FT peg onto outer rim or safe zone mid-split is a voluntary FT exit and triggers FT loss per FT_LOSS_VOLUNTARY_EXIT. NO FT-peg-priority rule: the player may choose any two of their pegs (FT or non-FT) for the split. If splitting moves a non-FT peg while FT pegs exist, FT_LOSS_ON_NON_FT_MOVE fires for the player. Bullseye-ending halves are always offered when geometrically legal. FT-ring own-peg passing is FORBIDDEN per FT_RING_PASS_RELAX v3.1.0.",
-      "assertion": "isSplit ==> split.pegs.length===2 && split.pegs[0]!==split.pegs[1] && split.a>=1 && split.b>=1 && split.a+split.b===7 && all_legal(split) && (peg.onFasttrack ? path.every(h => h.startsWith('ft-') || h==='center') : true)",
+      "desc": "Card 7 split semantics (v3.3.1): split is between exactly 2 DIFFERENT pegs, each half >=1, both halves must be individually legal moves, both clockwise. FT pegs participating in the split now enumerate FT_EXIT_ANY_HOLE leave-at-k options per half (user_directive_2026-05-20e) instead of being confined to the FT ring. The 'all-FT-path' constraint from v3.1.0–3.3.0 is RETIRED: an FT peg may leave the ring during its half, with FT status loss evaluated downstream by FT_LOSS_VOLUNTARY_EXIT. FT peg cardinality rule preserved: if the player has N FT pegs, the split must use min(N,2) of them as the two split pegs (cannot route around an idle FT peg while another non-FT peg gets the half). If splitting moves a non-FT peg while FT pegs exist outside the chosen pair, FT_LOSS_ON_NON_FT_MOVE fires. Bullseye-ending halves offered when geometrically legal (1-hit FT→bullseye preserved; multi-hop FT→bullseye still forbidden by BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL). FT-ring own-peg passing FORBIDDEN per FT_RING_PASS_RELAX.",
+      "assertion": "isSplit ==> split.pegs.length===2 && split.pegs[0]!==split.pegs[1] && split.a>=1 && split.b>=1 && split.a+split.b===7 && all_legal(split) && (player.ft_peg_count > 0 ==> ft_pegs_in_split >= min(player.ft_peg_count, 2))",
       "provenance": [
         "unified_rules.card_7",
         "user_directive_2026-04-25",
-        "user_directive_2026-05-20.card_7_no_ft_priority_constraint"
+        "user_directive_2026-05-20.card_7_no_ft_priority_constraint",
+        "user_directive_2026-05-20e"
       ]
     },
     {

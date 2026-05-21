@@ -540,3 +540,150 @@ test('fasttrack: FT peg 1-hit jump to bullseye remains legal (7-split scenario A
         '1-hit FT→bullseye must still be emitted as a 7-split half');
 });
 
+test('fasttrack: 7-split FT half emits min(half,D)+1 leave-at-k options (user_directive_2026-05-20e)', () => {
+    // FT_EXIT_ANY_HOLE extends into 7-split halves: when one half is assigned
+    // to an FT peg, that half must enumerate leave-at-k options instead of
+    // being forced to consume the full half on the ring.
+    // Setup: D=3 (peg at ft-(bp+3) backward = ft-(bp+3); D=(bp - (bp+3)+6)%6=3),
+    // a=2 → expect at least 2 distinct dest options for the FT half (k=0,1,2
+    // when N=2 caps at min(2,3)+1=3 options; the k=2 with N=2 hits mandatory
+    // stretch since k===D means k=D=3 ≠ 2, so 3 leave-at-k outer-rim options).
+    const { run } = loadCore();
+    const result = run(`
+        (function () {
+            initGame(2, { launchMode: 'solo' });
+            state.players.set('current', 0);
+            const players = state.players.get('list');
+            for (const pl of players) {
+                for (const peg of pl.pegs) {
+                    if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                    peg.holeId = 'holding'; peg.holeType = 'holding';
+                    peg.onFasttrack = false; peg.mustExitFasttrack = false;
+                }
+            }
+            const player = players[0];
+            const bp = player.boardPosition;
+            // FT peg at ft-((bp+3)%6) → D = 3 (3 ring hops to own ft-bp).
+            const ftPeg = player.pegs[0];
+            placePeg(ftPeg, 'ft-' + ((bp + 3) % 6), 0);
+            ftPeg.onFasttrack = true;
+            // Second peg on outer rim, far from FT peg to avoid collisions.
+            const rimPeg = player.pegs[1];
+            placePeg(rimPeg, 'outer-' + ((bp + 4) % 6) + '-0', 0);
+            state.deck.set('currentCard', { value: '7' });
+            calculateValidMoves();
+            const vm = state.turn.get('validMoves') || [];
+            // Find all split moves where the FT peg (pegIdx 0 or peg2Idx 0)
+            // got the half a=2 (steps=2) and collect distinct dests.
+            const ftHalfDests = new Set();
+            for (const m of vm) {
+                if (m.type !== 'split') continue;
+                if (m.pegIdx === 0 && m.steps === 2 && m.dest !== 'bullseye') {
+                    ftHalfDests.add(m.dest);
+                }
+                if (m.peg2Idx === 0 && m.steps2 === 2 && m.dest2 !== 'bullseye') {
+                    ftHalfDests.add(m.dest2);
+                }
+            }
+            return { bp, ftHalfDestCount: ftHalfDests.size, dests: [...ftHalfDests] };
+        })()
+    `);
+    assert.ok(result.ftHalfDestCount >= 3,
+        `expected >=3 leave-at-k dests for FT-peg 7-split half (D=3, n=2), got ${result.ftHalfDestCount}: ${JSON.stringify(result.dests)}`);
+});
+
+test('fasttrack: 7-split FT peg at own ft (D=0) half forces stretch (user_directive_2026-05-20e)', () => {
+    // FT peg sitting AT own ft-{bp} during 7-split: assigned half value n
+    // must produce ONLY the mandatory stretch path (safe-{bp}-1..n).
+    // No outer-rim continuation is legal.
+    const { run } = loadCore();
+    const result = run(`
+        (function () {
+            initGame(2, { launchMode: 'solo' });
+            state.players.set('current', 0);
+            const players = state.players.get('list');
+            for (const pl of players) {
+                for (const peg of pl.pegs) {
+                    if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                    peg.holeId = 'holding'; peg.holeType = 'holding';
+                    peg.onFasttrack = false; peg.mustExitFasttrack = false;
+                }
+            }
+            const player = players[0];
+            const bp = player.boardPosition;
+            // FT peg AT own ft-{bp} → D = 0 → mandatory stretch consumption.
+            const ftPeg = player.pegs[0];
+            placePeg(ftPeg, 'ft-' + bp, 0);
+            ftPeg.onFasttrack = true;
+            // Second peg on outer rim.
+            const rimPeg = player.pegs[1];
+            placePeg(rimPeg, 'outer-' + ((bp + 4) % 6) + '-0', 0);
+            state.deck.set('currentCard', { value: '7' });
+            calculateValidMoves();
+            const vm = state.turn.get('validMoves') || [];
+            // Collect all split half-dests for the FT peg (pegIdx 0 or peg2Idx 0).
+            // For half value n, the ONLY legal dest must be safe-{bp}-n.
+            const ftHalfRecords = [];
+            for (const m of vm) {
+                if (m.type !== 'split') continue;
+                if (m.pegIdx === 0) ftHalfRecords.push({ n: m.steps, dest: m.dest });
+                if (m.peg2Idx === 0) ftHalfRecords.push({ n: m.steps2, dest: m.dest2 });
+            }
+            return { bp, ftHalfRecords };
+        })()
+    `);
+    // Every FT-half record must dest to safe-{bp}-{n} (stretch) OR bullseye
+    // when n=1 (the legal 1-hit jump from own ft-{bp} per user_directive
+    // _2026-05-20d scenario A). No outer-rim continuations allowed.
+    const illegal = result.ftHalfRecords.filter(r => {
+        if (r.dest === 'safe-' + result.bp + '-' + r.n) return false;
+        if (r.n === 1 && r.dest === 'bullseye') return false;
+        return true;
+    });
+    assert.equal(illegal.length, 0,
+        `D=0 FT half must land in safe-{bp}-{n} (or bullseye if n=1), illegal: ${JSON.stringify(illegal)}`);
+    assert.ok(result.ftHalfRecords.length > 0,
+        'expected at least one 7-split variant featuring the D=0 FT peg');
+});
+
+test('fasttrack: 7-split FT half k===D triggers mandatory stretch into safe zone (user_directive_2026-05-20e)', () => {
+    // FT peg with D=2, assigned half n=3. The k=D=2 option must consume 2 ring
+    // hops then drop the remaining 1 hop into safe-{bp}-1 (mandatory stretch).
+    // The k=0 and k=1 options also exist (leave to outer rim).
+    const { run } = loadCore();
+    const result = run(`
+        (function () {
+            initGame(2, { launchMode: 'solo' });
+            state.players.set('current', 0);
+            const players = state.players.get('list');
+            for (const pl of players) {
+                for (const peg of pl.pegs) {
+                    if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                    peg.holeId = 'holding'; peg.holeType = 'holding';
+                    peg.onFasttrack = false; peg.mustExitFasttrack = false;
+                }
+            }
+            const player = players[0];
+            const bp = player.boardPosition;
+            // FT peg with D=2 (2 ring hops to own ft-bp).
+            const ftPeg = player.pegs[0];
+            placePeg(ftPeg, 'ft-' + ((bp + 4) % 6), 0);
+            ftPeg.onFasttrack = true;
+            const rimPeg = player.pegs[1];
+            placePeg(rimPeg, 'outer-' + ((bp + 1) % 6) + '-0', 0);
+            state.deck.set('currentCard', { value: '7' });
+            calculateValidMoves();
+            const vm = state.turn.get('validMoves') || [];
+            // Look for a split half where FT peg (pegIdx 0) used 3 steps and
+            // ended at safe-{bp}-1 (the mandatory-stretch k=D outcome).
+            const stretchHalf = vm.find(m =>
+                m.type === 'split' &&
+                ((m.pegIdx === 0 && m.steps === 3 && m.dest === 'safe-' + bp + '-1') ||
+                 (m.peg2Idx === 0 && m.steps2 === 3 && m.dest2 === 'safe-' + bp + '-1')));
+            return { bp, hasStretchHalf: !!stretchHalf };
+        })()
+    `);
+    assert.equal(result.hasStretchHalf, true,
+        'expected a 7-split variant where FT peg consumes 3 = D(2) + stretch(1)');
+});
+

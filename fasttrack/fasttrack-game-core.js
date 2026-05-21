@@ -1264,6 +1264,118 @@ function calculateValidMoves() {
   const rules = CARDS[card.value];
   const bp = player.boardPosition;
 
+  // ── FT EXIT OPTION ENUMERATOR (user_directive_2026-05-20e / FT_EXIT_ANY_HOLE) ──
+  // Returns array of { path, dest } options for an FT peg consuming exactly N
+  // hops via the leave-at-k semantics. Used by both the per-card emission
+  // (_ftForward branch below) and the 7-split halves (so an FT peg with split
+  // half value `a` enumerates min(a,D)+1 options for that half).
+  // Closures: peg-dependent context (eligibleForSafeZone, holeId, id) is read
+  // from the passed peg; player/bp/ci/CLOCKWISE_TRACK from outer scope.
+  const _enumerateFtExitOptions = (peg, N) => {
+    const opts = [];
+    if (N < 1) return opts;
+    if (!peg || !peg.holeId || !peg.holeId.startsWith('ft-')) return opts;
+    const ftX = parseInt(peg.holeId.replace('ft-', ''));
+    const D = (bp - ftX + 6) % 6;
+
+    // Pre-walk inner ring (blocked by own peg on next ft-* via canAdvanceFastTrackStep).
+    const ringDests = [];
+    {
+      let curr = ftX;
+      const ringLimit = D === 0 ? 0 : D;
+      for (let i = 0; i < ringLimit; i++) {
+        const next = (ftX + i + 1) % 6;
+        if (!canAdvanceFastTrackStep(player, curr, next, peg)) break;
+        ringDests.push(`ft-${next}`);
+        curr = next;
+      }
+    }
+    const maxRing = ringDests.length;
+
+    const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
+    const _safeZoneFull = _inSafe >= SAFE_ZONE_SIZE;
+    const _safeEntry = `outer-${bp}-2`;
+    const _len = CLOCKWISE_TRACK.length;
+    const walkOuter = (startFtIdx, hops) => {
+      if (hops < 0) return null;
+      if (hops === 0) return { path: [], dest: `ft-${startFtIdx}` };
+      const startHole = `ft-${startFtIdx}`;
+      const startIdx = CLOCKWISE_TRACK.indexOf(startHole);
+      if (startIdx < 0) return null;
+      const path = [];
+      for (let s = 1; s <= hops; s++) {
+        const ni = (startIdx + s) % _len;
+        const hole = CLOCKWISE_TRACK[ni];
+        if (hole === _safeEntry && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
+          path.push(hole);
+          const remaining = hops - s;
+          if (_safeZoneFull) {
+            if (remaining === 0) return { path, dest: hole };
+            if (remaining === 1) { path.push(`outer-${bp}-3`); return { path, dest: `outer-${bp}-3` }; }
+            if (remaining === 2) { path.push(`outer-${bp}-3`); path.push(`home-${bp}`); return { path, dest: `home-${bp}` }; }
+            return null;
+          }
+          if (remaining > SAFE_ZONE_SIZE) return null;
+          for (let h = 1; h <= remaining; h++) {
+            const sh = `safe-${bp}-${h}`;
+            if (hasOwnPegOnHole(player, sh, peg.id)) return null;
+            path.push(sh);
+          }
+          return { path, dest: path[path.length - 1] };
+        }
+        const occ = state.board.get(hole);
+        if (occ && occ.playerIdx === ci) return null;
+        path.push(hole);
+      }
+      return { path, dest: path[path.length - 1] };
+    };
+
+    // D == 0: peg already at own ft-{bp} → mandatory full-stretch consumption.
+    if (D === 0) {
+      if (N <= SAFE_ZONE_SIZE) {
+        const stretchPath = [];
+        let blocked = false;
+        for (let h = 1; h <= N; h++) {
+          const sh = `safe-${bp}-${h}`;
+          if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
+          stretchPath.push(sh);
+        }
+        if (!blocked) opts.push({ path: stretchPath, dest: stretchPath[N - 1] });
+      }
+      return opts;
+    }
+
+    // Enumerate k = 0..min(N, maxRing).
+    for (let k = 0; k <= Math.min(N, maxRing); k++) {
+      const ringSeg = ringDests.slice(0, k);
+
+      if (k === D) {
+        // Mandatory stretch exit.
+        const remaining = N - D;
+        if (remaining > SAFE_ZONE_SIZE) continue;
+        const stretchPath = [];
+        let blocked = false;
+        for (let h = 1; h <= remaining; h++) {
+          const sh = `safe-${bp}-${h}`;
+          if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
+          stretchPath.push(sh);
+        }
+        if (blocked) continue;
+        const dest = remaining === 0 ? `ft-${bp}` : stretchPath[remaining - 1];
+        opts.push({ path: [...ringSeg, ...stretchPath], dest });
+        continue;
+      }
+
+      // k < D: leave ring at ft-(ftX+k) onto outer rim, continue N-k hops.
+      const exitFt = (ftX + k) % 6;
+      const w = walkOuter(exitFt, N - k);
+      if (!w) continue;
+      opts.push({ path: [...ringSeg, ...w.path], dest: w.dest });
+    }
+
+    return opts;
+  };
+
   for (let pi = 0; pi < player.pegs.length; pi++) {
     const peg = player.pegs[pi];
 
@@ -1335,121 +1447,14 @@ function calculateValidMoves() {
 
       if (_ftForward) {
         const N = rules.movement;
-        const ftX = parseInt(peg.holeId.replace('ft-', ''));
-        const D = (bp - ftX + 6) % 6;
-
-        // Pre-walk inner ring to find max k achievable (blocked by own peg on next ft-*).
-        const ringDests = [];
-        {
-          let curr = ftX;
-          const ringLimit = D === 0 ? 0 : D; // can only ring-hop up to own ft-{bp}
-          for (let i = 0; i < ringLimit; i++) {
-            const next = (ftX + i + 1) % 6;
-            if (!canAdvanceFastTrackStep(player, curr, next, peg)) break;
-            ringDests.push(`ft-${next}`);
-            curr = next;
-          }
-        }
-        const maxRing = ringDests.length;
-
-        // Helper: walk outer rim from a starting ft-* idx for `hops` clockwise steps,
-        // honoring safe-zone diversion and normal own-peg blocking.
-        const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
-        const _safeZoneFull = _inSafe >= SAFE_ZONE_SIZE;
-        const _safeEntry = `outer-${bp}-2`;
-        const _len = CLOCKWISE_TRACK.length;
-        const walkOuter = (startFtIdx, hops) => {
-          if (hops < 0) return null;
-          if (hops === 0) return { path: [], dest: `ft-${startFtIdx}` };
-          const startHole = `ft-${startFtIdx}`;
-          const startIdx = CLOCKWISE_TRACK.indexOf(startHole);
-          if (startIdx < 0) return null;
-          const path = [];
-          for (let s = 1; s <= hops; s++) {
-            const ni = (startIdx + s) % _len;
-            const hole = CLOCKWISE_TRACK[ni];
-            if (hole === _safeEntry && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
-              path.push(hole);
-              const remaining = hops - s;
-              if (_safeZoneFull) {
-                if (remaining === 0) return { path, dest: hole };
-                if (remaining === 1) { path.push(`outer-${bp}-3`); return { path, dest: `outer-${bp}-3` }; }
-                if (remaining === 2) { path.push(`outer-${bp}-3`); path.push(`home-${bp}`); return { path, dest: `home-${bp}` }; }
-                return null;
-              }
-              if (remaining > SAFE_ZONE_SIZE) return null;
-              for (let h = 1; h <= remaining; h++) {
-                const sh = `safe-${bp}-${h}`;
-                if (hasOwnPegOnHole(player, sh, peg.id)) return null;
-                path.push(sh);
-              }
-              return { path, dest: path[path.length - 1] };
-            }
-            // Normal own-peg blocking (intermediate + landing).
-            const occ = state.board.get(hole);
-            if (occ && occ.playerIdx === ci) return null;
-            path.push(hole);
-          }
-          return { path, dest: path[path.length - 1] };
-        };
-
-        // Enumerate k = 0..min(N, maxRing).
-        for (let k = 0; k <= Math.min(N, maxRing); k++) {
-          const ringSeg = ringDests.slice(0, k);
-
-          if (D > 0 && k === D) {
-            // Mandatory stretch exit: peg consumed D hops on the ring to reach
-            // own ft-{bp}; remaining N-D hops drop into safe-{bp}-1..(N-D).
-            const remaining = N - D;
-            if (remaining > SAFE_ZONE_SIZE) continue; // overshoot
-            const stretchPath = [];
-            let blocked = false;
-            for (let h = 1; h <= remaining; h++) {
-              const sh = `safe-${bp}-${h}`;
-              if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
-              stretchPath.push(sh);
-            }
-            if (blocked) continue;
-            const dest = remaining === 0 ? `ft-${bp}` : stretchPath[remaining - 1];
-            moves.push({
-              type: 'exitFastTrack', pegIdx: pi, dest,
-              steps: N, from: peg.holeId,
-              path: [...ringSeg, ...stretchPath]
-            });
-            continue;
-          }
-
-          // k < D (or D == 0 and k == 0): leave at ft-(ftX+k) onto outer rim.
-          const exitFt = (ftX + k) % 6;
-          const outerHops = N - k;
-          const w = walkOuter(exitFt, outerHops);
-          if (!w) continue;
+        const _ftOpts = _enumerateFtExitOptions(peg, N);
+        for (const opt of _ftOpts) {
           moves.push({
-            type: 'exitFastTrack', pegIdx: pi, dest: w.dest,
+            type: 'exitFastTrack', pegIdx: pi, dest: opt.dest,
             steps: N, from: peg.holeId,
-            path: [...ringSeg, ...w.path]
+            path: opt.path
           });
         }
-
-        // D == 0 special: peg sits AT own ft-{bp} → mandatory stretch for full N.
-        if (D === 0) {
-          if (N <= SAFE_ZONE_SIZE) {
-            const stretchPath = [];
-            let blocked = false;
-            for (let h = 1; h <= N; h++) {
-              const sh = `safe-${bp}-${h}`;
-              if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
-              stretchPath.push(sh);
-            }
-            if (!blocked) {
-              moves.push({
-                type: 'exitFastTrack', pegIdx: pi, dest: stretchPath[N - 1],
-                steps: N, from: peg.holeId, path: stretchPath
-              });
-            }
-          }
-        }
-
         // Skip standard perimeter emission below for FT-forward pegs.
       } else {
 
@@ -1691,26 +1696,24 @@ function calculateValidMoves() {
       //   from an ft-* hole). It may NEVER reach bullseye by traversing
       //   the FT ring across multiple hops. Therefore 'bullseye' is a
       //   legal terminal for an FT peg's half ONLY when path.length === 1.
+      // Helper: FT-status rule (user_directive_2026-04-25, refined by 2026-05-20e).
+      // General principle: "all pegs on FT must complete FT before any other
+      // move can be made." For a Card 7 split this still means:
+      //   - If the player has N FT pegs, the split MUST include min(N,2) of
+      //     them as either peg1 or peg2. The player cannot route the 7 around
+      //     an idle FT peg while another non-FT peg gets the half.
+      // user_directive_2026-05-20e (FT_EXIT_ANY_HOLE) REMOVES the prior
+      // requirement that an FT peg's half must stay on the FT ring. Under
+      // the new semantics an FT peg may legitimately leave the ring at any
+      // hole during its half — enumeration of those leave-at-k options is
+      // delegated to `_enumerateFtExitOptions` (see _halfOptions below).
+      // The 1-hit bullseye jump and the no-multi-hop-bullseye gate are
+      // preserved via _bullPath (user_directive_2026-05-20d).
       const _ftPegCount = player.pegs.filter(p => p.onFasttrack).length;
-      const _isAllFT = (path) => {
-        if (!Array.isArray(path) || path.length === 0) return false;
-        // Single-hop bullseye jump — legal 1-hit completion from an ft-* hole.
-        if (path.length === 1 && path[0] === 'bullseye') return true;
-        for (let i = 0; i < path.length; i++) {
-          const h = path[i];
-          if (typeof h !== 'string') return false;
-          if (h.startsWith('ft-')) continue;
-          // Multi-hop paths may NOT terminate at bullseye for an FT peg.
-          return false;
-        }
-        return true;
-      };
       const _ftRuleOK = (path1, path2, peg1, peg2) => {
         if (_ftPegCount === 0) return true;
         const ftInSplit = (peg1.onFasttrack ? 1 : 0) + (peg2.onFasttrack ? 1 : 0);
         if (ftInSplit < Math.min(_ftPegCount, 2)) return false;
-        if (peg1.onFasttrack && !_isAllFT(path1)) return false;
-        if (peg2.onFasttrack && !_isAllFT(path2)) return false;
         return true;
       };
 
@@ -1731,6 +1734,25 @@ function calculateValidMoves() {
         });
       };
 
+      // Helper: enumerate all legal "rim" half-paths of length n for a peg.
+      // Geometry-authoritative (peg.holeId, not peg.onFasttrack flag):
+      //  - Peg on an `ft-*` hole → returns the FT_EXIT_ANY_HOLE leave-at-k
+      //    options (delegated to `_enumerateFtExitOptions`). This is the
+      //    user_directive_2026-05-20e extension to 7-split halves: an FT peg
+      //    with split half value `n` enumerates min(n,D)+1 stopping options
+      //    instead of being forced to consume the entire half on the ring.
+      //  - Peg elsewhere → standard perimeter half via getTrackSequence.
+      // Returns Array<{ path, dest }>. May be empty (blocked / unreachable).
+      const _halfOptions = (peg, n) => {
+        if (n < 1 || !peg || !peg.holeId) return [];
+        if (peg.holeId.startsWith('ft-')) {
+          return _enumerateFtExitOptions(peg, n);
+        }
+        const seq = getTrackSequence(peg, player, 'clockwise');
+        if (!_rimReachable(seq, n)) return [];
+        return [{ path: seq.slice(0, n), dest: seq[n - 1] }];
+      };
+
       for (let a = 1; a <= 6; a++) {
         const b = 7 - a;
         for (let i = 0; i < activePegs.length; i++) {
@@ -1739,44 +1761,52 @@ function calculateValidMoves() {
             const pi1 = activePegs[i], pi2 = activePegs[j];
             const peg1 = player.pegs[pi1], peg2 = player.pegs[pi2];
 
+            // Rim full-seqs still used for bullseye-variant derivation
+            // (_bullPath needs the rim sequence for the n>=2 penultimate-ft
+            // scenario from a NON-FT peg). FT pegs only reach bullseye via
+            // the n=1 scenario, which _bullPath handles from `fromHole`.
             const seq1 = getTrackSequence(peg1, player, 'clockwise');
             const seq2 = getTrackSequence(peg2, player, 'clockwise');
-            if (seq1.length < a || seq2.length < b) continue;
-            const dest1 = seq1[a - 1], dest2 = seq2[b - 1];
 
-            const aReachable = _rimReachable(seq1, a);
-            const bReachable = _rimReachable(seq2, b);
+            const opts1 = _halfOptions(peg1, a);
+            const opts2 = _halfOptions(peg2, b);
             const path1Bull = _bullPath(seq1, a, peg1.holeId, peg1);
             const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
             const bullOK = _bullFree();
 
-            // VARIANT 1: STANDARD (rim/FT both halves)
-            if (aReachable && bReachable) {
-              const path1 = seq1.slice(0, a);
-              const path2 = seq2.slice(0, b);
-              if (_ftRuleOK(path1, path2, peg1, peg2)) {
-                _pushSplit(`${pi1}:${a}-${pi2}:${b}`,
-                  pi1, dest1, a, peg1.holeId, path1,
-                  pi2, dest2, b, peg2.holeId, path2);
+            // VARIANT 1: STANDARD (rim/FT both halves — cartesian product of
+            // per-half options so FT pegs surface every leave-at-k variant).
+            for (const o1 of opts1) {
+              for (const o2 of opts2) {
+                if (o1.dest === o2.dest) continue;
+                if (!_ftRuleOK(o1.path, o2.path, peg1, peg2)) continue;
+                _pushSplit(
+                  `${pi1}:${a}@${o1.dest}-${pi2}:${b}@${o2.dest}`,
+                  pi1, o1.dest, a, peg1.holeId, o1.path,
+                  pi2, o2.dest, b, peg2.holeId, o2.path);
               }
             }
 
-            // VARIANT 2: peg1 → bullseye, peg2 → rim
-            if (path1Bull && bReachable && bullOK) {
-              const path2 = seq2.slice(0, b);
-              if (_ftRuleOK(path1Bull, path2, peg1, peg2)) {
-                _pushSplit(`${pi1}:${a}B-${pi2}:${b}`,
+            // VARIANT 2: peg1 → bullseye, peg2 → rim/FT (any option)
+            if (path1Bull && bullOK) {
+              for (const o2 of opts2) {
+                if (o2.dest === 'bullseye') continue;
+                if (!_ftRuleOK(path1Bull, o2.path, peg1, peg2)) continue;
+                _pushSplit(
+                  `${pi1}:${a}B-${pi2}:${b}@${o2.dest}`,
                   pi1, 'bullseye', a, peg1.holeId, path1Bull,
-                  pi2, dest2, b, peg2.holeId, path2);
+                  pi2, o2.dest, b, peg2.holeId, o2.path);
               }
             }
 
-            // VARIANT 3: peg1 → rim, peg2 → bullseye
-            if (aReachable && path2Bull && bullOK) {
-              const path1 = seq1.slice(0, a);
-              if (_ftRuleOK(path1, path2Bull, peg1, peg2)) {
-                _pushSplit(`${pi1}:${a}-${pi2}:${b}B`,
-                  pi1, dest1, a, peg1.holeId, path1,
+            // VARIANT 3: peg1 → rim/FT (any option), peg2 → bullseye
+            if (path2Bull && bullOK) {
+              for (const o1 of opts1) {
+                if (o1.dest === 'bullseye') continue;
+                if (!_ftRuleOK(o1.path, path2Bull, peg1, peg2)) continue;
+                _pushSplit(
+                  `${pi1}:${a}@${o1.dest}-${pi2}:${b}B`,
+                  pi1, o1.dest, a, peg1.holeId, o1.path,
                   pi2, 'bullseye', b, peg2.holeId, path2Bull);
               }
             }
