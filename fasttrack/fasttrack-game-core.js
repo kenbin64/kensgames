@@ -1151,14 +1151,32 @@ function getTrackSequence(peg, player, direction) {
   // and this branch was skipped, then perimeter lookup returned empty,
   // freezing all of that peg's future moves.
   if (type === 'fasttrack') {
+    // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0, user_directive_2026-05-20b)
+    // The peg consumes the full card value. When the ring path crosses the
+    // player's own ft-{bp}, the move continues through it into the home
+    // stretch (safe-{bp}-1..4). The OLD behaviour — truncating at own FT —
+    // is retired: stopping early discarded hops and removed legal choices.
+    // Up-stream (calculateValidMoves) re-types this move as `exitFastTrack`
+    // when the destination is own FT or own stretch so the UI/AI still
+    // distinguish "left the ring" from "still on it".
     const ftIdx = parseInt(peg.holeId.replace('ft-', ''));
     let currentFt = ftIdx;
+    let crossedOwnFt = false;
     for (let i = 1; i <= 6; i++) {
       const next = (ftIdx + i) % 6;
       if (!canAdvanceFastTrackStep(player, currentFt, next, peg)) break;
       seq.push(`ft-${next}`);
       currentFt = next;
-      if (next === bp) break;
+      if (next === bp) { crossedOwnFt = true; break; }
+    }
+    if (crossedOwnFt) {
+      // Continue past own ft-{bp} into the home stretch. Own-peg occupancy
+      // in the stretch blocks further hops (MOV_NO_PASS_OWN).
+      for (let h = 1; h <= SAFE_ZONE_SIZE; h++) {
+        const stretchHole = `safe-${bp}-${h}`;
+        if (hasOwnPegOnHole(player, stretchHole, peg.id)) break;
+        seq.push(stretchHole);
+      }
     }
     return seq;
   }
@@ -1297,7 +1315,17 @@ function calculateValidMoves() {
         const destOcc = state.board.get(dest);
         if (destOcc && destOcc.playerIdx === ci) blocked = true;
         if (!blocked) {
-          moves.push({ type: 'move', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
+          // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) — an FT peg whose path
+          // exits through own ft-{bp} into the stretch is classified as
+          // `exitFastTrack` so the peg flips off FT and downstream UI / AI
+          // see a real exit event. Pure on-ring continuations stay as `move`.
+          const _exitsFt = peg.onFasttrack && dir === 'clockwise' &&
+            (dest === `ft-${bp}` || dest.startsWith(`safe-${bp}-`));
+          moves.push({
+            type: _exitsFt ? 'exitFastTrack' : 'move',
+            pegIdx: pi, dest, steps, from: peg.holeId,
+            path: trackSeq.slice(0, steps)
+          });
 
           // FT entry: offer the inner-ring jump whenever the peg LANDS on its
           // own ft-${bp} hole going clockwise. Starting position doesn't
@@ -1373,24 +1401,13 @@ function calculateValidMoves() {
         }
       }
 
-      // ── FT EXIT OPTIONS ──
-      // Peg on FastTrack can only exit at their own FT exit (ft-{bp})
-      if (peg.onFasttrack && dir === 'clockwise') {
-        const maxExitStep = Math.min(steps, trackSeq.length);
-        for (let s = 0; s < maxExitStep; s++) {
-          const h = trackSeq[s];
-          const occ = state.board.get(h);
-          if (occ && occ.playerIdx === ci) break;
-          // Only allow exit to player's own FT exit hole
-          if (h === `ft-${bp}`) {
-            moves.push({
-              type: 'exitFastTrack', pegIdx: pi, dest: h,
-              steps: s + 1, from: peg.holeId,
-              path: trackSeq.slice(0, s + 1)
-            });
-          }
-        }
-      }
+      // ── FT EXIT (v3.2.0) ──
+      // Retired: the loop that emitted a TRUNCATED exitFastTrack at own
+      // ft-{bp} (steps=k instead of the full card value). Per
+      // user_directive_2026-05-20b, an FT peg must consume the entire card
+      // value; when the path crosses own ft-{bp}, the remaining hops carry
+      // the peg into the home stretch automatically. The regular `move`
+      // emission above is re-typed as `exitFastTrack` in that case.
 
       // ── FT RING TRAVERSAL (peg sitting on an ft-* hole, not in FT mode) ──
       // Only allow FT entry from own home hole, not by backing up or traversing from other FT holes

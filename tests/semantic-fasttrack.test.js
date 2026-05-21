@@ -147,10 +147,14 @@ test('fasttrack: getBalancedBoardPosition is a pure observer', () => {
     }
 });
 
-test('fasttrack: FastTrack traversal stops at the player\'s own ft hole', () => {
+test('fasttrack: FastTrack peg consumes full card value through own ft into stretch (v3.2.0)', () => {
+    // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) — FT peg one hop short of
+    // own ft-{bp} with card 3 consumes all 3 hops: ft-{bp} → safe-{bp}-1 →
+    // safe-{bp}-2. Move is emitted as exitFastTrack at safe-{bp}-2.
     const { run } = loadCore();
     run(`
         initGame(2, { launchMode: 'solo' });
+        state.players.set('current', 0);
         const players = state.players.get('list');
         for (const pl of players) {
             for (const peg of pl.pegs) {
@@ -173,6 +177,7 @@ test('fasttrack: FastTrack traversal stops at the player\'s own ft hole', () => 
             moves: (state.turn.get('validMoves') || []).map(m => ({
                 type: m.type,
                 dest: m.dest,
+                steps: m.steps,
                 path: Array.isArray(m.path) ? m.path.slice() : []
             }))
         };
@@ -180,16 +185,25 @@ test('fasttrack: FastTrack traversal stops at the player\'s own ft hole', () => 
 
     const result = run('__ftOwnBoundary');
     const ownFt = `ft-${result.bp}`;
+    const stretch2 = `safe-${result.bp}-2`;
 
-    assert.ok(result.moves.some(m => m.type === 'exitFastTrack' && m.dest === ownFt));
-    assert.ok(!result.moves.some(m => Array.isArray(m.path) && m.path.includes(ownFt) && m.path[m.path.length - 1] !== ownFt),
-        'FastTrack path continued beyond the player\'s own ft hole');
+    // Full 3 hops consumed: dest = safe-{bp}-2; path crosses own ft-{bp}.
+    const exit = result.moves.find(m => m.type === 'exitFastTrack' && m.dest === stretch2);
+    assert.ok(exit, `expected exitFastTrack at ${stretch2}, got ${JSON.stringify(result.moves)}`);
+    assert.equal(exit.steps, 3, 'FT exit must use full card value, not truncate at own ft');
+    assert.ok(exit.path.includes(ownFt), 'path must cross own ft-{bp}');
+    assert.equal(exit.path[exit.path.length - 1], stretch2);
+    // The truncated legacy move (exitFastTrack at own ft with steps=1) must NOT be offered.
+    assert.ok(!result.moves.some(m => m.type === 'exitFastTrack' && m.dest === ownFt && m.steps < 3),
+        'truncated FT exit at own ft hole must not be emitted');
 });
 
-test('fasttrack: FastTrack traversal stops before bypassing an own peg on regular track', () => {
+test('fasttrack: FastTrack peg with exact-to-own-ft card lands on own ft (v3.2.0)', () => {
+    // Edge case: card value === distance to own ft → dest is exactly ft-{bp}.
     const { run } = loadCore();
     run(`
         initGame(2, { launchMode: 'solo' });
+        state.players.set('current', 0);
         const players = state.players.get('list');
         for (const pl of players) {
             for (const peg of pl.pegs) {
@@ -202,32 +216,73 @@ test('fasttrack: FastTrack traversal stops before bypassing an own peg on regula
         }
         const player = players[0];
         const bp = player.boardPosition;
-        const startFt = (bp + 2) % 6;
-        const lastSafeFt = (bp + 3) % 6;
-        const blockedFt = (bp + 4) % 6;
-        const mover = player.pegs[0];
-        const blocker = player.pegs[1];
-        placePeg(mover, 'ft-' + startFt, 0);
-        mover.onFasttrack = true;
-        placePeg(blocker, 'outer-' + lastSafeFt + '-1', 0);
-        state.deck.set('currentCard', { value: '3' });
+        const peg = player.pegs[0];
+        placePeg(peg, 'ft-' + ((bp + 5) % 6), 0);
+        peg.onFasttrack = true;
+        state.deck.set('currentCard', { value: 'A' });
         calculateValidMoves();
-        globalThis.__ftBypassBoundary = {
-            lastSafeFt,
-            blockedFt,
+        globalThis.__ftExact = {
+            bp,
             moves: (state.turn.get('validMoves') || []).map(m => ({
-                type: m.type,
-                dest: m.dest,
-                path: Array.isArray(m.path) ? m.path.slice() : []
+                type: m.type, dest: m.dest, steps: m.steps
             }))
         };
     `);
 
-    const result = run('__ftBypassBoundary');
-    const allowedExit = `ft-${result.lastSafeFt}`;
-    const blockedFt = `ft-${result.blockedFt}`;
-
-    assert.ok(result.moves.some(m => m.type === 'exitFastTrack' && m.dest === allowedExit));
-    assert.ok(!result.moves.some(m => m.dest === blockedFt || (Array.isArray(m.path) && m.path.includes(blockedFt))),
-        'FastTrack path bypassed a same-color peg on the regular track');
+    const result = run('__ftExact');
+    const ownFt = `ft-${result.bp}`;
+    const exit = result.moves.find(m => m.type === 'exitFastTrack' && m.dest === ownFt);
+    assert.ok(exit, 'expected exitFastTrack landing exactly at own ft');
+    assert.equal(exit.steps, 1);
 });
+
+test('fasttrack: FastTrack stretch overshoot blocked by own peg in stretch is illegal (v3.2.0)', () => {
+    // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) + MOV_NO_PASS_OWN —
+    // if remaining hops would overtake an own peg sitting in own stretch,
+    // the entire move is illegal (no auto-truncation fallback).
+    const { run } = loadCore();
+    run(`
+        initGame(2, { launchMode: 'solo' });
+        state.players.set('current', 0);
+        const players = state.players.get('list');
+        for (const pl of players) {
+            for (const peg of pl.pegs) {
+                if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                peg.holeId = 'holding';
+                peg.holeType = 'holding';
+                peg.onFasttrack = false;
+                peg.mustExitFasttrack = false;
+            }
+        }
+        const player = players[0];
+        const bp = player.boardPosition;
+        const mover = player.pegs[0];
+        const blocker = player.pegs[1];
+        placePeg(mover, 'ft-' + ((bp + 5) % 6), 0);
+        mover.onFasttrack = true;
+        // Block stretch slot 1 with own peg
+        placePeg(blocker, 'safe-' + bp + '-1', 0);
+        state.deck.set('currentCard', { value: '3' });
+        calculateValidMoves();
+        globalThis.__ftStretchBlock = {
+            bp,
+            moves: (state.turn.get('validMoves') || []).map(m => ({
+                type: m.type, dest: m.dest, pegIdx: m.pegIdx
+            }))
+        };
+    `);
+
+    const result = run('__ftStretchBlock');
+    // No FT exit move involving the mover (pegIdx 0) — own stretch peg blocks the path.
+    const moverMoves = result.moves.filter(m => m.pegIdx === 0);
+    assert.ok(!moverMoves.some(m => m.type === 'exitFastTrack'),
+        `expected no exitFastTrack for blocked FT peg, got ${JSON.stringify(moverMoves)}`);
+});
+
+// Retired (v3.2.0): "FastTrack traversal stops before bypassing an own peg
+// on regular track". The premise contradicts rules.json :: FT_RING_PASS_RELAX
+// (z=72) — own pegs on the regular outer/home/side segments are NOT on the
+// FT ring path and do not block FT traversal. The FT-ring stop conditions
+// covered by v3.2.0 are: (a) own peg ON ft-{toIdx} (canAdvanceFastTrackStep),
+// (b) own peg in own stretch when path crosses own ft-{bp} (above test).
+

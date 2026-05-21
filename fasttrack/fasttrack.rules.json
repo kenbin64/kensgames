@@ -3,7 +3,7 @@
   "_meta": {
     "id": "fasttrack",
     "name": "FastTrack",
-    "version": "3.1.0",
+    "version": "3.2.0",
     "compiled": "2026-05-20",
     "axiom": "z = x * y",
     "supersedes": [
@@ -18,7 +18,8 @@
       "Single source of truth. Engine consumers must read this file and not encode parallel registries.",
       "Geometry was previously wrong in every source: outer track has 14 holes per wedge (84 total), not 36 or 72.",
       "Variants 5-card-draw and 2-dice are intentionally omitted in 3.0.0 \u2014 awaiting authoritative rules.",
-      "v3.1.0 (2026-05-20) folds user_directive_2026-05-20 (AI_DIRECTIVE_RULES_CLARIFICATION.md v2): bullseye now cuttable (single-occupancy); FT-ring own-peg passing removed (Option A retired); redraw cards trigger extra turn even when forfeited for no legal moves; Card-7 split FT-priority constraints relaxed to two-different-pegs only; bullseye penultimate-entry restricted to pegs already on FT; bullseye exit fallback removed (blocked = illegal); FT loss on non-FT move evaluated per-draw; new rules FT_NO_SECOND_LAP, BULL_NO_REENTRY, TURN_PLAYER_CHOICE, TURN_AUTO_PLAY, SPLIT_ANTI_TUNNELING added."
+      "v3.1.0 (2026-05-20) folds user_directive_2026-05-20 (AI_DIRECTIVE_RULES_CLARIFICATION.md v2): bullseye now cuttable (single-occupancy); FT-ring own-peg passing removed (Option A retired); redraw cards trigger extra turn even when forfeited for no legal moves; Card-7 split FT-priority constraints relaxed to two-different-pegs only; bullseye penultimate-entry restricted to pegs already on FT; bullseye exit fallback removed (blocked = illegal); FT loss on non-FT move evaluated per-draw; new rules FT_NO_SECOND_LAP, BULL_NO_REENTRY, TURN_PLAYER_CHOICE, TURN_AUTO_PLAY, SPLIT_ANTI_TUNNELING added.",
+      "v3.2.0 (2026-05-20) folds user_directive_2026-05-20b: FT_NO_PASS_OWN_FT semantics inverted. An FT peg no longer auto-stops at own ft-{bp}; the peg consumes the FULL card value, exiting through own ft-{bp} into the home stretch (safe-{bp}-{1..4}) for any leftover hops. Engine: getTrackSequence FT-forward extended past own ft-{bp} into the stretch; calculateValidMoves now re-types the FT-exit move as 'exitFastTrack'; old truncating FT-exit loop retired. Tests updated."
     ]
   },
   "axes": {
@@ -68,7 +69,7 @@
       "outer_rim_position": "outer-{p}-1 (FT hole and rim hole are the SAME hole, dual role)",
       "ring_traversal_clockwise": "ft-0 -> ft-1 -> ft-2 -> ft-3 -> ft-4 -> ft-5 -> ft-0",
       "ft_holes_not_adjacent_on_outer_rim": true,
-      "exit_constraint": "A peg traversing the FT ring CANNOT pass its own FT hole on the ring; it must exit at its own FT hole"
+      "exit_constraint": "A peg traversing the FT ring consumes the full card value. If the trajectory crosses own ft-{bp}, the peg exits there and continues into own stretch (safe-{bp}-{1..4}) for the remaining hops. No auto-stop at own ft-{bp}."
     },
     "safe_zone": {
       "holes_per_player": 4,
@@ -672,10 +673,11 @@
       "y": 4,
       "z": 32,
       "category": "fasttrack",
-      "desc": "A peg on the FT ring cannot pass its own FT hole; it must exit there to its home stretch.",
-      "assertion": "peg.onFasttrack && nextHop crosses ownFtHole ==> force exit at ownFtHole",
+      "desc": "A peg on the FT ring consumes the FULL card value. The peg does NOT auto-stop at its own FT hole; the token takes all of its hops. If the path crosses own ft-{bp}, the peg exits the ring through own ft-{bp} and continues for the remaining hops into the home stretch (safe-{bp}-{1..SAFE_ZONE_SIZE}). The peg cannot overtake any of its own tokens along the ring or stretch (MOV_NO_PASS_OWN). If the full-hop trajectory would overtake an own peg, the move is illegal; the player must choose a different peg or card (no auto-truncation).",
+      "assertion": "peg.onFasttrack && dir==='clockwise' ==> trackSeq extends past ownFtHole into ownStretch; final dest = trackSeq[card.movement-1]; ownPeg in path => move illegal",
       "provenance": [
-        "user_directive_2026-04-25"
+        "user_directive_2026-04-25",
+        "user_directive_2026-05-20b"
       ]
     },
     {
