@@ -1319,123 +1319,261 @@ function calculateValidMoves() {
     // MOVE on perimeter (not safe zone — safe zone pegs handled above)
     if (peg.holeType !== 'holding' && peg.holeId !== 'bullseye' && peg.holeType !== 'safezone') {
       const dir = rules.direction;
-      const trackSeq = getTrackSequence(peg, player, dir);
-      const steps = rules.movement;
 
-      if (trackSeq.length >= steps) {
-        const dest = trackSeq[steps - 1];
-        let blocked = false;
-        for (let s = 0; s < steps; s++) {
-          const h = trackSeq[s];
-          const occ = state.board.get(h);
-          // rules.json :: MOV_NO_PASS_OWN (z=9) — cannot pass own peg
-          // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates exempt
-          if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
-            blocked = true; break;
+      // ── FT-FORWARD ENUMERATION (user_directive_2026-05-20e) ──
+      // rules.json :: FT_EXIT_ANY_HOLE (replaces FT_NO_PASS_OWN_FT / v3.2.0).
+      // When a peg geometrically sits on an `ft-*` hole and the card is a
+      // forward / FT-eligible card, the player chooses how many hops k
+      // (0..min(N,D)) to spend on the inner ring before "leaving" the ring
+      // back onto the outer rim. Remaining N-k hops are spent clockwise on
+      // the outer rim. Reaching own ft-{bp} (k=D) FORCES exit into the home
+      // stretch consuming N-D hops there (blocked only by own peg in stretch).
+      // D = (bp - X + 6) % 6 = ring distance from ft-X to own ft-{bp}.
+      // The 1-hit bullseye jump (peg on foreign ft-*, card movement===1) is
+      // still emitted separately below — independent of this enumeration.
+      const _ftForward = peg.holeId.startsWith('ft-') && dir === 'clockwise' && !rules.noFastTrack;
+
+      if (_ftForward) {
+        const N = rules.movement;
+        const ftX = parseInt(peg.holeId.replace('ft-', ''));
+        const D = (bp - ftX + 6) % 6;
+
+        // Pre-walk inner ring to find max k achievable (blocked by own peg on next ft-*).
+        const ringDests = [];
+        {
+          let curr = ftX;
+          const ringLimit = D === 0 ? 0 : D; // can only ring-hop up to own ft-{bp}
+          for (let i = 0; i < ringLimit; i++) {
+            const next = (ftX + i + 1) % 6;
+            if (!canAdvanceFastTrackStep(player, curr, next, peg)) break;
+            ringDests.push(`ft-${next}`);
+            curr = next;
           }
         }
-        // rules.json :: MOV_NO_LAND_OWN (z=6) — cannot land on own peg
-        const destOcc = state.board.get(dest);
-        if (destOcc && destOcc.playerIdx === ci) blocked = true;
-        if (!blocked) {
-          // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) — an FT peg whose path
-          // exits through own ft-{bp} into the stretch is classified as
-          // `exitFastTrack` so the peg flips off FT and downstream UI / AI
-          // see a real exit event. Pure on-ring continuations stay as `move`.
-          const _exitsFt = peg.onFasttrack && dir === 'clockwise' &&
-            (dest === `ft-${bp}` || dest.startsWith(`safe-${bp}-`));
-          moves.push({
-            type: _exitsFt ? 'exitFastTrack' : 'move',
-            pegIdx: pi, dest, steps, from: peg.holeId,
-            path: trackSeq.slice(0, steps)
-          });
+        const maxRing = ringDests.length;
 
-          // FT entry: offer the inner-ring jump whenever the peg LANDS on its
-          // own ft-${bp} hole going clockwise. Starting position doesn't
-          // matter — Bambi (or anyone) can hit FT from any outer-rim hole.
-          // The peg must not already be on FT, the card must not be a
-          // noFastTrack card, and the peg must not be flagged mustExitFasttrack.
-          // bugfix_2026-05-19: previous code required peg.holeId === `home-${bp}`
-          // which is geometrically unreachable from clockwise motion (own home
-          // is 9 holes PAST own ft-${bp}, requiring a 75-step move), so the
-          // FT-entry choice was effectively never generated.
-          if (
-            dir === 'clockwise' &&
-            dest === `ft-${bp}` &&
-            !peg.onFasttrack &&
-            !rules.noFastTrack &&
-            !peg.mustExitFasttrack
-          ) {
-            moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
-          }
-        }
-      }
-
-      // ── PENULTIMATE FT HOLE → BULLSEYE CHOICE ──
-      // rules.json :: BULL_ENTRY_PENULTIMATE (z=18) — !FT peg may divert to
-      //               bullseye when penult lands on `ft-*` (clockwise only).
-      // rules.json :: BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL (user_directive_2026-05-09)
-      //               while traversing the FT inner ring, the final hop may
-      //               NEVER be the bullseye. Only a 1-move card from a peg
-      //               sitting on an ft-* hole may enter the bullseye.
-      // rules.json :: BULL_NO_BACKWARD        (z=24) — `!rules.noFastTrack`.
-      // rules.json :: BULL_MAX_ONE_PEG        (z=30) — bullseye occupancy check.
-      // rules.json :: FT_RING_PASS_RELAX      (z=72) — own pegs on `ft-*`
-      //               intermediates are passable; penult itself must be free.
-      // rules.json :: BULL_PENULT_REACHABLE   (user_directive_2026-05-09)
-      //               bullseye divert may only be offered when the regular
-      //               full-step continuation is ALSO reachable AND the
-      //               regular path itself was not blocked. Both alternatives
-      //               must be genuine choices.
-      if (dir === 'clockwise' && !rules.noFastTrack && !peg.onFasttrack &&
-        !peg.holeId.startsWith('ft-') &&
-        !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps) {
-        const penultimate = trackSeq[steps - 2];
-        const finalHole = trackSeq[steps - 1];
-        if (penultimate && penultimate.startsWith('ft-')
-          // user_directive_2026-05-18 — bullseye entry forbidden when the
-          // launching ft-* is the player's OWN ft-{bp}. This mirrors
-          // BULL_NO_FROM_OWN_FT for the 1-step rule and stops the
-          // exit-bullseye → own-FT → re-enter-bullseye no-op loop.
-          && penultimate !== `ft-${bp}`) {
-          let bullPathBlocked = false;
-          for (let s = 0; s < steps - 1; s++) {
-            const h = trackSeq[s];
-            const occ = state.board.get(h);
-            if (occ && occ.playerIdx === ci) {
-              if (s === steps - 2 || !h.startsWith('ft-')) {
-                bullPathBlocked = true; break;
+        // Helper: walk outer rim from a starting ft-* idx for `hops` clockwise steps,
+        // honoring safe-zone diversion and normal own-peg blocking.
+        const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
+        const _safeZoneFull = _inSafe >= SAFE_ZONE_SIZE;
+        const _safeEntry = `outer-${bp}-2`;
+        const _len = CLOCKWISE_TRACK.length;
+        const walkOuter = (startFtIdx, hops) => {
+          if (hops < 0) return null;
+          if (hops === 0) return { path: [], dest: `ft-${startFtIdx}` };
+          const startHole = `ft-${startFtIdx}`;
+          const startIdx = CLOCKWISE_TRACK.indexOf(startHole);
+          if (startIdx < 0) return null;
+          const path = [];
+          for (let s = 1; s <= hops; s++) {
+            const ni = (startIdx + s) % _len;
+            const hole = CLOCKWISE_TRACK[ni];
+            if (hole === _safeEntry && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
+              path.push(hole);
+              const remaining = hops - s;
+              if (_safeZoneFull) {
+                if (remaining === 0) return { path, dest: hole };
+                if (remaining === 1) { path.push(`outer-${bp}-3`); return { path, dest: `outer-${bp}-3` }; }
+                if (remaining === 2) { path.push(`outer-${bp}-3`); path.push(`home-${bp}`); return { path, dest: `home-${bp}` }; }
+                return null;
               }
+              if (remaining > SAFE_ZONE_SIZE) return null;
+              for (let h = 1; h <= remaining; h++) {
+                const sh = `safe-${bp}-${h}`;
+                if (hasOwnPegOnHole(player, sh, peg.id)) return null;
+                path.push(sh);
+              }
+              return { path, dest: path[path.length - 1] };
             }
+            // Normal own-peg blocking (intermediate + landing).
+            const occ = state.board.get(hole);
+            if (occ && occ.playerIdx === ci) return null;
+            path.push(hole);
           }
-          // Penultimate ft-* itself must be unoccupied by own peg
-          // (so peg can pivot to bullseye from it). Opponent on penult is OK.
-          const penultOcc = state.board.get(penultimate);
-          if (penultOcc && penultOcc.playerIdx === ci) bullPathBlocked = true;
-          if (!bullPathBlocked) {
-            const bullOcc = state.board.get('bullseye');
-            if (!bullOcc || bullOcc.playerIdx !== ci) {
+          return { path, dest: path[path.length - 1] };
+        };
+
+        // Enumerate k = 0..min(N, maxRing).
+        for (let k = 0; k <= Math.min(N, maxRing); k++) {
+          const ringSeg = ringDests.slice(0, k);
+
+          if (D > 0 && k === D) {
+            // Mandatory stretch exit: peg consumed D hops on the ring to reach
+            // own ft-{bp}; remaining N-D hops drop into safe-{bp}-1..(N-D).
+            const remaining = N - D;
+            if (remaining > SAFE_ZONE_SIZE) continue; // overshoot
+            const stretchPath = [];
+            let blocked = false;
+            for (let h = 1; h <= remaining; h++) {
+              const sh = `safe-${bp}-${h}`;
+              if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
+              stretchPath.push(sh);
+            }
+            if (blocked) continue;
+            const dest = remaining === 0 ? `ft-${bp}` : stretchPath[remaining - 1];
+            moves.push({
+              type: 'exitFastTrack', pegIdx: pi, dest,
+              steps: N, from: peg.holeId,
+              path: [...ringSeg, ...stretchPath]
+            });
+            continue;
+          }
+
+          // k < D (or D == 0 and k == 0): leave at ft-(ftX+k) onto outer rim.
+          const exitFt = (ftX + k) % 6;
+          const outerHops = N - k;
+          const w = walkOuter(exitFt, outerHops);
+          if (!w) continue;
+          moves.push({
+            type: 'exitFastTrack', pegIdx: pi, dest: w.dest,
+            steps: N, from: peg.holeId,
+            path: [...ringSeg, ...w.path]
+          });
+        }
+
+        // D == 0 special: peg sits AT own ft-{bp} → mandatory stretch for full N.
+        if (D === 0) {
+          if (N <= SAFE_ZONE_SIZE) {
+            const stretchPath = [];
+            let blocked = false;
+            for (let h = 1; h <= N; h++) {
+              const sh = `safe-${bp}-${h}`;
+              if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
+              stretchPath.push(sh);
+            }
+            if (!blocked) {
               moves.push({
-                type: 'enterBullseye', pegIdx: pi, dest: 'bullseye',
-                steps, from: peg.holeId,
-                path: [...trackSeq.slice(0, steps - 1), 'bullseye']
+                type: 'exitFastTrack', pegIdx: pi, dest: stretchPath[N - 1],
+                steps: N, from: peg.holeId, path: stretchPath
               });
             }
           }
         }
-      }
 
-      // ── FT EXIT (v3.2.0) ──
-      // Retired: the loop that emitted a TRUNCATED exitFastTrack at own
-      // ft-{bp} (steps=k instead of the full card value). Per
-      // user_directive_2026-05-20b, an FT peg must consume the entire card
-      // value; when the path crosses own ft-{bp}, the remaining hops carry
-      // the peg into the home stretch automatically. The regular `move`
-      // emission above is re-typed as `exitFastTrack` in that case.
+        // Skip standard perimeter emission below for FT-forward pegs.
+      } else {
 
-      // ── FT RING TRAVERSAL (peg sitting on an ft-* hole, not in FT mode) ──
-      // Only allow FT entry from own home hole, not by backing up or traversing from other FT holes
-      // (No FT entry from other FT holes)
+        const trackSeq = getTrackSequence(peg, player, dir);
+        const steps = rules.movement;
+
+        if (trackSeq.length >= steps) {
+          const dest = trackSeq[steps - 1];
+          let blocked = false;
+          for (let s = 0; s < steps; s++) {
+            const h = trackSeq[s];
+            const occ = state.board.get(h);
+            // rules.json :: MOV_NO_PASS_OWN (z=9) — cannot pass own peg
+            // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates exempt
+            if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
+              blocked = true; break;
+            }
+          }
+          // rules.json :: MOV_NO_LAND_OWN (z=6) — cannot land on own peg
+          const destOcc = state.board.get(dest);
+          if (destOcc && destOcc.playerIdx === ci) blocked = true;
+          if (!blocked) {
+            // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) — an FT peg whose path
+            // exits through own ft-{bp} into the stretch is classified as
+            // `exitFastTrack` so the peg flips off FT and downstream UI / AI
+            // see a real exit event. Pure on-ring continuations stay as `move`.
+            const _exitsFt = peg.onFasttrack && dir === 'clockwise' &&
+              (dest === `ft-${bp}` || dest.startsWith(`safe-${bp}-`));
+            moves.push({
+              type: _exitsFt ? 'exitFastTrack' : 'move',
+              pegIdx: pi, dest, steps, from: peg.holeId,
+              path: trackSeq.slice(0, steps)
+            });
+
+            // FT entry: offer the inner-ring jump whenever the peg LANDS on its
+            // own ft-${bp} hole going clockwise. Starting position doesn't
+            // matter — Bambi (or anyone) can hit FT from any outer-rim hole.
+            // The peg must not already be on FT, the card must not be a
+            // noFastTrack card, and the peg must not be flagged mustExitFasttrack.
+            // bugfix_2026-05-19: previous code required peg.holeId === `home-${bp}`
+            // which is geometrically unreachable from clockwise motion (own home
+            // is 9 holes PAST own ft-${bp}, requiring a 75-step move), so the
+            // FT-entry choice was effectively never generated.
+            if (
+              dir === 'clockwise' &&
+              dest === `ft-${bp}` &&
+              !peg.onFasttrack &&
+              !rules.noFastTrack &&
+              !peg.mustExitFasttrack
+            ) {
+              moves.push({ type: 'enterFastTrack', pegIdx: pi, dest, steps, from: peg.holeId, path: trackSeq.slice(0, steps) });
+            }
+          }
+        }
+
+        // ── PENULTIMATE FT HOLE → BULLSEYE CHOICE ──
+        // rules.json :: BULL_ENTRY_PENULTIMATE (z=18) — !FT peg may divert to
+        //               bullseye when penult lands on `ft-*` (clockwise only).
+        // rules.json :: BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL (user_directive_2026-05-09)
+        //               while traversing the FT inner ring, the final hop may
+        //               NEVER be the bullseye. Only a 1-move card from a peg
+        //               sitting on an ft-* hole may enter the bullseye.
+        // rules.json :: BULL_NO_BACKWARD        (z=24) — `!rules.noFastTrack`.
+        // rules.json :: BULL_MAX_ONE_PEG        (z=30) — bullseye occupancy check.
+        // rules.json :: FT_RING_PASS_RELAX      (z=72) — own pegs on `ft-*`
+        //               intermediates are passable; penult itself must be free.
+        // rules.json :: BULL_PENULT_REACHABLE   (user_directive_2026-05-09)
+        //               bullseye divert may only be offered when the regular
+        //               full-step continuation is ALSO reachable AND the
+        //               regular path itself was not blocked. Both alternatives
+        //               must be genuine choices.
+        if (dir === 'clockwise' && !rules.noFastTrack && !peg.onFasttrack &&
+          !peg.holeId.startsWith('ft-') &&
+          !peg.mustExitFasttrack && steps >= 2 && trackSeq.length >= steps) {
+          const penultimate = trackSeq[steps - 2];
+          const finalHole = trackSeq[steps - 1];
+          if (penultimate && penultimate.startsWith('ft-')
+            // user_directive_2026-05-18 — bullseye entry forbidden when the
+            // launching ft-* is the player's OWN ft-{bp}. This mirrors
+            // BULL_NO_FROM_OWN_FT for the 1-step rule and stops the
+            // exit-bullseye → own-FT → re-enter-bullseye no-op loop.
+            && penultimate !== `ft-${bp}`) {
+            let bullPathBlocked = false;
+            for (let s = 0; s < steps - 1; s++) {
+              const h = trackSeq[s];
+              const occ = state.board.get(h);
+              if (occ && occ.playerIdx === ci) {
+                if (s === steps - 2 || !h.startsWith('ft-')) {
+                  bullPathBlocked = true; break;
+                }
+              }
+            }
+            // Penultimate ft-* itself must be unoccupied by own peg
+            // (so peg can pivot to bullseye from it). Opponent on penult is OK.
+            const penultOcc = state.board.get(penultimate);
+            if (penultOcc && penultOcc.playerIdx === ci) bullPathBlocked = true;
+            if (!bullPathBlocked) {
+              const bullOcc = state.board.get('bullseye');
+              if (!bullOcc || bullOcc.playerIdx !== ci) {
+                moves.push({
+                  type: 'enterBullseye', pegIdx: pi, dest: 'bullseye',
+                  steps, from: peg.holeId,
+                  path: [...trackSeq.slice(0, steps - 1), 'bullseye']
+                });
+              }
+            }
+          }
+        }
+
+        // ── FT EXIT (v3.2.0) ──
+        // Retired: the loop that emitted a TRUNCATED exitFastTrack at own
+        // ft-{bp} (steps=k instead of the full card value). Per
+        // user_directive_2026-05-20b, an FT peg must consume the entire card
+        // value; when the path crosses own ft-{bp}, the remaining hops carry
+        // the peg into the home stretch automatically. The regular `move`
+        // emission above is re-typed as `exitFastTrack` in that case.
+        // FURTHER RETIRED (user_directive_2026-05-20e / FT_EXIT_ANY_HOLE):
+        // FT-forward emission is now handled in the `_ftForward` branch above
+        // and bypasses this entire perimeter path.
+
+        // ── FT RING TRAVERSAL (peg sitting on an ft-* hole, not in FT mode) ──
+        // Only allow FT entry from own home hole, not by backing up or traversing from other FT holes
+        // (No FT entry from other FT holes)
+      } // end else (_ftForward)
     }
 
     // ENTER BULLSEYE from FastTrack — ONLY on a 1-move card (A, J, Q, K, JOKER)
@@ -2351,7 +2489,27 @@ function executeMove(moveIdx) {
       peg.fasttrackEntryHole = null;
       peg.mustExitFasttrack = false;
       peg.mood = 'CAUTIOUS';
+      // user_directive_2026-05-20e: FT-leave moves may continue onto the
+      // outer rim or into the home stretch. Mirror the regular `move`
+      // handler's circuit-completion + safe-zone flag bookkeeping so the
+      // peg's state is consistent regardless of which leg of the path
+      // landed it.
+      {
+        const _bp = player.boardPosition;
+        const _safeEntry = `outer-${_bp}-2`;
+        const _traversed = move.path || [];
+        if (!peg.eligibleForSafeZone && _traversed.includes(_safeEntry)) {
+          peg.eligibleForSafeZone = true;
+        }
+      }
       placePeg(peg, move.dest, ci);
+      if (getHoleType(move.dest) === 'safezone') {
+        peg.lockedToSafeZone = true;
+        peg.mood = 'RELAXED';
+        _deferredCutscenes.push(['safeZone', {
+          peg, playerColor: player.color, playerName: player.name, playerId: ci
+        }]);
+      }
       log(`${getCurrentPlayerName()} exited FastTrack at ${move.dest}`);
       if (window.ManifoldAudio) ManifoldAudio.playEnter();
       break;

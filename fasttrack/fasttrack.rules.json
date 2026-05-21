@@ -3,7 +3,7 @@
   "_meta": {
     "id": "fasttrack",
     "name": "FastTrack",
-    "version": "3.2.0",
+    "version": "3.3.0",
     "compiled": "2026-05-20",
     "axiom": "z = x * y",
     "supersedes": [
@@ -19,7 +19,8 @@
       "Geometry was previously wrong in every source: outer track has 14 holes per wedge (84 total), not 36 or 72.",
       "Variants 5-card-draw and 2-dice are intentionally omitted in 3.0.0 \u2014 awaiting authoritative rules.",
       "v3.1.0 (2026-05-20) folds user_directive_2026-05-20 (AI_DIRECTIVE_RULES_CLARIFICATION.md v2): bullseye now cuttable (single-occupancy); FT-ring own-peg passing removed (Option A retired); redraw cards trigger extra turn even when forfeited for no legal moves; Card-7 split FT-priority constraints relaxed to two-different-pegs only; bullseye penultimate-entry restricted to pegs already on FT; bullseye exit fallback removed (blocked = illegal); FT loss on non-FT move evaluated per-draw; new rules FT_NO_SECOND_LAP, BULL_NO_REENTRY, TURN_PLAYER_CHOICE, TURN_AUTO_PLAY, SPLIT_ANTI_TUNNELING added.",
-      "v3.2.0 (2026-05-20) folds user_directive_2026-05-20b: FT_NO_PASS_OWN_FT semantics inverted. An FT peg no longer auto-stops at own ft-{bp}; the peg consumes the FULL card value, exiting through own ft-{bp} into the home stretch (safe-{bp}-{1..4}) for any leftover hops. Engine: getTrackSequence FT-forward extended past own ft-{bp} into the stretch; calculateValidMoves now re-types the FT-exit move as 'exitFastTrack'; old truncating FT-exit loop retired. Tests updated."
+      "v3.2.0 (2026-05-20) folds user_directive_2026-05-20b: FT_NO_PASS_OWN_FT semantics inverted. An FT peg no longer auto-stops at own ft-{bp}; the peg consumes the FULL card value, exiting through own ft-{bp} into the home stretch (safe-{bp}-{1..4}) for any leftover hops. Engine: getTrackSequence FT-forward extended past own ft-{bp} into the stretch; calculateValidMoves now re-types the FT-exit move as 'exitFastTrack'; old truncating FT-exit loop retired. Tests updated.",
+      "v3.3.0 (2026-05-20) folds user_directive_2026-05-20e: FT_EXIT_ANY_HOLE replaces FT_NO_PASS_OWN_FT. Player choice expanded \u2014 a peg geometrically on any ft-* hole with card value N gets min(N,D)+1 stopping options where k = 0..min(N,D) is the number of inner-ring hops before LEAVING the ring back onto the outer rim; remaining N-k hops are spent clockwise on the outer rim. Reaching own ft-{bp} (k=D) FORCES exit into the home stretch consuming N-D hops there (only blocked by own peg in stretch). Engine: calculateValidMoves grows a dedicated _ftForward branch enumerating all leave-at-k options; v3.2.0 consume-full-card-on-ring semantics retired. 1-hit bullseye jump (movement===1 from foreign ft-*) remains as a separate option."
     ]
   },
   "axes": {
@@ -69,7 +70,7 @@
       "outer_rim_position": "outer-{p}-1 (FT hole and rim hole are the SAME hole, dual role)",
       "ring_traversal_clockwise": "ft-0 -> ft-1 -> ft-2 -> ft-3 -> ft-4 -> ft-5 -> ft-0",
       "ft_holes_not_adjacent_on_outer_rim": true,
-      "exit_constraint": "A peg traversing the FT ring consumes the full card value. If the trajectory crosses own ft-{bp}, the peg exits there and continues into own stretch (safe-{bp}-{1..4}) for the remaining hops. No auto-stop at own ft-{bp}."
+      "exit_constraint": "A peg geometrically on any ft-* hole with card value N may leave the FT inner ring at hop k = 0..min(N,D), where D = ring distance to own ft-{bp}. For k<D the peg drops back onto the outer rim at ft-(X+k) and continues N-k clockwise hops on the outer rim. For k=D the peg MUST exit into own stretch (safe-{bp}-{1..4}) consuming N-D hops there; blocked only by own peg in stretch. The 1-hit bullseye jump (movement===1, from foreign ft-*) is offered independently."
     },
     "safe_zone": {
       "holes_per_player": 4,
@@ -668,16 +669,17 @@
       ]
     },
     {
-      "id": "FT_NO_PASS_OWN_FT",
+      "id": "FT_EXIT_ANY_HOLE",
       "x": 8,
       "y": 4,
       "z": 32,
       "category": "fasttrack",
-      "desc": "A peg on the FT ring consumes the FULL card value. The peg does NOT auto-stop at its own FT hole; the token takes all of its hops. If the path crosses own ft-{bp}, the peg exits the ring through own ft-{bp} and continues for the remaining hops into the home stretch (safe-{bp}-{1..SAFE_ZONE_SIZE}). The peg cannot overtake any of its own tokens along the ring or stretch (MOV_NO_PASS_OWN). If the full-hop trajectory would overtake an own peg, the move is illegal; the player must choose a different peg or card (no auto-truncation).",
-      "assertion": "peg.onFasttrack && dir==='clockwise' ==> trackSeq extends past ownFtHole into ownStretch; final dest = trackSeq[card.movement-1]; ownPeg in path => move illegal",
+      "desc": "A peg geometrically on any ft-X hole (regardless of peg.onFasttrack flag) with card value N receives up to min(N,D)+1 distinct stopping options, where D = (bp - X + 6) mod 6 is the ring distance to the player's own ft-{bp}. For each k = 0..min(N,D-1) the peg makes k clockwise hops on the inner FT ring, then 'leaves' the ring at ft-((X+k) mod 6) back onto the outer rim and continues N-k hops clockwise on the outer rim. For k=D (only when N>=D) the peg reaches own ft-{bp} and MUST exit into the home stretch (safe-{bp}-{1..SAFE_ZONE_SIZE}) consuming the remaining N-D hops; this stretch exit is suppressed (only) if blocked by an own peg in the stretch. Ring hops are blocked by an own peg sitting on the next ft-* destination (canAdvanceFastTrackStep). Outer-rim continuation uses normal MOV_NO_PASS_OWN / MOV_NO_LAND_OWN blocking. If the peg is already AT own ft-{bp} (D=0) the move is mandatory full-stretch consumption. The 1-hit bullseye jump (movement===1 from foreign ft-*) is offered as a separate option, independent of this enumeration. Supersedes FT_NO_PASS_OWN_FT (v3.2.0).",
+      "assertion": "peg.holeId.startsWith('ft-') && dir==='clockwise' && !rules.noFastTrack ==> for k in 0..min(N,D): emit exitFastTrack at (k<D ? walkOuter(ft-(X+k), N-k).dest : stretch[N-D]); ring blocked by own peg on next ft-* halts enumeration; stretch blocked by own peg in safe-{bp}-* suppresses k=D option only",
       "provenance": [
         "user_directive_2026-04-25",
-        "user_directive_2026-05-20b"
+        "user_directive_2026-05-20b",
+        "user_directive_2026-05-20e"
       ]
     },
     {

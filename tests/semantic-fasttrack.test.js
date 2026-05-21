@@ -147,10 +147,12 @@ test('fasttrack: getBalancedBoardPosition is a pure observer', () => {
     }
 });
 
-test('fasttrack: FastTrack peg consumes full card value through own ft into stretch (v3.2.0)', () => {
-    // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) — FT peg one hop short of
-    // own ft-{bp} with card 3 consumes all 3 hops: ft-{bp} → safe-{bp}-1 →
-    // safe-{bp}-2. Move is emitted as exitFastTrack at safe-{bp}-2.
+test('fasttrack: FastTrack peg with card N reaches own ft → mandatory stretch (user_directive_2026-05-20e)', () => {
+    // rules.json :: FT_EXIT_ANY_HOLE (replaces FT_NO_PASS_OWN_FT / v3.2.0)
+    // Peg one hop from own ft-{bp} (D=1) with card 3 must still be able to
+    // reach safe-{bp}-2 via k=D mandatory stretch exit. ADDITIONALLY the
+    // peg now also gets k=0 leave-immediately options on the outer rim
+    // (those are tested separately).
     const { run } = loadCore();
     run(`
         initGame(2, { launchMode: 'solo' });
@@ -187,19 +189,17 @@ test('fasttrack: FastTrack peg consumes full card value through own ft into stre
     const ownFt = `ft-${result.bp}`;
     const stretch2 = `safe-${result.bp}-2`;
 
-    // Full 3 hops consumed: dest = safe-{bp}-2; path crosses own ft-{bp}.
+    // k=D=1 + remaining 2 in stretch: dest = safe-{bp}-2 via ft-{bp}.
     const exit = result.moves.find(m => m.type === 'exitFastTrack' && m.dest === stretch2);
     assert.ok(exit, `expected exitFastTrack at ${stretch2}, got ${JSON.stringify(result.moves)}`);
-    assert.equal(exit.steps, 3, 'FT exit must use full card value, not truncate at own ft');
-    assert.ok(exit.path.includes(ownFt), 'path must cross own ft-{bp}');
+    assert.equal(exit.steps, 3, 'FT exit must use full card value');
+    assert.ok(exit.path.includes(ownFt), 'mandatory stretch path must cross own ft-{bp}');
     assert.equal(exit.path[exit.path.length - 1], stretch2);
-    // The truncated legacy move (exitFastTrack at own ft with steps=1) must NOT be offered.
-    assert.ok(!result.moves.some(m => m.type === 'exitFastTrack' && m.dest === ownFt && m.steps < 3),
-        'truncated FT exit at own ft hole must not be emitted');
 });
 
-test('fasttrack: FastTrack peg with exact-to-own-ft card lands on own ft (v3.2.0)', () => {
-    // Edge case: card value === distance to own ft → dest is exactly ft-{bp}.
+test('fasttrack: FastTrack peg with exact-to-own-ft card lands on own ft (user_directive_2026-05-20e)', () => {
+    // Edge case: card value === D → k=D mandatory stretch with 0 remaining
+    // hops → dest is exactly ft-{bp}, path = [ft-{bp}].
     const { run } = loadCore();
     run(`
         initGame(2, { launchMode: 'solo' });
@@ -236,10 +236,11 @@ test('fasttrack: FastTrack peg with exact-to-own-ft card lands on own ft (v3.2.0
     assert.equal(exit.steps, 1);
 });
 
-test('fasttrack: FastTrack stretch overshoot blocked by own peg in stretch is illegal (v3.2.0)', () => {
-    // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0) + MOV_NO_PASS_OWN —
-    // if remaining hops would overtake an own peg sitting in own stretch,
-    // the entire move is illegal (no auto-truncation fallback).
+test('fasttrack: stretch overshoot blocked still allows k<D leave-to-outer-rim moves (user_directive_2026-05-20e)', () => {
+    // rules.json :: FT_EXIT_ANY_HOLE — when stretch is blocked by own peg,
+    // the k=D mandatory-stretch option is suppressed but k<D leave moves
+    // onto the outer rim remain legal. This is the semantic shift from
+    // v3.2.0 (where blocked stretch killed the entire FT-forward move).
     const { run } = loadCore();
     run(`
         initGame(2, { launchMode: 'solo' });
@@ -267,16 +268,119 @@ test('fasttrack: FastTrack stretch overshoot blocked by own peg in stretch is il
         globalThis.__ftStretchBlock = {
             bp,
             moves: (state.turn.get('validMoves') || []).map(m => ({
-                type: m.type, dest: m.dest, pegIdx: m.pegIdx
+                type: m.type, dest: m.dest, pegIdx: m.pegIdx, steps: m.steps,
+                path: Array.isArray(m.path) ? m.path.slice() : []
             }))
         };
     `);
 
     const result = run('__ftStretchBlock');
-    // No FT exit move involving the mover (pegIdx 0) — own stretch peg blocks the path.
     const moverMoves = result.moves.filter(m => m.pegIdx === 0);
-    assert.ok(!moverMoves.some(m => m.type === 'exitFastTrack'),
-        `expected no exitFastTrack for blocked FT peg, got ${JSON.stringify(moverMoves)}`);
+    const ownFt = `ft-${result.bp}`;
+
+    // Mandatory stretch exit (dest in own stretch) must NOT be offered — blocked.
+    const stretchExit = moverMoves.find(m => m.type === 'exitFastTrack' &&
+        typeof m.dest === 'string' && m.dest.startsWith(`safe-${result.bp}-`));
+    assert.ok(!stretchExit, `stretch blocked → no stretch exit, got ${JSON.stringify(stretchExit)}`);
+
+    // k=0 leave-immediately option onto outer rim MUST still be available.
+    const kZero = moverMoves.find(m => m.type === 'exitFastTrack' &&
+        Array.isArray(m.path) && m.path.length === 3 &&
+        !m.path.some(h => typeof h === 'string' && h.startsWith('ft-')));
+    assert.ok(kZero, `expected k=0 leave-to-outer-rim option, got ${JSON.stringify(moverMoves)}`);
+});
+
+test('fasttrack: FT peg with card N gets multiple leave-at-k options on outer rim (user_directive_2026-05-20e)', () => {
+    // The core new behavior: peg at ft-X with card N gets up to min(N,D)+1
+    // distinct stopping points (k=0, k=1, ..., k=min(N,D)). For X=(bp+3)%6
+    // (D=3) and card '2' (N=2), expect 3 options: k=0, k=1, k=2 — all on
+    // the outer rim (none reach own ft-{bp} since N<D).
+    const { run } = loadCore();
+    run(`
+        initGame(2, { launchMode: 'solo' });
+        state.players.set('current', 0);
+        const players = state.players.get('list');
+        for (const pl of players) {
+            for (const peg of pl.pegs) {
+                if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                peg.holeId = 'holding';
+                peg.holeType = 'holding';
+                peg.onFasttrack = false;
+                peg.mustExitFasttrack = false;
+            }
+        }
+        const player = players[0];
+        const bp = player.boardPosition;
+        const peg = player.pegs[0];
+        placePeg(peg, 'ft-' + ((bp + 3) % 6), 0);
+        peg.onFasttrack = true;
+        state.deck.set('currentCard', { value: '2' });
+        calculateValidMoves();
+        globalThis.__ftMulti = {
+            bp,
+            moves: (state.turn.get('validMoves') || [])
+                .filter(m => m.pegIdx === 0)
+                .map(m => ({
+                    type: m.type, dest: m.dest, steps: m.steps,
+                    path: Array.isArray(m.path) ? m.path.slice() : []
+                }))
+        };
+    `);
+
+    const result = run('__ftMulti');
+    const exits = result.moves.filter(m => m.type === 'exitFastTrack');
+    // D=3, N=2 → k=0,1,2 = 3 options.
+    assert.equal(exits.length, 3,
+        `expected 3 leave-at-k options for N=2,D=3, got ${exits.length}: ${JSON.stringify(exits)}`);
+
+    // None of them should be the mandatory-stretch (no path crosses own ft-{bp}).
+    const ownFt = `ft-${result.bp}`;
+    const reachedStretch = exits.some(m => m.path.includes(ownFt));
+    assert.ok(!reachedStretch, 'no option may reach own ft-{bp} when N<D');
+});
+
+test('fasttrack: FT peg sitting AT own ft-{bp} (D=0) forces immediate stretch exit (user_directive_2026-05-20e)', () => {
+    // D=0 edge: peg already at own ft-{bp} consumes full card in stretch.
+    // Card '3' → dest = safe-{bp}-3, path = [safe-{bp}-1, safe-{bp}-2, safe-{bp}-3].
+    const { run } = loadCore();
+    run(`
+        initGame(2, { launchMode: 'solo' });
+        state.players.set('current', 0);
+        const players = state.players.get('list');
+        for (const pl of players) {
+            for (const peg of pl.pegs) {
+                if (peg.holeId && peg.holeId !== 'holding') state.board.set(peg.holeId, null);
+                peg.holeId = 'holding';
+                peg.holeType = 'holding';
+                peg.onFasttrack = false;
+                peg.mustExitFasttrack = false;
+            }
+        }
+        const player = players[0];
+        const bp = player.boardPosition;
+        const peg = player.pegs[0];
+        placePeg(peg, 'ft-' + bp, 0);
+        peg.onFasttrack = true;
+        state.deck.set('currentCard', { value: '3' });
+        calculateValidMoves();
+        globalThis.__ftAtOwn = {
+            bp,
+            moves: (state.turn.get('validMoves') || [])
+                .filter(m => m.pegIdx === 0)
+                .map(m => ({
+                    type: m.type, dest: m.dest, steps: m.steps,
+                    path: Array.isArray(m.path) ? m.path.slice() : []
+                }))
+        };
+    `);
+
+    const result = run('__ftAtOwn');
+    const stretch3 = `safe-${result.bp}-3`;
+    const stretchExit = result.moves.find(m => m.type === 'exitFastTrack' && m.dest === stretch3);
+    assert.ok(stretchExit,
+        `expected mandatory stretch exit at ${stretch3}, got ${JSON.stringify(result.moves)}`);
+    assert.equal(stretchExit.steps, 3);
+    assert.equal(stretchExit.path.length, 3);
 });
 
 // Retired (v3.2.0): "FastTrack traversal stops before bypassing an own peg
