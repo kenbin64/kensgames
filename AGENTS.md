@@ -10,6 +10,27 @@
   - Shared manifold code in [`js/`](js/)
   - Multiplayer server in [`server/`](server/)
 
+## Governing Tenant (load-bearing — read before any design decision)
+
+**Use geometry when the question is navigational. Use records when the question is exact. Never substitute one for the other.**
+
+The manifold `m` and the server/database state are complementary layers. Neither replaces the other.
+
+Apply the manifold when:
+- The query space is larger than the answer space (discovery, similarity, clustering)
+- Relationships are the data (connections between games, mechanics, identities)
+- The path to the goal is unknown (navigation, exploration, emergence)
+- Graceful degradation is acceptable (nearest match is useful)
+
+Apply records/exact state when:
+- Exact answers are required (player scores, session tokens, auth state, email addresses)
+- Deterministic workflow must be followed (auth, payment, deployment)
+- The manifold field is too sparse to form useful geometry (< ~50 nodes)
+
+**Clarification on `UltimateAIDirective.md`**: The directive's claim that "the manifold is the source of truth and artifacts are read-only shadows" applies to *geometric/relational* data. For transactional state — scores, sessions, auth tokens, payment records — the database record is the source of truth. This is the governing tenant applied correctly, not a contradiction.
+
+This tenant is falsifiable: if the manifold is queried for exact state and returns wrong answers, the manifold layer is being misused and must be diagnosed.
+
 ## Read First
 
 - [`docs/HARD_RULES.md`](docs/HARD_RULES.md): **hard product constraints** — product positioning, creator profile, nav/branding, license boundary, brand stack (HR-0–HR-0.10), viewport/scroll (HR-1–6, HR-6.1 single-viewport rule for all non-landing pages, **HR-6.2 fixed control rail** — every button/control lives in a viewport-fixed footer outside the game/wizard/3D layer; relaxes HR-6.1's vertical no-scroll clause), shared wizard architecture (HR-7–12), guest-friendly landing (HR-13–16), passkeys-first passwordless auth (HR-17), no-duplication restatement (HR-18), shared game manager (HR-21–26), decision substrates (HR-27–30), AI participation + MCP (HR-31–36), performance tailoring (HR-37–39), platform distribution (HR-40–46), generative AI roles HR-47–49 (Game Master, Game Maker, Games Promoter), federated content (HR-50–52), trade-secret boundary (HR-53), compliance procedure (HR-19–20). Supersedes any softer guidance in other docs.

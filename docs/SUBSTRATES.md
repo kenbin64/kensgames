@@ -7,11 +7,11 @@ This repo speaks the manifold dialect:
 
 - **x** is identity — the seed, the observer, and always the point of reference. The AI is also an x.
 - **y** is the modifier set — attributes and nutrients extracted from the manifold m.
-- **z** is the manifested current state (bloom) — always derived, never stored independently.
-- **m** is the manifold substrate — the garden, a continuous queryable geometric field, not a database.
+- **z** is the manifested current state (bloom) — geometric z is always derived at query time, never pre-materialised in the manifold. Transactional z (a recorded score, a session event, a published outcome) is persisted in records outside the manifold.
+- **m** is the manifold substrate — the garden, a continuous queryable geometric field, not a database for transactional records.
 - **r** is traversal resistance ($r \ge 1$). At $r = 1$ (unit crossing at the void), traversal has no resistance.
 
-State is never stored; it is extracted from the manifold at query time via a lens:
+Geometric state is extracted from the manifold at query time via a lens (navigational queries). Transactional state (scores, sessions, auth) is persisted in records and read directly (exact queries). Use the manifold when the question is navigational. Use records when the question is exact.
 
 $$z = x \cdot y \cdot m \quad \text{(gather — multiplication unites)}$$
 $$z = \frac{x}{y} \cdot m \quad \text{(explode — division decomposes into constituent parts)}$$

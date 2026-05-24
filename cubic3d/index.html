@@ -5,7 +5,7 @@
   <script src="/js/session-identity.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cubic — 3D Tetris · KensGames</title>
+  <title>Cubit — Crystal 3D Tetris · KensGames</title>
   <style>
     *,
     *::before,
@@ -16,20 +16,13 @@
     }
 
     :root {
-      --bg: #04040c;
-      --panel: rgba(8, 12, 28, 0.90);
-      --border: rgba(255, 255, 255, 0.09);
-      --gold: #f1c644;
-      --cyan: #00eeff;
-      --text: #c8d8f0;
-      --dim: #4a5a72;
-      --p1: #ff284f;
-      --p2: #18c96e;
-      --p3: #7a3cff;
-      --p4: #f1c644;
-      --p5: #00eeff;
-      --p6: #1a8cff;
-      --p7: #ff8c1a;
+      --bg: #03030e;
+      --panel: rgba(4, 6, 22, 0.94);
+      --border: rgba(0, 255, 238, 0.14);
+      --cyan: #00ffee;
+      --purple: #aa44ff;
+      --text: #b8d8f8;
+      --dim: #3a4a6a;
     }
 
     html,
@@ -40,6 +33,18 @@
       color: var(--text);
       overflow: hidden;
       font-family: 'Courier New', monospace;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(rgba(0, 255, 238, 0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 238, 0.022) 1px, transparent 1px);
+      background-size: 44px 44px;
+      pointer-events: none;
+      z-index: 0;
     }
 
     #app {
@@ -62,35 +67,40 @@
 
     /* ── HUD SIDEBAR ──────────────────────────────────────── */
     #hud {
-      width: 188px;
+      width: 204px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       padding: 16px 12px;
       background: var(--panel);
       border-left: 1px solid var(--border);
+      box-shadow: -4px 0 28px rgba(0, 255, 238, 0.07);
       overflow: hidden;
     }
 
     .hud-title {
       font-size: 20px;
       font-weight: bold;
-      letter-spacing: 0.12em;
-      color: var(--gold);
-      text-shadow: 0 0 18px rgba(241, 198, 68, .4);
+      letter-spacing: 0.16em;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 10px rgba(0, 255, 238, 0.55));
     }
 
     .hud-panel {
-      background: rgba(0, 0, 0, 0.32);
+      background: rgba(0, 4, 20, 0.60);
       border: 1px solid var(--border);
-      border-radius: 5px;
+      border-radius: 6px;
       padding: 9px 11px;
+      box-shadow: 0 0 14px rgba(0, 255, 238, 0.05) inset, 0 0 10px rgba(170, 68, 255, 0.05) inset;
     }
 
     .hud-label {
       font-size: 9px;
-      letter-spacing: 0.14em;
-      color: var(--dim);
+      letter-spacing: 0.18em;
+      color: rgba(170, 68, 255, 0.65);
       text-transform: uppercase;
       margin-bottom: 3px;
     }
@@ -98,12 +108,13 @@
     .hud-value {
       font-size: 22px;
       font-weight: bold;
-      color: var(--gold);
+      color: var(--cyan);
+      text-shadow: 0 0 16px rgba(0, 255, 238, 0.65);
     }
 
     .hud-sub {
       font-size: 10px;
-      color: var(--dim);
+      color: rgba(0, 255, 238, 0.42);
       margin-top: 2px;
     }
 
@@ -121,9 +132,10 @@
     }
 
     #legend b {
-      color: var(--text);
+      color: var(--cyan);
       display: inline-block;
-      min-width: 46px;
+      min-width: 52px;
+      text-shadow: 0 0 8px rgba(0, 255, 238, 0.5);
     }
 
     /* ── OVERLAYS ──────────────────────────────────────────── */
@@ -134,7 +146,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(4, 4, 12, 0.84);
+      background: radial-gradient(ellipse at center, rgba(10, 4, 30, 0.92) 0%, rgba(3, 2, 14, 0.96) 100%);
       z-index: 10;
     }
 
@@ -143,44 +155,50 @@
     }
 
     #overlay-title {
-      font-size: 40px;
+      font-size: 56px;
       font-weight: bold;
-      letter-spacing: 0.12em;
-      color: var(--gold);
-      text-shadow: 0 0 32px rgba(241, 198, 68, .55);
+      letter-spacing: 0.18em;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 32px rgba(170, 68, 255, 0.8));
       margin-bottom: 8px;
     }
 
     #overlay-sub {
-      font-size: 13px;
-      color: var(--dim);
-      letter-spacing: 0.1em;
+      font-size: 12px;
+      color: rgba(0, 255, 238, 0.42);
+      letter-spacing: 0.18em;
       margin-bottom: 8px;
     }
 
     #overlay-score {
-      font-size: 30px;
-      color: var(--cyan);
+      font-size: 36px;
+      color: var(--purple);
+      text-shadow: 0 0 22px rgba(170, 68, 255, 0.75);
       margin-bottom: 24px;
       display: none;
     }
 
     #start-btn {
       background: transparent;
-      border: 1px solid var(--gold);
-      color: var(--gold);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
       font-family: inherit;
       font-size: 13px;
-      letter-spacing: 0.12em;
-      padding: 10px 28px;
+      letter-spacing: 0.16em;
+      padding: 11px 34px;
       cursor: pointer;
       border-radius: 4px;
       text-transform: uppercase;
-      transition: background 0.18s;
+      transition: background 0.18s, box-shadow 0.18s;
+      box-shadow: 0 0 16px rgba(0, 255, 238, 0.20);
     }
 
     #start-btn:hover {
-      background: rgba(241, 198, 68, 0.12);
+      background: rgba(0, 255, 238, 0.10);
+      box-shadow: 0 0 28px rgba(0, 255, 238, 0.40);
     }
 
     #pause-pill {
@@ -189,15 +207,43 @@
       left: 50%;
       transform: translate(-50%, -50%);
       font-size: 28px;
-      letter-spacing: 0.12em;
-      color: var(--gold);
-      text-shadow: 0 0 22px rgba(241, 198, 68, .5);
+      letter-spacing: 0.16em;
+      color: var(--purple);
+      text-shadow: 0 0 28px rgba(170, 68, 255, 0.85);
       pointer-events: none;
       display: none;
     }
 
     #pause-pill.vis {
       display: block;
+    }
+
+    /* ── VR BUTTON ───────────────────────────────────────── */
+    .hud-vr-btn {
+      background: transparent;
+      border: 1px solid rgba(170, 68, 255, 0.32);
+      color: rgba(170, 68, 255, 0.60);
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.13em;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      text-transform: uppercase;
+      transition: all 0.18s;
+      width: 100%;
+      margin-top: 2px;
+    }
+
+    .hud-vr-btn:hover:not(.unsupported) {
+      border-color: var(--purple);
+      color: var(--purple);
+      box-shadow: 0 0 16px rgba(170, 68, 255, 0.32);
+    }
+
+    .hud-vr-btn.unsupported {
+      opacity: 0.24;
+      cursor: default;
     }
 
     /* ── LINE FLASH ────────────────────────────────────────── */
@@ -222,6 +268,7 @@
   <script src="/js/kernel-client.js" defer></script>
   <script src="/js/player-panel.js" defer></script>
   <script src="music_manifold.js"></script>
+  <script src="/js/controller-manifold.js"></script>
   <script type="importmap">
   {
     "imports": {
@@ -236,15 +283,15 @@
     <div id="stage">
       <canvas id="c"></canvas>
       <div class="overlay" id="overlay">
-        <div id="overlay-title">CUBIC</div>
-        <div id="overlay-sub">3D TETRIS · KENS GAMES</div>
+        <div id="overlay-title">CUBIT</div>
+        <div id="overlay-sub">CRYSTAL 3D · KENS GAMES</div>
         <div id="overlay-score"></div>
         <button id="start-btn">START GAME</button>
       </div>
       <div id="pause-pill">PAUSED</div>
     </div>
     <div id="hud">
-      <div class="hud-title">CUBIC</div>
+      <div class="hud-title">CUBIT</div>
       <div class="hud-panel">
         <div class="hud-label">Score</div>
         <div class="hud-value" id="score-val">0</div>
@@ -262,10 +309,11 @@
         <div class="hud-label">Controls</div>
         <b>← →</b> Move X<br>
         <b>↑ ↓</b> Move Z<br>
-        <b>A / D</b> Rotate Y<br>
-        <b>W / S</b> Rotate X<br>
+        <b>A / D</b> Spin Y axis<br>
+        <b>W / S</b> Spin X axis<br>
+        <b>Q / E</b> Spin Z axis<br>
         <b>Space</b> Hard drop<br>
-        <b>Shift</b> Soft drop<br>
+        <b>Shift+↓</b> Soft drop<br>
         <b>P</b> Pause<br>
         <b>F</b> Fullscreen<br>
         <b>Mouse</b> Move piece<br>
@@ -274,6 +322,7 @@
         <b>Shift+Drag</b> Orbit cam<br>
         <b>Scroll</b> Zoom
       </div>
+      <button id="vr-btn" type="button" class="hud-vr-btn">&#x2395;&thinsp;VR</button>
     </div>
   </div>
 
@@ -291,15 +340,15 @@
     const SOFT_SPEED = 12.0;  // cells/sec when soft-dropping
     const PHI = 1.6180339887;
 
-    // Piece type → color hex, emissive hex
+    // Piece type → color hex, emissive hex  (hue-wheel 51° spacing — spectral crystal palette)
     const PIECE_COLORS = [
-      [0x00eeff, 0x005566], // 0 I — cyan
-      [0xf1c644, 0x6f5210], // 1 O — gold
-      [0x7a3cff, 0x2b1466], // 2 T — purple
-      [0x18c96e, 0x0c4f2e], // 3 S — green
-      [0xff284f, 0x5c0f1f], // 4 Z — red
-      [0x1a8cff, 0x0a3a6f], // 5 J — blue
-      [0xff8c1a, 0x6f3a0a], // 6 L — orange
+      [0x00ffee, 0x004444], // 0 I — aqua-cyan    174°
+      [0x0077ff, 0x001a44], // 1 O — electric-blue 213°
+      [0x9922ff, 0x250055], // 2 T — violet        275°
+      [0xff0099, 0x440022], // 3 S — magenta       323°
+      [0xff5500, 0x441100], // 4 Z — orange          16°
+      [0xaaff00, 0x2a4400], // 5 J — lime            74°
+      [0x00ff77, 0x004422], // 6 L — emerald        151°
     ];
 
     // Pieces defined as [dx,dy=0,dz] offsets lying flat in XZ plane
@@ -328,16 +377,23 @@
       const minY = Math.min(...r.map(c => c[1])), minZ = Math.min(...r.map(c => c[2]));
       return r.map(([x, y, z]) => [x, y - minY, z - minZ]);
     }
+    // 90° CW in XY plane: (x,y) → (-y, x) then normalize  — 3rd dice axis (Q / E)
+    function rotZ90(cells) {
+      const r = cells.map(([x, y, z]) => [-y, x, z]);
+      const minX = Math.min(...r.map(c => c[0])), minY = Math.min(...r.map(c => c[1]));
+      return r.map(([x, y, z]) => [x - minX, y - minY, z]);
+    }
 
     // Piece cells in absolute coords
-    function getCells(typeIdx, ry, rx) {
+    function getCells(typeIdx, ry, rx, rz = 0) {
       let cells = PIECE_DEFS[typeIdx].cells.map(c => [...c]);
       for (let i = 0; i < ry; i++) cells = rotY90(cells);
       for (let i = 0; i < rx; i++) cells = rotX90(cells);
+      for (let i = 0; i < rz; i++) cells = rotZ90(cells);
       return cells;
     }
     function pieceCells(p) {
-      return getCells(p.type, p.ry, p.rx).map(([dx, dy, dz]) => [p.x + dx, p.y + dy, p.z + dz]);
+      return getCells(p.type, p.ry, p.rx, p.rz ?? 0).map(([dx, dy, dz]) => [p.x + dx, p.y + dy, p.z + dz]);
     }
 
     // ── BOARD STATE ──────────────────────────────────────────────────
@@ -366,11 +422,11 @@
     }
 
     function spawnPiece(typeIdx) {
-      const cells = getCells(typeIdx, 0, 0);
+      const cells = getCells(typeIdx, 0, 0, 0);
       const maxX = Math.max(...cells.map(c => c[0]));
       const maxZ = Math.max(...cells.map(c => c[2]));
       return {
-        type: typeIdx, ry: 0, rx: 0,
+        type: typeIdx, ry: 0, rx: 0, rz: 0,
         x: Math.floor((COLS - maxX - 1) / 2),
         y: SPAWN_Y,
         z: Math.floor((DEPTH - maxZ - 1) / 2),
@@ -381,7 +437,8 @@
       const turns = dir > 0 ? 1 : 3;
       const nry = axis === 'y' ? ((p.ry + turns) % 4) : p.ry;
       const nrx = axis === 'x' ? ((p.rx + turns) % 4) : p.rx;
-      const np = { ...p, ry: nry, rx: nrx };
+      const nrz = axis === 'z' ? (((p.rz ?? 0) + turns) % 4) : (p.rz ?? 0);
+      const np = { ...p, ry: nry, rx: nrx, rz: nrz };
       const kicks = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]];
       for (const [kx, kz] of kicks) {
         const kp = { ...np, x: np.x + kx, z: np.z + kz };
@@ -399,8 +456,8 @@
     renderer.shadowMap.enabled = false;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x04040c);
-    scene.fog = new THREE.FogExp2(0x04040c, 0.010);
+    scene.background = new THREE.Color(0x03030e);
+    scene.fog = new THREE.FogExp2(0x03030e, 0.009);
 
     // Well center for camera targeting
     const wellCenter = new THREE.Vector3(COLS / 2, ROWS / 2, DEPTH / 2);
@@ -410,19 +467,21 @@
     camera.lookAt(wellCenter);
 
     // Lights
-    scene.add(new THREE.AmbientLight(0x16233a, 1.4));
-    const key = new THREE.DirectionalLight(0xffffff, 1.8);
+    scene.add(new THREE.AmbientLight(0x080418, 1.6));
+    const key = new THREE.DirectionalLight(0xddeeff, 2.0);
     key.position.set(12, 24, 12); scene.add(key);
-    const fill = new THREE.PointLight(0x3355ff, 1.0, 80);
+    const fill = new THREE.PointLight(0x0055ff, 1.1, 90);
     fill.position.set(-8, 28, -6); scene.add(fill);
-    const rim = new THREE.PointLight(0xff3366, 0.55, 50);
+    const rim = new THREE.PointLight(0xaa33ff, 0.75, 55);
     rim.position.set(10, -3, 10); scene.add(rim);
+    const top = new THREE.PointLight(0x00ffee, 0.45, 60);
+    top.position.set(COLS / 2, ROWS + 4, DEPTH / 2); scene.add(top);
 
     // Corner accent lights at base of well
     const corners = [
       [0, 0, 0], [COLS, 0, 0], [0, 0, DEPTH], [COLS, 0, DEPTH]
     ].map(([cx, cy, cz]) => {
-      const l = new THREE.PointLight(0x00eeff, 0.35, 18);
+      const l = new THREE.PointLight(0x00ffee, 0.45, 24);
       l.position.set(cx, cy, cz);
       scene.add(l);
       return l;
@@ -436,12 +495,12 @@
       // Outer wireframe
       const outerGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(COLS, ROWS, DEPTH));
       const outerMesh = new THREE.LineSegments(outerGeo,
-        new THREE.LineBasicMaterial({ color: 0x1e3555, transparent: true, opacity: 0.75 }));
+        new THREE.LineBasicMaterial({ color: 0x00ccee, transparent: true, opacity: 0.50 }));
       outerMesh.position.set(COLS / 2, ROWS / 2, DEPTH / 2);
       wellGroup.add(outerMesh);
 
       // Grid lines on the 4 walls
-      const gridMat = new THREE.LineBasicMaterial({ color: 0x0d1e30, transparent: true, opacity: 0.40 });
+      const gridMat = new THREE.LineBasicMaterial({ color: 0x004455, transparent: true, opacity: 0.28 });
       function line(pts) {
         wellGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
       }
@@ -465,7 +524,7 @@
       // at this resolution because the well is small.
       const reflector = new Reflector(
         new THREE.PlaneGeometry(COLS, DEPTH),
-        { textureWidth: 512, textureHeight: 512, color: 0x223044 }
+        { textureWidth: 512, textureHeight: 512, color: 0x001833 }
       );
       reflector.rotation.x = -Math.PI / 2;
       reflector.position.set(COLS / 2, 0.001, DEPTH / 2);
@@ -473,7 +532,7 @@
       // Tint pane on top of the reflector so the reflection is dimmed and tinted.
       const tint = new THREE.Mesh(
         new THREE.PlaneGeometry(COLS, DEPTH),
-        new THREE.MeshBasicMaterial({ color: 0x040814, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+        new THREE.MeshBasicMaterial({ color: 0x02061a, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false })
       );
       tint.rotation.x = -Math.PI / 2;
       tint.position.set(COLS / 2, 0.012, DEPTH / 2);
@@ -482,10 +541,10 @@
       // Glass wall panes — four faintly-tinted transparent panels framing the
       // play volume so the well reads as a glass aquarium rather than a wire box.
       const wallMat = new THREE.MeshPhysicalMaterial({
-        color: 0x3a6fb0, transparent: true, opacity: 0.06,
-        roughness: 0.02, metalness: 0.0,
-        transmission: 0.85, ior: 1.4,
-        clearcoat: 1.0, clearcoatRoughness: 0.05,
+        color: 0x00ccff, transparent: true, opacity: 0.032,
+        roughness: 0.0, metalness: 0.0,
+        transmission: 0.97, ior: 1.46,
+        clearcoat: 1.0, clearcoatRoughness: 0.0,
         side: THREE.DoubleSide, depthWrite: false,
       });
       // +X / -X walls (DEPTH × ROWS)
@@ -510,7 +569,7 @@
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.18, transparent: true, opacity: 0.55 })));
+      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xaaccff, size: 0.20, transparent: true, opacity: 0.60 })));
     })();
 
     // ── BLOCK MATERIALS ──────────────────────────────────────────────
@@ -520,14 +579,14 @@
 
     // Glassy semi-transparent block. Each cube of every piece gets one of these,
     // so a 3-in-a-row I-piece reads as three discrete glassy cubes (per spec).
-    function getBlockMat(colorHex, emissiveHex, alpha = 0.55) {
+    function getBlockMat(colorHex, emissiveHex, alpha = 0.74) {
       const k = `${colorHex}-${emissiveHex}-${alpha.toFixed(2)}`;
       if (!matCache.has(k)) {
         matCache.set(k, new THREE.MeshPhysicalMaterial({
-          color: colorHex, emissive: emissiveHex, emissiveIntensity: 0.85,
-          metalness: 0.05, roughness: 0.06,
-          clearcoat: 1.0, clearcoatRoughness: 0.04,
-          transmission: 0.55, ior: 1.45,
+          color: colorHex, emissive: emissiveHex, emissiveIntensity: 1.15,
+          metalness: 0.0, roughness: 0.0,
+          clearcoat: 1.0, clearcoatRoughness: 0.0,
+          transmission: 0.78, ior: 1.52,
           transparent: true, opacity: alpha,
           depthWrite: false,
         }));
@@ -623,8 +682,11 @@
       if (typeIdx == null) return;
       const [col, emi] = PIECE_COLORS[typeIdx];
       const mat = new THREE.MeshPhysicalMaterial({
-        color: col, emissive: emi, emissiveIntensity: 0.7,
-        metalness: 0.2, roughness: 0.1, clearcoat: 0.9,
+        color: col, emissive: emi, emissiveIntensity: 1.05,
+        metalness: 0.0, roughness: 0.0,
+        clearcoat: 1.0, clearcoatRoughness: 0.0,
+        transmission: 0.68, ior: 1.52,
+        transparent: true, opacity: 0.84,
       });
       getCells(typeIdx, 0, 0).forEach(([dx, , dz]) => {
         const m = new THREE.Mesh(BLOCK_GEO, mat);
@@ -767,78 +829,86 @@
       if (window.MusicManifold) { MusicManifold.setIntensity(level); MusicManifold.start(level); }
     }
 
-    // ── INPUT ────────────────────────────────────────────────────────
-    const keys = {};
-    document.addEventListener('keydown', e => {
-      if (e.repeat) return;
-      keys[e.code] = true;
+    // ── INPUT  (ControllerManifold — keyboard · mouse · gamepad · VR) ──
 
-      if (e.code === 'KeyP') {
-        if (state === 'playing') { state = 'paused'; document.getElementById('pause-pill').classList.add('vis'); if (window.MusicManifold) MusicManifold.pause(); }
-        else if (state === 'paused') { state = 'playing'; document.getElementById('pause-pill').classList.remove('vis'); if (window.MusicManifold) MusicManifold.resume(); }
-        return;
-      }
-      if (e.code === 'KeyM' && window.MusicManifold) {
-        MusicManifold.toggleMute();
-        return;
-      }
-      if (e.code === 'KeyF') {
-        const root = document.documentElement;
-        if (document.fullscreenElement) {
-          (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
-        } else {
-          (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => { });
-        }
-        return;
-      }
+    // Camera-relative direction helper — used by both keyboard and gamepad
+    function camAxes() {
+      const fx = Math.sin(orbitTheta), fz = Math.cos(orbitTheta);
+      const rx = Math.cos(orbitTheta), rz = -Math.sin(orbitTheta);
+      const right = (Math.abs(rx) >= Math.abs(rz))
+        ? { dx: Math.sign(rx) || 1, dz: 0 }
+        : { dx: 0, dz: Math.sign(rz) || 1 };
+      const fwd = (Math.abs(fx) >= Math.abs(fz))
+        ? { dx: -Math.sign(fx) || 1, dz: 0 }
+        : { dx: 0, dz: -Math.sign(fz) || 1 };
+      return { right, fwd };
+    }
+
+    // Semantic action helpers
+    function doMove(dx, dz) {
       if (state !== 'playing' || !piece) return;
+      const np = { ...piece, x: piece.x + dx, z: piece.z + dz };
+      if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
+    }
+    function doRotate(axis, dir) {
+      if (state !== 'playing' || !piece) return;
+      const np = tryRotate(piece, axis, dir);
+      if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
+    }
+    function doHardDrop() {
+      if (state !== 'playing' || !piece) return;
+      const d = hardDropDist(piece);
+      score += d * 2; piece = { ...piece, y: piece.y - d };
+      updateHUD(); sfx.drop(); lockPiece(); piece = null; spawnNext();
+    }
 
-      // Map screen-relative arrow directions to world (X,Z) using camera azimuth
-      // so "left" on the keyboard always means "left on screen" no matter how
-      // the user has orbited the camera. Snap to the nearest cardinal axis.
-      function camAxes() {
-        const fx = Math.sin(orbitTheta), fz = Math.cos(orbitTheta);
-        const rx = Math.cos(orbitTheta), rz = -Math.sin(orbitTheta);
-        const right = (Math.abs(rx) >= Math.abs(rz))
-          ? { dx: Math.sign(rx) || 1, dz: 0 }
-          : { dx: 0, dz: Math.sign(rz) || 1 };
-        const fwd = (Math.abs(fx) >= Math.abs(fz))
-          ? { dx: -Math.sign(fx) || 1, dz: 0 }
-          : { dx: 0, dz: -Math.sign(fz) || 1 };
-        return { right, fwd };
-      }
+    // Instantiate the manifold (attaches keyboard + mouse-wheel modifiers)
+    const M = new ControllerManifold(canvas);
 
-      let np;
-      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'ArrowUp' || (e.code === 'ArrowDown' && !e.shiftKey)) {
-        const { right, fwd } = camAxes();
-        let dx = 0, dz = 0;
-        if (e.code === 'ArrowRight') { dx = right.dx; dz = right.dz; }
-        else if (e.code === 'ArrowLeft') { dx = -right.dx; dz = -right.dz; }
-        else if (e.code === 'ArrowUp') { dx = fwd.dx; dz = fwd.dz; }
-        else if (e.code === 'ArrowDown') { dx = -fwd.dx; dz = -fwd.dz; }
-        np = { ...piece, x: piece.x + dx, z: piece.z + dz };
-        if (isValid(np)) { piece = np; sfx.move(); renderActive(piece); }
-      } else if (e.code === 'KeyA') {
-        np = tryRotate(piece, 'y', -1); if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
-      } else if (e.code === 'KeyD') {
-        np = tryRotate(piece, 'y', 1); if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
-      } else if (e.code === 'KeyW') {
-        np = tryRotate(piece, 'x', -1); if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
-      } else if (e.code === 'KeyS' && !e.shiftKey) {
-        np = tryRotate(piece, 'x', 1); if (np) { piece = np; sfx.rotate(); renderActive(piece); lockArmed = false; lockTimer = 0; }
-      } else if (e.code === 'Space') {
-        e.preventDefault();
-        const d = hardDropDist(piece);
-        score += d * 2;
-        piece = { ...piece, y: piece.y - d };
-        updateHUD();
-        sfx.drop();
-        lockPiece();
-        piece = null;
-        spawnNext();
+    // Movement — camera-relative so arrows always match screen orientation
+    M.on('move_left',  () => { const { right } = camAxes(); doMove(-right.dx, -right.dz); });
+    M.on('move_right', () => { const { right } = camAxes(); doMove( right.dx,  right.dz); });
+    M.on('move_fwd',   () => { const { fwd }   = camAxes(); doMove( fwd.dx,    fwd.dz);   });
+    M.on('move_back',  () => { const { fwd }   = camAxes(); doMove(-fwd.dx,   -fwd.dz);   });
+
+    // 6-axis dice tumble
+    M.on('rotate_y-', () => doRotate('y', -1));
+    M.on('rotate_y+', () => doRotate('y',  1));
+    M.on('rotate_x-', () => doRotate('x', -1));
+    M.on('rotate_x+', () => doRotate('x',  1));
+    M.on('rotate_z-', () => doRotate('z', -1));
+    M.on('rotate_z+', () => doRotate('z',  1));
+
+    M.on('hard_drop',  doHardDrop);
+
+    M.on('pause', () => {
+      if (state === 'playing') {
+        state = 'paused';
+        document.getElementById('pause-pill').classList.add('vis');
+        if (window.MusicManifold) MusicManifold.pause();
+      } else if (state === 'paused') {
+        state = 'playing';
+        document.getElementById('pause-pill').classList.remove('vis');
+        if (window.MusicManifold) MusicManifold.resume();
       }
     });
-    document.addEventListener('keyup', e => { keys[e.code] = false; });
+    M.on('mute', () => { if (window.MusicManifold) MusicManifold.toggleMute(); });
+    M.on('fullscreen', () => {
+      const root = document.documentElement;
+      if (document.fullscreenElement)
+        (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+      else
+        (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => {});
+    });
+
+    // Gamepad right-stick → orbit camera
+    M.on('orbit_dx', dx => { orbitTheta -= dx; applyOrbit(); });
+    M.on('orbit_dy', dy => { orbitPhi   += dy; applyOrbit(); });
+
+    // VR session end → restore requestAnimationFrame loop
+    M.on('vr_end',    () => { renderer.xr.enabled = false; renderer.setAnimationLoop(null); requestAnimationFrame(tick); });
+    // VR frame → drive rendering from inside the XR loop
+    M.on('vr_frame',  ({ frame }) => { if (frame) renderer.render(scene, camera); });
 
     // ── CAMERA ORBIT ─────────────────────────────────────────────────
     let orbitTheta = Math.atan2(camera.position.x - wellCenter.x, camera.position.z - wellCenter.z);

@@ -1,254 +1,77 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * PASSWORD RECOVERY - Manifold-Based Recovery Tokens
+ * PASSWORD RECOVERY — SQLite-backed recovery tokens
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Manages password recovery tokens with 15-minute expiration
- * Tokens stored on temporary manifold coordinates with TTL
+ * Recovery tokens are exact/transactional state.  They are persisted in
+ * the SQLite records layer (db.resetTokens) — NOT in an in-memory object.
+ *
+ * Governing tenant: "Use records when the question is exact."
+ *
+ * index.js calls db.resetTokens directly.  This class remains as a thin
+ * compatibility shim in case external callers depend on the old interface.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
+'use strict';
 
 const crypto = require('crypto');
+const db = require('./db');
 
 class PasswordRecoveryManager {
-  constructor(manifoldStorage) {
-    this.manifold = manifoldStorage; // Mock manifold object
-    this.tokenExpiryMinutes = 15;
-    this.tokenExpiryMs = this.tokenExpiryMinutes * 60 * 1000;
+  constructor() {
+    // No in-memory storage — all token state lives in SQLite (db.resetTokens).
+    // The constructor accepts no arguments; legacy callers that passed a
+    // manifoldStorage object are safe — the argument is silently ignored.
   }
 
-  /**
-   * Generate recovery token and store on manifold
-   * Returns token string
-   */
+  /** Generate a token, persist it to the records layer, return token string. */
   generateRecoveryToken(email, username) {
-    try {
-      // Generate 32-byte (256-bit) secure random token
-      const token = crypto.randomBytes(32).toString('hex');
-
-      // Create temporary manifold coordinate for recovery token
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email.toLowerCase())
-        .digest('hex');
-
-      const coordinateKey = `recovery-${emailHash}`;
-      const expiryTime = Date.now() + this.tokenExpiryMs;
-
-      // Store on manifold
-      this.manifold[coordinateKey] = {
-        token: token,
-        email: email,
-        username: username,
-        createdAt: Date.now(),
-        expiresAt: expiryTime,
-        used: false,
-        attempts: 0
-      };
-
-      console.log(`🔐 Recovery token generated for ${email}, expires at ${new Date(expiryTime).toISOString()}`);
-
-      return token;
-    } catch (error) {
-      throw new Error(`Recovery token generation failed: ${error.message}`);
-    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const { expiresAt } = db.resetTokens.create(email, token);
+    console.log(`🔐 Recovery token generated for ${email}, expires at ${new Date(expiresAt).toISOString()}`);
+    return token;
   }
 
-  /**
-   * Validate recovery token
-   * Returns { valid: boolean, error?: string, username?: string }
-   */
+  /** Validate. Returns { valid, error?, username? }. Delegates to db.resetTokens. */
   validateRecoveryToken(email, token) {
-    try {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email.toLowerCase())
-        .digest('hex');
-
-      const coordinateKey = `recovery-${emailHash}`;
-      const tokenData = this.manifold[coordinateKey];
-
-      // Token not found
-      if (!tokenData) {
-        return { valid: false, error: 'Invalid recovery token' };
-      }
-
-      // Token already used
-      if (tokenData.used) {
-        return { valid: false, error: 'Recovery token already used' };
-      }
-
-      // Token expired
-      if (Date.now() > tokenData.expiresAt) {
-        return { valid: false, error: 'Recovery token expired' };
-      }
-
-      // Email mismatch
-      if (tokenData.email.toLowerCase() !== email.toLowerCase()) {
-        return { valid: false, error: 'Email mismatch' };
-      }
-
-      // Token mismatch (constant-time comparison)
-      try {
-        const tokenMatch = crypto.timingSafeEqual(
-          Buffer.from(token, 'hex'),
-          Buffer.from(tokenData.token, 'hex')
-        );
-
-        if (!tokenMatch) {
-          // Increment failed attempts
-          tokenData.attempts = (tokenData.attempts || 0) + 1;
-
-          // Invalidate token after 5 failed attempts
-          if (tokenData.attempts >= 5) {
-            console.warn(`⚠️ Token for ${email} invalidated after ${tokenData.attempts} failed attempts`);
-            this.consumeRecoveryToken(email, token);
-          }
-
-          return { valid: false, error: 'Invalid recovery token' };
-        }
-      } catch (e) {
-        return { valid: false, error: 'Invalid recovery token' };
-      }
-
-      return { valid: true, username: tokenData.username };
-    } catch (error) {
-      console.error('Recovery token validation error:', error);
-      return { valid: false, error: 'Token validation failed' };
-    }
+    return db.resetTokens.validate(email, token);
   }
 
-  /**
-   * Mark recovery token as used (consumed)
-   * Prevents token reuse
-   */
+  /** Mark token as used so it cannot be replayed. */
   consumeRecoveryToken(email, token) {
-    try {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email.toLowerCase())
-        .digest('hex');
-
-      const coordinateKey = `recovery-${emailHash}`;
-      const tokenData = this.manifold[coordinateKey];
-
-      if (tokenData) {
-        tokenData.used = true;
-        tokenData.usedAt = Date.now();
-        console.log(`✓ Recovery token consumed for ${email}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Token consumption error:', error);
-      return false;
-    }
+    db.resetTokens.consume(email, token);
+    return true;
   }
 
-  /**
-   * Delete recovery token from manifold
-   * Called after successful password reset
-   */
+  /** Kept for interface compatibility; SQLite TTL + used_at handles expiry. */
   deleteRecoveryToken(email) {
-    try {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email.toLowerCase())
-        .digest('hex');
-
-      const coordinateKey = `recovery-${emailHash}`;
-
-      if (this.manifold[coordinateKey]) {
-        delete this.manifold[coordinateKey];
-        console.log(`🗑️ Recovery token deleted for ${email}`);
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Token deletion error:', error);
-      return false;
-    }
+    // Tokens are invalidated by used_at; hard-delete is handled by cleanupExpiredTokens.
+    return true;
   }
 
-  /**
-   * Get recovery token info (for verification)
-   */
-  getRecoveryTokenInfo(email) {
-    try {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email.toLowerCase())
-        .digest('hex');
-
-      const coordinateKey = `recovery-${emailHash}`;
-      const tokenData = this.manifold[coordinateKey];
-
-      if (!tokenData) {
-        return null;
-      }
-
-      // Don't return the actual token, just metadata
-      return {
-        email: tokenData.email,
-        username: tokenData.username,
-        createdAt: tokenData.createdAt,
-        expiresAt: tokenData.expiresAt,
-        expiresIn: Math.max(0, Math.floor((tokenData.expiresAt - Date.now()) / 1000)),
-        used: tokenData.used,
-        attempts: tokenData.attempts || 0,
-        minutesRemaining: Math.max(0, Math.ceil((tokenData.expiresAt - Date.now()) / 60000))
-      };
-    } catch (error) {
-      console.error('Token info retrieval error:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Cleanup expired tokens from manifold
-   * Runs periodically to remove stale data
-   */
+  /** Cleanup expired / used tokens from SQLite. Safe to call any time. */
   cleanupExpiredTokens() {
     try {
-      let cleanedCount = 0;
       const now = Date.now();
-
-      for (const key in this.manifold) {
-        if (key.startsWith('recovery-')) {
-          const tokenData = this.manifold[key];
-          if (tokenData.expiresAt < now || tokenData.used) {
-            delete this.manifold[key];
-            cleanedCount++;
-          }
-        }
+      const result = db.getDb()
+        .prepare('DELETE FROM password_reset_tokens WHERE expires_at < ? OR used_at IS NOT NULL')
+        .run(now);
+      if (result.changes > 0) {
+        console.log(`🧹 Cleaned up ${result.changes} expired recovery tokens`);
       }
-
-      if (cleanedCount > 0) {
-        console.log(`🧹 Cleaned up ${cleanedCount} expired recovery tokens`);
-      }
-
-      return cleanedCount;
-    } catch (error) {
-      console.error('Token cleanup error:', error);
+      return result.changes;
+    } catch (err) {
+      console.error('Token cleanup error:', err);
       return 0;
     }
   }
 
-  /**
-   * Start automatic cleanup interval
-   * Runs every 5 minutes to clean expired tokens
-   */
+  /** Start periodic cleanup — SQLite handles durability, this keeps the table small. */
   startAutoCleanup() {
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredTokens();
-    }, 5 * 60 * 1000); // Every 5 minutes
-
-    console.log('🔄 Recovery token auto-cleanup started (every 5 minutes)');
+    this.cleanupInterval = setInterval(() => this.cleanupExpiredTokens(), 5 * 60 * 1000);
+    console.log('🔄 Recovery token auto-cleanup started (every 5 min, SQLite-backed)');
   }
 
-  /**
-   * Stop automatic cleanup
-   */
   stopAutoCleanup() {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);

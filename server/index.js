@@ -16,7 +16,7 @@ require('dotenv').config();
 const AuthHandler = require('./auth-handler');
 const EncryptionService = require('./encryption');
 const EmailService = require('./email-service');
-const PasswordRecoveryManager = require('./password-recovery');
+const db = require('./db');
 
 // Initialize Express
 const app = express();
@@ -31,85 +31,13 @@ app.use(cors({
   credentials: true
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PLACEHOLDER: Manifold Integration
-// ═══════════════════════════════════════════════════════════════════════════
-// TODO: Import manifold-core when server runs in Node environment
-// For now using mock manifold - will be replaced with real manifold integration
+// ── Records layer (SQLite via db.js) ─────────────────────────────────────────
+// Transactional/exact state: users, tokens, scores.
+// Navigational/relational queries use manifold-projection.js.
 
-let manifoldData = {}; // Mock manifold storage
-let nextUserId = 1;
-
-// Initialize recovery manager with mock manifold
-const recoveryManager = new PasswordRecoveryManager(manifoldData);
-recoveryManager.startAutoCleanup();
-
-/**
- * Get or create user coordinate [userId, authMethod, z]
- */
-function getOrCreateUserCoordinate(username, authMethod = 1) {
-  const coordinateKey = `user-${username}`;
-  if (!manifoldData[coordinateKey]) {
-    const userId = nextUserId++;
-    manifoldData[coordinateKey] = {
-      id: `user-${userId}`,
-      userId: userId,
-      username: username,
-      authMethod: authMethod,
-      coordinate: [userId, authMethod, userId * authMethod],
-      createdAt: Date.now(),
-      sessions: []
-    };
-  }
-  return manifoldData[coordinateKey];
-}
-
-/**
- * Read user from manifold by userId (slow scan; manifold is small)
- */
-function readUserFromManifoldById(userId) {
-  const target = String(userId || '');
-  if (!target) return null;
-  for (const key in manifoldData) {
-    if (!key.startsWith('user-')) continue;
-    const u = manifoldData[key];
-    if (u && String(u.userId) === target) return u;
-  }
-  return null;
-}
-
-/**
- * Read user from manifold by username
- */
-function readUserFromManifold(username) {
-  const coordinateKey = `user-${username}`;
-  return manifoldData[coordinateKey] || null;
-}
-
-/**
- * Read user from manifold by email
- */
-function readUserFromManifoldByEmail(email) {
-  for (const key in manifoldData) {
-    if (key.startsWith('user-') && manifoldData[key].email === email.toLowerCase()) {
-      return manifoldData[key];
-    }
-  }
-  return null;
-}
-
-/**
- * Write user to manifold
- */
-function writeUserToManifold(username, userData) {
-  const coordinateKey = `user-${username}`;
-  manifoldData[coordinateKey] = {
-    ...manifoldData[coordinateKey],
-    ...userData,
-    lastModified: Date.now()
-  };
-  return manifoldData[coordinateKey];
-}
+// Kick off DB initialisation immediately so the file is created before
+// the first request arrives.
+db.getDb();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ENDPOINT: POST /api/auth/register
@@ -126,7 +54,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if username exists
-    if (readUserFromManifold(username)) {
+    if (db.users.usernameExists(username)) {
       return res.status(409).json({ success: false, error: 'Username already taken' });
     }
 
@@ -138,7 +66,7 @@ app.post('/api/auth/register', async (req, res) => {
       }
 
       // Check if email exists
-      if (readUserFromManifoldByEmail(email)) {
+      if (db.users.emailExists(email)) {
         return res.status(409).json({ success: false, error: 'Email already registered' });
       }
 
@@ -157,10 +85,6 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const passwordHash = await authHandler.hashPassword(password);
 
-    // Create user on manifold
-    const authMethod = 1; // username + password
-    const userCoord = getOrCreateUserCoordinate(username, authMethod);
-
     // Generate verification code (6 digits)
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationCodeHash = require('crypto')
@@ -168,25 +92,19 @@ app.post('/api/auth/register', async (req, res) => {
       .update(verificationCode)
       .digest('hex');
 
-    const userData = {
-      ...userCoord,
-      email: email ? email.toLowerCase() : null,
-      passwordHash: passwordHash,
+    // Persist user to records layer (exact state — credentials, identity)
+    const newUserId = db.users.create({
+      username,
+      email,
+      passwordHash,
       displayName: username,
       avatar: avatar || '🎮',
       status: 'active',
       emailVerified: true,
-      verificationCodeHash: verificationCodeHash,
-      verificationCodeExpiry: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
-      isAdmin: false,
-      isSuperuser: false,
-      adminLevel: 0, // 0=user, 1=mod, 2=admin, 3=superuser
-      stats: { gamesPlayed: 0, totalScore: 0 },
-      preferences: { theme: 'light' },
-      createdAt: Date.now()
-    };
-
-    writeUserToManifold(username, userData);
+      verificationCodeHash,
+      verificationCodeExpiry: Date.now() + (24 * 60 * 60 * 1000),
+      adminLevel: 0,
+    });
 
     // Send verification email (non-blocking — don't await)
     if (email) {
@@ -197,9 +115,9 @@ app.post('/api/auth/register', async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Account created! You can now sign in.',
-      userId: userCoord.userId,
-      username: username,
-      email: email,
+      userId: newUserId,
+      username,
+      email,
       requiresEmailVerification: false
     });
   } catch (error) {
@@ -221,8 +139,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username required' });
     }
 
-    // Find user
-    const userData = readUserFromManifold(username);
+    // Find user (records layer — exact lookup by username)
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
@@ -256,27 +174,12 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
 
-    // Create session
+    // Create JWT session
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const token = authHandler.generateToken(userData.userId, sessionId);
 
-    // Create session object
-    const session = {
-      id: sessionId,
-      token: token,
-      createdAt: Date.now(),
-      lastActivityAt: Date.now()
-    };
-
-    // Add session to user
-    const sessions = userData.sessions || [];
-    sessions.push(session);
-
-    // Write back to manifold
-    writeUserToManifold(username, {
-      sessions: sessions,
-      lastLoginAt: Date.now()
-    });
+    // Record last login in the records layer
+    db.users.update(username, { last_login_at: Date.now() });
 
     return res.status(200).json({
       success: true,
@@ -305,7 +208,7 @@ function _profileFromToken(req) {
   if (!token) return { error: 'No token provided', status: 401 };
   const decoded = authHandler.verifyToken(token);
   if (decoded.error) return { error: decoded.error, status: 401 };
-  const user = readUserFromManifoldById(decoded.userId);
+  const user = db.users.findById(decoded.userId);
   if (!user) return { error: 'User not found', status: 404 };
   return { user };
 }
@@ -359,7 +262,8 @@ app.put('/api/profile', express.json(), (req, res) => {
     return res.status(400).json({ success: false, error: 'nothing to update' });
   }
 
-  const updated = writeUserToManifold(u.username, patch);
+  db.users.update(u.username, patch);
+  const updated = db.users.findByUsername(u.username);
   return res.status(200).json({
     success: true,
     userId: updated.userId,
@@ -415,8 +319,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
     }
 
-    // Find user by email
-    const userData = readUserFromManifoldByEmail(email);
+    // Find user by email (records layer — exact lookup)
+    const userData = db.users.findByEmail(email);
 
     // For security, always return success even if email not found
     // This prevents email enumeration attacks
@@ -428,8 +332,10 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       });
     }
 
-    // Generate recovery token
-    const token = recoveryManager.generateRecoveryToken(email, userData.username);
+    // Generate recovery token and persist to records layer
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    db.resetTokens.create(email, token);
 
     // Send recovery email
     try {
@@ -437,7 +343,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       console.log(`✓ Recovery email sent to ${email}`);
     } catch (emailError) {
       console.error('Recovery email failed:', emailError);
-      // Don't fail the request, just log it
       return res.status(500).json({
         success: false,
         error: 'Failed to send recovery email. Please try again later.'
@@ -467,8 +372,8 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email, token, and password required' });
     }
 
-    // Validate recovery token
-    const tokenValidation = recoveryManager.validateRecoveryToken(email, token);
+    // Validate recovery token (records layer)
+    const tokenValidation = db.resetTokens.validate(email, token);
     if (!tokenValidation.valid) {
       return res.status(401).json({ success: false, error: tokenValidation.error });
     }
@@ -484,15 +389,14 @@ app.post('/api/auth/reset-password', async (req, res) => {
     // Hash new password
     const passwordHash = await authHandler.hashPassword(password);
 
-    // Update user on manifold
-    writeUserToManifold(username, {
-      passwordHash: passwordHash,
-      lastPasswordChangeAt: Date.now(),
-      sessions: [] // Invalidate all existing sessions
+    // Update user record
+    db.users.update(username, {
+      password_hash: passwordHash,
+      last_password_change_at: Date.now(),
     });
 
-    // Consume (mark as used) the recovery token
-    recoveryManager.consumeRecoveryToken(email, token);
+    // Consume the token
+    db.resetTokens.consume(email, token);
 
     console.log(`✓ Password reset successful for ${username}`);
 
@@ -519,8 +423,8 @@ app.post('/api/auth/verify-email', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username, email, and verification code required' });
     }
 
-    // Find user
-    const userData = readUserFromManifold(username);
+    // Find user (records layer)
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -540,7 +444,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Email does not match' });
     }
 
-    // Verify code (use crypto.timingSafeEqual to prevent timing attacks)
+    // Verify code (timing-safe comparison)
     const crypto = require('crypto');
     const providedCodeHash = crypto
       .createHash('sha256')
@@ -552,7 +456,6 @@ app.post('/api/auth/verify-email', async (req, res) => {
         Buffer.from(providedCodeHash, 'hex'),
         Buffer.from(userData.verificationCodeHash, 'hex')
       );
-
       if (!codeMatch) {
         return res.status(401).json({ success: false, error: 'Invalid verification code' });
       }
@@ -560,13 +463,12 @@ app.post('/api/auth/verify-email', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid verification code' });
     }
 
-    // Mark email as verified
-    writeUserToManifold(username, {
-      emailVerified: true,
+    // Mark email as verified in records layer
+    db.users.update(username, {
+      email_verified: 1,
       status: 'active',
-      verificationCodeHash: null,
-      verificationCodeExpiry: null,
-      verifiedAt: Date.now()
+      verification_code_hash: null,
+      verification_code_expiry: null,
     });
 
     console.log(`✓ Email verified for user ${username}`);
@@ -585,7 +487,17 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: Date.now() });
+  const dbOk = !!db.getDb();
+  res.json({ status: 'OK', timestamp: Date.now(), database: dbOk ? 'sqlite' : 'unavailable' });
+});
+
+// Evidence endpoint — proven-usage stats per substrate (public; non-sensitive aggregate only)
+app.get('/api/substrate-evidence', (req, res) => {
+  try {
+    res.json({ success: true, stats: db.getUsageStats(), byOp: db.getUsageByOp() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Evidence query failed' });
+  }
 });
 
 // Proxy GM log ingest/tail to lobby server so public /api/gm/log works even
@@ -632,8 +544,8 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username and email required' });
     }
 
-    // Find user
-    const userData = readUserFromManifold(username);
+    // Find user (records layer)
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -656,10 +568,10 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       .update(verificationCode)
       .digest('hex');
 
-    // Update user with new code
-    writeUserToManifold(username, {
-      verificationCodeHash: verificationCodeHash,
-      verificationCodeExpiry: Date.now() + (24 * 60 * 60 * 1000)
+    // Update records layer with new code
+    db.users.update(username, {
+      verification_code_hash: verificationCodeHash,
+      verification_code_expiry: Date.now() + (24 * 60 * 60 * 1000),
     });
 
     // Send verification email
@@ -701,16 +613,10 @@ function requireSuperuser(req, res, next) {
     return res.status(401).json({ success: false, error: 'Invalid token' });
   }
 
-  // Find user and check if superuser
+  // Find user and check if superuser (records layer — exact auth check)
   const userId = decoded.userId;
-  let isAdmin = false;
-
-  for (const key in manifoldData) {
-    if (manifoldData[key].userId === userId && manifoldData[key].isSuperuser) {
-      isAdmin = true;
-      break;
-    }
-  }
+  const callerUser = db.users.findById(userId);
+  const isAdmin = callerUser && callerUser.adminLevel >= 3;
 
   if (!isAdmin) {
     return res.status(403).json({ success: false, error: 'Superuser access required' });
@@ -732,21 +638,16 @@ app.post('/api/admin/promote-superuser', (req, res) => {
       return res.status(400).json({ success: false, error: 'Username required' });
     }
 
-    const userData = readUserFromManifold(username);
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    if (userData.isSuperuser) {
+    if (userData.adminLevel >= 3) {
       return res.status(400).json({ success: false, error: 'Already a superuser' });
     }
 
-    writeUserToManifold(username, {
-      isAdmin: true,
-      isSuperuser: true,
-      adminLevel: 3,
-      promotedAt: Date.now()
-    });
+    db.users.update(username, { admin_level: 3 });
 
     console.log(`✓ ${username} promoted to superuser`);
 
@@ -768,32 +669,25 @@ app.post('/api/admin/promote-superuser', (req, res) => {
 
 app.get('/api/admin/users', requireSuperuser, (req, res) => {
   try {
-    const users = [];
-
-    for (const key in manifoldData) {
-      if (key.startsWith('user-')) {
-        const user = manifoldData[key];
-        users.push({
-          userId: user.userId,
-          username: user.username,
-          email: user.email,
-          displayName: user.displayName,
-          avatar: user.avatar,
-          status: user.status,
-          emailVerified: user.emailVerified,
-          isAdmin: user.isAdmin,
-          isSuperuser: user.isSuperuser,
-          adminLevel: user.adminLevel,
-          createdAt: user.createdAt,
-          lastLoginAt: user.lastLoginAt
-        });
-      }
-    }
+    const allUsers = db.users.all().map(u => ({
+      userId: u.userId,
+      username: u.username,
+      email: u.email,
+      displayName: u.displayName,
+      avatar: u.avatar,
+      status: u.status,
+      emailVerified: u.emailVerified,
+      isAdmin: u.isAdmin,
+      isSuperuser: u.isSuperuser,
+      adminLevel: u.adminLevel,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+    }));
 
     return res.status(200).json({
       success: true,
-      users: users,
-      totalUsers: users.length
+      users: allUsers,
+      totalUsers: allUsers.length,
     });
   } catch (error) {
     console.error('Get users error:', error);
@@ -807,37 +701,31 @@ app.get('/api/admin/users', requireSuperuser, (req, res) => {
 
 app.get('/api/admin/stats', requireSuperuser, (req, res) => {
   try {
+    const byStatus = db.users.countByStatus();
+    const tally = { active: 0, banned: 0, suspended: 0, pending: 0 };
     let totalUsers = 0;
-    let activeUsers = 0;
-    let bannedUsers = 0;
-    let suspendedUsers = 0;
-    let admins = 0;
-    let superusers = 0;
+    for (const row of byStatus) { tally[row.status] = row.n; totalUsers += row.n; }
 
-    for (const key in manifoldData) {
-      if (key.startsWith('user-')) {
-        const user = manifoldData[key];
-        totalUsers++;
+    const allUsers = db.users.all();
+    const admins = allUsers.filter(u => u.adminLevel >= 2).length;
+    const superusers = allUsers.filter(u => u.adminLevel >= 3).length;
 
-        if (user.status === 'active') activeUsers++;
-        if (user.status === 'banned') bannedUsers++;
-        if (user.status === 'suspended') suspendedUsers++;
-        if (user.isAdmin) admins++;
-        if (user.isSuperuser) superusers++;
-      }
-    }
+    // Include proven-usage evidence in admin stats
+    const usageStats = db.getUsageStats();
 
     return res.status(200).json({
       success: true,
       stats: {
-        totalUsers: totalUsers,
-        activeUsers: activeUsers,
-        bannedUsers: bannedUsers,
-        suspendedUsers: suspendedUsers,
-        admins: admins,
-        superusers: superusers,
-        timestamp: Date.now()
-      }
+        totalUsers,
+        activeUsers: tally.active,
+        bannedUsers: tally.banned,
+        suspendedUsers: tally.suspended,
+        pendingUsers: tally.pending,
+        admins,
+        superusers,
+        timestamp: Date.now(),
+      },
+      substrateEvidence: usageStats,
     });
   } catch (error) {
     console.error('Get stats error:', error);
@@ -853,15 +741,12 @@ app.post('/api/admin/user/:username/suspend', requireSuperuser, (req, res) => {
   try {
     const { username } = req.params;
 
-    const userData = readUserFromManifold(username);
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    writeUserToManifold(username, {
-      status: 'suspended',
-      suspendedAt: Date.now()
-    });
+    db.users.update(username, { status: 'suspended' });
 
     console.log(`⚠️ ${username} suspended`);
 
@@ -883,15 +768,12 @@ app.post('/api/admin/user/:username/ban', requireSuperuser, (req, res) => {
   try {
     const { username } = req.params;
 
-    const userData = readUserFromManifold(username);
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    writeUserToManifold(username, {
-      status: 'banned',
-      bannedAt: Date.now()
-    });
+    db.users.update(username, { status: 'banned' });
 
     console.log(`🚫 ${username} banned`);
 
@@ -913,15 +795,12 @@ app.post('/api/admin/user/:username/activate', requireSuperuser, (req, res) => {
   try {
     const { username } = req.params;
 
-    const userData = readUserFromManifold(username);
+    const userData = db.users.findByUsername(username);
     if (!userData) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    writeUserToManifold(username, {
-      status: 'active',
-      emailVerified: true
-    });
+    db.users.update(username, { status: 'active', email_verified: 1 });
 
     console.log(`✓ ${username} activated by admin`);
 
@@ -955,7 +834,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🎮 Manifold Auth Server running on http://localhost:${PORT}`);
+  const dbPath = require('path').join(__dirname, '..', 'state', 'kensgames.db');
+  console.log(`💾 Database: ${dbPath}`);
   console.log(`📝 Endpoints:`);
+  console.log(`   GET  /api/admin/stats  — includes substrate evidence (use v_usage_stats view for full breakdown)`);
   console.log(`   POST /api/auth/register`);
   console.log(`   POST /api/auth/login`);
   console.log(`   GET  /api/auth/validate`);

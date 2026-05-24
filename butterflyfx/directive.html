@@ -263,7 +263,10 @@
       <li><b>Coordinates, not tables:</b> Identities are located by coordinates and links, not by rows in
         domain‑specific tables. Relationships are edges in the manifold, not foreign keys in isolated schemas.</li>
       <li><b>Lazy manifestation:</b> Artifacts (documents, views, APIs) are projections from the manifold, not primary
-        truth. The manifold is the source of truth; artifacts are lenses.</li>
+        truth for geometric/relational data. The manifold is the source of truth for <em>position, proximity, emergence,
+          and relational structure</em>. For transactional state (player scores, session tokens, auth records) the
+        database record is the source of truth. Use geometry when the question is navigational. Use records when the
+        question is exact.</li>
     </ol>
     <h2>4. Symbolic Algebraic Cycle</h2>
     <div class="cycle-diagram">
@@ -289,7 +292,8 @@
       <li><b>Oscillate / Life:</b> Reversible, bounded transformations over time (state evolution). No step may break
         manifold continuity or ancestry.</li>
       <li><b>Invoke / Manifest:</b> Project from manifold into a concrete artifact (view, document, API response, code).
-        Artifacts are read‑only shadows of manifold truth, not new sources of truth.</li>
+        Artifacts are derivatives of manifold geometry for navigational/relational data. Transactional state (scores,
+        sessions, auth) must be persisted in durable records — the manifold does not replace the ledger.</li>
     </ol>
     <h2>5. Dimensional Math and Emergence</h2>
     <h3>5.1. Universal Law: <span class="math">z = x y</span></h3>
@@ -336,8 +340,9 @@
           </li>
           <li>Break ancestry: No destructive updates that lose lineage; only reversible or traceable transformations.
           </li>
-          <li>Fork truth: No parallel truth systems (shadow databases, ad‑hoc caches) that diverge from the manifold.
-          </li>
+          <li>Fork truth: No uncoordinated parallel truth systems for the <em>same</em> geometric data. A separate
+            database for transactional state (auth, scores, sessions) is correct and required — it complements the
+            manifold; it does not fork it.</li>
           <li>Optimize against identity: Performance optimizations may not violate identity integrity, ancestry, or
             manifold coherence.</li>
         </ul>
@@ -347,8 +352,9 @@
           <li>Explain behavior algebraically: Any decision or output must be explainable as a composition of the
             symbolic operations over x, y, z, and the manifold.</li>
           <li>Prefer manifold‑first design: New features begin with geometry and identity, not endpoints or UI.</li>
-          <li>Keep artifacts subordinate: Documents, APIs, and code are derivatives of the manifold, never the governing
-            source.</li>
+          <li>Keep artifacts subordinate: Documents, APIs, and code are derivatives of the manifold for
+            geometric/relational data. Transactional records (scores, auth, sessions) are independently authoritative
+            — they record what happened, the manifold reveals relationships.</li>
         </ul>
       </li>
     </ul>

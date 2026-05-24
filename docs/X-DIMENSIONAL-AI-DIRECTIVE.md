@@ -38,8 +38,8 @@ y is a modifying identity applied to x.
 
 z is the manifested identity of x after all y-modifiers have been applied through the manifold m — equivalently, the next identity in the recursion.
 
-- z is always derived. It is never stored independently.
-- z is extracted from the manifold at query time, not retrieved from a database.
+- z as a **geometric manifold output** is always derived — it is extracted from the manifold at query time, not materialised in advance.
+- z as **transactional state** (a game score, a session token, an auth record, a high-score entry) must be persisted in records. The query-derived z and the persisted z are different representations of the same event; neither cancels the other.
 - z becomes the next x in the recursion cycle:
 
 $$x_{n+1} = z_n$$
@@ -159,7 +159,7 @@ A **manifold** is an expression-shape with height-bearing derivability.
 - The expression must produce a shape with height — a derivable surface (or higher-dimensional analogue) over its domain.
 - All structure in the X-Dimensional paradigm is manifold structure. There are no flat data containers; there is only the manifold and queries against it.
 - **Computation is extraction from the manifold's geometry.** Compression is collapse along an axis; expansion is computation along an axis.
-- The manifold is the single source of truth for $z = f(x, y, m)$ — the manifold IS $m$, and $z$ is the height of the manifold at $(x, y)$.
+- The manifold is the source of truth for **geometric/relational** data — position, proximity, emergence, relational structure. For **transactional state** (scores, sessions, auth, payments) the database record is the source of truth. Use geometry when the question is navigational. Use records when the question is exact.
 
 This axiom subsumes and grounds every later axiom: the algebraic forms of PART III are the operators that extract from manifolds; the runtime model of PART VIII is the resonance of queries against the manifold.
 
@@ -437,7 +437,7 @@ Those geometric patterns **are** the manifolds.
 ## Ax 7.3 — Manifold Is Queried, Not Stored
 
 The manifold is a queryable geometry field from which structure and state are extracted relative to x as the observing identity.
-It is not a database. Nothing in it is pre-materialized.
+It is not a database for transactional records. Geometric z-values are derived at query time, not pre-materialised. However, transactional state derived from z (scores, session events, published outcomes) must be recorded in durable storage — the manifold is queried again when needed, but the record of what happened persists in the ledger.
 
 ---
 

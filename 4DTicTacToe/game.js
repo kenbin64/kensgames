@@ -294,6 +294,28 @@ function saddleGrad(lx, ly, lz, out) {
   const h = SADDLE_HALF;
   return out.set(-ly / h, -lx / h, 1);
 }
+// X-family saddle wall: f_X = x - yz/h. Normal ≈ (1, 0, 0). Stops motion in the X direction.
+function saddleSignedDistanceX(lx, ly, lz) {
+  const h = SADDLE_HALF;
+  const f = lx - (ly * lz) / h;
+  const gMag = Math.sqrt(1 + (ly * ly + lz * lz) / (h * h));
+  return f / gMag;
+}
+function saddleGradX(lx, ly, lz, out) {
+  const h = SADDLE_HALF;
+  return out.set(1, -lz / h, -ly / h);
+}
+// Y-family saddle wall: f_Y = y - xz/h. Normal ≈ (0, 1, 0). Stops motion in the Y direction.
+function saddleSignedDistanceY(lx, ly, lz) {
+  const h = SADDLE_HALF;
+  const f = ly - (lx * lz) / h;
+  const gMag = Math.sqrt(1 + (lx * lx + lz * lz) / (h * h));
+  return f / gMag;
+}
+function saddleGradY(lx, ly, lz, out) {
+  const h = SADDLE_HALF;
+  return out.set(-lz / h, 1, -lx / h);
+}
 // Visual lattice: each cell is a saddle surface z = xy/h derived directly from the
 // Winki manifold equation (the +W face: w = uv, normalized to cell half-extent h).
 // No GLB needed — the manifold equation paints the picture synchronously.
@@ -700,7 +722,7 @@ const Audio4D = (() => {
 })();
 
 // Physics tunables; overwritten from manifold.game.json:params.physics at bootstrap.
-let GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
+let GRAV = -62, RESTIT = 0.06, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
 // Lattice spans gx,gz in 0..G-1 → world coords (gx-1.5)*CELL ∈ [-4.2, +4.2] for G=4.
 let PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;          // tight x half-extent
@@ -751,6 +773,94 @@ function _saddleSignedAt(blx, bly, blz) {
   _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
   return saddleSignedDistance(_cellLocal.x, _cellLocal.y, _cellLocal.z);
 }
+// X-family signed distance at board-local point.
+function _saddleSignedAtX(blx, bly, blz) {
+  _saddleCellOf(blx, bly, blz, _gyCellIdx);
+  _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
+  return saddleSignedDistanceX(_cellLocal.x, _cellLocal.y, _cellLocal.z);
+}
+// Y-family signed distance at board-local point.
+function _saddleSignedAtY(blx, bly, blz) {
+  _saddleCellOf(blx, bly, blz, _gyCellIdx);
+  _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
+  return saddleSignedDistanceY(_cellLocal.x, _cellLocal.y, _cellLocal.z);
+}
+// Apply one saddle-family collision in board-local space.
+// fullDistFn: (bx,by,bz)->signed_dist using board-local coords (handles cell lookup internally).
+// gradFn: (lx,ly,lz, out)->gradient in cell-local coords.
+// sideKey: physBall property storing the home side for this family ('side'|'sideX'|'sideY').
+// prevBL / currBL: board-local prev / curr positions (Vector3). currBL is corrected in-place.
+function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
+  const home = physBall[sideKey];
+  if (!home) return;
+  const dPrev = fullDistFn(prevBL.x, prevBL.y, prevBL.z);
+  const dCurr = fullDistFn(currBL.x, currBL.y, currBL.z);
+  // --- Tunneling: ball crossed the membrane this substep ---
+  if ((home * dPrev) > 0 && (home * dCurr) <= 0) {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) * 0.5;
+      const x = prevBL.x + (currBL.x - prevBL.x) * mid;
+      const y = prevBL.y + (currBL.y - prevBL.y) * mid;
+      const z = prevBL.z + (currBL.z - prevBL.z) * mid;
+      if ((home * fullDistFn(x, y, z)) > 0) lo = mid; else hi = mid;
+    }
+    currBL.x = prevBL.x + (currBL.x - prevBL.x) * lo;
+    currBL.y = prevBL.y + (currBL.y - prevBL.y) * lo;
+    currBL.z = prevBL.z + (currBL.z - prevBL.z) * lo;
+    _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellIdx);
+    _toCellLocal(currBL.x, currBL.y, currBL.z, _gyCellIdx, _cellLocal);
+    gradFn(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
+    saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
+    _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+    currBL.x += _gyN.x * BALL_R; currBL.y += _gyN.y * BALL_R; currBL.z += _gyN.z * BALL_R;
+    _gyWorldPos.copy(currBL); boardGroup.localToWorld(_gyWorldPos);
+    physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
+    _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
+    const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+    if (vn < 0) {
+      if (-vn > 2) Audio4D.onTap(-vn);
+      physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
+      physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
+      physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
+      const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+      // High tangential retention — ball slides along contours instead of scattering.
+      physBall.vx = _gyWorldN.x * vAfter + (physBall.vx - vAfter * _gyWorldN.x) * 0.97;
+      physBall.vy = _gyWorldN.y * vAfter + (physBall.vy - vAfter * _gyWorldN.y) * 0.97;
+      physBall.vz = _gyWorldN.z * vAfter + (physBall.vz - vAfter * _gyWorldN.z) * 0.97;
+    }
+    return;
+  }
+  // --- Thickness: ball on home side but within BALL_R of the surface ---
+  if ((home * dCurr) >= BALL_R) return;
+  const overshoot = BALL_R - home * dCurr;
+  _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellIdx);
+  _toCellLocal(currBL.x, currBL.y, currBL.z, _gyCellIdx, _cellLocal);
+  gradFn(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
+  saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
+  _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+  currBL.x += _gyN.x * overshoot; currBL.y += _gyN.y * overshoot; currBL.z += _gyN.z * overshoot;
+  _gyWorldPos.copy(currBL); boardGroup.localToWorld(_gyWorldPos);
+  physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
+  _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
+  const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+  if (vn < 0) {
+    if (-vn > 2) Audio4D.onTap(-vn);
+    physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
+    physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
+    physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
+    const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
+    const vtx = physBall.vx - vAfter * _gyWorldN.x;
+    const vty = physBall.vy - vAfter * _gyWorldN.y;
+    const vtz = physBall.vz - vAfter * _gyWorldN.z;
+    physBall.vx = _gyWorldN.x * vAfter + vtx * 0.97;
+    physBall.vy = _gyWorldN.y * vAfter + vty * 0.97;
+    physBall.vz = _gyWorldN.z * vAfter + vtz * 0.97;
+    physBall.spinX += (_gyWorldN.y * vtz - _gyWorldN.z * vty) * 0.06;
+    physBall.spinY += (_gyWorldN.z * vtx - _gyWorldN.x * vtz) * 0.06;
+    physBall.spinZ += (_gyWorldN.x * vty - _gyWorldN.y * vtx) * 0.06;
+  }
+}
 function gyroidGuide(dt, pwx, pwy, pwz) {
   if (!physBall || physBall.settled) return;
   _gyLocal.set(physBall.x, physBall.y, physBall.z); boardGroup.worldToLocal(_gyLocal);
@@ -770,85 +880,14 @@ function gyroidGuide(dt, pwx, pwy, pwz) {
     if (cubeBounced & 2) { _gyWorldN.set(0, Math.sign(_gyLocal.y), 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.10); }
     if (cubeBounced & 4) { _gyWorldN.set(0, 0, Math.sign(_gyLocal.z)).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
   }
-  if (physBall.side === undefined) return;
-  // Once the winki GLB collider is loaded, raycast handles the membrane (collideBallVsGlb +
-  // safetyScanGlb). The analytic saddle stays as a fallback only while the GLB is loading.
+  // GLB bypass (always empty — procedural lattice; saddle collision is fully analytic).
   if (glbColliders.length) return;
-  // --- 2. Per-cell saddle membrane. ---
+  // --- 2. Three saddle families: Z (z=xy/h), X (x=yz/h), Y (y=xz/h). ---
+  // All cells share identity quaternion so home-side values from spawn are valid everywhere.
   _gyPrev.set(pwx, pwy, pwz); boardGroup.worldToLocal(_gyPrev);
-  const dPrev = _saddleSignedAt(_gyPrev.x, _gyPrev.y, _gyPrev.z);
-  const dCurr = _saddleSignedAt(_gyLocal.x, _gyLocal.y, _gyLocal.z);
-  const home = physBall.side;
-  const tunneled = (home * dPrev) > 0 && (home * dCurr) <= 0;
-  if (tunneled) {
-    // Binary search for the membrane crossing t in [0,1].
-    let lo = 0, hi = 1;
-    for (let i = 0; i < 14; i++) {
-      const mid = (lo + hi) * 0.5;
-      const x = _gyPrev.x + (_gyLocal.x - _gyPrev.x) * mid;
-      const y = _gyPrev.y + (_gyLocal.y - _gyPrev.y) * mid;
-      const z = _gyPrev.z + (_gyLocal.z - _gyPrev.z) * mid;
-      if ((home * _saddleSignedAt(x, y, z)) > 0) lo = mid; else hi = mid;
-    }
-    _gyLocal.x = _gyPrev.x + (_gyLocal.x - _gyPrev.x) * lo;
-    _gyLocal.y = _gyPrev.y + (_gyLocal.y - _gyPrev.y) * lo;
-    _gyLocal.z = _gyPrev.z + (_gyLocal.z - _gyPrev.z) * lo;
-    // Compute outward normal in board-local: rotate cell-local grad by cell quaternion.
-    _saddleCellOf(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx);
-    _toCellLocal(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx, _cellLocal);
-    saddleGrad(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
-    saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
-    _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
-    _gyLocal.x += _gyN.x * BALL_R;
-    _gyLocal.y += _gyN.y * BALL_R;
-    _gyLocal.z += _gyN.z * BALL_R;
-    _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
-    physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
-    _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
-    const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
-    if (vn < 0) {
-      if (-vn > 2) Audio4D.onTap(-vn);
-      physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
-      physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
-      physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
-      const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
-      physBall.vx = _gyWorldN.x * vAfter + (physBall.vx - vAfter * _gyWorldN.x) * 0.92;
-      physBall.vy = _gyWorldN.y * vAfter + (physBall.vy - vAfter * _gyWorldN.y) * 0.92;
-      physBall.vz = _gyWorldN.z * vAfter + (physBall.vz - vAfter * _gyWorldN.z) * 0.92;
-    }
-    return;
-  }
-  // --- 3. Thickness collision (ball still on home side, surface within BALL_R). ---
-  if ((home * dCurr) >= BALL_R) return;
-  const overshoot = BALL_R - home * dCurr;
-  _saddleCellOf(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx);
-  _toCellLocal(_gyLocal.x, _gyLocal.y, _gyLocal.z, _gyCellIdx, _cellLocal);
-  saddleGrad(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
-  saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
-  _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
-  _gyLocal.x += _gyN.x * overshoot;
-  _gyLocal.y += _gyN.y * overshoot;
-  _gyLocal.z += _gyN.z * overshoot;
-  _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
-  physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
-  _gyWorldN.copy(_gyN).transformDirection(boardGroup.matrixWorld);
-  const vn = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
-  if (vn < 0) {
-    if (-vn > 2) Audio4D.onTap(-vn);
-    physBall.vx -= (1 + RESTIT) * vn * _gyWorldN.x;
-    physBall.vy -= (1 + RESTIT) * vn * _gyWorldN.y;
-    physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
-    const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
-    const vtx = physBall.vx - vAfter * _gyWorldN.x;
-    const vty = physBall.vy - vAfter * _gyWorldN.y;
-    const vtz = physBall.vz - vAfter * _gyWorldN.z;
-    physBall.vx = _gyWorldN.x * vAfter + vtx * 0.96;
-    physBall.vy = _gyWorldN.y * vAfter + vty * 0.96;
-    physBall.vz = _gyWorldN.z * vAfter + vtz * 0.96;
-    physBall.spinX += (_gyWorldN.y * vtz - _gyWorldN.z * vty) * 0.06;
-    physBall.spinY += (_gyWorldN.z * vtx - _gyWorldN.x * vtz) * 0.06;
-    physBall.spinZ += (_gyWorldN.x * vty - _gyWorldN.y * vtx) * 0.06;
-  }
+  _collideSaddleFamily(_saddleSignedAt, saddleGrad, 'side', _gyPrev, _gyLocal);
+  _collideSaddleFamily(_saddleSignedAtX, saddleGradX, 'sideX', _gyPrev, _gyLocal);
+  _collideSaddleFamily(_saddleSignedAtY, saddleGradY, 'sideY', _gyPrev, _gyLocal);
 }
 function reflectVel(n, restit) {
   const vn = physBall.vx * n.x + physBall.vy * n.y + physBall.vz * n.z;
@@ -1047,11 +1086,13 @@ function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
   _spawnLocal[inB] = _snapQuadrant(_spawnLocal[inB], inB);
   const dSpawn = _saddleSignedAt(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z);
   const side = dSpawn >= 0 ? 1 : -1;
+  const sideX = _saddleSignedAtX(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z) >= 0 ? 1 : -1;
+  const sideY = _saddleSignedAtY(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z) >= 0 ? 1 : -1;
   const v0 = -1;                                   // m/s downward in world
   boardGroup.localToWorld(_spawnLocal);
   mesh.position.copy(_spawnLocal); halo.position.copy(mesh.position);
   scene.add(mesh); scene.add(halo);
-  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null, dropColumn: dropColumn || null };
+  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, sideX, sideY, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null, dropColumn: dropColumn || null };
   return true;
 }
 // Snap the cube's rotation to the nearest cube symmetry so that one local axis aligns to world-up.

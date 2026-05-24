@@ -101,19 +101,22 @@ const MOBILE_INPUT = {
 };
 
 // Ball speeds (φ-scaled — coefficients come from the seed ladder).
-let SPEED_EASY = __pick('speedEasyPhi', 0.25) * PHI;
-let SPEED_HARD = __pick('speedHardPhi', 0.4) * PHI;
-let SPEED_MULTI = __pick('speedMultiPhi', 0.3) * PHI;
+// Ladder: easy → hard ratio ≈ φ (0.24/0.15 = 1.6 ≈ φ). Max = 0.50*φ ≈ 0.81.
+let SPEED_EASY = __pick('speedEasyPhi', 0.15) * PHI;
+let SPEED_HARD = __pick('speedHardPhi', 0.24) * PHI;
+let SPEED_MULTI = __pick('speedMultiPhi', 0.19) * PHI;
 
 // Ball dynamics (pseudo-physics) — ALL derived from the seed.
 const GRAVITY = __pick('gravity', 0.00075);
 const FREE_FLIGHT_DRAG = __pick('freeFlightDrag', 0.99935);
-let MIN_BALL_SPEED = __pick('minBallSpeedPhi', 0.22) * PHI;
-let MAX_BALL_SPEED = __pick('maxBallSpeedPhi', 0.85) * PHI;
-const WALL_BOOST = __pick('wallBoost', 1.035);
-const CEILING_BOOST = __pick('ceilingBoost', 1.06);
-const WALL_BOOST_ADD = __pick('wallBoostAdd', 0.004);
-const CEILING_BOOST_ADD = __pick('ceilingBoostAdd', 0.006);
+let MIN_BALL_SPEED = __pick('minBallSpeedPhi', 0.12) * PHI;
+let MAX_BALL_SPEED = __pick('maxBallSpeedPhi', 0.50) * PHI;
+// Boost per bounce: was 1.035/1.06 (compounded to 4-31× after many bounces).
+// Now 1.008/1.013 — 100 bounces ≈ 2.2× which feels earned, not runaway.
+const WALL_BOOST = __pick('wallBoost', 1.008);
+const CEILING_BOOST = __pick('ceilingBoost', 1.013);
+const WALL_BOOST_ADD = __pick('wallBoostAdd', 0.001);
+const CEILING_BOOST_ADD = __pick('ceilingBoostAdd', 0.002);
 const BRICK_ABSORB_BASE = __pick('brickAbsorbBase', 0.968);
 const BRICK_ABSORB_SPEED_FACTOR = __pick('brickAbsorbSpeedFactor', 0.08);
 const BRICK_DEFLECT = __pick('brickDeflect', 0.030);
@@ -123,11 +126,12 @@ const TURBULENCE_MAX = __pick('turbulenceMax', 0.08);
 const TURBULENCE_BRICK_ADD = __pick('turbulenceBrickAdd', 0.022);
 const TURBULENCE_WALL_ADD = __pick('turbulenceWallAdd', 0.010);
 
-const PADDLE_LAUNCH_EASY = __pick('paddleLaunchEasy', 0.34);
-const PADDLE_LAUNCH_HARD = __pick('paddleLaunchHard', 0.42);
-const PADDLE_LAUNCH_MULTI = __pick('paddleLaunchMulti', 0.38);
+const PADDLE_LAUNCH_EASY = __pick('paddleLaunchEasy', 0.22);
+const PADDLE_LAUNCH_HARD = __pick('paddleLaunchHard', 0.28);
+const PADDLE_LAUNCH_MULTI = __pick('paddleLaunchMulti', 0.25);
 const FINAL_LAYER_INDEX = 0;
-const FINAL_LAYER_SPEED_MULT = __pick('finalLayerSpeedMult', 1.618);
+// √φ ≈ 1.272 — still golden-ratio derived but half the spike of the old φ = 1.618.
+const FINAL_LAYER_SPEED_MULT = __pick('finalLayerSpeedMult', 1.272);
 const PADDLE_SHRINK_FACTOR = __pick('paddleShrinkFactor', 0.618);
 
 function fib1to4(n) {

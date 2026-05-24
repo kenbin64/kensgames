@@ -41,7 +41,8 @@ with all three riding on a **universal manifold** that preserves ancestry and di
 
 3. **Lazy manifestation:**
    - Artifacts (documents, views, APIs) are **projections** from the manifold, not primary truth.
-   - The manifold is the **source of truth**; artifacts are **lenses**.
+   - The manifold is the **source of truth** for *geometric/relational* data — identities, positions, relationships, emergent states.
+   - **Exception — transactional state**: player scores, session tokens, auth records, email addresses, payment records are exact state. For these, the database record is the source of truth. The manifold does not replace exact-state storage; it complements it. Use geometry when the question is navigational. Use records when the question is exact.
 
 ---
 
