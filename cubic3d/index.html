@@ -866,20 +866,20 @@
     const M = new ControllerManifold(canvas);
 
     // Movement — camera-relative so arrows always match screen orientation
-    M.on('move_left',  () => { const { right } = camAxes(); doMove(-right.dx, -right.dz); });
-    M.on('move_right', () => { const { right } = camAxes(); doMove( right.dx,  right.dz); });
-    M.on('move_fwd',   () => { const { fwd }   = camAxes(); doMove( fwd.dx,    fwd.dz);   });
-    M.on('move_back',  () => { const { fwd }   = camAxes(); doMove(-fwd.dx,   -fwd.dz);   });
+    M.on('move_left', () => { const { right } = camAxes(); doMove(-right.dx, -right.dz); });
+    M.on('move_right', () => { const { right } = camAxes(); doMove(right.dx, right.dz); });
+    M.on('move_fwd', () => { const { fwd } = camAxes(); doMove(fwd.dx, fwd.dz); });
+    M.on('move_back', () => { const { fwd } = camAxes(); doMove(-fwd.dx, -fwd.dz); });
 
     // 6-axis dice tumble
     M.on('rotate_y-', () => doRotate('y', -1));
-    M.on('rotate_y+', () => doRotate('y',  1));
+    M.on('rotate_y+', () => doRotate('y', 1));
     M.on('rotate_x-', () => doRotate('x', -1));
-    M.on('rotate_x+', () => doRotate('x',  1));
+    M.on('rotate_x+', () => doRotate('x', 1));
     M.on('rotate_z-', () => doRotate('z', -1));
-    M.on('rotate_z+', () => doRotate('z',  1));
+    M.on('rotate_z+', () => doRotate('z', 1));
 
-    M.on('hard_drop',  doHardDrop);
+    M.on('hard_drop', doHardDrop);
 
     M.on('pause', () => {
       if (state === 'playing') {
@@ -898,17 +898,17 @@
       if (document.fullscreenElement)
         (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
       else
-        (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => {});
+        (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => { });
     });
 
     // Gamepad right-stick → orbit camera
     M.on('orbit_dx', dx => { orbitTheta -= dx; applyOrbit(); });
-    M.on('orbit_dy', dy => { orbitPhi   += dy; applyOrbit(); });
+    M.on('orbit_dy', dy => { orbitPhi += dy; applyOrbit(); });
 
     // VR session end → restore requestAnimationFrame loop
-    M.on('vr_end',    () => { renderer.xr.enabled = false; renderer.setAnimationLoop(null); requestAnimationFrame(tick); });
+    M.on('vr_end', () => { renderer.xr.enabled = false; renderer.setAnimationLoop(null); requestAnimationFrame(tick); });
     // VR frame → drive rendering from inside the XR loop
-    M.on('vr_frame',  ({ frame }) => { if (frame) renderer.render(scene, camera); });
+    M.on('vr_frame', ({ frame }) => { if (frame) renderer.render(scene, camera); });
 
     // ── CAMERA ORBIT ─────────────────────────────────────────────────
     let orbitTheta = Math.atan2(camera.position.x - wellCenter.x, camera.position.z - wellCenter.z);
@@ -960,7 +960,7 @@
     }
     function moveTo(targetX, targetZ) {
       if (!piece) return;
-      const cells = getCells(piece.type, piece.ry, piece.rx);
+      const cells = getCells(piece.type, piece.ry, piece.rx, piece.rz ?? 0);
       const maxX = Math.max(...cells.map(c => c[0]));
       const maxZ = Math.max(...cells.map(c => c[2]));
       const nx = Math.max(0, Math.min(COLS - 1 - maxX, targetX - Math.floor(maxX / 2)));
