@@ -3212,6 +3212,21 @@ const SFProgression = (function () {
   ];
 
   // ═══════════════════════════════════════════════════════════════════════
+  // ABILITIES — active, cooldown-gated powers earned at wave milestones
+  // unlock format: 'wave_complete:N' = awarded when completing wave N
+  // ═══════════════════════════════════════════════════════════════════════
+  const ABILITIES = [
+    { id: 'shield_burst',    name: 'Shield Burst',    unlock: 'wave_complete:2',
+      desc: '2s of full invulnerability.',                cooldown: 30, duration: 2 },
+    { id: 'boost_overdrive', name: 'Boost Overdrive', unlock: 'wave_complete:3',
+      desc: '5s of afterburner with no fuel cost.',       cooldown: 45, duration: 5 },
+    { id: 'tac_emp',         name: 'Tactical EMP',    unlock: 'wave_complete:4',
+      desc: 'Short-range EMP burst that stuns nearby enemies.', cooldown: 25 },
+    { id: 'decoy_drop',      name: 'Decoy Drop',      unlock: 'wave_complete:5',
+      desc: 'Releases a flare that draws missile lock for 6s.', cooldown: 40, duration: 6 },
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════
   // DEFAULT CAREER PROFILE
   // ═══════════════════════════════════════════════════════════════════════
   function _defaultCareer() {
@@ -3229,6 +3244,12 @@ const SFProgression = (function () {
       purchasedUpgrades: [], // array of unlock ids
       selectedShip: 'ship_fighter',
       achievements: [],
+      ownedAbilities: [],   // ability ids earned via wave milestones
+      equippedLoadout: {    // Phase 5 loadout (see ABILITIES, UNLOCKS)
+        primary:   'laser',
+        secondary: null,
+        ability:   null,
+      },
       createdAt: Date.now(),
     };
   }
@@ -3328,6 +3349,15 @@ const SFProgression = (function () {
     const newRank = getRank(c.xp);
     save();
     return { xp, credits: cr, ranked: newRank.id !== oldRank.id, newRank: newRank.id !== oldRank.id ? newRank : null };
+  }
+
+  function addCredits(n) {
+    const cr = Math.max(0, Math.floor(n || 0));
+    if (cr <= 0) return 0;
+    const c = career();
+    c.credits += cr;
+    save();
+    return cr;
   }
 
   function endMission(stats) {
@@ -3481,6 +3511,71 @@ const SFProgression = (function () {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // LOADOUT — equipped weapon/ability slots, owned-ability inventory
+  // ═══════════════════════════════════════════════════════════════════════
+  function _ensureLoadoutShape(c) {
+    if (!c.equippedLoadout) c.equippedLoadout = { primary: 'laser', secondary: null, ability: null };
+    if (!Array.isArray(c.ownedAbilities)) c.ownedAbilities = [];
+  }
+
+  function getLoadout() {
+    const c = career();
+    _ensureLoadoutShape(c);
+    return c.equippedLoadout;
+  }
+
+  function getOwnedAbilities() {
+    const c = career();
+    _ensureLoadoutShape(c);
+    return c.ownedAbilities.slice();
+  }
+
+  function getAbilityById(id) {
+    return ABILITIES.find(a => a.id === id) || null;
+  }
+
+  function awardAbility(id) {
+    const c = career();
+    _ensureLoadoutShape(c);
+    const a = getAbilityById(id);
+    if (!a) return { awarded: false, ability: null };
+    if (c.ownedAbilities.includes(id)) return { awarded: false, ability: a };
+    c.ownedAbilities.push(id);
+    save();
+    return { awarded: true, ability: a };
+  }
+
+  // Returns abilities whose unlock condition is 'wave_complete:N' for the
+  // completedWave passed in. Used by debrief to surface "NEW ABILITY" banner
+  // and by the wave-complete handler to auto-award.
+  function getAbilitiesEarnedAtWave(completedWave) {
+    const key = 'wave_complete:' + completedWave;
+    return ABILITIES.filter(a => a.unlock === key);
+  }
+
+  // slot ∈ {'primary','secondary','ability'}.  itemId may be null to clear.
+  // Validation:  primary must be a known weapon id (wave-gating enforced by
+  // bundle.js at use time);  ability must be in ownedAbilities;  secondary
+  // accepts null for now (Phase 6 will populate ownedSecondaries).
+  function equip(slot, itemId) {
+    const c = career();
+    _ensureLoadoutShape(c);
+    if (slot === 'primary') {
+      if (itemId && !UNLOCKS.find(u => u.id === itemId && u.type === 'weapon')) return false;
+      c.equippedLoadout.primary = itemId || 'laser';
+    } else if (slot === 'secondary') {
+      c.equippedLoadout.secondary = itemId || null;
+    } else if (slot === 'ability') {
+      if (itemId && !c.ownedAbilities.includes(itemId)) return false;
+      c.equippedLoadout.ability = itemId || null;
+    } else {
+      return false;
+    }
+    save();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // KILL TALLY RENDERER — generates HTML for alien silhouette icons
   // ═══════════════════════════════════════════════════════════════════════
   function renderKillTallyHTML() {
@@ -3509,18 +3604,106 @@ const SFProgression = (function () {
   // ═══════════════════════════════════════════════════════════════════════
   return {
     load, save, career, reset,
-    RANKS, UNLOCKS, ACHIEVEMENTS, TALLY_ICONS,
+    RANKS, UNLOCKS, ABILITIES, ACHIEVEMENTS, TALLY_ICONS,
     getRank, getNextRank, getRankProgress,
-    awardKill, awardEvent, endMission,
+    awardKill, awardEvent, addCredits, endMission,
     getAvailableUnlocks, getLockedUnlocks,
     getPurchasableUpgrades, purchaseUpgrade, selectShip,
     applyUpgradesToPlayer,
     checkAchievements, awardAchievement,
     renderKillTallyHTML,
+    getLoadout, equip, getOwnedAbilities, getAbilityById,
+    awardAbility, getAbilitiesEarnedAtWave,
   };
 })();
 
 window.SFProgression = SFProgression;
+
+// ════════════════════════════════════════════════════════════════════════════
+// SFPickupManifold — Phase 6 (Pickup System)
+// ════════════════════════════════════════════════════════════════════════════
+// A single 2D parameter surface (Risk × Cleverness) sampled at kill-time.
+// z = R·C is Tiresias re-rooted at the kill site. Color, size, magnet
+// radius, lifespan, and payload magnitude all fall out of (R, C, z) — no
+// enum tiers, no drop tables, no switch on rarity. Payload *family* is
+// the direction on the manifold: which axis dominated.
+//   z < 0.15       → currency   (participation)
+//   R > C + 0.20   → defensive  (hull / shields / fuel — you survived)
+//   C > R + 0.20   → enablement (boost reset + fuel — you flew sharp)
+//   R ≈ C, z high  → mastery    (ability cooldown rebate + credits)
+const SFPickupManifold = (function () {
+  const ENEMY_RISK = {
+    enemy: 0.20, predator: 0.40, interceptor: 0.50,
+    bomber: 0.70, dreadnought: 1.00,
+    'alien-baseship': 0.90, egg: 0.10, youngling: 0.10,
+  };
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  // HSV→RGB on a 120°→0° hue sweep: green (low z) → yellow → red (high z).
+  function colorAt(z) {
+    const h = (120 * (1 - clamp01(z))) / 360;
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const q = 1 - f, t = f;
+    let r, g, b;
+    switch (i) {
+      case 0: r = 1; g = t; b = 0; break;
+      case 1: r = q; g = 1; b = 0; break;
+      case 2: r = 0; g = 1; b = t; break;
+      default: r = 1; g = 0; b = 0;
+    }
+    return { r, g, b };
+  }
+  function payloadFamily(R, C, z) {
+    if (z < 0.15) return 'currency';
+    if (R > C + 0.20) return 'defensive';
+    if (C > R + 0.20) return 'enablement';
+    return 'mastery';
+  }
+  function buildPayload(family, z) {
+    switch (family) {
+      case 'defensive': {
+        const amt = Math.round(5 + 30 * z);
+        return { family, amt, label: '+' + amt + ' RESTORE' };
+      }
+      case 'enablement': {
+        const charge = Math.round(1 + 4 * z);
+        return { family, charge, fuel: 10 * charge, label: '+' + charge + ' BOOST CHARGE' };
+      }
+      case 'mastery': {
+        const rebate = Math.round(3 + 6 * z);
+        const cr = Math.round(40 + 80 * z);
+        return { family, rebate, credits: cr, label: 'MASTERY · -' + rebate + 's CD · ₡' + cr };
+      }
+      default: {
+        const cr = Math.round(10 + 80 * z);
+        return { family: 'currency', credits: cr, label: '₡' + cr };
+      }
+    }
+  }
+  // sample(killCtx): the manifold's primary verb. Pure.
+  // killCtx = { risk, cleverness, enemyType, position }
+  function sample(killCtx) {
+    const R = clamp01(killCtx.risk || 0);
+    const C = clamp01(killCtx.cleverness || 0);
+    const z = R * C;
+    const spawnP = 0.18 + 0.40 * z;
+    const family = payloadFamily(R, C, z);
+    return {
+      R, C, z,
+      spawnP,
+      shouldSpawn: Math.random() < spawnP,
+      family,
+      payload: buildPayload(family, z),
+      color: colorAt(z),
+      size: 6 + 14 * z,
+      magnetR: 200 + 600 * z,
+      lifespan: 14 - 8 * z,
+    };
+  }
+  return { sample, colorAt, payloadFamily, buildPayload, ENEMY_RISK };
+})();
+
+window.SFPickupManifold = SFPickupManifold;
 
 /**
  * Starfighter 3D Renderer
@@ -3936,13 +4119,24 @@ const SF3D = (function () {
     scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x000000, 0.000008);
 
+    // Visible-area height: deduct the 64-px desktop control rail when it's
+    // displayed so the camera's projection center sits at the visible center
+    // of the canvas (otherwise the crosshair sits 32 px below scene center).
+    const _railH = () => {
+      const r = document.getElementById('sf-rail');
+      return (r && getComputedStyle(r).display !== 'none') ? 64 : 0;
+    };
+    const _visH = () => Math.max(120, window.innerHeight - _railH());
+
     // Camera setup
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 300000);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / _visH(), 0.5, 300000);
 
     // Renderer setup
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, _visH());
+    // Cap DPR so 4K / Retina displays don't quadruple the fragment workload.
+    // The HUD/text stays crisp at 1.5; the scene barely loses detail at speed.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // Cockpit visor filter — sun in space is blinding; the canopy polarizes
     // light down to a level the human eye (and HUD) can tolerate
@@ -3954,14 +4148,17 @@ const SF3D = (function () {
     const EARTH_POS = new THREE.Vector3(-15000, -55000, -25000);
     const MOON_POS = new THREE.Vector3(60000, -20000, -90000);
 
-    // Ambient — Earth-orbit space is far from pitch black: lots of
-    // scattered light from Earth, Moon, sun corona and bright starfield.
-    const ambient = new THREE.AmbientLight(0x223344, 0.55);
+    // Ambient — Earth-orbit space is far from pitch black: scattered light
+    // from Earth's day side, the Moon, sun corona and the dense starfield
+    // all contribute. Boosted from 0.55 so shadow-side hull detail reads
+    // through the toneMappingExposure 0.55 cockpit-visor filter.
+    const ambient = new THREE.AmbientLight(0x334a66, 1.1);
     scene.add(ambient);
 
     // Hemisphere fill — bluish from "up" (Earth glow), warmish from "down"
-    // (sun-lit cloud tops / nebulae). Lifts shadow-side detail on every ship.
-    const hemiFill = new THREE.HemisphereLight(0x88aaff, 0xffaa66, 0.45);
+    // (sun-lit cloud tops / nebulae). Earthshine from low orbit covers half
+    // the sky, so this is the dominant fill for any ship's shadow side.
+    const hemiFill = new THREE.HemisphereLight(0x88aaff, 0xffaa66, 1.6);
     scene.add(hemiFill);
 
     // Primary sun directional light — intense (space has no atmosphere to soften)
@@ -3970,21 +4167,24 @@ const SF3D = (function () {
     sunLight.position.copy(SUN_POS);
     scene.add(sunLight);
 
-    // ── Earth-shine — blue reflected light from the Earth's day side ──
+    // ── Earth-shine — blue reflected light from the Earth's day side.
+    // At low orbit Earth subtends ~140° of sky; albedo ~0.3 makes this the
+    // single brightest fill after the sun. Raised to 5.5 so it can actually
+    // light up the hull facing Earth even through the visor exposure clamp.
     const earthShineDir = EARTH_POS.clone().normalize();
-    const earthShine = new THREE.DirectionalLight(0x6aa8ff, 2.2);
+    const earthShine = new THREE.DirectionalLight(0x6aa8ff, 5.5);
     earthShine.position.copy(earthShineDir.clone().multiplyScalar(-1)); // light FROM Earth toward scene
     scene.add(earthShine);
 
     // ── Moon-shine — soft silver bounce, opposite the Earth-shine quadrant ──
     const moonShineDir = MOON_POS.clone().normalize();
-    const moonShine = new THREE.DirectionalLight(0xd8e4ff, 0.9);
+    const moonShine = new THREE.DirectionalLight(0xd8e4ff, 1.8);
     moonShine.position.copy(moonShineDir.clone().multiplyScalar(-1));
     scene.add(moonShine);
 
     // Subtle fill from opposite sun (scattered starlight / nebula) — keeps
     // the deep-shadow side from collapsing into a black silhouette.
-    const fillLight = new THREE.DirectionalLight(0x3344aa, 0.6);
+    const fillLight = new THREE.DirectionalLight(0x3344aa, 1.4);
     fillLight.position.set(-SUN_POS.x, -SUN_POS.y, -SUN_POS.z);
     scene.add(fillLight);
 
@@ -4744,10 +4944,25 @@ const SF3D = (function () {
     // Visual default remains the authored GLB cockpit.
     createManifoldCockpit();
 
-    // Load GLB cockpit model
+    // Load GLB cockpit model.
+    // Watchdog: if neither success nor error fires within COCKPIT_LOAD_TIMEOUT_MS
+    // (e.g. flaky CDN, blocked range request, paused service worker), promote
+    // the manifold-fallback cockpit so the pilot is never staring at a missing
+    // chrome. The fallback group is already built above by createManifoldCockpit().
+    const COCKPIT_LOAD_TIMEOUT_MS = 4000;
+    let _cockpitWatchdog = setTimeout(function () {
+      if (cockpitLoaded || cockpitLoadFailed) return;
+      console.warn('[Starfighter] Cockpit GLB load timed out after '
+        + COCKPIT_LOAD_TIMEOUT_MS + 'ms — promoting manifold-fallback cockpit.');
+      cockpitLoadFailed = true;
+      if (manifoldCockpitGroup) manifoldCockpitGroup.visible = cockpitVisible;
+      if (typeof _updateLoadingProgress === 'function') _updateLoadingProgress('cockpit');
+    }, COCKPIT_LOAD_TIMEOUT_MS);
+
     const gltfLoader = new THREE.GLTFLoader();
     gltfLoader.load('assets/models/optimized/firstPersonStarFighterCockpit_lod0.glb',
       function (gltf) {
+        clearTimeout(_cockpitWatchdog);
         cockpitModel = gltf.scene;
 
         // Model bounds are roughly -0.8 to 0.8 (unit cube).
@@ -4796,6 +5011,7 @@ const SF3D = (function () {
         }
       },
       function (error) {
+        clearTimeout(_cockpitWatchdog);
         console.error('Failed to load cockpit GLB:', error);
         cockpitLoadFailed = true;
         if (manifoldCockpitGroup) manifoldCockpitGroup.visible = cockpitVisible;
@@ -5354,6 +5570,21 @@ const SF3D = (function () {
       const podMesh = new THREE.Mesh(podGeo, podMat);
       podMesh.rotation.x = Math.PI / 2;
       mesh.add(podMesh);
+    } else if (type === 'pickup') {
+      // Manifold pickup: octahedron + cheap low-poly halo. Geometry intentionally
+      // minimal so a handful in view doesn't drag the perf budget into tier 1.
+      const pk = (owner && owner._pickup) || { color: { r: 0.4, g: 1, b: 0.4 }, size: 10 };
+      const col = new THREE.Color(pk.color.r, pk.color.g, pk.color.b);
+      const core = new THREE.Mesh(
+        new THREE.OctahedronGeometry(pk.size, 0),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.92 })
+      );
+      mesh.add(core);
+      const halo = new THREE.Mesh(
+        new THREE.OctahedronGeometry(pk.size * 1.5, 0),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending })
+      );
+      mesh.add(halo);
     } else if (type === 'tanker') {
       // Tanker fallback: white-orange utility craft
       const bodyMat = new THREE.MeshStandardMaterial({ color: 0xccbbaa, metalness: 0.5, roughness: 0.5 });
@@ -6229,14 +6460,22 @@ const SF3D = (function () {
       }
     }
 
-    // Rotate station slowly
+    // Rotate the civilian science station — the disk is its centrifuge,
+    // generating artificial gravity for the apiary decks where Earth bees
+    // were raised and the Zorgon honey trade was conducted. The centrifuge
+    // has been dormant since the war began (after the Zorgon-led boarding
+    // of the disk during the honey-supply collapse), but the disk still
+    // turns at a maintenance idle to prevent bearing fatigue. Rotation is
+    // about the disk's axis of symmetry (X) — spinning on Y would tumble
+    // the saucer end-over-end and produce no centripetal gravity. Held to
+    // a slow maintenance idle (~1 RPM) consistent with the dormant canon.
     const station = scene.getObjectByName('station-scenery');
     if (station && _staticAnimFrame === 0) {
       station.getWorldPosition(_tmpVec);
       _tmpSphere.center.copy(_tmpVec);
       _tmpSphere.radius = 5000;
       if (_viewFrustum.intersectsSphere(_tmpSphere)) {
-        station.rotation.y += 0.001;
+        station.rotation.x += 0.0018;
         if (station.isLOD) station.update(camera);
       }
     }
@@ -6273,9 +6512,12 @@ const SF3D = (function () {
 
   function onWindowResize() {
     if (!camera || !renderer) return;
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const rail = document.getElementById('sf-rail');
+    const railH = (rail && getComputedStyle(rail).display !== 'none') ? 64 : 0;
+    const visH = Math.max(120, window.innerHeight - railH);
+    camera.aspect = window.innerWidth / visH;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(window.innerWidth, visH);
     resizeCockpit();
   }
 
@@ -8541,7 +8783,7 @@ const Starfighter = (function () {
     paused: false,
     lastTime: 0,
     arenaRadius: 8000,
-    phase: 'loading', // 'loading', 'bay-ready', 'launching', 'combat', 'landing', 'land-approach', 'docking'
+    phase: 'loading', // see SORTIE_PHASES below for canonical names
     launchTimer: 0,
     launchDuration: 8.0, // 5 sec countdown + 3 sec acceleration
     cutsceneCamPos: null, // isolated camera position for launch cutscene
@@ -8589,6 +8831,9 @@ const Starfighter = (function () {
     _gyroidDefendersSpawned: false,
     _gyroidWeaponUnlocked: false,
     _honeycombPowerups: [],
+    _pickups: [],
+    _lastDamageT: -999,
+    _killT: 0,
     _auroraDockReady: false,
     _auroraDockDone: false,
     _storyCutsceneActive: false,
@@ -8633,7 +8878,41 @@ const Starfighter = (function () {
     },
   };
 
+  // ── Sortie phases (canonical names → internal strings) ──
+  // Logical names follow the UI Contract state machine
+  // (IN_BAY → LAUNCHING → IN_FLIGHT → RETURNING → LANDING → DEBRIEF → IN_BAY,
+  //  or → DEAD on player loss). Existing call sites still compare against the
+  //  raw strings; this dict is the single source of truth for new code.
+  const SORTIE_PHASES = Object.freeze({
+    LOADING:   'loading',
+    IN_BAY:    'bay-ready',
+    TUTORIAL:  'tutorial',
+    LAUNCHING: 'launching',
+    IN_FLIGHT: 'combat',
+    RETURNING: 'land-approach',
+    LANDING:   'landing',
+    DEBRIEF:   'docking',
+    DEAD:      'dead',
+  });
+  const _phaseSubscribers = [];
+
+  // Phase 5: maps SFProgression UNLOCKS weapon id → Player.selectedWeapon index
+  // (firePrimary switch: 0=laser, 1=machinegun, 2=torpedo, 3=pulse/emp)
+  const _LOADOUT_WEAPON_INDEX = { laser: 0, machinegun: 1, torpedo: 2, pulse: 3 };
+
+  function _applyEquippedLoadoutToPlayer() {
+    if (!state.player || !window.SFProgression) return;
+    const lo = SFProgression.getLoadout();
+    if (!lo || !lo.primary) return;
+    const idx = _LOADOUT_WEAPON_INDEX[lo.primary];
+    if (idx === undefined) return;
+    const maxSlots = _getUnlockedWeaponCount(state.wave);
+    state.player.selectedWeapon = Math.min(idx, maxSlots - 1);
+  }
+
   function _setPhase(nextPhase) {
+    const prev = state.phase;
+    if (prev === nextPhase) return;
     state.phase = nextPhase;
     if (window.SFInput && SFInput.setMobilePhase) SFInput.setMobilePhase(nextPhase);
     if (nextPhase === 'bay-ready') {
@@ -8643,6 +8922,11 @@ const Starfighter = (function () {
       _speakLaunchBriefing();
     } else {
       _showLaunchBayBriefing(false);
+    }
+    // Phase 5: at sortie launch, copy bay-equipped primary into selectedWeapon
+    if (nextPhase === 'combat' && prev === 'launching') _applyEquippedLoadoutToPlayer();
+    for (let i = 0; i < _phaseSubscribers.length; i++) {
+      try { _phaseSubscribers[i](nextPhase, prev); } catch (_) {}
     }
   }
 
@@ -8762,6 +9046,51 @@ const Starfighter = (function () {
         const opacity = Math.max(0, 1 - age / FADE_DURATION);
         return '<div style="color:' + e.color + ';opacity:' + opacity.toFixed(2) + ';margin-bottom:3px;text-shadow:0 0 6px ' + e.color + ';">' + e.text + '</div>';
       }).join('');
+  }
+
+  // ── Phase 7 L2: Delta gates around the non-numeric HUD writes ──
+  // Both the kill-feed and the retry banner were rebuilding innerHTML every
+  // frame; on a 60 Hz loop that's the layout-thrash floor. We gate each
+  // behind its own signature so it only paints when the underlying data
+  // actually changed. The kill-feed needs a small extra window during the
+  // fade-out tail so the opacity tween still reads as smooth animation.
+  let _lastKillFeedSig = '';
+  let _lastKillFeedRenderT = 0;
+  function _renderKillFeedDelta() {
+    const feed = state.killFeed;
+    const now = performance.now();
+    const FADE_DURATION = 4000;
+    let topTime = 0;
+    let oldestAge = 0;
+    for (let i = 0; i < feed.length; i++) {
+      const t = feed[i].time;
+      if (t > topTime) topTime = t;
+      const age = now - t;
+      if (age > oldestAge) oldestAge = age;
+    }
+    const sig = feed.length + ':' + topTime;
+    const sigChanged = sig !== _lastKillFeedSig;
+    // Tail-fade redraw: when the oldest entry is in the last quarter of its
+    // fade we re-paint at ~5 Hz so the opacity step is invisible to the eye.
+    const inFadeTail = oldestAge > FADE_DURATION * 0.75 && oldestAge < FADE_DURATION + 100;
+    const needRedraw = sigChanged
+      || (inFadeTail && now - _lastKillFeedRenderT > 200)
+      || (feed.length > 0 && oldestAge > FADE_DURATION && now - _lastKillFeedRenderT > 200);
+    if (!needRedraw) return;
+    _lastKillFeedSig = sig;
+    _lastKillFeedRenderT = now;
+    _renderKillFeed();
+  }
+
+  let _lastBannerSig = '';
+  function _renderBannerDelta() {
+    const activePhase = state.phase === 'combat' || state.phase === 'bay-ready' || state.phase === 'launching' || state.respawning;
+    const shouldShow = activePhase && (state.livesRemaining < state.maxLives || state._retrySortiePending);
+    const sig = (shouldShow ? '1' : '0') + ':' + state.wave + ':' + state.livesRemaining + ':' + state.maxLives
+      + ':' + (state._retrySortiePending ? 1 : 0) + ':' + (state._sortieCheckpointWave || 0);
+    if (sig === _lastBannerSig) return;
+    _lastBannerSig = sig;
+    _updateSortieRetryBanner();
   }
 
   function _updateSortieRetryBanner() {
@@ -9576,8 +9905,10 @@ const Starfighter = (function () {
 
     const pressure = state.entities.length + (projectiles * 0.7) + (hostiles * 0.5);
     let tier = 0;
-    if (pressure > 280 || frameDt > 0.032) tier = 2;
-    else if (pressure > 180 || frameDt > 0.024) tier = 1;
+    // Trip tiers earlier so framerate has buffer before the budget actually
+    // saves it — a tier change is cheap, late throttle is visible to the eye.
+    if (pressure > 240 || frameDt > 0.028) tier = 2;
+    else if (pressure > 150 || frameDt > 0.020) tier = 1;
 
     state._adaptivePerfTier = tier;
     if (tier === 2) {
@@ -9598,21 +9929,120 @@ const Starfighter = (function () {
     }
   }
 
+  // ── Spatial neighbor grid (Phase 7 — Delta Substrate, L3) ──
+  // Rebuilt once per simTick. Any "who is near me" query (predator avoid,
+  // nearest-enemy targeting, future projectile pair scans) walks the
+  // 3³-cell neighborhood of the query position instead of the full entity
+  // array, collapsing the per-AI-tick O(N²) inner loop to O(N) + O(k).
+  // Cell size is tuned so the predator-avoid range (~400 units) and the
+  // typical fighter-engagement range fit a 3³ window comfortably.
+  const _NEIGHBOR_CELL = 600;
+  const _neighborGrid = new Map();
+  let _neighborGridTick = -1;
+  const _neighborOut = [];
+
+  function _cellKey(x, y, z) {
+    return Math.floor(x / _NEIGHBOR_CELL) + '|' + Math.floor(y / _NEIGHBOR_CELL) + '|' + Math.floor(z / _NEIGHBOR_CELL);
+  }
+
+  function _rebuildNeighborGrid() {
+    if (_neighborGridTick === state._simTick) return;
+    _neighborGridTick = state._simTick;
+    // Reuse cell arrays — cheaper than allocating fresh per frame.
+    _neighborGrid.forEach(arr => { arr.length = 0; });
+    const ents = state.entities;
+    for (let i = 0, len = ents.length; i < len; i++) {
+      const e = ents[i];
+      if (!e || e.markedForDeletion || !e.position) continue;
+      const k = _cellKey(e.position.x, e.position.y, e.position.z);
+      let cell = _neighborGrid.get(k);
+      if (!cell) { cell = []; _neighborGrid.set(k, cell); }
+      cell.push(e);
+    }
+    // Periodic empty-cell cull keeps the Map small as the swarm migrates.
+    if ((state._simTick & 63) === 0) {
+      const dead = [];
+      _neighborGrid.forEach((arr, k) => { if (arr.length === 0) dead.push(k); });
+      for (let i = 0; i < dead.length; i++) _neighborGrid.delete(dead[i]);
+    }
+  }
+
+  // Returns a shared array of entities in the (2*radius+1)³ cell window
+  // around (x,y,z). Caller must filter by exact distance/type and must NOT
+  // retain the array across frames — it's truncated on the next call.
+  function _neighborsNear(x, y, z, radius) {
+    _rebuildNeighborGrid();
+    _neighborOut.length = 0;
+    const r = radius | 0;
+    const cx = Math.floor(x / _NEIGHBOR_CELL);
+    const cy = Math.floor(y / _NEIGHBOR_CELL);
+    const cz = Math.floor(z / _NEIGHBOR_CELL);
+    for (let ox = -r; ox <= r; ox++)
+      for (let oy = -r; oy <= r; oy++)
+        for (let oz = -r; oz <= r; oz++) {
+          const cell = _neighborGrid.get((cx + ox) + '|' + (cy + oy) + '|' + (cz + oz));
+          if (!cell) continue;
+          for (let i = 0; i < cell.length; i++) _neighborOut.push(cell[i]);
+        }
+    return _neighborOut;
+  }
+
+  // ── SimLOD tiers (Phase 7 — Delta Substrate, L1) ──
+  // Extends the m / viewport / delta doctrine into the simulation half:
+  // every entity is classified each simTick into one of four activity
+  // tiers and ticks at a stride proportional to its presence to the
+  // viewport. Hot entities (close or in tight cone) tick every frame;
+  // frozen entities (far + offscreen) tick never. The bucket modulo on
+  // entity-id spreads the load so a wave's worth of warm entities don't
+  // all light up on the same frame.
+  const TIER_HOT = 0;
+  const TIER_WARM = 1;
+  const TIER_COLD = 2;
+  const TIER_FROZEN = 3;
+  const _TIER_STRIDE = [1, 2, 4, 8];
+  // Distance² thresholds (units squared) for the tier transitions.
+  const _TIER_D2_HOT = 1440000;       // ≤1.2 km — knife fight, always hot
+  const _TIER_D2_WARM = 25000000;     // ≤5 km on-screen
+  const _TIER_D2_COLD = 144000000;    // ≤12 km anywhere (drifts in/out of screen)
+
+  function _classifyTier(entity) {
+    if (!entity || entity.markedForDeletion) return TIER_FROZEN;
+    const t = entity.type;
+    // Mission-critical actors and projectiles always hot — their behavior
+    // must read frame-exact (collision, aim, intercept).
+    if (t === 'player' || t === 'baseship' || t === 'tanker' || t === 'medic') return TIER_HOT;
+    if (t === 'laser' || t === 'machinegun' || t === 'torpedo' || t === 'plasma' || t === 'gyroid-lance') return TIER_HOT;
+    if (!state.player || !entity.position) return TIER_FROZEN;
+    const p = state.player;
+    const dx = entity.position.x - p.position.x;
+    const dy = entity.position.y - p.position.y;
+    const dz = entity.position.z - p.position.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq < _TIER_D2_HOT) return TIER_HOT;
+    const onScreen = _isInPlayerViewport(entity, (dim('radar.range') || 15000) * 1.1, -0.05);
+    if (onScreen && distSq < _TIER_D2_WARM) return TIER_WARM;
+    if (onScreen || distSq < _TIER_D2_COLD) return TIER_COLD;
+    return TIER_FROZEN;
+  }
+
   function _shouldProcessEntityAI(entity) {
     if (!entity || entity.markedForDeletion) return false;
-    if (entity.type === 'player' || entity.type === 'baseship') return true;
-    if (entity.type === 'tanker' || entity.type === 'medic') return true;
-    if (entity.type === 'torpedo' || entity.type === 'laser' || entity.type === 'machinegun' || entity.type === 'plasma') return true;
-    if (_isInPlayerViewport(entity, (dim('radar.range') || 15000) * 1.05, 0.12)) return true;
-    if (!state.player || !entity.position) return false;
-    const dx = entity.position.x - state.player.position.x;
-    const dy = entity.position.y - state.player.position.y;
-    const dz = entity.position.z - state.player.position.z;
-    const distSq = dx * dx + dy * dy + dz * dz;
-    const rr = dim('radar.range') || 15000;
-    const divisor = (distSq > (rr * rr * 0.85) ? 8 : 5) + (state._offscreenAIDivisorBoost || 0);
-    const bucket = (entity.id && entity.id.charCodeAt(0)) ? entity.id.charCodeAt(0) % divisor : 0;
-    return ((state._simTick + bucket) % divisor) === 0;
+    // Cache tier once per simTick so the classify cost is paid once even
+    // when multiple subsystems (AI, physics gate, neighbor query) ask.
+    if (entity._tierTick !== state._simTick) {
+      entity._tier = _classifyTier(entity);
+      entity._tierTick = state._simTick;
+      if (entity._tierBucket === undefined) {
+        entity._tierBucket = (entity.id && entity.id.charCodeAt(0)) ? entity.id.charCodeAt(0) % 8 : 0;
+      }
+    }
+    const tier = entity._tier;
+    if (tier === TIER_HOT) return true;
+    if (tier === TIER_FROZEN) return false;
+    // Warm/cold stretch by adaptive boost so the perf budget can throttle
+    // simulation cost the same way it throttles HUD modulo.
+    const stride = _TIER_STRIDE[tier] + (state._offscreenAIDivisorBoost || 0);
+    return ((state._simTick + entity._tierBucket) % stride) === 0;
   }
 
   function _ensureHiveLabyrinthMission() {
@@ -10135,6 +10565,104 @@ const Starfighter = (function () {
     }
   }
 
+  // ── Pickup substrate: spawn / drift+magnet / collect ──────────────────────
+  // Pickups are Entities so the renderer & culler treat them uniformly.
+  // The manifold sample is carried on `_pickup`; collision is bypassed in
+  // handleCollision and re-implemented here as a proximity sweep so we have
+  // full control over magnet behavior and payload application.
+  function _spawnPickup(pos, sample) {
+    if (!pos || !sample) return;
+    // Hard cap on live pickups so a kill streak can't bury the renderer.
+    if (state._pickups && state._pickups.length >= 6) return;
+    const pk = new Entity('pickup', pos.x, pos.y, pos.z);
+    pk.radius = sample.size;
+    pk.maxAge = sample.lifespan;
+    pk.hull = 1;
+    pk.shields = 0;
+    pk._pickup = sample;
+    // Slight upward + random drift so it doesn't sit invisibly inside debris
+    pk.velocity = new THREE.Vector3(
+      (Math.random() - 0.5) * 30,
+      (Math.random() - 0.5) * 30 + 20,
+      (Math.random() - 0.5) * 30
+    );
+    state.entities.push(pk);
+    state._pickups.push(pk);
+  }
+
+  function _updatePickups(dt) {
+    if (state.phase !== 'combat' || !state.player || state.player.markedForDeletion) return;
+    const p = state.player.position;
+    for (let i = state._pickups.length - 1; i >= 0; i--) {
+      const e = state._pickups[i];
+      if (!e || e.markedForDeletion) { state._pickups.splice(i, 1); continue; }
+      const dx = p.x - e.position.x;
+      const dy = p.y - e.position.y;
+      const dz = p.z - e.position.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      const mr = (e._pickup && e._pickup.magnetR) || 250;
+      // Magnet drift: pull toward player when inside magnet radius
+      if (d2 < mr * mr && d2 > 1) {
+        const d = Math.sqrt(d2);
+        const pull = (1 - d / mr) * 320;
+        e.velocity.x += (dx / d) * pull * dt;
+        e.velocity.y += (dy / d) * pull * dt;
+        e.velocity.z += (dz / d) * pull * dt;
+      }
+      // Collection radius scales with pickup size
+      const cr = (e.radius || 10) + 22;
+      if (d2 < cr * cr) {
+        _collectPickup(e);
+        state._pickups.splice(i, 1);
+      }
+    }
+  }
+
+  function _collectPickup(e) {
+    const s = e._pickup; if (!s) return;
+    e.markedForDeletion = true;
+    if (M) M.remove(e.id);
+    const p = state.player;
+    const py = s.payload || {};
+    const maxShields = dim('player.shields');
+    const maxHull = dim('player.hull');
+    const maxFuel = dim('player.fuel');
+    switch (py.family) {
+      case 'defensive': {
+        // Half to shields, half to hull (with a small fuel sip)
+        const half = (py.amt || 10) / 2;
+        p.shields = Math.min(maxShields, (p.shields || 0) + half);
+        p.hull = Math.min(maxHull, (p.hull || 0) + half);
+        p.fuel = Math.min(maxFuel, (p.fuel || 0) + half * 0.5);
+        break;
+      }
+      case 'enablement': {
+        // Reset boost cooldown and add fuel proportional to charge
+        p.boostCooldown = 0;
+        p.fuel = Math.min(maxFuel, (p.fuel || 0) + (py.fuel || 10));
+        break;
+      }
+      case 'mastery': {
+        // Rebate active ability cooldown and award credits
+        const rebate = py.rebate || 3;
+        if (p.abilityCooldown > 0) p.abilityCooldown = Math.max(0, p.abilityCooldown - rebate);
+        if (window.SFProgression && SFProgression.addCredits) SFProgression.addCredits(py.credits || 0);
+        break;
+      }
+      default: {
+        if (window.SFProgression && SFProgression.addCredits) SFProgression.addCredits(py.credits || 0);
+      }
+    }
+    // HUD floater colored to manifold height z
+    const c = s.color || { r: 1, g: 1, b: 1 };
+    const hex = '#' +
+      Math.round(c.r * 255).toString(16).padStart(2, '0') +
+      Math.round(c.g * 255).toString(16).padStart(2, '0') +
+      Math.round(c.b * 255).toString(16).padStart(2, '0');
+    if (typeof _addKillFeedEntry === 'function') _addKillFeedEntry('◆ ' + (py.label || 'PICKUP'), hex);
+    if (window.SFAudio) SFAudio.playSound('click');
+  }
+
   function _updateHiveLabyrinthMission(dt) {
     if (state.wave < 7) return;
     _ensureHiveLabyrinthMission();
@@ -10364,7 +10892,10 @@ const Starfighter = (function () {
       } else {
         this.hull -= amt;
       }
-      if (this.type === 'player') state.missionStats.damageTaken += amt;
+      if (this.type === 'player') {
+        state.missionStats.damageTaken += amt;
+        state._lastDamageT = state._killT || 0;
+      }
       if (this.hull <= 0) this.explode();
     }
 
@@ -10522,6 +11053,21 @@ const Starfighter = (function () {
         for (const a of achievements) {
           _addKillFeedEntry('🏆 ' + a.name + ' — ' + a.desc, '#ffaa00');
         }
+
+        // ── Pickup manifold: sample (R, C) at kill-time and emit a pickup ──
+        // R reads from the enemy class; C reads from the player's current
+        // posture (weapon choice, boost, damage-free window).
+        if (window.SFPickupManifold && state.player && !state.player.markedForDeletion) {
+          const R = SFPickupManifold.ENEMY_RISK[this.type] || 0.20;
+          const p = state.player;
+          const nonLaser = (p.selectedWeapon || 0) !== 0 ? 0.30 : 0;
+          const boost = p.boostActive ? 0.30 : 0;
+          const since = (state._killT || 0) - (state._lastDamageT || -999);
+          const clean = since > 3 ? 0.40 : Math.max(0, since / 3) * 0.40;
+          const C = nonLaser + boost + clean;
+          const s = SFPickupManifold.sample({ risk: R, cleverness: C, enemyType: this.type, position: this.position });
+          if (s.shouldSpawn) _spawnPickup(this.position, s);
+        }
       }
     }
   }
@@ -10553,6 +11099,9 @@ const Starfighter = (function () {
       this.flightAssist = true;    // GDD §4.1: FA ON by default
       // Weapon selector — cycle with Q
       this.selectedWeapon = 0;     // 0=laser, 1=gun, 2=pulse, 3=torpedo
+      // Phase 5: equipped ability cooldown + boost_overdrive timer
+      this.abilityCooldown = 0;
+      this._freeBoostTimer = 0;
     }
 
     // Weapons unlock progressively by wave/level:
@@ -10606,15 +11155,21 @@ const Starfighter = (function () {
           this.boostActive = false;
           this.boostCooldown = dim('player.boostCooldown') * (state._sortieBuff ? state._sortieBuff.boostCooldownScale : 1);
         }
-      } else if (this.afterburnerActive && this.fuel > 0) {
+      } else if (this.afterburnerActive && (this.fuel > 0 || this._freeBoostTimer > 0)) {
         currentMax = this.afterburnerSpeed;
-        this.fuel = Math.max(0, this.fuel - dt * dim('player.afterburnerBurn'));
+        // Phase 5: boost_overdrive ability skips fuel consumption while active
+        if (this._freeBoostTimer <= 0) {
+          this.fuel = Math.max(0, this.fuel - dt * dim('player.afterburnerBurn'));
+        }
       }
 
       // Boost cooldown tick
       if (this.boostCooldown > 0) this.boostCooldown -= dt;
       // Hyperdrive cooldown tick
       if (this.hyperdriveCooldown > 0) this.hyperdriveCooldown -= dt;
+      // Phase 5: ability cooldown + free-boost timer
+      if (this.abilityCooldown > 0) this.abilityCooldown -= dt;
+      if (this._freeBoostTimer > 0) this._freeBoostTimer -= dt;
 
       // Forward velocity
       const targetVel = _v1.clone().multiplyScalar(this.throttle * currentMax);
@@ -11615,10 +12170,17 @@ const Starfighter = (function () {
     countdownDisplay.style.fontSize = '1.8em';
     countdownDisplay.style.color = '#00ff88';
     // ── Progression: award wave-complete XP ──
+    let _earnedAbilities = [];
     if (window.SFProgression) {
       SFProgression.awardEvent('wave_complete');
       // Check for no-damage bonus
       if (state.missionStats.damageTaken === 0) SFProgression.awardEvent('wave_no_damage');
+      // Phase 5: auto-award abilities whose unlock matches this wave threshold
+      const _candidates = SFProgression.getAbilitiesEarnedAtWave(prevWave);
+      for (const a of _candidates) {
+        const r = SFProgression.awardAbility(a.id);
+        if (r.awarded) _earnedAbilities.push(a);
+      }
     }
 
     // Build upgrade shop HTML for between-wave screen
@@ -11654,12 +12216,16 @@ const Starfighter = (function () {
       + `<span style="color:#58ffb0;">SORTIE ${state.wave} GAINS:</span> ${_sortieGains.join(' ')}`
       + `</div>`
       : '';
+    const _abilityBanner = _earnedAbilities.length > 0
+      ? `<div style="font-size:0.38em;color:#ffd866;margin:6px 0 3px;text-shadow:0 0 10px #ffaa00;">⚡ NEW ABILITY: ${_earnedAbilities.map(a => a.name.toUpperCase()).join(', ')} ⚡<br><span style="color:#aaccdd;font-size:0.9em;">Equip in bay → MENU → LOADOUT</span></div>`
+      : '';
     countdownDisplay.innerHTML = `WAVE ${prevWave} COMPLETE<br>` +
       `<span style="font-size:0.5em;color:#88ccff">` +
       `Kills: ${state.kills} | Score: ${state.score}<br>` +
       `Hull: ${Math.floor(state.player.hull)}% | Base Hull: ${Math.floor((state.baseship.hull / dim('baseship.hull')) * 100)}%` +
       `</span><br>` +
       _unlockBanner +
+      _abilityBanner +
       _gainBanner +
       shopHTML +
       `<span style="font-size:0.45em;color:#ffaa00">Rearming... Wave ${state.wave} launching in 8s</span>`;
@@ -12149,9 +12715,11 @@ const Starfighter = (function () {
       const tierTypes = Object.keys(typeWeights).filter(t => typeWeights[t] > 0);
       const totalTW = tierTypes.reduce((s, t) => s + typeWeights[t], 0);
 
-      // Distance band: scales with wave but always well away from the player
-      const rBase = 5500 + w * 180;
-      const rSpread = 1200 + w * 240;
+      // Distance band: tight enough that first contact happens in ~3s of
+      // cruise, scales out with wave so later sorties still demand approach.
+      // rMod (below) still pushes bombers/interceptors to the back of the band.
+      const rBase = 2000 + w * 200;
+      const rSpread = 700 + w * 180;
 
       // Angular base — random each wave so clusters never come from the same direction
       const baseAngle = Math.random() * Math.PI * 2;
@@ -12317,6 +12885,7 @@ const Starfighter = (function () {
   }
 
   function gameOver(reason, isVictory) {
+    _setPhase('dead');
     state.running = false;
     const deathScreen = document.getElementById('death-screen');
     deathScreen.style.display = 'flex';
@@ -12500,7 +13069,7 @@ const Starfighter = (function () {
   function _updateRespawn(dt) {
     if (!state.respawning) return false;
     state.respawnTimer -= dt;
-    _updateSortieRetryBanner();
+    _renderBannerDelta();
 
     const cdEl = document.getElementById('countdown-display');
     if (cdEl) {
@@ -12907,10 +13476,12 @@ const Starfighter = (function () {
       // ── Combat Phase (normal gameplay) ──
 
       state._simTick = (state._simTick + 1) % 4096;
+      state._killT = (state._killT || 0) + safeDt;
       _updateAdaptivePerfBudget(dt);
       _updateHiveLabyrinthMission(safeDt);
       _updateCarrierDefenseSortie(safeDt);
       _updateSortieScenario(safeDt);
+      _updatePickups(safeDt);
       checkWave();
 
       if (state._storyCutsceneActive) {
@@ -13041,6 +13612,8 @@ const Starfighter = (function () {
 
       // Apply velocity → position for all entities (3D physics step)
       // The unified Manifold tracks 2D projections; this is the authoritative 3D update
+      const _playerPos = state.player && !state.player.markedForDeletion ? state.player.position : null;
+      const _closePhysicsR2 = 2000 * 2000;
       for (let i = 0, len = ents.length; i < len; i++) {
         const e = ents[i];
         if (e.markedForDeletion) continue;
@@ -13048,11 +13621,25 @@ const Starfighter = (function () {
         const inViewport = _isInPlayerViewport(e, (dim('radar.range') || 15000) * 1.25, -0.15);
         if (!inViewport) {
           const isProjectile = e.type === 'laser' || e.type === 'machinegun' || e.type === 'torpedo' || e.type === 'plasma' || e.type === 'gyroid-lance';
-          if (e.type !== 'player' && !isProjectile && e.velocity.lengthSq() < 0.4) continue;
-          if (e.type !== 'player' && !isProjectile) {
-            const div = 3 + (state._offscreenPhysicsDivisorBoost || 0);
-            const bucket = (e.id && e.id.charCodeAt(0)) ? e.id.charCodeAt(0) % div : 0;
-            if (((state._simTick + bucket) % div) !== 0) continue;
+          // Close-engagement bubble: never throttle an entity within 2000m of
+          // the player, regardless of facing. Keeps offscreen asteroids and
+          // ships in their true positions on the frame of contact (max closing
+          // ~800 m/s × ~33ms throttle window ≈ 25m drift; 2000m bubble covers
+          // it with margin).
+          let _nearPlayer = false;
+          if (_playerPos && e !== state.player) {
+            const _dpx = e.position.x - _playerPos.x;
+            const _dpy = e.position.y - _playerPos.y;
+            const _dpz = e.position.z - _playerPos.z;
+            if (_dpx * _dpx + _dpy * _dpy + _dpz * _dpz < _closePhysicsR2) _nearPlayer = true;
+          }
+          if (!_nearPlayer) {
+            if (e.type !== 'player' && !isProjectile && e.velocity.lengthSq() < 0.4) continue;
+            if (e.type !== 'player' && !isProjectile) {
+              const div = 3 + (state._offscreenPhysicsDivisorBoost || 0);
+              const bucket = (e.id && e.id.charCodeAt(0)) ? e.id.charCodeAt(0) % div : 0;
+              if (((state._simTick + bucket) % div) !== 0) continue;
+            }
           }
         }
         e.position.x += e.velocity.x * safeDt;
@@ -13365,19 +13952,32 @@ const Starfighter = (function () {
     if (mode === 'baseship') return state.baseship;
     if (mode === 'mixed') return (Math.random() > 0.3) ? state.baseship : (_playerAlive ? state.player : state.baseship);
     if (mode === 'nearest_enemy') {
-      let best = null, bestD = Infinity;
-      for (let i = 0, len = state.entities.length; i < len; i++) {
-        const e = state.entities[i];
-        if (e.markedForDeletion) continue;
-        if (e.type !== 'enemy' && e.type !== 'interceptor' && e.type !== 'bomber' &&
-          e.type !== 'predator' && e.type !== 'alien-baseship' && e.type !== 'dreadnought') continue;
-        const dx = e.position.x - entity.position.x;
-        const dy = e.position.y - entity.position.y;
-        const dz = e.position.z - entity.position.z;
-        const d = dx * dx + dy * dy + dz * dz;
-        if (d < bestD) { bestD = d; best = e; }
-      }
-      return best;
+      // Phase 7 L3: scan the local neighborhood first (covers the common
+      // mid-engagement case in O(k)); only fall through to a full-array
+      // scan when the wingman is genuinely alone in its sector.
+      const pickHostile = (list) => {
+        let b = null, bd = Infinity;
+        for (let i = 0, len = list.length; i < len; i++) {
+          const e = list[i];
+          if (!e || e.markedForDeletion || e === entity) continue;
+          const t = e.type;
+          if (t !== 'enemy' && t !== 'interceptor' && t !== 'bomber' &&
+            t !== 'predator' && t !== 'alien-baseship' && t !== 'dreadnought') continue;
+          const dx = e.position.x - entity.position.x;
+          const dy = e.position.y - entity.position.y;
+          const dz = e.position.z - entity.position.z;
+          const d = dx * dx + dy * dy + dz * dz;
+          if (d < bd) { bd = d; b = e; }
+        }
+        return b;
+      };
+      // 3³ window at cellSize 600 → ~1.8 km local radius.
+      let best = pickHostile(_neighborsNear(entity.position.x, entity.position.y, entity.position.z, 1));
+      if (best) return best;
+      // Widen to 5³ (~3 km) before paying the full-array cost.
+      best = pickHostile(_neighborsNear(entity.position.x, entity.position.y, entity.position.z, 2));
+      if (best) return best;
+      return pickHostile(state.entities);
     }
     return _playerAlive ? state.player : state.baseship;
   }
@@ -13422,9 +14022,13 @@ const Starfighter = (function () {
   }
 
   // ── Predator avoidance dimension ──
+  // Phase 7 L3: 400-unit detection range fits in a 1-cell window at
+  // cellSize 600, so the spatial grid lookup beats the full-array scan
+  // by roughly N/k where k is the local cell population (typically <10).
   function _combatAvoidPredator(entity, dt) {
-    for (let i = 0, len = state.entities.length; i < len; i++) {
-      const pred = state.entities[i];
+    const near = _neighborsNear(entity.position.x, entity.position.y, entity.position.z, 1);
+    for (let i = 0, len = near.length; i < len; i++) {
+      const pred = near[i];
       if (pred.type !== 'predator' || pred.markedForDeletion) continue;
       const dx = pred.position.x - entity.position.x;
       const dy = pred.position.y - entity.position.y;
@@ -13660,22 +14264,30 @@ const Starfighter = (function () {
 
     // Target selection: Predator is indiscriminate — attacks ANYTHING nearby
     // It doesn't know friend from foe. Only ignores baseship/station (too large to damage)
-    let target = null;
-    let bestDist = Infinity;
-    const ents = state.entities;
-    for (let i = 0, len = ents.length; i < len; i++) {
-      const e = ents[i];
-      if (e.markedForDeletion) continue;
-      // Skip other predators, plasma, lasers, torpedoes, baseship, alien-baseship, eggs, younglings
-      if (e.type === 'predator' || e.type === 'plasma' || e.type === 'laser' || e.type === 'torpedo') continue;
-      if (e.type === 'baseship' || e.type === 'alien-baseship') continue; // too strong to damage
-      if (e.type === 'egg' || e.type === 'youngling') continue; // own offspring
-      const dx = e.position.x - pred.position.x;
-      const dy = e.position.y - pred.position.y;
-      const dz = e.position.z - pred.position.z;
-      const d = dx * dx + dy * dy + dz * dz;
-      if (d < bestDist) { bestDist = d; target = e; }
-    }
+    // Phase 7 L3: predator pursuit naturally favors near targets, so the
+    // 3³ cell window covers the realistic engagement envelope; widen to
+    // 5³ before falling through to a full scan (a lone predator with no
+    // local victims drifts to the next sector — the rare path).
+    const pickPrey = (list) => {
+      let b = null, bd = Infinity;
+      for (let i = 0, len = list.length; i < len; i++) {
+        const e = list[i];
+        if (!e || e.markedForDeletion) continue;
+        const t = e.type;
+        if (t === 'predator' || t === 'plasma' || t === 'laser' || t === 'torpedo') continue;
+        if (t === 'baseship' || t === 'alien-baseship') continue;
+        if (t === 'egg' || t === 'youngling') continue;
+        const dx = e.position.x - pred.position.x;
+        const dy = e.position.y - pred.position.y;
+        const dz = e.position.z - pred.position.z;
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d < bd) { bd = d; b = e; }
+      }
+      return b;
+    };
+    let target = pickPrey(_neighborsNear(pred.position.x, pred.position.y, pred.position.z, 1));
+    if (!target) target = pickPrey(_neighborsNear(pred.position.x, pred.position.y, pred.position.z, 2));
+    if (!target) target = pickPrey(state.entities);
     if (!target) { target = state.player; }
     if (!target) return;
 
@@ -14450,6 +15062,53 @@ const Starfighter = (function () {
     cdEl.style.color = '#00ffff';
   }
 
+  // ── Phase 5: activate the equipped ability from the cockpit ABIL slot ──
+  // Reads SFProgression.getLoadout().ability, validates cooldown, applies
+  // the per-ability effect, then sets the cooldown from ABILITIES table.
+  function _activateEquippedAbility() {
+    const p = state.player;
+    if (!p || p.markedForDeletion || state.phase !== 'combat') return;
+    if (!window.SFProgression) return;
+    const loadout = SFProgression.getLoadout();
+    if (!loadout || !loadout.ability) {
+      if (window.SFAudio) SFAudio.playSound('click');
+      addComm(_crew('tactical'), 'No ability equipped.', 'base');
+      return;
+    }
+    if (p.abilityCooldown > 0) {
+      if (window.SFAudio) SFAudio.playSound('click');
+      return;
+    }
+    const ability = SFProgression.getAbilityById(loadout.ability);
+    if (!ability) return;
+
+    switch (ability.id) {
+      case 'shield_burst':
+        p._invulnUntilT = (performance.now() / 1000) + (ability.duration || 2);
+        if (window.SFAudio) SFAudio.playSound('shield');
+        addComm(_crew('tactical'), 'Shield burst engaged.', 'base');
+        break;
+      case 'boost_overdrive':
+        p._freeBoostTimer = ability.duration || 5;
+        p.afterburnerActive = true;
+        if (window.SFAudio) SFAudio.playSound('boost');
+        addComm(_crew('tactical'), 'Boost overdrive — full throttle.', 'base');
+        break;
+      case 'tac_emp':
+        firePulseEMP(p, 'player');
+        addComm(_crew('tactical'), 'Tactical EMP deployed.', 'base');
+        break;
+      case 'decoy_drop':
+        p._decoyUntilT = (performance.now() / 1000) + (ability.duration || 6);
+        if (window.SFAudio) SFAudio.playSound('comm_beep');
+        addComm(_crew('tactical'), 'Decoy flare released.', 'base');
+        break;
+      default:
+        return;
+    }
+    p.abilityCooldown = ability.cooldown || 30;
+  }
+
   function _checkHideRTBButton() {
     // Hide RTB button if no younglings are attached to player
     const hasAttached = state.entities.some(e =>
@@ -14974,6 +15633,9 @@ const Starfighter = (function () {
   }
 
   function handleCollision(a, b) {
+    // ── Pickup short-circuit — pickups are collected via _updatePickups, never via broadphase ──
+    if (a.type === 'pickup' || b.type === 'pickup') return;
+
     // ── Egg collision — ships hitting eggs take damage (egg's only defense) ──
     if (a.type === 'egg' && b.type !== 'laser' && b.type !== 'torpedo' && b.type !== 'plasma') {
       b.takeDamage(dim('damage.eggSplash'));
@@ -15198,9 +15860,11 @@ const Starfighter = (function () {
 
   function updateHUD() {
     if (!state.player || state.player.markedForDeletion) return;
-    // Kill feed overlay — render every frame for fade animation
-    _renderKillFeed();
-    _updateSortieRetryBanner();
+    // Phase 7 L2: both gated behind their own signatures — only repaint
+    // when underlying data actually changed (kill-feed keeps a small
+    // window during fade tails to keep the opacity tween smooth).
+    _renderKillFeedDelta();
+    _renderBannerDelta();
     const speed = Math.floor(state.player.velocity.length());
     const throttle = Math.floor(state.player.throttle * 100);
     const fuel = Math.floor(state.player.fuel);
@@ -15250,21 +15914,25 @@ const Starfighter = (function () {
       ge('gauge-base').className = 'gauge-fill ' + (basePct < 20 ? 'red' : basePct < 50 ? 'orange' : 'orange');
     }
 
-    // Flash warning if baseship critical
-    let message = 'DEFEND THE BASESHIP';
-    if (state.wave === 3) {
-      const astLeft = state.entities.filter(e => e.type === 'asteroid' && !e.markedForDeletion).length;
-      message = `CLEAR ASTEROID BELT (${astLeft})`;
-    } else if (state._sortieScenario) {
-      message = _scenarioObjectiveLabel() || state._sortieObjectiveText || message;
-    }
-    if (basePct < 20) {
-      message = 'BASESHIP CRITICAL';
-    }
+    // Flash warning if baseship critical. The message write itself is
+    // delta-gated, but the alarm flash needs to keep alternating colors
+    // while critical even if no numbers changed — so the critical branch
+    // bypasses hudChanged.
     const msg = ge('hud-message');
-    if (msg) {
-      if (basePct < 20) msg.style.color = msg.style.color === '#ff0000' ? '#ffff00' : '#ff0000';
-      else msg.style.color = '#00ffaa';
+    if (msg && (hudChanged || basePct < 20)) {
+      let message = 'DEFEND THE BASESHIP';
+      if (state.wave === 3) {
+        const astLeft = state.entities.filter(e => e.type === 'asteroid' && !e.markedForDeletion).length;
+        message = `CLEAR ASTEROID BELT (${astLeft})`;
+      } else if (state._sortieScenario) {
+        message = _scenarioObjectiveLabel() || state._sortieObjectiveText || message;
+      }
+      if (basePct < 20) {
+        message = 'BASESHIP CRITICAL';
+        msg.style.color = msg.style.color === '#ff0000' ? '#ffff00' : '#ff0000';
+      } else {
+        msg.style.color = '#00ffaa';
+      }
       msg.innerText = message;
     }
 
@@ -16164,6 +16832,20 @@ const Starfighter = (function () {
     init,
     getState: () => state,
     getPhase: () => state.phase,
+    PHASE: SORTIE_PHASES,
+    getLogicalPhase: () => {
+      const p = state.phase;
+      for (const k in SORTIE_PHASES) if (SORTIE_PHASES[k] === p) return k;
+      return 'UNKNOWN';
+    },
+    onPhaseChange: (cb) => {
+      if (typeof cb !== 'function') return () => {};
+      _phaseSubscribers.push(cb);
+      return () => {
+        const i = _phaseSubscribers.indexOf(cb);
+        if (i !== -1) _phaseSubscribers.splice(i, 1);
+      };
+    },
     getDim: dim,
     firePrimary,
     fireLaser: () => fireLaser(state.player, 'player'),
@@ -16175,6 +16857,10 @@ const Starfighter = (function () {
     tryLockOnTarget: () => tryLockOnTarget(state.player),
     emergencyRTB: _triggerEmergencyRTB,
     requestDock: _requestDock,
+    activateAbility: _activateEquippedAbility,
+    // Phase 5 stop-gap: SEC button cycles primary weapon until Phase 6
+    // pickups populate a real secondary inventory.
+    fireSecondary: () => state.player && state.player.cycleWeapon(),
     callTanker: () => _callSupport('tanker'),
     callMedic: () => _callSupport('medic'),
     togglePause,

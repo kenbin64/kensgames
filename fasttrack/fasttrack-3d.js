@@ -2367,10 +2367,20 @@ async function init3D() {
   // Initialize manifold audio system
   ManifoldAudio.init();
 
-  // Scene - rich warm billiard room
+  // Mobile / coarse-pointer devices strip the billiard-room substrate
+  // (walls, floor, ceiling, sconces, fireplace, env reflections) and run
+  // a void-only scene with the board + Schwarz Diamond manifold. PBR
+  // uniform-light limits on phone GPUs were silently dropping the warm
+  // sconce/neon point lights and making the room look unlit; the void
+  // mode sidesteps the limit entirely.
+  const FT_MOBILE_VOID = (typeof window !== 'undefined') &&
+    (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches);
+  window.FT_MOBILE_VOID = FT_MOBILE_VOID;
+
+  // Scene - rich warm billiard room (desktop) / pure void (mobile)
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d0a07);
-  scene.fog = new THREE.FogExp2(0x0d0a07, 0.0006);
+  scene.background = new THREE.Color(FT_MOBILE_VOID ? 0x000000 : 0x0d0a07);
+  if (!FT_MOBILE_VOID) scene.fog = new THREE.FogExp2(0x0d0a07, 0.0006);
 
   // Camera — vertical FOV widens automatically on narrow/portrait viewports
   // so the whole board stays in frame on phones.
@@ -2390,7 +2400,9 @@ async function init3D() {
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
+  // Void mode has no floor/walls to receive shadows — skip the 2048² shadow
+  // pass and its per-frame cost.
+  renderer.shadowMap.enabled = !FT_MOBILE_VOID;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.4;
@@ -2399,7 +2411,9 @@ async function init3D() {
   container.appendChild(renderer.domElement);
 
   // ── ENVIRONMENT MAP — warm room reflections for PBR materials ──
-  createEnvironmentMap();
+  // Skipped in void mode: no walls to reflect, and the cubemap allocation
+  // is one of the heavier GPU costs at init.
+  if (!FT_MOBILE_VOID) createEnvironmentMap();
 
   // Controls - always enabled for manual camera (default)
   controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -2426,7 +2440,7 @@ async function init3D() {
   // awaiting it stalled init3D for up to 20 seconds behind a black screen.
   // ingestArt() now applies each texture to its canvas mesh as it lands.
   try { ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
-  createBilliardRoom();
+  if (!FT_MOBILE_VOID) createBilliardRoom();
 
   // Lighting (billiard table lamp style)
   setupLighting();
@@ -2444,7 +2458,7 @@ async function init3D() {
 
 
   // Create hexagonal billiard table
-  createBilliardRoom && createBilliardRoom();
+  if (!FT_MOBILE_VOID) createBilliardRoom && createBilliardRoom();
 
   // ── FEATURE FLAG: Procedural vs. Legacy Board Mesh ──
   // Set window.FT_USE_PROCEDURAL_BOARD = true in console or before load to enable procedural SDF board

@@ -87,7 +87,11 @@ const MOBILE_INPUT = {
     enabled: (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''))
         || (typeof window !== 'undefined' && 'ontouchstart' in window && window.innerWidth < 1024),
     touchActive: false,
-    touchNormX: 0,
+    touchNormX: 0,                  // legacy — retained for any external read; unused by new drag path
+    paddleTargetX: 0,               // world-X paddle should move toward (set by touch drag)
+    _paddleAnchorX: 0,              // paddle X at touchdown — drag is relative to this
+    _paddleStartClientX: 0,         // finger X at touchdown
+    _paddleSensitivity: 1,          // world-units per CSS pixel, recomputed per touchdown
     tiltEnabled: false,
     tiltNormX: 0,
     tiltMode: 'paddle', // 'paddle' | 'camera'
@@ -350,110 +354,75 @@ function initMobileControls() {
     modeLabel.style.cssText = 'position:fixed;left:10px;bottom:62px;z-index:141;padding:6px 10px;border-radius:8px;border:1px solid rgba(0,255,204,.45);background:rgba(4,20,34,.78);color:#9ffff0;font:700 11px Rajdhani,sans-serif;letter-spacing:.06em;';
     const setModeLabel = (isImu, tiltMode = MOBILE_INPUT.tiltMode) => {
         modeLabel.textContent = isImu
-            ? (tiltMode === 'camera' ? 'GYRO CAMERA + SWIPE PADDLE' : 'GYRO PADDLE + SWIPE CAMERA')
-            : 'SWIPE LEFT=PADDLE | RIGHT=CAM';
+            ? (tiltMode === 'camera' ? 'GYRO CAMERA + DRAG PADDLE' : 'GYRO PADDLE + 2-FINGER ZOOM')
+            : 'DRAG ANYWHERE = PADDLE | 2-FINGER = ZOOM';
         modeLabel.style.color = isImu ? '#b8ffe8' : '#9ffff0';
         modeLabel.style.borderColor = isImu ? 'rgba(100,255,220,.75)' : 'rgba(0,255,204,.45)';
     };
     setModeLabel(false);
     document.body.appendChild(modeLabel);
 
-    const pad = document.createElement('div');
-    pad.id = 'bb-touch-pad';
-    pad.style.cssText = 'position:relative;flex:1;height:44px;border:1px solid rgba(0,255,204,.35);background:rgba(4,20,34,.66);border-radius:10px;overflow:hidden;';
-    const thumb = document.createElement('div');
-    thumb.id = 'bb-touch-thumb';
-    thumb.style.cssText = 'position:absolute;top:4px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:18px;background:rgba(0,255,204,.28);border:1px solid rgba(0,255,204,.8);';
-    pad.appendChild(thumb);
     wrap.appendChild(tiltBtn);
     wrap.appendChild(gyroModeBtn);
-    wrap.appendChild(pad);
     document.body.appendChild(wrap);
 
-    const paddleZone = document.createElement('div');
-    paddleZone.id = 'bb-gesture-paddle';
-    paddleZone.style.cssText = 'position:fixed;left:0;top:56px;bottom:64px;width:58vw;z-index:130;touch-action:none;background:transparent;';
-    const cameraZone = document.createElement('div');
-    cameraZone.id = 'bb-gesture-camera';
-    cameraZone.style.cssText = 'position:fixed;right:0;top:56px;bottom:64px;width:42vw;z-index:130;touch-action:none;background:transparent;';
-    document.body.appendChild(paddleZone);
-    document.body.appendChild(cameraZone);
+    // Full-screen relative-delta paddle drag, attached to the renderer canvas
+    // so two-finger pinch falls through to OrbitControls (THREE.TOUCH.DOLLY).
+    // Drag is anchored: paddle starts at its current X on touchdown and moves
+    // by (finger Δx × sensitivity). Touchend leaves the paddle in place — no
+    // center-snap. Multi-touch releases paddle control immediately so pinch
+    // works without fighting the drag.
+    const dragTarget = (renderer && renderer.domElement) ? renderer.domElement : window;
 
-    const setThumb = (norm) => {
-        const w = pad.clientWidth - 40;
-        thumb.style.left = `${20 + ((norm + 1) * 0.5 * w)}px`;
-    };
-    setThumb(0);
-
-    const updateTouchNorm = (clientX) => {
-        const r = paddleZone.getBoundingClientRect();
-        const t = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
-        MOBILE_INPUT.touchNormX = t * 2 - 1;
-        setThumb(MOBILE_INPUT.touchNormX);
-    };
-
-    paddleZone.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touch = e.changedTouches[0];
-        if (!touch) return;
+    const beginPaddleDrag = (touch) => {
+        if (!paddles || paddles.length === 0 || !paddles[0]) return false;
         MOBILE_INPUT.paddleTouchId = touch.identifier;
         MOBILE_INPUT.touchActive = true;
-        updateTouchNorm(touch.clientX);
-    }, { passive: false });
+        MOBILE_INPUT._paddleAnchorX = paddles[0].position.x;
+        MOBILE_INPUT._paddleStartClientX = touch.clientX;
+        // Sensitivity: a full-screen swipe ≈ 1.5× full paddle travel, so the
+        // user can cover the arena edge-to-edge in one stroke AND still dial
+        // in fine corrections at the slow end.
+        const halfScreen = Math.max(160, window.innerWidth * 0.5);
+        MOBILE_INPUT._paddleSensitivity = (PADDLE_BOUND * 1.5) / halfScreen;
+        MOBILE_INPUT.paddleTargetX = MOBILE_INPUT._paddleAnchorX;
+        return true;
+    };
 
-    paddleZone.addEventListener('touchmove', (e) => {
-        if (!MOBILE_INPUT.touchActive) return;
-        e.preventDefault();
-        const touch = Array.from(e.touches).find(t => t.identifier === MOBILE_INPUT.paddleTouchId);
-        if (!touch) return;
-        updateTouchNorm(touch.clientX);
-    }, { passive: false });
-
-    const releaseTouch = () => {
+    const releasePaddleDrag = () => {
         MOBILE_INPUT.touchActive = false;
         MOBILE_INPUT.paddleTouchId = null;
-        MOBILE_INPUT.touchNormX = 0;
-        setThumb(0);
+        // Intentionally retain paddleTargetX — paddle holds last position.
     };
-    paddleZone.addEventListener('touchend', (e) => {
-        const ended = Array.from(e.changedTouches).some(t => t.identifier === MOBILE_INPUT.paddleTouchId);
-        if (ended) releaseTouch();
-    }, { passive: true });
-    paddleZone.addEventListener('touchcancel', releaseTouch, { passive: true });
 
-    cameraZone.addEventListener('touchstart', (e) => {
-        e.preventDefault();
+    dragTarget.addEventListener('touchstart', (e) => {
+        // Two or more fingers → let OrbitControls handle pinch; drop any drag.
+        if (e.touches.length >= 2) {
+            if (MOBILE_INPUT.touchActive) releasePaddleDrag();
+            return;
+        }
         const touch = e.changedTouches[0];
         if (!touch) return;
-        MOBILE_INPUT.cameraTouchActive = true;
-        MOBILE_INPUT.cameraTouchId = touch.identifier;
-        MOBILE_INPUT._cameraLastX = touch.clientX;
-        MOBILE_INPUT._cameraLastY = touch.clientY;
+        if (beginPaddleDrag(touch)) e.preventDefault();
     }, { passive: false });
 
-    cameraZone.addEventListener('touchmove', (e) => {
-        if (!MOBILE_INPUT.cameraTouchActive) return;
-        e.preventDefault();
-        const touch = Array.from(e.touches).find(t => t.identifier === MOBILE_INPUT.cameraTouchId);
+    dragTarget.addEventListener('touchmove', (e) => {
+        if (!MOBILE_INPUT.touchActive) return;
+        // Second finger landed mid-drag → cede control to pinch zoom.
+        if (e.touches.length >= 2) { releasePaddleDrag(); return; }
+        const touch = Array.from(e.touches).find(t => t.identifier === MOBILE_INPUT.paddleTouchId);
         if (!touch) return;
-        const dx = touch.clientX - (MOBILE_INPUT._cameraLastX ?? touch.clientX);
-        const dy = touch.clientY - (MOBILE_INPUT._cameraLastY ?? touch.clientY);
-        MOBILE_INPUT._cameraLastX = touch.clientX;
-        MOBILE_INPUT._cameraLastY = touch.clientY;
-        rotateCameraGesture(dx, dy, 0.0065);
+        e.preventDefault();
+        const dx = touch.clientX - MOBILE_INPUT._paddleStartClientX;
+        const tx = MOBILE_INPUT._paddleAnchorX + dx * MOBILE_INPUT._paddleSensitivity;
+        MOBILE_INPUT.paddleTargetX = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, tx));
     }, { passive: false });
 
-    const releaseCamTouch = () => {
-        MOBILE_INPUT.cameraTouchActive = false;
-        MOBILE_INPUT.cameraTouchId = null;
-        MOBILE_INPUT._cameraLastX = null;
-        MOBILE_INPUT._cameraLastY = null;
-    };
-    cameraZone.addEventListener('touchend', (e) => {
-        const ended = Array.from(e.changedTouches).some(t => t.identifier === MOBILE_INPUT.cameraTouchId);
-        if (ended) releaseCamTouch();
+    dragTarget.addEventListener('touchend', (e) => {
+        const ended = Array.from(e.changedTouches).some(t => t.identifier === MOBILE_INPUT.paddleTouchId);
+        if (ended) releasePaddleDrag();
     }, { passive: true });
-    cameraZone.addEventListener('touchcancel', releaseCamTouch, { passive: true });
+    dragTarget.addEventListener('touchcancel', releasePaddleDrag, { passive: true });
 
     const onTilt = (ev) => {
         if (!MOBILE_INPUT.tiltEnabled || typeof ev.gamma !== 'number') return;
@@ -472,7 +441,7 @@ function initMobileControls() {
         gyroModeBtn.disabled = true;
         gyroModeBtn.style.opacity = '0.65';
         tiltBtn.style.opacity = '0.65';
-        tiltBtn.title = 'IMU not available. Using touch pad control.';
+        tiltBtn.title = 'IMU not available. Drag anywhere on screen to move paddle.';
         gyroModeBtn.title = 'IMU not available.';
         setModeLabel(false);
     }
@@ -519,12 +488,18 @@ function initMobileControls() {
 
 function applyMobilePaddleControl() {
     if (!MOBILE_INPUT.enabled || !gameActive || gamePaused || paddles.length === 0 || !players[0] || !players[0].alive) return;
-    let n = null;
-    if (MOBILE_INPUT.touchActive) n = MOBILE_INPUT.touchNormX;
-    else if (MOBILE_INPUT.tiltEnabled && MOBILE_INPUT.tiltMode === 'paddle') n = MOBILE_INPUT.tiltNormX;
-    if (n === null) return;
+    // Touch drag wins over gyro when active. Touch supplies a world-X target
+    // directly (relative-delta drag); gyro supplies a normalized [-1,1] that
+    // maps to absolute paddle position.
+    let tx = null;
+    if (MOBILE_INPUT.touchActive) {
+        tx = MOBILE_INPUT.paddleTargetX;
+    } else if (MOBILE_INPUT.tiltEnabled && MOBILE_INPUT.tiltMode === 'paddle') {
+        tx = MOBILE_INPUT.tiltNormX * PADDLE_BOUND;
+    }
+    if (tx === null) return;
     const p = paddles[0];
-    const tx = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, n * PADDLE_BOUND));
+    tx = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, tx));
     movePaddleTo(0, tx, p.position.z);
 }
 

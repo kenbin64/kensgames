@@ -278,13 +278,26 @@ const SFInput = (function () {
         _ensureMobileModeBadge();
         _setMobileModeBadge(false);
 
-        // ── Remaining action buttons (lock, boost, afterburner, RTB) ──
+        // ── Cockpit action grid (FIRE · SEC · LOCK · BOOST · ABILITY · RTB) ──
+        // UI Contract phase 1: AB merged into BOOST (tap = burst via
+        // activateBoost; hold = sustained afterburner via afterburnerHeld).
+        // TILT relocated to hamburger menu (phase 2) — _bindGyroButton
+        // early-returns harmlessly if #mob-tilt is absent. SEC / ABILITY
+        // hooks call into Starfighter.* methods that phase 5 will define;
+        // optional-chained so they no-op safely until the inventory lands.
         _bindTouchHold('mob-fire', 'fireHeld');
         _bindGyroButton();
         _bindTouchBtn('mob-lock', () => { if (window.Starfighter) window.Starfighter.tryLockOnTarget(); });
         _bindTouchBtn('mob-boost', () => { if (player) player.activateBoost(); });
-        _bindTouchHold('mob-afterburner', 'afterburnerHeld');
+        _bindTouchHold('mob-boost', 'afterburnerHeld');
+        _bindTouchBtn('mob-sec', () => { if (window.Starfighter && Starfighter.fireSecondary) Starfighter.fireSecondary(); });
+        _bindTouchBtn('mob-ability', () => { if (window.Starfighter && Starfighter.activateAbility) Starfighter.activateAbility(); });
         _bindTouchBtn('mob-rtb', () => { if (window.Starfighter && Starfighter.emergencyRTB) Starfighter.emergencyRTB(); });
+
+        // ── Cockpit D-pad (▲ THR · ▼ BRK · ◀ ▶ yaw) — gyro-fallback steering ──
+        // Drives the same nav* state used by the legacy thumb-stick path, so
+        // applyInputToPlayer needs no changes. Pitch stays gyro-only.
+        _bindDpad();
 
         // Sync touch HUD visibility with current game phase as soon as controls mount.
         setMobilePhase(mobilePhase);
@@ -345,10 +358,73 @@ const SFInput = (function () {
 
     function _syncGyroButtonVisual() {
         const btn = document.getElementById('mob-tilt');
-        if (!btn) return;
-        btn.classList.toggle('active', !!gyroEnabled);
-        btn.textContent = gyroEnabled ? 'TILT ON' : 'TILT';
+        if (btn) {
+            btn.classList.toggle('active', !!gyroEnabled);
+            btn.textContent = gyroEnabled ? 'TILT ON' : 'TILT';
+        }
+        // Body class drives D-pad yaw-arrow opacity (see SF-MOBILE-OVERHAUL CSS).
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.toggle('sf-gyro-on', !!gyroEnabled);
+        }
         _setMobileModeBadge(!!gyroEnabled);
+    }
+
+    // ── D-pad (cockpit-seated 6-button fallback) ──────────────────────────
+    // Tracks per-arrow hold state; each change recomputes navActive/navDx/
+    // navDy/navThrust so applyInputToPlayer consumes them through the same
+    // path the legacy thumb-stick used. Pitch corner buttons (↗ pitchUp,
+    // ↘ pitchDn) drive navDy with the sphere's existing sign convention:
+    // applyInputToPlayer does `player.pitch -= navDy * dt * 2.5`, so
+    // navDy = -1 climbs (nose up) and navDy = +1 dives (nose down).
+    const _dpadHeld = {
+        up: false, down: false, left: false, right: false,
+        pitchUp: false, pitchDn: false,
+    };
+    function _dpadApply() {
+        const yaw   = (_dpadHeld.right   ? 1 : 0) - (_dpadHeld.left    ? 1 : 0);
+        const pitch = (_dpadHeld.pitchDn ? 1 : 0) - (_dpadHeld.pitchUp ? 1 : 0);
+        navDx = yaw;
+        navDy = pitch;
+        navActive = (yaw !== 0) || (pitch !== 0);
+        navThrust = _dpadHeld.up;
+        // _dpadHeld.down currently maps to "release thrust" (passive decel
+        // already handled in applyInputToPlayer when navThrust=false).
+    }
+    function _bindDpad() {
+        const map = [
+            ['sf-dpad-up',      'up'],
+            ['sf-dpad-down',    'down'],
+            ['sf-dpad-left',    'left'],
+            ['sf-dpad-right',   'right'],
+            ['sf-dpad-pitchup', 'pitchUp'],
+            ['sf-dpad-pitchdn', 'pitchDn'],
+        ];
+        for (let i = 0; i < map.length; i++) {
+            const id = map[i][0];
+            const key = map[i][1];
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const press = (e) => {
+                if (e && e.preventDefault) e.preventDefault();
+                _dpadHeld[key] = true;
+                el.classList.add('held');
+                _dpadApply();
+                lastInputDevice = 'touch';
+            };
+            const release = (e) => {
+                if (e && e.preventDefault) e.preventDefault();
+                _dpadHeld[key] = false;
+                el.classList.remove('held');
+                _dpadApply();
+            };
+            el.addEventListener('touchstart',  press,   { passive: false });
+            el.addEventListener('touchend',    release, { passive: false });
+            el.addEventListener('touchcancel', release, { passive: false });
+            // Mouse fallback for desktop QA / Chrome devtools mobile emulator
+            el.addEventListener('mousedown',   press);
+            el.addEventListener('mouseup',     release);
+            el.addEventListener('mouseleave',  release);
+        }
     }
 
     function _onDeviceOrientation(ev) {
@@ -1250,10 +1326,20 @@ const SFInput = (function () {
         }
     };
 
+    // Public gyro toggle for hamburger drawer (UI Contract phase 2).
+    // Returns a Promise resolving to the new gyroEnabled state; the drawer
+    // uses this to refresh its aria-pressed + label without reading globals.
+    async function toggleGyro() {
+        await _toggleGyro();
+        _syncGyroButtonVisual();
+        return gyroEnabled;
+    }
+
     return {
         init, update, getLaunchTriggered, checkLaunch, isKeyDown,
         updateLivePanel, togglePanel, enterImmersive, enterXR,
-        getWheelDir, setMobilePhase, isMobile: () => isMobile
+        getWheelDir, setMobilePhase, isMobile: () => isMobile,
+        toggleGyro
     };
 })();
 

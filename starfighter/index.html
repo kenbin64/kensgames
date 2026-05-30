@@ -165,11 +165,14 @@
     }
 
     /* ═══════════════════════════════════════
-       CROSSHAIR — always dead center
+       CROSSHAIR — centered on the rendered canvas, not the viewport.
+       Desktop reserves 64 px at the bottom for #sf-rail, so the canvas
+       center is 32 px above viewport center. Mobile hides the rail and
+       restores the crosshair to true viewport center via media query.
        ═══════════════════════════════════════ */
     #crosshair {
       position: absolute;
-      top: 50%;
+      top: calc(50% - 32px);
       left: 50%;
       transform: translate(-50%, -50%);
       width: 44px;
@@ -467,6 +470,29 @@
       border-color: rgba(0, 160, 255, 0.5);
       color: #0af;
     }
+
+    /* SEC — secondary weapon slot (orange, populated by inventory in phase 5) */
+    .mob-sec {
+      border-color: rgba(255, 170, 60, 0.55);
+      color: #ffb84d;
+    }
+
+    /* ABILITY — single-use item / power slot (violet, populated phase 5) */
+    .mob-ability {
+      border-color: rgba(200, 120, 255, 0.55);
+      color: #d39bff;
+    }
+
+    /* Charge counter pip inside SEC / ABILITY (data-count="0" => dim) */
+    .mob-btn .mob-count {
+      display: block;
+      font-size: 9px;
+      line-height: 1;
+      margin-top: 2px;
+      opacity: 0.8;
+    }
+    .mob-btn[data-count="0"] .mob-count { opacity: 0.35; }
+    .mob-btn[data-count="0"] { opacity: 0.55; }
 
     .mob-rtb {
       border-color: rgba(255, 68, 68, 0.6);
@@ -2968,68 +2994,161 @@
         left: 8px;
       }
 
-      body.sf-mobile-menu-open #gameplay-hud,
-      body.sf-mobile-menu-open #console-buttons,
-      body.sf-mobile-menu-open #sf-controls-hint,
-      body.sf-mobile-menu-open #rescue-btn,
-      body.sf-mobile-menu-open #cm-deploy-btn,
-      body.sf-mobile-menu-open #cm-gauge-container,
-      body.sf-mobile-menu-open #sf-frigate-btn {
-        display: block !important;
-        pointer-events: auto !important;
-        opacity: 1 !important;
-        z-index: 208 !important;
+      /* ════════════════════════════════════════════════════════════════
+         HAMBURGER DRAWER (UI Contract phase 2) — tabbed modal sheet.
+         Replaces the legacy "expand corner widgets" pattern. The drawer
+         is the single home for every non-play control (RTB, gyro toggle,
+         radar, mission, settings). Cockpit footer keeps only play-time
+         reflexes (FIRE / SEC / LOCK / BOOST / ABILITY) per Tiresias.
+         ════════════════════════════════════════════════════════════════ */
+      #sf-ham-drawer {
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        display: none;
+        pointer-events: none;
       }
-
-      body.sf-mobile-menu-open #gameplay-hud {
-        top: 52px;
-        right: 10px;
-        left: auto;
-        max-width: 56vw;
+      body.sf-mobile-menu-open #sf-ham-drawer {
+        display: block;
+        pointer-events: auto;
       }
-
-      body.sf-mobile-menu-open #console-buttons {
-        bottom: 12px !important;
-        left: auto;
-        right: 10px;
-        transform: none;
-        display: flex !important;
+      #sf-ham-drawer .sf-ham-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 4, 12, 0.62);
+        backdrop-filter: blur(2px);
+      }
+      #sf-ham-drawer .sf-ham-sheet {
+        position: absolute;
+        left: 50%;
+        bottom: 0;
+        transform: translate(-50%, 100%);
+        width: min(94vw, 420px);
+        max-height: 78vh;
+        background: linear-gradient(180deg, rgba(0, 14, 28, 0.97), rgba(0, 6, 14, 0.99));
+        border: 1px solid rgba(0, 200, 255, 0.35);
+        border-bottom: none;
+        border-radius: 10px 10px 0 0;
+        box-shadow: 0 -6px 28px rgba(0, 180, 255, 0.18);
+        color: #cfeeff;
+        font-family: 'Courier New', monospace;
+        display: flex;
         flex-direction: column;
-        align-items: flex-end;
-        gap: 8px !important;
+        transition: transform 180ms ease-out;
       }
-
-      body.sf-mobile-menu-open #sf-controls-hint {
-        right: 10px;
-        bottom: 210px;
-        width: min(58vw, 210px);
-        display: block !important;
+      body.sf-mobile-menu-open #sf-ham-drawer .sf-ham-sheet {
+        transform: translate(-50%, 0);
       }
-
-      body.sf-mobile-menu-open #rescue-btn {
-        right: 10px;
-        bottom: 170px;
-        left: auto;
-        transform: none;
+      #sf-ham-drawer .sf-ham-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(0, 200, 255, 0.18);
       }
-
-      body.sf-mobile-menu-open #cm-deploy-btn {
-        right: 10px;
-        bottom: 132px;
-        left: auto;
-        transform: none;
+      #sf-ham-drawer .sf-ham-title {
+        font-size: 12px;
+        letter-spacing: 3px;
+        color: #9fefff;
       }
-
-      body.sf-mobile-menu-open #cm-gauge-container {
-        right: 10px;
-        bottom: 102px;
-        left: auto;
-        transform: none;
+      #sf-ham-drawer .sf-ham-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: transparent;
+        border: 1px solid rgba(0, 200, 255, 0.3);
+        color: #9fefff;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
       }
-
-      body.sf-mobile-menu-open #sf-frigate-btn {
-        top: 54px;
-        right: 10px;
+      #sf-ham-drawer .sf-ham-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 8px 8px 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #sf-ham-drawer .sf-ham-tab {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        background: rgba(0, 30, 50, 0.55);
+        border: 1px solid rgba(0, 200, 255, 0.22);
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        color: #7fc8e6;
+        cursor: pointer;
+      }
+      #sf-ham-drawer .sf-ham-tab[aria-selected="true"],
+      #sf-ham-drawer[data-tab="combat"]   .sf-ham-tab[data-tab="combat"],
+      #sf-ham-drawer[data-tab="controls"] .sf-ham-tab[data-tab="controls"],
+      #sf-ham-drawer[data-tab="info"]     .sf-ham-tab[data-tab="info"],
+      #sf-ham-drawer[data-tab="loadout"]  .sf-ham-tab[data-tab="loadout"],
+      #sf-ham-drawer[data-tab="meta"]     .sf-ham-tab[data-tab="meta"] {
+        background: rgba(0, 60, 90, 0.85);
+        color: #d8f6ff;
+        border-color: rgba(0, 220, 255, 0.55);
+      }
+      #sf-ham-drawer .sf-ham-tab[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #sf-ham-drawer .sf-ham-body {
+        padding: 12px 14px 18px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-top: 1px solid rgba(0, 220, 255, 0.35);
+      }
+      #sf-ham-drawer .sf-ham-pane[hidden] { display: none; }
+      #sf-ham-drawer .sf-ham-action {
+        display: block;
+        width: 100%;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        background: linear-gradient(180deg, rgba(0, 30, 50, 0.78), rgba(0, 14, 28, 0.92));
+        border: 1px solid rgba(0, 200, 255, 0.32);
+        border-radius: 6px;
+        color: #cfeeff;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 1.5px;
+        text-align: left;
+        cursor: pointer;
+      }
+      #sf-ham-drawer .sf-ham-action:active {
+        background: rgba(0, 80, 120, 0.85);
+        border-color: rgba(0, 255, 255, 0.6);
+      }
+      #sf-ham-drawer .sf-ham-toggle[aria-pressed="true"] {
+        border-color: rgba(120, 255, 180, 0.6);
+        color: #b9ffd6;
+      }
+      #sf-ham-drawer .sf-ham-state { color: #ffcb5c; font-weight: bold; }
+      #sf-ham-drawer .sf-ham-toggle[aria-pressed="true"] .sf-ham-state { color: #b9ffd6; }
+      #sf-ham-drawer .sf-ham-note {
+        font-size: 10px;
+        color: #7a9cb0;
+        line-height: 1.5;
+        padding: 4px 2px;
+      }
+      /* Phase 5: LOADOUT pane slot rows */
+      #sf-ham-drawer .sf-loadout-slot { margin-bottom: 10px; }
+      #sf-ham-drawer .sf-loadout-label {
+        font-size: 11px; color: #88aacc; letter-spacing: 1.5px;
+        margin-bottom: 3px; text-transform: uppercase;
+      }
+      #sf-ham-drawer .sf-loadout-select {
+        width: 100%; padding: 8px;
+        background: rgba(0, 30, 60, 0.85); color: #0ff;
+        border: 1px solid rgba(0, 255, 255, 0.3); border-radius: 4px;
+        font-family: inherit; font-size: 13px;
+      }
+      #sf-ham-drawer .sf-loadout-select:disabled { color: #556; }
+      #sf-ham-drawer .sf-loadout-passives {
+        font-size: 11px; color: #9effc9; line-height: 1.6;
+        padding: 4px 2px;
       }
     }
   </style>
@@ -3085,6 +3204,18 @@
     <div class="hud-row hud-row-secondary">
       <span class="hud-label">WPN</span>
       <span id="ghud-weapon" class="hud-val" style="color:#00ff88">LASER</span>
+    </div>
+    <!-- Inventory slot counters (UI Contract phase 3). Populated by the
+         reward economy (phase 5); dimmed while empty via [data-count="0"]. -->
+    <div class="hud-row hud-row-secondary hud-slot" data-count="0">
+      <span class="hud-label">SEC</span>
+      <span id="ghud-sec" class="hud-val" style="color:#ffb84d">—</span>
+      <span id="ghud-sec-count" class="hud-val hud-slot-count">×0</span>
+    </div>
+    <div class="hud-row hud-row-secondary hud-slot" data-count="0">
+      <span class="hud-label">ABIL</span>
+      <span id="ghud-ability" class="hud-val" style="color:#d39bff">—</span>
+      <span id="ghud-ability-count" class="hud-val hud-slot-count">×0</span>
     </div>
     <div class="hud-row hud-score-row">
       <span class="hud-label">KILLS</span>
@@ -3196,12 +3327,17 @@
     <div id="mob-nav-sphere" style="display:none">
       <div id="mob-nav-knob"></div>
     </div>
+    <!-- Cockpit action grid · play-only controls (UI Contract phase 1):
+         FIRE · SEC · LOCK · BOOST · ABILITY. TILT moved to hamburger
+         (phase 2). AB merged into BOOST (tap=burst, hold=afterburner).
+         SEC and ABILITY slots show current item + charge count via
+         data-count; bindings are no-ops until inventory lands (phase 5). -->
     <div id="mob-btn-group" style="display:none">
       <button id="mob-fire" class="mob-btn">FIRE</button>
-      <button id="mob-tilt" class="mob-btn">TILT</button>
-      <button id="mob-lock" class="mob-btn">LOCK</button>
-      <button id="mob-afterburner" class="mob-btn">AB</button>
-      <button id="mob-boost" class="mob-btn">BOOST</button>
+      <button id="mob-sec" class="mob-btn mob-sec" data-count="0">SEC<span class="mob-count">0</span></button>
+      <button id="mob-lock" class="mob-btn mob-lock">LOCK</button>
+      <button id="mob-boost" class="mob-btn mob-boost">BOOST</button>
+      <button id="mob-ability" class="mob-btn mob-ability" data-count="0">ABIL<span class="mob-count">0</span></button>
       <button id="mob-rtb" class="mob-btn" style="display:none">RTB</button>
       <button id="mob-call-tanker" class="mob-btn" style="display:none"
         onclick="if(window.Starfighter&&Starfighter.callTanker)Starfighter.callTanker()">⛽</button>
@@ -3429,6 +3565,82 @@
   <!-- ═══ MOBILE HUD HAMBURGER + EVENT TEXT ═══ -->
   <button id="ctrl-hamburger" type="button" aria-label="Toggle HUD menu" title="Toggle HUD menu">☰</button>
   <div id="sf-mobile-delta" aria-live="polite"></div>
+
+  <!-- ═══ HAMBURGER DRAWER (UI Contract phase 2) ═══════════════════════
+       Modal sheet summoned by #ctrl-hamburger. Visibility is gated by
+       body.sf-mobile-menu-open (the existing class wired in script at
+       ~line 4093). Tab buttons swap [data-tab] on the drawer; tab panes
+       use [hidden] for native fallback. Bindings:
+         · COMBAT.RTB        → Starfighter.emergencyRTB()
+         · COMBAT.FRIGATE    → Starfighter.emergencyRTB() (alias for now)
+         · COMBAT.PAUSE      → Starfighter.togglePause() (no-op if absent)
+         · CONTROLS.TILT     → ham_toggleGyro() (relocated from #mob-tilt)
+         · INFO.MAP          → toggles #radar-overlay visibility
+         · LOADOUT / META    → placeholders, populated in phases 5/8
+       LOADOUT pane is only enabled while gameState === 'IN_BAY' (phase 4). -->
+  <div id="sf-ham-drawer" data-tab="combat" aria-hidden="true">
+    <div class="sf-ham-backdrop"></div>
+    <div class="sf-ham-sheet" role="dialog" aria-label="Game menu">
+      <div class="sf-ham-header">
+        <div class="sf-ham-title">MENU</div>
+        <button type="button" class="sf-ham-close" aria-label="Close menu">×</button>
+      </div>
+      <nav class="sf-ham-tabs" role="tablist">
+        <button type="button" class="sf-ham-tab" data-tab="combat"   role="tab">COMBAT</button>
+        <button type="button" class="sf-ham-tab" data-tab="controls" role="tab">CONTROLS</button>
+        <button type="button" class="sf-ham-tab" data-tab="info"     role="tab">INFO</button>
+        <button type="button" class="sf-ham-tab" data-tab="loadout"  role="tab" disabled title="Bay only">LOADOUT</button>
+        <button type="button" class="sf-ham-tab" data-tab="meta"     role="tab">META</button>
+      </nav>
+      <div class="sf-ham-body">
+        <!-- COMBAT -->
+        <section class="sf-ham-pane" data-pane="combat">
+          <button type="button" class="sf-ham-action" data-action="rtb">RETURN TO BASE</button>
+          <button type="button" class="sf-ham-action" data-action="frigate">CALL FRIGATE</button>
+          <button type="button" class="sf-ham-action" data-action="pause">PAUSE</button>
+        </section>
+        <!-- CONTROLS -->
+        <section class="sf-ham-pane" data-pane="controls" hidden>
+          <button type="button" class="sf-ham-action sf-ham-toggle" data-action="gyro" aria-pressed="false">
+            TILT (GYRO): <span class="sf-ham-state">OFF</span>
+          </button>
+          <div class="sf-ham-note">Tilt your phone to steer. Requires motion permission on iOS.</div>
+        </section>
+        <!-- INFO -->
+        <section class="sf-ham-pane" data-pane="info" hidden>
+          <button type="button" class="sf-ham-action" data-action="map">SHOW RADAR MAP</button>
+          <button type="button" class="sf-ham-action" data-action="mission">MISSION BRIEFING</button>
+        </section>
+        <!-- LOADOUT (bay only) — populated by _renderLoadoutPane() -->
+        <section class="sf-ham-pane" data-pane="loadout" hidden>
+          <div class="sf-ham-note" id="sf-loadout-bay-only">Loadout is available in the launch bay between sorties.</div>
+          <div id="sf-loadout-body" style="display:none;">
+            <div class="sf-loadout-slot">
+              <div class="sf-loadout-label">Primary</div>
+              <select id="sf-loadout-primary" class="sf-loadout-select"></select>
+            </div>
+            <div class="sf-loadout-slot">
+              <div class="sf-loadout-label">Secondary</div>
+              <select id="sf-loadout-secondary" class="sf-loadout-select"></select>
+            </div>
+            <div class="sf-loadout-slot">
+              <div class="sf-loadout-label">Ability</div>
+              <select id="sf-loadout-ability" class="sf-loadout-select"></select>
+            </div>
+            <div class="sf-loadout-slot">
+              <div class="sf-loadout-label">Passives (auto)</div>
+              <div id="sf-loadout-passives" class="sf-loadout-passives"></div>
+            </div>
+          </div>
+        </section>
+        <!-- META -->
+        <section class="sf-ham-pane" data-pane="meta" hidden>
+          <button type="button" class="sf-ham-action" data-action="restart">RESTART MISSION</button>
+          <button type="button" class="sf-ham-action" data-action="quit">QUIT TO MENU</button>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ CONTROLLER WIREFRAME OVERLAY — legacy, hidden by CSS ═══ -->
   <div id="ctrl-overlay">
@@ -4069,12 +4281,203 @@
         });
       }
 
+      // Outside-tap closes drawer. #gameplay-hud (header) stays interactive
+      // for future hud toggles; #sf-ham-drawer is the drawer itself.
       document.addEventListener('click', (e) => {
         const open = body.classList.contains('sf-mobile-menu-open');
         if (!open) return;
-        if (e.target.closest('#ctrl-hamburger, #gameplay-hud, #console-buttons, #sf-controls-hint, #rescue-btn, #cm-deploy-btn, #cm-gauge-container, #sf-frigate-btn')) return;
+        if (e.target.closest('#ctrl-hamburger, #gameplay-hud, #sf-ham-drawer .sf-ham-sheet')) return;
         setMenuOpen(false);
       }, true);
+
+      // ── Hamburger drawer (UI Contract phase 2) ──────────────────────
+      // Tab switching via [data-tab] on the drawer root; action dispatch
+      // via [data-action] on buttons. All calls into Starfighter.* are
+      // optional-chained so missing methods no-op until phase 4/5 lands.
+      const drawer = document.getElementById('sf-ham-drawer');
+      if (drawer) {
+        const closeBtn = drawer.querySelector('.sf-ham-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => setMenuOpen(false));
+
+        drawer.querySelectorAll('.sf-ham-tab').forEach((tab) => {
+          tab.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (tab.disabled) return;
+            const name = tab.getAttribute('data-tab');
+            if (!name) return;
+            drawer.setAttribute('data-tab', name);
+            drawer.querySelectorAll('.sf-ham-tab').forEach((t) => {
+              t.setAttribute('aria-selected', t.getAttribute('data-tab') === name ? 'true' : 'false');
+            });
+            drawer.querySelectorAll('.sf-ham-pane').forEach((p) => {
+              if (p.getAttribute('data-pane') === name) p.removeAttribute('hidden');
+              else p.setAttribute('hidden', '');
+            });
+          });
+        });
+
+        // Mirror current gyro state into the CONTROLS toggle so the label
+        // reflects reality even if the user toggled gyro elsewhere.
+        const gyroBtn = drawer.querySelector('[data-action="gyro"]');
+        const syncGyroLabel = () => {
+          if (!gyroBtn) return;
+          const on = document.body.classList.contains('sf-gyro-on');
+          gyroBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          const stateEl = gyroBtn.querySelector('.sf-ham-state');
+          if (stateEl) stateEl.textContent = on ? 'ON' : 'OFF';
+        };
+        syncGyroLabel();
+        const gyroObs = new MutationObserver(syncGyroLabel);
+        gyroObs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+        drawer.addEventListener('click', (e) => {
+          const btn = e.target.closest('.sf-ham-action');
+          if (!btn) return;
+          e.stopPropagation();
+          const action = btn.getAttribute('data-action');
+          const SF = window.Starfighter || {};
+          switch (action) {
+            case 'rtb':
+            case 'frigate':
+              if (SF.emergencyRTB) SF.emergencyRTB();
+              setMenuOpen(false);
+              break;
+            case 'pause':
+              if (SF.togglePause) SF.togglePause();
+              setMenuOpen(false);
+              break;
+            case 'gyro':
+              if (window.SFInput && window.SFInput.toggleGyro) {
+                Promise.resolve(window.SFInput.toggleGyro()).then(syncGyroLabel);
+              }
+              break;
+            case 'map':
+              {
+                const radar = document.getElementById('radar-overlay');
+                if (radar) {
+                  const showing = radar.style.display !== 'none' && radar.style.display !== '';
+                  radar.style.display = showing ? 'none' : 'block';
+                }
+              }
+              setMenuOpen(false);
+              break;
+            case 'mission':
+              if (SF.showMissionBriefing) SF.showMissionBriefing();
+              setMenuOpen(false);
+              break;
+            case 'restart':
+              if (SF.restartMission) SF.restartMission();
+              setMenuOpen(false);
+              break;
+            case 'quit':
+              if (SF.quitToMenu) SF.quitToMenu();
+              else window.location.href = '/';
+              break;
+          }
+        });
+      }
+
+      // ── Phase 5: LOADOUT pane renderer + phase-driven enable/disable ──
+      // Populates Primary / Secondary / Ability / Passives from SFProgression.
+      // Re-renders on every phase change (subscribes via Starfighter.onPhaseChange,
+      // added in Phase 4). LOADOUT tab is enabled only while in the bay.
+      // Indices match Player.WEAPONS / firePrimary switch (0=laser, 1=gun, 2=torp, 3=emp).
+      // IDs match SFProgression.UNLOCKS so equip('primary', id) validates.
+      const _wepIds = ['laser', 'machinegun', 'torpedo', 'pulse'];
+      const _wepLabels = ['LASER CANNON', 'SPREAD SHOT', 'PROTON TORPEDO', 'EMP PULSE'];
+      function _renderLoadoutPane() {
+        const SF = window.Starfighter;
+        const SP = window.SFProgression;
+        if (!SP || !SP.getLoadout) return;
+        const phase = (SF && SF.getLogicalPhase) ? SF.getLogicalPhase() : '';
+        const inBay = phase === 'IN_BAY' || phase === 'TUTORIAL' || phase === 'DEBRIEF';
+        const loadoutTab = document.querySelector('#sf-ham-drawer .sf-ham-tab[data-tab="loadout"]');
+        if (loadoutTab) {
+          if (inBay) { loadoutTab.removeAttribute('disabled'); loadoutTab.removeAttribute('title'); }
+          else { loadoutTab.setAttribute('disabled', ''); loadoutTab.setAttribute('title', 'Bay only'); }
+        }
+        const bayOnly = document.getElementById('sf-loadout-bay-only');
+        const bodyEl = document.getElementById('sf-loadout-body');
+        if (!bodyEl) return;
+        if (!inBay) {
+          if (bayOnly) bayOnly.style.display = 'block';
+          bodyEl.style.display = 'none';
+          return;
+        }
+        if (bayOnly) bayOnly.style.display = 'none';
+        bodyEl.style.display = 'block';
+
+        const loadout = SP.getLoadout();
+        const wave = (SF.getState && SF.getState().wave) || 1;
+        const unlockedCount = wave >= 4 ? 4 : (wave >= 3 ? 3 : (wave >= 2 ? 2 : 1));
+
+        // Primary — wave-gated weapons
+        const primarySel = document.getElementById('sf-loadout-primary');
+        if (primarySel) {
+          primarySel.innerHTML = '';
+          for (let i = 0; i < 4; i++) {
+            const opt = document.createElement('option');
+            opt.value = _wepIds[i];
+            opt.textContent = _wepLabels[i] + (i >= unlockedCount ? '  (locked — Wave ' + (i + 1) + ')' : '');
+            if (i >= unlockedCount) opt.disabled = true;
+            if (_wepIds[i] === loadout.primary) opt.selected = true;
+            primarySel.appendChild(opt);
+          }
+          primarySel.onchange = () => SP.equip('primary', primarySel.value);
+        }
+
+        // Secondary — empty until Phase 6 pickups
+        const secondarySel = document.getElementById('sf-loadout-secondary');
+        if (secondarySel) {
+          secondarySel.innerHTML = '<option value="">— none yet — earn via pickups (Phase 6)</option>';
+          secondarySel.disabled = true;
+        }
+
+        // Ability — populated from ownedAbilities
+        const owned = SP.getOwnedAbilities ? SP.getOwnedAbilities() : [];
+        const abilitySel = document.getElementById('sf-loadout-ability');
+        if (abilitySel) {
+          abilitySel.innerHTML = '';
+          const noneOpt = document.createElement('option');
+          noneOpt.value = '';
+          noneOpt.textContent = owned.length ? '— none equipped —' : '— complete waves to earn abilities —';
+          abilitySel.appendChild(noneOpt);
+          for (const id of owned) {
+            const a = SP.getAbilityById(id);
+            if (!a) continue;
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = a.name + ' — ' + a.desc;
+            if (loadout.ability === id) opt.selected = true;
+            abilitySel.appendChild(opt);
+          }
+          abilitySel.disabled = owned.length === 0;
+          abilitySel.onchange = () => SP.equip('ability', abilitySel.value || null);
+        }
+
+        // Passives — read-only purchased upgrades
+        const passivesEl = document.getElementById('sf-loadout-passives');
+        if (passivesEl) {
+          const c = SP.career();
+          const purchased = c.purchasedUpgrades || [];
+          if (purchased.length === 0) {
+            passivesEl.innerHTML = '<span style="color:#556;">No passives purchased. Buy upgrades on debrief.</span>';
+          } else {
+            passivesEl.innerHTML = purchased.map(uid => {
+              const u = SP.UNLOCKS.find(x => x.id === uid);
+              return u ? '✓ ' + u.name : '';
+            }).filter(Boolean).join('<br>');
+          }
+        }
+      }
+      function _attachLoadoutPaneHook() {
+        if (!window.Starfighter || !window.Starfighter.onPhaseChange) {
+          setTimeout(_attachLoadoutPaneHook, 250); return;
+        }
+        Starfighter.onPhaseChange(() => _renderLoadoutPane());
+        _renderLoadoutPane();
+      }
+      _attachLoadoutPaneHook();
 
       const tickerInner = document.getElementById('comm-ticker-inner');
       if (tickerInner && window.MutationObserver) {
@@ -4359,8 +4762,6 @@
     #sf-frigate-btn,
     #console-buttons,
     #console-buttons *,
-    #mob-btn-group,
-    #mob-btn-group *,
     #training-skip-btn,
     #cm-gauge-container {
       display: none !important;
@@ -4369,11 +4770,37 @@
       opacity: 0 !important;
     }
 
-    /* Radar retired — gets in the way of the battle scene. Enemies are
-       now visible directly via the brightened scene lighting + on-HUD
-       target lock cues. */
-    #radar-overlay {
-      display: none !important;
+    /* Desktop keeps the right-side diamond pad + throttle, so the legacy
+       mobile button cluster stays hidden here. On phones we re-enable it
+       as the bottom-right action stack (see SF-MOBILE-OVERHAUL block). */
+    @media (min-width: 981px) and (hover: hover) and (pointer: fine) {
+      #mob-btn-group, #mob-btn-group * {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+      }
+    }
+
+    /* Radar hidden on phones only (it covered the play field). Desktop
+       keeps it because mouse-look gives plenty of screen real estate. */
+    @media (hover: none) and (pointer: coarse), (max-width: 600px) {
+      #radar-overlay {
+        display: none !important;
+      }
+
+      /* Suppress the pointer-lock resume prompt on touch devices.
+         #fs-resume sits at top/left 50 % with z-index 9990 and the
+         #fs-resume-overlay dim layer at z-index 9989 — together they
+         cover the entire play field. enterImmersive() schedules a
+         400 ms timeout that re-shows the prompt whenever
+         pointerLockElement !== document.body, which is permanently
+         true on mobile (requestPointerLock is desktop-only). Input on
+         phones is taps + gyro, so the prompt has no purpose here. */
+      #fs-resume,
+      #fs-resume-overlay {
+        display: none !important;
+      }
     }
   </style>
 
@@ -4390,6 +4817,29 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════
+       SF-DPAD — cockpit-seated 4-arrow flight control (phone only).
+       Default flight control on phones with no gyro, or when gyro is toggled
+       off. On gyro-capable devices the left/right arrows visually dim because
+       tilt already handles yaw, but they remain active for fine-tune.
+         ▲ THR  — hold to accelerate
+         ▼ BRK  — release thrust (passive decel)
+         ◀ / ▶  — yaw left / right
+       Pitch is exclusively gyro on phones (arrow buttons stay flat).
+       Sits inside the bottom-left cockpit panel so it never overlaps the
+       windshield (the central battle view).
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="sf-dpad" aria-label="Flight controls">
+    <div class="sf-dpad-frame">
+      <button type="button" id="sf-dpad-up"      class="sf-dpad-btn sf-dpad-pos-up"      title="Thrust (hold)">▲<span class="sf-dpad-key">THR</span></button>
+      <button type="button" id="sf-dpad-left"    class="sf-dpad-btn sf-dpad-pos-left    sf-dpad-yaw"   title="Yaw Left">◀</button>
+      <button type="button" id="sf-dpad-right"   class="sf-dpad-btn sf-dpad-pos-right   sf-dpad-yaw"   title="Yaw Right">▶</button>
+      <button type="button" id="sf-dpad-down"    class="sf-dpad-btn sf-dpad-pos-down"    title="Brake (hold)">▼<span class="sf-dpad-key">BRK</span></button>
+      <button type="button" id="sf-dpad-pitchup" class="sf-dpad-btn sf-dpad-pos-pitchup sf-dpad-pitch" title="Nose Up (climb)">↗<span class="sf-dpad-key">UP</span></button>
+      <button type="button" id="sf-dpad-pitchdn" class="sf-dpad-btn sf-dpad-pos-pitchdn sf-dpad-pitch" title="Nose Down (dive)">↘<span class="sf-dpad-key">DN</span></button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
        SF-THROTTLE — cockpit throttle lever, bottom-left corner.
        Sits flush against the cockpit edge so it doesn't block the central
        space-battle view. Drives state.player.throttle directly.
@@ -4517,6 +4967,398 @@
         bottom: 50px;
       }
     }
+
+    /* ═════════════════════════════════════════════════════════════════
+       SF-MOBILE-OVERHAUL — phone layout (Rule 1: no controls over play)
+       ─────────────────────────────────────────────────────────────────
+       Phone (coarse pointer OR ≤ 600 px):
+         • flight control          → bottom-LEFT  (#sf-dpad: ▲▼◀▶ in cockpit panel)
+         • action stack            → bottom-RIGHT (#mob-btn-group: FIRE, AB, TILT, LOCK, BOOST)
+         • diamond pad             → hidden       (#sf-diamond-pad)
+         • right-side throttle     → hidden       (#sf-throttle) — thrust lives in ▲ arrow
+         • legacy nav sphere       → hidden       (#mob-nav-sphere) — D-pad replaces it
+         • radar                   → hidden       (handled in earlier block)
+       Steering policy:
+         • Gyro is auto-attempted on first user gesture. When ON, body gets
+           class .sf-gyro-on and the ◀▶ yaw arrows visually dim (still
+           tappable for fine-tune). Tilt provides pitch+yaw.
+         • Gyro OFF → ◀▶ arrows are the only yaw input. Pitch is unavailable
+           without gyro (acceptable for an arcade space shooter).
+       Both clusters use a cockpit-panel backing (dark inset, cyan rule) so
+       they read as integral dashboard instruments, not floating overlay UI.
+       Desktop is unchanged: diamond pad + throttle on the right.
+       ═════════════════════════════════════════════════════════════════ */
+
+    /* Shared cockpit-panel backing for phone control clusters */
+    .sf-cockpit-panel {
+      border: 1px solid rgba(0, 255, 255, 0.35);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(0, 24, 40, 0.82), rgba(0, 8, 18, 0.92));
+      box-shadow: inset 0 0 18px rgba(0, 255, 255, 0.08), 0 0 14px rgba(0, 255, 255, 0.12);
+    }
+
+    /* D-pad: 3×3 grid with arrows on the cross, corners empty.
+       Default desktop = hidden; phone media query promotes it. */
+    #sf-dpad {
+      display: none;
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      width: 168px;
+      height: 168px;
+      z-index: 230;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-family: 'Courier New', monospace;
+    }
+    #sf-dpad .sf-dpad-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .sf-dpad-btn {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0, 255, 255, 0.55);
+      background: radial-gradient(circle at 35% 30%, rgba(0, 60, 90, 0.85), rgba(0, 12, 24, 0.95));
+      color: #cfffff;
+      font-size: 22px;
+      line-height: 1;
+      font-weight: bold;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.18), inset 0 0 14px rgba(0, 255, 255, 0.06);
+      text-shadow: 0 0 6px rgba(0, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 0;
+    }
+    .sf-dpad-btn:active,
+    .sf-dpad-btn.held {
+      transform: scale(0.94);
+      background: radial-gradient(circle at 35% 30%, rgba(0, 200, 255, 0.6), rgba(0, 40, 80, 0.95));
+      box-shadow: 0 0 18px rgba(0, 255, 255, 0.55), inset 0 0 16px rgba(0, 255, 255, 0.25);
+    }
+    .sf-dpad-btn .sf-dpad-key {
+      display: block;
+      font-size: 8px;
+      opacity: 0.6;
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+    /* Cross positions inside the 148-px content area (168 − 2×10 padding):
+       ▲ top-center · ◀ middle-left · ▶ middle-right · ▼ bottom-center.
+       Corner pitch buttons are smaller (42 px) so they don't crowd the
+       cross — ↗ sits in the top-right corner, ↘ in the bottom-right.
+       Right column was chosen because that side points INWARD from the
+       screen edge (D-pad lives bottom-left), making the thumb pivot
+       natural and the buttons easy to reach. */
+    .sf-dpad-pos-up      { left: 49px; top: 0;    }
+    .sf-dpad-pos-left    { left: 0;    top: 49px; }
+    .sf-dpad-pos-right   { left: 98px; top: 49px; }
+    .sf-dpad-pos-down    { left: 49px; top: 98px; }
+    .sf-dpad-pitch       { width: 42px; height: 42px; font-size: 18px; }
+    .sf-dpad-pos-pitchup { left: 106px; top: 3px;   }
+    .sf-dpad-pos-pitchdn { left: 106px; top: 103px; }
+    /* THR (▲) tinted green to match FIRE primacy convention */
+    #sf-dpad-up {
+      border-color: rgba(120, 255, 140, 0.75);
+      color: #9fff9f;
+      background: radial-gradient(circle at 35% 30%, rgba(20, 90, 30, 0.92), rgba(0, 30, 10, 0.95));
+      text-shadow: 0 0 8px rgba(120, 255, 140, 0.8);
+    }
+    /* BRK (▼) tinted amber */
+    #sf-dpad-down {
+      border-color: rgba(255, 180, 80, 0.7);
+      color: #ffcb88;
+      background: radial-gradient(circle at 35% 30%, rgba(90, 50, 10, 0.92), rgba(40, 20, 0, 0.95));
+      text-shadow: 0 0 8px rgba(255, 180, 80, 0.8);
+    }
+    /* When gyro is active, both yaw and pitch arrows recede (still tappable
+       for fine-tune). Tilt covers both axes, so the corner ↗ ↘ pitch
+       buttons follow the same visual rule as the ◀ ▶ yaw buttons. */
+    body.sf-gyro-on #sf-dpad .sf-dpad-yaw,
+    body.sf-gyro-on #sf-dpad .sf-dpad-pitch {
+      opacity: 0.38;
+      box-shadow: none;
+    }
+
+    @media (hover: none) and (pointer: coarse), (max-width: 600px) {
+      #sf-diamond-pad   { display: none !important; }
+      #sf-throttle      { display: none !important; }
+      #mob-nav-sphere   { display: none !important; }   /* D-pad replaces it */
+
+      /* ── Rule-1: kill or shove every overlay that crowds the play field ── */
+
+      /* Desktop control rail: 64-px full-width footer that buries the bottom
+         edges of the D-pad and action grid. Mobile gets a compact HUD via
+         #gameplay-hud (top-right) instead — the rail's hull / shield / speed /
+         weapon / lives readouts are duplicated in #gameplay-hud's SHIELD /
+         HULL / FUEL / ROCS / WPN rows. */
+      #sf-rail          { display: none !important; }
+
+      /* Rail is hidden here, so canvas fills the whole viewport — restore
+         crosshair to true center (cancels the desktop -32 px offset). */
+      #crosshair        { top: 50% !important; }
+
+      /* Re-enable #gameplay-hud on phones (it's suppressed game-wide via
+         base CSS display:none and bundle.js hide calls because desktop
+         relies on the rail). bundle.js uses plain .style.display='none'
+         without !important, so this stylesheet rule wins. pointer-events
+         already 'none' so it never steals taps from the D-pad. */
+      #gameplay-hud     { display: block !important; }
+
+      /* Controls hint card: bottom-right info popup that overlaps the
+         action grid. The D-pad and button labels are self-evident on
+         touch, so the card is redundant noise. */
+      #sf-controls-hint { display: none !important; }
+
+      /* Lock-on alert: floats at top:60 on desktop (inside the play field).
+         Push it to top:6 so it sits in the status-bar margin above the
+         3D viewport. Background already transparented for mobile @2836. */
+      #lock-alert       { top: 6px !important; font-size: 13px !important; padding: 6px 14px !important; }
+
+      /* Promote D-pad — cockpit-panel backing keeps it visually seated */
+      #sf-dpad {
+        display: block;
+        border: 1px solid rgba(0, 255, 255, 0.35);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(0, 24, 40, 0.82), rgba(0, 8, 18, 0.92));
+        box-shadow: inset 0 0 18px rgba(0, 255, 255, 0.08), 0 0 14px rgba(0, 255, 255, 0.12);
+      }
+
+      /* Action stack — cockpit-seated, bottom-right */
+      #mob-btn-group {
+        display: grid !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        position: fixed !important;
+        right: 14px !important;
+        bottom: 14px !important;
+        left: auto !important;
+        top: auto !important;
+        grid-template-columns: repeat(2, 58px) !important;
+        gap: 8px !important;
+        padding: 10px !important;
+        z-index: 230;
+        border: 1px solid rgba(0, 255, 255, 0.35);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(0, 24, 40, 0.82), rgba(0, 8, 18, 0.92));
+        box-shadow: inset 0 0 18px rgba(0, 255, 255, 0.08), 0 0 14px rgba(0, 255, 255, 0.12);
+      }
+      #mob-btn-group .mob-btn {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 58px !important;
+        height: 58px !important;
+        font-size: 9px !important;
+      }
+      /* FIRE: green-tinted primary action */
+      #mob-fire {
+        border-color: rgba(120, 255, 140, 0.75) !important;
+        color: #9fff9f !important;
+        background: radial-gradient(circle at 35% 30%, rgba(20, 90, 30, 0.92), rgba(0, 30, 10, 0.95)) !important;
+        text-shadow: 0 0 8px rgba(120, 255, 140, 0.8) !important;
+      }
+      /* RTB / call-tanker / call-medic stay hidden in combat (inline display:none honored) */
+
+      /* ════════════════════════════════════════════════════════════════
+         HEADER — fixed top strip, stats only, no buttons.
+         Repurposes #gameplay-hud (already populated by bundle.js with
+         SHIELD / HULL / FUEL / ROCS / WPN rows) from a corner column
+         into a full-width flex-row band. pointer-events:auto blocks
+         accidental taps reaching the canvas through the header.
+         ════════════════════════════════════════════════════════════════ */
+      #gameplay-hud {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 38px !important;
+        max-height: 58px !important;
+        padding: 5px 10px 6px !important;
+        background: linear-gradient(180deg, rgba(0, 8, 18, 0.95) 0%, rgba(0, 4, 12, 0.78) 100%) !important;
+        border-bottom: 1px solid rgba(0, 200, 255, 0.3) !important;
+        box-shadow: 0 2px 12px rgba(0, 180, 255, 0.12) !important;
+        z-index: 240 !important;
+        pointer-events: auto !important;
+        font-size: 10px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      #gameplay-hud .hud-row {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 4px !important;
+        margin-bottom: 0 !important;
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+      }
+      #gameplay-hud .hud-bar-track { width: 48px !important; height: 6px !important; }
+      #gameplay-hud .hud-label {
+        font-size: 8px !important;
+        width: auto !important;
+        letter-spacing: 1.2px !important;
+        text-align: left !important;
+      }
+      #gameplay-hud .hud-val {
+        font-size: 10px !important;
+        min-width: 0 !important;
+        padding-left: 1px;
+      }
+      /* The dismiss × and the show-tab button are meaningless when the
+         stat panel IS the fixed header. */
+      #ghud-dismiss, #ghud-show { display: none !important; }
+
+      /* Inventory slot rows (SEC / ABIL) — dimmed while empty so the
+         player's eye isn't drawn to empty slots. Phase 5 reward economy
+         will live-update [data-count] from "0" to N to unmute them. */
+      #gameplay-hud .hud-slot[data-count="0"] {
+        opacity: 0.45 !important;
+      }
+      #gameplay-hud .hud-slot .hud-slot-count {
+        font-size: 9px !important;
+        opacity: 0.75 !important;
+        padding-left: 2px !important;
+      }
+      #gameplay-hud .hud-slot[data-count="0"] .hud-slot-count {
+        opacity: 0.45 !important;
+      }
+
+      /* Comm slot in header right edge (UI Contract phase 3). #sf-mobile-delta
+         already exists as a transient text element wired to the comm-ticker
+         observer (~line 4243). Anchor it to the header's right edge with
+         autohide via display:none default; the observer flips display:block
+         for ~2.4 s on each new comm line, then hides. */
+      #sf-mobile-delta {
+        position: fixed !important;
+        top: 6px !important;
+        right: 10px !important;
+        left: auto !important;
+        transform: none !important;
+        max-width: 48vw !important;
+        text-align: right !important;
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+        background: rgba(0, 12, 24, 0.78) !important;
+        border: 1px solid rgba(0, 220, 255, 0.28) !important;
+        border-radius: 4px !important;
+        z-index: 242 !important;
+        pointer-events: none !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+
+      /* ════════════════════════════════════════════════════════════════
+         FOOTER — fixed bottom band that visually unifies D-pad +
+         action grid + hamburger. Implemented via body::before so no
+         new DOM is needed. pointer-events:auto blocks accidental taps
+         reaching the canvas in the dead space between controls.
+         ════════════════════════════════════════════════════════════════ */
+      body::before {
+        content: '';
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 196px;
+        background: linear-gradient(0deg,
+          rgba(0, 4, 12, 0.92) 0%,
+          rgba(0, 8, 18, 0.7) 60%,
+          rgba(0, 8, 18, 0) 100%);
+        border-top: 1px solid rgba(0, 200, 255, 0.22);
+        box-shadow: 0 -2px 14px rgba(0, 180, 255, 0.1);
+        z-index: 225;
+        pointer-events: auto;
+      }
+      /* Controls sit above the band so their taps register first */
+      #sf-dpad, #mob-btn-group { z-index: 232 !important; }
+
+      /* Hamburger menu: moved out of the top-right corner (which now
+         belongs to the header) into the footer center. */
+      #ctrl-hamburger {
+        display: flex !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 233 !important;
+        width: 44px !important;
+        height: 44px !important;
+        background: linear-gradient(180deg, rgba(0, 24, 40, 0.82), rgba(0, 8, 18, 0.92)) !important;
+        border: 1px solid rgba(0, 255, 255, 0.35) !important;
+        border-radius: 10px !important;
+        box-shadow: 0 0 12px rgba(0, 255, 255, 0.15) !important;
+      }
+    }
+
+    /* Landscape phone: shrink both clusters so they don't crowd vertical space */
+    @media (hover: none) and (pointer: coarse) and (max-height: 480px) {
+      #sf-dpad {
+        width: 140px !important;
+        height: 140px !important;
+        bottom: 8px !important;
+        left: 8px !important;
+      }
+      #sf-dpad .sf-dpad-btn { width: 42px !important; height: 42px !important; font-size: 18px !important; }
+      #sf-dpad .sf-dpad-pitch { width: 34px !important; height: 34px !important; font-size: 14px !important; }
+      .sf-dpad-pos-up      { left: 41px !important; top: 0 !important;  }
+      .sf-dpad-pos-left    { left: 0 !important;    top: 41px !important; }
+      .sf-dpad-pos-right   { left: 82px !important; top: 41px !important; }
+      .sf-dpad-pos-down    { left: 41px !important; top: 82px !important; }
+      .sf-dpad-pos-pitchup { left: 90px !important; top: 2px !important;  }
+      .sf-dpad-pos-pitchdn { left: 90px !important; top: 90px !important; }
+      #mob-btn-group {
+        right: 8px !important;
+        bottom: 8px !important;
+        grid-template-columns: repeat(2, 48px) !important;
+        gap: 6px !important;
+        padding: 8px !important;
+      }
+      #mob-btn-group .mob-btn {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 8px !important;
+      }
+      /* Header + footer band shrink to reclaim vertical real estate */
+      body::before { height: 156px !important; }
+      #gameplay-hud {
+        min-height: 30px !important;
+        max-height: 44px !important;
+        padding: 3px 8px 4px !important;
+        gap: 8px !important;
+      }
+      #gameplay-hud .hud-bar-track { width: 40px !important; height: 5px !important; }
+      #gameplay-hud .hud-label     { font-size: 7px !important; }
+      #gameplay-hud .hud-val       { font-size: 9px !important; }
+      #ctrl-hamburger {
+        bottom: 8px !important;
+        width: 38px !important;
+        height: 38px !important;
+      }
+    }
   </style>
 
   <script>
@@ -4526,8 +5368,12 @@
       // Belt + suspenders: CSS hides them, this rips them out so they
       // can never bleed through other layers or steal pointer events.
       function stripLegacy() {
+        // NOTE: 'mob-btn-group' intentionally NOT in this list — on phones it
+        // hosts the bottom-right FIRE/SEC/LOCK/BOOST/ABIL cluster (see
+        // SF-MOBILE-OVERHAUL CSS block). It stays display:none on desktop
+        // via the (min-width:981px) rule, so it's safe to leave in the DOM.
         var ids = ['rescue-btn', 'cm-deploy-btn', 'sf-frigate-btn',
-          'console-buttons', 'mob-btn-group', 'training-skip-btn',
+          'console-buttons', 'training-skip-btn',
           'cm-gauge-container'];
         ids.forEach(function (id) {
           var el = document.getElementById(id);
