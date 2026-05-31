@@ -314,6 +314,7 @@ function fibonacciScaling(n) {
           <button class="cta-btn alt" onclick="loadExample('decisionTree')">Decision Tree</button>
           <button class="cta-btn alt" onclick="loadExample('carParts')">Car Parts</button>
           <button class="cta-btn alt" onclick="loadExample('parkingLot')">Parking Lot</button>
+          <button class="cta-btn alt" onclick="loadExample('dimensionalPrimer')">Dimensional Primer</button>
         </div>
       </div>
     </section>
@@ -965,6 +966,131 @@ console.log('=== Individual Spaces ===');
 lot.spaces.forEach(space => {
   console.log(\`Space \${space.id}: \${space.area.toFixed(2)} sq m, Occupied: \${space.occupied}\`);
 });`;
+          break;
+          
+        case 'dimensionalPrimer':
+          exampleCode = `// Dimensional Programming: Primer for AI Coders
+// State, geometry, and relationships drive behavior instead of scripts
+
+// 1. observe() — Read the Current Dimension
+// Purpose: Extract the state of the system as a geometric point
+// 0D → 1D transition: from nothing → a point → a line of possible actions
+
+function observe(world) {
+  // Read the environment
+  // Convert inputs into coordinates
+  // Collapse the moment into a point on the manifold
+  
+  const state = {
+    x: world.input.x,
+    y: world.input.y,
+    z: world.input.z,
+    timestamp: world.timestamp,
+    context: world.context
+  };
+  
+  console.log('OBSERVED STATE:', state);
+  return state;
+}
+
+// 2. relate() — Map Interactions on the Manifold
+// Purpose: Turn raw state into relationships using z = x·y
+// 1D → 2D transition: from a line → a plane of relationships
+
+function relate(state, relation = (x, y) => x * y) {
+  // Compute interactions
+  // Find structure
+  // Reveal patterns
+  // Eliminate noise
+  
+  const structure = {
+    xy: relation(state.x, state.y),
+    yz: relation(state.y, state.z),
+    xz: relation(state.x, state.z),
+    xyz: relation(state.x, relation(state.y, state.z))
+  };
+  
+  console.log('RELATED STRUCTURE:', structure);
+  return structure;
+}
+
+// 3. expand() — Reveal the Next Dimension
+// Purpose: Generate the next layer of meaning from the structure
+// 2D → 3D transition: from a plane → a volume of possibilities
+
+function expand(structure) {
+  // Add depth
+  // Build a 3D model of the situation
+  // Show hidden layers and consequences
+  // Turn patterns into systems
+  
+  const volume = {
+    surface: structure.xy + structure.yz + structure.xz,
+    depth: structure.xyz,
+    gradient: {
+      x: structure.yz - structure.xz,
+      y: structure.xz - structure.xy,
+      z: structure.xy - structure.yz
+    },
+    stability: Math.abs(structure.xyz) / (Math.abs(structure.xy) + Math.abs(structure.yz) + Math.abs(structure.xz) + 1)
+  };
+  
+  console.log('EXPANDED VOLUME:', volume);
+  return volume;
+}
+
+// 4. resolve() — Produce the Action
+// Purpose: Choose the correct behavior based on the dimensional state
+// 3D → 4D transition: from a volume → a timeline (the chosen action)
+
+function resolve(volume) {
+  // Evaluate the 3D structure
+  // Select the most stable path
+  // Output the action or code
+  // No scripts, no rules — just geometry
+  
+  const action = {
+    type: volume.stability > 0.5 ? 'STABLE' : 'UNSTABLE',
+    magnitude: volume.depth,
+    direction: volume.gradient,
+    confidence: volume.stability,
+    recommendation: volume.stability > 0.7 ? 'PROCEED' : 'CAUTION'
+  };
+  
+  console.log('RESOLVED ACTION:', action);
+  return action;
+}
+
+// Example: Complete Dimensional Programming Pipeline
+const world = {
+  input: { x: 5, y: 3, z: 2 },
+  timestamp: Date.now(),
+  context: 'production'
+};
+
+console.log('=== Dimensional Programming Pipeline ===');
+console.log('');
+
+console.log('Step 1: observe() - Read the Current Dimension');
+const state = observe(world);
+console.log('');
+
+console.log('Step 2: relate() - Map Interactions on the Manifold');
+const structure = relate(state);
+console.log('');
+
+console.log('Step 3: expand() - Reveal the Next Dimension');
+const volume = expand(structure);
+console.log('');
+
+console.log('Step 4: resolve() - Produce the Action');
+const action = resolve(volume);
+console.log('');
+
+console.log('=== Summary ===');
+console.log('Traditional programming uses if/else, switch statements, stored state');
+console.log('Dimensional programming uses observe → relate → expand → resolve');
+console.log('The AI becomes a dimensional interpreter, not a script follower');`;
           break;
       }
       
