@@ -1,3 +1,82 @@
+/* Animated Gradient Borders */
+@keyframes gradient-border {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+                    linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: gradient-border 8s ease infinite;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.project-card,
+.service-card,
+.pillar-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+                    linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: gradient-border 8s ease infinite;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.project-card:hover,
+.service-card:hover,
+.pillar-card:hover {
+  animation-duration: 4s;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(44, 240, 255, 0.3);
+}
+
+.hero {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+                    linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: gradient-border 8s ease infinite;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.navbar {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+                    linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: gradient-border 8s ease infinite;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
 /* Projects Page Modern Card Styles */
 .projects-grid {
   display: grid;
