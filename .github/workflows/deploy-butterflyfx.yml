@@ -25,13 +25,13 @@ jobs:
       - name: Deploy to VPS
         run: |
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key -p 2222 -o StrictHostKeyChecking=no" \
             kensgames/butterflyfx/ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.BUTTERFLYFX_DEPLOY_PATH }}/
 
       - name: Restart nginx (if needed)
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -i ~/.ssh/deploy_key -p 2222 -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "sudo systemctl reload nginx || echo 'nginx reload skipped'"
 
