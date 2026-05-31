@@ -109,7 +109,56 @@
   color: #2cf0ff;
 }
 
-/* Projects Page Modern Card Styles */
+/* Manifold Certification Checkmark */
+.manifold-certified {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #4dffb0, #2cf0ff);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(77, 255, 176, 0.4);
+  animation: pulse-certified 2s ease-in-out infinite;
+}
+
+.manifold-certified::before {
+  content: '✓';
+  color: #000;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+@keyframes pulse-certified {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(77, 255, 176, 0.4);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 4px 16px rgba(77, 255, 176, 0.6);
+  }
+}
+
+/* Manifold Object Badge */
+.manifold-object {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(77, 255, 176, 0.2);
+  border: 1px solid #4dffb0;
+  border-radius: 4px;
+  font-size: 0.75em;
+  color: #4dffb0;
+  margin-left: 0.5em;
+}
+
+.manifold-object::before {
+  content: 'M·';
+  font-weight: bold;
+}
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
