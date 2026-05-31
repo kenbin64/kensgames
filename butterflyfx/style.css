@@ -1,9 +1,14 @@
 /* Projects Page Modern Card Styles */
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 2em;
   margin: 2.5em 0 2em 0;
+}
+
+.project-card.span-2x2 {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
 .project-card {
@@ -89,9 +94,27 @@
 /* Services Page Modern Card Styles */
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 2em;
   margin: 2.5em 0 2em 0;
+}
+
+.service-card.span-2x2 {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+/* Pillars Grid - Law of 3s */
+.pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2em;
+  margin: 2.5em 0 2em 0;
+}
+
+.pillar-card.span-2x2 {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
 .service-card {
@@ -259,7 +282,8 @@
   color: #0a0a1a;
 }
 
-# Imported in fonts.css body,
+/* Imported in fonts.css */
+body,
 html {
   margin: 0;
   padding: 0;
@@ -468,7 +492,36 @@ footer {
     padding: 4px 8px;
   }
 
+  .projects-grid,
+  .services-grid,
+  .pillars-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .project-card.span-2x2,
+  .service-card.span-2x2,
+  .pillar-card.span-2x2 {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
   .hero-title {
     font-size: 2.1em;
+  }
+}
+
+@media (max-width: 600px) {
+
+  .projects-grid,
+  .services-grid,
+  .pillars-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-card.span-2x2,
+  .service-card.span-2x2,
+  .pillar-card.span-2x2 {
+    grid-column: span 1;
+    grid-row: span 1;
   }
 }
