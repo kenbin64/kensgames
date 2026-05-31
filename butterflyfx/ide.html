@@ -233,6 +233,7 @@
           <div class="editor-toolbar">
             <button id="saveBtn" class="cta-btn">Save</button>
             <button id="loadBtn" class="cta-btn alt">Load</button>
+            <button id="runBtn" class="cta-btn">Run</button>
             <button id="clearBtn" class="cta-btn alt">Clear</button>
             <button id="downloadBtn" class="cta-btn alt">Download</button>
             <button id="uploadBtn" class="cta-btn alt">Upload</button>
@@ -269,6 +270,11 @@ function fibonacciScaling(n) {
             <span id="saveStatus">Not saved</span>
           </div>
         </div>
+        
+        <div class="results-container">
+          <h3>Output</h3>
+          <div id="outputWindow" class="output-window"></div>
+        </div>
       </div>
     </section>
 
@@ -301,6 +307,11 @@ function fibonacciScaling(n) {
           <button class="cta-btn alt" onclick="loadExample('fibonacci')">Fibonacci Scaling</button>
           <button class="cta-btn alt" onclick="loadExample('schwarzDiamond')">Schwarz Diamond</button>
           <button class="cta-btn alt" onclick="loadExample('determinationGraph')">Determination Graph</button>
+          <button class="cta-btn alt" onclick="loadExample('invertibility')">Invertibility</button>
+          <button class="cta-btn alt" onclick="loadExample('saddleGeometry')">Saddle Geometry</button>
+          <button class="cta-btn alt" onclick="loadExample('complexManifold')">Complex Manifold</button>
+          <button class="cta-btn alt" onclick="loadExample('truthTable')">Truth Table</button>
+          <button class="cta-btn alt" onclick="loadExample('decisionTree')">Decision Tree</button>
         </div>
       </div>
     </section>
@@ -324,6 +335,8 @@ function fibonacciScaling(n) {
     const saveStatus = document.getElementById('saveStatus');
     const lintBtn = document.getElementById('lintBtn');
     const lintResults = document.getElementById('lintResults');
+    const runBtn = document.getElementById('runBtn');
+    const outputWindow = document.getElementById('outputWindow');
 
     // Update character and line count
     codeEditor.addEventListener('input', function() {
@@ -394,6 +407,7 @@ function fibonacciScaling(n) {
       }
     });
 
+    // Linter functionality
     // Linter functionality
     lintBtn.addEventListener('click', function() {
       const code = codeEditor.value;
@@ -580,6 +594,204 @@ graph.addEdge(1, 2);
 const resolved = graph.resolve();
 console.log('Resolved nodes:', resolved);`;
           break;
+          
+        case 'invertibility':
+          exampleCode = `// Invertibility: Recover x from z and y
+function testInvertibility() {
+  const x = 5;
+  const y = 3;
+  const z = manifold(x, y);
+  
+  console.log(\`Original x: \${x}\`);
+  console.log(\`Original y: \${y}\`);
+  console.log(\`z = x·y: \${z}\`);
+  
+  // Recover x from z and y
+  const xRecovered = z / y;
+  console.log(\`Recovered x: \${xRecovered}\`);
+  console.log(\`Match: \${x === xRecovered}\`);
+  
+  // Recover y from z and x
+  const yRecovered = z / x;
+  console.log(\`Recovered y: \${yRecovered}\`);
+  console.log(\`Match: \${y === yRecovered}\`);
+}
+
+testInvertibility();`;
+          break;
+          
+        case 'saddleGeometry':
+          exampleCode = `// Saddle Geometry of Manifold
+function saddleGeometry(x, y) {
+  // Manifold as saddle surface (hyperbolic paraboloid)
+  // z = x·y creates a saddle point at origin
+  const z = x * y;
+  
+  // Calculate curvature properties
+  const curvature = {
+    x: -y, // Second derivative w.r.t x
+    y: -x, // Second derivative w.r.t y
+    xy: 1   // Mixed partial derivative
+  };
+  
+  console.log(\`Manifold point: (\${x}, \${y}, \${z})\`);
+  console.log('Curvature properties:', curvature);
+  
+  // Gaussian curvature (negative for saddle)
+  const gaussianCurvature = curvature.x * curvature.y - Math.pow(curvature.xy, 2);
+  console.log(\`Gaussian curvature: \${gaussianCurvature}\`);
+  
+  return { z, curvature, gaussianCurvature };
+}
+
+// Test saddle geometry
+saddleGeometry(2, 3);
+saddleGeometry(-1, 4);
+saddleGeometry(0, 0);`;
+          break;
+          
+        case 'complexManifold':
+          exampleCode = `// Complex-Valued Manifold Operations
+function complexManifold(a, b, c, d) {
+  // z = (a + bi) * (c + di)
+  const real = a * c - b * d;
+  const imag = a * d + b * c;
+  
+  const magnitude = Math.sqrt(real * real + imag * imag);
+  const phase = Math.atan2(imag, real);
+  
+  console.log(\`Input: (\${a} + \${b}i) * (\${c} + \${d}i)\`);
+  console.log(\`Result: \${real} + \${imag}i\`);
+  console.log(\`Magnitude: \${magnitude}\`);
+  console.log(\`Phase: \${phase} radians\`);
+  
+  return { real, imag, magnitude, phase };
+}
+
+// Euler's formula: e^(iθ) = cos(θ) + i·sin(θ)
+function eulerFormula(theta) {
+  const real = Math.cos(theta);
+  const imag = Math.sin(theta);
+  console.log(\`e^(i\${theta}) = \${real} + \${imag}i\`);
+  return { real, imag };
+}
+
+complexManifold(1, 2, 3, 4);
+eulerFormula(Math.PI / 4); // 45 degrees
+eulerFormula(Math.PI / 2); // 90 degrees`;
+          break;
+          
+        case 'truthTable':
+          exampleCode = `// Truth Table Constraints
+class TruthTable {
+  constructor(variables, constraints) {
+    this.variables = variables;
+    this.constraints = constraints;
+  }
+  
+  evaluate(values) {
+    const assignment = {};
+    this.variables.forEach((v, i) => {
+      assignment[v] = values[i];
+    });
+    
+    for (const constraint of this.constraints) {
+      if (!constraint(assignment)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  generateTable() {
+    const results = [];
+    const n = this.variables.length;
+    
+    for (let i = 0; i < Math.pow(2, n); i++) {
+      const values = [];
+      for (let j = 0; j < n; j++) {
+        values.push((i >> j) & 1);
+      }
+      
+      const valid = this.evaluate(values);
+      results.push({ values, valid });
+    }
+    
+    return results;
+  }
+}
+
+// Example: Manifold operation constraints
+const table = new TruthTable(['x', 'y'], [
+  (a) => a.x >= 0, // x must be non-negative
+  (a) => a.y >= 0, // y must be non-negative
+  (a) => a.x * a.y <= 100 // z = x·y must be <= 100
+]);
+
+const results = table.generateTable();
+console.log('Truth Table Results:');
+results.forEach(r => {
+  console.log(\`x=\${r.values[0]}, y=\${r.values[1]}: \${r.valid ? 'VALID' : 'INVALID'}\`);
+});`;
+          break;
+          
+        case 'decisionTree':
+          exampleCode = `// Decision Tree for Manifold Routing
+class DecisionTree {
+  constructor(root) {
+    this.root = root;
+  }
+  
+  evaluate(context) {
+    return this.evaluateNode(this.root, context);
+  }
+  
+  evaluateNode(node, context) {
+    if (node.type === 'leaf') {
+      return node.value;
+    }
+    
+    const condition = node.condition(context);
+    if (condition) {
+      return this.evaluateNode(node.trueBranch, context);
+    } else {
+      return this.evaluateNode(node.falseBranch, context);
+    }
+  }
+}
+
+// Build decision tree for manifold operation routing
+const tree = new DecisionTree({
+  type: 'condition',
+  condition: (ctx) => ctx.x > 10,
+  trueBranch: {
+    type: 'condition',
+    condition: (ctx) => ctx.y > 10,
+    trueBranch: { type: 'leaf', value: 'HIGH_COST_HIGH_QUALITY' },
+    falseBranch: { type: 'leaf', value: 'HIGH_COST_LOW_QUALITY' }
+  },
+  falseBranch: {
+    type: 'condition',
+    condition: (ctx) => ctx.y > 10,
+    trueBranch: { type: 'leaf', value: 'LOW_COST_HIGH_QUALITY' },
+    falseBranch: { type: 'leaf', value: 'LOW_COST_LOW_QUALITY' }
+  }
+});
+
+// Test decision tree
+const contexts = [
+  { x: 15, y: 12 },
+  { x: 15, y: 5 },
+  { x: 8, y: 12 },
+  { x: 3, y: 4 }
+];
+
+console.log('Decision Tree Routing:');
+contexts.forEach(ctx => {
+  const route = tree.evaluate(ctx);
+  console.log(\`x=\${ctx.x}, y=\${ctx.y}: \${route}\`);
+});`;
+          break;
       }
       
       codeEditor.value = exampleCode;
@@ -717,6 +929,40 @@ console.log('Resolved nodes:', resolved);`;
       color: #4dffb0;
       background: rgba(77, 255, 176, 0.1);
       border: 1px solid #4dffb0;
+    }
+
+    .results-container {
+      margin: 2em 0;
+    }
+
+    .results-container h3 {
+      color: #2cf0ff;
+      margin-bottom: 1em;
+    }
+
+    .output-window {
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(44, 240, 255, 0.3);
+      border-radius: 8px;
+      padding: 1em;
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #e0e0e0;
+    }
+
+    .output-line {
+      padding: 0.25em 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .output-error {
+      color: #ff6b6b;
+      padding: 0.5em;
+      background: rgba(255, 107, 107, 0.1);
+      border-radius: 4px;
     }
 
     .examples-container {
