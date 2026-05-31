@@ -57,6 +57,7 @@
     <a href="research.html">Research</a>
     <a href="resume.html">Resume</a>
     <a href="search.html" class="active">Search</a>
+    <a href="ide.html">IDE</a>
     <a href="contact.html">Contact</a>
   </nav>
 
@@ -225,6 +226,60 @@
       }
     ];
 
+    // Related pages mapping for dimensional search
+    const relatedPagesMap = {
+      'manifold': ['dimensional-programming.html', 'schwarz-diamond.html', 'directive.html'],
+      'dimensional': ['dimensional-programming.html', 'method.html', 'agents.html'],
+      'programming': ['dimensional-programming.html', 'projects.html', 'ide.html'],
+      'schwarz': ['schwarz-diamond.html', 'routing.html'],
+      'diamond': ['schwarz-diamond.html', 'routing.html'],
+      'routing': ['routing.html', 'agents.html', 'directive.html'],
+      'agent': ['agents.html', 'method.html', 'directive.html'],
+      'directive': ['directive.html', 'method.html', 'agents.html'],
+      'truth table': ['directive.html', 'method.html'],
+      'decision tree': ['directive.html', 'agents.html', 'method.html'],
+      'determination graph': ['directive.html', 'method.html'],
+      'fibonacci': ['dimensional-programming.html', 'research.html'],
+      'russian doll': ['dimensional-programming.html', 'research.html'],
+      'invertibility': ['dimensional-programming.html', 'research.html'],
+      'research': ['research.html', 'dimensional-programming.html'],
+      'white paper': ['research.html', 'dimensional-programming.html'],
+      'proof': ['research.html', 'dimensional-programming.html'],
+      'kensgames': ['projects.html', 'https://kensgames.com'],
+      'ttlrecall': ['projects.html'],
+      'climate': ['index.html'],
+      'butterfly': ['index.html'],
+      'ai': ['method.html', 'agents.html', 'directive.html', 'routing.html'],
+      'llm': ['method.html', 'agents.html', 'routing.html'],
+      'minimal surface': ['schwarz-diamond.html', 'routing.html'],
+      'tpms': ['schwarz-diamond.html'],
+      'geometry': ['schwarz-diamond.html', 'dimensional-programming.html'],
+      'saddle': ['schwarz-diamond.html', 'dimensional-programming.html'],
+      'complex': ['dimensional-programming.html'],
+      'observe': ['ide.html'],
+      'relate': ['ide.html'],
+      'expand': ['ide.html'],
+      'resolve': ['ide.html'],
+      'car parts': ['ide.html'],
+      'parking': ['ide.html'],
+      'inventory': ['ide.html']
+    };
+
+    // Get related pages for a search term
+    function getRelatedPages(term) {
+      const related = [];
+      Object.keys(relatedPagesMap).forEach(key => {
+        if (term.toLowerCase().includes(key) || key.includes(term.toLowerCase())) {
+          relatedPagesMap[key].forEach(page => {
+            if (!related.includes(page)) {
+              related.push(page);
+            }
+          });
+        }
+      });
+      return related;
+    }
+
     // Manifold-based search function
     function manifoldSearch(query) {
       if (!query || query.trim() === '') {
@@ -285,11 +340,31 @@
 
       let html = '<div class="results-list">';
       results.forEach(result => {
+        // Get related pages based on matched terms
+        const relatedPages = new Set();
+        result.matchedTerms.forEach(term => {
+          const pages = getRelatedPages(term);
+          pages.forEach(page => relatedPages.add(page));
+        });
+        
+        const relatedPagesArray = Array.from(relatedPages);
+        let relatedHtml = '';
+        if (relatedPagesArray.length > 0) {
+          relatedHtml = '<div class="related-pages"><strong>Related:</strong> ';
+          relatedHtml += relatedPagesArray.map(page => {
+            const isExternal = page.startsWith('http');
+            const pageName = page.replace('.html', '').replace('https://', '').replace('http://', '');
+            return `<a href="${page}" ${isExternal ? 'target="_blank" rel="noopener"' : ''} class="related-link">${pageName}</a>`;
+          }).join(' · ');
+          relatedHtml += '</div>';
+        }
+        
         html += `
           <div class="result-item glass">
             <h3><a href="${result.url}">${result.title}</a></h3>
             <p class="result-score">Relevance: ${result.score}</p>
             <p class="result-matched">Matched terms: ${result.matchedTerms.join(', ')}</p>
+            ${relatedHtml}
           </div>
         `;
       });
