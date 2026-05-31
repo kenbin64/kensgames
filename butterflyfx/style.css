@@ -12,33 +12,41 @@
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 30, 0.85);
   backdrop-filter: blur(12px);
   border-radius: 16px;
   border: 2px solid transparent;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+  background-image: linear-gradient(rgba(10, 10, 30, 0.85), rgba(10, 10, 30, 0.85)),
                     linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
   background-origin: border-box;
   background-clip: padding-box, border-box;
   background-size: 100% 100%, 300% 300%;
   animation: gradient-border 8s ease infinite;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .project-card,
 .service-card,
 .pillar-card {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 15, 35, 0.90);
   backdrop-filter: blur(12px);
   border-radius: 16px;
   border: 2px solid transparent;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+  background-image: linear-gradient(rgba(15, 15, 35, 0.90), rgba(15, 15, 35, 0.90)),
                     linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
   background-origin: border-box;
   background-clip: padding-box, border-box;
   background-size: 100% 100%, 300% 300%;
   animation: gradient-border 8s ease infinite;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 1.13em;
+  font-weight: 500;
+  position: relative;
+  outline: none;
+  text-align: center;
+  transition: box-shadow 0.2s, background 0.2s, color 0.2s, transform 0.2s;
+  padding: 2em 1.2em 1.2em 1.2em;
 }
 
 .project-card:hover,
@@ -46,35 +54,36 @@
 .pillar-card:hover {
   animation-duration: 4s;
   transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(44, 240, 255, 0.3);
+  box-shadow: 0 8px 30px rgba(44, 240, 255, 0.4);
+  background: rgba(20, 20, 40, 0.95);
 }
 
 .hero {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 30, 0.85);
   backdrop-filter: blur(12px);
   border-radius: 16px;
   border: 2px solid transparent;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+  background-image: linear-gradient(rgba(10, 10, 30, 0.85), rgba(10, 10, 30, 0.85)),
                     linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
   background-origin: border-box;
   background-clip: padding-box, border-box;
   background-size: 100% 100%, 300% 300%;
   animation: gradient-border 8s ease infinite;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .navbar {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 30, 0.90);
   backdrop-filter: blur(12px);
   border-radius: 16px;
   border: 2px solid transparent;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+  background-image: linear-gradient(rgba(10, 10, 30, 0.90), rgba(10, 10, 30, 0.90)),
                     linear-gradient(90deg, #2cf0ff, #4dffb0, #ffd166, #c79aff, #2cf0ff);
   background-origin: border-box;
   background-clip: padding-box, border-box;
   background-size: 100% 100%, 300% 300%;
   animation: gradient-border 8s ease infinite;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* Projects Page Modern Card Styles */
@@ -121,17 +130,33 @@
   background: #fff;
 }
 
+.project-card h3,
+.service-card h3,
+.pillar-card h3 {
+  color: #2cf0ff;
+  margin: 0 0 0.5em 0;
+  font-size: 1.2em;
+}
+
+.project-card p,
+.service-card p,
+.pillar-card p {
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
 .project-summary {
-  color: #444;
+  color: #ffd166;
   font-size: 1em;
-  margin-bottom: 0.2em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
 }
 
 .project-tech {
   margin: 1em 0 1em 0;
   padding: 0;
   list-style: none;
-  color: #222;
+  color: #c0c0c0;
   font-size: 0.98em;
 }
 
