@@ -312,6 +312,8 @@ function fibonacciScaling(n) {
           <button class="cta-btn alt" onclick="loadExample('complexManifold')">Complex Manifold</button>
           <button class="cta-btn alt" onclick="loadExample('truthTable')">Truth Table</button>
           <button class="cta-btn alt" onclick="loadExample('decisionTree')">Decision Tree</button>
+          <button class="cta-btn alt" onclick="loadExample('carParts')">Car Parts</button>
+          <button class="cta-btn alt" onclick="loadExample('parkingLot')">Parking Lot</button>
         </div>
       </div>
     </section>
@@ -790,6 +792,178 @@ console.log('Decision Tree Routing:');
 contexts.forEach(ctx => {
   const route = tree.evaluate(ctx);
   console.log(\`x=\${ctx.x}, y=\${ctx.y}: \${route}\`);
+});`;
+          break;
+          
+        case 'carParts':
+          exampleCode = `// Real-World: Car Parts Inventory System
+// Using manifold z = x·y for inventory tracking
+
+class CarPart {
+  constructor(id, name, basePrice, quantity) {
+    this.id = id;
+    this.name = name;
+    this.basePrice = basePrice; // x: identity (base price)
+    this.quantity = quantity;   // y: modifier (quantity)
+  }
+  
+  // Manifold: total value = basePrice * quantity
+  get totalValue() {
+    return manifold(this.basePrice, this.quantity);
+  }
+  
+  // Invertibility: recover quantity from total value
+  get recoveredQuantity() {
+    return this.totalValue / this.basePrice;
+  }
+}
+
+// Car parts inventory
+const parts = [
+  new CarPart('BRK-001', 'Brake Pads', 45.99, 24),
+  new CarPart('ENG-015', 'Oil Filter', 12.50, 50),
+  new CarPart('TIR-100', 'Tire Set', 320.00, 8),
+  new CarPart('BAT-050', 'Battery', 89.99, 15),
+  new CarPart('LGT-025', 'Headlight', 35.00, 30)
+];
+
+console.log('=== Car Parts Inventory ===');
+parts.forEach(part => {
+  console.log(\`\${part.name}:\`);
+  console.log(\`  Base Price: $\${part.basePrice.toFixed(2)}\`);
+  console.log(\`  Quantity: \${part.quantity}\`);
+  console.log(\`  Total Value: $\${part.totalValue.toFixed(2)}\`);
+  console.log(\`  Verified: \${part.recoveredQuantity === part.quantity}\`);
+  console.log('');
+});
+
+// Russian Doll: Order history containment
+class OrderHistory {
+  constructor(initialValue) {
+    this.history = [initialValue];
+    this.current = initialValue;
+  }
+  
+  addTransaction(modifier) {
+    this.current = manifold(this.current, modifier);
+    this.history.push(this.current);
+  }
+  
+  // Every state contains the whole history
+  getFullHistory() {
+    return this.history;
+  }
+}
+
+// Track order modifications
+const order = new OrderHistory(1000.00); // Initial order
+order.addTransaction(1.08); // Add 8% tax
+order.addTransaction(0.95); // 5% discount
+order.addTransaction(1.02); // 2% shipping
+
+console.log('=== Order History (Russian Doll) ===');
+console.log('Full history:', order.getFullHistory());
+console.log('Final amount:', order.current.toFixed(2));`;
+          break;
+          
+        case 'parkingLot':
+          exampleCode = `// Real-World: Parking Lot Optimization
+// Using manifold z = x·y for space allocation
+
+class ParkingSpace {
+  constructor(id, width, length, occupied = false) {
+    this.id = id;
+    this.width = width;      // x: identity (width)
+    this.length = length;    // y: modifier (length)
+    this.occupied = occupied;
+  }
+  
+  // Manifold: area = width * length
+  get area() {
+    return manifold(this.width, this.length);
+  }
+  
+  // Efficiency: how well space is used
+  get efficiency() {
+    return this.occupied ? 1.0 : 0.0;
+  }
+  
+  // Effective area: area * efficiency
+  get effectiveArea() {
+    return manifold(this.area, this.efficiency);
+  }
+}
+
+class ParkingLot {
+  constructor(name) {
+    this.name = name;
+    this.spaces = [];
+  }
+  
+  addSpace(space) {
+    this.spaces.push(space);
+  }
+  
+  get totalArea() {
+    return this.spaces.reduce((sum, space) => sum + space.area, 0);
+  }
+  
+  get occupiedArea() {
+    return this.spaces.reduce((sum, space) => sum + space.effectiveArea, 0);
+  }
+  
+  get utilization() {
+    return this.occupiedArea / this.totalArea;
+  }
+  
+  // Schwarz Diamond: minimal surface for cost optimization
+  getOptimalLayout() {
+    const totalArea = this.totalArea;
+    const targetUtilization = 0.85; // 85% utilization target
+    const optimalArea = manifold(totalArea, targetUtilization);
+    
+    return {
+      totalArea,
+      targetUtilization,
+      optimalArea,
+      currentUtilization: this.utilization,
+      efficiency: this.utilization / targetUtilization
+    };
+  }
+}
+
+// Create parking lot
+const lot = new ParkingLot('Downtown Garage');
+
+// Add parking spaces (various sizes)
+lot.addSpace(new ParkingSpace('A1', 3.0, 5.5, true));
+lot.addSpace(new ParkingSpace('A2', 3.0, 5.5, false));
+lot.addSpace(new ParkingSpace('A3', 3.0, 5.5, true));
+lot.addSpace(new ParkingSpace('B1', 3.5, 6.0, true));
+lot.addSpace(new ParkingSpace('B2', 3.5, 6.0, true));
+lot.addSpace(new ParkingSpace('B3', 3.5, 6.0, false));
+lot.addSpace(new ParkingSpace('C1', 4.0, 7.0, true));
+lot.addSpace(new ParkingSpace('C2', 4.0, 7.0, false));
+
+console.log('=== Parking Lot Analysis ===');
+console.log(\`\${lot.name}\`);
+console.log(\`Total Spaces: \${lot.spaces.length}\`);
+console.log(\`Total Area: \${lot.totalArea.toFixed(2)} sq m\`);
+console.log(\`Occupied Area: \${lot.occupiedArea.toFixed(2)} sq m\`);
+console.log(\`Utilization: \${(lot.utilization * 100).toFixed(1)}%\`);
+
+console.log('');
+console.log('=== Optimal Layout (Schwarz Diamond) ===');
+const optimal = lot.getOptimalLayout();
+console.log(\`Target Utilization: \${(optimal.targetUtilization * 100)}%\`);
+console.log(\`Optimal Area: \${optimal.optimalArea.toFixed(2)} sq m\`);
+console.log(\`Current Utilization: \${(optimal.currentUtilization * 100).toFixed(1)}%\`);
+console.log(\`Efficiency Score: \${optimal.efficiency.toFixed(2)}\`);
+
+console.log('');
+console.log('=== Individual Spaces ===');
+lot.spaces.forEach(space => {
+  console.log(\`Space \${space.id}: \${space.area.toFixed(2)} sq m, Occupied: \${space.occupied}\`);
 });`;
           break;
       }
