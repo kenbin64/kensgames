@@ -410,6 +410,71 @@ function fibonacciScaling(n) {
       }
     });
 
+    // Run code functionality
+    runBtn.addEventListener('click', function() {
+      const code = codeEditor.value;
+      outputWindow.innerHTML = '';
+      
+      try {
+        // Capture console.log output
+        const logs = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = (...args) => {
+          const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          logs.push({ type: 'log', message });
+          originalLog.apply(console, args);
+        };
+        
+        console.error = (...args) => {
+          const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          logs.push({ type: 'error', message });
+          originalError.apply(console, args);
+        };
+        
+        console.warn = (...args) => {
+          const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          logs.push({ type: 'warn', message });
+          originalWarn.apply(console, args);
+        };
+        
+        // Execute the code
+        eval(code);
+        
+        // Restore console methods
+        console.log = originalLog;
+        console.error = originalError;
+        console.warn = originalWarn;
+        
+        // Display output
+        if (logs.length > 0) {
+          outputWindow.innerHTML = logs.map(log => {
+            const className = log.type === 'error' ? 'output-error' : 
+                            log.type === 'warn' ? 'output-warn' : 'output-line';
+            return `<div class="${className}">${escapeHtml(log.message)}</div>`;
+          }).join('');
+        } else {
+          outputWindow.innerHTML = '<div class="output-line">Code executed successfully (no console output)</div>';
+        }
+      } catch (error) {
+        outputWindow.innerHTML = `<div class="output-error">Error: ${escapeHtml(error.message)}</div>`;
+      }
+    });
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     // Linter functionality
     // Linter functionality
     lintBtn.addEventListener('click', function() {
