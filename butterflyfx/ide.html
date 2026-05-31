@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dimensional Programming IDE &mdash; Web-Based Development Environment &middot; ButterflyFX</title>
+  <meta name="description"
+    content="Web-based dimensional programming IDE with pre-loaded AI directives, code editor, and client-side storage. Experience the manifold paradigm in a live development environment.">
+  <meta name="keywords" content="IDE, Dimensional Programming, Web Editor, AI Directives, Manifold, Code Editor, Client-Side Storage">
+  <meta name="author" content="Kenneth W. Bingham">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://butterflyfx.us/ide.html">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://butterflyfx.us/ide.html">
+  <meta property="og:title" content="Dimensional Programming IDE &mdash; Web-Based Development Environment">
+  <meta property="og:description" content="Web-based dimensional programming IDE with pre-loaded AI directives, code editor, and client-side storage.">
+  <meta property="og:image" content="https://butterflyfx.us/kennethbingham.jpg">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://butterflyfx.us/ide.html">
+  <meta property="twitter:title" content="Dimensional Programming IDE &mdash; Web-Based Development Environment">
+  <meta property="twitter:description" content="Web-based dimensional programming IDE with pre-loaded AI directives, code editor, and client-side storage.">
+  <meta property="twitter:image" content="https://butterflyfx.us/kennethbingham.jpg">
+  
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
+  
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="carousel.css">
+  <link rel="stylesheet" href="theme.css">
+</head>
+
+<body>
+  <canvas id="spiral-bg"></canvas>
+
+  <nav class="navbar glass">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="method.html">Method</a>
+    <a href="agents.html">Agents</a>
+    <a href="routing.html">Routing</a>
+    <a href="projects.html">Projects</a>
+    <a href="directive.html">Directive</a>
+    <a href="schwarz-diamond.html">Schwarz Diamond</a>
+    <a href="dimensional-programming.html">Dimensional Programming</a>
+    <a href="research.html">Research</a>
+    <a href="search.html">Search</a>
+    <a href="ide.html" class="active">IDE</a>
+    <a href="resume.html">Resume</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <div class="content">
+
+    <header>
+      <h1>Dimensional Programming IDE</h1>
+      <h2>Web-Based Development Environment</h2>
+      <h3>Live manifold paradigm experience with client-side storage</h3>
+    </header>
+
+    <section class="section glass">
+      <h2 class="section-title">AI Directives</h2>
+      <div class="section-content">
+        <p>
+          Pre-loaded AI directives for dimensional programming. These directives provide the
+          governing rules and algebraic transformations that keep AI systems stable and
+          deterministic.
+        </p>
+        
+        <div class="directives-container">
+          <div class="directive-panel glass">
+            <h3>Structured Prompt</h3>
+            <p>
+              The core directive structure: a clear prompt plus governing rules that define
+              allowed transformations. This prevents drift, hallucination, and brittle failure modes.
+            </p>
+            <pre class="code-block"><code>directive: {
+  prompt: "Clear task description",
+  rules: [
+    "No destructive updates",
+    "Maintain identity",
+    "Use manifold operations",
+    "Validate outputs"
+  ]
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Algebraic Transformations</h3>
+            <p>
+              Allowed transformations using the manifold operation <span class="math">z = x·y</span>.
+              These transformations preserve the identity of the original content while allowing
+              flexible extraction through modifier application.
+            </p>
+            <pre class="code-block"><code>transformations: {
+  manifold: "z = x * y",
+  identity: "x preserved in z",
+  invertibility: "x = z / y",
+  russian_doll: "z contains history"
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Determination Graphs</h3>
+            <p>
+              DAG-based decision structures that independently route nodes through the manifold.
+              Each node represents a computation that can be resolved through manifold operations.
+            </p>
+            <pre class="code-block"><code>determination_graph: {
+  nodes: [
+    { id: 1, operation: "manifold" },
+    { id: 2, operation: "extract" },
+    { id: 3, operation: "validate" }
+  ],
+  edges: [(1,2), (2,3)]
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Truth Table Constraints</h3>
+            <p>
+              Hard constraints enforced through truth tables. These provide mathematical
+              guarantees that certain conditions will always be satisfied, preventing LLMs
+              from returning invalid outputs.
+            </p>
+            <pre class="code-block"><code>truth_table: {
+  inputs: [A, B, C],
+  outputs: [valid],
+  constraints: [
+    "A ∧ B → valid",
+    "¬A ∧ ¬B → invalid"
+  ]
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Decision Trees</h3>
+            <p>
+              Tree-based decision structures that provide shortcuts through the manifold.
+              Decision trees allow efficient routing by pruning unnecessary computation paths.
+            </p>
+            <pre class="code-block"><code>decision_tree: {
+  root: condition_1,
+  branches: {
+    true: node_2,
+    false: node_3
+  },
+  leaf: final_output
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Logic Gates</h3>
+            <p>
+              Boolean logic operations that can be applied to manifold states. These provide
+              the fundamental logical operations needed for complex decision-making.
+            </p>
+            <pre class="code-block"><code>logic_gates: {
+  AND: (a, b) => a && b,
+  OR: (a, b) => a || b,
+  NOT: (a) => !a,
+  XOR: (a, b) => a ^ b
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Regex Pre-Filters</h3>
+            <p>
+              Regular expression filters applied before manifold operations. These provide
+              pattern-based filtering to reduce the search space and improve efficiency.
+            </p>
+            <pre class="code-block"><code>regex_filters: [
+  /^[a-zA-Z0-9]+$/,
+  /\d{4}-\d{2}-\d{2}/,
+  /^[a-z]+@[a-z]+\.[a-z]+$/
+]</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Complex-Valued Mode</h3>
+            <p>
+              Extended manifold operations using complex numbers. This mode allows
+              representation of phase and magnitude, enabling more sophisticated
+              transformations.
+            </p>
+            <pre class="code-block"><code>complex_mode: {
+  z = (a + bi) * (c + di),
+  magnitude: |z|,
+  phase: arg(z),
+  applications: ["phase_space", "quantum_ops"]
+}</code></pre>
+          </div>
+
+          <div class="directive-panel glass">
+            <h3>Schwarz Diamond Manifold</h3>
+            <p>
+              Minimal surface decision boundaries using the Schwarz Diamond TPMS.
+              This provides optimal routing through cost-quality tradeoff space.
+            </p>
+            <pre class="code-block"><code>schwarz_diamond: {
+  surface: "TPMS minimal",
+  boundary: "cost_quality",
+  optimization: "minimal_surface",
+  porosity: 0.5
+}</code></pre>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Code Editor</h2>
+      <div class="section-content">
+        <p>
+          Write dimensional programming code in the editor below. All code is stored
+          locally in your browser using localStorage - nothing is sent to any server.
+          Your code stays on your computer.
+        </p>
+        
+        <div class="editor-container">
+          <div class="editor-toolbar">
+            <button id="saveBtn" class="cta-btn">Save</button>
+            <button id="loadBtn" class="cta-btn alt">Load</button>
+            <button id="clearBtn" class="cta-btn alt">Clear</button>
+            <button id="downloadBtn" class="cta-btn alt">Download</button>
+            <button id="uploadBtn" class="cta-btn alt">Upload</button>
+            <input type="file" id="fileInput" accept=".txt,.js,.py,.md" style="display: none;">
+          </div>
+          
+          <textarea id="codeEditor" class="code-editor" placeholder="// Write your dimensional programming code here...
+// Example: Manifold operation
+function manifold(x, y) {
+  return x * y; // z = x·y
+}
+
+// Example: Russian Doll containment
+function russianDoll(x, modifiers) {
+  let z = x;
+  for (const y of modifiers) {
+    z = manifold(z, y);
+  }
+  return z;
+}
+
+// Example: Fibonacci scaling
+function fibonacciScaling(n) {
+  const fib = [1, 1];
+  for (let i = 2; i < n; i++) {
+    fib.push(fib[i-1] + fib[i-2]);
+  }
+  return fib;
+}"></textarea>
+          
+          <div class="editor-status">
+            <span id="charCount">0 characters</span>
+            <span id="lineCount">0 lines</span>
+            <span id="saveStatus">Not saved</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Lint & Validation</h2>
+      <div class="section-content">
+        <p>
+          Validate your dimensional programming code against manifold principles.
+          The linter checks for proper manifold operations, identity preservation,
+          and directive compliance.
+        </p>
+        
+        <div class="lint-container">
+          <button id="lintBtn" class="cta-btn">Run Linter</button>
+          <div id="lintResults" class="lint-results"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Examples</h2>
+      <div class="section-content">
+        <p>
+          Load example dimensional programming code to see the paradigm in action.
+        </p>
+        
+        <div class="examples-container">
+          <button class="cta-btn alt" onclick="loadExample('manifold')">Manifold Basics</button>
+          <button class="cta-btn alt" onclick="loadExample('russianDoll')">Russian Doll</button>
+          <button class="cta-btn alt" onclick="loadExample('fibonacci')">Fibonacci Scaling</button>
+          <button class="cta-btn alt" onclick="loadExample('schwarzDiamond')">Schwarz Diamond</button>
+          <button class="cta-btn alt" onclick="loadExample('determinationGraph')">Determination Graph</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
+    </footer>
+  </div>
+
+  <script>
+    // Code editor functionality
+    const codeEditor = document.getElementById('codeEditor');
+    const saveBtn = document.getElementById('saveBtn');
+    const loadBtn = document.getElementById('loadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const charCount = document.getElementById('charCount');
+    const lineCount = document.getElementById('lineCount');
+    const saveStatus = document.getElementById('saveStatus');
+    const lintBtn = document.getElementById('lintBtn');
+    const lintResults = document.getElementById('lintResults');
+
+    // Update character and line count
+    codeEditor.addEventListener('input', function() {
+      const text = this.value;
+      charCount.textContent = text.length + ' characters';
+      lineCount.textContent = text.split('\n').length + ' lines';
+      saveStatus.textContent = 'Unsaved changes';
+    });
+
+    // Save to localStorage
+    saveBtn.addEventListener('click', function() {
+      localStorage.setItem('dimensionalCode', codeEditor.value);
+      saveStatus.textContent = 'Saved';
+      setTimeout(() => {
+        saveStatus.textContent = 'Saved';
+      }, 2000);
+    });
+
+    // Load from localStorage
+    loadBtn.addEventListener('click', function() {
+      const savedCode = localStorage.getItem('dimensionalCode');
+      if (savedCode) {
+        codeEditor.value = savedCode;
+        saveStatus.textContent = 'Loaded';
+        // Trigger input event to update counts
+        codeEditor.dispatchEvent(new Event('input'));
+      } else {
+        saveStatus.textContent = 'No saved code';
+      }
+    });
+
+    // Clear editor
+    clearBtn.addEventListener('click', function() {
+      if (confirm('Clear editor?')) {
+        codeEditor.value = '';
+        saveStatus.textContent = 'Cleared';
+        codeEditor.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Download code
+    downloadBtn.addEventListener('click', function() {
+      const blob = new Blob([codeEditor.value], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dimensional_code.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+      saveStatus.textContent = 'Downloaded';
+    });
+
+    // Upload code
+    uploadBtn.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          codeEditor.value = e.target.result;
+          saveStatus.textContent = 'Uploaded';
+          codeEditor.dispatchEvent(new Event('input'));
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Linter functionality
+    lintBtn.addEventListener('click', function() {
+      const code = codeEditor.value;
+      const issues = [];
+      
+      // Check for manifold operations
+      if (!code.includes('manifold') && !code.includes('z = x') && !code.includes('z=x')) {
+        issues.push({
+          type: 'warning',
+          message: 'No manifold operation found. Consider using z = x·y pattern.'
+        });
+      }
+      
+      // Check for identity preservation
+      if (code.includes('delete') || code.includes('remove') || code.includes('destroy')) {
+        issues.push({
+          type: 'error',
+          message: 'Destructive operations detected. Manifold paradigm preserves identity.'
+        });
+      }
+      
+      // Check for Russian Doll pattern
+      if (code.includes('for') && code.includes('*')) {
+        issues.push({
+          type: 'info',
+          message: 'Potential Russian Doll pattern detected. Good for history preservation.'
+        });
+      }
+      
+      // Check for Fibonacci pattern
+      if (code.includes('fibonacci') || code.includes('fib')) {
+        issues.push({
+          type: 'success',
+          message: 'Fibonacci scaling pattern detected. Natural manifold property.'
+        });
+      }
+      
+      // Display results
+      if (issues.length === 0) {
+        lintResults.innerHTML = '<div class="lint-success">No issues found. Code follows manifold principles.</div>';
+      } else {
+        let html = '<div class="lint-issues">';
+        issues.forEach(issue => {
+          const className = 'lint-' + issue.type;
+          html += `<div class="${className}">${issue.type.toUpperCase()}: ${issue.message}</div>`;
+        });
+        html += '</div>';
+        lintResults.innerHTML = html;
+      }
+    });
+
+    // Load examples
+    function loadExample(type) {
+      let exampleCode = '';
+      
+      switch(type) {
+        case 'manifold':
+          exampleCode = `// Manifold Basics: z = x·y
+function manifold(x, y) {
+  return x * y;
+}
+
+// Example usage
+const x = 5;
+const y = 3;
+const z = manifold(x, y);
+console.log(\`z = \${z}\`); // z = 15
+
+// Identity preservation
+const original = x;
+const recovered = z / y;
+console.log(\`Recovered: \${recovered}\`); // Recovered: 5`;
+          break;
+          
+        case 'russianDoll':
+          exampleCode = `// Russian Doll Containment
+function russianDoll(x, modifiers) {
+  let z = x;
+  const history = [x];
+  
+  for (const y of modifiers) {
+    z = manifold(z, y);
+    history.push(z);
+  }
+  
+  return { result: z, history };
+}
+
+// Example: Each state contains previous states
+const initial = 1;
+const modifiers = [2, 3, 4];
+const result = russianDoll(initial, modifiers);
+
+console.log('Final result:', result.result);
+console.log('History:', result.history);
+// History: [1, 2, 6, 24] - each contains the whole`;
+          break;
+          
+        case 'fibonacci':
+          exampleCode = `// Fibonacci Scaling from Manifold
+function fibonacciScaling(n) {
+  const fib = [1, 1];
+  for (let i = 2; i < n; i++) {
+    fib.push(fib[i-1] + fib[i-2]);
+  }
+  return fib;
+}
+
+// Natural emergence from manifold structure
+const sequence = fibonacciScaling(13);
+console.log('Fibonacci sequence:', sequence);
+// [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]
+
+// This scaling law emerges naturally from the manifold`;
+          break;
+          
+        case 'schwarzDiamond':
+          exampleCode = `// Schwarz Diamond Manifold
+function schwarzDiamond(cost, quality) {
+  // Minimal surface boundary for cost-quality tradeoff
+  const surface = (c, q) => {
+    // TPMS minimal surface equation
+    const porosity = 0.5;
+    const minimalArea = c * q * porosity;
+    return minimalArea;
+  };
+  
+  return surface(cost, quality);
+}
+
+// Example: Optimal routing boundary
+const cost = 0.3;
+const quality = 0.9;
+const boundary = schwarzDiamond(cost, quality);
+console.log('Minimal surface boundary:', boundary);`;
+          break;
+          
+        case 'determinationGraph':
+          exampleCode = `// Determination Graph for Multi-Step Requests
+class DeterminationGraph {
+  constructor() {
+    this.nodes = new Map();
+    this.edges = [];
+  }
+  
+  addNode(id, operation) {
+    this.nodes.set(id, { operation, result: null });
+  }
+  
+  addEdge(from, to) {
+    this.edges.push([from, to]);
+  }
+  
+  resolve() {
+    // Topologically sort and resolve nodes
+    const resolved = [];
+    const visited = new Set();
+    
+    const visit = (nodeId) => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+      
+      // Visit dependencies first
+      this.edges
+        .filter(([from, to]) => to === nodeId)
+        .forEach(([from]) => visit(from));
+      
+      // Resolve this node
+      const node = this.nodes.get(nodeId);
+      node.result = manifold(node.operation.x, node.operation.y);
+      resolved.push(nodeId);
+    };
+    
+    this.nodes.forEach((_, id) => visit(id));
+    return resolved;
+  }
+}
+
+// Example usage
+const graph = new DeterminationGraph();
+graph.addNode(1, { x: 5, y: 3 });
+graph.addNode(2, { x: 15, y: 2 });
+graph.addEdge(1, 2);
+const resolved = graph.resolve();
+console.log('Resolved nodes:', resolved);`;
+          break;
+      }
+      
+      codeEditor.value = exampleCode;
+      codeEditor.dispatchEvent(new Event('input'));
+      saveStatus.textContent = 'Loaded';
+    }
+
+    // Load saved code on page load
+    window.addEventListener('load', function() {
+      const savedCode = localStorage.getItem('dimensionalCode');
+      if (savedCode) {
+        codeEditor.value = savedCode;
+        codeEditor.dispatchEvent(new Event('input'));
+        saveStatus.textContent = 'Loaded';
+      }
+    });
+  </script>
+
+  <style>
+    .directives-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5em;
+      margin: 2em 0;
+    }
+
+    .directive-panel {
+      padding: 1.5em;
+      border-radius: 12px;
+    }
+
+    .directive-panel h3 {
+      color: #2cf0ff;
+      margin: 0 0 0.5em 0;
+      font-size: 1.1em;
+    }
+
+    .directive-panel p {
+      color: #e0e0e0;
+      font-size: 0.95em;
+      line-height: 1.6;
+      margin-bottom: 1em;
+    }
+
+    .code-block {
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      padding: 1em;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #4dffb0;
+      border: 1px solid rgba(44, 240, 255, 0.3);
+    }
+
+    .editor-container {
+      margin: 2em 0;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 0.5em;
+      margin-bottom: 1em;
+      flex-wrap: wrap;
+    }
+
+    .code-editor {
+      width: 100%;
+      min-height: 400px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(44, 240, 255, 0.3);
+      border-radius: 8px;
+      padding: 1em;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95em;
+      color: #e0e0e0;
+      resize: vertical;
+      outline: none;
+    }
+
+    .code-editor:focus {
+      border-color: #2cf0ff;
+      box-shadow: 0 0 0 3px rgba(44, 240, 255, 0.2);
+    }
+
+    .editor-status {
+      display: flex;
+      gap: 2em;
+      margin-top: 0.5em;
+      color: #c0c0c0;
+      font-size: 0.9em;
+    }
+
+    .lint-container {
+      margin: 2em 0;
+    }
+
+    .lint-results {
+      margin-top: 1em;
+    }
+
+    .lint-success {
+      color: #4dffb0;
+      padding: 1em;
+      background: rgba(77, 255, 176, 0.1);
+      border-radius: 8px;
+      border: 1px solid #4dffb0;
+    }
+
+    .lint-issues > div {
+      padding: 0.5em 1em;
+      margin-bottom: 0.5em;
+      border-radius: 4px;
+    }
+
+    .lint-error {
+      color: #ff6b6b;
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid #ff6b6b;
+    }
+
+    .lint-warning {
+      color: #ffd166;
+      background: rgba(255, 209, 102, 0.1);
+      border: 1px solid #ffd166;
+    }
+
+    .lint-info {
+      color: #2cf0ff;
+      background: rgba(44, 240, 255, 0.1);
+      border: 1px solid #2cf0ff;
+    }
+
+    .lint-success {
+      color: #4dffb0;
+      background: rgba(77, 255, 176, 0.1);
+      border: 1px solid #4dffb0;
+    }
+
+    .examples-container {
+      display: flex;
+      gap: 0.5em;
+      flex-wrap: wrap;
+      margin: 2em 0;
+    }
+
+    .math {
+      font-family: 'Times New Roman', serif;
+      font-style: italic;
+      color: #ffd166;
+    }
+
+    @media (max-width: 600px) {
+      .editor-toolbar {
+        flex-direction: column;
+      }
+      
+      .editor-status {
+        flex-direction: column;
+        gap: 0.5em;
+      }
+      
+      .examples-container {
+        flex-direction: column;
+      }
+    }
+  </style>
+
+  <script src="manifold-bg.js" defer></script>
+</body>
+
+</html>
