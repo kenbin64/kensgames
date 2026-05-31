@@ -226,6 +226,86 @@
       }
     ];
 
+    // Dimensional hierarchy mapping
+    const dimensionHierarchy = {
+      'index.html': {
+        above: null,
+        current: 'Home',
+        down: ['about.html', 'method.html']
+      },
+      'about.html': {
+        above: 'index.html',
+        current: 'About',
+        down: ['method.html', 'agents.html']
+      },
+      'method.html': {
+        above: 'about.html',
+        current: 'Method',
+        down: ['agents.html', 'directive.html']
+      },
+      'agents.html': {
+        above: 'method.html',
+        current: 'Agents',
+        down: ['routing.html', 'directive.html']
+      },
+      'routing.html': {
+        above: 'agents.html',
+        current: 'Routing',
+        down: ['projects.html', 'schwarz-diamond.html']
+      },
+      'projects.html': {
+        above: 'routing.html',
+        current: 'Projects',
+        down: ['directive.html', 'ide.html']
+      },
+      'directive.html': {
+        above: 'projects.html',
+        current: 'Directive',
+        down: ['schwarz-diamond.html', 'dimensional-programming.html']
+      },
+      'schwarz-diamond.html': {
+        above: 'directive.html',
+        current: 'Schwarz Diamond',
+        down: ['dimensional-programming.html', 'research.html']
+      },
+      'dimensional-programming.html': {
+        above: 'schwarz-diamond.html',
+        current: 'Dimensional Programming',
+        down: ['research.html', 'ide.html']
+      },
+      'research.html': {
+        above: 'dimensional-programming.html',
+        current: 'Research',
+        down: ['ide.html', 'resume.html']
+      },
+      'search.html': {
+        above: 'research.html',
+        current: 'Search',
+        down: ['ide.html', 'resume.html']
+      },
+      'ide.html': {
+        above: 'research.html',
+        current: 'IDE',
+        down: ['resume.html', 'contact.html']
+      },
+      'resume.html': {
+        above: 'ide.html',
+        current: 'Resume',
+        down: ['contact.html']
+      },
+      'contact.html': {
+        above: 'resume.html',
+        current: 'Contact',
+        down: []
+      }
+    };
+
+    // Get dimensional context for a page
+    function getDimensionalContext(url) {
+      const context = dimensionHierarchy[url] || { above: null, current: 'Unknown', down: [] };
+      return context;
+    }
+
     // Related pages mapping for dimensional search
     const relatedPagesMap = {
       'manifold': ['dimensional-programming.html', 'schwarz-diamond.html', 'directive.html'],
@@ -340,6 +420,9 @@
 
       let html = '<div class="results-list">';
       results.forEach(result => {
+        // Get dimensional context
+        const context = getDimensionalContext(result.url);
+        
         // Get related pages based on matched terms
         const relatedPages = new Set();
         result.matchedTerms.forEach(term => {
@@ -359,11 +442,26 @@
           relatedHtml += '</div>';
         }
         
+        // Dimensional context display
+        let dimensionHtml = '';
+        if (context.above) {
+          const abovePage = dimensionHierarchy[context.above];
+          dimensionHtml += `<div class="dimension-context"><strong>↑ Above:</strong> <a href="${context.above}" class="dimension-link">${abovePage ? abovePage.current : context.above}</a></div>`;
+        }
+        if (context.down.length > 0) {
+          const downLinks = context.down.slice(0, 2).map(url => {
+            const page = dimensionHierarchy[url];
+            return `<a href="${url}" class="dimension-link">${page ? page.current : url}</a>`;
+          }).join(' · ');
+          dimensionHtml += `<div class="dimension-context"><strong>↓ Down:</strong> ${downLinks}</div>`;
+        }
+        
         html += `
           <div class="result-item glass">
             <h3><a href="${result.url}">${result.title}</a></h3>
             <p class="result-score">Relevance: ${result.score}</p>
             <p class="result-matched">Matched terms: ${result.matchedTerms.join(', ')}</p>
+            ${dimensionHtml}
             ${relatedHtml}
           </div>
         `;
