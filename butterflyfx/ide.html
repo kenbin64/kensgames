@@ -11,21 +11,21 @@
   <meta name="author" content="Kenneth W. Bingham">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://butterflyfx.us/ide.html">
-  
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://butterflyfx.us/ide.html">
   <meta property="og:title" content="Dimensional Programming IDE &mdash; Web-Based Development Environment">
   <meta property="og:description" content="Web-based dimensional programming IDE with pre-loaded AI directives, code editor, and client-side storage.">
   <meta property="og:image" content="https://butterflyfx.us/kennethbingham.jpg">
-  
+
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://butterflyfx.us/ide.html">
   <meta property="twitter:title" content="Dimensional Programming IDE &mdash; Web-Based Development Environment">
   <meta property="twitter:description" content="Web-based dimensional programming IDE with pre-loaded AI directives, code editor, and client-side storage.">
   <meta property="twitter:image" content="https://butterflyfx.us/kennethbingham.jpg">
-  
+
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
@@ -34,7 +34,7 @@
     gtag('js', new Date());
     gtag('config', 'G-XXXXXXXXXX');
   </script>
-  
+
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="carousel.css">
@@ -52,11 +52,9 @@
     <a href="routing.html">Routing</a>
     <a href="projects.html">Projects</a>
     <a href="directive.html">Directive</a>
-    <a href="schwarz-diamond.html">Schwarz Diamond</a>
     <a href="dimensional-programming.html">Dimensional Programming</a>
     <a href="research.html">Research</a>
     <a href="search.html">Search</a>
-    <a href="ide.html" class="active">IDE</a>
     <a href="resume.html">Resume</a>
     <a href="contact.html">Contact</a>
   </nav>
@@ -77,7 +75,7 @@
           governing rules and algebraic transformations that keep AI systems stable and
           deterministic.
         </p>
-        
+
         <div class="directives-container">
           <div class="directive-panel glass">
             <h3>Structured Prompt</h3>
@@ -99,12 +97,12 @@
           <div class="directive-panel glass">
             <h3>Algebraic Transformations</h3>
             <p>
-              Allowed transformations using the manifold operation <span class="math">z = x·y</span>.
+              Allowed transformations using the manifold operation <span class="math">z derived from x and y</span>.
               These transformations preserve the identity of the original content while allowing
               flexible extraction through modifier application.
             </p>
             <pre class="code-block"><code>transformations: {
-  manifold: "z = x * y",
+  manifold: "derived z from x and y",
   identity: "x preserved in z",
   invertibility: "x = z / y",
   russian_doll: "z contains history"
@@ -228,7 +226,7 @@
           locally in your browser using localStorage - nothing is sent to any server.
           Your code stays on your computer.
         </p>
-        
+
         <div class="editor-container">
           <div class="editor-toolbar">
             <button id="saveBtn" class="cta-btn">Save</button>
@@ -239,11 +237,11 @@
             <button id="uploadBtn" class="cta-btn alt">Upload</button>
             <input type="file" id="fileInput" accept=".txt,.js,.py,.md" style="display: none;">
           </div>
-          
+
           <textarea id="codeEditor" class="code-editor" placeholder="// Write your dimensional programming code here...
 // Example: Manifold operation
 function manifold(x, y) {
-  return x * y; // z = x·y
+  return x * y; // derived z
 }
 
 // Example: Russian Doll containment
@@ -263,14 +261,14 @@ function fibonacciScaling(n) {
   }
   return fib;
 }"></textarea>
-          
+
           <div class="editor-status">
             <span id="charCount">0 characters</span>
             <span id="lineCount">0 lines</span>
             <span id="saveStatus">Not saved</span>
           </div>
         </div>
-        
+
         <div class="results-container">
           <h3>Output</h3>
           <div id="outputWindow" class="output-window"></div>
@@ -286,7 +284,7 @@ function fibonacciScaling(n) {
           The linter checks for proper manifold operations, identity preservation,
           and directive compliance.
         </p>
-        
+
         <div class="lint-container">
           <button id="lintBtn" class="cta-btn">Run Linter</button>
           <div id="lintResults" class="lint-results"></div>
@@ -300,7 +298,7 @@ function fibonacciScaling(n) {
         <p>
           Load example dimensional programming code to see the paradigm in action.
         </p>
-        
+
         <div class="examples-container">
           <button class="cta-btn alt" onclick="loadExample('manifold')">Manifold Basics</button>
           <button class="cta-btn alt" onclick="loadExample('russianDoll')">Russian Doll</button>
@@ -414,50 +412,50 @@ function fibonacciScaling(n) {
     runBtn.addEventListener('click', function() {
       const code = codeEditor.value;
       outputWindow.innerHTML = '';
-      
+
       try {
         // Capture console.log output
         const logs = [];
         const originalLog = console.log;
         const originalError = console.error;
         const originalWarn = console.warn;
-        
+
         console.log = (...args) => {
-          const message = args.map(arg => 
+          const message = args.map(arg =>
             typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
           ).join(' ');
           logs.push({ type: 'log', message });
           originalLog.apply(console, args);
         };
-        
+
         console.error = (...args) => {
-          const message = args.map(arg => 
+          const message = args.map(arg =>
             typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
           ).join(' ');
           logs.push({ type: 'error', message });
           originalError.apply(console, args);
         };
-        
+
         console.warn = (...args) => {
-          const message = args.map(arg => 
+          const message = args.map(arg =>
             typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
           ).join(' ');
           logs.push({ type: 'warn', message });
           originalWarn.apply(console, args);
         };
-        
+
         // Execute the code
         eval(code);
-        
+
         // Restore console methods
         console.log = originalLog;
         console.error = originalError;
         console.warn = originalWarn;
-        
+
         // Display output
         if (logs.length > 0) {
           outputWindow.innerHTML = logs.map(log => {
-            const className = log.type === 'error' ? 'output-error' : 
+            const className = log.type === 'error' ? 'output-error' :
                             log.type === 'warn' ? 'output-warn' : 'output-line';
             return `<div class="${className}">${escapeHtml(log.message)}</div>`;
           }).join('');
@@ -480,15 +478,15 @@ function fibonacciScaling(n) {
     lintBtn.addEventListener('click', function() {
       const code = codeEditor.value;
       const issues = [];
-      
+
       // Check for manifold operations
       if (!code.includes('manifold') && !code.includes('z = x') && !code.includes('z=x')) {
         issues.push({
           type: 'warning',
-          message: 'No manifold operation found. Consider using z = x·y pattern.'
+          message: 'No manifold operation found. Consider using the configured manifold operation pattern.'
         });
       }
-      
+
       // Check for identity preservation
       if (code.includes('delete') || code.includes('remove') || code.includes('destroy')) {
         issues.push({
@@ -496,7 +494,7 @@ function fibonacciScaling(n) {
           message: 'Destructive operations detected. Manifold paradigm preserves identity.'
         });
       }
-      
+
       // Check for Russian Doll pattern
       if (code.includes('for') && code.includes('*')) {
         issues.push({
@@ -504,7 +502,7 @@ function fibonacciScaling(n) {
           message: 'Potential Russian Doll pattern detected. Good for history preservation.'
         });
       }
-      
+
       // Check for Fibonacci pattern
       if (code.includes('fibonacci') || code.includes('fib')) {
         issues.push({
@@ -512,7 +510,7 @@ function fibonacciScaling(n) {
           message: 'Fibonacci scaling pattern detected. Natural manifold property.'
         });
       }
-      
+
       // Display results
       if (issues.length === 0) {
         lintResults.innerHTML = '<div class="lint-success">No issues found. Code follows manifold principles.</div>';
@@ -530,10 +528,10 @@ function fibonacciScaling(n) {
     // Load examples
     function loadExample(type) {
       let exampleCode = '';
-      
+
       switch(type) {
         case 'manifold':
-          exampleCode = `// Manifold Basics: z = x·y
+          exampleCode = `// Manifold Basics: z derived from x and y
 function manifold(x, y) {
   return x * y;
 }
@@ -549,18 +547,18 @@ const original = x;
 const recovered = z / y;
 console.log(\`Recovered: \${recovered}\`); // Recovered: 5`;
           break;
-          
+
         case 'russianDoll':
           exampleCode = `// Russian Doll Containment
 function russianDoll(x, modifiers) {
   let z = x;
   const history = [x];
-  
+
   for (const y of modifiers) {
     z = manifold(z, y);
     history.push(z);
   }
-  
+
   return { result: z, history };
 }
 
@@ -573,7 +571,7 @@ console.log('Final result:', result.result);
 console.log('History:', result.history);
 // History: [1, 2, 6, 24] - each contains the whole`;
           break;
-          
+
         case 'fibonacci':
           exampleCode = `// Fibonacci Scaling from Manifold
 function fibonacciScaling(n) {
@@ -591,7 +589,7 @@ console.log('Fibonacci sequence:', sequence);
 
 // This scaling law emerges naturally from the manifold`;
           break;
-          
+
         case 'schwarzDiamond':
           exampleCode = `// Schwarz Diamond Manifold
 function schwarzDiamond(cost, quality) {
@@ -602,7 +600,7 @@ function schwarzDiamond(cost, quality) {
     const minimalArea = c * q * porosity;
     return minimalArea;
   };
-  
+
   return surface(cost, quality);
 }
 
@@ -612,7 +610,7 @@ const quality = 0.9;
 const boundary = schwarzDiamond(cost, quality);
 console.log('Minimal surface boundary:', boundary);`;
           break;
-          
+
         case 'determinationGraph':
           exampleCode = `// Determination Graph for Multi-Step Requests
 class DeterminationGraph {
@@ -620,35 +618,35 @@ class DeterminationGraph {
     this.nodes = new Map();
     this.edges = [];
   }
-  
+
   addNode(id, operation) {
     this.nodes.set(id, { operation, result: null });
   }
-  
+
   addEdge(from, to) {
     this.edges.push([from, to]);
   }
-  
+
   resolve() {
     // Topologically sort and resolve nodes
     const resolved = [];
     const visited = new Set();
-    
+
     const visit = (nodeId) => {
       if (visited.has(nodeId)) return;
       visited.add(nodeId);
-      
+
       // Visit dependencies first
       this.edges
         .filter(([from, to]) => to === nodeId)
         .forEach(([from]) => visit(from));
-      
+
       // Resolve this node
       const node = this.nodes.get(nodeId);
       node.result = manifold(node.operation.x, node.operation.y);
       resolved.push(nodeId);
     };
-    
+
     this.nodes.forEach((_, id) => visit(id));
     return resolved;
   }
@@ -662,23 +660,23 @@ graph.addEdge(1, 2);
 const resolved = graph.resolve();
 console.log('Resolved nodes:', resolved);`;
           break;
-          
+
         case 'invertibility':
           exampleCode = `// Invertibility: Recover x from z and y
 function testInvertibility() {
   const x = 5;
   const y = 3;
   const z = manifold(x, y);
-  
+
   console.log(\`Original x: \${x}\`);
   console.log(\`Original y: \${y}\`);
-  console.log(\`z = x·y: \${z}\`);
-  
+  console.log(\`z derived from x and y: \${z}\`);
+
   // Recover x from z and y
   const xRecovered = z / y;
   console.log(\`Recovered x: \${xRecovered}\`);
   console.log(\`Match: \${x === xRecovered}\`);
-  
+
   // Recover y from z and x
   const yRecovered = z / x;
   console.log(\`Recovered y: \${yRecovered}\`);
@@ -687,28 +685,30 @@ function testInvertibility() {
 
 testInvertibility();`;
           break;
-          
+
         case 'saddleGeometry':
           exampleCode = `// Saddle Geometry of Manifold
 function saddleGeometry(x, y) {
   // Manifold as saddle surface (hyperbolic paraboloid)
-  // z = x·y creates a saddle point at origin
-  const z = x * y;
-  
+  // derived z from x and y (saddle point at origin)
+  const z1 = x;
+  const z2 = y;
+  const z = z1 * z2;
+
   // Calculate curvature properties
   const curvature = {
     x: -y, // Second derivative w.r.t x
     y: -x, // Second derivative w.r.t y
     xy: 1   // Mixed partial derivative
   };
-  
+
   console.log(\`Manifold point: (\${x}, \${y}, \${z})\`);
   console.log('Curvature properties:', curvature);
-  
+
   // Gaussian curvature (negative for saddle)
   const gaussianCurvature = curvature.x * curvature.y - Math.pow(curvature.xy, 2);
   console.log(\`Gaussian curvature: \${gaussianCurvature}\`);
-  
+
   return { z, curvature, gaussianCurvature };
 }
 
@@ -717,22 +717,22 @@ saddleGeometry(2, 3);
 saddleGeometry(-1, 4);
 saddleGeometry(0, 0);`;
           break;
-          
+
         case 'complexManifold':
           exampleCode = `// Complex-Valued Manifold Operations
 function complexManifold(a, b, c, d) {
   // z = (a + bi) * (c + di)
   const real = a * c - b * d;
   const imag = a * d + b * c;
-  
+
   const magnitude = Math.sqrt(real * real + imag * imag);
   const phase = Math.atan2(imag, real);
-  
+
   console.log(\`Input: (\${a} + \${b}i) * (\${c} + \${d}i)\`);
   console.log(\`Result: \${real} + \${imag}i\`);
   console.log(\`Magnitude: \${magnitude}\`);
   console.log(\`Phase: \${phase} radians\`);
-  
+
   return { real, imag, magnitude, phase };
 }
 
@@ -748,7 +748,7 @@ complexManifold(1, 2, 3, 4);
 eulerFormula(Math.PI / 4); // 45 degrees
 eulerFormula(Math.PI / 2); // 90 degrees`;
           break;
-          
+
         case 'truthTable':
           exampleCode = `// Truth Table Constraints
 class TruthTable {
@@ -756,13 +756,13 @@ class TruthTable {
     this.variables = variables;
     this.constraints = constraints;
   }
-  
+
   evaluate(values) {
     const assignment = {};
     this.variables.forEach((v, i) => {
       assignment[v] = values[i];
     });
-    
+
     for (const constraint of this.constraints) {
       if (!constraint(assignment)) {
         return false;
@@ -770,21 +770,21 @@ class TruthTable {
     }
     return true;
   }
-  
+
   generateTable() {
     const results = [];
     const n = this.variables.length;
-    
+
     for (let i = 0; i < Math.pow(2, n); i++) {
       const values = [];
       for (let j = 0; j < n; j++) {
         values.push((i >> j) & 1);
       }
-      
+
       const valid = this.evaluate(values);
       results.push({ values, valid });
     }
-    
+
     return results;
   }
 }
@@ -793,7 +793,7 @@ class TruthTable {
 const table = new TruthTable(['x', 'y'], [
   (a) => a.x >= 0, // x must be non-negative
   (a) => a.y >= 0, // y must be non-negative
-  (a) => a.x * a.y <= 100 // z = x·y must be <= 100
+  (a) => a.x * a.y <= 100 // derived z constraint
 ]);
 
 const results = table.generateTable();
@@ -802,23 +802,23 @@ results.forEach(r => {
   console.log(\`x=\${r.values[0]}, y=\${r.values[1]}: \${r.valid ? 'VALID' : 'INVALID'}\`);
 });`;
           break;
-          
+
         case 'decisionTree':
           exampleCode = `// Decision Tree for Manifold Routing
 class DecisionTree {
   constructor(root) {
     this.root = root;
   }
-  
+
   evaluate(context) {
     return this.evaluateNode(this.root, context);
   }
-  
+
   evaluateNode(node, context) {
     if (node.type === 'leaf') {
       return node.value;
     }
-    
+
     const condition = node.condition(context);
     if (condition) {
       return this.evaluateNode(node.trueBranch, context);
@@ -860,10 +860,10 @@ contexts.forEach(ctx => {
   console.log(\`x=\${ctx.x}, y=\${ctx.y}: \${route}\`);
 });`;
           break;
-          
+
         case 'carParts':
           exampleCode = `// Real-World: Car Parts Inventory System
-// Using manifold z = x·y for inventory tracking
+// Using manifold for inventory tracking (z derived from x and y)
 
 class CarPart {
   constructor(id, name, basePrice, quantity) {
@@ -872,12 +872,12 @@ class CarPart {
     this.basePrice = basePrice; // x: identity (base price)
     this.quantity = quantity;   // y: modifier (quantity)
   }
-  
+
   // Manifold: total value = basePrice * quantity
   get totalValue() {
     return manifold(this.basePrice, this.quantity);
   }
-  
+
   // Invertibility: recover quantity from total value
   get recoveredQuantity() {
     return this.totalValue / this.basePrice;
@@ -909,12 +909,12 @@ class OrderHistory {
     this.history = [initialValue];
     this.current = initialValue;
   }
-  
+
   addTransaction(modifier) {
     this.current = manifold(this.current, modifier);
     this.history.push(this.current);
   }
-  
+
   // Every state contains the whole history
   getFullHistory() {
     return this.history;
@@ -931,10 +931,10 @@ console.log('=== Order History (Russian Doll) ===');
 console.log('Full history:', order.getFullHistory());
 console.log('Final amount:', order.current.toFixed(2));`;
           break;
-          
+
         case 'parkingLot':
           exampleCode = `// Real-World: Parking Lot Optimization
-// Using manifold z = x·y for space allocation
+// Using manifold for space allocation (z derived from x and y)
 
 class ParkingSpace {
   constructor(id, width, length, occupied = false) {
@@ -943,17 +943,17 @@ class ParkingSpace {
     this.length = length;    // y: modifier (length)
     this.occupied = occupied;
   }
-  
+
   // Manifold: area = width * length
   get area() {
     return manifold(this.width, this.length);
   }
-  
+
   // Efficiency: how well space is used
   get efficiency() {
     return this.occupied ? 1.0 : 0.0;
   }
-  
+
   // Effective area: area * efficiency
   get effectiveArea() {
     return manifold(this.area, this.efficiency);
@@ -965,29 +965,29 @@ class ParkingLot {
     this.name = name;
     this.spaces = [];
   }
-  
+
   addSpace(space) {
     this.spaces.push(space);
   }
-  
+
   get totalArea() {
     return this.spaces.reduce((sum, space) => sum + space.area, 0);
   }
-  
+
   get occupiedArea() {
     return this.spaces.reduce((sum, space) => sum + space.effectiveArea, 0);
   }
-  
+
   get utilization() {
     return this.occupiedArea / this.totalArea;
   }
-  
+
   // Schwarz Diamond: minimal surface for cost optimization
   getOptimalLayout() {
     const totalArea = this.totalArea;
     const targetUtilization = 0.85; // 85% utilization target
     const optimalArea = manifold(totalArea, targetUtilization);
-    
+
     return {
       totalArea,
       targetUtilization,
@@ -1032,7 +1032,7 @@ lot.spaces.forEach(space => {
   console.log(\`Space \${space.id}: \${space.area.toFixed(2)} sq m, Occupied: \${space.occupied}\`);
 });`;
           break;
-          
+
         case 'dimensionalPrimer':
           exampleCode = `// Dimensional Programming: Primer for AI Coders
 // State, geometry, and relationships drive behavior instead of scripts
@@ -1045,7 +1045,7 @@ function observe(world) {
   // Read the environment
   // Convert inputs into coordinates
   // Collapse the moment into a point on the manifold
-  
+
   const state = {
     x: world.input.x,
     y: world.input.y,
@@ -1053,13 +1053,13 @@ function observe(world) {
     timestamp: world.timestamp,
     context: world.context
   };
-  
+
   console.log('OBSERVED STATE:', state);
   return state;
 }
 
 // 2. relate() — Map Interactions on the Manifold
-// Purpose: Turn raw state into relationships using z = x·y
+// Purpose: Turn raw state into relationships (z derived from x and y)
 // 1D → 2D transition: from a line → a plane of relationships
 
 function relate(state, relation = (x, y) => x * y) {
@@ -1067,14 +1067,14 @@ function relate(state, relation = (x, y) => x * y) {
   // Find structure
   // Reveal patterns
   // Eliminate noise
-  
+
   const structure = {
     xy: relation(state.x, state.y),
     yz: relation(state.y, state.z),
     xz: relation(state.x, state.z),
     xyz: relation(state.x, relation(state.y, state.z))
   };
-  
+
   console.log('RELATED STRUCTURE:', structure);
   return structure;
 }
@@ -1088,7 +1088,7 @@ function expand(structure) {
   // Build a 3D model of the situation
   // Show hidden layers and consequences
   // Turn patterns into systems
-  
+
   const volume = {
     surface: structure.xy + structure.yz + structure.xz,
     depth: structure.xyz,
@@ -1099,7 +1099,7 @@ function expand(structure) {
     },
     stability: Math.abs(structure.xyz) / (Math.abs(structure.xy) + Math.abs(structure.yz) + Math.abs(structure.xz) + 1)
   };
-  
+
   console.log('EXPANDED VOLUME:', volume);
   return volume;
 }
@@ -1113,7 +1113,7 @@ function resolve(volume) {
   // Select the most stable path
   // Output the action or code
   // No scripts, no rules — just geometry
-  
+
   const action = {
     type: volume.stability > 0.5 ? 'STABLE' : 'UNSTABLE',
     magnitude: volume.depth,
@@ -1121,7 +1121,7 @@ function resolve(volume) {
     confidence: volume.stability,
     recommendation: volume.stability > 0.7 ? 'PROCEED' : 'CAUTION'
   };
-  
+
   console.log('RESOLVED ACTION:', action);
   return action;
 }
@@ -1158,7 +1158,7 @@ console.log('Dimensional programming uses observe → relate → expand → reso
 console.log('The AI becomes a dimensional interpreter, not a script follower');`;
           break;
       }
-      
+
       codeEditor.value = exampleCode;
       codeEditor.dispatchEvent(new Event('input'));
       saveStatus.textContent = 'Loaded';
@@ -1354,12 +1354,12 @@ console.log('The AI becomes a dimensional interpreter, not a script follower');`
       .editor-toolbar {
         flex-direction: column;
       }
-      
+
       .editor-status {
         flex-direction: column;
         gap: 0.5em;
       }
-      
+
       .examples-container {
         flex-direction: column;
       }

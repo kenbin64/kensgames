@@ -11,21 +11,21 @@
   <meta name="author" content="Kenneth W. Bingham">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://butterflyfx.us/search.html">
-  
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://butterflyfx.us/search.html">
   <meta property="og:title" content="Site Search &mdash; ButterflyFX.us">
   <meta property="og:description" content="Search the ButterflyFX.us portfolio site for AI systems architecture, dimensional programming, and research publications.">
   <meta property="og:image" content="https://butterflyfx.us/kennethbingham.jpg">
-  
+
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://butterflyfx.us/search.html">
   <meta property="twitter:title" content="Site Search &mdash; ButterflyFX.us">
   <meta property="twitter:description" content="Search the ButterflyFX.us portfolio site for AI systems architecture, dimensional programming, and research publications.">
   <meta property="twitter:image" content="https://butterflyfx.us/kennethbingham.jpg">
-  
+
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
@@ -34,7 +34,7 @@
     gtag('js', new Date());
     gtag('config', 'G-XXXXXXXXXX');
   </script>
-  
+
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="carousel.css">
@@ -52,12 +52,10 @@
     <a href="routing.html">Routing</a>
     <a href="projects.html">Projects</a>
     <a href="directive.html">Directive</a>
-    <a href="schwarz-diamond.html">Schwarz Diamond</a>
     <a href="dimensional-programming.html">Dimensional Programming</a>
     <a href="research.html">Research</a>
     <a href="resume.html">Resume</a>
     <a href="search.html" class="active">Search</a>
-    <a href="ide.html">IDE</a>
     <a href="contact.html">Contact</a>
   </nav>
 
@@ -74,16 +72,16 @@
       <div class="section-content">
         <p>
           This search demonstrates the manifold paradigm applied to information retrieval.
-          The search uses the <span class="math">z = x·y</span> operation as the fundamental
+          The search uses the manifold operation derived from x and y as the fundamental
           indexing and retrieval mechanism, where documents are indexed as identity-modifier pairs
           and search queries are resolved through manifold extraction.
         </p>
-        
+
         <div class="search-container">
           <input type="text" id="searchInput" class="search-input" placeholder="Search the site..." autocomplete="off">
           <button id="searchButton" class="cta-btn">Search</button>
         </div>
-        
+
         <div id="searchResults" class="search-results"></div>
         <div id="searchStats" class="search-stats"></div>
       </div>
@@ -93,11 +91,11 @@
       <h2 class="section-title">How It Works</h2>
       <div class="section-content">
         <div class="pillars-grid">
-          
+
           <article class="pillar-card">
             <h3>Manifold Indexing</h3>
             <p>
-              Each page is indexed using the manifold operation <span class="math">z = x·y</span>,
+              Each page is indexed using the manifold operation derived from x and y,
               where <span class="math">x</span> is the page content and <span class="math">y</span> is the
               search query modifier. This creates a mathematical representation of the content
               that can be efficiently searched.
@@ -401,14 +399,14 @@
             const regex = new RegExp(term, 'g');
             const matches = content.match(regex);
             const count = matches ? matches.length : 0;
-            
+
             // Title matches get higher score
             if (page.title.toLowerCase().includes(term)) {
               score += count * 3;
             } else {
               score += count;
             }
-            
+
             matchedTerms.push(term);
           }
         });
@@ -432,7 +430,7 @@
     function displayResults(results) {
       const resultsContainer = document.getElementById('searchResults');
       const statsContainer = document.getElementById('searchStats');
-      
+
       if (results.length === 0) {
         resultsContainer.innerHTML = '<div class="no-results">No results found. Try different search terms.</div>';
         statsContainer.innerHTML = '';
@@ -443,14 +441,14 @@
       results.forEach(result => {
         // Get dimensional context
         const context = getDimensionalContext(result.url);
-        
+
         // Get related pages based on matched terms
         const relatedPages = new Set();
         result.matchedTerms.forEach(term => {
           const pages = getRelatedPages(term);
           pages.forEach(page => relatedPages.add(page));
         });
-        
+
         const relatedPagesArray = Array.from(relatedPages);
         let relatedHtml = '';
         if (relatedPagesArray.length > 0) {
@@ -462,7 +460,7 @@
           }).join(' · ');
           relatedHtml += '</div>';
         }
-        
+
         // Dimensional context display
         let dimensionHtml = '';
         if (context.above) {
@@ -476,7 +474,7 @@
           }).join(' · ');
           dimensionHtml += `<div class="dimension-context"><strong>↓ Down:</strong> ${downLinks}</div>`;
         }
-        
+
         html += `
           <div class="result-item glass">
             <h3><a href="${result.url}">${result.title}</a></h3>
@@ -488,7 +486,7 @@
         `;
       });
       html += '</div>';
-      
+
       resultsContainer.innerHTML = html;
       statsContainer.innerHTML = `<p>Found ${results.length} result(s) for your search.</p>`;
     }
@@ -604,7 +602,7 @@
       .search-container {
         flex-direction: column;
       }
-      
+
       .search-input {
         width: 100%;
       }
