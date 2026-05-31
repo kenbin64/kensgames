@@ -94,7 +94,8 @@ a:hover, a:focus{ color: var(--c-gold); }
 /* Navbar — clearer state, golden-ratio padding ---------------------- */
 .navbar a {
   color: var(--c-cyan) !important;
-  padding: calc(6px * var(--phi)) calc(10px * var(--phi)) !important;
+  padding: 6px 10px !important;
+  font-size: 0.95em !important;
 }
 .navbar a:hover, .navbar a.active {
   background: linear-gradient(90deg, var(--c-purple), var(--c-cyan)) !important;
