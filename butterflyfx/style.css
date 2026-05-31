@@ -72,6 +72,7 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* Navbar Button Fixes */
 .navbar {
   background: rgba(10, 10, 30, 0.90);
   backdrop-filter: blur(12px);
@@ -84,12 +85,34 @@
   background-size: 100% 100%, 300% 300%;
   animation: gradient-border 8s ease infinite;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  padding: 0.8em 1.2em;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.navbar a {
+  color: #ffffff;
+  text-decoration: none;
+  padding: 0.6em 1em;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+  font-size: 0.95em;
+}
+
+.navbar a:hover,
+.navbar a.active {
+  background: rgba(44, 240, 255, 0.2);
+  color: #2cf0ff;
 }
 
 /* Projects Page Modern Card Styles */
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2em;
   margin: 2.5em 0 2em 0;
 }
@@ -198,7 +221,7 @@
 /* Services Page Modern Card Styles */
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2em;
   margin: 2.5em 0 2em 0;
 }
@@ -208,10 +231,10 @@
   grid-row: span 2;
 }
 
-/* Pillars Grid - Law of 3s */
+/* Pillars Grid - Law of 2s */
 .pillars-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2em;
   margin: 2.5em 0 2em 0;
 }
