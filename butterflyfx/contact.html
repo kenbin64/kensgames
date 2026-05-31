@@ -4,59 +4,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contact – ButterflyFX.us</title>
+  <title>Contact &mdash; Kenneth W. Bingham, AI Systems Architect</title>
+  <meta name="description"
+    content="Get in touch with Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer.">
+  <link rel="canonical" href="https://butterflyfx.us/contact.html">
+  <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="carousel.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 
 <body>
   <canvas id="spiral-bg"></canvas>
+
+  <nav class="navbar glass">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="method.html">Method</a>
+    <a href="agents.html">Agents</a>
+    <a href="routing.html">Routing</a>
+    <a href="projects.html">Projects</a>
+    <a href="directive.html">Directive</a>
+    <a href="schwarz-diamond.html">Schwarz Diamond</a>
+    <a href="dimensional-programming.html">Dimensional Programming</a>
+    <a href="resume.html">Resume</a>
+    <a href="contact.html" class="active">Contact</a>
+    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
+  </nav>
+
   <div class="content">
-    <nav class="navbar">
-      <a href="index.html">Home</a>
-      <a href="about.html">About</a>
-      <a href="services.html">Services</a>
-      <a href="projects.html">Projects</a>
-      <a href="https://kensgames.com" target="_blank" rel="noopener">KensGames</a>
-      <a href="method.html">Method</a>
-      <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Blog</a>
-      <a href="contact.html" class="active">Contact</a>
-    </nav>
+
     <header>
       <h1>Contact</h1>
-      <h2>Let’s Build the Future Together</h2>
+      <h2>For hiring inquiries and technical questions about portfolio work.</h2>
+      <h3>Kaysville, UT &middot; Available for full-time employment &middot; Open to remote</h3>
     </header>
-    <section class="contact glass" style="max-width:480px;margin:0 auto 2em auto;">
-      <h3>Consulting & Collaboration</h3>
-      <p>Email: <a href="mailto:kenneth.bingham.w@gmail.com" id="email-link">kenneth.bingham.w@gmail.com</a> <button
-          id="copy-email" aria-label="Copy email"
-          style="margin-left:0.5em;padding:0.2em 0.8em;font-size:0.95em;">Copy</button></p>
-      <p>LinkedIn: <a href="https://www.linkedin.com/in/kennethbingham/" target="_blank"
-          rel="noopener">linkedin.com/in/kennethbingham</a></p>
-      <p>Blog: <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack – @kbingh</a></p>
-      <p style="font-size:1.08em;">For consulting, workshops, or project inquiries, please reach out by email or
-        LinkedIn. I respond within 24 hours.</p>
-      <form class="contact-form" autocomplete="off"
-        onsubmit="event.preventDefault(); document.getElementById('form-success').style.display='block'; this.reset();">
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" required>
-        <label for="email">Your Email:</label>
-        <input type="email" id="email" name="email" required>
-        <label for="message">Message:</label>
-        <textarea id="message" name="message" rows="5" required></textarea>
-        <button type="submit">Send</button>
-        <div id="form-success" style="display:none;color:#06d6a0;margin-top:1em;">Thank you! Your message was received
-          (demo only).</div>
-      </form>
-      <p style="font-size:0.98em;color:#ffd166;margin-top:1.2em;">Your information is kept private and used only to
-        respond to your inquiry.</p>
+
+    <section class="section glass" style="max-width:560px;margin:0 auto 2em auto;">
+      <div class="section-content">
+        <p><strong>Email.</strong>
+          <a href="mailto:kennethbinghamw@gmail.com" id="email-link">kennethbinghamw@gmail.com</a>
+          <button id="copy-email" aria-label="Copy email"
+            style="margin-left:0.5em;padding:0.2em 0.8em;font-size:0.95em;">Copy</button>
+        </p>
+        <p><strong>LinkedIn.</strong>
+          <a href="https://www.linkedin.com/in/kenneth-bingham-11378b10" target="_blank"
+            rel="noopener">linkedin.com/in/kenneth-bingham-11378b10</a>
+        </p>
+        <p><strong>GitHub.</strong>
+          <a href="https://github.com/kenbin64" target="_blank" rel="noopener">github.com/kenbin64</a>
+        </p>
+        <p><strong>Substack.</strong>
+          <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">@kbingh</a>
+        </p>
+        <p style="margin-top:1.5em;">
+          <a href="assets/KennethWBingham_Resume_2026.pdf" class="cta-btn" download>Download Resume (PDF)</a>
+        </p>
+        <p style="font-size:0.95em;color:#ffd166;margin-top:1.5em;">
+          Email is the fastest way to reach me about employment opportunities. I respond
+          within 24 hours on weekdays.
+        </p>
+      </div>
     </section>
+
     <footer>
-      <p>&copy; 2026 Kenneth Bingham · ButterflyFX.us</p>
+      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
     </footer>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="spiral.js"></script>
+
+  <script src="manifold-bg.js" defer></script>
   <script>
     document.getElementById('copy-email').onclick = function () {
       const email = document.getElementById('email-link').textContent;

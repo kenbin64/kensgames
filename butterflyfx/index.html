@@ -4,281 +4,234 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ButterflyFX.us – AI & Software Consulting</title>
+  <title>Kenneth W. Bingham &mdash; AI Systems Architect &middot; Senior Software Engineer</title>
+  <meta name="description"
+    content="Portfolio of Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer. Directive engineering, agent loops routed by logic gates and Schwarz-D minimal-surface boundaries, dimensional / manifold programming.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://butterflyfx.us/">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
-  <style>
-    body {
-      background: #f7f9fa;
-      color: #1a1a1a;
-      font-family: 'Inter', 'Lato', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-    }
-
-    .navbar {
-      background: #fff;
-      box-shadow: 0 2px 16px #e0e6ed44;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.2em 2.5em;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    .nav-logo img {
-      height: 44px;
-      width: 44px;
-      margin-right: 1.2em;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 2em;
-    }
-
-    .nav-link {
-      color: #118ab2;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 1.13em;
-      padding: 0.5em 1.2em;
-      border-radius: 2em;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .nav-link.active,
-    .nav-link:hover {
-      background: #118ab2;
-      color: #fff;
-    }
-
-    .cta-btn {
-      background: #ffd166;
-      color: #1a1a1a;
-      font-weight: 700;
-      border: none;
-      border-radius: 2em;
-      padding: 0.7em 2.2em;
-      font-size: 1.13em;
-      margin-left: 2em;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .cta-btn:hover {
-      background: #06d6a0;
-      color: #fff;
-    }
-
-    .hero {
-      max-width: 900px;
-      margin: 4em auto 2.5em auto;
-      padding: 3.5em 2em 2.5em 2em;
-      background: #fff;
-      border-radius: 2.5em;
-      box-shadow: 0 4px 32px #e0e6ed55;
-      text-align: center;
-    }
-
-    .hero-title {
-      font-size: 2.8em;
-      font-weight: 800;
-      color: #118ab2;
-      margin-bottom: 0.3em;
-      letter-spacing: 0.01em;
-    }
-
-    .hero-sub {
-      font-size: 1.4em;
-      color: #1a1a1a;
-      margin-bottom: 1.2em;
-      font-weight: 500;
-    }
-
-    .hero-desc {
-      font-size: 1.18em;
-      color: #444;
-      margin-bottom: 2.2em;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-      line-height: 1.6;
-    }
-
-    .section {
-      max-width: 900px;
-      margin: 2.5em auto;
-      padding: 2.5em 2em;
-      background: #fff;
-      border-radius: 1.5em;
-      box-shadow: 0 2px 16px #e0e6ed33;
-    }
-
-    .section-title {
-      font-size: 1.7em;
-      color: #118ab2;
-      font-weight: 700;
-      margin-bottom: 1em;
-    }
-
-    .section-content {
-      font-size: 1.13em;
-      color: #222;
-      line-height: 1.7;
-    }
-
-    .footer {
-      background: #f7f9fa;
-      color: #888;
-      text-align: center;
-      padding: 2em 0 1em 0;
-      font-size: 1em;
-      margin-top: 4em;
-    }
-
-    @media (max-width: 700px) {
-
-      .navbar,
-      .hero,
-      .section {
-        padding-left: 1em;
-        padding-right: 1em;
-      }
-
-      .hero {
-        padding-top: 2em;
-        padding-bottom: 2em;
-      }
-
-      .section {
-        padding-top: 1.2em;
-        padding-bottom: 1.2em;
-      }
-
-      .nav-links {
-        gap: 0.7em;
-      }
-
-      .cta-btn {
-        margin-left: 0.7em;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="carousel.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 
 <body>
-  <nav class="navbar">
-    <div class="nav-logo">
-      <a href="index.html" aria-label="ButterflyFX Home">
-        <img src="assets/butterfly.png" alt="Butterfly Logo"
-          style="height:36px;width:36px;margin-right:0.5em;vertical-align:middle;" />
-        <img src="assets/logo.svg" alt="ButterflyFX Logo" style="height:44px;width:44px;vertical-align:middle;" />
-      </a>
-    </div>
-    <div class="nav-links">
-      <a href="index.html" class="nav-link active">Home</a>
-      <a href="about.html" class="nav-link">About</a>
-      <a href="services.html" class="nav-link">Services</a>
-      <a href="projects.html" class="nav-link">Projects</a>
-      <a href="blog.html" class="nav-link">Blog</a>
-      <a href="contact.html" class="nav-link">Contact</a>
-      <a href="directive.html" class="nav-link">AI Directive</a>
-      <a href="mailto:kenneth.bingham.w@gmail.com" class="cta-btn">Contact</a>
-    </div>
+  <canvas id="spiral-bg"></canvas>
+
+  <nav class="navbar glass">
+    <a href="index.html" class="active">Home</a>
+    <a href="about.html">About</a>
+    <a href="method.html">Method</a>
+    <a href="agents.html">Agents</a>
+    <a href="routing.html">Routing</a>
+    <a href="projects.html">Projects</a>
+    <a href="directive.html">Directive</a>
+    <a href="schwarz-diamond.html">Schwarz Diamond</a>
+    <a href="dimensional-programming.html">Dimensional Programming</a>
+    <a href="resume.html">Resume</a>
+    <a href="contact.html">Contact</a>
+    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
   </nav>
-  <section class="hero">
-    <img src="kennethbingham.webp" alt="Kenneth Bingham" class="hero-photo" />
-    <div class="hero-title">ButterflyFX</div>
-    <div class="hero-sub">AI & Software Consulting</div>
-    <div class="hero-desc">AI, dimensional programming, and modern software solutions for ambitious teams and founders.
-      Technical depth, clear communication, and a passion for building what’s next.</div>
-    <a href="services.html" class="cta-btn">Our Services</a>
-    <style>
-      .hero-photo {
-        width: 120px;
-        height: 120px;
-        object-fit: cover;
-        border-radius: 50%;
-        box-shadow: 0 2px 16px #118ab244, 0 1.5px 0 #ffd16655;
-        margin-bottom: 1.2em;
-        border: 4px solid #fff;
-        background: #e0e6ed;
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-      }
-    </style>
-  </section>
-  <section class="section">
-    <div class="section-title">The Service Includes</div>
-    <div class="section-content">
-      <p>At ButterflyFX, I teach a method called <strong>dimensional programming</strong> — a way of organizing systems,
-        data, and logic using geometry instead of traditional code structures. It’s not a new programming language. It
-        works with any language, any framework, any stack.</p>
-      <p>Think of it as a new mental model for building AI‑driven systems.</p>
-      <h4>Manifolds: Geometry That Is the Data</h4>
-      <p>A <strong>manifold</strong> is a geometric surface that naturally encodes relationships. Instead of storing
-        data in tables, objects, or files, dimensional programming treats the shape itself as the information.</p>
-      <ul>
-        <li>A <strong>point</strong> represents a state</li>
-        <li>A <strong>line</strong> represents a relationship</li>
-        <li>A <strong>surface</strong> represents a system</li>
-        <li>A <strong>volume</strong> represents a full decision space</li>
-      </ul>
-      <p>You don’t compute the data — you observe it on the manifold.</p>
-      <h4>Dimensional Programming: A Framework for Thinking</h4>
-      <p>Dimensional programming is a way to design systems where:</p>
-      <ul>
-        <li>State drives behavior</li>
-        <li>Geometry replaces storage</li>
-        <li>AI handles the heavy math</li>
-        <li>Developers focus on meaning, not mechanics</li>
-      </ul>
-      <p>You don’t need to understand the calculus behind manifolds.<br>
-        You don’t need to derive equations.<br>
-        You don’t need to visualize 7‑dimensional surfaces.</p>
-      <p>AI does the math. You think about the results.</p>
-      <p>This frees teams from low‑level implementation details and lets them focus on:</p>
-      <ul>
-        <li>system behavior</li>
-        <li>relationships</li>
-        <li>constraints</li>
-        <li>outcomes</li>
-        <li>user experience</li>
-        <li>business logic</li>
-      </ul>
-      <h4>Why This Matters</h4>
-      <p>Dimensional programming gives organizations:</p>
-      <ul>
-        <li>clearer system architecture</li>
-        <li>more adaptive AI behavior</li>
-        <li>faster iteration</li>
-        <li>reduced complexity</li>
-        <li>a unified conceptual model for teams</li>
-      </ul>
-      <p>It’s a way to build systems that are dynamic, reactive, and state‑aware — the way real life works.</p>
-    </div>
-  </section>
-  <section class="section">
-    <div class="section-title">Why Work With ButterflyFX?</div>
-    <div class="section-content">
-      <ul>
-        <li>Direct, jargon-free communication and clear deliverables</li>
-        <li>Modern, scalable, and maintainable solutions</li>
-        <li>Personalized, hands-on approach for every client</li>
-        <li>Up-to-date with the latest in AI and software best practices</li>
-        <li>Driven by curiosity, integrity, and a commitment to quality</li>
-      </ul>
-    </div>
-  </section>
-  <footer class="footer">
-    &copy; 2026 Kenneth Bingham · ButterflyFX.us
-  </footer>
+
+  <div class="content">
+
+    <section class="hero glass">
+      <img src="kennethbingham.webp" alt="Kenneth W. Bingham" class="hero-photo" />
+      <div class="hero-title">Kenneth W. Bingham</div>
+      <div class="hero-subtitle">AI Systems Architect &middot; Senior Software Engineer</div>
+      <div class="hero-role">Kaysville, UT &middot; Available for full-time employment &middot; Open to remote</div>
+      <div class="hero-tagline">
+        Ten-plus-year senior engineer who designs AI systems whose behavior is
+        <b>provable</b>, not hoped-for. Seeking a senior or staff role.
+      </div>
+      <p class="hero-desc">
+        This site is an extended resume &mdash; a working portfolio of directive
+        frameworks, agent loops routed by logic gates and minimal-surface decision
+        boundaries, and full-stack platforms I have built end-to-end. The other
+        sites linked from here (KensGames, TTLRecall, the dimensional-programming
+        writeups) are <b>personal portfolio projects</b> demonstrating the same
+        skill set in different domains. None are commercial products, businesses,
+        or services for sale.
+      </p>
+      <div class="hero-cta">
+        <a href="assets/KennethWBingham_Resume_2026.pdf" class="cta-btn" download>Download Resume (PDF)</a>
+        <a href="contact.html" class="cta-btn alt">Contact for Hiring</a>
+        <a href="https://www.linkedin.com/in/kenneth-bingham-11378b10" class="cta-btn alt" target="_blank" rel="noopener">LinkedIn</a>
+      </div>
+      <div class="hero-3d-hint">z = x &middot; y&sup2; &nbsp;&middot;&nbsp; stakes dominate quadratically &mdash; route accordingly</div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">A Framework I Designed &mdash; The Butterfly Thesis</h2>
+      <div class="section-content">
+        <p style="font-size:1.18em;line-height:1.55;">
+          <b>A point becomes the whole. The whole becomes a point in a higher dimension.</b>
+        </p>
+        <p>
+          This is the architectural principle I developed across the portfolio projects below.
+          The butterfly effect taken literally &mdash; not "small thing causes big thing"
+          but <em>small thing IS big thing IS small thing,</em> depending on which octave you
+          address it from. A wing-flap is a point. A hurricane is the whole. A century of
+          climate data is the hurricane as a single point. Same substrate, three altitudes.
+        </p>
+        <p>
+          In code: a seed <code>x</code> is folded through a lens <code>y</code> to produce a
+          delta <code>z</code>; the closed manifold <code>m</code> becomes the seed
+          <code>x</code><sub>n+1</sub> of the next octave. <b>D7 of one breath is D0 of the next.</b>
+          The substrate is self-similar at every scale. I have used this discipline to keep
+          AI directives stable, route agent traffic deterministically, and structure data
+          stores around geometry instead of bespoke tables.
+        </p>
+        <p style="margin-top:1.2em;">
+          The other personal portfolio sites linked from here each apply this framework to a
+          different domain &mdash;
+          <a href="https://kensgames.com">KensGames</a> (the substrate at play),
+          <a href="https://dimensionalprogramming.com">DimensionalProgramming.com</a> (the
+          substrate formalized as a writeup), and several others in progress. They are
+          demonstrations of skill, not products for sale.
+        </p>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Core Skills</h2>
+      <div class="pillars-grid">
+
+        <article class="pillar-card">
+          <h3>AI Directive Engineering</h3>
+          <p>
+            I write the reasoning frameworks that keep AI systems stable. Directives are
+            structured prompts plus governing rules &mdash; an algebra of allowed transformations
+            that prevents drift, hallucination, and brittle failure modes. Demonstrated across
+            the portfolio projects on this site.
+          </p>
+          <a href="directive.html" class="card-link">Read a full directive &rarr;</a>
+        </article>
+
+        <article class="pillar-card">
+          <h3>Agent Systems</h3>
+          <p>
+            I design agents whose job is to make other AI work better &mdash; verifier loops,
+            evaluation harnesses, retrieval-augmented pipelines, and rule engines that catch
+            what a single LLM call cannot. Practical orchestration over hype.
+          </p>
+          <a href="agents.html" class="card-link">How I design agents &rarr;</a>
+        </article>
+
+        <article class="pillar-card">
+          <h3>Logic &amp; Manifolds</h3>
+          <p>
+            Truth tables, logic gates, and decision trees give an AI system a hard skeleton
+            it cannot lie around. Manifolds &mdash; geometric surfaces governed by
+            <span class="math">z = x &middot; y</span> &mdash; give it a way to focus attention
+            on the small region of state that actually matters. Together they replace
+            guesswork with geometry.
+          </p>
+          <a href="method.html" class="card-link">How I think &rarr;</a>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">What I Optimize For</h2>
+      <div class="pillars-grid">
+        <article class="pillar-card">
+          <h3>Maximum quality per dollar of AI spend</h3>
+          <p>
+            Route by regex pre-filter, truth-table constraints, decision-tree
+            shortcuts, and a <a href="routing.html">Schwarz-D minimal-surface
+            boundary</a> so frontier credits go only where frontier reasoning
+            is required. The router is real, tested, and live on this site.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <h3>Determinism over fluency</h3>
+          <p>
+            Schema-validated outputs, retry budgets, verifier ensembles.
+            LLMs never return free text to the next stage. Drift dies at the
+            boundary.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <h3>Ancestry-preserving systems</h3>
+          <p>
+            No destructive updates. Every state is traceable through its
+            lineage on the underlying manifold &mdash; debugging becomes
+            walking the path, not guessing the past.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <h3>Sovereign over rented</h3>
+          <p>
+            I own the VPS, the deploy pipeline, the data model, the directive
+            doctrine. Vendor portability is a first-class requirement &mdash;
+            no primitive I cannot replace within one sprint.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Portfolio Projects</h2>
+      <p style="margin:0 0 1em;opacity:0.85;">
+        Each link below is a personal portfolio piece &mdash; built end-to-end to demonstrate the
+        skills above. None are commercial products or services for sale.
+      </p>
+      <div class="projects-grid">
+        <div class="project-card">
+          <h3>KensGames.com</h3>
+          <p class="project-summary">3D game platform with deterministic simulation, real-time
+            rendering, authentication, and multiplayer orchestration. Designed and built solo
+            as a portfolio piece.</p>
+          <ul class="project-tech">
+            <li>Vanilla JS + WebGL2 + Web Audio</li>
+            <li>Node auth/lobby server, PM2, nginx</li>
+            <li>GitHub Actions CI/CD to VPS</li>
+          </ul>
+          <a href="https://kensgames.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+        </div>
+        <div class="project-card">
+          <h3>TTLRecall.com</h3>
+          <p class="project-summary">Rapid-build challenge platform with AI-accelerated workflows
+            for scenario generation, scoring, and feedback. Personal portfolio project.</p>
+          <ul class="project-tech">
+            <li>AI workflow automation</li>
+            <li>Scenario engine, real-time feedback</li>
+          </ul>
+          <a href="https://ttlrecall.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+        </div>
+        <div class="project-card">
+          <h3>DimensionalProgramming.com</h3>
+          <p class="project-summary">A technical writeup site presenting the paradigm I developed
+            &mdash; z = x &middot; y as a substrate, breath verbs, the manifold-as-database.</p>
+          <ul class="project-tech">
+            <li>Dimensional programming as a discipline</li>
+            <li>Explainable, non-drifting AI primitives</li>
+          </ul>
+          <a href="https://dimensionalprogramming.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+        </div>
+        <div class="project-card">
+          <h3>Open Source</h3>
+          <p class="project-summary">Public projects and code samples across AI tooling,
+            agent design, and dimensional programming.</p>
+          <ul class="project-tech">
+            <li>github.com/kenbin64</li>
+          </ul>
+          <a href="https://github.com/kenbin64" class="cta-btn" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </div>
+      <p style="text-align:center;margin-top:1.5em;">
+        <a href="projects.html" class="card-link">See full project details &rarr;</a>
+      </p>
+    </section>
+
+    <footer>
+      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
+    </footer>
+  </div>
+
+  <script src="manifold-bg.js" defer></script>
 </body>
 
 </html>

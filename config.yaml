@@ -1,0 +1,19 @@
+project:
+  name: kensgames
+  description: "ButterflyFX dimensional game engine and deployment system"
+  version: "1.0"
+
+paths:
+  workspace: "C:/projects/kensgames/kensgames"
+  build_output: "C:/projects/kensgames/kensgames/build"
+  logs: "C:/projects/kensgames/kensgames/logs"
+
+agent:
+  allow_file_read: true
+  allow_file_write: true
+
+dimensions:
+  observer_adds_dimension: true
+  reference_points_add_length: true
+  treat_3d_line_as_4d: true
+  manifold_mode: "potential-completeness"

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schwarz-D AI Routing &mdash; ButterflyFX</title>
+  <meta name="description"
+    content="A model-routing layer that picks the cheapest AI model good enough for each request, using the Schwarz D minimal surface as the cost/quality decision boundary, with truth tables, logic gates, manifold demand, and a determination graph.">
+  <link rel="canonical" href="https://butterflyfx.us/routing.html">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="carousel.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .route-section { max-width: 900px; margin: 32px auto; padding: 36px 28px; border-radius: 24px;
+      background: rgba(20,20,40,0.85); box-shadow: 0 8px 32px rgba(0,0,0,0.45); color: #f3f3f7; }
+    .route-section h2 { color: #ffd166; font-family: 'Orbitron','Inter',Arial,sans-serif; margin-top: 1.5em; }
+    .route-section h3 { color: #06d6a0; margin-top: 1.2em; }
+    .route-section code, .route-section pre { background: #181830; color: #ffd166; border-radius: 6px; padding: 2px 6px; }
+    .route-section pre { display:block; padding: 12px 16px; overflow-x:auto; font-size:0.92em; }
+    .route-section .math { color: #ef476f; font-weight: 700; }
+    .layers { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 1.5em 0; }
+    .layer-card { background:#181830; border-radius:12px; padding:14px 16px; border-left:4px solid #ffd166; }
+    .layer-card h4 { margin:0 0 6px 0; color:#06d6a0; font-family:'Orbitron','Inter',Arial,sans-serif; font-size:1em; }
+    .layer-card p { margin:0; font-size:0.9em; color:#cfd0d8; }
+    .demo { background:#0d0d20; border-radius:16px; padding:24px; margin-top:1.5em; }
+    .demo-row { display:grid; grid-template-columns: 140px 1fr 56px; gap:12px; align-items:center; margin:10px 0; }
+    .demo-row label { color:#ffd166; font-family:'Orbitron','Inter',Arial,sans-serif; font-size:0.95em; }
+    .demo-row input[type=range] { width:100%; }
+    .demo-row .val { color:#06d6a0; font-family:'Courier New',monospace; text-align:right; }
+    .flag-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px; margin:14px 0; }
+    .flag-grid label { color:#cfd0d8; font-size:0.92em; cursor:pointer; }
+    .flag-grid input { margin-right:6px; }
+    .result-card { background:#181830; border-radius:12px; padding:18px 22px; margin-top:16px; border:1px solid #06d6a033; }
+    .result-tier { color:#ffd166; font-size:1.4em; font-family:'Orbitron','Inter',Arial,sans-serif; }
+    .result-cost { color:#06d6a0; font-size:1.1em; }
+    .result-reason { color:#cfd0d8; font-size:0.92em; margin-top:8px; }
+    .plan-step { background:#0d0d20; border-radius:8px; padding:10px 14px; margin:6px 0; border-left:3px solid #ef476f; }
+    .plan-step .step-name { color:#ef476f; font-weight:700; text-transform:uppercase; font-size:0.85em; }
+    .surface-viz { width:100%; max-width:520px; height:240px; display:block; margin:18px auto; background:#0d0d20; border-radius:12px; }
+    .truth-table { width:100%; border-collapse:collapse; margin:1em 0; font-size:0.9em; }
+    .truth-table th, .truth-table td { padding:6px 10px; border:1px solid #181830; text-align:center; }
+    .truth-table th { background:#181830; color:#ffd166; font-family:'Orbitron','Inter',Arial,sans-serif; }
+    .truth-table td.t { color:#06d6a0; } .truth-table td.f { color:#666; }
+  </style>
+</head>
+
+<body>
+  <canvas id="spiral-bg"></canvas>
+
+  <nav class="navbar glass">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="method.html">Method</a>
+    <a href="agents.html">Agents</a>
+    <a href="routing.html" class="active">Routing</a>
+    <a href="projects.html">Projects</a>
+    <a href="directive.html">Directive</a>
+    <a href="schwarz-diamond.html">Schwarz Diamond</a>
+    <a href="dimensional-programming.html">Dimensional Programming</a>
+    <a href="resume.html">Resume</a>
+    <a href="contact.html">Contact</a>
+    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
+  </nav>
+
+  <div class="content">
+
+    <header>
+      <h1>Schwarz-D AI Routing</h1>
+      <h2>Maximum quality per dollar &mdash; as a minimal-surface problem.</h2>
+      <h3>Six decision layers stacked: regex pre-filter &middot; truth table &middot; logic gates &middot; decision tree &middot; manifold demand &middot; Schwarz-D surface &middot; determination graph.</h3>
+    </header>
+
+    <div class="route-section">
+
+      <h2>1. The metaphor</h2>
+      <p>The <b>Schwarz D</b> is a triply-periodic <em>minimal surface</em>. It divides
+        3-space into two interlocking labyrinths of <b>equal volume</b> with the
+        <b>maximum possible interface area per unit of material</b>. It is the canonical
+        answer to: <em>where do I place the wall so I get the most useful boundary
+          out of the least stuff?</em></p>
+      <p>Model routing has the same shape. Each request lives somewhere in a small
+        feature space (complexity, stakes, context load). I want a <b>boundary</b> that
+        sends as many requests as possible to the cheapest model that&rsquo;s still good
+        enough &mdash; <b>maximum quality per dollar, minimum material burnt on
+        oversized models</b>. So I literally use the Schwarz D as that boundary.</p>
+      <p class="math" style="text-align:center;font-size:1.05em;">
+        F(x,y,z) = sin(x)sin(y)sin(z) + sin(x)cos(y)cos(z) + cos(x)sin(y)cos(z) + cos(x)cos(y)sin(z) = 0
+      </p>
+
+      <h2>2. The six layers</h2>
+      <div class="layers">
+        <div class="layer-card"><h4>1 &middot; Regex pre-filter</h4><p>Zero-token
+          deterministic classifier. Patterns on the raw request infer
+          <code>kind</code>, <code>needs_code</code>, <code>needs_vision</code>,
+          <code>contains_pii</code>, <code>irreversible_action</code> before any
+          model is consulted. Caller-supplied flags always win.</p></div>
+        <div class="layer-card"><h4>2 &middot; Truth table</h4><p>Hard constraints
+          (vision, tools, PII, offline) expressed as AND/OR/NOT rows over tier
+          capabilities. Implication form: <code>flag &rarr; tier_supports</code>.</p></div>
+        <div class="layer-card"><h4>3 &middot; Logic gates</h4><p>The truth table
+          composes through explicit <code>AND</code>, <code>OR</code>, <code>NOT</code>,
+          <code>IMPL</code>. Auditable as a circuit, not as natural-language policy.</p></div>
+        <div class="layer-card"><h4>4 &middot; Decision tree</h4><p>Categorical
+          shortcuts. <em>kind = embedding</em> &rarr; embed tier. <em>must_be_offline</em>
+          &rarr; best local. Trivial classification &rarr; cheapest eligible. Early
+          termination before the continuous pipeline.</p></div>
+        <div class="layer-card"><h4>5 &middot; Manifold demand</h4><p>The Tiresias
+          surface <span class="math">z = x &middot; y&sup2;</span>. Stakes dominate
+          quadratically, complexity is linear, context loads additively. Smooth
+          continuous score in [0, 1].</p></div>
+        <div class="layer-card"><h4>6 &middot; Schwarz-D surface</h4><p>The
+          cost-vs-quality boundary itself. Signals map to angles in [0, 2&pi;]; the
+          surface value modulates the demand threshold. Picks the cheapest tier
+          whose quality clears the bar.</p></div>
+        <div class="layer-card"><h4>7 &middot; Determination graph</h4><p>The final
+          plan is a small DAG: <code>retrieve &rarr; answer &rarr; verify</code>.
+          Each node is routed independently, so retrieval can ride a free embed
+          tier while answer/verify use the surface-selected one.</p></div>
+      </div>
+
+      <h2>3. Truth table (excerpt)</h2>
+      <p>Six implications, AND-composed. A tier is eligible iff every row evaluates
+        to true. <code>1</code> = flag present / capability supported.</p>
+      <table class="truth-table">
+        <tr><th>needs_vision</th><th>tier.vision</th><th>row evaluates to</th></tr>
+        <tr><td class="f">0</td><td class="f">0</td><td class="t">true (vacuous)</td></tr>
+        <tr><td class="f">0</td><td class="t">1</td><td class="t">true</td></tr>
+        <tr><td class="t">1</td><td class="f">0</td><td class="f">false &rarr; tier rejected</td></tr>
+        <tr><td class="t">1</td><td class="t">1</td><td class="t">true</td></tr>
+      </table>
+
+    </div>
+
+    <div class="route-section">
+      <h2>4. Live demo</h2>
+      <p>Drag the sliders, flip flags. The five layers run in real time against the
+        default tier catalog. Output: selected tier, cost estimate, the routing
+        path (which layer fired), and the full determination-graph plan.</p>
+
+      <div class="demo" id="demo">
+        <div class="demo-row">
+          <label for="s-complexity">complexity</label>
+          <input type="range" id="s-complexity" min="0" max="1" step="0.01" value="0.5">
+          <span class="val" id="v-complexity">0.50</span>
+        </div>
+        <div class="demo-row">
+          <label for="s-stakes">stakes</label>
+          <input type="range" id="s-stakes" min="0" max="1" step="0.01" value="0.5">
+          <span class="val" id="v-stakes">0.50</span>
+        </div>
+        <div class="demo-row">
+          <label for="s-context">context</label>
+          <input type="range" id="s-context" min="0" max="1" step="0.01" value="0.3">
+          <span class="val" id="v-context">0.30</span>
+        </div>
+
+        <div class="flag-grid">
+          <label><input type="checkbox" id="f-vision">needs_vision</label>
+          <label><input type="checkbox" id="f-tools">needs_tools</label>
+          <label><input type="checkbox" id="f-code">needs_code</label>
+          <label><input type="checkbox" id="f-pii">contains_pii</label>
+          <label><input type="checkbox" id="f-offline">must_be_offline</label>
+          <label><input type="checkbox" id="f-retrieval">needs_retrieval</label>
+          <label><input type="checkbox" id="f-irrev">irreversible_action</label>
+          <label>kind:
+            <select id="f-kind" style="background:#0d0d20;color:#06d6a0;border:1px solid #181830;">
+              <option value="">(general)</option>
+              <option value="classification">classification</option>
+              <option value="embedding">embedding</option>
+            </select>
+          </label>
+        </div>
+
+        <svg class="surface-viz" id="viz" viewBox="0 0 520 240" aria-label="Schwarz-D surface slice"></svg>
+
+        <div class="result-card" id="result-card">
+          <div class="result-tier" id="r-tier">tier &mdash;</div>
+          <div class="result-cost" id="r-cost">cost &mdash;</div>
+          <div class="result-reason" id="r-reason">&mdash;</div>
+        </div>
+
+        <h3 style="color:#ef476f;">Determination graph (plan)</h3>
+        <div id="r-plan"></div>
+      </div>
+    </div>
+
+    <div class="route-section">
+      <h2>5. Personal workflow &mdash; how I apply this to my own AI spend</h2>
+      <p>I eat my own cooking. Inside VS Code (Augment, Continue, Copilot), in the
+        Claude/ChatGPT/Gemini apps, and in the agents that run my own products,
+        I route by the same rule: <b>use the cheapest model that will get the job
+          right; reserve frontier credits for the work that actually needs
+          frontier reasoning</b>. The policy below is the table I work from.</p>
+
+      <table class="truth-table" style="font-size:0.88em;">
+        <tr>
+          <th style="text-align:left;">Task</th>
+          <th>Complexity</th><th>Stakes</th><th>Context</th>
+          <th>Tier</th>
+          <th style="text-align:left;">Tool / model I actually use</th>
+        </tr>
+        <tr><td style="text-align:left;">Inline code completion</td>
+          <td>0.1</td><td>0.1</td><td>0.1</td><td>nano</td>
+          <td style="text-align:left;">Copilot, local llama via Continue</td></tr>
+        <tr><td style="text-align:left;">Quick chat / one-shot question</td>
+          <td>0.2</td><td>0.1</td><td>0.1</td><td>nano</td>
+          <td style="text-align:left;">Haiku, GPT-4o-mini, Gemini Flash</td></tr>
+        <tr><td style="text-align:left;">Single-file refactor or bug fix</td>
+          <td>0.5</td><td>0.3</td><td>0.4</td><td>small&ndash;mid</td>
+          <td style="text-align:left;">Augment Sonnet, Cursor Sonnet</td></tr>
+        <tr><td style="text-align:left;">Test generation</td>
+          <td>0.4</td><td>0.2</td><td>0.4</td><td>small&ndash;mid</td>
+          <td style="text-align:left;">Sonnet, Haiku for boilerplate</td></tr>
+        <tr><td style="text-align:left;">Cross-file architecture work</td>
+          <td>0.75</td><td>0.6</td><td>0.85</td><td>mid&ndash;large</td>
+          <td style="text-align:left;">Augment Sonnet w/ codebase context</td></tr>
+        <tr><td style="text-align:left;">Production code review</td>
+          <td>0.6</td><td>0.85</td><td>0.5</td><td>large</td>
+          <td style="text-align:left;">GPT-5, Sonnet w/ extended thinking</td></tr>
+        <tr><td style="text-align:left;">Hard debugging (state-space search)</td>
+          <td>0.9</td><td>0.7</td><td>0.8</td><td>frontier</td>
+          <td style="text-align:left;">Claude Opus with extended thinking</td></tr>
+        <tr><td style="text-align:left;">Spec / RFC drafting</td>
+          <td>0.55</td><td>0.5</td><td>0.6</td><td>mid</td>
+          <td style="text-align:left;">Sonnet (prose + structure)</td></tr>
+        <tr><td style="text-align:left;">Embeddings / vector search</td>
+          <td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>embed</td>
+          <td style="text-align:left;">Local bge-small (free, &lt;100ms)</td></tr>
+        <tr><td style="text-align:left;">Image / diagram analysis</td>
+          <td>0.5</td><td>0.4</td><td>0.3</td><td>mid (vision)</td>
+          <td style="text-align:left;">Sonnet vision, Gemini Flash</td></tr>
+        <tr><td style="text-align:left;">PII / regulated content</td>
+          <td>&mdash;</td><td>0.9</td><td>&mdash;</td><td>local</td>
+          <td style="text-align:left;">Local llama; never call cloud</td></tr>
+        <tr><td style="text-align:left;">Irreversible action (deploy, db write)</td>
+          <td>&mdash;</td><td>0.95</td><td>&mdash;</td><td>frontier + verify</td>
+          <td style="text-align:left;">Opus, with a second-pass verify step</td></tr>
+      </table>
+
+      <h3>The three rules I follow without exception</h3>
+      <ol>
+        <li><b>Don&rsquo;t pay Opus for Sonnet work.</b> If Sonnet&rsquo;s answer would be
+          indistinguishable, Sonnet wins. The cost ratio is ~20&times;.</li>
+        <li><b>Don&rsquo;t pay Sonnet for Haiku work.</b> Boilerplate, formatting, simple
+          edits, lookups, summarization &mdash; Haiku / Flash / 4o-mini are
+          ~10&times; cheaper and equally correct.</li>
+        <li><b>Frontier is for irreversibility, ambiguity, and high context.</b>
+          Production review, state-space debugging, architecture decisions that are
+          hard to undo. Everywhere else, frontier is waste.</li>
+      </ol>
+
+      <h2>6. The policy as a file</h2>
+      <p>The same table, as JSON, drop-in for a router, a Continue config, an Augment
+        guideline, or any custom agent loop:</p>
+      <p><a class="cta-btn" href="assets/routing-policy.example.json" download>Download routing-policy.example.json</a></p>
+    </div>
+
+    <footer>
+      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
+    </footer>
+  </div>
+
+  <script src="manifold-bg.js" defer></script>
+  <script src="router.js"></script>
+  <script>
+    (function () {
+      const R = window.SchwarzRouter;
+      if (!R) return;
+
+      const sliders = ['complexity', 'stakes', 'context'];
+      const flags = ['vision', 'tools', 'code', 'pii', 'offline', 'retrieval', 'irrev'];
+
+      function readSignals() {
+        const out = {};
+        sliders.forEach(k => { out[k] = parseFloat(document.getElementById('s-' + k).value); });
+        return out;
+      }
+      function readFlags() {
+        const kind = document.getElementById('f-kind').value;
+        return {
+          needs_vision:        document.getElementById('f-vision').checked,
+          needs_tools:         document.getElementById('f-tools').checked,
+          needs_code:          document.getElementById('f-code').checked,
+          contains_pii:        document.getElementById('f-pii').checked,
+          must_be_offline:     document.getElementById('f-offline').checked,
+          needs_retrieval:     document.getElementById('f-retrieval').checked,
+          irreversible_action: document.getElementById('f-irrev').checked,
+          kind: kind || undefined
+        };
+      }
+
+      function drawSurface(signals) {
+        const svg = document.getElementById('viz');
+        const W = 520, H = 240;
+        svg.innerHTML = '';
+        const ns = 'http://www.w3.org/2000/svg';
+
+        // 2D slice of Schwarz-D at z = signals.context*2π. Sample (x,y) and shade.
+        const z = signals.context * 2 * Math.PI;
+        const cols = 65, rows = 30;
+        for (let i = 0; i < cols; i++) {
+          for (let j = 0; j < rows; j++) {
+            const x = (i / (cols - 1)) * 2 * Math.PI;
+            const y = (j / (rows - 1)) * 2 * Math.PI;
+            const F = R.schwarzD(x, y, z);
+            const intensity = Math.min(1, Math.abs(F) / 1.5);
+            const color = F >= 0
+              ? 'rgba(6,214,160,' + (0.15 + 0.55 * intensity) + ')'
+              : 'rgba(239,71,111,' + (0.15 + 0.55 * intensity) + ')';
+            const r = document.createElementNS(ns, 'rect');
+            r.setAttribute('x', (i * W / cols).toFixed(2));
+            r.setAttribute('y', (j * H / rows).toFixed(2));
+            r.setAttribute('width', (W / cols + 0.5).toFixed(2));
+            r.setAttribute('height', (H / rows + 0.5).toFixed(2));
+            r.setAttribute('fill', color);
+            svg.appendChild(r);
+          }
+        }
+        // Request marker
+        const px = signals.complexity * W;
+        const py = signals.stakes * H;
+        const dot = document.createElementNS(ns, 'circle');
+        dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+        dot.setAttribute('r', 7); dot.setAttribute('fill', '#ffd166');
+        dot.setAttribute('stroke', '#0d0d20'); dot.setAttribute('stroke-width', 2);
+        svg.appendChild(dot);
+        const label = document.createElementNS(ns, 'text');
+        label.setAttribute('x', px + 12); label.setAttribute('y', py + 5);
+        label.setAttribute('fill', '#ffd166'); label.setAttribute('font-size', 12);
+        label.textContent = 'request';
+        svg.appendChild(label);
+      }
+
+      function render() {
+        const signals = readSignals();
+        const flagsObj = readFlags();
+        sliders.forEach(k => { document.getElementById('v-' + k).textContent = signals[k].toFixed(2); });
+        // Bridge: feed slider state into the manifold-bg shader uniforms.
+        if (window.__manifold) {
+          window.__manifold.update({
+            complexity: signals.complexity,
+            stakes:     signals.stakes,
+            context:    signals.context
+          });
+        }
+
+        const result = R.route(signals, undefined, { flags: flagsObj, tokens: 1500 });
+        document.getElementById('r-tier').textContent =
+          'tier: ' + result.tier + '   (quality ' + result.model.quality + ', $' +
+          result.model.cost_per_1k.toFixed(4) + '/1k)';
+        document.getElementById('r-cost').textContent =
+          'estimated cost @ 1500 tokens: $' + result.cost_estimate.toFixed(5);
+        document.getElementById('r-reason').textContent = result.reasoning;
+
+        const planObj = R.plan(Object.assign({}, signals, { flags: flagsObj, tokens: 1500 }));
+        const planEl = document.getElementById('r-plan');
+        planEl.innerHTML = '';
+        planObj.steps.forEach(s => {
+          const d = document.createElement('div');
+          d.className = 'plan-step';
+          d.innerHTML = '<span class="step-name">' + s.step + '</span> &rarr; ' +
+            s.route.tier + '  <span style="color:#06d6a0;">$' +
+            s.route.cost_estimate.toFixed(5) + '</span><br>' +
+            '<span style="font-size:0.85em;color:#888;">' + s.route.path + '</span>';
+          planEl.appendChild(d);
+        });
+        const totalEl = document.createElement('div');
+        totalEl.style.cssText = 'margin-top:10px;color:#ffd166;font-family:Orbitron,Inter,Arial,sans-serif;';
+        totalEl.textContent = 'plan total: $' + planObj.total_cost.toFixed(5);
+        planEl.appendChild(totalEl);
+
+        drawSurface(signals);
+      }
+
+      sliders.forEach(k => document.getElementById('s-' + k).addEventListener('input', render));
+      flags.forEach(k => document.getElementById('f-' + k).addEventListener('change', render));
+      document.getElementById('f-kind').addEventListener('change', render);
+      render();
+    })();
+  </script>
+</body>
+
+</html>
