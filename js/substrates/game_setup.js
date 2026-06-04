@@ -174,14 +174,13 @@
       authRequiredModes: authRequiredPanelModes || (opts && opts.authRequiredModes) || null,
       signupMethods: setupAssessment && setupAssessment.signup ? setupAssessment.signup : ((opts && opts.signupMethods) || null),
       onSignInRequired(info) {
+        // Redirects disabled: do not force navigation to /login/.
+        // If the caller supplied a handler, keep using it.
         if (opts && typeof opts.onSignInRequired === 'function') {
           return opts.onSignInRequired(info);
         }
-        const loginUrl = new URL('/login/', location.origin);
-        loginUrl.searchParams.set('next', location.pathname + location.search);
-        loginUrl.searchParams.set('game', gameId);
-        if (info && info.mode) loginUrl.searchParams.set('mode', String(info.mode));
-        location.href = loginUrl.toString();
+        // Let the calling panel / substrate decide how to proceed (likely show
+        // an in-place sign-in UI or block the action) without navigation.
         return false;
       },
       onStageChange(stageInfo) {

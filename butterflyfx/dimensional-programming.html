@@ -352,6 +352,14 @@ z = x ⊗ y (exact mathematical result)</code></pre>
     </footer>
   </div>
 
+  <script src="../js/auth-gate.js"></script>
+  <script>
+    // Gate website until server-verified login succeeds.
+    // Uses /api/auth/validate and redirects to /login/?redirect=…
+    if (window.kgAuth && typeof window.kgAuth.ensureAuthed === 'function') {
+      window.kgAuth.ensureAuthed();
+    }
+  </script>
   <script src="manifold-bg.js" defer></script>
 </body>
 

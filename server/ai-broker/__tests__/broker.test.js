@@ -140,3 +140,42 @@ describe('describe + usage snapshot', () => {
     expect(Array.isArray(snap.sessions)).toBe(true);
   });
 });
+
+describe('tools provider (PointDomain bytes roundtrip)', () => {
+  test('facilitator executes deterministic lossless roundtrip', async () => {
+    const payload = Buffer.from('HELLO_POINTDOMAIN_' + Date.now()).toString('base64');
+
+    const broker = makeBroker({
+      config: {
+        providers: {
+          anthropic: {},  // not needed; heuristic fallback is fine
+          tools: { enabled: true },
+        }
+      },
+    });
+
+    const r = await broker.invoke({
+      role: 'facilitator',
+      phase: 'lobby',
+      gameId: 'dimprog',
+      sessionId: 's-tools-1',
+      input: {
+        tool: {
+          type: 'pointdomain_roundtrip_bytes',
+          payload_b64: payload,
+          compression: true,
+          compression_level: 6,
+        }
+      }
+    });
+
+    expect(r.source).toBe('primary');
+    expect(r.provider.id).toBe('tools');
+    expect(r.result.tool_result).toBeDefined();
+    expect(r.result.tool_result.lossless).toBe(true);
+
+    // Verify expanded bytes are byte-identical to original payload
+    expect(r.result.tool_result.expanded_payload_b64).toBe(payload);
+    expect(r.result.tool_result.compressed_payload_b64).toBeDefined();
+  });
+});

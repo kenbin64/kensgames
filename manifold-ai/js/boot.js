@@ -8,6 +8,12 @@ import { VOID } from './dimensional.js';
 import { ToolRegistry, SandboxTransport, FolderTransport, MCPTransport }
   from './code-agent.js';
 
+// Gate AI until the user is authenticated (server-verified).
+if (!window.kgAuth || typeof window.kgAuth.ensureAuthed !== 'function') {
+  throw new Error('auth-gate missing: window.kgAuth.ensureAuthed not found');
+}
+await window.kgAuth.ensureAuthed();
+
 // Always-available instant engine for first-paint answers.
 const instant = createEngine('deterministic');
 await instant.init(() => { });

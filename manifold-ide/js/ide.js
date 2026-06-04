@@ -12,6 +12,12 @@ import {
 import { Runner } from './runner.js';
 import { DimensionalDebugger } from './debugger.js';
 
+// Gate IDE until the user is authenticated (server-verified).
+if (!window.kgAuth || typeof window.kgAuth.ensureAuthed !== 'function') {
+  throw new Error('auth-gate missing: window.kgAuth.ensureAuthed not found');
+}
+await window.kgAuth.ensureAuthed();
+
 const MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.50.0/min/vs';
 
 const $ = (s, r = document) => r.querySelector(s);
