@@ -16,6 +16,7 @@
   <header class="rail rail-top">
     <div class="brand"><span class="glyph">◇</span> Manifold IDE</div>
     <div class="path" id="filePath" title="Active file">untitled</div>
+    <div id="publicBanner" class="public-banner">Public mode — restricted, client-side only. No server access.</div>
 
     <label class="ctrl">
       <span class="ctrl-label">lang</span>
@@ -36,7 +37,10 @@
     <label class="ctrl">
       <span class="ctrl-label">engine</span>
       <select id="engineSelect">
-        <option value="auto" selected>auto</option>
+        <option value="auto">auto</option>
+        <option value="ollama:qwen2.5-coder:1.5b" selected>Ollama: Qwen 1.5B (server-side)</option>
+        <option value="ollama:qwen2.5-coder:7b">Ollama: Qwen 7B (server-side)</option>
+        <option value="ollama:llama3.1:8b">Ollama: Llama 3.1 8B (server-side)</option>
         <option value="webllm">Qwen2.5-1.5B · WebGPU · ~1 GB</option>
         <option value="webllm-3b">Llama-3.2-3B · WebGPU · ~2 GB</option>
         <option value="transformers">SmolLM2-1.7B · WASM</option>
@@ -44,15 +48,21 @@
       </select>
     </label>
 
+    <button class="ctrl-btn" id="examplesBtn" title="Examples">💡 examples</button>
+    <button class="ctrl-btn" id="ingestBtn" title="Ingest Markdown">📥 ingest</button>
+    <button class="ctrl-btn" id="aiDiagBtn" title="AI diagnostics">🧪 AI diag</button>
+
     <button class="ctrl-btn run" id="runBtn" title="Run (Ctrl+Enter)">▶ run</button>
     <button class="ctrl-btn dbg" id="debugBtn" title="Debug (step the dimensional ladder)">◐ debug</button>
     <button class="ctrl-btn dep" id="deployBtn" title="Deploy via MCP">☁ deploy</button>
+    <button class="ctrl-btn" id="gitBtn" title="Git"> git</button>
 
     <button class="ctrl-btn" id="grantFolderBtn" title="Grant a local folder">📁 folder</button>
     <button class="ctrl-btn" id="connectMcpBtn" title="Connect MCP bridge">🔌 MCP</button>
 
     <div class="lens" id="dimIndicator" title="Project dimensional level">◇ dim 1 (point)</div>
     <a class="ctrl-btn link" href="../index.html">portal</a>
+    <button class="ctrl-btn" id="secretBtn" title="Secret (local-only)" style="display:none">🔐 secret</button>
   </header>
 
   <main id="surface">
@@ -90,6 +100,7 @@
           <button class="bt-tab active" data-pane="console">CONSOLE</button>
           <button class="bt-tab" data-pane="debug">DEBUG</button>
           <button class="bt-tab" data-pane="manifold">MANIFOLD</button>
+          <button class="bt-tab" data-pane="preview">PREVIEW</button>
           <span class="spacer"></span>
           <button class="icon-btn" id="clearConsoleBtn" title="Clear">⌫</button>
           <button class="icon-btn" id="bottomToggle" title="Collapse">▾</button>
@@ -97,6 +108,7 @@
         <pre class="pane pane-console active" id="paneConsole"></pre>
         <pre class="pane pane-debug" id="paneDebug"></pre>
         <pre class="pane pane-manifold" id="paneManifold"></pre>
+        <div class="pane pane-preview" id="panePreview"><iframe id="previewFrame" style="width:100%;height:100%;border:none;background:#fff;"></iframe></div>
       </div>
     </section>
 
@@ -121,6 +133,53 @@
         <div class="upgrade-label"><span class="u-text">loading model…</span><span class="u-pct">0%</span></div>
         <div class="upgrade-track">
           <div class="upgrade-fill"></div>
+        </div>
+        <!-- Secret panel: shown only on localhost and after unlocking with your passphrase. -->
+        <div id="secretPanel" class="secret-panel hidden">
+          <div class="secret-body">
+            <h3>Local Secret Panel</h3>
+            <p class="muted">This panel is local-only. Your passphrase and settings are stored in this browser and never sent to the server.</p>
+            <div id="secretLockedArea">
+              <label for="secretPass">Enter passphrase to unlock:</label>
+              <input id="secretPass" type="password" autocomplete="new-password">
+              <button id="secretUnlockBtn">Unlock</button>
+              <button id="secretCreateBtn">Create New</button>
+            </div>
+            <div id="secretUnlockedArea" style="display:none">
+              <p>Unlocked. Local features and owner controls:</p>
+              <label><input type="checkbox" id="secretLocalOnlyToggle" checked> Enforce local-only LLM (no server contact)</label>
+              <div style="margin-top:8px">
+                <label><input type="checkbox" id="secretOwnerAccessToggle"> Enable Owner / Server Access</label>
+              </div>
+              <div style="margin-top:8px">
+                <label for="secretBridgeUrl">Bridge URL:</label>
+                <input id="secretBridgeUrl" type="text" placeholder="ws://localhost:8765" style="width:90%">
+                <div style="margin-top:6px">
+                  <button id="secretBridgeSave">Save URL</button>
+                  <button id="secretBridgeConnect">Connect Bridge</button>
+                  <button id="secretBridgeSSH">SSH Helper</button>
+                </div>
+              </div>
+              <div style="margin-top:8px"><button id="secretLockBtn">Lock</button></div>
+              <div style="margin-top:8px">
+                <button id="secretExportBtn">Export Backup</button>
+                <button id="secretImportBtn">Import Backup</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Git staging modal -->
+      <div id="gitPanel" class="modal hidden">
+        <div class="modal-body">
+          <h3>Git Staging</h3>
+          <div id="gitFilesList" style="max-height:240px;overflow:auto;border:1px solid var(--panel-border);padding:6px;margin-bottom:8px"></div>
+          <label>Commit message: <input id="gitCommitMsg" type="text" style="width:80%"></label>
+          <div style="margin-top:8px">
+            <button id="gitStageAllBtn">Stage All</button>
+            <button id="gitCommitBtn">Commit & Push</button>
+            <button id="gitCloseBtn">Close</button>
+          </div>
         </div>
       </div>
       <form id="aiForm" class="ai-form">
