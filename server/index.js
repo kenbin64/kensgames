@@ -139,8 +139,16 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username required' });
     }
 
-    // Find user (records layer — exact lookup by username)
-    const userData = db.users.findByUsername(username);
+    // Find user (records layer)
+    // NOTE: UI label says "Username or Email", but older code only looked up username.
+    // Accept email login transparently.
+    const loginIdent = String(username).trim();
+    let userData = db.users.findByUsername(loginIdent);
+
+    if (!userData && loginIdent.includes('@')) {
+      userData = db.users.findByEmail(loginIdent);
+    }
+
     if (!userData) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
@@ -178,15 +186,16 @@ app.post('/api/auth/login', async (req, res) => {
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const token = authHandler.generateToken(userData.userId, sessionId);
 
-    // Record last login in the records layer
-    db.users.update(username, { last_login_at: Date.now() });
+    // Record last login in the records layer (use canonical username from DB)
+    const canonicalUsername = userData.username;
+    db.users.update(canonicalUsername, { last_login_at: Date.now() });
 
     return res.status(200).json({
       success: true,
       message: 'Login successful',
       token: token,
       userId: userData.userId,
-      username: username,
+      username: canonicalUsername,
       displayName: userData.displayName,
       avatar: userData.avatar
     });

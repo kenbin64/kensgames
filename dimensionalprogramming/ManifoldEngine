@@ -1,0 +1,107 @@
+import math
+
+class Dimension:
+    """
+    Base class for all dimensional components.
+    A Dimension is a whole that may contain parts.
+    """
+    pass
+
+
+class Manifold(Dimension):
+    """
+    A manifold is a whole that defines z from (x, y).
+    It is swappable, extendable, and purely geometric.
+    """
+
+    def __init__(self, func):
+        """
+        func: a function (x, y) -> z
+        """
+        self.func = func
+
+    def z(self, x, y):
+        return self.func(x, y)
+
+
+class Geometry(Dimension):
+    """
+    Geometry extracts all geometric parts from the manifold.
+    It is a whole composed of many geometric sub-parts.
+    """
+
+    def __init__(self, manifold, derivatives):
+        """
+        manifold: Manifold instance
+        derivatives: a function returning all derivative info
+        """
+        self.manifold = manifold
+        self.derivatives = derivatives
+
+    def observe(self, x, y):
+        """
+        Returns a dictionary of geometric parts.
+        """
+        z = self.manifold.z(x, y)
+        geo = self.derivatives(x, y, z)
+        geo["z"] = z
+        geo["x"] = x
+        geo["y"] = y
+        return geo
+
+
+class Resonance(Dimension):
+    """
+    Resonance converts geometry into a universal signal packet.
+    This is the dimensional 'whole' that lenses interpret.
+    """
+
+    def __init__(self, translator):
+        """
+        translator: a function that maps geometry -> resonance packet
+        """
+        self.translator = translator
+
+    def relate(self, geometry):
+        return self.translator(geometry)
+
+
+class Lens(Dimension):
+    """
+    A lens is a whole that interprets resonance.
+    It defines meaning but does not alter the manifold.
+    """
+
+    def __init__(self, func):
+        """
+        func: a function resonance -> output
+        """
+        self.func = func
+
+    def apply(self, resonance):
+        return self.func(resonance)
+
+
+class ManifoldEngine(Dimension):
+    """
+    The ManifoldEngine is the highest whole.
+    It contains:
+        - a manifold (shape)
+        - a geometry extractor (parts of the shape)
+        - a resonance translator (meaningful signals)
+        - a lens (interpretation)
+    """
+
+    def __init__(self, manifold, geometry, resonance):
+        self.manifold = manifold
+        self.geometry = geometry
+        self.resonance = resonance
+
+    def extract(self, x, y, lens):
+        """
+        Full dimensional pipeline:
+            (x, y) → geometry → resonance → lens
+        """
+        geo = self.geometry.observe(x, y)
+        res = self.resonance.relate(geo)
+        return lens.apply(res)

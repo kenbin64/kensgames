@@ -1210,7 +1210,7 @@ function getTrackSequence(peg, player, direction) {
 
   const len = CLOCKWISE_TRACK.length;
   const fwd = dir === 'clockwise';
-  const safeEntry = `outer-${bp}-2`;
+  const safeEntry = `outer-${bp}-8`;
 
   // IF the peg is already sitting exactly ON the safe entry gate,
   // and is eligible to enter, and is moving forward, build the safe sequence directly.
@@ -1294,7 +1294,7 @@ function calculateValidMoves() {
 
     const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
     const _safeZoneFull = _inSafe >= SAFE_ZONE_SIZE;
-    const _safeEntry = `outer-${bp}-2`;
+    const _safeEntry = `outer-${bp}-8`;
     const _len = CLOCKWISE_TRACK.length;
     const walkOuter = (startFtIdx, hops) => {
       if (hops < 0) return null;
@@ -2447,7 +2447,7 @@ function executeMove(moveIdx) {
 
     case 'move': {
       const bp = player.boardPosition;
-      const safeEntry = `outer-${bp}-2`;
+      const safeEntry = `outer-${bp}-8`;
       // Circuit completion: passing the safe zone entrance in either direction
       // (including card 4 backward) makes peg eligible for safe zone on next forward turn
       const traversed = move.path || [];
@@ -2526,7 +2526,7 @@ function executeMove(moveIdx) {
       // landed it.
       {
         const _bp = player.boardPosition;
-        const _safeEntry = `outer-${_bp}-2`;
+        const _safeEntry = `outer-${_bp}-8`;
         const _traversed = move.path || [];
         if (!peg.eligibleForSafeZone && _traversed.includes(_safeEntry)) {
           peg.eligibleForSafeZone = true;
@@ -2568,7 +2568,7 @@ function executeMove(moveIdx) {
     case 'split': {
       // First peg moves
       const bp = player.boardPosition;
-      const safeEntry = `outer-${bp}-2`;
+      const safeEntry = `outer-${bp}-8`;
       if (!peg.eligibleForSafeZone && move.path && move.path.includes(safeEntry)) {
         peg.eligibleForSafeZone = true;
       }
@@ -3200,7 +3200,7 @@ function botTurn() {
       // Circuit-completion lookups (used by scoring pass below)
       const _bpForBot = player.boardPosition;
       const _ownFTForBot = `ft-${_bpForBot}`;
-      const _safeEntryForBot = `outer-${_bpForBot}-2`;
+      const _safeEntryForBot = `outer-${_bpForBot}-8`;
 
       // ── BULLSEYE RISK/REWARD (user_directive_2026-04-25) ──
       // Bullseye is high-risk/high-reward. Score adjustment factors:

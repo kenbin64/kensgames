@@ -1,8 +1,31 @@
 // manifold-bg.js — pure vanilla WebGL2.  Schwarz-D / gyroid wireframe,
 // raymarched, reactive to mouse + scroll + router sliders.  No deps.
 // Palette: cyan, green, purple, gold.  PHI-tuned proportions.
-(function () {
+(async function () {
   'use strict';
+
+  // Gate dimensionalprogramming.com pages with the same auth used by the IDE/AI.
+  // We only enforce on that hostname to avoid locking down the broader ButterflyFX site.
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    const host = window.location.hostname;
+    const shouldGate = host === 'dimensionalprogramming.com' || host.endsWith('.dimensionalprogramming.com');
+    if (shouldGate) {
+      if (!window.kgAuth || typeof window.kgAuth.ensureAuthed !== 'function') {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = '/js/auth-gate.js';
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('failed to load /js/auth-gate.js'));
+          (document.head || document.body || document.documentElement).appendChild(s);
+        });
+      }
+      if (!window.kgAuth || typeof window.kgAuth.ensureAuthed !== 'function') {
+        throw new Error('auth gate not available after loading /js/auth-gate.js');
+      }
+      await window.kgAuth.ensureAuthed();
+    }
+  }
+
   const PHI = 1.6180339887;
   const canvas = document.getElementById('spiral-bg');
   if (!canvas) return;

@@ -641,6 +641,21 @@
       ]
     },
     {
+      "id": "FT_SUPPRESS_AT_OWN_FT",
+      "x": 8,
+      "y": 1.5,
+      "z": 12,
+      "category": "fasttrack",
+      "desc": "If a peg begins its move on its own ft-{bp}, it is treated as being on the outer rim, not on the FT ring. No FT ring hops are generated. No k=D forced stretch exit is generated. No bullseye entry option is generated. Peg must move on the outer rim (clockwise or backward-4). Safe-zone entry allowed only via exact landing on outer-{p}-8 after completedCircuit.",
+      "assertion": "ctx.moveStart && peg.holeId === ('ft-'+bp) ==> { peg.onFasttrack = false; suppressFTExitOptions = true; suppressBullseyeEntry = true; movementMode = 'outer_rim_only'; }",
+      "provenance": [
+        "user_directive_2026-06-04",
+        "geometry.ft_circuit_completion",
+        "bullseye_entry_requires_ft_status",
+        "outer_rim_continuation_after_ft"
+      ]
+    },
+    {
       "id": "FT_NO_BACKWARD_ENTRY",
       "x": 8,
       "y": 2,
@@ -1026,48 +1041,29 @@
       ]
     },
     {
-      "id": "CARD_7_SPLIT",
+      "id": "CARD_7_FORWARD_ONLY",
       "x": 2,
       "y": 19,
       "z": 38,
       "category": "card",
-      "desc": "Card 7 may be split between exactly 2 pegs in any (a,b) where a+b=7 (a,b>=1), both clockwise, both moves individually legal.",
-      "assertion": "card.rank==='7' && isSplit ==> split.pegs.length===2 && split.a + split.b === 7 && all_legal(split)",
+      "desc": "Card 7 may only use forward-legal hops. Pegs in holding cannot participate and cannot move backward. A Card 7 turn is legal only if at least onepeg in play (not in holding) can make a forward-legal hop. If the player has only one peg in play, that peg must perform all 7 forward-legal hops; if it cannot, the card is forfeited.",
+      "assertion": "card.rank==='7' ==> !movingBackward && pegs_in_play>=1 && (pegs_in_play===1 ? !isSplit : true)",
       "provenance": [
-        "unified_rules.card_7",
-        "game_spec.json.card_7",
-        "rules_substrate.CARD_006",
-        "user_directive_2026-04-25"
+        "user_directive_2026-06-04",
+        "fasttrack.card_7_forward_only"
       ]
     },
     {
-      "id": "CARD_7_SOLO",
+      "id": "CARD_7_FT_PRIORITY",
       "x": 2,
-      "y": 20,
-      "z": 40,
+      "y": 19.5,
+      "z": 39,
       "category": "card",
-      "desc": "Card 7 with only 1 peg in play: that peg moves all 7 spaces clockwise.",
-      "assertion": "card.rank==='7' && pegs_in_play===1 ==> single peg moves 7",
+      "desc": "In a Card 7 split, if Peg A begins the split on FastTrack, Peg A must reach its own ft-{bp} to keep FastTrack status. If Peg A does not reach its own ft-{bp} and Peg B is moved (Peg B is not on FastTrack), then Peg A immediately loses FastTrack status and becomes an outer-rim peg for the remainder of the game. If both Peg A and Peg B are on FastTrack, both may move without Peg A losing FastTrack status (subject to normal FT no-pass/no-land-on-own rules).",
+      "assertion": "isSplit && P1.onFasttrack === true && !P1.passes(ownFtHole) && P2.onFasttrack === false ==> { P1.onFasttrack = false; P1.fasttrackEntryHole = null; P1.mustExitFasttrack = false; }",
       "provenance": [
-        "unified_rules",
-        "game_spec.json.card_7.single_peg_fallback",
-        "rules_substrate.CARD_006",
-        "user_directive_2026-04-25"
-      ]
-    },
-    {
-      "id": "CARD_7_FT_HANDOFF",
-      "x": 2,
-      "y": 21,
-      "z": 42,
-      "category": "card",
-      "desc": "Card 7 split semantics (v3.3.1): split is between exactly 2 DIFFERENT pegs, each half >=1, both halves must be individually legal moves, both clockwise. FT pegs participating in the split now enumerate FT_EXIT_ANY_HOLE leave-at-k options per half (user_directive_2026-05-20e) instead of being confined to the FT ring. The 'all-FT-path' constraint from v3.1.0–3.3.0 is RETIRED: an FT peg may leave the ring during its half, with FT status loss evaluated downstream by FT_LOSS_VOLUNTARY_EXIT. FT peg cardinality rule preserved: if the player has N FT pegs, the split must use min(N,2) of them as the two split pegs (cannot route around an idle FT peg while another non-FT peg gets the half). If splitting moves a non-FT peg while FT pegs exist outside the chosen pair, FT_LOSS_ON_NON_FT_MOVE fires. Bullseye-ending halves offered when geometrically legal (1-hit FT→bullseye preserved; multi-hop FT→bullseye still forbidden by BULL_NO_FINAL_HOP_FROM_FT_TRAVERSAL). FT-ring own-peg passing FORBIDDEN per FT_RING_PASS_RELAX.",
-      "assertion": "isSplit ==> split.pegs.length===2 && split.pegs[0]!==split.pegs[1] && split.a>=1 && split.b>=1 && split.a+split.b===7 && all_legal(split) && (player.ft_peg_count > 0 ==> ft_pegs_in_split >= min(player.ft_peg_count, 2))",
-      "provenance": [
-        "unified_rules.card_7",
-        "user_directive_2026-04-25",
-        "user_directive_2026-05-20.card_7_no_ft_priority_constraint",
-        "user_directive_2026-05-20e"
+        "user_directive_2026-06-04",
+        "fasttrack.card_7_ft_priority"
       ]
     },
     {

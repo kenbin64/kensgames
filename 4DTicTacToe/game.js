@@ -1257,6 +1257,15 @@ function releaseBall() {
     if (btn) { btn.hidden = false; btn.classList.add('orient-pulse'); setTimeout(() => btn.classList.remove('orient-pulse'), 700); }
     return;
   }
+
+  // Force follow during drop so “camera follows the ball down” works on touch.
+  if (!camFollow) {
+    camFollow = true;
+    const bf = document.getElementById('btn-follow'); if (bf) bf.classList.add('on');
+    const ba = document.getElementById('btn-cama'); if (ba) ba.classList.remove('on');
+    const bb = document.getElementById('btn-camb'); if (bb) bb.classList.remove('on');
+  }
+
   // Capture the ghost's current world-space aim point BEFORE we snap, so the ball spawns
   // above the column the player was actually pointing at (re-projected after snap).
   const p = ghostBall.p;
@@ -1345,9 +1354,9 @@ canvas.addEventListener('pointerdown', e => {
   lastMouseX = e.clientX; lastMouseY = e.clientY;
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
 });
-window.addEventListener('mouseup', e => { if (cDrag && cBtn === 0 && cMoved < 6) releaseBall(); cDrag = false; });
+window.addEventListener('mouseup', e => { if (cDrag && cBtn === 0) releaseBall(); cDrag = false; });
 canvas.addEventListener('pointerup', e => {
-  if (cDrag && cBtn === 0 && cMoved < 6) releaseBall();
+  if (cDrag && cBtn === 0) releaseBall();
   cDrag = false;
   try { canvas.releasePointerCapture(e.pointerId); } catch (_) { }
 });
@@ -1356,10 +1365,14 @@ window.addEventListener('mousemove', e => {
   parallax.ty = (e.clientY / window.innerHeight - .5) * 2;
   lastMouseX = e.clientX; lastMouseY = e.clientY;
   if (!cDrag) return;
+
   const ddx = e.clientX - cLX, ddy = e.clientY - cLY;
   cMoved += Math.hypot(ddx, ddy);
-  if (cBtn !== 2 && cMoved < 6) { cLX = e.clientX; cLY = e.clientY; return; }
-  rotateBoard(ddx, ddy);
+
+  // Right drag rotates cube; left drag moves the ghost ball.
+  if (cBtn === 2) rotateBoard(ddx, ddy);
+  else moveGhostFromClient(e.clientX, e.clientY);
+
   cLX = e.clientX; cLY = e.clientY;
 });
 window.addEventListener('pointermove', e => {
@@ -1382,8 +1395,16 @@ canvas.addEventListener('wheel', e => {
   e.preventDefault();
 }, { passive: false });
 canvas.addEventListener('touchstart', e => { cDrag = true; cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; cDownX = cLX; cDownY = cLY; cMoved = 0; cBtn = 0; moveGhostFromClient(cLX, cLY); }, { passive: true });
-canvas.addEventListener('touchend', () => { if (cDrag && cMoved < 8) releaseBall(); cDrag = false; });
-canvas.addEventListener('touchmove', e => { if (!cDrag) return; const tx = e.touches[0].clientX, ty = e.touches[0].clientY; const ddx = tx - cLX, ddy = ty - cLY; cMoved += Math.hypot(ddx, ddy); lastMouseX = tx; lastMouseY = ty; if (cMoved < 8) { cLX = tx; cLY = ty; return; } rotateBoard(ddx, ddy); cLX = tx; cLY = ty; }, { passive: true });
+canvas.addEventListener('touchend', () => { if (cDrag) releaseBall(); cDrag = false; });
+canvas.addEventListener('touchmove', e => {
+  if (!cDrag) return;
+  const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+  const ddx = tx - cLX, ddy = ty - cLY;
+  cMoved += Math.hypot(ddx, ddy);
+  lastMouseX = tx; lastMouseY = ty;
+  cLX = tx; cLY = ty;
+  moveGhostFromClient(tx, ty);
+}, { passive: true });
 // Keyboard / gamepad: space, enter, or any gamepad button releases the ball.
 window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); releaseBall(); } });
 let _gpPrev = false;
@@ -1887,7 +1908,8 @@ function finishPlacement(p, cell) {
   currentPlayer = numPlayers <= 1 ? P1 : ((currentPlayer % numPlayers) + 1);
   isDropping = false;
   updateHUD();
-  if (camFollow) setTimeout(() => { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); }, 600);
+  // Smooth auto-camera on mobile: avoid delayed hard snaps; per-frame lerp handles easing.
+  if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); }
   maybeSpawnTurnBall();
 }
 // Hand control to the next actor: AI auto-drops, a human gets a cursor ball.

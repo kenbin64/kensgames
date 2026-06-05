@@ -37,6 +37,7 @@ function createDefaultRegistry(brokerConfig) {
   const reg = createRegistry();
   const cfg = (brokerConfig && brokerConfig.providers) || {};
   const aCfg = cfg.anthropic;
+
   if (aCfg && aCfg.apiKey) {
     try {
       const { createAnthropicProvider } = require('./anthropic');
@@ -45,6 +46,21 @@ function createDefaultRegistry(brokerConfig) {
       // Fall through silently: heuristic remains as fallback (HR-21 liveness).
     }
   }
+
+  // Optional local/unsafe-free tool provider (inproc only).
+  // Config shape:
+  //   providers: { tools: { enabled: true } }  OR providers: { tools: true }
+  const tCfg = cfg.tools;
+  const toolsEnabled = tCfg === true || (tCfg && tCfg.enabled !== false);
+  if (toolsEnabled) {
+    try {
+      const toolsProvider = require('./tools');
+      reg.register(toolsProvider);
+    } catch (_) {
+      // Fall through: heuristic remains as fallback (HR-21 liveness).
+    }
+  }
+
   return reg;
 }
 

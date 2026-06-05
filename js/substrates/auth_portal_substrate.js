@@ -246,30 +246,53 @@ const AuthPortalSubstrate = (() => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   const init = async () => {
-    // Check if user is already authenticated (session token in storage)
-    const stored = sessionStorage.getItem('sessionToken');
-    if (stored) {
-      _sessionToken = stored;
+    // Check if user is already authenticated (token in storage).
+    // username/password login stores: localStorage.user_token
+    // OAuth path stores: sessionStorage.sessionToken
+    const storedSessionToken = sessionStorage.getItem('sessionToken');
+    const storedUserToken = (() => {
+      try { return localStorage.getItem('user_token'); } catch { return null; }
+    })();
 
-      try {
-        const response = await fetch('/api/auth/validate', {
-          headers: { 'Authorization': `Bearer ${_sessionToken}` }
-        });
+    const token = storedSessionToken || storedUserToken;
+    if (!token) return false;
 
-        const data = await response.json();
-        if (data.user) {
-          _currentUser = data.user;
-          _state.set('currentUser', _currentUser);
-          emit('restored', { user: _currentUser });
-          return true;
-        }
-      } catch (error) {
-        console.warn('Session restore failed:', error);
-        sessionStorage.removeItem('sessionToken');
+    _sessionToken = token;
+
+    try {
+      const response = await fetch('/api/auth/validate', {
+        headers: { 'Authorization': `Bearer ${_sessionToken}` }
+      });
+
+      const data = await response.json();
+
+      // Backend validate shape (see server/index.js):
+      // { valid: true, userId, sessionId, expiresAt }
+      if (data && data.valid) {
+        // This substrate expects _currentUser.id when submitting scores.
+        const userId = data.userId;
+        _currentUser = {
+          id: userId,
+          userId,
+        };
+        _state.set('currentUser', _currentUser);
+
+        // Keep sessionStorage in sync so subsequent calls use the same token.
+        sessionStorage.setItem('sessionToken', _sessionToken);
+
+        emit('restored', { user: _currentUser });
+        return true;
       }
-    }
 
-    return false;
+      // Token present but invalid.
+      sessionStorage.removeItem('sessionToken');
+      try { localStorage.removeItem('user_token'); } catch { /* ignore */ }
+      return false;
+    } catch (error) {
+      console.warn('Session restore failed:', error);
+      sessionStorage.removeItem('sessionToken');
+      return false;
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
