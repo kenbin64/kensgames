@@ -27,10 +27,14 @@ function loadConfig(env) {
   return {
     enabled: /^(1|true|yes|on)$/i.test(e.AI_BROKER_ENABLED || ''),
     defaultProvider: e.AI_BROKER_PROVIDER || 'heuristic',
+    // Set AI_BROKER_USE_MANIFOLD_ROUTER=1 to replace the fixed-model broker
+    // with the Schwarz Diamond router. Each role call selects the cheapest
+    // Claude tier that clears the surface-derived quality threshold.
+    useManifoldRouter: /^(1|true|yes|on)$/i.test(e.AI_BROKER_USE_MANIFOLD_ROUTER || ''),
     providers: {
       anthropic: {
         apiKey: e.ANTHROPIC_API_KEY || '',
-        model: e.ANTHROPIC_MODEL || 'claude-opus-4-5',
+        model: e.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
         maxTokens: parseInt(e.ANTHROPIC_MAX_TOKENS || '1024', 10),
       },
     },

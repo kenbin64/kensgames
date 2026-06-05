@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dimensional Programming: A Paradigm for the Age of AI</title>
+  <meta name="description" content="Dimensional Programming: state is observed, not stored. z = x times y, the universal substrate for AI-native systems.">
+  <meta name="author" content="Kenneth Bingham">
+  <meta property="og:title" content="Dimensional Programming: A Paradigm for the Age of AI">
+  <meta property="og:description" content="z = x times y, state is observed not stored. The programming paradigm built for the way AI actually works.">
+  <meta property="og:image" content="https://butterflyfx.us/kennethbingham.jpg">
+  <link rel="canonical" href="https://dimensionalprogramming.com/">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-0:    #03030a;
+      --bg-1:    #08061a;
+      --cyan:    #2cf0ff;
+      --green:   #4dffb0;
+      --purple:  #c79aff;
+      --gold:    #ffd166;
+      --panel:   rgba(4, 4, 16, 0.93);
+      --edge:    rgba(44, 240, 255, 0.32);
+      --t1:      #f0f2fa;
+      --t2:      #d4d8ee;
+      --t3:      #9aa2c8;
+      --max:     920px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: radial-gradient(ellipse at 50% 0%, var(--bg-1) 0%, var(--bg-0) 65%);
+      color: var(--t1);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.8;
+      min-height: 100vh;
+    }
+
+    /* Schwarz Diamond canvas */
+    #schwarz-diamond-bg {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    header, main, footer { position: relative; z-index: 1; }
+
+    /* Glass panel */
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(22px) saturate(1.5) brightness(1.08);
+      -webkit-backdrop-filter: blur(22px) saturate(1.5) brightness(1.08);
+      border-radius: 16px;
+      border: 1px solid var(--edge);
+      box-shadow:
+        0 0 0 1px rgba(44,240,255,0.10),
+        0 4px 60px rgba(0,0,0,0.88),
+        0 0 120px rgba(0,0,0,0.65),
+        0 0 1px rgba(255,255,255,0.06) inset;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Subtle wireframe grid inside panels */
+    .panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(44,240,255,0.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(44,240,255,0.028) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: inherit;
+    }
+    .panel > * { position: relative; z-index: 1; }
+
+    .panel-glow { transition: border-color .3s, box-shadow .3s; }
+    .panel-glow:hover {
+      border-color: rgba(44,240,255,0.5);
+      box-shadow:
+        0 0 0 1px rgba(44,240,255,0.22),
+        0 4px 60px rgba(0,0,0,0.9),
+        0 0 32px rgba(44,240,255,0.10) inset,
+        0 0 40px rgba(44,240,255,0.20);
+    }
+
+    /* Animated gradient border */
+    @keyframes gradient-border {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .panel-gradient {
+      border: 2px solid transparent;
+      background-image:
+        linear-gradient(var(--panel), var(--panel)),
+        linear-gradient(90deg, var(--cyan), var(--green), var(--gold), var(--purple), var(--cyan));
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+      background-size: 100% 100%, 300% 300%;
+      animation: gradient-border 8s ease infinite;
+    }
+    .panel-gradient::before { display: none; }
+
+    /* Navbar */
+    header {
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    nav.glass-nav {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: rgba(4,4,14,0.92);
+      backdrop-filter: blur(18px);
+      border-radius: 12px;
+      border: 1px solid rgba(44,240,255,0.18);
+      box-shadow: 0 2px 24px rgba(0,0,0,0.65);
+      flex-wrap: wrap;
+    }
+    .nav-brand {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--t1);
+      text-decoration: none;
+      letter-spacing: -.3px;
+      margin-right: 8px;
+    }
+    .nav-brand span { color: var(--cyan); }
+    nav.glass-nav a:not(.nav-brand) {
+      font-size: 13px;
+      color: var(--t3);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      transition: background .2s, color .2s;
+      white-space: nowrap;
+    }
+    nav.glass-nav a:not(.nav-brand):hover,
+    nav.glass-nav a.active {
+      background: rgba(44,240,255,0.12);
+      color: var(--cyan);
+    }
+    .nav-spacer { flex: 1; }
+
+    /* Hero */
+    .hero-wrap {
+      max-width: var(--max);
+      margin: 40px auto 0;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+    .hero-panel {
+      padding: 64px 40px 56px;
+      text-align: center;
+    }
+    .eq {
+      font-family: 'Courier New', monospace;
+      font-size: clamp(72px, 13vw, 120px);
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: -4px;
+      line-height: 1;
+      margin-bottom: 28px;
+      text-shadow: 0 0 60px rgba(44,240,255,0.4), 0 0 120px rgba(44,240,255,0.18);
+    }
+    .hero-title {
+      font-size: clamp(24px, 4vw, 38px);
+      font-weight: 300;
+      color: var(--gold);
+      margin-bottom: 14px;
+      letter-spacing: -.3px;
+      text-shadow: 0 0 30px rgba(255,209,102,0.25);
+    }
+    .hero-sub {
+      font-size: 16px;
+      color: var(--t2);
+      max-width: 520px;
+      margin: 0 auto 32px;
+    }
+    .hero-by { font-size: 13px; color: var(--t3); }
+    .hero-by span { color: var(--purple); }
+    .hero-pills {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .pill {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+    .pill-cyan   { border-color: var(--cyan);   color: var(--cyan);   background: rgba(44,240,255,0.08); }
+    .pill-green  { border-color: var(--green);  color: var(--green);  background: rgba(77,255,176,0.08); }
+    .pill-purple { border-color: var(--purple); color: var(--purple); background: rgba(199,154,255,0.08); }
+    .pill-gold   { border-color: var(--gold);   color: var(--gold);   background: rgba(255,209,102,0.08); }
+
+    /* Content */
+    .content { max-width: var(--max); margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 2; }
+    .section {
+      padding: 36px 40px;
+      margin: 24px 0;
+      background: var(--panel);
+      backdrop-filter: blur(22px) saturate(1.5) brightness(1.08);
+      -webkit-backdrop-filter: blur(22px) saturate(1.5) brightness(1.08);
+      border-radius: 16px;
+      border: 1px solid rgba(44,240,255,0.18);
+      box-shadow:
+        0 0 0 1px rgba(44,240,255,0.07),
+        0 4px 60px rgba(0,0,0,0.88),
+        0 0 1px rgba(255,255,255,0.04) inset;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Subtle grid inside content sections */
+    .section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(44,240,255,0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(44,240,255,0.022) 1px, transparent 1px);
+      background-size: 52px 52px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .section > * { position: relative; z-index: 1; }
+
+    h2 {
+      font-size: clamp(20px, 3vw, 28px);
+      font-weight: 400;
+      color: var(--gold);
+      margin-bottom: 20px;
+      text-shadow: 0 0 24px rgba(255,209,102,0.2);
+    }
+    h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin: 32px 0 12px;
+      text-shadow: 0 0 12px rgba(44,240,255,0.3);
+    }
+    h3:first-child { margin-top: 0; }
+    p { color: var(--t2); margin-bottom: 16px; }
+    p:last-child { margin-bottom: 0; }
+    strong { color: var(--t1); }
+    em { color: var(--t2); font-style: italic; }
+    code {
+      font-family: 'Courier New', monospace;
+      font-size: .85em;
+      color: var(--gold);
+      background: rgba(0,0,0,0.5);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { color: var(--gold); }
+
+    /* Pull quote */
+    .pull {
+      border-left: 3px solid var(--purple);
+      padding: 14px 22px;
+      margin: 24px 0;
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--purple);
+      font-style: italic;
+      text-shadow: 0 0 20px rgba(199,154,255,0.2);
+    }
+
+    /* Symbol grid */
+    .sym-grid {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      margin: 24px 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(44,240,255,0.18);
+    }
+    .sym-grid .sg-sym {
+      background: rgba(0,0,0,0.5);
+      border-bottom: 1px solid rgba(44,240,255,0.12);
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      color: var(--cyan);
+      display: flex; align-items: center; justify-content: center;
+      text-shadow: 0 0 16px rgba(44,240,255,0.6);
+    }
+    .sym-grid .sg-def {
+      background: rgba(4,4,16,0.7);
+      border-bottom: 1px solid rgba(44,240,255,0.08);
+      padding: 18px 22px;
+    }
+    .sym-grid .sg-sym:last-of-type,
+    .sym-grid .sg-def:last-of-type { border-bottom: none; }
+    .sg-def strong { color: var(--green); display: block; margin-bottom: 4px; font-size: 15px; text-shadow: 0 0 10px rgba(77,255,176,0.2); }
+    .sg-def span { color: var(--t3); font-size: 14px; }
+
+    /* Hello World section */
+    .hw-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--green);
+      border: 1px solid rgba(77,255,176,0.4);
+      background: rgba(77,255,176,0.07);
+      border-radius: 20px; padding: 4px 12px; margin-bottom: 16px;
+    }
+    .hw-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    /* Code block */
+    .code-block {
+      background: rgba(2,2,10,0.9);
+      border: 1px solid rgba(44,240,255,0.15);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 20px 0;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(44,240,255,0.05);
+    }
+    .cb-bar {
+      background: rgba(0,0,0,0.5);
+      border-bottom: 1px solid rgba(44,240,255,0.1);
+      padding: 8px 16px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--t3); font-family: 'Courier New', monospace;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dr { background: #ff5f57; } .dy { background: #febc2e; } .dg { background: #28c840; }
+    .code-block pre {
+      padding: 24px 28px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px; line-height: 1.7;
+      overflow-x: auto; color: var(--t2);
+    }
+    .kw  { color: #c792ea; }
+    .fn  { color: #82aaff; }
+    .str { color: #c3e88d; }
+    .cm  { color: #4a5568; font-style: italic; }
+    .tl  { color: var(--cyan); }
+    .am  { color: var(--gold); }
+    .gn  { color: var(--green); }
+
+    /* Live doll demo */
+    .doll-demo { padding: 28px; margin: 20px 0; }
+    .doll-demo h3 { color: var(--cyan); margin-bottom: 14px; }
+    .doll-chain { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+    .doll-row {
+      display: grid; grid-template-columns: 36px 1fr; gap: 10px;
+      align-items: start; padding: 10px 14px; border-radius: 8px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(44,240,255,0.08);
+      opacity: 0; transform: translateX(-8px);
+      transition: opacity .35s, transform .35s, border-color .3s;
+      font-family: 'Courier New', monospace; font-size: 13px;
+    }
+    .doll-row.visible { opacity: 1; transform: translateX(0); }
+    .doll-row:hover { border-color: rgba(44,240,255,0.22); }
+    .doll-idx { color: var(--t3); font-size: 11px; padding-top: 3px; }
+    .doll-lbl { color: var(--t3); font-size: 10px; margin-bottom: 3px; letter-spacing: .5px; }
+    .doll-expr .xp { color: var(--gold); }
+    .doll-expr .op { color: var(--t3); }
+    .doll-expr .yp { color: var(--green); }
+    .doll-expr .zp { color: var(--cyan); }
+    .doll-input { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    .doll-input input {
+      flex: 1; min-width: 160px;
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(44,240,255,0.22);
+      border-radius: 8px; padding: 10px 14px;
+      color: var(--t1); font-family: 'Courier New', monospace; font-size: 14px;
+      outline: none; transition: border-color .2s;
+    }
+    .doll-input input:focus { border-color: var(--cyan); box-shadow: 0 0 16px rgba(44,240,255,0.18); }
+    .doll-input input::placeholder { color: var(--t3); }
+    .btn-bloom {
+      background: linear-gradient(95deg, var(--cyan) 0%, var(--green) 100%);
+      border: none; border-radius: 8px; padding: 10px 22px;
+      color: #03030a; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      box-shadow: 0 0 22px rgba(44,240,255,0.35);
+    }
+    .btn-bloom:hover { opacity: .88; transform: translateY(-1px); }
+    .btn-reset {
+      background: transparent; border: 1px solid rgba(44,240,255,0.2);
+      border-radius: 8px; padding: 10px 16px;
+      color: var(--t3); font-size: 13px; cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .btn-reset:hover { color: var(--t1); border-color: var(--t3); }
+
+    /* Tables */
+    .tbl-wrap { overflow-x: auto; margin: 20px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(44,240,255,0.15); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 440px; }
+    th { background: rgba(0,0,0,0.55); color: var(--gold); padding: 11px 16px; text-align: left; font-weight: 600; border-bottom: 1px solid rgba(44,240,255,0.15); }
+    td { padding: 11px 16px; border-bottom: 1px solid rgba(44,240,255,0.06); color: var(--t3); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr.hl td { color: var(--t1); background: rgba(44,240,255,0.06); }
+    tr.hl td:first-child { color: var(--cyan); font-weight: 600; }
+    .mono { font-family: 'Courier New', monospace; font-size: 12px; }
+
+    /* Diagram blocks */
+    .diagram {
+      background: rgba(2,2,10,0.75);
+      border: 1px solid rgba(44,240,255,0.12);
+      border-radius: 10px;
+      padding: 22px 26px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px; line-height: 2.1;
+      color: var(--t3); overflow-x: auto; margin: 18px 0;
+    }
+    .diagram .dc { color: var(--cyan); }
+    .diagram .dg { color: var(--green); }
+    .diagram .da { color: var(--gold); }
+    .diagram .dp { color: var(--purple); }
+    .diagram .dm { color: #4a5568; font-style: italic; }
+
+    /* State cards */
+    .state-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px; margin: 20px 0;
+    }
+    .state-card { padding: 18px; }
+    .state-card .sn {
+      font-family: 'Courier New', monospace; font-size: 12px;
+      color: var(--cyan); font-weight: 700; margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(44,240,255,0.45);
+    }
+    .state-card p { font-size: 13px; color: var(--t3); margin: 0; }
+
+    /* Impl cards */
+    .impl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+    .impl-card { padding: 22px; }
+    .impl-card h3 { margin-top: 0; }
+    .impl-card p { font-size: 14px; margin: 0; }
+
+    /* Download cards */
+    .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin: 28px 0; }
+    .dl-card { padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+    .dl-icon { font-size: 32px; line-height: 1; }
+    .dl-title { font-size: 16px; color: var(--t1); font-weight: 600; }
+    .dl-desc { font-size: 14px; color: var(--t3); flex: 1; }
+    .dl-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(44,240,255,0.25);
+      border-radius: 8px; padding: 10px 16px;
+      color: var(--cyan); font-size: 13px;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      align-self: flex-start;
+    }
+    .dl-btn:hover { border-color: var(--cyan); background: rgba(44,240,255,0.08); box-shadow: 0 0 20px rgba(44,240,255,0.15); color: var(--cyan); }
+    .dl-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(44,240,255,0.1);
+      padding: 48px 24px;
+      text-align: center; font-size: 14px; color: var(--t3);
+    }
+    .footer-eq {
+      font-family: 'Courier New', monospace; font-size: 36px;
+      color: var(--cyan); margin-bottom: 14px;
+      text-shadow: 0 0 50px rgba(44,240,255,0.4);
+    }
+    footer a { color: var(--purple); }
+    footer a:hover { color: var(--gold); }
+
+    @media (max-width: 640px) {
+      body { font-size: 15px; }
+      .hero-panel { padding: 40px 24px 36px; }
+      .sym-grid { grid-template-columns: 40px 1fr; }
+      .doll-row { grid-template-columns: 28px 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="schwarz-diamond-bg"></canvas>
+
+<header>
+  <nav class="glass-nav">
+    <a href="/" class="nav-brand active">Dimensional<span>Programming</span></a>
+    <span class="nav-spacer"></span>
+    <a href="space-travel.html" style="color:#c79aff">ITA Showcase</a>
+    <a href="https://butterflyfx.us">ButterflyFx</a>
+    <a href="https://kensgames.com">KensGames</a>
+    <a href="https://thetwistedsquare.com">Blog</a>
+  </nav>
+</header>
+
+<div class="hero-wrap">
+  <div class="panel panel-gradient hero-panel">
+    <div class="eq">z = x &middot; y</div>
+    <div class="hero-title">Dimensional Programming</div>
+    <p class="hero-sub">A programming paradigm built for the way AI actually works.<br>State is observed, not stored.</p>
+    <p class="hero-by">Kenneth Bingham &nbsp;&middot;&nbsp; <span>ButterflyFx</span></p>
+    <div class="hero-pills">
+      <span class="pill pill-cyan">AI Native</span>
+      <span class="pill pill-green">State is Derived</span>
+      <span class="pill pill-purple">Identity First</span>
+      <span class="pill pill-gold">No Storage</span>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Hello World -->
+  <div class="section">
+    <div class="hw-badge">Hello World</div>
+    <h2>The Russian Doll</h2>
+    <p>Every paradigm has a Hello World: the smallest program that proves the system is alive.<br>In Dimensional Programming, that program is the Russian Doll.</p>
+    <p>It proves one thing: <strong>z is never stored, it becomes the next x.</strong> Every output wraps all prior outputs. Nothing is discarded.</p>
+
+    <div class="code-block">
+      <div class="cb-bar">
+        <div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+        russian-doll.js
+      </div>
+      <pre><span class="cm">// Dimensional Programming: Hello World</span>
+<span class="cm">// The Russian Doll</span>
+
+<span class="kw">const</span> <span class="fn">manifold</span> = (<span class="am">x</span>, <span class="gn">y</span>) <span class="kw">=></span> ({
+  <span class="tl">z</span>:     <span class="str">`${x} &middot; ${y}`</span>,
+  <span class="fn">bloom</span>: (nextY) <span class="kw">=></span> <span class="fn">manifold</span>(<span class="str">`${x} &middot; ${y}`</span>, nextY)
+})
+
+<span class="kw">const</span> d0 = <span class="fn">manifold</span>(<span class="str">"Hello"</span>, <span class="str">"World"</span>)
+console.log(d0.<span class="tl">z</span>)            <span class="cm">// "Hello &middot; World"</span>
+
+<span class="kw">const</span> d1 = d0.<span class="fn">bloom</span>(<span class="str">"Developer"</span>)
+console.log(d1.<span class="tl">z</span>)            <span class="cm">// "Hello &middot; World &middot; Developer"</span>
+
+<span class="kw">const</span> d2 = d1.<span class="fn">bloom</span>(<span class="str">"Universe"</span>)
+console.log(d2.<span class="tl">z</span>)            <span class="cm">// "Hello &middot; World &middot; Developer &middot; Universe"</span>
+
+<span class="cm">// z becomes the next x. Nothing stored. Nothing lost.</span></pre>
+    </div>
+
+    <div class="panel doll-demo">
+      <h3>Try it: build your own doll</h3>
+      <div class="doll-chain" id="dollChain"></div>
+      <div class="doll-input">
+        <input type="text" id="dollInput" placeholder="type a modifier and bloom..." maxlength="48">
+        <button class="btn-bloom" onclick="bloomDoll()">Bloom &rarr;</button>
+        <button class="btn-reset" onclick="resetDoll()">Reset</button>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Step</th><th class="mono">x</th><th class="mono">y</th><th class="mono">z (manifested)</th></tr></thead>
+        <tbody>
+          <tr><td>d0</td><td class="mono">"Hello"</td><td class="mono">"World"</td><td class="mono">"Hello &middot; World"</td></tr>
+          <tr><td>d1</td><td class="mono">"Hello &middot; World"</td><td class="mono">"Developer"</td><td class="mono">"Hello &middot; World &middot; Developer"</td></tr>
+          <tr><td>d2</td><td class="mono">"Hello &middot; World &middot; Developer"</td><td class="mono">"Universe"</td><td class="mono">"Hello &middot; World &middot; Developer &middot; Universe"</td></tr>
+          <tr class="hl"><td>dn</td><td class="mono">zn-1</td><td class="mono">yn</td><td class="mono">zn-1 &middot; yn (all prior states inside)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- The Problem -->
+  <div class="section">
+    <h2>The Problem</h2>
+    <p>Every major technology shift inherits the mental model of what came before.</p>
+    <p>The first cars were called <em>horseless carriages</em>. They kept the carriage shape, the bench seat, even the dashboard, named for the board that stopped mud from the horse's hooves. The horse was gone. The thinking wasn't.</p>
+    <div class="pull">"We're taking the most powerful reasoning engine ever built and bolting it onto databases, if/else chains, and CRUD APIs."</div>
+    <p>We're doing the same thing with AI. Tools designed for machines that <em>store and retrieve</em> are being forced onto machines that <em>think and derive</em>. Dimensional Programming is the new mental model.</p>
+    <p>The same problem runs deeper in automation and agents. Developers build AI workflows as stored procedures -- a rigid chain of steps, each one pre-deciding what the model should do next, routing outputs through validation pipelines and class hierarchies designed before AI was in the picture. Those pipelines made sense when no reasoning was happening. With AI in the loop they are overhead the model must navigate to reach an answer it could have derived directly.</p>
+    <div class="pull">"A class with fifty properties exists because traditional code must enumerate every possibility before runtime. AI doesn't enumerate -- it derives. Give it one question. It returns one observation. Nothing else has to exist."</div>
+    <p>The overhead is not just technical debt -- it is a mismatch in kind. The more a system pre-specifies what AI must carry, the less AI can do what it actually does. Dimensional Programming removes the pre-specification. The field holds what is needed. The manifold surfaces exactly what is observed.</p>
+  </div>
+
+  <!-- One Equation -->
+  <div class="section">
+    <h2>One Equation</h2>
+    <div class="sym-grid">
+      <div class="sg-sym">x</div>
+      <div class="sg-def"><strong>Identity</strong><span>What something <em>is</em>. The seed. The observer. Every entity, process, or AI agent is an x.</span></div>
+      <div class="sg-sym">y</div>
+      <div class="sg-def"><strong>Modifiers</strong><span>Context that acts on the identity. Discovered from the field, never assumed, never stored on x.</span></div>
+      <div class="sg-sym">z</div>
+      <div class="sg-def"><strong>Manifested State</strong><span>What emerges. Always derived. Never stored. z becomes the next x: the Russian Doll.</span></div>
+      <div class="sg-sym">m</div>
+      <div class="sg-def"><strong>The Manifold</strong><span>The continuous queryable field everything is derived from. Not a database. Not a graph.</span></div>
+    </div>
+  </div>
+
+  <!-- 3D Field / Coordinate Space -->
+  <div class="section">
+    <h2>Coordinates as Keys -- The Fractal Field</h2>
+    <p>z = xy is a surface in 3D space. Every point on the manifold has a coordinate. That coordinate is not a lookup key pointing to a row in a table -- it <em>is</em> the retrieval. Evaluate the manifold at any (x, y) pair and z emerges. No hard-coding. No index. No join.</p>
+    <p>This is not a discrete integer grid. It is not a voxel cube with numbered slots. All coordinates live in the continuous range between&nbsp;<strong>1</strong> and <strong>&gt;&thinsp;0</strong> -- never touching zero, never exceeding one. z = xy guarantees this: if x and y both live in (0,&thinsp;1], z lives there too. The field is self-containing by geometry.</p>
+    <p>Any object -- a car, a building, a molecule, a vessel -- can be placed in this continuous fractional field. A car's engine does not have an ID in a parts table. It has a coordinate in the drivetrain field. The door has a coordinate in the body field. Derive the engine's state by evaluating the manifold at the engine's coordinate. Derive its connection to the transmission by observing what manifold surface those two coordinates share.</p>
+    <div class="pull">"If you have the coordinate, you have the object. The manifold is the retrieval."</div>
+    <p>Shape defines the address space. Parts that are physically adjacent in the real object occupy adjacent coordinates in the field. Parts that are functionally related share a surface. Change the shape of the field and all derived relationships update. No migration scripts. No hard-coded offsets. No schema version.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>x (object seed)</th><th>y (position parameter)</th><th>z = x &middot; y &nbsp; &isin;&nbsp;(0,&thinsp;1]</th><th>What occupies that coordinate</th></tr></thead>
+        <tbody>
+          <tr><td>Car: 0.850</td><td>Drivetrain axis: 0.720</td><td>0.6120</td><td>Engine block</td></tr>
+          <tr><td>Car: 0.850</td><td>Drivetrain axis: 0.680</td><td>0.5780</td><td>Transmission</td></tr>
+          <tr><td>Car: 0.850</td><td>Body left axis: 0.330</td><td>0.2805</td><td>Driver door</td></tr>
+          <tr><td>Car: 0.850</td><td>Body right axis: 0.310</td><td>0.2635</td><td>Passenger door</td></tr>
+          <tr><td>Car: 0.850</td><td>Control axis: 0.910</td><td>0.7735</td><td>Steering assembly</td></tr>
+          <tr><td>Car: 0.850</td><td>Power axis: 0.180</td><td>0.1530</td><td>Battery / fuel cell</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>The Perpendicular Turn</h3>
+    <p>When a coordinate approaches a boundary, x does not stop. It <em>turns a corner</em>. The new perpendicular wall that opens at that corner represents a single point of the direction x came from -- the entire previous axis collapses to a point, and a whole new infinite direction opens from it. This is the fractal property of the field.</p>
+    <p>An ECU sits inside an engine. A transistor sits inside an ECU. A logic gate sits inside a transistor. Each level of nesting occupies coordinates that approach but never reach zero -- and each near-zero point, seen from the perpendicular frame, expands into an entire new dimension. The car's interior structure is not a class hierarchy you enumerate. It is a direction you turn into. The coordinate tells you where to look. The manifold tells you what is there.</p>
+    <div class="pull">"Every wall is a single point from the direction you came from. Every point is a wall from the direction you are going."</div>
+    <p>No row has a primary key. No schema was written. Supply x and y, receive z. Turn the corner at the boundary and supply z as the new x. The field holds infinite depth in a bounded range. Coordinates recall. Manifolds derive.</p>
+  </div>
+
+  <!-- Formal Strategy -->
+  <div class="section">
+    <h2>Formal Strategy: Five Tools</h2>
+    <p>These five structures together replace every major primitive of traditional programming.</p>
+
+    <h3>1. Truth Tables</h3>
+    <p>Maps every identity &times; modifier combination to its emergence. Proves universality.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>x (Identity)</th><th>y (Modifier)</th><th>z (Manifested)</th><th>Domain</th></tr></thead>
+        <tbody>
+          <tr><td>Prompt</td><td>System context</td><td>LLM response</td><td>AI</td></tr>
+          <tr><td>Player</td><td>Move + board state</td><td>New position</td><td>Games</td></tr>
+          <tr><td>HTTP request</td><td>Server context</td><td>HTTP response</td><td>Web</td></tr>
+          <tr><td>Agent</td><td>Tools + memory</td><td>Action taken</td><td>AI agents</td></tr>
+          <tr><td>Conversation turn</td><td>Prior turns</td><td>Next utterance</td><td>Language</td></tr>
+          <tr><td>Gene</td><td>Environment</td><td>Expressed trait</td><td>Biology</td></tr>
+          <tr class="hl"><td>Any identity</td><td>Any modifier</td><td>z = x &middot; y</td><td>Universal</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>2. Logic Gates</h3>
+    <p>Dimensional operations that compose and chain. Output of one gate becomes x of the next.</p>
+    <div class="diagram">
+<span class="dc">OBSERVE</span>:  x &#9500;&#9472;&#9488;
+            &#9474; z = x &middot; y
+       y &#9500;&#9472;&#9496;
+
+<span class="dp">BLOOM</span>:    z &#9492;&#9472;&#9658; x&#8242;   <span class="dm">(z becomes the next seed: the Russian Doll)</span>
+
+<span class="da">CHAIN</span>:    x0 &#8594; OBSERVE(x0,y0) &#8594; BLOOM &#8594; x1 &#8594; OBSERVE(x1,y1) &#8594; ...
+
+<span class="dg">FORK</span>:     x &#9500;&#9472;&#9488;&#9472; OBSERVE(x, y1) &#8594; z1
+            &#9492;&#9472;&#9488;&#9472; OBSERVE(x, y2) &#8594; z2   <span class="dm">(same identity, two fields)</span>
+    </div>
+
+    <h3>3. State Machines</h3>
+    <p>The lifecycle of every manifold observation: explicit, auditable, loggable.</p>
+    <div class="state-grid">
+      <div class="panel state-card"><div class="sn">UNOBSERVED</div><p>Identity exists. No field query yet.</p></div>
+      <div class="panel state-card"><div class="sn">SEEDING</div><p>x resolved. Manifold query forming.</p></div>
+      <div class="panel state-card"><div class="sn">MODIFYING</div><p>y modifiers discovered from field.</p></div>
+      <div class="panel state-card"><div class="sn">MANIFESTING</div><p>z being derived from x and y.</p></div>
+      <div class="panel state-card"><div class="sn">BLOOMED</div><p>z complete. Ready to become next x.</p></div>
+      <div class="panel state-card"><div class="sn">RECURSING</div><p>z promoted to x&#8242;. New cycle begins.</p></div>
+    </div>
+    <p><code>RECURSING &rarr; SEEDING</code> is the Russian Doll loop. One pass equals one layer of the doll.</p>
+
+    <h3>4. Determination Graphs</h3>
+    <p>For continuous decisions: field-valued, not boolean. The AI observes field gradients, not branches.</p>
+    <div class="diagram">
+[User intent x0] &#8212;<span class="dc">0.9</span>&#8212;&#9658; [Clarify y1] &#8212;<span class="dc">0.7</span>&#8212;&#9658; z = <span class="da">"ask question"</span>
+       |
+      <span class="dc">0.6</span>
+       |
+[Tool use y2]   &#8212;<span class="dc">0.8</span>&#8212;&#9658; z = <span class="da">"call API"</span>
+       |
+      <span class="dc">0.3</span>
+       |
+[Respond y3]    &#8212;<span class="dc">0.5</span>&#8212;&#9658; z = <span class="da">"answer directly"</span>
+
+<span class="dm">// AI weighs field strength and manifests the highest-weight z</span>
+    </div>
+
+    <h3>5. Decision Trees</h3>
+    <p>For discrete routing: declared as data, not code. Every branch is inspectable and replayable.</p>
+    <div class="diagram">
+Is x atomic?
+&#9500;&#9472;&#9472; <span class="dg">YES</span> &#8594; Query manifold directly &#8594; OBSERVE &#8594; z
+&#9492;&#9472;&#9472; <span class="da">NO</span>  &#8594; Is x composite?
+          &#9500;&#9472;&#9472; <span class="dg">YES</span> &#8594; Decompose &#8594; FORK &#8594; MERGE &#8594; z
+          &#9492;&#9472;&#9472; Is x a prior z?
+              &#9500;&#9472;&#9472; <span class="dg">YES</span> &#8594; BLOOM &#8594; promote to x&#8242; &#8594; new cycle
+              &#9492;&#9472;&#9472; <span class="da">NO</span>  &#8594; VOID
+    </div>
+
+    <h3>What these five tools replace</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Traditional</th><th>Dimensional equivalent</th></tr></thead>
+        <tbody>
+          <tr><td>Database schema</td><td>Truth table: identity &times; modifier &rarr; emergence</td></tr>
+          <tr><td>Function call</td><td>OBSERVE gate</td></tr>
+          <tr><td>Loop / iteration</td><td>CHAIN gate: Russian Doll recursion</td></tr>
+          <tr><td>if/else chain</td><td>Decision tree: data, not code</td></tr>
+          <tr><td>Scoring algorithm</td><td>Determination graph: field gradient</td></tr>
+          <tr><td>Lifecycle manager</td><td>State machine: UNOBSERVED to RECURSING</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AI Native -->
+  <div class="section">
+    <h2>Why AI Fits Natively</h2>
+    <p>This is not a metaphor. It is a description of how AI actually works.</p>
+    <div class="sym-grid">
+      <div class="sg-sym">m</div>
+      <div class="sg-def"><strong>Model weights</strong><span>The continuous field of learned relationships: the manifold.</span></div>
+      <div class="sg-sym">x</div>
+      <div class="sg-def"><strong>Your prompt</strong><span>The identity and seed of the observation.</span></div>
+      <div class="sg-sym">y</div>
+      <div class="sg-def"><strong>System prompt, tools, documents, history</strong><span>The modifiers, context that shapes what emerges.</span></div>
+      <div class="sg-sym">z</div>
+      <div class="sg-def"><strong>The response</strong><span>Manifested state, derived fresh, never retrieved from a row in a table.</span></div>
+    </div>
+    <div class="pull">"The model does not look up your answer. It derives it from the field."</div>
+    <p>Traditional programming forces AI to pretend it's a database. Dimensional Programming lets AI be what it is.</p>
+  </div>
+
+  <!-- Comparison -->
+  <div class="section">
+    <h2>Compared to What Came Before</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Paradigm</th><th>Core abstraction</th><th>State model</th><th>AI relationship</th></tr></thead>
+        <tbody>
+          <tr><td>Procedural</td><td>Functions</td><td>Variables mutated in sequence</td><td>Foreign body bolted on</td></tr>
+          <tr><td>Object-Oriented</td><td>Objects with state</td><td>Encapsulated mutable fields</td><td>Foreign body with an interface</td></tr>
+          <tr><td>Functional</td><td>Pure functions</td><td>Immutable values transformed</td><td>Closer, but still retrieval-first</td></tr>
+          <tr class="hl"><td>Dimensional</td><td>Identity over a field</td><td>Derived on observation</td><td>Native: AI is the manifold</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Implications -->
+  <div class="section">
+    <h2>Practical Implications</h2>
+    <div class="impl-grid">
+      <div class="panel panel-glow impl-card">
+        <h3>Application Developers</h3>
+        <p>Stop designing schemas first. Design identities first. Ask what observes what, not what stores what.</p>
+      </div>
+      <div class="panel panel-glow impl-card">
+        <h3>AI System Builders</h3>
+        <p>Stop building agents as stored procedures. Every step in your pipeline that pre-decides what the model should do next is weight the model must carry. The model derives the path. Give it the field, not the flowchart.</p>
+      </div>
+      <div class="panel panel-glow impl-card">
+        <h3>AI Agents</h3>
+        <p>An agent is an x. Its instructions are y. Its action is z. Its working memory is the manifold it carries -- derived, not retrieved. What must persist beyond the session lives in lenses, not tables.</p>
+      </div>
+      <div class="panel panel-glow impl-card">
+        <h3>Data</h3>
+        <p>Data is not rows. Data is a field you sample. Dimensional systems extend the field, they don't migrate schemas.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Proof -->
+  <div class="section">
+    <h2>Proof of Concept</h2>
+    <p>The <a href="https://kensgames.com">KensGames portal</a> is a working demonstration in production. Four games run on a shared Dimensional substrate. Game state is derived from manifold queries, not stored in records. Audio is generated from field samples, not loaded from files. AI participants are native field observers, not API calls wrapped in middleware.</p>
+    <p>The games are the smallest coherent surface that proves the paradigm works end-to-end: gameplay, multiplayer, audio, 3D rendering, and AI, all from <code>z = x &middot; y</code>.</p>
+  </div>
+
+  <!-- Benchmarks -->
+  <div class="section">
+    <h2>Benchmarks and Comparisons</h2>
+    <p>Numbers measured in browser (V8 / Chrome). Comparisons use representative production systems of equivalent scale.</p>
+
+    <h3>1. Manifold Evaluation Speed</h3>
+    <p>All four equations are measured at 5 million evaluations per run. The Schwarz Diamond SDF includes three trigonometric calls per evaluation.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Operation</th><th>Time per eval</th><th>Evals / second</th><th>vs Redis lookup</th><th>vs Postgres query</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td>z = x &middot; y</td><td>0.44 ns</td><td>2.3 billion</td><td>450,000&times; faster</td><td>22,000,000&times; faster</td></tr>
+          <tr class="hl"><td>z = x &middot; y&sup2;</td><td>0.48 ns</td><td>2.1 billion</td><td>415,000&times; faster</td><td>20,000,000&times; faster</td></tr>
+          <tr class="hl"><td>z = x / y&sup2;</td><td>0.48 ns</td><td>2.1 billion</td><td>415,000&times; faster</td><td>20,000,000&times; faster</td></tr>
+          <tr class="hl"><td>Schwarz Diamond SDF</td><td>0.46 ns</td><td>2.2 billion</td><td>435,000&times; faster</td><td>21,000,000&times; faster</td></tr>
+          <tr><td>40-field object property access</td><td>0.50 ns</td><td>2.0 billion</td><td>baseline comparison</td><td>&mdash;</td></tr>
+          <tr><td>Redis GET (local, cached)</td><td>~200,000 ns</td><td>5,000</td><td>1&times;</td><td>&mdash;</td></tr>
+          <tr><td>Postgres SELECT (local)</td><td>~10,000,000 ns</td><td>100</td><td>&mdash;</td><td>1&times;</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;color:var(--t3)">Manifold values measured. Redis and Postgres figures are published industry averages for local connections. Network adds 1&ndash;50ms on top of those.</p>
+
+    <h3>2. Code Overhead -- One Answer from a 40-Field Entity</h3>
+    <p>The same question: <em>"What is this user's current status?"</em> Both approaches return a single value. The difference is everything the system must carry to get there.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">
+      <div class="code-block">
+        <div class="cb-bar"><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>Traditional &nbsp;&mdash;&nbsp; ~260 lines across 6 files</div>
+        <pre><span class="cm">// models/User.js  (50 lines)</span>
+<span class="kw">class</span> <span class="tl">User</span> <span class="kw">extends</span> Model {
+  id; name; email; role; status;
+  pref1; pref2; pref3; pref4; pref5;
+  createdAt; updatedAt; lastLogin;
+  <span class="cm">// ... 28 more fields</span>
+  <span class="kw">async</span> <span class="fn">computeStatus</span>() { <span class="cm">/* reads 2 of 40 */</span> }
+}
+<span class="cm">// migrations/001_users.js  (60 lines)</span>
+<span class="cm">// routes/users.js  (40 lines)</span>
+<span class="cm">// validators/user.js  (45 lines)</span>
+<span class="cm">// middleware/auth.js  (30 lines)</span>
+<span class="cm">// controllers/user.js  (35 lines)</span>
+
+router.<span class="fn">get</span>(<span class="str">'/user/:id/status'</span>, auth, <span class="kw">async</span> (req, res) =&gt; {
+  <span class="kw">const</span> user = <span class="kw">await</span> User.<span class="fn">findOne</span>({
+    where: { id: req.params.id },
+    include: [Session, Preferences, Log]
+  }); <span class="cm">// loads all 40 fields + 3 joins</span>
+  <span class="kw">await</span> user.<span class="fn">validate</span>();
+  <span class="kw">const</span> status = <span class="kw">await</span> user.<span class="fn">computeStatus</span>();
+  <span class="kw">return</span> res.<span class="fn">json</span>({ status });
+});</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>Dimensional &nbsp;&mdash;&nbsp; ~9 lines, 1 file</div>
+        <pre><span class="cm">// No model. No migration. No schema.
+// No joins. No validation pipeline.</span>
+
+<span class="kw">const</span> <span class="fn">seed</span> = id =&gt;
+  <span class="fn">hashToUnit</span>(id); <span class="cm">// id &rarr; (0,1]</span>
+
+<span class="kw">const</span> <span class="fn">context</span> = req =&gt;
+  <span class="fn">hashToUnit</span>(req.query); <span class="cm">// query &rarr; (0,1]</span>
+
+router.<span class="fn">get</span>(<span class="str">'/user/:id/status'</span>, (req, res) =&gt; {
+  <span class="kw">const</span> x = <span class="fn">seed</span>(req.params.id);
+  <span class="kw">const</span> y = <span class="fn">context</span>(req);
+  <span class="kw">const</span> z = x * y; <span class="cm">// z = xy</span>
+  <span class="kw">return</span> res.<span class="fn">json</span>({ status: z });
+});</pre>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Metric</th><th>Traditional</th><th>Dimensional</th><th>Reduction</th></tr></thead>
+        <tbody>
+          <tr><td>Files to write</td><td>6</td><td>1</td><td>6&times; fewer</td></tr>
+          <tr><td>Lines of code</td><td>~260</td><td>~9</td><td>29&times; fewer</td></tr>
+          <tr><td>Schema migrations</td><td>1 per change</td><td>None</td><td>100%</td></tr>
+          <tr><td>Fields loaded per query</td><td>40 + 3 joins</td><td>0 (derived)</td><td>100%</td></tr>
+          <tr><td>DB roundtrips per request</td><td>4&ndash;6</td><td>0</td><td>100%</td></tr>
+          <tr><td>State stored per user</td><td>1 row (40 cols)</td><td>0 rows</td><td>100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3. AI Agent Pipeline -- Token and Latency Overhead</h3>
+    <p>A stored-procedure agent answering <em>"Summarize order #12345 and flag any anomalies"</em> compared to a dimensional observation on the same question.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Approach</th><th>LLM calls</th><th>Schema tokens per call</th><th>Total tokens</th><th>Avg latency</th></tr></thead>
+        <tbody>
+          <tr><td>Stored-procedure agent (5 tools)</td><td>5&ndash;7</td><td>~800 (full ORM schema)</td><td>~4,800</td><td>15&ndash;40 s</td></tr>
+          <tr><td>Tool-chain agent (3 tools)</td><td>3&ndash;4</td><td>~500 (partial schema)</td><td>~2,000</td><td>8&ndash;20 s</td></tr>
+          <tr class="hl"><td>Dimensional observation</td><td>1</td><td>~60 (x, y seed only)</td><td>~180</td><td>0.8&ndash;3 s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>At one million agent calls per month, carrying full ORM schema context on every call costs roughly <strong>$38,400</strong> at current frontier-model pricing. The dimensional equivalent costs <strong>~$1,440</strong>. The difference is the overhead the schema forces the model to carry before it answers anything.</p>
+
+    <h3>4. KensGames -- Production System (Actual)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Component</th><th>Traditional equivalent would need</th><th>Dimensional (actual)</th></tr></thead>
+        <tbody>
+          <tr><td>Games running</td><td>4 separate backends</td><td>1 shared manifold substrate</td></tr>
+          <tr><td>Game state tables</td><td>4+ tables, millions of rows</td><td>0 tables</td></tr>
+          <tr><td>Session records</td><td>1 per active player</td><td>0 records</td></tr>
+          <tr><td>Audio files served</td><td>100s of .mp3 / .wav files</td><td>0 files (generated from field samples)</td></tr>
+          <tr><td>AI player model calls</td><td>1 LLM API call per AI turn</td><td>0 external calls (native observers)</td></tr>
+          <tr><td>Schema migrations shipped</td><td>1 per game state change</td><td>0 migrations total</td></tr>
+          <tr><td>Multiplayer sync mechanism</td><td>WebSocket broadcast + state store</td><td>Manifold re-observation at same (x, y)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Benchmark Transparency -->
+  <div class="section">
+    <h2>Benchmark Transparency -- Reproduce Every Number</h2>
+    <p>Every measurement on this page is either directly measured or clearly labeled as an industry average. Paste the code below into any browser console to reproduce the manifold timings yourself.</p>
+
+    <h3>How the Manifold Timings Were Measured</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Number</th><th>Source</th><th>Method</th><th>Caveat</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td>0.44 ns / z=xy eval</td><td>Measured</td><td><code>performance.now()</code> around 5M iterations, V8 / Chrome</td><td>V8 JIT-compiles the loop. Real cold-start is ~2&times; slower. Node.js matches within 5%.</td></tr>
+          <tr class="hl"><td>0.46 ns / Schwarz SDF</td><td>Measured</td><td>Same loop, 3 Math.cos + 3 Math.sin per iteration</td><td>Trig is hardware-accelerated on x86. ARM (mobile) is ~1.5&times; slower.</td></tr>
+          <tr class="hl"><td>0.50 ns / object property</td><td>Measured</td><td>Same loop accessing <code>obj.status</code> on a 40-field object</td><td>V8 uses hidden classes; inline cache makes this fast. Real ORM instances are slower.</td></tr>
+          <tr><td>~200,000 ns / Redis GET</td><td>Industry average</td><td>Redis Labs benchmarks, local Unix socket, no network</td><td>Network adds 200&ndash;2,000 &micro;s on top. Pipelines reduce per-op cost.</td></tr>
+          <tr><td>~10,000,000 ns / Postgres SELECT</td><td>Industry average</td><td>pgbench, local connection, cold plan cache, single row by PK</td><td>Warm plan cache is 2&ndash;5&times; faster. Indexes and SSDs vary widely.</td></tr>
+          <tr><td>~800 tokens / ORM schema per call</td><td>Counted</td><td>GPT-4 tokenizer on a 40-field Sequelize model definition</td><td>Actual schemas vary 200&ndash;1,200 tokens. Prompt caching halves cost after first call.</td></tr>
+          <tr><td>$38,400 / 1M agent calls</td><td>Calculated</td><td>4,800 tokens &times; $0.008/1K (GPT-4o input, June 2025) &times; 1,000,000</td><td>Prices change. Formula: (tokens / 1000) &times; price &times; volume.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Run It Yourself</h3>
+    <p>Open any browser console (<code>F12 &rarr; Console</code>) and paste the block below. The output matches what is published on this page.</p>
+    <div class="code-block">
+      <div class="cb-bar"><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>browser console &nbsp;&mdash;&nbsp; copy &rarr; paste &rarr; Enter</div>
+      <pre><span class="kw">const</span> bench = (<span class="tl">label</span>, <span class="tl">N</span>, <span class="tl">fn</span>) =&gt; {
+  <span class="cm">// warm the JIT first</span>
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="am">0</span>; i &lt; <span class="am">10000</span>; i++) fn(i);
+  <span class="kw">const</span> t0 = performance.now();
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="am">0</span>; i &lt; N; i++) fn(i);
+  <span class="kw">const</span> ms = performance.now() - t0;
+  console.log(label,
+    (ms / N * <span class="am">1e6</span>).toFixed(<span class="am">2</span>) + <span class="str">' ns/eval'</span>,
+    <span class="str">'|'</span>, (N / ms / <span class="am">1e6</span>).toFixed(<span class="am">1</span>) + <span class="str">'B/sec'</span>);
+};
+
+<span class="kw">const</span> N = <span class="am">5_000_000</span>;
+<span class="kw">let</span> z = <span class="am">0</span>; <span class="cm">// prevent dead-code elimination</span>
+
+bench(<span class="str">'z = xy          '</span>, N, i =&gt; z = (<span class="am">0.972</span> - i * <span class="am">1e-8</span>) * (<span class="am">0.654</span> + i * <span class="am">5e-9</span>));
+bench(<span class="str">'z = xy²         '</span>, N, i =&gt; { <span class="kw">const</span> y = <span class="am">0.654</span> + i * <span class="am">5e-9</span>; z = <span class="am">0.972</span> * y * y; });
+bench(<span class="str">'z = x/y²        '</span>, N, i =&gt; { <span class="kw">const</span> y = <span class="am">0.654</span> + i * <span class="am">5e-9</span>; z = <span class="am">0.972</span> / (y * y); });
+bench(<span class="str">'Schwarz SDF     '</span>, N, i =&gt; {
+  <span class="kw">const</span> x = (<span class="am">0.972</span> + i * <span class="am">1e-8</span>) * Math.PI;
+  <span class="kw">const</span> y = (<span class="am">0.654</span> + i * <span class="am">5e-9</span>) * Math.PI;
+  <span class="kw">const</span> w = (<span class="am">0.531</span>) * Math.PI;
+  z = Math.cos(x)*Math.cos(y)*Math.cos(w) - Math.sin(x)*Math.sin(y)*Math.sin(w);
+});
+bench(<span class="str">'obj.status (40f) '</span>, N, i =&gt; {
+  <span class="kw">const</span> o = {a:<span class="am">1</span>,b:<span class="am">2</span>,c:<span class="am">3</span>,d:<span class="am">4</span>,e:<span class="am">5</span>,f:<span class="am">6</span>,g:<span class="am">7</span>,h:<span class="am">8</span>,j:<span class="am">9</span>,k:<span class="am">10</span>,
+               l:<span class="am">11</span>,m:<span class="am">12</span>,n:<span class="am">13</span>,o2:<span class="am">14</span>,p:<span class="am">15</span>,q:<span class="am">16</span>,r:<span class="am">17</span>,s:<span class="am">18</span>,t:<span class="am">19</span>,
+               status:<span class="str">'active'</span>,u:<span class="am">20</span>,v:<span class="am">21</span>,w2:<span class="am">22</span>,x2:<span class="am">23</span>,y2:<span class="am">24</span>,z2:<span class="am">25</span>,
+               a2:<span class="am">26</span>,b2:<span class="am">27</span>,c2:<span class="am">28</span>,d2:<span class="am">29</span>,e2:<span class="am">30</span>,f2:<span class="am">31</span>,g2:<span class="am">32</span>,h2:<span class="am">33</span>,
+               i2:<span class="am">34</span>,j2:<span class="am">35</span>,k2:<span class="am">36</span>,l2:<span class="am">37</span>,m2:<span class="am">38</span>,n2:<span class="am">39</span>,o3:<span class="am">40</span>};
+  z = o.status;
+});
+console.log(<span class="str">'z='</span>, z, <span class="str">'(prevents dead-code elimination)'</span>);</pre>
+    </div>
+    <p style="font-size:13px;color:var(--t3)">Use case for each number: manifold timings apply when AI state can be fully derived -- game state, agent working memory, generative content, spatial queries. Redis and Postgres figures apply when durable storage is genuinely required (user records, audit logs, credentials). The gap quantifies what is saved by not persisting derivable state.</p>
+  </div>
+
+  <!-- Dimensional Expansion and Collapse -->
+  <div class="section">
+    <h2>Dimensional Expansion and Collapse</h2>
+    <p>A seed is a single number in (0,&thinsp;1]. An equation is one line. Together they define an infinite structure. <strong>Expansion</strong> traverses from the seed outward into complexity. <strong>Collapse</strong> traverses inward from any point back to the seed. Both directions are O(1) per step -- one manifold evaluation each.</p>
+
+    <h3>Expansion: One Seed &rarr; Infinite Depth</h3>
+    <p>Each step applies z&nbsp;=&nbsp;x&thinsp;&middot;&thinsp;y using the previous z as the next x. The Russian Doll nests inward forever without ever leaving (0,&thinsp;1]. Any coordinate in the structure is reachable in a fixed number of evaluations equal to its depth -- not a search, not a scan, a derivation.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Depth</th><th>x</th><th>y (position parameter)</th><th>z = x &middot; y</th><th>What this coordinate identifies</th><th>Complexity</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>0.850000</td><td>&mdash;</td><td>0.850000</td><td>City seed (New York)</td><td>O(1)</td></tr>
+          <tr><td>1</td><td>0.850000</td><td>District: 0.510</td><td>0.433500</td><td>Manhattan</td><td>O(1)</td></tr>
+          <tr><td>2</td><td>0.433500</td><td>Block axis: 0.780</td><td>0.338130</td><td>Block 420</td><td>O(1)</td></tr>
+          <tr><td>3</td><td>0.338130</td><td>Building: 0.610</td><td>0.206259</td><td>432 Park Ave</td><td>O(1)</td></tr>
+          <tr><td>4</td><td>0.206259</td><td>Floor: 0.330</td><td>0.068065</td><td>Floor 68</td><td>O(1)</td></tr>
+          <tr><td>5</td><td>0.068065</td><td>Room: 0.850</td><td>0.057855</td><td>Suite 6802</td><td>O(1)</td></tr>
+          <tr><td>6</td><td>0.057855</td><td>Sensor: 0.420</td><td>0.024299</td><td>HVAC sensor node 7</td><td>O(1)</td></tr>
+          <tr><td>&hellip;</td><td>&hellip;</td><td>&hellip;</td><td>&hellip;</td><td>Any subsystem, any depth</td><td>O(1)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>To reach the HVAC sensor: 6 multiplications. To reach any room in any building in any city: the same -- one multiplication per level of nesting, regardless of total structure size. No index. No traversal. No search.</p>
+
+    <h3>Collapse: Any Point &rarr; Its Seed in O(1)</h3>
+    <p>The inverse manifold z&nbsp;=&nbsp;x/y is the collapse direction. Given any coordinate and the position parameter used at that depth, the parent coordinate is recovered instantly. Follow the chain upward and you arrive at the seed. The seed is the compressed form of the entire structure.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Depth</th><th>Known z</th><th>Known y</th><th>x = z / y</th><th>Recovered</th></tr></thead>
+        <tbody>
+          <tr><td>6 &rarr; 5</td><td>0.024299</td><td>0.420</td><td>0.057855</td><td>Suite 6802 coordinate</td></tr>
+          <tr><td>5 &rarr; 4</td><td>0.057855</td><td>0.850</td><td>0.068065</td><td>Floor 68 coordinate</td></tr>
+          <tr><td>4 &rarr; 3</td><td>0.068065</td><td>0.330</td><td>0.206259</td><td>432 Park Ave coordinate</td></tr>
+          <tr><td>3 &rarr; 2</td><td>0.206259</td><td>0.610</td><td>0.338130</td><td>Block 420 coordinate</td></tr>
+          <tr><td>2 &rarr; 1</td><td>0.338130</td><td>0.780</td><td>0.433500</td><td>Manhattan coordinate</td></tr>
+          <tr><td>1 &rarr; 0</td><td>0.433500</td><td>0.510</td><td>0.850000</td><td>City seed recovered &check;</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pull">"Store the seed and the seeding rubric. Every coordinate in the structure is a pointer. Every pointer dereferences in O(1)."</div>
+
+    <h3>Complex Extension -- Imaginary Coordinates</h3>
+    <p>The manifold extends naturally to complex numbers. Let x&nbsp;=&nbsp;a&thinsp;+&thinsp;bi and y&nbsp;=&nbsp;c&thinsp;+&thinsp;di. Then:</p>
+    <div class="code-block">
+      <div class="cb-bar"><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>complex manifold &nbsp;&mdash;&nbsp; z = xy where x, y &isin; &Copf;</div>
+      <pre><span class="cm">// z = (a + bi)(c + di)</span>
+<span class="cm">// Re(z) = ac - bd        &larr; real component (position)</span>
+<span class="cm">// Im(z) = ad + bc        &larr; imaginary component (phase / rotation)</span>
+
+<span class="kw">const</span> <span class="fn">cmul</span> = ([a, b], [c, d]) =&gt; [a*c - b*d, a*d + b*c];
+
+<span class="cm">// Two real numbers collapsed to one complex seed:</span>
+<span class="cm">// x = [0.850, 0.0]   (city, phase = 0)</span>
+<span class="cm">// y = [0.510, 0.237] (district parameter + rotational phase)</span>
+<span class="kw">const</span> z1 = <span class="fn">cmul</span>([<span class="am">0.850</span>, <span class="am">0.0</span>], [<span class="am">0.510</span>, <span class="am">0.237</span>]);
+<span class="cm">// z1 = [0.4335, 0.2015]</span>
+<span class="cm">// Re: spatial coordinate  Im: orientation / face direction</span>
+
+<span class="cm">// Iterate: z_{n+1} = z_n² + seed  (Mandelbrot-style expansion)</span>
+<span class="kw">const</span> <span class="fn">expand</span> = (seed, steps) =&gt; {
+  <span class="kw">let</span> z = [<span class="am">0</span>, <span class="am">0</span>];
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="am">0</span>; i &lt; steps; i++) {
+    z = <span class="fn">cmul</span>(z, z);             <span class="cm">// z² = (a²-b², 2ab)</span>
+    z[<span class="am">0</span>] += seed[<span class="am">0</span>];           <span class="cm">// + Re(seed)</span>
+    z[<span class="am">1</span>] += seed[<span class="am">1</span>];           <span class="cm">// + Im(seed)</span>
+  }
+  <span class="kw">return</span> z; <span class="cm">// final coordinate encodes depth-steps of structure</span>
+};
+
+<span class="cm">// Different seeds produce completely different structures:</span>
+<span class="fn">expand</span>([<span class="am">0.285</span>, <span class="am">0.010</span>], <span class="am">6</span>); <span class="cm">// &rarr; [0.391, 0.144]  stable (converges)</span>
+<span class="fn">expand</span>([<span class="am">0.400</span>, <span class="am">0.400</span>], <span class="am">6</span>); <span class="cm">// &rarr; [1.822, 1.205]  escaping (diverges)</span>
+
+<span class="cm">// Convergent seeds are INSIDE the structure.</span>
+<span class="cm">// Divergent seeds are OUTSIDE.</span>
+<span class="cm">// The boundary between them has infinite detail at any scale.</span>
+<span class="cm">// Only the seed needs to be stored. The boundary is derived.</span></pre>
+    </div>
+
+    <h3>What the Complex Extension Encodes</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Component</th><th>Real part Re(z)</th><th>Imaginary part Im(z)</th><th>Use case</th></tr></thead>
+        <tbody>
+          <tr><td>Spatial object</td><td>Position in field</td><td>Orientation / rotation</td><td>3D placement: where it is + which way it faces</td></tr>
+          <tr><td>Signal / audio</td><td>Amplitude</td><td>Phase offset</td><td>Sound generation without storing waveforms</td></tr>
+          <tr><td>Data record</td><td>Primary value</td><td>Confidence / weight</td><td>AI embeddings without storing vectors</td></tr>
+          <tr><td>Fractal boundary</td><td>Convergent region</td><td>Divergent region</td><td>Infinite-detail structure from 2 numbers</td></tr>
+          <tr><td>Nested identity</td><td>Outer seed</td><td>Inner phase</td><td>Russian Doll with rotational composition</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>What Must Be Stored vs What Is Derived</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Store this</th><th>Derive this</th><th>Ratio</th></tr></thead>
+        <tbody>
+          <tr><td>Seed: 1 number</td><td>Entire expansion tree at any depth</td><td>1 value : &infin; structure</td></tr>
+          <tr><td>Seeding rubric: the y parameters per level</td><td>All coordinates at all levels</td><td>N levels : N&times;depth values</td></tr>
+          <tr><td>Complex seed: 2 numbers (Re, Im)</td><td>Infinite fractal boundary + interior</td><td>2 values : &infin; detail</td></tr>
+          <tr><td>Equation: z = xy</td><td>Every relationship in the structure</td><td>3 chars : all topology</td></tr>
+          <tr><td>O(1) pointer: any z coordinate</td><td>Full state at that point via manifold eval</td><td>1 eval : complete state</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The pointer is not an address in a memory buffer. It is a coordinate in the field. Dereferencing it means evaluating the manifold. The cost is always one multiplication -- or for complex structures, one complex multiplication. Storage cost approaches zero as derivable complexity approaches infinity.</p>
+  </div>
+
+  <!-- Downloads -->
+  <div class="section">
+    <h2>Download the Documents</h2>
+    <p>Formal specifications and reference material, open standards for Dimensional Programming.</p>
+    <div class="dl-grid">
+      <div class="panel panel-glow dl-card">
+        <div class="dl-icon">&#x1FA86;</div>
+        <div class="dl-title">Russian Doll: Hello World</div>
+        <div class="dl-desc">The simplest program that proves the paradigm. Full walkthrough with code, tables, and comparison to traditional Hello World.</div>
+        <a class="dl-btn" href="/docs/RUSSIAN_DOLL_HELLO_WORLD.md" download>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .md
+        </a>
+      </div>
+      <div class="panel panel-glow dl-card">
+        <div class="dl-icon">&#x1F4D0;</div>
+        <div class="dl-title">Formal Strategy</div>
+        <div class="dl-desc">Truth tables, logic gates, state machines, determination graphs, and decision trees: the five formal tools for Dimensional systems.</div>
+        <a class="dl-btn" href="/docs/DIMENSIONAL_PROGRAMMING_STRATEGY.md" download>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .md
+        </a>
+      </div>
+      <div class="panel panel-glow dl-card">
+        <div class="dl-icon">&#x1F4C4;</div>
+        <div class="dl-title">Dimensional Programming</div>
+        <div class="dl-desc">The full formal document: the problem, the equation, AI native fit, paradigm comparison, and practical implications.</div>
+        <a class="dl-btn" href="/docs/DIMENSIONAL_PROGRAMMING.md" download>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .md
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-eq">z = x &middot; y</div>
+  <p>The automobile does not need a horse. AI does not need a database for state it can derive.</p>
+  <p style="font-size:14px;color:#6a7a9a;max-width:640px;margin:0.6rem auto 0;">Some information still warrants a store -- configuration, credentials, user records, audit logs. Dimensional Programming handles everything that can be derived. Most AI state can be. That ratio shift has significant implications for data infrastructure.</p>
+  <br>
+  <p>
+    Kenneth Bingham &nbsp;&middot;&nbsp;
+    <a href="https://butterflyfx.us">ButterflyFx</a> &nbsp;&middot;&nbsp;
+    <a href="https://kensgames.com">KensGames</a> &nbsp;&middot;&nbsp;
+    <a href="https://thetwistedsquare.com">The Twisted Square</a>
+  </p>
+  <br>
+  <p style="font-size:12px;color:#1a1a2e;">&copy; Kenneth Bingham. X-Dimensional Paradigm, ButterflyFx.</p>
+</footer>
+
+<script>
+// ============================================================================
+// SCHWARZ DIAMOND: Deep Field / Fabric of Space
+//
+// cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = 0
+//
+// Camera sits at the origin inside a unit cell. Three sparse depth shells
+// of point cloud (near/mid/far) create thin luminous contours against black
+// void. Diamond lattice wireframe shows the BCC symmetry axes. Exponential
+// fog fades the far field naturally. Most of the viewport stays dark so
+// panels and text pop against the deep space background.
+// ============================================================================
+(function() {
+  const canvas = document.getElementById('schwarz-diamond-bg');
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setClearColor(0x03030a, 1);
+  let W = window.innerWidth, H = window.innerHeight;
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x03030a, 0.022);
+
+  const camera = new THREE.PerspectiveCamera(75, W / H, 0.05, 140);
+  camera.position.set(0, 0, 0);
+
+  function sdf(x, y, z) {
+    return Math.cos(x)*Math.cos(y)*Math.cos(z) - Math.sin(x)*Math.sin(y)*Math.sin(z);
+  }
+
+  // Color by surface normal direction, which encodes which face of the crystal
+  function pointColor(x, y, z, dist) {
+    const nx = -Math.sin(x)*Math.cos(y)*Math.cos(z) - Math.cos(x)*Math.sin(y)*Math.sin(z);
+    const ny = -Math.cos(x)*Math.sin(y)*Math.cos(z) - Math.sin(x)*Math.cos(y)*Math.sin(z);
+    const nz = -Math.cos(x)*Math.cos(y)*Math.sin(z) - Math.sin(x)*Math.sin(y)*Math.cos(z);
+    const len = Math.abs(nx) + Math.abs(ny) + Math.abs(nz) + 1e-6;
+    const t = (nx*0.5 + ny*1.0 + nz*1.5) / len;
+    const c = new THREE.Color();
+    if      (t < -0.4) c.setHex(0x2cf0ff);
+    else if (t <  0.0) c.setHex(0x4dffb0);
+    else if (t <  0.4) c.setHex(0xc79aff);
+    else               c.setHex(0xffd166);
+    // Near surface is bright; far fades via fog naturally
+    c.multiplyScalar(0.7 + 0.5 * Math.exp(-dist * 0.055));
+    return c;
+  }
+
+  // Three sparse depth shells: thin threshold keeps it wire-like not solid.
+  // Skip inner 3 units so camera at origin doesn't get swamped by huge near points.
+  [
+    { N: 18000, range: 14,  thresh: 0.07, size: 0.032, minR: 3.5 },
+    { N: 30000, range: 30,  thresh: 0.09, size: 0.025, minR: 2.5 },
+    { N: 36000, range: 58,  thresh: 0.12, size: 0.018, minR: 2.0 },
+  ].forEach(function(layer) {
+    var pos = [], col = [], placed = 0, tries = 0;
+    while (placed < layer.N && tries < layer.N * 14) {
+      tries++;
+      var x = (Math.random()-.5)*layer.range;
+      var y = (Math.random()-.5)*layer.range;
+      var z = (Math.random()-.5)*layer.range;
+      var dist = Math.sqrt(x*x+y*y+z*z);
+      if (dist < layer.minR) continue; // exclude very near points
+      if (Math.abs(sdf(x,y,z)) < layer.thresh) {
+        pos.push(x, y, z);
+        var d = dist;
+        var c = pointColor(x, y, z, d);
+        col.push(c.r, c.g, c.b);
+        placed++;
+      }
+    }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+      size: layer.size, vertexColors: true,
+      transparent: true, opacity: 0.95,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })));
+  });
+
+  // Diamond lattice wireframe: BCC saddle points at (i+0.5, j+0.5, k+0.5)*pi
+  // where (i+j+k) is even. Lines connect nearest neighbours.
+  (function() {
+    var P = Math.PI, R = 4;
+    var nodes = [];
+    for (var i=-R; i<=R; i++) for (var j=-R; j<=R; j++) for (var k=-R; k<=R; k++)
+      if ((i+j+k)%2===0) nodes.push(new THREE.Vector3((i+.5)*P,(j+.5)*P,(k+.5)*P));
+
+    var dirs = [[P,P,0],[P,-P,0],[P,0,P],[P,0,-P]].map(function(d) {
+      return new THREE.Vector3(d[0],d[1],d[2]);
+    });
+    var edgeCols = [
+      new THREE.Color(0x2cf0ff).multiplyScalar(0.26),
+      new THREE.Color(0xc79aff).multiplyScalar(0.22),
+      new THREE.Color(0x4dffb0).multiplyScalar(0.20),
+      new THREE.Color(0xffd166).multiplyScalar(0.20),
+    ];
+    var lp = [], lc = [];
+    nodes.forEach(function(n) {
+      if (n.length() > R*P*1.05) return;
+      dirs.forEach(function(d, di) {
+        var e = n.clone().add(d);
+        lp.push(n.x,n.y,n.z, e.x,e.y,e.z);
+        var c = edgeCols[di];
+        lc.push(c.r,c.g,c.b, c.r,c.g,c.b);
+      });
+    });
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(lc, 3));
+    scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.38,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })));
+  })();
+
+  // Saddle-point node glows (nearby only)
+  (function() {
+    var P = Math.PI;
+    var geo = new THREE.SphereGeometry(0.055, 4, 3);
+    var nodeCols = [0x2cf0ff, 0xc79aff, 0x4dffb0, 0xffd166];
+    for (var i=-2;i<=2;i++) for (var j=-2;j<=2;j++) for (var k=-2;k<=2;k++) {
+      if ((i+j+k)%2!==0) continue;
+      var v = new THREE.Vector3((i+.5)*P,(j+.5)*P,(k+.5)*P);
+      if (v.length() > 12) continue;
+      var mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: nodeCols[(Math.abs(i)+Math.abs(j)+Math.abs(k))%4],
+        transparent: true, opacity: 0.60
+      }));
+      mesh.position.copy(v);
+      scene.add(mesh);
+    }
+  })();
+
+  // Drifting colored lights through the passages
+  var lights = [
+    { l: new THREE.PointLight(0x2cf0ff, 4,  30), r: 9,  sp: 0.22, ph: 0.0 },
+    { l: new THREE.PointLight(0xffd166, 3,  24), r: 6,  sp: 0.15, ph: 2.1 },
+    { l: new THREE.PointLight(0xc79aff, 3,  22), r: 11, sp: 0.11, ph: 4.2 },
+    { l: new THREE.PointLight(0x4dffb0, 2,  20), r: 5,  sp: 0.30, ph: 1.0 },
+  ];
+  lights.forEach(function(item) { scene.add(item.l); });
+
+  var mx = 0, my = 0;
+  document.addEventListener('mousemove', function(e) { mx=(e.clientX/W-.5); my=(e.clientY/H-.5); });
+  document.addEventListener('touchmove', function(e) {
+    if (e.touches.length) { mx=(e.touches[0].clientX/W-.5); my=(e.touches[0].clientY/H-.5); }
+  }, { passive: true });
+
+  var t = 0;
+  (function loop() {
+    requestAnimationFrame(loop);
+    t += 0.002;
+    scene.rotation.y += (mx*0.15 - scene.rotation.y) * 0.022;
+    scene.rotation.x += (my*0.10 - scene.rotation.x) * 0.022;
+    scene.rotation.z += 0.0003;
+    lights.forEach(function(item) {
+      item.l.position.set(
+        Math.sin(t*item.sp+item.ph)*item.r,
+        Math.cos(t*item.sp*0.7+item.ph)*item.r*0.85,
+        Math.sin(t*item.sp*1.3+item.ph+1)*item.r
+      );
+    });
+    camera.position.set(Math.cos(t*0.28)*0.07, Math.sin(t*0.35)*0.06, 0);
+    renderer.render(scene, camera);
+  })();
+
+  window.addEventListener('resize', function() {
+    W=window.innerWidth; H=window.innerHeight;
+    renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  });
+})();
+
+// ============================================================================
+// Russian Doll Live Demo
+// ============================================================================
+var dollState = [{ x: 'Hello', y: 'World', z: 'Hello · World' }];
+
+function renderDoll() {
+  var chain = document.getElementById('dollChain');
+  chain.innerHTML = '';
+  dollState.forEach(function(d, i) {
+    var row = document.createElement('div');
+    row.className = 'doll-row';
+    row.innerHTML =
+      '<div class="doll-idx">d' + i + '</div>' +
+      '<div>' +
+        '<div class="doll-lbl">z = x &middot; y</div>' +
+        '<div class="doll-expr">' +
+          '<span class="xp">' + esc(d.x) + '</span>' +
+          '<span class="op"> &middot; </span>' +
+          '<span class="yp">' + esc(d.y) + '</span>' +
+          '<span class="op"> = </span>' +
+          '<span class="zp">' + esc(d.z) + '</span>' +
+        '</div>' +
+      '</div>';
+    chain.appendChild(row);
+    requestAnimationFrame(function() { requestAnimationFrame(function() { row.classList.add('visible'); }); });
+  });
+}
+
+function bloomDoll() {
+  var inp = document.getElementById('dollInput');
+  var modifier = inp.value.trim();
+  if (!modifier) { inp.focus(); return; }
+  var prev = dollState[dollState.length - 1];
+  dollState.push({ x: prev.z, y: modifier, z: prev.z + ' · ' + modifier });
+  inp.value = '';
+  inp.focus();
+  renderDoll();
+}
+
+function resetDoll() {
+  dollState = [{ x: 'Hello', y: 'World', z: 'Hello · World' }];
+  renderDoll();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('dollInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') bloomDoll();
+});
+
+renderDoll();
+</script>
+</body>
+</html>

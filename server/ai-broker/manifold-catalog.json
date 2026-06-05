@@ -1,0 +1,70 @@
+{
+  "_note": "Production Claude 4.x catalog for schwarz-router. Costs are USD per 1k input tokens as of mid-2026. quality is a 0..1 heuristic — calibrate against your own evals. The router picks the cheapest tier whose quality >= the Schwarz-D threshold for the call.",
+  "tiers": [
+    {
+      "name": "haiku",
+      "vendor": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "quality": 0.50,
+      "cost_per_1k": 0.0008,
+      "latency_p50": 450,
+      "max_context": 200000,
+      "default_roles": ["logger", "performance", "facilitator"],
+      "capabilities": {
+        "vision": true,
+        "tools": true,
+        "code": true,
+        "embed": false,
+        "local": false,
+        "audited_pii": true
+      }
+    },
+    {
+      "name": "sonnet",
+      "vendor": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "quality": 0.82,
+      "cost_per_1k": 0.003,
+      "latency_p50": 1200,
+      "max_context": 200000,
+      "default_roles": ["player", "host", "curator", "gamekeeper"],
+      "capabilities": {
+        "vision": true,
+        "tools": true,
+        "code": true,
+        "embed": false,
+        "local": false,
+        "audited_pii": true
+      }
+    },
+    {
+      "name": "opus",
+      "vendor": "anthropic",
+      "model": "claude-opus-4-8",
+      "quality": 0.96,
+      "cost_per_1k": 0.075,
+      "latency_p50": 3200,
+      "max_context": 500000,
+      "default_roles": ["game-master", "game-maker"],
+      "capabilities": {
+        "vision": true,
+        "tools": true,
+        "code": true,
+        "embed": false,
+        "local": false,
+        "audited_pii": true
+      }
+    }
+  ],
+  "role_signals": {
+    "gamekeeper":   { "complexity": 0.55, "stakes": 0.85, "context": 0.60 },
+    "facilitator":  { "complexity": 0.30, "stakes": 0.45, "context": 0.50 },
+    "host":         { "complexity": 0.40, "stakes": 0.60, "context": 0.50 },
+    "logger":       { "complexity": 0.25, "stakes": 0.20, "context": 0.75 },
+    "player":       { "complexity": 0.45, "stakes": 0.50, "context": 0.60 },
+    "curator":      { "complexity": 0.70, "stakes": 0.50, "context": 0.65 },
+    "performance":  { "complexity": 0.20, "stakes": 0.25, "context": 0.40 },
+    "game-master":  { "complexity": 0.65, "stakes": 0.80, "context": 0.65 },
+    "game-maker":   { "complexity": 0.80, "stakes": 0.60, "context": 0.70 }
+  }
+}

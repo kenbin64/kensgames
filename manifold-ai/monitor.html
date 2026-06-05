@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manifold Monitor -- Generic Real-Time System Visualization</title>
+<style>
+:root {
+  --bg:     #01020a;
+  --bg1:    #050815;
+  --panel:  rgba(3,4,16,0.94);
+  --edge:   rgba(44,240,255,0.14);
+  --t1:     #f0f2fa;
+  --t2:     #c0cae0;
+  --t3:     #5a6a82;
+  --mono:   'Consolas','Monaco','Courier New',monospace;
+  /* state colors */
+  --c-low:  #2cf0ff;
+  --c-ok:   #4dffb0;
+  --c-warn: #ffd166;
+  --c-hi:   #ff8c42;
+  --c-crit: #ff6b6b;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size:13px; min-height:100vh; overflow-x:hidden; }
+
+/* ---- HEADER ---- */
+header {
+  position:sticky; top:0; z-index:10;
+  background:rgba(1,2,10,0.95);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--edge);
+  padding:0 20px;
+  height:52px;
+  display:flex; align-items:center; gap:16px;
+}
+.hdr-brand { display:flex; align-items:center; gap:8px; }
+.hdr-logo  { font-size:0.75rem; letter-spacing:0.2em; color:var(--c-low); text-shadow:0 0 10px var(--c-low); text-transform:uppercase; }
+.hdr-sub   { font-size:0.6rem; color:var(--t3); letter-spacing:0.1em; }
+.hdr-sep   { width:1px; height:22px; background:var(--edge); }
+.hdr-stat  { display:flex; gap:6px; align-items:center; font-size:0.65rem; color:var(--t3); }
+.hdr-stat span { color:var(--c-low); }
+.hdr-right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.hdr-btn   { padding:5px 12px; border:1px solid var(--edge); border-radius:5px; background:transparent; color:var(--t2); font-family:var(--mono); font-size:0.68rem; cursor:pointer; transition:all 0.15s; }
+.hdr-btn:hover { border-color:var(--c-low); color:var(--c-low); }
+.hdr-btn.primary { border-color:rgba(44,240,255,0.35); color:var(--c-low); background:rgba(44,240,255,0.06); }
+.range-btn { padding:4px 9px; border:1px solid var(--edge); border-radius:4px; background:transparent; color:var(--t3); font-family:var(--mono); font-size:0.62rem; cursor:pointer; }
+.range-btn.active { border-color:rgba(44,240,255,0.3); color:var(--c-low); background:rgba(44,240,255,0.06); }
+
+/* ---- MONITOR GRID ---- */
+#grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap:14px;
+  padding:16px 20px;
+}
+
+/* ---- MONITOR CARD ---- */
+.mon-card {
+  background:var(--panel);
+  border:1px solid var(--card-color, var(--edge));
+  border-radius:10px;
+  overflow:hidden;
+  position:relative;
+  transition:border-color 0.6s, box-shadow 0.6s;
+}
+.mon-card.state-ok   { --card-color:rgba(77,255,176,0.2);  box-shadow:0 0 18px rgba(77,255,176,0.06); }
+.mon-card.state-warn { --card-color:rgba(255,209,102,0.25); box-shadow:0 0 18px rgba(255,209,102,0.08); }
+.mon-card.state-crit { --card-color:rgba(255,107,107,0.3);  box-shadow:0 0 22px rgba(255,107,107,0.12); animation:crit-pulse 2s ease-in-out infinite; }
+
+@keyframes crit-pulse {
+  0%,100% { box-shadow:0 0 22px rgba(255,107,107,0.12); }
+  50%      { box-shadow:0 0 30px rgba(255,107,107,0.25); }
+}
+
+/* card top accent line -- color derived from state */
+.mon-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--accent-color, var(--c-low)), transparent);
+  transition:background 0.6s;
+}
+
+.card-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px 4px;
+}
+.card-name  { font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--t3); }
+.card-badge {
+  font-size:0.58rem; padding:2px 7px; border-radius:10px;
+  text-transform:uppercase; letter-spacing:0.1em;
+  border:1px solid currentColor;
+}
+.badge-idle  { color:var(--t3); border-color:rgba(90,106,130,0.3); }
+.badge-ok    { color:var(--c-ok); border-color:rgba(77,255,176,0.3); }
+.badge-warn  { color:var(--c-warn); border-color:rgba(255,209,102,0.3); }
+.badge-crit  { color:var(--c-crit); border-color:rgba(255,107,107,0.3); }
+
+.card-value-row {
+  display:flex; align-items:baseline; gap:4px;
+  padding:0 12px 6px;
+}
+.card-value { font-size:1.8rem; font-weight:700; transition:color 0.5s; line-height:1; }
+.card-unit  { font-size:0.72rem; color:var(--t3); }
+.card-delta { font-size:0.65rem; margin-left:4px; }
+.delta-up   { color:var(--c-crit); }
+.delta-down { color:var(--c-ok); }
+.delta-flat { color:var(--t3); }
+
+/* Chart canvas */
+.card-canvas-wrap { position:relative; height:80px; }
+.card-canvas { display:block; width:100%; height:100%; }
+
+/* Stats bar */
+.card-stats {
+  display:flex; align-items:center; gap:0;
+  padding:5px 12px;
+  border-top:1px solid rgba(44,240,255,0.06);
+  font-size:0.6rem; color:var(--t3);
+}
+.stat-item { flex:1; text-align:center; }
+.stat-item + .stat-item { border-left:1px solid rgba(44,240,255,0.06); }
+.stat-val { display:block; color:var(--t2); font-size:0.68rem; margin-top:1px; }
+.card-z  { margin-left:auto; color:rgba(44,240,255,0.45); font-size:0.58rem; white-space:nowrap; }
+
+/* ---- ADD MONITOR MODAL ---- */
+.modal-bg  { position:fixed;inset:0;background:rgba(1,2,10,0.88);z-index:100;display:flex;align-items:center;justify-content:center; }
+.modal     { background:var(--bg1);border:1px solid var(--edge);border-radius:10px;padding:22px;width:460px;max-width:95vw; }
+.modal h3  { color:var(--c-low);font-size:0.85rem;margin-bottom:16px; }
+.modal label { display:block;font-size:0.65rem;color:var(--t3);margin-bottom:3px;margin-top:10px;text-transform:uppercase;letter-spacing:0.1em; }
+.modal input, .modal select, .modal textarea {
+  width:100%;background:rgba(44,240,255,0.04);border:1px solid var(--edge);border-radius:5px;
+  padding:7px 10px;color:var(--t1);font-family:var(--mono);font-size:0.74rem;outline:none;
+}
+.modal input:focus,.modal select:focus,.modal textarea:focus { border-color:var(--c-low); }
+.modal textarea { resize:vertical; min-height:60px; }
+.modal-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.modal-btns { display:flex;gap:8px;justify-content:flex-end;margin-top:16px; }
+.modal-btn  { padding:6px 16px;border:1px solid var(--edge);border-radius:5px;background:transparent;color:var(--t2);font-family:var(--mono);font-size:0.72rem;cursor:pointer; }
+.modal-btn.ok { border-color:rgba(44,240,255,0.3);color:var(--c-low);background:rgba(44,240,255,0.07); }
+.modal-btn:hover { border-color:var(--c-low); }
+.hidden { display:none; }
+
+/* ---- GROUP HEADER ---- */
+.group-header {
+  grid-column:1/-1;
+  display:flex; align-items:center; gap:10px;
+  padding:4px 0 2px;
+  font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--t3);
+}
+.group-header::after { content:''; flex:1; height:1px; background:var(--edge); }
+
+/* ---- SCROLLBAR ---- */
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-thumb { background:rgba(44,240,255,0.15); border-radius:2px; }
+
+/* ---- FOOTER ---- */
+footer { border-top:1px solid var(--edge); padding:10px 20px; display:flex; align-items:center; gap:12px; font-size:0.62rem; color:var(--t3); }
+footer span { color:var(--c-low); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-brand">
+    <div>
+      <div class="hdr-logo">&#9670; Manifold Monitor</div>
+      <div class="hdr-sub">Generic Real-Time System Visualization</div>
+    </div>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-stat">x <span id="hdr-x">--</span></div>
+  <div class="hdr-stat">z <span id="hdr-z">--</span></div>
+  <div class="hdr-stat">monitors <span id="hdr-count">0</span></div>
+  <div class="hdr-right">
+    <div style="display:flex;gap:4px">
+      <button class="range-btn active" data-range="60">1m</button>
+      <button class="range-btn" data-range="300">5m</button>
+      <button class="range-btn" data-range="1800">30m</button>
+    </div>
+    <div class="hdr-sep"></div>
+    <a class="hdr-btn" href="agent.html">&#8592; Agent</a>
+    <button class="hdr-btn primary" id="add-btn">+ Add Monitor</button>
+  </div>
+</header>
+
+<div id="grid"></div>
+
+<footer>
+  <span>Manifold Monitor</span> &middot; All state derived from z=xy &middot; Color gradient: cyan (low) &#8594; green (ok) &#8594; gold (warn) &#8594; red (crit) &middot;
+  Each sample: z = prev_norm &times; curr_norm (Russian Doll) &middot;
+  <span id="fps-display">0</span> fps
+</footer>
+
+<!-- ADD MONITOR MODAL -->
+<div class="modal-bg hidden" id="modal">
+  <div class="modal">
+    <h3>Add Custom Monitor</h3>
+    <label>Name</label>
+    <input id="m-name" placeholder="My Metric">
+    <label>Source (JavaScript expression -- returns a number)</label>
+    <textarea id="m-source" placeholder="Math.sin(Date.now() / 2000) * 50 + 50"></textarea>
+    <label>Units</label>
+    <input id="m-unit" placeholder="%" value="%">
+    <div class="modal-row">
+      <div>
+        <label>Min</label>
+        <input id="m-min" type="number" value="0">
+      </div>
+      <div>
+        <label>Max</label>
+        <input id="m-max" type="number" value="100">
+      </div>
+    </div>
+    <div class="modal-row">
+      <div>
+        <label>Warn threshold (%)</label>
+        <input id="m-warn" type="number" value="70">
+      </div>
+      <div>
+        <label>Crit threshold (%)</label>
+        <input id="m-crit" type="number" value="85">
+      </div>
+    </div>
+    <label>Group</label>
+    <input id="m-group" placeholder="Custom">
+    <label>Update interval (ms)</label>
+    <input id="m-interval" type="number" value="1000">
+    <div class="modal-btns">
+      <button class="modal-btn" id="modal-cancel">Cancel</button>
+      <button class="modal-btn ok" id="modal-ok">Add Monitor</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ================================================================
+// MANIFOLD PRIMITIVES
+// ================================================================
+const M = {
+  position: (x, y) => x * y,
+  schwarz:  (x, y, z) =>
+    Math.cos(x)*Math.cos(y)*Math.cos(z) - Math.sin(x)*Math.sin(y)*Math.sin(z)
+};
+
+function seedHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h<<5)+h)^s.charCodeAt(i);
+  return ((h>>>0) % 900000 + 100000) / 1000000;
+}
+
+// ================================================================
+// COLOR SYSTEM
+// Continuous gradient: cyan(0) -> green(0.35) -> gold(0.65) -> orange(0.82) -> red(1.0)
+// All derived from norm position -- no hardcoded state labels.
+// ================================================================
+const COLOR_STOPS = [
+  [0.00, [44,  240, 255]], // cyan   -- void / very low
+  [0.35, [77,  255, 176]], // green  -- nominal
+  [0.65, [255, 209, 102]], // gold   -- elevated
+  [0.82, [255, 140, 66 ]], // orange -- warning
+  [1.00, [255, 107, 107]], // red    -- critical
+];
+
+function normToRGB(norm) {
+  const n = Math.max(0, Math.min(1, norm));
+  for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+    const [t0, c0] = COLOR_STOPS[i];
+    const [t1, c1] = COLOR_STOPS[i + 1];
+    if (n >= t0 && n <= t1) {
+      const t = (n - t0) / (t1 - t0 || 1);
+      return [
+        c0[0] + (c1[0]-c0[0])*t,
+        c0[1] + (c1[1]-c0[1])*t,
+        c0[2] + (c1[2]-c0[2])*t,
+      ];
+    }
+  }
+  return COLOR_STOPS[COLOR_STOPS.length-1][1];
+}
+
+function rgb(c)     { return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`; }
+function rgba(c, a) { return `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`; }
+function lerp(a, b, t) { return a + (b-a)*t; }
+function lerpRGB(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+
+// ================================================================
+// METRIC MONITOR CLASS
+// ================================================================
+let DISPLAY_RANGE = 60; // seconds visible on chart
+
+class MetricMonitor {
+  constructor(cfg) {
+    this.id       = cfg.id || seedHash(cfg.name + Date.now()).toString();
+    this.name     = cfg.name;
+    this.group    = cfg.group || 'System';
+    this.source   = cfg.source;    // () => number (sync or async)
+    this.unit     = cfg.unit  || '';
+    this.min      = cfg.min   || 0;
+    this.max      = cfg.max   || 100;
+    this.warnPct  = cfg.warn  || 70;   // % of normalized range
+    this.critPct  = cfg.crit  || 85;
+    this.invert   = cfg.invert || false; // true = high is good (cache hit, uptime)
+    this.interval = cfg.interval || 1000;
+
+    this.history  = [];       // { value, norm, z, ts }
+    this.maxPts   = 1800;     // 30 min at 1s
+
+    // Canvas rendering state
+    this.canvas   = null;
+    this.ctx      = null;
+    this.displayColor = [44, 240, 255]; // lerps toward target each frame
+    this.cardEl   = null;
+    this._raf     = null;
+    this._timer   = null;
+    this._lastFrameTs = 0;
+  }
+
+  // Normalise value to [0,1]
+  norm(v) {
+    return Math.max(0, Math.min(1, (v - this.min) / (this.max - this.min)));
+  }
+
+  // Derive manifold point: z = prev_norm * curr_norm (Russian Doll)
+  deriveZ(prevNorm, currNorm) {
+    return M.position(Math.max(1e-4, prevNorm), Math.max(1e-4, currNorm));
+  }
+
+  stateBadge(norm) {
+    if (this.invert) {
+      // High norm = good. Thresholds are lower bounds: warn when below warnPct, crit when below critPct.
+      const w = this.warnPct / 100;
+      const c = this.critPct / 100;
+      if (norm > w * 0.9) return ['ok',   'OK'];
+      if (norm > w)       return ['ok',   'OK'];
+      if (norm > c)       return ['warn', 'WARN'];
+      return               ['crit', 'CRIT'];
+    }
+    const w = this.warnPct / 100;
+    const c = this.critPct / 100;
+    if (norm < w * 0.5) return ['idle', 'IDLE'];
+    if (norm < w)       return ['ok',   'OK'];
+    if (norm < c)       return ['warn', 'WARN'];
+    return               ['crit', 'CRIT'];
+  }
+
+  // Return the norm to use for color -- inverted metrics flip the gradient
+  colorNorm(norm) {
+    return this.invert ? 1 - norm : norm;
+  }
+
+  // ---- TICK (data acquisition) ----
+  async tick() {
+    let value;
+    try { value = await this.source(); } catch(e) { value = 0; }
+    value = Math.max(this.min, Math.min(this.max, value));
+    const n = this.norm(value);
+    const prevN = this.history.length > 0
+      ? this.history[this.history.length-1].norm : n;
+    const z = this.deriveZ(prevN, n);
+
+    this.history.push({ value, norm: n, z, ts: Date.now() });
+    if (this.history.length > this.maxPts) this.history.shift();
+
+    this.updateUI(value, n, z);
+  }
+
+  // ---- UI UPDATE (DOM elements, not canvas) ----
+  updateUI(value, n, z) {
+    if (!this.cardEl) return;
+    const [stateKey, stateLabel] = this.stateBadge(n);
+
+    // Value display
+    const valEl = this.cardEl.querySelector('.card-value');
+    if (valEl) {
+      valEl.textContent = this._fmt(value);
+      valEl.style.color = rgb(normToRGB(this.colorNorm(n)));
+    }
+
+    // Delta indicator
+    const h = this.history;
+    const deltaEl = this.cardEl.querySelector('.card-delta');
+    if (deltaEl && h.length > 2) {
+      const prev = h[h.length - 2].value;
+      const diff = value - prev;
+      const pct  = Math.abs(diff / (this.max - this.min) * 100).toFixed(1);
+      if (Math.abs(diff) < 0.01 * (this.max - this.min)) {
+        deltaEl.className = 'card-delta delta-flat';
+        deltaEl.textContent = '~';
+      } else if (diff > 0) {
+        deltaEl.className = 'card-delta delta-up';
+        deltaEl.textContent = '+' + pct + '%';
+      } else {
+        deltaEl.className = 'card-delta delta-down';
+        deltaEl.textContent = '-' + pct + '%';
+      }
+    }
+
+    // Badge
+    const badgeEl = this.cardEl.querySelector('.card-badge');
+    if (badgeEl) {
+      badgeEl.className = 'card-badge badge-' + stateKey;
+      badgeEl.textContent = stateLabel;
+    }
+
+    // Card border state class
+    this.cardEl.classList.remove('state-ok','state-warn','state-crit');
+    if (stateKey === 'ok') this.cardEl.classList.add('state-ok');
+    else if (stateKey === 'warn') this.cardEl.classList.add('state-warn');
+    else if (stateKey === 'crit') this.cardEl.classList.add('state-crit');
+
+    // Stats
+    const vals = h.map(p => p.value);
+    const mn = Math.min(...vals), mx = Math.max(...vals), avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const minEl = this.cardEl.querySelector('.stat-min');
+    const avgEl = this.cardEl.querySelector('.stat-avg');
+    const maxEl = this.cardEl.querySelector('.stat-max');
+    if (minEl) minEl.textContent = this._fmt(mn);
+    if (avgEl) avgEl.textContent = this._fmt(avg);
+    if (maxEl) maxEl.textContent = this._fmt(mx);
+
+    // Z coordinate
+    const zEl = this.cardEl.querySelector('.card-z');
+    if (zEl) zEl.textContent = 'z=' + z.toFixed(4);
+
+    // Accent line color (CSS custom property)
+    const col = rgb(normToRGB(n));
+    this.cardEl.style.setProperty('--accent-color', col);
+  }
+
+  // ---- CANVAS RENDER LOOP (RAF) ----
+  draw(ts) {
+    const h = this.history;
+    if (!this.canvas || !this.ctx || h.length < 2) return;
+
+    const canvas = this.canvas;
+    const ctx    = this.ctx;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W; canvas.height = H;
+    }
+
+    // Lerp display color toward current target
+    const curr = h[h.length-1];
+    const targetColor = normToRGB(this.colorNorm(curr.norm));
+    const dt = ts - (this._lastFrameTs || ts);
+    this._lastFrameTs = ts;
+    const speed = Math.min(1, dt / 400);  // ~400ms transition
+    this.displayColor = lerpRGB(this.displayColor, targetColor, speed);
+    const dc = this.displayColor;
+
+    // Clear
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#01020a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid lines at 25 / 50 / 75 %
+    ctx.strokeStyle = 'rgba(44,240,255,0.05)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([2, 5]);
+    [0.25, 0.5, 0.75].forEach(t => {
+      const y = H - t * (H - 6) - 3;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // Threshold lines
+    const warnY = H - (this.warnPct/100) * (H-6) - 3;
+    const critY = H - (this.critPct/100) * (H-6) - 3;
+    ctx.strokeStyle = rgba([255,209,102], 0.25); ctx.lineWidth = 0.8;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, warnY); ctx.lineTo(W, warnY); ctx.stroke();
+    ctx.strokeStyle = rgba([255,107,107], 0.25);
+    ctx.beginPath(); ctx.moveTo(0, critY); ctx.lineTo(W, critY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Visible window
+    const now = Date.now();
+    const windowMs = DISPLAY_RANGE * 1000;
+    const windowStart = now - windowMs;
+
+    const visible = h.filter(p => p.ts >= windowStart);
+    if (visible.length < 2) return;
+
+    // Map to canvas coords
+    const pts = visible.map(p => {
+      const x = ((p.ts - windowStart) / windowMs) * W;
+      const y = H - p.norm * (H - 6) - 3;
+      return { x, y, norm: p.norm, z: p.z };
+    });
+
+    // --- GRADIENT FILL ---
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0,   rgba(dc, 0.22));
+    grad.addColorStop(0.6, rgba(dc, 0.06));
+    grad.addColorStop(1,   rgba(dc, 0));
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, H);
+    ctx.lineTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      const cpx = (pts[i-1].x + pts[i].x) / 2;
+      ctx.bezierCurveTo(cpx, pts[i-1].y, cpx, pts[i].y, pts[i].x, pts[i].y);
+    }
+    ctx.lineTo(pts[pts.length-1].x, H);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // --- COLOR-SHIFTING LINE ---
+    // Each segment gets a color interpolated between its endpoints' norm values
+    // This creates a beautiful gradient along the timeline
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i-1], b = pts[i];
+      const colA = normToRGB(this.colorNorm(a.norm));
+      const colB = normToRGB(this.colorNorm(b.norm));
+      const midCol = lerpRGB(colA, colB, 0.5);
+      const cpx = (a.x + b.x) / 2;
+
+      const segGrad = ctx.createLinearGradient(a.x, 0, b.x, 0);
+      segGrad.addColorStop(0, rgb(colA));
+      segGrad.addColorStop(1, rgb(colB));
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(cpx, a.y, cpx, b.y, b.x, b.y);
+      ctx.strokeStyle = segGrad;
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = rgb(midCol);
+      ctx.shadowBlur = 5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // --- LEADING EDGE PULSE ---
+    const last = pts[pts.length-1];
+    const pulseR = 3.5 + Math.sin(now * 0.004) * 1.2;
+
+    // Outer glow ring
+    const glowGrad = ctx.createRadialGradient(last.x, last.y, 0, last.x, last.y, pulseR * 3.5);
+    glowGrad.addColorStop(0, rgba(dc, 0.4));
+    glowGrad.addColorStop(1, rgba(dc, 0));
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, pulseR * 3.5, 0, Math.PI*2);
+    ctx.fillStyle = glowGrad;
+    ctx.fill();
+
+    // Core dot
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, pulseR, 0, Math.PI*2);
+    ctx.fillStyle = rgb(dc);
+    ctx.shadowColor = rgb(dc);
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Vertical cursor line at leading edge
+    ctx.strokeStyle = rgba(dc, 0.18);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(last.x, 0); ctx.lineTo(last.x, H); ctx.stroke();
+  }
+
+  // ---- FORMAT VALUE ----
+  _fmt(v) {
+    if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString();
+    if (Math.abs(v) >= 100)  return v.toFixed(1);
+    if (Math.abs(v) >= 10)   return v.toFixed(2);
+    return v.toFixed(3);
+  }
+
+  // ---- INIT ----
+  mount(cardEl, canvasEl) {
+    this.cardEl = cardEl;
+    this.canvas = canvasEl;
+    this.ctx    = canvasEl.getContext('2d');
+  }
+
+  start() {
+    this.tick();
+    this._timer = setInterval(() => this.tick(), this.interval);
+    const loop = (ts) => {
+      this.draw(ts);
+      this._raf = requestAnimationFrame(loop);
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+
+  destroy() {
+    clearInterval(this._timer);
+    cancelAnimationFrame(this._raf);
+    if (this.cardEl) this.cardEl.remove();
+  }
+}
+
+// ================================================================
+// MONITOR REGISTRY
+// ================================================================
+const MONITORS = new Map();
+let agentX = seedHash('manifold-monitor-v1');
+
+function observeAgent(label) {
+  const y = seedHash(label + Date.now());
+  const z = M.position(agentX, y);
+  agentX = z;
+  document.getElementById('hdr-x').textContent = agentX.toFixed(4);
+  document.getElementById('hdr-z').textContent = z.toFixed(4);
+  return z;
+}
+
+// ================================================================
+// CARD FACTORY
+// ================================================================
+function createCard(monitor) {
+  const card = document.createElement('div');
+  card.className = 'mon-card';
+  card.id = 'card-' + monitor.id;
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="card-name">${esc(monitor.name)}</div>
+      <div class="card-badge badge-idle">IDLE</div>
+    </div>
+    <div class="card-value-row">
+      <div class="card-value" style="color:var(--c-low)">--</div>
+      <div class="card-unit">${esc(monitor.unit)}</div>
+      <div class="card-delta delta-flat"></div>
+    </div>
+    <div class="card-canvas-wrap">
+      <canvas class="card-canvas"></canvas>
+    </div>
+    <div class="card-stats">
+      <div class="stat-item">min<span class="stat-val stat-min">--</span></div>
+      <div class="stat-item">avg<span class="stat-val stat-avg">--</span></div>
+      <div class="stat-item">max<span class="stat-val stat-max">--</span></div>
+      <div class="card-z">z=?</div>
+    </div>`;
+
+  const canvas = card.querySelector('.card-canvas');
+  monitor.mount(card, canvas);
+  return card;
+}
+
+function addMonitor(cfg) {
+  const mon = new MetricMonitor(cfg);
+  MONITORS.set(mon.id, mon);
+
+  const grid = document.getElementById('grid');
+
+  // Group header
+  const existingGroup = grid.querySelector(`[data-group="${esc(cfg.group || 'System')}"]`);
+  if (!existingGroup) {
+    const gh = document.createElement('div');
+    gh.className = 'group-header';
+    gh.dataset.group = cfg.group || 'System';
+    gh.textContent = cfg.group || 'System';
+    grid.appendChild(gh);
+  }
+
+  const card = createCard(mon);
+  grid.appendChild(card);
+  mon.start();
+
+  document.getElementById('hdr-count').textContent = MONITORS.size;
+  observeAgent('add:' + cfg.name);
+  return mon;
+}
+
+// ================================================================
+// BUILT-IN METRIC SOURCES
+// All derived from manifold equations + noise -- no actual system calls
+// (browser has no native CPU/disk access; production would swap these
+//  for real endpoints or WebSocket streams)
+// ================================================================
+
+// Gaussian noise helper
+const noise = (seed) => {
+  let s = seed;
+  return (bias, range) => {
+    s = (s * 1664525 + 1013904223) & 0xFFFFFFFF;
+    const r = (s >>> 0) / 0xFFFFFFFF;
+    return bias + (r - 0.5) * 2 * range;
+  };
+};
+
+// Smooth random walk bounded to [lo, hi]
+class RandWalk {
+  constructor(start, lo, hi, step) {
+    this.v = start; this.lo = lo; this.hi = hi; this.step = step;
+  }
+  next() {
+    this.v += (Math.random() - 0.5) * this.step;
+    this.v = Math.max(this.lo, Math.min(this.hi, this.v));
+    return this.v;
+  }
+}
+
+// Periodic + noise pattern
+const periodic = (base, amp, freq, noiseAmp, n) => {
+  const ng = noise(n);
+  return () => base + Math.sin(Date.now() * freq) * amp + ng(0, noiseAmp);
+};
+
+// Burst pattern (normally low, occasional spikes)
+const burst = (base, peak, freq, n) => {
+  const ng = noise(n);
+  return () => {
+    const spike = Math.pow(Math.max(0, Math.sin(Date.now() * freq)), 8);
+    return base + spike * (peak - base) + ng(0, base * 0.1);
+  };
+};
+
+// Memory-like: slow creep upward with occasional GC drops
+class MemPattern {
+  constructor(start) { this.v = start; this.gc = false; }
+  next() {
+    if (this.gc) { this.v *= 0.85; this.gc = false; return this.v; }
+    this.v += Math.random() * 0.4 + 0.05;
+    if (this.v > 78 + Math.random() * 10) this.gc = true;
+    return this.v;
+  }
+}
+
+// Queue that builds and drains
+class QueuePattern {
+  constructor() { this.v = 5; this.filling = true; }
+  next() {
+    if (this.filling) {
+      this.v += Math.random() * 8;
+      if (this.v > 80 + Math.random() * 15) this.filling = false;
+    } else {
+      this.v -= Math.random() * 12;
+      if (this.v < 2) { this.v = 2; this.filling = true; }
+    }
+    return Math.max(0, this.v);
+  }
+}
+
+// Latency correlated with CPU load
+class LatencyPattern {
+  constructor(cpuWalk) { this.cpu = cpuWalk; }
+  next() {
+    const c = this.cpu.v / 100;
+    return 8 + c * c * 180 + (Math.random() - 0.3) * 12;
+  }
+}
+
+// Shared state for correlated metrics
+const cpuWalk      = new RandWalk(32, 5, 92, 6);
+const memPattern   = new MemPattern(38);
+const queuePattern = new QueuePattern();
+const latency      = new LatencyPattern(cpuWalk);
+const diskWalk     = new RandWalk(18, 2, 95, 14);
+const netInWalk    = new RandWalk(12, 0, 100, 18);
+const netOutWalk   = new RandWalk(8,  0, 80,  14);
+const connWalk     = new RandWalk(240, 20, 600, 30);
+const tempWalk     = new RandWalk(62, 40, 90, 2);
+const cacheWalk    = new RandWalk(91, 60, 99.5, 2);
+const errWalk      = new RandWalk(0.2, 0, 8, 0.8);
+const reqWalk      = new RandWalk(180, 10, 1200, 40);
+
+// ================================================================
+// DEFAULT MONITORS
+// ================================================================
+const DEFAULT_MONITORS = [
+  // --- System ---
+  { name:'CPU Usage',        group:'System',      unit:'%',   min:0, max:100, warn:70, crit:85, source:() => cpuWalk.next() },
+  { name:'Memory',           group:'System',      unit:'%',   min:0, max:100, warn:75, crit:90, source:() => memPattern.next() },
+  { name:'Temperature',      group:'System',      unit:'°C',  min:30, max:100, warn:78, crit:88, source:() => tempWalk.next() },
+  { name:'Disk I/O',         group:'System',      unit:'%',   min:0, max:100, warn:65, crit:88, source:() => diskWalk.next() },
+
+  // --- Network ---
+  { name:'Network In',       group:'Network',     unit:'Mb/s',min:0, max:1000, warn:600, crit:850, source:() => netInWalk.next() * 8.5 },
+  { name:'Network Out',      group:'Network',     unit:'Mb/s',min:0, max:800,  warn:500, crit:720, source:() => netOutWalk.next() * 6.8 },
+  { name:'Active Connections',group:'Network',    unit:'',    min:0, max:1000, warn:700, crit:900, source:() => connWalk.next() },
+
+  // --- Application ---
+  { name:'Request Rate',     group:'Application', unit:'rps', min:0, max:2000, warn:1400, crit:1800, source:() => reqWalk.next() },
+  { name:'P95 Latency',      group:'Application', unit:'ms',  min:0, max:500,  warn:200,  crit:350,  source:() => latency.next() },
+  { name:'Error Rate',       group:'Application', unit:'%',   min:0, max:20,   warn:2,    crit:5,    source:() => errWalk.next() },
+  { name:'Cache Hit Rate',   group:'Application', unit:'%',   min:50, max:100, warn:0.5, crit:0.3, invert:true, source:() => cacheWalk.next() },
+
+  // --- Manifold (meta-monitor -- observes the observer) ---
+  { name:'Request Queue',    group:'Manifold',    unit:'jobs',min:0, max:200,  warn:120, crit:160,  source:() => queuePattern.next() },
+  { name:'Manifold z (live)',group:'Manifold',    unit:'',    min:0, max:1,    warn:0.7, crit:0.88, interval:500,
+    source:() => {
+      const y = (Date.now() % 10000) / 10000;
+      return M.position(agentX, y);
+    }
+  },
+];
+
+// ================================================================
+// INIT
+// ================================================================
+DEFAULT_MONITORS.forEach(cfg => addMonitor(cfg));
+
+// ================================================================
+// TIME RANGE CONTROLS
+// ================================================================
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    DISPLAY_RANGE = parseInt(btn.dataset.range);
+    observeAgent('range:' + DISPLAY_RANGE);
+  });
+});
+
+// ================================================================
+// ADD MONITOR MODAL
+// ================================================================
+document.getElementById('add-btn').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('hidden');
+});
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal').classList.add('hidden');
+});
+document.getElementById('modal-ok').addEventListener('click', () => {
+  const name = document.getElementById('m-name').value.trim() || 'Custom Metric';
+  const srcExpr = document.getElementById('m-source').value.trim() || 'Math.random() * 100';
+  const unit  = document.getElementById('m-unit').value.trim();
+  const min   = parseFloat(document.getElementById('m-min').value) || 0;
+  const max   = parseFloat(document.getElementById('m-max').value) || 100;
+  const warn  = parseFloat(document.getElementById('m-warn').value) || 70;
+  const crit  = parseFloat(document.getElementById('m-crit').value) || 85;
+  const group = document.getElementById('m-group').value.trim() || 'Custom';
+  const iv    = parseInt(document.getElementById('m-interval').value) || 1000;
+
+  // Build source function safely
+  let sourceFn;
+  try {
+    // eslint-disable-next-line no-new-func
+    sourceFn = new Function('M', 'agentX', 'return (' + srcExpr + ')').bind(null, M, agentX);
+    sourceFn = () => new Function('M', 'agentX', 'return (' + srcExpr + ')')(M, agentX);
+  } catch(e) {
+    alert('Invalid source expression: ' + e.message);
+    return;
+  }
+
+  addMonitor({ name, unit, min, max, warn:(warn/100)*(max-min)+min, crit:(crit/100)*(max-min)+min, group, interval:iv, source:sourceFn });
+  document.getElementById('modal').classList.add('hidden');
+});
+
+// ================================================================
+// FPS COUNTER
+// ================================================================
+let fpsFrames = 0, fpsLast = performance.now();
+function trackFps() {
+  fpsFrames++;
+  const now = performance.now();
+  if (now - fpsLast >= 1000) {
+    document.getElementById('fps-display').textContent = fpsFrames;
+    fpsFrames = 0; fpsLast = now;
+  }
+  requestAnimationFrame(trackFps);
+}
+requestAnimationFrame(trackFps);
+
+// ================================================================
+// UTILITY
+// ================================================================
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

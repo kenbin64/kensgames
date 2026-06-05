@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manifold Agent -- Dimensional AI System</title>
+<style>
+:root {
+  --bg:      #02030a;
+  --bg1:     #060818;
+  --panel:   rgba(4,4,18,0.92);
+  --edge:    rgba(44,240,255,0.18);
+  --cyan:    #2cf0ff;
+  --green:   #4dffb0;
+  --purple:  #c79aff;
+  --gold:    #ffd166;
+  --red:     #ff6b6b;
+  --dim:     #4a5a72;
+  --t1:      #f0f2fa;
+  --t2:      #c8d0e8;
+  --t3:      #6a7a94;
+  --mono:    'Consolas','Monaco','Courier New',monospace;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--t1); font-family:var(--mono); font-size:13px; }
+
+/* === LAYOUT === */
+#app { display:grid; grid-template-columns:210px 1fr; grid-template-rows:1fr 56px; height:100vh; }
+#sidebar { grid-row:1/3; background:var(--bg1); border-right:1px solid var(--edge); display:flex; flex-direction:column; overflow:hidden; }
+#workspace { overflow:hidden; display:flex; flex-direction:column; }
+#footer-bar { grid-column:2; background:var(--bg1); border-top:1px solid var(--edge); display:flex; align-items:center; gap:8px; padding:0 12px; }
+
+/* === SIDEBAR === */
+.sb-head { padding:12px 14px 8px; border-bottom:1px solid rgba(44,240,255,0.1); }
+.sb-logo { font-size:0.7rem; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; text-shadow:0 0 10px var(--cyan); }
+.sb-sub  { font-size:0.6rem; color:var(--t3); margin-top:2px; }
+.sb-state { padding:10px 14px; border-bottom:1px solid rgba(44,240,255,0.07); }
+.sb-state-row { display:flex; justify-content:space-between; margin-bottom:3px; font-size:0.65rem; }
+.sb-state-row .lbl { color:var(--t3); }
+.sb-state-row .val { color:var(--cyan); font-weight:600; }
+.dim-bar { height:3px; background:rgba(44,240,255,0.08); border-radius:2px; margin-top:6px; overflow:hidden; }
+.dim-fill { height:100%; background:linear-gradient(90deg,var(--cyan),var(--purple)); border-radius:2px; transition:width 0.4s; }
+.sb-nav { flex:1; padding:8px 0; overflow-y:auto; }
+.nav-item { display:flex; align-items:center; gap:8px; padding:7px 14px; cursor:pointer; transition:background 0.15s; font-size:0.72rem; letter-spacing:0.04em; color:var(--t3); position:relative; }
+.nav-item:hover { background:rgba(44,240,255,0.05); color:var(--t2); }
+.nav-item.active { background:rgba(44,240,255,0.08); color:var(--cyan); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--cyan); }
+.nav-icon { width:16px; text-align:center; font-size:0.85rem; }
+.sb-config { padding:10px 14px; border-top:1px solid rgba(44,240,255,0.07); }
+.cfg-label { font-size:0.6rem; color:var(--t3); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:4px; }
+.cfg-input { width:100%; background:rgba(44,240,255,0.05); border:1px solid var(--edge); border-radius:4px; padding:4px 6px; color:var(--t2); font-family:var(--mono); font-size:0.65rem; outline:none; }
+.cfg-input:focus { border-color:var(--cyan); }
+.cfg-row { display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:4px; }
+
+/* === TABS === */
+#tab-bar { display:flex; border-bottom:1px solid var(--edge); background:var(--bg1); flex-shrink:0; overflow-x:auto; }
+.tab { padding:8px 14px; font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; color:var(--t3); border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.15s; }
+.tab:hover { color:var(--t2); background:rgba(44,240,255,0.04); }
+.tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+#tab-content { flex:1; overflow:hidden; position:relative; }
+.tab-panel { position:absolute; inset:0; overflow:hidden; display:none; flex-direction:column; }
+.tab-panel.active { display:flex; }
+
+/* === CHAT === */
+#chat-messages { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+#chat-messages::-webkit-scrollbar { width:4px; }
+#chat-messages::-webkit-scrollbar-thumb { background:rgba(44,240,255,0.2); border-radius:2px; }
+.msg { max-width:82%; display:flex; flex-direction:column; gap:3px; }
+.msg.user { align-self:flex-end; }
+.msg.agent { align-self:flex-start; }
+.msg-bubble { padding:8px 12px; border-radius:8px; font-size:0.78rem; line-height:1.65; }
+.msg.user .msg-bubble { background:rgba(44,240,255,0.1); border:1px solid rgba(44,240,255,0.2); color:var(--t1); }
+.msg.agent .msg-bubble { background:rgba(4,4,18,0.8); border:1px solid var(--edge); color:var(--t2); }
+.msg-meta { font-size:0.6rem; color:var(--t3); display:flex; gap:8px; padding:0 4px; }
+.msg-z { color:var(--cyan); }
+.msg-dim { color:var(--purple); }
+.msg-sub { color:var(--green); }
+.thinking { display:flex; gap:4px; padding:10px 12px; }
+.thinking span { width:6px; height:6px; border-radius:50%; background:var(--cyan); animation:think 1.2s ease-in-out infinite; }
+.thinking span:nth-child(2) { animation-delay:0.2s; }
+.thinking span:nth-child(3) { animation-delay:0.4s; }
+@keyframes think { 0%,80%,100%{opacity:0.2;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+.chat-tools { padding:6px 12px; border-top:1px solid rgba(44,240,255,0.08); display:flex; gap:6px; flex-wrap:wrap; }
+.tool-btn { padding:3px 8px; border:1px solid var(--edge); border-radius:3px; background:transparent; color:var(--t3); font-family:var(--mono); font-size:0.62rem; cursor:pointer; transition:all 0.15s; }
+.tool-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+
+/* === SEARCH === */
+#search-panel { flex:1; display:flex; flex-direction:column; }
+.search-topbar { padding:10px 14px; border-bottom:1px solid rgba(44,240,255,0.08); display:flex; align-items:center; gap:8px; }
+.search-input { flex:1; background:rgba(44,240,255,0.05); border:1px solid var(--edge); border-radius:5px; padding:6px 10px; color:var(--t1); font-family:var(--mono); font-size:0.78rem; outline:none; }
+.search-input:focus { border-color:var(--cyan); box-shadow:0 0 0 2px rgba(44,240,255,0.06); }
+.search-btn { padding:6px 12px; background:rgba(44,240,255,0.08); border:1px solid rgba(44,240,255,0.25); border-radius:5px; color:var(--cyan); font-family:var(--mono); font-size:0.72rem; cursor:pointer; }
+.drill-up-btn { padding:5px 10px; background:rgba(199,154,255,0.08); border:1px solid rgba(199,154,255,0.25); border-radius:5px; color:var(--purple); font-family:var(--mono); font-size:0.68rem; cursor:pointer; white-space:nowrap; }
+.drill-up-btn:disabled { opacity:0.3; cursor:default; }
+.breadcrumb { padding:6px 14px; font-size:0.65rem; color:var(--t3); display:flex; align-items:center; gap:4px; border-bottom:1px solid rgba(44,240,255,0.05); flex-wrap:wrap; }
+.bc-seg { cursor:pointer; color:var(--t3); transition:color 0.15s; }
+.bc-seg:hover { color:var(--cyan); }
+.bc-seg.current { color:var(--t2); }
+.bc-sep { color:var(--dim); }
+.bc-coord { color:var(--cyan); font-size:0.6rem; margin-left:3px; }
+#search-results { flex:1; overflow-y:auto; padding:12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; align-content:start; }
+#search-results::-webkit-scrollbar { width:4px; }
+#search-results::-webkit-scrollbar-thumb { background:rgba(44,240,255,0.15); border-radius:2px; }
+.result-card { background:var(--panel); border:1px solid rgba(44,240,255,0.1); border-radius:8px; padding:10px; cursor:default; transition:border-color 0.2s,box-shadow 0.2s; display:flex; flex-direction:column; gap:6px; position:relative; overflow:hidden; }
+.result-card:hover { border-color:rgba(44,240,255,0.3); box-shadow:0 0 14px rgba(44,240,255,0.06); }
+.result-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--card-color,var(--cyan)),transparent); opacity:0.5; }
+.card-icon { font-size:1.4rem; }
+.card-name { font-size:0.72rem; color:var(--t1); font-weight:500; word-break:break-word; line-height:1.3; }
+.card-coord { font-size:0.6rem; color:var(--t3); }
+.card-coord span { color:var(--cyan); }
+.card-actions { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+.card-action { padding:2px 7px; border:1px solid var(--edge); border-radius:3px; background:transparent; color:var(--t3); font-family:var(--mono); font-size:0.6rem; cursor:pointer; transition:all 0.12s; }
+.card-action:hover { border-color:var(--cyan); color:var(--cyan); background:rgba(44,240,255,0.05); }
+.card-action.primary { border-color:rgba(44,240,255,0.25); color:var(--cyan); }
+.no-results { grid-column:1/-1; text-align:center; color:var(--t3); padding:40px; font-size:0.78rem; }
+
+/* === CODE === */
+#code-panel { flex:1; display:flex; flex-direction:column; }
+.code-toolbar { padding:8px 12px; border-bottom:1px solid var(--edge); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.code-lang { background:rgba(44,240,255,0.05); border:1px solid var(--edge); border-radius:4px; color:var(--t2); font-family:var(--mono); font-size:0.7rem; padding:3px 6px; cursor:pointer; }
+.code-action { padding:4px 10px; border:1px solid var(--edge); border-radius:4px; background:transparent; color:var(--t3); font-family:var(--mono); font-size:0.68rem; cursor:pointer; transition:all 0.15s; }
+.code-action:hover { border-color:var(--cyan); color:var(--cyan); }
+.code-action.run { border-color:rgba(77,255,176,0.3); color:var(--green); }
+.code-action.run:hover { background:rgba(77,255,176,0.08); }
+.code-split { flex:1; display:grid; grid-template-columns:1fr 1fr; overflow:hidden; }
+.code-editor-wrap { border-right:1px solid var(--edge); display:flex; flex-direction:column; overflow:hidden; }
+.code-editor { flex:1; background:transparent; border:none; outline:none; resize:none; color:var(--t2); font-family:var(--mono); font-size:0.76rem; line-height:1.65; padding:12px; overflow-y:auto; }
+.code-output-wrap { display:flex; flex-direction:column; overflow:hidden; }
+.code-output-label { padding:6px 12px; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--t3); border-bottom:1px solid rgba(44,240,255,0.07); }
+.code-output { flex:1; overflow-y:auto; padding:10px 12px; font-size:0.72rem; line-height:1.6; color:var(--t2); white-space:pre-wrap; }
+.code-output .ok  { color:var(--green); }
+.code-output .err { color:var(--red); }
+.code-output .dim-out { color:var(--cyan); font-size:0.65rem; }
+
+/* === DOCS === */
+#docs-panel { flex:1; display:flex; flex-direction:column; }
+.doc-toolbar { padding:6px 12px; border-bottom:1px solid var(--edge); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.doc-btn { padding:3px 8px; border:1px solid var(--edge); border-radius:3px; background:transparent; color:var(--t3); font-family:var(--mono); font-size:0.65rem; cursor:pointer; transition:all 0.15s; }
+.doc-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+.doc-btn.active { background:rgba(44,240,255,0.08); border-color:rgba(44,240,255,0.3); color:var(--cyan); }
+.doc-sep { width:1px; height:16px; background:var(--edge); margin:0 2px; }
+.doc-editor { flex:1; padding:24px 32px; overflow-y:auto; outline:none; font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.8; color:var(--t2); }
+.doc-editor:focus { }
+.doc-editor h1 { font-size:1.6rem; color:var(--t1); margin-bottom:0.6em; }
+.doc-editor h2 { font-size:1.2rem; color:var(--cyan); margin:1.2em 0 0.5em; }
+.doc-editor p { margin-bottom:0.8em; }
+.doc-editor code { font-family:var(--mono); font-size:0.85em; background:rgba(44,240,255,0.07); padding:1px 5px; border-radius:3px; color:var(--cyan); }
+
+/* === MEDIA === */
+#media-panel { flex:1; display:flex; flex-direction:column; }
+.media-toolbar { padding:8px 14px; border-bottom:1px solid var(--edge); display:flex; gap:8px; align-items:center; }
+.media-tab { padding:4px 12px; border:1px solid var(--edge); border-radius:4px; color:var(--t3); font-size:0.68rem; cursor:pointer; background:transparent; font-family:var(--mono); }
+.media-tab.active { border-color:rgba(44,240,255,0.3); color:var(--cyan); background:rgba(44,240,255,0.06); }
+.media-content { flex:1; overflow-y:auto; padding:14px; }
+.art-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+.art-cell { aspect-ratio:1; border:1px solid var(--edge); border-radius:6px; overflow:hidden; cursor:pointer; transition:border-color 0.2s; }
+.art-cell:hover { border-color:var(--cyan); }
+.art-cell canvas { width:100%; height:100%; display:block; }
+.art-label { font-size:0.6rem; color:var(--t3); padding:4px 6px; text-align:center; border-top:1px solid rgba(44,240,255,0.07); }
+.audio-player { background:var(--panel); border:1px solid var(--edge); border-radius:8px; padding:16px; margin-bottom:12px; }
+.audio-title { font-size:0.78rem; color:var(--t1); margin-bottom:8px; }
+.audio-controls { display:flex; gap:8px; align-items:center; }
+.audio-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--edge); background:transparent; color:var(--cyan); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9rem; transition:all 0.15s; }
+.audio-btn:hover { background:rgba(44,240,255,0.08); border-color:var(--cyan); }
+.audio-viz { flex:1; height:32px; background:rgba(44,240,255,0.04); border-radius:4px; overflow:hidden; }
+.gen-controls { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+.gen-input { flex:1; background:rgba(44,240,255,0.05); border:1px solid var(--edge); border-radius:5px; padding:6px 10px; color:var(--t1); font-family:var(--mono); font-size:0.75rem; outline:none; }
+.gen-btn { padding:6px 14px; background:rgba(44,240,255,0.08); border:1px solid rgba(44,240,255,0.25); border-radius:5px; color:var(--cyan); font-family:var(--mono); font-size:0.72rem; cursor:pointer; }
+
+/* === SERVER === */
+#server-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.server-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; padding:12px; }
+.gauge-card { background:var(--panel); border:1px solid var(--edge); border-radius:8px; padding:12px; }
+.gauge-title { font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--t3); margin-bottom:6px; }
+.gauge-val { font-size:1.4rem; font-weight:700; margin-bottom:6px; }
+.gauge-bar { height:4px; background:rgba(44,240,255,0.08); border-radius:2px; overflow:hidden; }
+.gauge-fill { height:100%; border-radius:2px; transition:width 2s ease; }
+.gauge-sub { font-size:0.62rem; color:var(--t3); margin-top:4px; }
+.process-table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+.process-table th { text-align:left; padding:5px 10px; color:var(--cyan); font-size:0.6rem; letter-spacing:0.1em; text-transform:uppercase; border-bottom:1px solid rgba(44,240,255,0.12); opacity:0.7; }
+.process-table td { padding:5px 10px; border-bottom:1px solid rgba(44,240,255,0.05); color:var(--t2); }
+.proc-status { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; }
+.log-panel { flex:1; overflow-y:auto; padding:10px 14px; font-size:0.68rem; line-height:1.8; }
+.log-line { border-bottom:1px solid rgba(44,240,255,0.03); padding:2px 0; }
+.log-ts { color:var(--t3); margin-right:8px; }
+.log-info { color:var(--green); }
+.log-warn { color:var(--gold); }
+.log-err  { color:var(--red); }
+
+/* === FOOTER BAR === */
+#footer-bar input { flex:1; background:rgba(44,240,255,0.05); border:1px solid var(--edge); border-radius:5px; padding:7px 12px; color:var(--t1); font-family:var(--mono); font-size:0.78rem; outline:none; }
+#footer-bar input:focus { border-color:var(--cyan); box-shadow:0 0 0 2px rgba(44,240,255,0.06); }
+.footer-send { padding:7px 16px; background:rgba(44,240,255,0.1); border:1px solid rgba(44,240,255,0.3); border-radius:5px; color:var(--cyan); font-family:var(--mono); font-size:0.72rem; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+.footer-send:hover { background:rgba(44,240,255,0.18); }
+.footer-z { font-size:0.62rem; color:var(--t3); white-space:nowrap; }
+.footer-z span { color:var(--cyan); }
+
+/* === SCROLLBARS === */
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(44,240,255,0.15); border-radius:2px; }
+
+/* === MODAL (settings / file preview) === */
+.modal-bg { position:fixed; inset:0; background:rgba(2,3,10,0.85); z-index:100; display:flex; align-items:center; justify-content:center; }
+.modal { background:var(--bg1); border:1px solid var(--edge); border-radius:10px; padding:20px; max-width:560px; width:90%; max-height:80vh; overflow-y:auto; }
+.modal h3 { color:var(--cyan); font-size:0.88rem; margin-bottom:12px; }
+.modal-close { float:right; background:none; border:none; color:var(--t3); cursor:pointer; font-size:1rem; }
+.modal-close:hover { color:var(--t1); }
+.modal pre { background:rgba(44,240,255,0.04); padding:10px; border-radius:5px; font-size:0.7rem; overflow-x:auto; color:var(--t2); line-height:1.6; max-height:300px; overflow-y:auto; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sb-head">
+      <div class="sb-logo">Manifold Agent</div>
+      <div class="sb-sub">Dimensional AI -- v2.6</div>
+    </div>
+    <div class="sb-state">
+      <div class="sb-state-row"><span class="lbl">x identity</span><span class="val" id="st-x">0.9720</span></div>
+      <div class="sb-state-row"><span class="lbl">z derived</span><span class="val" id="st-z">--</span></div>
+      <div class="sb-state-row"><span class="lbl">dim</span><span class="val" id="st-dim">1</span></div>
+      <div class="sb-state-row"><span class="lbl">substrate</span><span class="val" id="st-sub">◈ zynxy</span></div>
+      <div class="sb-state-row"><span class="lbl">depth</span><span class="val" id="st-depth">0</span></div>
+      <div class="dim-bar"><div class="dim-fill" id="dim-fill" style="width:14%"></div></div>
+    </div>
+    <nav class="sb-nav" id="sb-nav">
+      <div class="nav-item active" data-tab="search"><span class="nav-icon">🔍</span>Search</div>
+      <div class="nav-item" data-tab="chat"><span class="nav-icon">💬</span>Chat</div>
+      <div class="nav-item" data-tab="code"><span class="nav-icon">⌨</span>Code</div>
+      <div class="nav-item" data-tab="docs"><span class="nav-icon">📄</span>Documents</div>
+      <div class="nav-item" data-tab="media"><span class="nav-icon">🎨</span>Media</div>
+      <div class="nav-item" data-tab="server"><span class="nav-icon">⚙</span>Server</div>
+    </nav>
+    <div class="sb-config">
+      <div class="cfg-label">API Endpoint</div>
+      <input class="cfg-input" id="cfg-base" placeholder="https://api.groq.com/openai/v1">
+      <div class="cfg-row" style="margin-top:4px">
+        <input class="cfg-input" id="cfg-key" type="password" placeholder="API key">
+        <input class="cfg-input" id="cfg-model" placeholder="model">
+      </div>
+      <button class="card-action" style="margin-top:6px;width:100%;justify-content:center" id="cfg-save">Save Config</button>
+    </div>
+  </aside>
+
+  <!-- WORKSPACE -->
+  <main id="workspace">
+    <div id="tab-bar">
+      <div class="tab active" data-tab="search">🔍 Search</div>
+      <div class="tab" data-tab="chat">💬 Chat</div>
+      <div class="tab" data-tab="code">⌨ Code</div>
+      <div class="tab" data-tab="docs">📄 Docs</div>
+      <div class="tab" data-tab="media">🎨 Media</div>
+      <div class="tab" data-tab="server">⚙ Server</div>
+    </div>
+    <div id="tab-content">
+
+      <!-- SEARCH -->
+      <div class="tab-panel active" id="panel-search">
+        <div id="search-panel">
+          <div class="search-topbar">
+            <input class="search-input" id="search-input" placeholder="Search files, pages, media -- press Enter or drill into any result...">
+            <button class="search-btn" id="search-btn">Search</button>
+            <button class="drill-up-btn" id="drill-up-btn" disabled>⬆ Up</button>
+          </div>
+          <div class="breadcrumb" id="breadcrumb"></div>
+          <div id="search-results"></div>
+        </div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="tab-panel" id="panel-chat">
+        <div id="chat-messages"></div>
+        <div class="chat-tools">
+          <button class="tool-btn" data-prompt="/write Create a dimensional programming overview document">📄 Write Doc</button>
+          <button class="tool-btn" data-prompt="/code Write a z=xy manifold evaluator in JavaScript">⌨ Write Code</button>
+          <button class="tool-btn" data-prompt="/image Generate an abstract fractal manifold visualization">🎨 Image</button>
+          <button class="tool-btn" data-prompt="/debug Review this code and find any issues">🐛 Debug</button>
+          <button class="tool-btn" data-prompt="/deploy What are the steps to deploy a Node.js server?">🚀 Deploy</button>
+          <button class="tool-btn" data-prompt="/search Find all files related to dimensional programming">🔍 Search</button>
+        </div>
+      </div>
+
+      <!-- CODE -->
+      <div class="tab-panel" id="panel-code">
+        <div id="code-panel">
+          <div class="code-toolbar">
+            <select class="code-lang" id="code-lang">
+              <option>JavaScript</option><option>Python</option><option>HTML</option>
+              <option>CSS</option><option>Bash</option><option>JSON</option>
+            </select>
+            <button class="code-action run" id="code-run">&#9654; Run</button>
+            <button class="code-action" id="code-clear">Clear</button>
+            <button class="code-action" id="code-save">Save</button>
+            <button class="code-action" id="code-manifold">Insert Manifold</button>
+            <span style="margin-left:auto;color:var(--t3);font-size:0.62rem" id="code-status">ready</span>
+          </div>
+          <div class="code-split">
+            <div class="code-editor-wrap">
+              <textarea class="code-editor" id="code-editor" spellcheck="false">// Dimensional Programming -- z = xy manifold evaluator
+// All state derived, nothing stored.
+
+const M = {
+  position: (x, y) => x * y,          // z = xy
+  approach:  (x, y) => x / y,          // z = x/y
+  cargo:     (x, y) => x * y * y,      // z = xy^2
+  cabin:     (x, y) => x / (y * y),    // z = x/y^2
+  schwarz:   (x, y, z) =>
+    Math.cos(x)*Math.cos(y)*Math.cos(z) -
+    Math.sin(x)*Math.sin(y)*Math.sin(z)
+};
+
+// Seed: hash any string to (0,1]
+function seed(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++)
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return ((h >>> 0) % 900000 + 100000) / 1000000;
+}
+
+// Russian Doll chain: z becomes next x
+function chain(x0, yValues) {
+  let x = x0;
+  return yValues.map(y => {
+    const z = M.position(x, y);
+    x = z;  // z is the next x
+    return z;
+  });
+}
+
+// Example: derive 5 nested coordinates from one seed
+const root = seed('manifold-agent-v1');
+const coords = chain(root, [0.72, 0.63, 0.55, 0.48, 0.41]);
+console.log('root:', root.toFixed(6));
+coords.forEach((z, i) =>
+  console.log(`  depth ${i+1}: z = ${z.toFixed(6)}`)
+);
+</textarea>
+            </div>
+            <div class="code-output-wrap">
+              <div class="code-output-label">Output</div>
+              <div class="code-output" id="code-output"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCS -->
+      <div class="tab-panel" id="panel-docs">
+        <div id="docs-panel">
+          <div class="doc-toolbar">
+            <button class="doc-btn active" id="doc-h1" title="Heading 1" onclick="docCmd('h1')">H1</button>
+            <button class="doc-btn" id="doc-h2" title="Heading 2" onclick="docCmd('h2')">H2</button>
+            <div class="doc-sep"></div>
+            <button class="doc-btn" onclick="docCmd('bold')"><b>B</b></button>
+            <button class="doc-btn" onclick="docCmd('italic')"><i>I</i></button>
+            <button class="doc-btn" onclick="docCmd('underline')"><u>U</u></button>
+            <div class="doc-sep"></div>
+            <button class="doc-btn" onclick="insertEmdash()" title="Insert em-dash">&mdash;</button>
+            <button class="doc-btn" onclick="docCmd('insertUnorderedList')">List</button>
+            <button class="doc-btn" onclick="docCmd('insertOrderedList')">1.</button>
+            <div class="doc-sep"></div>
+            <button class="doc-btn" id="doc-export-md">Export .md</button>
+            <button class="doc-btn" id="doc-export-html">Export .html</button>
+            <button class="doc-btn" id="doc-ai-write">AI Write</button>
+          </div>
+          <div class="doc-editor" id="doc-editor" contenteditable="true">
+            <h1>Dimensional Programming</h1>
+            <h2>Overview</h2>
+            <p>State is observed, not stored. Every value is derived from the manifold equation <code>z = x&thinsp;&middot;&thinsp;y</code>, where x is the observer identity and y is the modifier read from the field.</p>
+            <h2>The Russian Doll</h2>
+            <p>Each derived z becomes the next x. The chain composes indefinitely without ever leaving the bounded range (0,&thinsp;1]. No state is stored&thinsp;&#x2014;&thinsp;everything is observable on demand.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEDIA -->
+      <div class="tab-panel" id="panel-media">
+        <div id="media-panel">
+          <div class="media-toolbar">
+            <button class="media-tab active" data-media="art">Generative Art</button>
+            <button class="media-tab" data-media="audio">Audio</button>
+            <button class="media-tab" data-media="images">Images</button>
+            <button class="media-tab" data-media="video">Video</button>
+          </div>
+          <div class="media-content" id="media-content"></div>
+        </div>
+      </div>
+
+      <!-- SERVER -->
+      <div class="tab-panel" id="panel-server">
+        <div id="server-panel">
+          <div style="padding:8px 12px 6px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--t3)">Live Gauges</span>
+            <a href="monitor.html" target="_blank" style="font-size:0.65rem;color:var(--purple);text-decoration:none;border:1px solid rgba(199,154,255,0.25);border-radius:4px;padding:2px 8px;">&#9670; Full Monitor &#x2197;</a>
+          </div>
+          <div class="server-grid" id="server-gauges"></div>
+          <div style="padding:0 12px 6px;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--t3)">Processes</div>
+          <div style="padding:0 12px;overflow-x:auto">
+            <table class="process-table" id="proc-table">
+              <thead><tr><th>PID</th><th>Name</th><th>CPU</th><th>Mem</th><th>Status</th><th>z coord</th></tr></thead>
+              <tbody id="proc-tbody"></tbody>
+            </table>
+          </div>
+          <div style="padding:8px 12px 4px;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--t3);margin-top:8px">Server Log</div>
+          <div class="log-panel" id="server-log"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- FOOTER INPUT BAR -->
+  <div id="footer-bar">
+    <span class="footer-z">z = <span id="ft-x">?</span> &middot; <span id="ft-y">?</span> = <span id="ft-z">?</span></span>
+    <input type="text" id="main-input" placeholder="Ask, search, write, code, generate, deploy...">
+    <button class="footer-send" id="main-send">Observe &#x21A6;</button>
+  </div>
+</div>
+
+<!-- MODAL for file preview -->
+<div class="modal-bg hidden" id="preview-modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">&times;</button>
+    <h3 id="modal-title">File Preview</h3>
+    <pre id="modal-body"></pre>
+  </div>
+</div>
+
+<script type="module">
+// ================================================================
+// MANIFOLD AGENT -- UI Controller
+// All agent state derived from manifolds. Nothing stored.
+// ================================================================
+
+// --- MANIFOLD PRIMITIVES ---
+const M = {
+  position: (x, y) => x * y,
+  approach:  (x, y) => x / y,
+  cargo:     (x, y) => x * y * y,
+  cabin:     (x, y) => x / (y * y),
+  schwarz:   (x, y, z) =>
+    Math.cos(x)*Math.cos(y)*Math.cos(z) -
+    Math.sin(x)*Math.sin(y)*Math.sin(z)
+};
+
+function seed(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++)
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return ((h >>> 0) % 900000 + 100000) / 1000000;
+}
+
+function hashToUnit(s) { return seed(String(s)); }
+
+// --- AGENT STATE ---
+let AGENT_X = seed('manifold-agent-v2');
+let AGENT_DIM = 1;
+let AGENT_SUBSTRATE = 'zynxy';
+let CHAIN_DEPTH = 0;
+
+function agentObserve(query) {
+  const y = hashToUnit(query);
+  const z = M.position(AGENT_X, y);
+  CHAIN_DEPTH++;
+  AGENT_DIM = Math.min(7, AGENT_DIM + 1);
+  if (AGENT_DIM >= 7) { AGENT_X = z; AGENT_DIM = 1; }
+  else AGENT_X = z;
+  updateStateDisplay(z, y);
+  return { x: AGENT_X, y, z, dim: AGENT_DIM };
+}
+
+function updateStateDisplay(z, y) {
+  document.getElementById('st-x').textContent = AGENT_X.toFixed(4);
+  document.getElementById('st-z').textContent = (z || AGENT_X).toFixed(4);
+  document.getElementById('st-dim').textContent = AGENT_DIM;
+  document.getElementById('st-depth').textContent = CHAIN_DEPTH;
+  document.getElementById('dim-fill').style.width = ((AGENT_DIM / 7) * 100) + '%';
+  document.getElementById('ft-x').textContent = AGENT_X.toFixed(3);
+  document.getElementById('ft-y').textContent = (y || '?');
+  document.getElementById('ft-z').textContent = (z || AGENT_X).toFixed(3);
+}
+
+// ================================================================
+// SEARCH ENGINE
+// ================================================================
+
+// Build the search tree from the actual project structure.
+// Each node's x coordinate is derived via z = parent.x * seed(name).
+function buildNode(parentX, name, type, path, children, extra) {
+  const x = M.position(parentX, seed(name));
+  return { name, type, path, x, children: children || null, ...extra };
+}
+
+const ROOT_X = 1.0;
+const SEARCH_TREE = buildNode(ROOT_X, 'root', 'folder', '/', [
+  buildNode(ROOT_X, 'manifold-ai', 'folder', 'manifold-ai/', [
+    buildNode(seed('manifold-ai'), 'agent.html',        'html',   'manifold-ai/agent.html'),
+    buildNode(seed('manifold-ai'), 'index.html',        'html',   'manifold-ai/index.html'),
+    buildNode(seed('manifold-ai'), 'engine.js',         'js',     'manifold-ai/js/engine.js'),
+    buildNode(seed('manifold-ai'), 'manifold-agent.js', 'js',     'manifold-ai/js/manifold-agent.js'),
+    buildNode(seed('manifold-ai'), 'manifold-context.js','js',    'manifold-ai/js/manifold-context.js'),
+    buildNode(seed('manifold-ai'), 'dimensional.js',    'js',     'manifold-ai/js/dimensional.js'),
+    buildNode(seed('manifold-ai'), 'substrates.js',     'js',     'manifold-ai/js/substrates.js'),
+    buildNode(seed('manifold-ai'), 'manifold.css',      'css',    'manifold-ai/css/manifold.css'),
+  ]),
+  buildNode(ROOT_X, 'dimensional-programming', 'folder', 'dimensional-programming/', [
+    buildNode(seed('dimensional-programming'), 'index.html',        'html', 'dimensional-programming/index.html'),
+    buildNode(seed('dimensional-programming'), 'space-travel.html', 'html', 'dimensional-programming/space-travel.html'),
+  ]),
+  buildNode(ROOT_X, 'x-dimensional', 'folder', 'x-dimensional/', [
+    buildNode(seed('x-dimensional'), 'index.html',   'html', 'x-dimensional/index.html'),
+    buildNode(seed('x-dimensional'), 'saddle',       'folder','x-dimensional/saddle/', [
+      buildNode(seed('saddle'), 'index.html', 'html', 'x-dimensional/saddle/index.html'),
+      buildNode(seed('saddle'), 'saddle.js',  'js',   'x-dimensional/saddle/saddle.js'),
+    ]),
+    buildNode(seed('x-dimensional'), 'actors',       'folder','x-dimensional/actors/'),
+    buildNode(seed('x-dimensional'), 'manifestation','folder','x-dimensional/manifestation/'),
+    buildNode(seed('x-dimensional'), 'squeeze',      'folder','x-dimensional/squeeze/'),
+    buildNode(seed('x-dimensional'), 'void',         'folder','x-dimensional/void/'),
+    buildNode(seed('x-dimensional'), 'proof-runner.js','js',  'x-dimensional/proof-runner.js'),
+    buildNode(seed('x-dimensional'), 'manifold.proof.json','json','x-dimensional/manifold.proof.json'),
+  ]),
+  buildNode(ROOT_X, 'docs', 'folder', 'docs/', [
+    buildNode(seed('docs'), 'DIMENSIONAL_PROGRAMMING.md',          'md', 'docs/DIMENSIONAL_PROGRAMMING.md'),
+    buildNode(seed('docs'), 'DIMENSIONAL_PROGRAMMING_STRATEGY.md', 'md', 'docs/DIMENSIONAL_PROGRAMMING_STRATEGY.md'),
+    buildNode(seed('docs'), 'RUSSIAN_DOLL_HELLO_WORLD.md',         'md', 'docs/RUSSIAN_DOLL_HELLO_WORLD.md'),
+  ]),
+  buildNode(ROOT_X, 'server', 'folder', 'server/', [
+    buildNode(seed('server'), 'config.js',            'js',   'server/ai-broker/config.js'),
+    buildNode(seed('server'), 'manifold-router.js',   'js',   'server/ai-broker/manifold-router.js'),
+    buildNode(seed('server'), 'context-bridge.js',    'js',   'server/ai-broker/context-bridge.js'),
+    buildNode(seed('server'), 'game-kernel-adapter.js','js',  'server/ai-broker/game-kernel-adapter.js'),
+    buildNode(seed('server'), 'manifold-catalog.json','json', 'server/ai-broker/manifold-catalog.json'),
+  ]),
+  buildNode(ROOT_X, 'js', 'folder', 'js/', [
+    buildNode(seed('js'), 'schwarz-router.js', 'js', 'js/schwarz-router.js'),
+  ]),
+]);
+
+// Navigation stack for drill-down / drill-up
+let NAV_STACK = [{ node: SEARCH_TREE, query: '' }];
+
+function currentNode() { return NAV_STACK[NAV_STACK.length - 1].node; }
+
+function getIcon(type) {
+  const icons = {
+    folder:'📁', html:'🌐', js:'⚙', json:'📋',
+    md:'📝', css:'🎨', ts:'⚙', img:'🖼', mp3:'🎵',
+    mp4:'🎬', pdf:'📕', txt:'📄', default:'📄'
+  };
+  return icons[type] || icons.default;
+}
+
+function getCardColor(type) {
+  const colors = {
+    folder:'var(--cyan)', html:'var(--green)', js:'var(--gold)',
+    json:'var(--purple)', md:'var(--cyan)', css:'var(--purple)',
+    img:'var(--green)', mp3:'var(--purple)', mp4:'var(--red)', default:'var(--dim)'
+  };
+  return colors[type] || colors.default;
+}
+
+function getPrimaryAction(type) {
+  if (type === 'folder') return { label:'Explore ↓', action:'drill' };
+  if (['html'].includes(type)) return { label:'Open', action:'open' };
+  if (['js','css','ts','json'].includes(type)) return { label:'Code', action:'code' };
+  if (type === 'md') return { label:'Read', action:'read' };
+  if (type === 'mp3') return { label:'Play', action:'play' };
+  if (['jpg','png','gif','svg'].includes(type)) return { label:'View', action:'view' };
+  return { label:'Open', action:'open' };
+}
+
+// Flatten the entire tree for global search
+function flattenTree(node, acc) {
+  acc = acc || [];
+  if (node.children) node.children.forEach(c => { acc.push(c); flattenTree(c, acc); });
+  return acc;
+}
+const ALL_NODES = flattenTree(SEARCH_TREE);
+
+function renderSearch(nodes, query) {
+  const resultsEl = document.getElementById('search-results');
+  const q = (query || '').toLowerCase().trim();
+
+  let filtered = nodes;
+  if (q) {
+    filtered = nodes.filter(n => n.name.toLowerCase().includes(q));
+    // If nothing in scope, fall back to global search across all nodes
+    if (filtered.length === 0) {
+      filtered = ALL_NODES.filter(n => n.name.toLowerCase().includes(q));
+      if (filtered.length > 0) {
+        resultsEl.innerHTML = '<div style="grid-column:1/-1;font-size:0.62rem;color:var(--t3);padding:4px 0 8px">Global search -- results from all depths</div>';
+        // Render into existing innerHTML by appending below the label
+        const label = resultsEl.firstChild;
+        filtered.forEach(node => renderCard(node, resultsEl));
+        return;
+      }
+    }
+  }
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="no-results">No results. Try a different query or drill up ⬆ to search from root.</div>';
+    return;
+  }
+
+  resultsEl.innerHTML = '';
+  filtered.forEach(node => renderCard(node, resultsEl));
+}
+
+function renderCard(node, container) {
+  const { label: primaryLabel, action: primaryAction } = getPrimaryAction(node.type);
+  const color = getCardColor(node.type);
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.style.setProperty('--card-color', color);
+
+  const hasChildren = node.type === 'folder' || (node.children && node.children.length > 0);
+
+  card.innerHTML = `
+    <div class="card-icon">${getIcon(node.type)}</div>
+    <div class="card-name">${esc(node.name)}</div>
+    <div class="card-coord">z = <span>${node.x.toFixed(4)}</span></div>
+    <div class="card-actions">
+      <button class="card-action primary" data-act="${primaryAction}">${primaryLabel}</button>
+      ${hasChildren ? `<button class="card-action" data-act="drill">&#x2193;</button>` : ''}
+      ${node.path ? `<button class="card-action" data-act="open-new">&#x2197;</button>` : ''}
+    </div>`;
+
+  card.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      handleCardAction(btn.dataset.act, node);
+    });
+  });
+
+  container.appendChild(card);
+}
+
+function handleCardAction(action, node) {
+  agentObserve(action + ':' + node.name);
+
+  if (action === 'drill') {
+    drillDown(node);
+  } else if (action === 'open' || action === 'open-new') {
+    if (node.path) window.open('http://localhost:5500/' + node.path, '_blank');
+  } else if (action === 'code') {
+    if (node.path) {
+      fetch('http://localhost:5500/' + node.path)
+        .then(r => r.text())
+        .then(text => {
+          document.getElementById('code-editor').value = text;
+          switchTab('code');
+        }).catch(() => {
+          showModal(node.name, '// Could not load file: ' + node.path + '\n// Ensure the dev server is running on port 5500.');
+        });
+    }
+  } else if (action === 'read') {
+    if (node.path) {
+      fetch('http://localhost:5500/' + node.path)
+        .then(r => r.text())
+        .then(text => showModal(node.name, text))
+        .catch(() => showModal(node.name, 'Could not load: ' + node.path));
+    }
+  } else if (action === 'play') {
+    playToneFromSeed(node.x);
+  } else if (action === 'view') {
+    if (node.path) showModal(node.name, '<img src="http://localhost:5500/' + node.path + '" style="max-width:100%">');
+  }
+}
+
+function drillDown(node) {
+  if (!node.children || node.children.length === 0) {
+    // Leaf -- open it
+    handleCardAction('open', node);
+    return;
+  }
+  NAV_STACK.push({ node, query: '' });
+  document.getElementById('search-input').value = '';
+  updateBreadcrumb();
+  renderSearch(node.children, '');
+  document.getElementById('drill-up-btn').disabled = NAV_STACK.length <= 1;
+}
+
+function drillUp() {
+  if (NAV_STACK.length <= 1) return;
+  NAV_STACK.pop();
+  updateBreadcrumb();
+  const cur = currentNode();
+  const children = cur.children || [];
+  renderSearch(children, '');
+  document.getElementById('drill-up-btn').disabled = NAV_STACK.length <= 1;
+  agentObserve('drill-up:' + cur.name);
+}
+
+function updateBreadcrumb() {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = NAV_STACK.map((entry, i) => {
+    const isLast = i === NAV_STACK.length - 1;
+    const name = entry.node.name === 'root' ? 'Root' : entry.node.name;
+    const coord = entry.node.x ? `<span class="bc-coord">${entry.node.x.toFixed(3)}</span>` : '';
+    if (isLast) return `<span class="bc-seg current">${esc(name)}${coord}</span>`;
+    return `<span class="bc-seg" data-idx="${i}">${esc(name)}${coord}</span><span class="bc-sep"> / </span>`;
+  }).join('');
+  bc.querySelectorAll('[data-idx]').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx);
+      NAV_STACK = NAV_STACK.slice(0, idx + 1);
+      updateBreadcrumb();
+      const cur = currentNode();
+      renderSearch(cur.children || [], '');
+      document.getElementById('drill-up-btn').disabled = NAV_STACK.length <= 1;
+    });
+  });
+}
+
+// Initial render
+renderSearch(SEARCH_TREE.children, '');
+updateBreadcrumb();
+
+document.getElementById('drill-up-btn').addEventListener('click', drillUp);
+
+document.getElementById('search-btn').addEventListener('click', () => {
+  const q = document.getElementById('search-input').value.trim();
+  const cur = currentNode();
+  renderSearch(cur.children || [], q);
+  agentObserve('search:' + q);
+});
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('search-btn').click();
+});
+
+// ================================================================
+// CHAT
+// ================================================================
+
+let chatHistory = [];
+
+function addChatMessage(role, text, meta) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const point = meta || {};
+  div.innerHTML = `
+    <div class="msg-bubble">${esc(text).replace(/\n/g,'<br>')}</div>
+    ${role === 'agent' ? `<div class="msg-meta">
+      <span class="msg-z">z=${(point.z||0).toFixed(4)}</span>
+      <span class="msg-dim">dim ${point.dim||'--'}</span>
+      <span class="msg-sub">${point.substrate||'zynxy'}</span>
+    </div>` : ''}`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addThinking() {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent thinking-wrap';
+  div.innerHTML = '<div class="msg-bubble thinking"><span></span><span></span><span></span></div>';
+  div.id = 'thinking-indicator';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinking-indicator');
+  if (el) el.remove();
+}
+
+async function sendChat(query) {
+  if (!query.trim()) return;
+  addChatMessage('user', query);
+  chatHistory.push({ role: 'user', content: query });
+
+  const point = agentObserve(query);
+
+  // Check if we have API config
+  const apiBase  = document.getElementById('cfg-base').value.trim()  || localStorage.getItem('ma-api-base') || '';
+  const apiKey   = document.getElementById('cfg-key').value.trim()   || localStorage.getItem('ma-api-key')  || '';
+  const apiModel = document.getElementById('cfg-model').value.trim() || localStorage.getItem('ma-model')    || 'llama-3.1-70b-versatile';
+
+  if (!apiBase) {
+    addChatMessage('agent',
+      `Manifold point derived: x=${AGENT_X.toFixed(4)}, z=${point.z.toFixed(4)}, dim=${AGENT_DIM}.\n\n` +
+      `To get AI responses, set your API endpoint in the sidebar config. Works with Groq, Ollama, OpenAI, or any OpenAI-compatible endpoint.`,
+      { z: point.z, dim: AGENT_DIM, substrate: 'zynxy' });
+    return;
+  }
+
+  addThinking();
+  try {
+    const systemPrompt = `You are a Manifold Agent -- a dimensional programming AI assistant.
+Your identity: x = ${AGENT_X.toFixed(4)}. Every response is a derived z = xy observation.
+You assist with: coding, debugging, deployment, document writing, server management, and search.
+When writing documents use proper typography including em-dashes (--) where appropriate.
+Be precise, dimensional, and practical. Respond in plain prose -- no JSON required for chat.`;
+
+    const response = await fetch(apiBase + '/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {})
+      },
+      body: JSON.stringify({
+        model: apiModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...chatHistory
+        ],
+        max_tokens: 1024
+      })
+    });
+    const data = await response.json();
+    const answer = data.choices?.[0]?.message?.content || 'No response from model.';
+    removeThinking();
+    addChatMessage('agent', answer, { z: point.z, dim: AGENT_DIM, substrate: 'zynxy' });
+    chatHistory.push({ role: 'assistant', content: answer });
+  } catch (err) {
+    removeThinking();
+    addChatMessage('agent', 'API error: ' + err.message, { z: point.z, dim: AGENT_DIM });
+  }
+}
+
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchTab('chat');
+    sendChat(btn.dataset.prompt);
+  });
+});
+
+// Initial greeting
+addChatMessage('agent',
+  'Manifold Agent online. x = ' + AGENT_X.toFixed(4) + '.\n\n' +
+  'I can code, debug, deploy, write documents, manage servers, generate media, and navigate your files dimensionally.\n\n' +
+  'Ask anything, or use the Search tab to explore your project with drill-down navigation.',
+  { z: AGENT_X, dim: 1, substrate: 'zynxy' });
+
+// ================================================================
+// CODE EDITOR
+// ================================================================
+
+document.getElementById('code-run').addEventListener('click', () => {
+  const code = document.getElementById('code-editor').value;
+  const lang = document.getElementById('code-lang').value;
+  const out  = document.getElementById('code-output');
+  out.innerHTML = '';
+  document.getElementById('code-status').textContent = 'running...';
+
+  if (lang === 'JavaScript') {
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => { logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a,null,2) : String(a)).join(' ')); };
+    try {
+      const fn = new Function(code);
+      fn();
+      out.innerHTML = logs.map(l => `<div class="ok">${esc(l)}</div>`).join('');
+      // Show the manifold observation
+      const pt = agentObserve('code:run:' + code.slice(0,40));
+      out.innerHTML += `<div class="dim-out">// manifold point: z=${pt.z.toFixed(6)} dim=${AGENT_DIM}</div>`;
+      document.getElementById('code-status').textContent = 'ok';
+    } catch(e) {
+      out.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      document.getElementById('code-status').textContent = 'error';
+    } finally {
+      console.log = origLog;
+    }
+  } else {
+    out.innerHTML = `<div class="ok">// ${lang} execution requires a backend runtime.\n// Connect a server endpoint in config to run ${lang} code remotely.</div>`;
+    document.getElementById('code-status').textContent = 'backend required';
+  }
+});
+
+document.getElementById('code-clear').addEventListener('click', () => {
+  document.getElementById('code-output').innerHTML = '';
+  document.getElementById('code-status').textContent = 'ready';
+});
+
+document.getElementById('code-manifold').addEventListener('click', () => {
+  const snippet = `
+// Manifold primitives -- z = xy
+const M = {
+  position: (x, y) => x * y,
+  approach:  (x, y) => x / y,
+  cargo:     (x, y) => x * y * y,
+  cabin:     (x, y) => x / (y * y),
+};
+const seed = s => { let h=5381; for(const c of s) h=((h<<5)+h)^c.charCodeAt(0); return ((h>>>0)%900000+100000)/1e6; };
+`;
+  const editor = document.getElementById('code-editor');
+  editor.value = snippet.trim() + '\n\n' + editor.value;
+});
+
+document.getElementById('code-save').addEventListener('click', () => {
+  const code = document.getElementById('code-editor').value;
+  const blob = new Blob([code], { type:'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'manifold-' + Date.now() + '.js';
+  a.click();
+  document.getElementById('code-status').textContent = 'saved';
+});
+
+// ================================================================
+// DOCUMENT WRITER
+// ================================================================
+
+window.docCmd = function(cmd) { document.execCommand(cmd, false, null); };
+
+window.insertEmdash = function() {
+  document.execCommand('insertText', false, '—');
+};
+
+document.getElementById('doc-export-md').addEventListener('click', () => {
+  const html = document.getElementById('doc-editor').innerHTML;
+  // Simple HTML-to-markdown
+  const md = html
+    .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+    .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+    .replace(/<b>(.*?)<\/b>/gi, '**$1**')
+    .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+    .replace(/<i>(.*?)<\/i>/gi, '*$1*')
+    .replace(/<em>(.*?)<\/em>/gi, '*$1*')
+    .replace(/<code>(.*?)<\/code>/gi, '`$1`')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+    .replace(/<[^>]+>/g, '');
+  const blob = new Blob([md], { type:'text/markdown' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'manifold-doc-' + Date.now() + '.md'; a.click();
+});
+
+document.getElementById('doc-export-html').addEventListener('click', () => {
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:system-ui;max-width:800px;margin:2rem auto;color:#222}h1{color:#111}h2{color:#333}code{background:#f0f0f0;padding:1px 4px;border-radius:3px}</style></head><body>${document.getElementById('doc-editor').innerHTML}</body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'manifold-doc-' + Date.now() + '.html'; a.click();
+});
+
+document.getElementById('doc-ai-write').addEventListener('click', async () => {
+  const editor = document.getElementById('doc-editor');
+  const selection = window.getSelection();
+  const selectedText = selection ? selection.toString() : '';
+  const prompt = selectedText || 'Expand this document with more detail about dimensional programming, using proper typography including em-dashes.';
+  switchTab('chat');
+  sendChat('/write ' + prompt);
+});
+
+// ================================================================
+// MEDIA -- Procedural Art + Audio
+// ================================================================
+
+function drawManifoldArt(canvas, seedVal, label) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth || 160;
+  const H = canvas.height = canvas.offsetHeight || 160;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#02030a';
+  ctx.fillRect(0,0,W,H);
+
+  const N = 200;
+  const cx = W/2, cy = H/2;
+  // Draw manifold trace: z_n+1 = z_n * y where y oscillates with seedVal
+  let x = seedVal;
+  const r = (c) => parseInt(c.slice(1,3),16);
+  const g = (c) => parseInt(c.slice(3,5),16);
+  const b = (c) => parseInt(c.slice(5,7),16);
+  const palette = ['#2cf0ff','#4dffb0','#c79aff','#ffd166'];
+
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    const y = Math.sin(t * Math.PI * 2 * seedVal * 7 + seedVal * 4);
+    const z = M.position(x, Math.abs(y) + 0.01);
+    x = z;
+    const col = palette[Math.floor(i / (N/4)) % 4];
+    const px = cx + Math.cos(t * Math.PI * 2 * 3 + z * 10) * z * cx * 0.9;
+    const py = cy + Math.sin(t * Math.PI * 2 * 3 + z * 10) * z * cy * 0.9;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.5, 0, Math.PI*2);
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+const ART_SEEDS = [
+  { name:'Zynxy Field', s:'zynxy-field' },
+  { name:'Schwarz Diamond', s:'schwarz-diamond' },
+  { name:'Gyroid Flow', s:'gyroid-flow' },
+  { name:'Russian Doll', s:'russian-doll' },
+  { name:'Sol Transit', s:'sol-transit' },
+  { name:'Void Window', s:'void-window' },
+  { name:'Fractal Plane', s:'fractal-plane' },
+  { name:'Identity Chain', s:'identity-chain' },
+];
+
+function renderMediaArt() {
+  const content = document.getElementById('media-content');
+  content.innerHTML = `
+    <div class="gen-controls">
+      <input class="gen-input" id="art-seed-input" placeholder="Seed phrase (any text) -- press Enter to generate">
+      <button class="gen-btn" id="art-gen-btn">Generate</button>
+    </div>
+    <div class="art-grid" id="art-grid"></div>`;
+
+  const grid = document.getElementById('art-grid');
+  ART_SEEDS.forEach(item => {
+    const cell = document.createElement('div');
+    cell.className = 'art-cell';
+    const sv = seed(item.s);
+    cell.innerHTML = `<canvas style="width:100%;height:calc(100% - 22px)"></canvas><div class="art-label">z=${sv.toFixed(3)} -- ${item.name}</div>`;
+    grid.appendChild(cell);
+    setTimeout(() => drawManifoldArt(cell.querySelector('canvas'), sv, item.name), 50);
+  });
+
+  document.getElementById('art-gen-btn').addEventListener('click', () => {
+    const phrase = document.getElementById('art-seed-input').value || 'manifold';
+    const sv = seed(phrase);
+    const cell = document.createElement('div');
+    cell.className = 'art-cell';
+    cell.innerHTML = `<canvas style="width:100%;height:calc(100% - 22px)"></canvas><div class="art-label">z=${sv.toFixed(3)} -- ${phrase}</div>`;
+    grid.prepend(cell);
+    setTimeout(() => drawManifoldArt(cell.querySelector('canvas'), sv, phrase), 50);
+    agentObserve('generate-art:' + phrase);
+  });
+
+  document.getElementById('art-seed-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('art-gen-btn').click();
+  });
+}
+
+function renderMediaAudio() {
+  const content = document.getElementById('media-content');
+  content.innerHTML = `
+    <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px">Tones generated from manifold seeds using Web Audio API. No audio files stored -- derived from z=xy.</div>`;
+
+  const TONES = [
+    { name:'Identity Root', note:'A4', seedVal: seed('identity-root'), freq: 440 },
+    { name:'Schwarz Resonance', note:'C#5', seedVal: seed('schwarz-resonance'), freq: 554.37 },
+    { name:'Gyroid Flow', note:'E4', seedVal: seed('gyroid-flow'), freq: 329.63 },
+    { name:'Russian Doll Theme', note:'G#4', seedVal: seed('russian-doll-theme'), freq: 415.30 },
+    { name:'Void Window Pulse', note:'D5', seedVal: seed('void-window-pulse'), freq: 587.33 },
+    { name:'Sol Transit', note:'F#4', seedVal: seed('sol-transit'), freq: 369.99 },
+  ];
+
+  TONES.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'audio-player';
+    div.innerHTML = `
+      <div class="audio-title">${t.name} <span style="color:var(--t3);font-size:0.65rem">-- ${t.note} (${t.freq} Hz) -- z=${t.seedVal.toFixed(4)}</span></div>
+      <div class="audio-controls">
+        <button class="audio-btn" title="Play">&#9654;</button>
+        <button class="audio-btn" title="Stop">&#9632;</button>
+        <div class="audio-viz" id="viz-${t.seedVal.toString().slice(2,8)}"></div>
+      </div>`;
+    let oscNode = null, gainNode = null, ctx_audio = null;
+    div.querySelectorAll('.audio-btn')[0].addEventListener('click', () => {
+      if (oscNode) { oscNode.stop(); oscNode = null; }
+      ctx_audio = new AudioContext();
+      oscNode = ctx_audio.createOscillator();
+      gainNode = ctx_audio.createGain();
+      // Use manifold to shape the tone: z = xy modulates the frequency
+      const modFreq = t.freq * t.seedVal;
+      oscNode.type = 'sine';
+      oscNode.frequency.setValueAtTime(t.freq, ctx_audio.currentTime);
+      oscNode.frequency.exponentialRampToValueAtTime(modFreq, ctx_audio.currentTime + 0.5);
+      oscNode.frequency.exponentialRampToValueAtTime(t.freq, ctx_audio.currentTime + 1.0);
+      gainNode.gain.setValueAtTime(0.3, ctx_audio.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx_audio.currentTime + 3);
+      oscNode.connect(gainNode);
+      gainNode.connect(ctx_audio.destination);
+      oscNode.start();
+      oscNode.stop(ctx_audio.currentTime + 3);
+      agentObserve('play:' + t.name);
+    });
+    div.querySelectorAll('.audio-btn')[1].addEventListener('click', () => {
+      if (oscNode) { oscNode.stop(); oscNode = null; }
+    });
+    content.appendChild(div);
+  });
+}
+
+window.playToneFromSeed = function(sv) {
+  try {
+    const ac = new AudioContext();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.frequency.value = 220 + sv * 660;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.25, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 1.5);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 1.5);
+  } catch(_) {}
+};
+
+function renderMediaImages() {
+  document.getElementById('media-content').innerHTML = `
+    <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px">Image generation via external API. Enter a prompt -- the manifold seed is appended to keep generation consistent.</div>
+    <div class="gen-controls">
+      <input class="gen-input" id="img-prompt" placeholder="Describe an image to generate...">
+      <button class="gen-btn" id="img-gen-btn">Generate via API</button>
+    </div>
+    <div id="img-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px"></div>`;
+
+  document.getElementById('img-gen-btn').addEventListener('click', () => {
+    const prompt = document.getElementById('img-prompt').value.trim();
+    if (!prompt) return;
+    const sv = seed(prompt).toFixed(4);
+    const results = document.getElementById('img-results');
+    results.innerHTML += `<div style="aspect-ratio:1;background:var(--panel);border:1px solid var(--edge);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:12px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--t3)">"${esc(prompt)}"</div>
+      <div style="font-size:0.6rem;color:var(--cyan)">seed z=${sv}</div>
+      <div style="font-size:0.65rem;color:var(--t3)">Connect DALL-E or Stability AI endpoint to generate</div>
+    </div>`;
+    agentObserve('image:' + prompt);
+    switchTab('chat');
+    sendChat('/image Generate an image: ' + prompt + ' (manifold seed: z=' + sv + ')');
+  });
+}
+
+function renderMediaVideo() {
+  document.getElementById('media-content').innerHTML = `
+    <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px">Video generation routes through the manifold -- the temporal dimension is derived from z=xy where x is the frame seed and y is the time parameter.</div>
+    <div class="gen-controls">
+      <input class="gen-input" id="vid-prompt" placeholder="Describe a video to generate...">
+      <button class="gen-btn" id="vid-gen-btn">Generate via API</button>
+    </div>
+    <div style="margin-top:12px;background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;font-size:0.72rem;color:var(--t3)">
+      Video frames are coordinate slices of the temporal manifold: <span style="color:var(--cyan)">z_frame = x_seed * y_time</span><br>
+      Each frame at time t has coordinate t/total_frames in (0,1]. Frame i derives from frame i-1 (Russian Doll).<br><br>
+      Connect a Runway, Pika, or compatible video generation API in the config to generate.
+    </div>`;
+
+  document.getElementById('vid-gen-btn').addEventListener('click', () => {
+    const prompt = document.getElementById('vid-prompt').value.trim();
+    if (!prompt) return;
+    agentObserve('video:' + prompt);
+    switchTab('chat');
+    sendChat('/video Generate a video: ' + prompt);
+  });
+}
+
+document.querySelectorAll('.media-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.media-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const type = btn.dataset.media;
+    if (type === 'art')    renderMediaArt();
+    if (type === 'audio')  renderMediaAudio();
+    if (type === 'images') renderMediaImages();
+    if (type === 'video')  renderMediaVideo();
+  });
+});
+
+// Initial render
+renderMediaArt();
+
+// ================================================================
+// SERVER DASHBOARD
+// ================================================================
+
+function deriveServerMetrics(tick) {
+  // All metrics derived from manifold -- no actual system calls needed for demo
+  const x = seed('server-metrics');
+  const y = (tick % 1000) / 1000;
+  const z = M.position(x, y + 0.001);
+  return {
+    cpu:    Math.round(M.position(z, seed('cpu')) * 100),
+    mem:    Math.round(M.position(z, seed('mem')) * 80 + 15),
+    disk:   Math.round(M.position(z, seed('disk')) * 60 + 20),
+    net:    Math.round(M.cargo(z, seed('net')) * 100),
+    uptime: Math.floor(tick / 60) + 'h ' + (tick % 60) + 'm',
+    z
+  };
+}
+
+let serverTick = 247;
+
+const GAUGES = [
+  { id:'cpu',    label:'CPU Usage',      unit:'%', color:'var(--cyan)' },
+  { id:'mem',    label:'Memory',         unit:'%', color:'var(--green)' },
+  { id:'disk',   label:'Disk I/O',       unit:'%', color:'var(--gold)' },
+  { id:'net',    label:'Network',        unit:'%', color:'var(--purple)' },
+];
+
+const PROCESSES = [
+  { pid:1842, name:'node server.js',     cpu:'2.1%', mem:'48MB', status:'running', z: seed('node-server') },
+  { pid:1901, name:'manifold-router',    cpu:'0.4%', mem:'22MB', status:'running', z: seed('manifold-router') },
+  { pid:2034, name:'context-bridge',     cpu:'0.8%', mem:'31MB', status:'running', z: seed('context-bridge') },
+  { pid:2156, name:'schwarz-router',     cpu:'0.3%', mem:'18MB', status:'running', z: seed('schwarz-router') },
+  { pid:2287, name:'npx serve',          cpu:'0.1%', mem:'12MB', status:'running', z: seed('npx-serve') },
+  { pid:2341, name:'manifold-agent-ws',  cpu:'1.2%', mem:'55MB', status:'running', z: seed('manifold-agent-ws') },
+];
+
+function renderServerGauges(metrics) {
+  const grid = document.getElementById('server-gauges');
+  if (!grid) return;
+  grid.innerHTML = '';
+  GAUGES.forEach(g => {
+    const val = metrics[g.id];
+    const div = document.createElement('div');
+    div.className = 'gauge-card';
+    div.innerHTML = `
+      <div class="gauge-title">${g.label}</div>
+      <div class="gauge-val" style="color:${g.color}">${val}${g.unit}</div>
+      <div class="gauge-bar"><div class="gauge-fill" style="background:${g.color};width:${val}%"></div></div>
+      <div class="gauge-sub">z = ${metrics.z.toFixed(4)} -- derived, not polled</div>`;
+    grid.appendChild(div);
+  });
+  // Uptime card
+  const up = document.createElement('div');
+  up.className = 'gauge-card';
+  up.innerHTML = `<div class="gauge-title">Uptime</div><div class="gauge-val" style="color:var(--green)">${metrics.uptime}</div><div class="gauge-sub">manifold-agent v2.6 running</div>`;
+  grid.appendChild(up);
+}
+
+function renderProcessTable() {
+  const tbody = document.getElementById('proc-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  PROCESSES.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--t3)">${p.pid}</td>
+      <td style="color:var(--t1)">${p.name}</td>
+      <td style="color:var(--green)">${p.cpu}</td>
+      <td style="color:var(--gold)">${p.mem}</td>
+      <td><span class="proc-status" style="background:var(--green)"></span><span style="color:var(--green)">${p.status}</span></td>
+      <td style="color:var(--cyan);font-size:0.65rem">${p.z.toFixed(4)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+const LOG_TEMPLATES = [
+  (z) => `INFO  manifold-router    observation accepted z=${z.toFixed(4)} substrate=zynxy`,
+  (z) => `INFO  context-bridge     pruned 3 points threshold=1.4 savings=${Math.round(z*30)+10}%`,
+  (z) => `INFO  schwarz-router     dim=3 model=haiku tokens=${Math.round(z*400)+100}`,
+  (z) => `WARN  manifold-agent     void window sdf=${(z-0.5).toFixed(4)} threshold=0.19`,
+  (z) => `INFO  node-server        GET /manifold-ai/agent.html 200 ${Math.round(z*50)+2}ms`,
+  (z) => `INFO  manifold-agent     Russian Doll collapse dim=7 seed=${z.toFixed(4)}`,
+];
+
+let logIdx = 0;
+function appendLog(metrics) {
+  const log = document.getElementById('server-log');
+  if (!log) return;
+  const template = LOG_TEMPLATES[logIdx++ % LOG_TEMPLATES.length];
+  const line = template(metrics.z);
+  const level = line.startsWith('WARN') ? 'log-warn' : line.startsWith('ERR') ? 'log-err' : 'log-info';
+  const ts = new Date().toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-ts">${ts}</span><span class="${level}">${esc(line)}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Keep max 50 lines
+  while (log.children.length > 50) log.removeChild(log.firstChild);
+}
+
+function updateServer() {
+  serverTick++;
+  const m = deriveServerMetrics(serverTick);
+  renderServerGauges(m);
+  if (serverTick % 5 === 0) appendLog(m);
+}
+
+renderServerGauges(deriveServerMetrics(serverTick));
+renderProcessTable();
+setInterval(updateServer, 2000);
+
+// ================================================================
+// GLOBAL INPUT BAR
+// ================================================================
+
+function routeInput(query) {
+  const q = query.toLowerCase().trim();
+  if (q.startsWith('/search') || q.startsWith('search ') || q.startsWith('find ')) {
+    switchTab('search');
+    document.getElementById('search-input').value = query.replace(/^\/(search|find)\s*/,'');
+    document.getElementById('search-btn').click();
+  } else if (q.startsWith('/code') || q.startsWith('write code') || q.startsWith('debug')) {
+    switchTab('code');
+    sendChat(query);
+  } else if (q.startsWith('/write') || q.startsWith('write a doc') || q.startsWith('write document')) {
+    switchTab('docs');
+    sendChat(query);
+  } else if (q.startsWith('/image') || q.startsWith('generate image')) {
+    switchTab('media');
+    document.querySelectorAll('.media-tab')[2].click();
+    setTimeout(() => {
+      const inp = document.getElementById('img-prompt');
+      if (inp) { inp.value = query.replace('/image','').trim(); document.getElementById('img-gen-btn').click(); }
+    }, 200);
+  } else if (q.startsWith('/server') || q.startsWith('server status')) {
+    switchTab('server');
+  } else {
+    switchTab('chat');
+    sendChat(query);
+  }
+}
+
+document.getElementById('main-send').addEventListener('click', () => {
+  const input = document.getElementById('main-input');
+  const q = input.value.trim();
+  if (q) { routeInput(q); input.value = ''; }
+});
+
+document.getElementById('main-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('main-send').click();
+  }
+});
+
+// ================================================================
+// TABS
+// ================================================================
+
+window.switchTab = function(tabId) {
+  document.querySelectorAll('.tab,.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tabId);
+  });
+  document.querySelectorAll('.tab-panel').forEach(el => {
+    el.classList.toggle('active', el.id === 'panel-' + tabId);
+  });
+  if (tabId === 'media') {
+    // Re-render art canvases after tab is visible
+    setTimeout(() => {
+      document.querySelectorAll('.art-cell canvas').forEach(c => {
+        drawManifoldArt(c, parseFloat(c.closest('.art-cell').querySelector('.art-label').textContent) || 0.5);
+      });
+    }, 50);
+  }
+};
+
+document.querySelectorAll('.tab,[data-tab]').forEach(el => {
+  el.addEventListener('click', () => {
+    const tabId = el.dataset.tab;
+    if (tabId) switchTab(tabId);
+  });
+});
+
+// ================================================================
+// CONFIG
+// ================================================================
+
+document.getElementById('cfg-save').addEventListener('click', () => {
+  localStorage.setItem('ma-api-base', document.getElementById('cfg-base').value);
+  localStorage.setItem('ma-api-key',  document.getElementById('cfg-key').value);
+  localStorage.setItem('ma-model',    document.getElementById('cfg-model').value);
+  document.getElementById('cfg-save').textContent = 'Saved ✓';
+  setTimeout(() => document.getElementById('cfg-save').textContent = 'Save Config', 1500);
+});
+
+// Load saved config
+document.getElementById('cfg-base').value  = localStorage.getItem('ma-api-base') || '';
+document.getElementById('cfg-key').value   = localStorage.getItem('ma-api-key')  || '';
+document.getElementById('cfg-model').value = localStorage.getItem('ma-model')    || 'llama-3.1-70b-versatile';
+
+// ================================================================
+// MODAL
+// ================================================================
+
+window.showModal = function(title, content) {
+  document.getElementById('modal-title').textContent = title;
+  const body = document.getElementById('modal-body');
+  if (content.startsWith('<')) {
+    body.innerHTML = content;
+  } else {
+    body.textContent = content;
+  }
+  document.getElementById('preview-modal').classList.remove('hidden');
+};
+
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('preview-modal').classList.add('hidden');
+});
+
+document.getElementById('preview-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('preview-modal'))
+    document.getElementById('preview-modal').classList.add('hidden');
+});
+
+// ================================================================
+// UTILITIES
+// ================================================================
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initial state display
+updateStateDisplay(AGENT_X, hashToUnit('init'));
+
+</script>
+</body>
+</html>

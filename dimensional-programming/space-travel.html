@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ITA -- Interdimensional Transit Authority | Dimensional Programming Showcase</title>
+  <meta name="description" content="A pure dimensional programming showcase: all fleet state derived from manifolds z=xy, z=x/y, z=xy^2, z=x/y^2, and the Schwarz Diamond void field.">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-0:   #03030a;
+      --bg-1:   #08061a;
+      --cyan:   #2cf0ff;
+      --green:  #4dffb0;
+      --purple: #c79aff;
+      --gold:   #ffd166;
+      --red:    #ff6b6b;
+      --panel:  rgba(4, 4, 16, 0.88);
+      --edge:   rgba(44, 240, 255, 0.22);
+      --t1:     #f0f2fa;
+      --t2:     #d4d8ee;
+      --t3:     #9aa2c8;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-0);
+      color: var(--t1);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ---- BACKGROUND CANVAS ---- */
+    #bg-canvas {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 0; pointer-events: none;
+    }
+
+    /* ---- LAYOUT ---- */
+    .page-wrap {
+      position: relative; z-index: 1;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 1.5rem 5rem;
+    }
+
+    /* ---- PANELS ---- */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      backdrop-filter: blur(20px) saturate(1.4);
+      padding: 1.4rem 1.6rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(44,240,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(44,240,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      border-radius: 10px;
+    }
+
+    /* ---- HEADER ---- */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.4rem 0 1.2rem;
+      border-bottom: 1px solid var(--edge);
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+    }
+
+    .logo-block { display: flex; flex-direction: column; gap: 0.1rem; }
+
+    .logo-main {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 1.05rem;
+      color: var(--cyan);
+      text-shadow: 0 0 14px rgba(44,240,255,0.6);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .logo-sub {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.62rem;
+      color: var(--t3);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    nav { display: flex; gap: 1.4rem; align-items: center; flex-wrap: wrap; }
+
+    nav a {
+      color: var(--t3);
+      text-decoration: none;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    nav a:hover { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+    nav a.active { color: var(--cyan); }
+
+    /* ---- HERO ---- */
+    .hero {
+      text-align: center;
+      padding: 3.5rem 0 2.5rem;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      border: 1px solid rgba(44,240,255,0.4);
+      color: var(--cyan);
+      font-size: 0.65rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 0.3em 1.1em;
+      border-radius: 2px;
+      margin-bottom: 1.4rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      text-shadow: 0 0 10px rgba(44,240,255,0.5);
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.6rem);
+      color: var(--t1);
+      text-shadow: 0 0 60px rgba(44,240,255,0.25);
+      line-height: 1.08;
+      margin-bottom: 0.6rem;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+    }
+
+    .hero h1 strong {
+      font-weight: 700;
+      color: var(--cyan);
+      text-shadow: 0 0 24px rgba(44,240,255,0.5);
+      display: block;
+    }
+
+    .hero-desc {
+      font-size: 0.95rem;
+      color: var(--t3);
+      max-width: 680px;
+      margin: 0.8rem auto 2rem;
+    }
+
+    /* ---- EQUATION BAR ---- */
+    .eq-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      margin-bottom: 2.5rem;
+    }
+
+    .eq-pill {
+      background: rgba(44,240,255,0.06);
+      border: 1px solid rgba(44,240,255,0.28);
+      border-radius: 6px;
+      padding: 0.35em 0.9em;
+      font-size: 1rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: var(--cyan);
+      text-shadow: 0 0 8px rgba(44,240,255,0.45);
+      cursor: default;
+    }
+
+    .eq-pill.green  { color: var(--green);  border-color: rgba(77,255,176,0.28);  background: rgba(77,255,176,0.06);  text-shadow: 0 0 8px rgba(77,255,176,0.45); }
+    .eq-pill.gold   { color: var(--gold);   border-color: rgba(255,209,102,0.28); background: rgba(255,209,102,0.06); text-shadow: 0 0 8px rgba(255,209,102,0.45); }
+    .eq-pill.purple { color: var(--purple); border-color: rgba(199,154,255,0.28); background: rgba(199,154,255,0.06); text-shadow: 0 0 8px rgba(199,154,255,0.45); }
+    .eq-pill.schwarz {
+      color: var(--purple); border-color: rgba(199,154,255,0.3);
+      background: rgba(199,154,255,0.05);
+      font-size: 0.7rem;
+      text-shadow: 0 0 8px rgba(199,154,255,0.4);
+    }
+
+    /* ---- SECTION LABELS ---- */
+    .sec-label {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      opacity: 0.65;
+      margin-bottom: 0.4rem;
+    }
+
+    .sec-title {
+      font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+      color: var(--t1);
+      margin-bottom: 1.4rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+    }
+
+    /* ---- VOID INDICATOR ---- */
+    .void-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      padding: 1rem 1.5rem;
+      background: rgba(199,154,255,0.04);
+      border: 1px solid rgba(199,154,255,0.22);
+      border-radius: 10px;
+      margin-bottom: 2.5rem;
+    }
+
+    .void-ring {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: 2px solid var(--purple);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 18px rgba(199,154,255,0.25), inset 0 0 12px rgba(199,154,255,0.08);
+    }
+
+    .void-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--purple);
+      box-shadow: 0 0 10px var(--purple);
+      animation: void-pulse 3.2s ease-in-out infinite;
+    }
+
+    @keyframes void-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.55; }
+    }
+
+    .void-text { flex: 1; }
+
+    .void-heading {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.63rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 0.25rem;
+    }
+
+    .void-status {
+      font-size: 0.98rem;
+      color: var(--t1);
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .void-sdf {
+      font-size: 0.68rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+      margin-top: 0.2rem;
+    }
+
+    .void-next { text-align: right; flex-shrink: 0; }
+
+    .void-next-label {
+      font-size: 0.6rem;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .void-next-val {
+      font-size: 1.5rem;
+      color: var(--purple);
+      text-shadow: 0 0 14px var(--purple);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-weight: 700;
+    }
+
+    /* ---- FLEET GRID ---- */
+    .fleet-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (max-width: 960px) { .fleet-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .fleet-grid { grid-template-columns: 1fr; } }
+
+    .vessel-card {
+      background: var(--panel);
+      border: 1px solid rgba(44,240,255,0.1);
+      border-radius: 10px;
+      padding: 1.1rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    .vessel-card::after {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--vc, var(--cyan)), transparent);
+    }
+
+    .vessel-card:hover {
+      border-color: rgba(44,240,255,0.28);
+      box-shadow: 0 0 24px rgba(44,240,255,0.06);
+    }
+
+    .vc-id {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.63rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--vc, var(--cyan));
+      opacity: 0.7;
+    }
+
+    .vc-name {
+      font-size: 1rem;
+      color: var(--t1);
+      margin: 0.2rem 0 0.35rem;
+      font-weight: 500;
+    }
+
+    .vc-class-badge {
+      display: inline-block;
+      font-size: 0.6rem;
+      padding: 0.12em 0.55em;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .cb-galaxy { background: rgba(199,154,255,0.12); color: var(--purple); border: 1px solid rgba(199,154,255,0.3); }
+    .cb-solar  { background: rgba(255,209,102,0.12); color: var(--gold);   border: 1px solid rgba(255,209,102,0.3); }
+    .cb-lunar  { background: rgba(77,255,176,0.12);  color: var(--green);  border: 1px solid rgba(77,255,176,0.3); }
+
+    .vc-mission {
+      font-size: 0.68rem;
+      color: var(--t3);
+      margin: 0.3rem 0;
+    }
+
+    .vc-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem;
+      margin-top: 0.7rem;
+    }
+
+    .vc-stat {
+      font-size: 0.68rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .vc-stat span { color: var(--t2); }
+
+    .vc-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.38em;
+      font-size: 0.65rem;
+      margin-top: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .sdot {
+      width: 6px; height: 6px; border-radius: 50%;
+      animation: sdot-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes sdot-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    .s-docked    { color: var(--green);  } .s-docked    .sdot { background: var(--green);  animation: none; }
+    .s-transit   { color: var(--cyan);   } .s-transit   .sdot { background: var(--cyan); }
+    .s-void      { color: var(--purple); } .s-void      .sdot { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+    .s-outbound  { color: var(--cyan);   } .s-outbound  .sdot { background: var(--cyan); }
+    .s-approach  { color: var(--gold);   } .s-approach  .sdot { background: var(--gold); }
+    .s-return    { color: var(--green);  } .s-return    .sdot { background: var(--green); }
+
+    .vc-manifolds {
+      margin-top: 0.75rem;
+      font-size: 0.63rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: rgba(44,240,255,0.4);
+      border-top: 1px solid rgba(44,240,255,0.07);
+      padding-top: 0.6rem;
+      line-height: 1.8;
+    }
+
+    /* ---- CONSOLE ---- */
+    .console-wrap {
+      background: #010209;
+      border: 1px solid rgba(44,240,255,0.14);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 2.5rem;
+    }
+
+    .console-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(44,240,255,0.04);
+      border-bottom: 1px solid rgba(44,240,255,0.1);
+      padding: 0.55rem 1rem;
+    }
+
+    .cbar-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .cb-r { background: #ff5f57; }
+    .cb-y { background: #febc2e; }
+    .cb-g { background: #28c840; }
+
+    .cbar-title {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.7rem;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      margin-left: 0.4rem;
+    }
+
+    .cbar-info {
+      margin-left: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.63rem;
+      color: var(--t3);
+    }
+
+    .console-body {
+      padding: 1rem 1.3rem;
+      min-height: 460px;
+      max-height: 560px;
+      overflow-y: auto;
+      font-size: 0.76rem;
+      line-height: 1.75;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .console-body::-webkit-scrollbar { width: 4px; }
+    .console-body::-webkit-scrollbar-thumb { background: rgba(44,240,255,0.18); border-radius: 2px; }
+
+    .cl { display: block; opacity: 0; animation: cl-fade 0.12s ease forwards; }
+    @keyframes cl-fade { to { opacity: 1; } }
+
+    .ck  { color: #c79aff; } /* keyword */
+    .cf  { color: #2cf0ff; } /* function */
+    .cs  { color: #4dffb0; } /* string */
+    .cn  { color: #ffd166; } /* number */
+    .cc  { color: #2a4a6a; } /* comment */
+    .co  { color: #7c8aa3; } /* operator */
+    .cv  { color: #d0dff0; } /* variable/label */
+    .cpass { color: #28c840; font-weight: 600; }
+    .cfail { color: #ff6b6b; font-weight: 600; }
+    .cwarn { color: #ffd166; font-weight: 600; }
+    .cval  { color: #2cf0ff; }
+    .cfile { color: #9aa2c8; text-decoration: underline; }
+
+    /* ---- MANIFOLD CANVASES ---- */
+    .manifold-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (max-width: 700px) { .manifold-grid { grid-template-columns: 1fr; } }
+
+    .manifold-panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .manifold-canvas {
+      display: block;
+      width: 100%;
+      height: 200px;
+    }
+
+    .manifold-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 0.6rem 0.9rem;
+      background: linear-gradient(transparent, rgba(4,4,16,0.85));
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    .manifold-eq {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 1.05rem;
+      text-shadow: 0 0 8px currentColor;
+    }
+
+    .manifold-role {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.62rem;
+      color: var(--t3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ---- HUB SVG ---- */
+    .hub-wrap {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      padding: 1.5rem 1rem;
+      margin-bottom: 2.5rem;
+      overflow-x: auto;
+    }
+
+    /* ---- SCHEDULE TABLE ---- */
+    .sched-panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 2.5rem;
+    }
+
+    .sched-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.74rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .sched-table th {
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      color: var(--cyan);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(44,240,255,0.14);
+      font-weight: 400;
+      opacity: 0.75;
+    }
+
+    .sched-table td {
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid rgba(44,240,255,0.05);
+      color: var(--t2);
+      vertical-align: middle;
+    }
+
+    .sched-table tr:last-child td { border-bottom: none; }
+    .sched-table tr:hover td { background: rgba(44,240,255,0.025); }
+
+    .z-tag {
+      display: inline-block;
+      font-size: 0.63rem;
+      padding: 0.1em 0.5em;
+      border-radius: 3px;
+      background: rgba(44,240,255,0.07);
+      color: var(--cyan);
+      border: 1px solid rgba(44,240,255,0.2);
+    }
+
+    /* ---- CABIN / CARGO BARS ---- */
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2.5rem; }
+    @media (max-width: 700px) { .grid-3 { grid-template-columns: 1fr; } }
+
+    .bar-panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+      padding: 1.2rem 1.4rem;
+    }
+
+    .bar-class-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: var(--t3);
+      margin-bottom: 0.3rem;
+    }
+
+    .bar-count {
+      font-size: 1.7rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-weight: 700;
+      text-shadow: 0 0 14px currentColor;
+      line-height: 1;
+      margin-bottom: 0.2rem;
+    }
+
+    .bar-sub {
+      font-size: 0.68rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+      margin-bottom: 0.8rem;
+    }
+
+    .bar-track-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+      margin-bottom: 0.2rem;
+    }
+
+    .bar-track {
+      height: 5px;
+      background: rgba(44,240,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* ---- CARGO BARS ---- */
+    .cargo-list { padding: 0.5rem 0; }
+
+    .cargo-row { margin-bottom: 1.1rem; }
+
+    .cargo-row-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: var(--t2);
+      margin-bottom: 0.2rem;
+    }
+
+    .cargo-row-eq {
+      font-size: 0.62rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+      margin-top: 0.15rem;
+    }
+
+    /* ---- FOOTER ---- */
+    footer {
+      border-top: 1px solid var(--edge);
+      padding: 2rem 0;
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--t3);
+      font-family: 'Consolas', 'Monaco', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    footer a { color: var(--cyan); text-decoration: none; opacity: 0.75; transition: opacity 0.2s; }
+    footer a:hover { opacity: 1; }
+
+    .spacer { height: 2.5rem; }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page-wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <div class="logo-main">ITA // Interdimensional Transit Authority</div>
+      <div class="logo-sub">Year 2157 &middot; Sol-Sector Registry &middot; 6 Active Vessels</div>
+    </div>
+    <nav>
+      <a href="index.html">Paradigm</a>
+      <a href="#fleet">Fleet</a>
+      <a href="#console">Lint Console</a>
+      <a href="#manifolds">Manifolds</a>
+      <a href="#schedule">Schedule</a>
+    </nav>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">Dimensional Programming -- Live Showcase</div>
+    <h1>
+      Interdimensional
+      <strong>Transit Authority</strong>
+    </h1>
+    <p class="hero-desc">
+      Six flying cities. Three Sol hubs. Eighteen galaxy ports. Millions of tons of freight.
+      Every berth assignment, cargo load, and jump window derived from four manifolds -- nothing stored, everything observed.
+    </p>
+    <div class="eq-bar">
+      <div class="eq-pill">z = x &middot; y</div>
+      <div class="eq-pill green">z = x / y</div>
+      <div class="eq-pill gold">z = x &middot; y&sup2;</div>
+      <div class="eq-pill purple">z = x / y&sup2;</div>
+      <div class="eq-pill schwarz">cos(x)cos(y)cos(z) &minus; sin(x)sin(y)sin(z) = 0</div>
+    </div>
+  </section>
+
+  <!-- VOID STATUS -->
+  <div class="void-bar" id="void-bar">
+    <div class="void-ring">
+      <div class="void-dot"></div>
+    </div>
+    <div class="void-text">
+      <div class="void-heading">Solar Event Horizon // Jump Void Field</div>
+      <div class="void-status" id="void-status">Evaluating Schwarz Diamond SDF...</div>
+      <div class="void-sdf" id="void-sdf">cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = computing...</div>
+    </div>
+    <div class="void-next">
+      <div class="void-next-label">Next Window</div>
+      <div class="void-next-val" id="void-next">--</div>
+    </div>
+  </div>
+
+  <!-- FLEET -->
+  <section id="fleet">
+    <div class="sec-label">Dimensional Fleet Registry</div>
+    <div class="sec-title">6 Active Vessels -- Flying Cities of the Transit Authority</div>
+    <div class="fleet-grid" id="fleet-grid"></div>
+  </section>
+
+  <!-- LINT CONSOLE -->
+  <section id="console">
+    <div class="sec-label">Pure Dimensional Programming</div>
+    <div class="sec-title">Fleet Linter -- All Values Derived From Manifolds</div>
+    <div class="console-wrap">
+      <div class="console-bar">
+        <div class="cbar-dot cb-r"></div>
+        <div class="cbar-dot cb-y"></div>
+        <div class="cbar-dot cb-g"></div>
+        <div class="cbar-title">ita-fleet-lint.js</div>
+        <div class="cbar-info">dimensional-programming v2.6 &middot; z=xy sole state authority</div>
+      </div>
+      <div class="console-body" id="console-body"></div>
+    </div>
+  </section>
+
+  <!-- MANIFOLD SURFACES -->
+  <section id="manifolds">
+    <div class="sec-label">Manifold Surfaces -- State Derivation Geometry</div>
+    <div class="sec-title">The Four Equations Underlying All Fleet Data</div>
+    <div class="manifold-grid">
+      <div class="manifold-panel">
+        <canvas class="manifold-canvas" id="mc1"></canvas>
+        <div class="manifold-overlay">
+          <div class="manifold-eq" style="color:var(--cyan)">z = x &middot; y</div>
+          <div class="manifold-role">Position / Cycle</div>
+        </div>
+      </div>
+      <div class="manifold-panel">
+        <canvas class="manifold-canvas" id="mc2"></canvas>
+        <div class="manifold-overlay">
+          <div class="manifold-eq" style="color:var(--green)">z = x / y</div>
+          <div class="manifold-role">Approach / Transit</div>
+        </div>
+      </div>
+      <div class="manifold-panel">
+        <canvas class="manifold-canvas" id="mc3"></canvas>
+        <div class="manifold-overlay">
+          <div class="manifold-eq" style="color:var(--gold)">z = x &middot; y&sup2;</div>
+          <div class="manifold-role">Cargo / Mass</div>
+        </div>
+      </div>
+      <div class="manifold-panel">
+        <canvas class="manifold-canvas" id="mc4"></canvas>
+        <div class="manifold-overlay">
+          <div class="manifold-eq" style="color:var(--purple)">z = x / y&sup2;</div>
+          <div class="manifold-role">Cabin / Allocation</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HUB NETWORK -->
+  <section id="hubs">
+    <div class="sec-label">Transit Network</div>
+    <div class="sec-title">Sol System Hubs -- Galaxy Deep Space Ports</div>
+    <div class="hub-wrap">
+      <svg id="hub-svg" width="1240" height="300" viewBox="0 0 1240 300" style="max-width:100%"></svg>
+    </div>
+  </section>
+
+  <!-- VOYAGE SCHEDULE -->
+  <section id="schedule">
+    <div class="sec-label">Manifold-Derived Schedule</div>
+    <div class="sec-title">Monthly Voyage Rotation -- One Departure Per Month</div>
+    <div class="sched-panel">
+      <table class="sched-table">
+        <thead>
+          <tr>
+            <th>Departure</th>
+            <th>Vessel</th>
+            <th>Class</th>
+            <th>Route</th>
+            <th>Galaxy Ports of Call</th>
+            <th>Berths</th>
+            <th>Cargo (MT)</th>
+            <th>z = xy</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="sched-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CABIN MANIFEST -->
+  <section id="cabins">
+    <div class="sec-label">z = x / y&sup2; &middot; Cabin Allocation</div>
+    <div class="sec-title">Berth Manifest by Class -- Fleet-Wide</div>
+    <div class="grid-3">
+      <div class="bar-panel">
+        <div class="bar-class-label">Galaxy Class</div>
+        <div class="bar-count" style="color:var(--purple)" id="gc-count">--</div>
+        <div class="bar-sub">Berths fleet-wide</div>
+        <div class="bar-track-label"><span>Occupancy</span><span id="gc-occ">--%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="gc-bar" style="background:var(--purple);width:0%"></div></div>
+      </div>
+      <div class="bar-panel">
+        <div class="bar-class-label">Solar Class</div>
+        <div class="bar-count" style="color:var(--gold)" id="sc-count">--</div>
+        <div class="bar-sub">Berths fleet-wide</div>
+        <div class="bar-track-label"><span>Occupancy</span><span id="sc-occ">--%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="sc-bar" style="background:var(--gold);width:0%"></div></div>
+      </div>
+      <div class="bar-panel">
+        <div class="bar-class-label">Lunar Class</div>
+        <div class="bar-count" style="color:var(--green)" id="lc-count">--</div>
+        <div class="bar-sub">Berths fleet-wide</div>
+        <div class="bar-track-label"><span>Occupancy</span><span id="lc-occ">--%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="lc-bar" style="background:var(--green);width:0%"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARGO HOLD -->
+  <section id="cargo">
+    <div class="sec-label">z = x &middot; y&sup2; &middot; Cargo Manifest</div>
+    <div class="sec-title">Freight Load by Vessel</div>
+    <div class="panel" style="margin-bottom:2.5rem">
+      <div id="cargo-list" class="cargo-list"></div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Interdimensional Transit Authority &middot; Sol-Sector Registry &middot; Year 2157</div>
+    <div style="margin-top:0.5rem">
+      All fleet state derived from manifolds -- z=xy &middot; z=x/y &middot; z=xy&sup2; &middot; z=x/y&sup2; &middot; Schwarz Diamond SDF
+    </div>
+    <div style="margin-top:0.5rem">
+      <a href="index.html">&larr; Dimensional Programming Paradigm</a>
+      &nbsp;&nbsp;&middot;&nbsp;&nbsp;
+      <a href="../x-dimensional/index.html">Proof System</a>
+    </div>
+  </footer>
+
+</div>
+
+<!-- ================================================================
+     DIMENSIONAL PROGRAMMING ENGINE
+     All fleet state derived from manifolds. Nothing stored.
+================================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  // ================================================================
+  // MANIFOLD DEFINITIONS
+  // These are the only functions that produce state.
+  // z is always derived -- never assigned from outside.
+  // ================================================================
+  var M = {
+    // z = xy  -- position / cycle manifold
+    position: function(x, y) { return x * y; },
+
+    // z = x/y  -- approach / transit manifold
+    approach:  function(x, y) { return x / y; },
+
+    // z = xy^2  -- cargo / mass manifold
+    cargo:     function(x, y) { return x * y * y; },
+
+    // z = x/y^2  -- cabin / allocation manifold
+    cabin:     function(x, y) { return x / (y * y); },
+
+    // Schwarz Diamond SDF  -- void field manifold
+    // cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = 0
+    // Near zero = on the surface = void accessible
+    schwarz:   function(x, y, z) {
+      return Math.cos(x) * Math.cos(y) * Math.cos(z)
+           - Math.sin(x) * Math.sin(y) * Math.sin(z);
+    }
+  };
+
+  // ================================================================
+  // FLEET SEED TABLE
+  // Only the irreducible identity of each vessel is stored here.
+  // Every other attribute is derived from the manifolds above.
+  // ================================================================
+  var FLEET = [
+    { id: 'ISV-001', name: 'Manifold Prime',    cls: 'galaxy', mission: 'tourist + science',  route: 0, x: 0.9720 },
+    { id: 'ISV-002', name: 'Schwarz Crossing',  cls: 'galaxy', mission: 'science + freight',  route: 0, x: 0.8913 },
+    { id: 'ISV-003', name: 'Gyroid Passage',    cls: 'solar',  mission: 'mixed transport',    route: 1, x: 0.7641 },
+    { id: 'ISV-004', name: 'Zynxy Traverse',    cls: 'solar',  mission: 'tourist liner',      route: 1, x: 0.6530 },
+    { id: 'ISV-005', name: 'Saddle Point',      cls: 'lunar',  mission: 'freight primary',    route: 2, x: 0.5314 },
+    { id: 'ISV-006', name: 'Dimension Six',     cls: 'lunar',  mission: 'cargo freighter',    route: 2, x: 0.4182 }
+  ];
+
+  // Sol-system hub seeds
+  var HUBS = [
+    { name: 'Earth Hub',  code: 'SOL-1',  seed: 1.000 },
+    { name: 'Mars Hub',   code: 'SOL-4',  seed: 0.520 },
+    { name: 'Pluto Hub',  code: 'SOL-OB', seed: 0.133 }
+  ];
+
+  // Galaxy route seeds -- 3 routes, 3 ports each = 9 ports across 6 vessels (2 vessels per route)
+  var GALAXY_ROUTES = [
+    { name: 'Route Alpha', ports: [
+      { name: 'Alpha Centauri Station',   ly:   4.37, seed: 0.4370 },
+      { name: 'Tau Ceti Outpost',         ly:  11.90, seed: 0.2830 },
+      { name: 'Kepler-442 Terminal',      ly: 1194.0, seed: 0.1194 }
+    ]},
+    { name: 'Route Beta', ports: [
+      { name: 'Gliese 667C Hub',          ly:  22.10, seed: 0.3470 },
+      { name: 'Epsilon Eridani Dock',     ly:  10.50, seed: 0.3910 },
+      { name: 'Vega Waystation',          ly:  25.04, seed: 0.3120 }
+    ]},
+    { name: 'Route Gamma', ports: [
+      { name: 'Proxima Station',          ly:   4.24, seed: 0.4530 },
+      { name: '61 Cygni Terminal',        ly:  11.40, seed: 0.2980 },
+      { name: "Barnard's Star Hub",       ly:   5.96, seed: 0.4120 }
+    ]}
+  ];
+
+  // Current month index (0-11) -- used as cycle seed
+  var CYCLE_MONTH = new Date().getMonth();
+
+  // ================================================================
+  // DERIVE VESSEL STATE FROM MANIFOLDS
+  // x = vessel identity seed
+  // y = derived from voyage slot and load factors
+  // z = computed by manifold -- never stored
+  // ================================================================
+  function deriveState(v, voyageSlot) {
+    // y values derived from vessel seed and slot position
+    var y_cycle    = voyageSlot / 6;                   // cycle position [0, 1)
+    var y_load     = 0.730 + v.x * 0.180;             // occupancy factor
+    var y_freight  = 0.610 + v.x * 0.270;             // freight density factor
+    var y_approach = 0.820 + v.x * 0.150;             // approach factor
+
+    // z = xy  -- cycle position on the manifold
+    var z_cycle    = M.position(v.x, y_cycle);
+
+    // z = x/y  -- approach: ratio of vessel identity to load factor
+    var z_approach = M.approach(v.x, y_approach);
+
+    // z = xy^2  -- cargo mass: vessel seed * freight density squared
+    var z_cargo    = M.cargo(v.x, y_freight);
+
+    // z = x/y^2  -- cabin allocation: seed over occupancy pressure squared
+    var z_cabin    = M.cabin(v.x, y_load * y_load);
+
+    // Schwarz Diamond SDF -- map cycle coordinates to [-pi, pi] for void field test
+    var sx = z_cycle * Math.PI;
+    var sy = z_approach * Math.PI;
+    var sz = z_cargo * Math.PI;
+    var sdf = M.schwarz(sx, sy, sz);
+
+    // Void window open when |sdf| < threshold -- the vessel is on the Schwarz surface
+    var voidOpen = Math.abs(sdf) < 0.19;
+
+    // Derive berth counts from z = x/y^2 cabin allocation
+    // Total berths: 20k-30k range, scaled by vessel class
+    var classScale = { galaxy: 1.18, solar: 1.04, lunar: 0.91 };
+    var totalBerths  = Math.round(24000 * classScale[v.cls] * (0.88 + v.x * 0.18));
+    var galaxyBerths = Math.round(totalBerths * 0.15 * Math.min(1.0, z_cabin * 0.6));
+    var solarBerths  = Math.round(totalBerths * 0.45);
+    var lunarBerths  = totalBerths - galaxyBerths - solarBerths;
+
+    // Derive cargo tonnage from z = xy^2 (millions of metric tons)
+    // Base: 3.2M MT, scaled by z_cargo
+    var BASE_CARGO = 3200000;
+    var cargoMT    = Math.round(BASE_CARGO * z_cargo);
+    var cargoFill  = Math.min(0.97, z_cargo * 1.08);
+
+    // Phase: determine status from z_cycle position
+    // 0.00-0.18: docked at Sol hub
+    // 0.18-0.36: outbound through Sol system (3 months to solar event horizon)
+    // 0.36-0.46: approaching void / solar event horizon
+    // 0.46-0.54: in the void -- dimensional collapse / jump
+    // 0.54-0.72: galaxy transit (instantaneous but arrival / departure protocols)
+    // 0.72-0.90: return through Sol system
+    // 0.90-1.00: docked at home hub
+    var phase = z_cycle;
+    var status, statusKey;
+    if      (phase < 0.18) { status = 'DOCKED';             statusKey = 'docked';   }
+    else if (phase < 0.36) { status = 'OUTBOUND';           statusKey = 'outbound'; }
+    else if (phase < 0.46) { status = 'APPROACHING VOID';   statusKey = 'approach'; }
+    else if (phase < 0.54) { status = 'IN THE VOID';        statusKey = 'void';     }
+    else if (phase < 0.72) { status = 'GALAXY TRANSIT';     statusKey = 'transit';  }
+    else if (phase < 0.90) { status = 'RETURN';             statusKey = 'return';   }
+    else                   { status = 'DOCKED';             statusKey = 'docked';   }
+
+    return {
+      y_cycle: y_cycle, y_load: y_load, y_freight: y_freight, y_approach: y_approach,
+      z_cycle: z_cycle, z_approach: z_approach, z_cargo: z_cargo, z_cabin: z_cabin,
+      sdf: sdf, voidOpen: voidOpen,
+      totalBerths: totalBerths, galaxyBerths: galaxyBerths,
+      solarBerths: solarBerths, lunarBerths: lunarBerths,
+      cargoMT: cargoMT, cargoFill: cargoFill,
+      status: status, statusKey: statusKey, phase: phase
+    };
+  }
+
+  // Compute all vessel states
+  var STATES = FLEET.map(function(v, i) {
+    return Object.assign({}, v, deriveState(v, i));
+  });
+
+  // ================================================================
+  // VESSEL COLOR MAP
+  // ================================================================
+  var CLS_COLOR = { galaxy: '#c79aff', solar: '#ffd166', lunar: '#4dffb0' };
+  var STATUS_STYLE = {
+    docked:   { cls: 's-docked',   label: 'DOCKED' },
+    outbound: { cls: 's-outbound', label: 'OUTBOUND' },
+    approach: { cls: 's-approach', label: 'APPROACHING VOID' },
+    void:     { cls: 's-void',     label: 'IN THE VOID' },
+    transit:  { cls: 's-transit',  label: 'GALAXY TRANSIT' },
+    return:   { cls: 's-return',   label: 'RETURN' }
+  };
+
+  // ================================================================
+  // RENDER: FLEET GRID
+  // ================================================================
+  function renderFleet() {
+    var grid = document.getElementById('fleet-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    STATES.forEach(function(vs) {
+      var route  = GALAXY_ROUTES[vs.route];
+      var color  = CLS_COLOR[vs.cls];
+      var ss     = STATUS_STYLE[vs.statusKey];
+      var card   = document.createElement('div');
+      card.className = 'vessel-card';
+      card.style.setProperty('--vc', color);
+      card.innerHTML =
+        '<div class="vc-id">' + vs.id + '</div>' +
+        '<div class="vc-name">' + vs.name + '</div>' +
+        '<div><span class="vc-class-badge cb-' + vs.cls + '">' + vs.cls + ' class</span></div>' +
+        '<div class="vc-mission">' + vs.mission + '</div>' +
+        '<div class="vc-stats">' +
+          '<div class="vc-stat">Berths <span>' + vs.totalBerths.toLocaleString() + '</span></div>' +
+          '<div class="vc-stat">Cargo <span>' + (vs.cargoMT / 1e6).toFixed(2) + 'M&nbsp;MT</span></div>' +
+          '<div class="vc-stat">Route <span>' + route.name + '</span></div>' +
+          '<div class="vc-stat">SDF <span>' + vs.sdf.toFixed(4) + '</span></div>' +
+        '</div>' +
+        '<div class="vc-status ' + ss.cls + '"><div class="sdot"></div>' + ss.label + '</div>' +
+        '<div class="vc-manifolds">' +
+          'z=xy:&nbsp;<span style="color:var(--cyan)">' + vs.z_cycle.toFixed(4) + '</span>&nbsp;&middot;&nbsp;' +
+          'z=x/y:&nbsp;<span style="color:var(--green)">' + vs.z_approach.toFixed(4) + '</span>&nbsp;&middot;&nbsp;' +
+          'z=xy²:&nbsp;<span style="color:var(--gold)">' + vs.z_cargo.toFixed(4) + '</span>&nbsp;&middot;&nbsp;' +
+          'z=x/y²:&nbsp;<span style="color:var(--purple)">' + vs.z_cabin.toFixed(4) + '</span>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+  }
+
+  // ================================================================
+  // RENDER: VOID INDICATOR
+  // ================================================================
+  function renderVoid() {
+    var ref = STATES[3]; // ISV-004 is typically near the void in the rotation
+    var open = ref.voidOpen;
+    var sdf  = ref.sdf;
+    var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var nextMonth = MONTHS[(CYCLE_MONTH + (open ? 0 : 1)) % 12];
+
+    document.getElementById('void-status').textContent =
+      open ? 'VOID WINDOW OPEN -- JUMP AUTHORIZED' :
+             ('VOID CLOSED -- |SDF| ' + Math.abs(sdf).toFixed(4) + ' > threshold 0.19');
+    document.getElementById('void-sdf').textContent =
+      'cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = ' + sdf.toFixed(6) +
+      '   threshold |sdf| < 0.19';
+    document.getElementById('void-next').textContent = nextMonth + ' 2157';
+
+    var bar = document.getElementById('void-bar');
+    if (bar) {
+      bar.style.borderColor = open ? 'rgba(40,200,64,0.35)' : 'rgba(199,154,255,0.22)';
+    }
+  }
+
+  // ================================================================
+  // RENDER: SCHEDULE TABLE
+  // ================================================================
+  var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var STATUS_COLOR = {
+    docked: '#4dffb0', outbound: '#2cf0ff', approach: '#ffd166',
+    void: '#c79aff', transit: '#2cf0ff', return: '#4dffb0'
+  };
+
+  function renderSchedule() {
+    var tbody = document.getElementById('sched-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    STATES.forEach(function(vs, i) {
+      var route = GALAXY_ROUTES[vs.route];
+      var depMonth = MONTH_NAMES[(CYCLE_MONTH - i + 12) % 12];
+      var portList = route.ports.map(function(p) { return p.name; }).join(' &rarr; ');
+      var sc = STATUS_COLOR[vs.statusKey] || '#2cf0ff';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + depMonth + ' 2157</td>' +
+        '<td style="color:#f0f2fa;font-weight:500">' + vs.name + '</td>' +
+        '<td><span class="vc-class-badge cb-' + vs.cls + '">' + vs.cls + '</span></td>' +
+        '<td>' + route.name + '</td>' +
+        '<td style="font-size:0.67rem;color:var(--t3)">' + portList + '</td>' +
+        '<td>' + vs.totalBerths.toLocaleString() + '</td>' +
+        '<td>' + (vs.cargoMT / 1e6).toFixed(2) + 'M</td>' +
+        '<td><span class="z-tag">' + vs.z_cycle.toFixed(4) + '</span></td>' +
+        '<td style="color:' + sc + '">' + vs.status + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ================================================================
+  // RENDER: CABIN MANIFEST
+  // ================================================================
+  function renderCabins() {
+    var totG = 0, totS = 0, totL = 0;
+    STATES.forEach(function(vs) {
+      totG += vs.galaxyBerths;
+      totS += vs.solarBerths;
+      totL += vs.lunarBerths;
+    });
+
+    // Average z_cabin across fleet -- occupancy pressure
+    var avgCabin = STATES.reduce(function(a, v) { return a + v.z_cabin; }, 0) / 6;
+
+    // Occupancy percentages derived from z=x/y^2 average
+    var gOcc = Math.min(98, Math.round(avgCabin * 75));
+    var sOcc = Math.min(98, Math.round(avgCabin * 91));
+    var lOcc = Math.min(98, Math.round(avgCabin * 68));
+
+    document.getElementById('gc-count').textContent = totG.toLocaleString();
+    document.getElementById('sc-count').textContent = totS.toLocaleString();
+    document.getElementById('lc-count').textContent = totL.toLocaleString();
+    document.getElementById('gc-occ').textContent = gOcc + '%';
+    document.getElementById('sc-occ').textContent = sOcc + '%';
+    document.getElementById('lc-occ').textContent = lOcc + '%';
+
+    setTimeout(function() {
+      document.getElementById('gc-bar').style.width = gOcc + '%';
+      document.getElementById('sc-bar').style.width = sOcc + '%';
+      document.getElementById('lc-bar').style.width = lOcc + '%';
+    }, 350);
+  }
+
+  // ================================================================
+  // RENDER: CARGO HOLD
+  // ================================================================
+  function renderCargo() {
+    var list = document.getElementById('cargo-list');
+    if (!list) return;
+    list.innerHTML = '';
+    STATES.forEach(function(vs) {
+      var pct = Math.round(vs.cargoFill * 100);
+      var col = CLS_COLOR[vs.cls];
+      var row = document.createElement('div');
+      row.className = 'cargo-row';
+      row.innerHTML =
+        '<div class="cargo-row-label">' +
+          '<span style="color:#f0f2fa">' + vs.name + ' <span style="color:var(--t3);font-size:0.62rem">' + vs.id + '</span></span>' +
+          '<span style="color:' + col + '">' + (vs.cargoMT / 1e6).toFixed(2) + 'M&nbsp;MT &nbsp; ' + pct + '%</span>' +
+        '</div>' +
+        '<div class="bar-track">' +
+          '<div class="bar-fill cargo-fill-' + vs.id.replace('-','') + '" style="background:' + col + ';width:0%"></div>' +
+        '</div>' +
+        '<div class="cargo-row-eq">' +
+          'z=xy² &middot; x=' + vs.x.toFixed(4) +
+          ' y=' + vs.y_freight.toFixed(4) +
+          ' &rarr; z=' + vs.z_cargo.toFixed(4) +
+        '</div>';
+      list.appendChild(row);
+    });
+    setTimeout(function() {
+      STATES.forEach(function(vs) {
+        var el = list.querySelector('.cargo-fill-' + vs.id.replace('-',''));
+        if (el) el.style.width = Math.round(vs.cargoFill * 100) + '%';
+      });
+    }, 450);
+  }
+
+  // ================================================================
+  // RENDER: HUB NETWORK SVG
+  // ================================================================
+  function renderHubNetwork() {
+    var svg = document.getElementById('hub-svg');
+    if (!svg) return;
+
+    var W = 1240, H = 300;
+
+    // Node layout
+    var nodes = [
+      { x: 130, y: 150, r: 30, label: 'Earth Hub',              sub: 'SOL-1',    col: '#2cf0ff' },
+      { x: 300, y: 150, r: 22, label: 'Mars Hub',               sub: 'SOL-4',    col: '#ff6b6b' },
+      { x: 470, y: 150, r: 18, label: 'Pluto Hub',              sub: 'SOL-OB',   col: '#ffd166' },
+      { x: 650, y: 150, r: 34, label: 'Solar Event Horizon',    sub: 'VOID',     col: '#c79aff', glow: true },
+      { x: 850, y:  55, r: 17, label: 'Route Alpha',            sub: 'α Cen, Tau Ceti, Kep-442', col: '#4dffb0' },
+      { x: 850, y: 150, r: 17, label: 'Route Beta',             sub: 'Gli 667C, Eps Eri, Vega',       col: '#4dffb0' },
+      { x: 850, y: 245, r: 17, label: 'Route Gamma',            sub: 'Proxima, 61 Cyg, Barnard',      col: '#4dffb0' },
+      { x:1070, y:  55, r: 14, label: '3 Galaxy Ports',         sub: 'DEEP α',  col: '#4dffb0' },
+      { x:1070, y: 150, r: 14, label: '3 Galaxy Ports',         sub: 'DEEP β',  col: '#4dffb0' },
+      { x:1070, y: 245, r: 14, label: '3 Galaxy Ports',         sub: 'DEEP γ',  col: '#4dffb0' }
+    ];
+
+    // Edges [from, to]
+    var edges = [
+      [0,1],[1,2],[2,3],
+      [3,4],[3,5],[3,6],
+      [4,7],[5,8],[6,9]
+    ];
+
+    var html = '<defs>';
+    // Glow filter for void node
+    html += '<filter id="void-glow">' +
+              '<feGaussianBlur stdDeviation="6" result="blur"/>' +
+              '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+            '</filter>';
+    // Galaxy fade filter
+    html += '<filter id="galaxy-glow">' +
+              '<feGaussianBlur stdDeviation="3" result="blur"/>' +
+              '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+            '</filter>';
+    html += '</defs>';
+
+    // Edges
+    edges.forEach(function(e) {
+      var a = nodes[e[0]], b = nodes[e[1]];
+      var dashed = (e[0] === 2 && e[1] === 3) ? ' stroke-dasharray="8 5"' : '';
+      html += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"' +
+              ' stroke="' + a.col + '" stroke-width="1.5" stroke-opacity="0.3"' + dashed + '/>';
+    });
+
+    // Void ripple rings
+    var vn = nodes[3];
+    [50, 62, 74].forEach(function(r, i) {
+      html += '<circle cx="' + vn.x + '" cy="' + vn.y + '" r="' + r + '"' +
+              ' stroke="' + vn.col + '" stroke-width="0.8" fill="none"' +
+              ' stroke-opacity="' + (0.18 - i * 0.04) + '" stroke-dasharray="5 5"/>';
+    });
+
+    // Nodes
+    nodes.forEach(function(n) {
+      var filt = n.glow ? ' filter="url(#void-glow)"' : '';
+      if (!n.glow && n.col === '#4dffb0') filt = ' filter="url(#galaxy-glow)"';
+      html += '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + n.r + '"' +
+              ' fill="' + n.col + '" fill-opacity="0.1"' +
+              ' stroke="' + n.col + '" stroke-width="' + (n.glow ? 2 : 1.5) + '"' +
+              filt + '/>';
+      html += '<text x="' + n.x + '" y="' + (n.y - n.r - 8) + '"' +
+              ' text-anchor="middle" fill="' + n.col + '"' +
+              ' font-family="Consolas,Monaco,monospace" font-size="10.5" letter-spacing="0.3">' +
+              n.label + '</text>';
+      html += '<text x="' + n.x + '" y="' + (n.y + n.r + 15) + '"' +
+              ' text-anchor="middle" fill="#3d5a7a"' +
+              ' font-family="Consolas,Monaco,monospace" font-size="8.5" letter-spacing="0.8">' +
+              n.sub + '</text>';
+    });
+
+    // Ship position markers -- one ship per phase position
+    STATES.forEach(function(vs, i) {
+      var phase = vs.phase;
+      var col   = CLS_COLOR[vs.cls];
+      var px, py;
+
+      // Map phase to a position along the hub network path
+      if (phase < 0.18) {
+        // Docked at Earth
+        px = nodes[0].x + (i - 2) * 5;
+        py = nodes[0].y + 40;
+      } else if (phase < 0.36) {
+        // Outbound: interpolate Earth -> Pluto
+        var t = (phase - 0.18) / 0.18;
+        px = nodes[0].x + (nodes[2].x - nodes[0].x) * t;
+        py = nodes[0].y;
+      } else if (phase < 0.46) {
+        // Approaching void: Pluto -> Void
+        var t2 = (phase - 0.36) / 0.10;
+        px = nodes[2].x + (nodes[3].x - nodes[2].x) * t2;
+        py = nodes[2].y;
+      } else if (phase < 0.54) {
+        // In the void
+        px = nodes[3].x;
+        py = nodes[3].y + (i - 2.5) * 6;
+      } else if (phase < 0.72) {
+        // Galaxy transit: on a route
+        var ri = vs.route;
+        var t3 = (phase - 0.54) / 0.18;
+        px = nodes[3].x + (nodes[4 + ri].x - nodes[3].x) * t3;
+        py = nodes[4 + ri].y;
+      } else if (phase < 0.90) {
+        // Return: from galaxy toward Earth
+        var t4 = (phase - 0.72) / 0.18;
+        px = nodes[2].x + (nodes[0].x - nodes[2].x) * t4;
+        py = nodes[2].y;
+      } else {
+        // Docked
+        px = nodes[0].x + (i - 2) * 5;
+        py = nodes[0].y + 40;
+      }
+
+      html += '<circle cx="' + px + '" cy="' + py + '" r="4"' +
+              ' fill="' + col + '" fill-opacity="0.9"' +
+              ' stroke="' + col + '" stroke-width="1">' +
+              '<title>' + vs.name + ' (' + vs.status + ')</title>' +
+              '</circle>';
+    });
+
+    svg.innerHTML = html;
+  }
+
+  // ================================================================
+  // RENDER: MANIFOLD SURFACE CANVASES
+  // Isometric 2D projection of each z surface
+  // ================================================================
+  function drawManifold(canvasId, fn, hexColor) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    var W = canvas.offsetWidth || 400;
+    var H = canvas.offsetHeight || 200;
+    canvas.width  = W;
+    canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    var N     = 40;  // grid resolution
+    var RANGE = 2.2;
+    var CX    = W * 0.5;
+    var CY    = H * 0.55;
+    var SC    = Math.min(W, H) * 0.13;
+
+    // Isometric projection: z = fn(x,y)
+    function iso(x, y, z) {
+      var ax = (x - y) * Math.cos(Math.PI / 6);
+      var ay = (x + y) * Math.sin(Math.PI / 6) - z;
+      return [CX + ax * SC, CY + ay * SC];
+    }
+
+    // Parse hex to rgba
+    var r = parseInt(hexColor.slice(1,3), 16);
+    var g = parseInt(hexColor.slice(3,5), 16);
+    var b = parseInt(hexColor.slice(5,7), 16);
+
+    // Draw x-direction grid lines
+    for (var i = 0; i <= N; i++) {
+      var yv = (i / N) * RANGE * 2 - RANGE;
+      ctx.beginPath();
+      var first = true;
+      for (var j = 0; j <= N; j++) {
+        var xv = (j / N) * RANGE * 2 - RANGE;
+        var zv = fn(xv, yv);
+        if (!isFinite(zv)) zv = 0;
+        zv = Math.max(-RANGE, Math.min(RANGE, zv));
+        var pt = iso(xv, yv, zv);
+        if (first) { ctx.moveTo(pt[0], pt[1]); first = false; }
+        else ctx.lineTo(pt[0], pt[1]);
+      }
+      ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',0.18)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+
+    // Draw y-direction grid lines
+    for (var i2 = 0; i2 <= N; i2++) {
+      var xv2 = (i2 / N) * RANGE * 2 - RANGE;
+      ctx.beginPath();
+      var first2 = true;
+      for (var j2 = 0; j2 <= N; j2++) {
+        var yv2 = (j2 / N) * RANGE * 2 - RANGE;
+        var zv2 = fn(xv2, yv2);
+        if (!isFinite(zv2)) zv2 = 0;
+        zv2 = Math.max(-RANGE, Math.min(RANGE, zv2));
+        var pt2 = iso(xv2, yv2, zv2);
+        if (first2) { ctx.moveTo(pt2[0], pt2[1]); first2 = false; }
+        else ctx.lineTo(pt2[0], pt2[1]);
+      }
+      ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',0.10)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Draw live vessel markers on the manifold
+    STATES.forEach(function(vs) {
+      var xp = vs.x;
+      var yp;
+      if (canvasId === 'mc1') yp = vs.y_cycle;
+      else if (canvasId === 'mc2') yp = vs.y_approach;
+      else if (canvasId === 'mc3') yp = vs.y_freight;
+      else yp = vs.y_load * vs.y_load;
+
+      var zp = fn(xp, yp);
+      if (!isFinite(zp)) return;
+      zp = Math.max(-RANGE, Math.min(RANGE, zp));
+      var pt3 = iso(xp, yp, zp);
+
+      ctx.beginPath();
+      ctx.arc(pt3[0], pt3[1], 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = CLS_COLOR[vs.cls];
+      ctx.shadowColor = CLS_COLOR[vs.cls];
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+  }
+
+  function renderManifolds() {
+    drawManifold('mc1', function(x, y) { return x * y; }, '#2cf0ff');
+    drawManifold('mc2', function(x, y) { return y !== 0 ? x / y : 0; }, '#4dffb0');
+    drawManifold('mc3', function(x, y) { return x * y * y; }, '#ffd166');
+    drawManifold('mc4', function(x, y) { var yy = Math.max(0.05, Math.abs(y)); return x / (yy * yy); }, '#c79aff');
+  }
+
+  // ================================================================
+  // LINT CONSOLE -- Live dimensional programming execution
+  //
+  // This is the showcase: real lint checks that derive all values
+  // from the manifolds. Every PASS/FAIL value is computed from z=xy
+  // or one of the other four equations. No hardcoded results.
+  // ================================================================
+  var lintActive = false;
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function runLint() {
+    if (lintActive) return;
+    lintActive = true;
+    var body = document.getElementById('console-body');
+    if (!body) return;
+    body.innerHTML = '';
+
+    // Each item: [html, delay_ms]
+    var lines = [];
+    var t = 0;
+    var DT = 48; // ms between lines
+
+    function push(html) { lines.push([html, t]); t += DT; }
+    function gap() { push('&nbsp;'); t += 6; }
+
+    // File header
+    push('<span class="cc">// ================================================================</span>');
+    push('<span class="cc">// ITA Fleet Linter -- Dimensional Programming v2.6</span>');
+    push('<span class="cc">// ita-fleet-lint.js :: ' + new Date().toISOString().slice(0,19) + 'Z</span>');
+    push('<span class="cc">//</span>');
+    push('<span class="cc">// Rule: all state derived from manifolds. z = x * y is the</span>');
+    push('<span class="cc">// single source of truth. No value may be stored that could</span>');
+    push('<span class="cc">// be computed. The Schwarz Diamond SDF guards the void.</span>');
+    push('<span class="cc">// ================================================================</span>');
+    gap();
+
+    // Imports
+    push('<span class="ck">import</span> <span class="co">{</span> <span class="cv">M</span> <span class="co">}</span> <span class="ck">from</span> <span class="cs">\'./manifolds.js\'</span><span class="co">;</span>');
+    push('<span class="ck">import</span> <span class="co">{</span> <span class="cv">FLEET</span><span class="co">,</span> <span class="cv">deriveState</span> <span class="co">}</span> <span class="ck">from</span> <span class="cs">\'./ita-fleet.js\'</span><span class="co">;</span>');
+    gap();
+
+    // Manifold definitions
+    push('<span class="cc">// Manifold definitions -- pure functions, no side effects</span>');
+    push('<span class="ck">const</span> <span class="cv">M</span> <span class="co">=</span> <span class="co">{</span>');
+    push('&nbsp;&nbsp;<span class="cf">position</span><span class="co">:</span> (x, y) <span class="co">=></span> x <span class="co">*</span> y<span class="co">,</span>          <span class="cc">// z = xy</span>');
+    push('&nbsp;&nbsp;<span class="cf">approach</span><span class="co">:</span>  (x, y) <span class="co">=></span> x <span class="co">/</span> y<span class="co">,</span>          <span class="cc">// z = x/y</span>');
+    push('&nbsp;&nbsp;<span class="cf">cargo</span><span class="co">:</span>    (x, y) <span class="co">=></span> x <span class="co">*</span> y <span class="co">*</span> y<span class="co">,</span>        <span class="cc">// z = xy^2</span>');
+    push('&nbsp;&nbsp;<span class="cf">cabin</span><span class="co">:</span>    (x, y) <span class="co">=></span> x <span class="co">/</span> (y <span class="co">*</span> y)<span class="co">,</span>      <span class="cc">// z = x/y^2</span>');
+    push('&nbsp;&nbsp;<span class="cf">schwarz</span><span class="co">:</span>  (x, y, z) <span class="co">=></span> cos(x)cos(y)cos(z) <span class="co">-</span> sin(x)sin(y)sin(z)');
+    push('<span class="co">};</span>');
+    gap();
+
+    // Lint rules definition
+    push('<span class="cc">// Lint rules -- each check returns { ok, z, eq, note }</span>');
+    push('<span class="ck">const</span> <span class="cv">LINT_RULES</span> <span class="co">=</span> <span class="co">[</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'SEED_IDENTITY\'</span><span class="co">,</span>   fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">position</span>(vs.x, <span class="cn">0.0</span>) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'CARGO_BOUNDS\'</span><span class="co">,</span>    fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">cargo</span>(vs.x, vs.y_freight) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'CABIN_ALLOC\'</span><span class="co">,</span>     fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">cabin</span>(vs.x, vs.y_load<span class="co">**</span><span class="cn">2</span>) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'CYCLE_RANGE\'</span><span class="co">,</span>     fn<span class="co">:</span> (vs, i) <span class="co">=></span> M.<span class="cf">position</span>(vs.x, i<span class="co">/</span><span class="cn">6</span>) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'APPROACH_VALID\'</span><span class="co">,</span>  fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">approach</span>(vs.x, vs.y_approach) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'VOID_WINDOW\'</span><span class="co">,</span>     fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">schwarz</span>(vs.z_cycle<span class="co">*</span>π, vs.z_approach<span class="co">*</span>π, vs.z_cargo<span class="co">*</span>π) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'RUSSIAN_DOLL\'</span><span class="co">,</span>    fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">position</span>(M.<span class="cf">position</span>(vs.x, y), y) <span class="co">===</span> M.<span class="cf">cargo</span>(vs.x, y) <span class="co">},</span>');
+    push('&nbsp;&nbsp;<span class="co">{</span> id<span class="co">:</span> <span class="cs">\'PAX_CAPACITY\'</span><span class="co">,</span>   fn<span class="co">:</span> (vs) <span class="co">=></span> M.<span class="cf">cabin</span>(vs.x, vs.y_load) <span class="co">}</span>');
+    push('<span class="co">];</span>');
+    gap();
+
+    push('<span class="cc">// === EXECUTING LINT PASS ===</span>');
+    gap();
+
+    // Run each vessel through all rules
+    var totalPass = 0, totalFail = 0;
+
+    STATES.forEach(function(vs, vi) {
+      push('<span class="cc">// ---- ' + vs.id + ': ' + vs.name + ' (x = ' + vs.x + ') ----</span>');
+
+      // SEED_IDENTITY: z = x*0 = 0 (zero-point identity check)
+      (function() {
+        var z = M.position(vs.x, 0.0);
+        var ok = (z === 0);
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">SEED_IDENTITY  </span> <span class="co">z=xy</span>     z=<span class="cval">' + z.toFixed(4) + '</span>  x=' + esc(vs.x) + ' y=0  <span class="cc">// identity at origin</span>');
+      })();
+
+      // CARGO_BOUNDS: z = xy^2 must be in (0, 10]
+      (function() {
+        var z = M.cargo(vs.x, vs.y_freight);
+        var ok = z > 0 && z < 10;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">CARGO_BOUNDS   </span> <span class="co">z=xy²</span>  z=<span class="cval">' + z.toFixed(4) + '</span>  x=' + vs.x + ' y=' + vs.y_freight.toFixed(4) + '  <span class="cc">// ' + (ok ? (vs.cargoMT / 1e6).toFixed(2) + 'M MT nominal' : 'cargo overflow') + '</span>');
+      })();
+
+      // CABIN_ALLOC: z = x/y^2 must be in (0.05, 6)
+      (function() {
+        var z = M.cabin(vs.x, vs.y_load * vs.y_load);
+        var ok = z > 0.05 && z < 6;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">CABIN_ALLOC    </span> <span class="co">z=x/y²</span> z=<span class="cval">' + z.toFixed(4) + '</span>  x=' + vs.x + ' y²=' + (vs.y_load * vs.y_load).toFixed(4) + '  <span class="cc">// ' + vs.totalBerths.toLocaleString() + ' berths</span>');
+      })();
+
+      // CYCLE_RANGE: z = xy with y=i/6 must be in [0, 1)
+      (function() {
+        var z = M.position(vs.x, vi / 6);
+        var ok = z >= 0 && z < 1;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">CYCLE_RANGE    </span> <span class="co">z=xy</span>     z=<span class="cval">' + z.toFixed(4) + '</span>  x=' + vs.x + ' y=' + (vi/6).toFixed(4) + '  <span class="cc">// voyage slot ' + vi + '/6</span>');
+      })();
+
+      // APPROACH_VALID: z = x/y must be finite and > 0
+      (function() {
+        var z = M.approach(vs.x, vs.y_approach);
+        var ok = isFinite(z) && z > 0;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">APPROACH_VALID </span> <span class="co">z=x/y</span>    z=<span class="cval">' + z.toFixed(4) + '</span>  x=' + vs.x + ' y=' + vs.y_approach.toFixed(4) + '  <span class="cc">// approach vector valid</span>');
+      })();
+
+      // VOID_WINDOW: Schwarz SDF -- only required near void phases
+      (function() {
+        var sdf = vs.sdf;
+        var voidPhase = vs.phase >= 0.36 && vs.phase <= 0.54;
+        var ok = !voidPhase || Math.abs(sdf) < 0.19;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        var note = voidPhase ? (ok ? 'void window open |sdf|=' + Math.abs(sdf).toFixed(4) : 'VOID BLOCKED') : 'not at horizon';
+        push(tag + ' <span class="cv">VOID_WINDOW    </span> <span class="co">schwarz</span>  z=<span class="cval">' + sdf.toFixed(4) + '</span>  <span class="cc">// ' + note + '</span>');
+      })();
+
+      // RUSSIAN_DOLL: z=xy applied twice with same y equals z=xy^2
+      // M.position(M.position(x, y), y) must equal M.cargo(x, y)
+      // This proves composition of observations follows the manifold algebra
+      (function() {
+        var y = vs.y_freight;
+        var z_step1  = M.position(vs.x, y);            // first observation: z = xy
+        var z_step2  = M.position(z_step1, y);         // doll it: z = (xy)*y = xy^2
+        var z_direct = M.cargo(vs.x, y);               // direct: z = xy^2
+        var ok = Math.abs(z_step2 - z_direct) < 1e-10;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">RUSSIAN_DOLL   </span> <span class="co">z→x²</span>    z=<span class="cval">' + z_step2.toFixed(4) + '</span>  pos(pos(x,y),y)=cargo(x,y)=' + z_direct.toFixed(4) + '  <span class="cc">// composition holds</span>');
+      })();
+
+      // PAX_CAPACITY: berths must be 20k-30k
+      (function() {
+        var ok = vs.totalBerths >= 20000 && vs.totalBerths <= 30000;
+        var tag = ok ? '<span class="cpass">PASS</span>' : '<span class="cfail">FAIL</span>';
+        totalPass += ok ? 1 : 0; totalFail += ok ? 0 : 1;
+        push(tag + ' <span class="cv">PAX_CAPACITY   </span> <span class="co">z=x/y²</span> z=<span class="cval">' + vs.z_cabin.toFixed(4) + '</span>  berths=' + vs.totalBerths.toLocaleString() + '  <span class="cc">// ' + (ok ? 'within spec 20k-30k' : 'out of spec') + '</span>');
+      })();
+
+      gap();
+    });
+
+    // Summary
+    push('<span class="cc">// ================================================================</span>');
+    push('<span class="cc">// SUMMARY</span>');
+    push('<span class="cc">// ================================================================</span>');
+    var total = totalPass + totalFail;
+    push('<span class="cpass">PASS: ' + totalPass + '</span>  <span class="cfail">FAIL: ' + totalFail + '</span>  <span class="cv">TOTAL: ' + total + '</span>  <span class="cc">(' + STATES.length + ' vessels x 8 rules)</span>');
+    gap();
+    push('<span class="cc">// All values derived from z=xy &middot; z=x/y &middot; z=xy² &middot; z=x/y² &middot; Schwarz SDF</span>');
+    push('<span class="cc">// No fleet state stored. Every check observes the manifold.</span>');
+    push('<span class="cc">// Russian Doll: each z_cycle becomes next vessel\'s x seed.</span>');
+
+    // Schedule output lines with delays
+    lines.forEach(function(item) {
+      var html = item[0], delay = item[1];
+      setTimeout(function() {
+        var body2 = document.getElementById('console-body');
+        if (!body2) return;
+        var span = document.createElement('span');
+        span.className = 'cl';
+        span.innerHTML = html;
+        body2.appendChild(span);
+        body2.scrollTop = body2.scrollHeight;
+      }, delay);
+    });
+
+    // Restart after full cycle
+    setTimeout(function() {
+      lintActive = false;
+      setTimeout(runLint, 9000);
+    }, t + 600);
+  }
+
+  // ================================================================
+  // THREE.JS -- SCHWARZ DIAMOND BACKGROUND
+  // Reuses the same Schwarz Diamond point cloud pattern from
+  // dimensional-programming/index.html for visual continuity.
+  // ================================================================
+  function initBackground() {
+    var canvas = document.getElementById('bg-canvas');
+    if (!canvas || !window.THREE) return;
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.4));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x03030a, 1);
+
+    var scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x03030a, 0.025);
+
+    var camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 140);
+    camera.position.set(0, 0, 24);
+
+    // Schwarz Diamond SDF: cos(x)cos(y)cos(z) - sin(x)sin(y)sin(z) = 0
+    function schwartzSDF(x, y, z) {
+      return Math.cos(x) * Math.cos(y) * Math.cos(z) -
+             Math.sin(x) * Math.sin(y) * Math.sin(z);
+    }
+
+    var positions = [];
+    var colors    = [];
+
+    // Palette: cyan / green / purple / gold
+    var palette = [
+      [0.172, 0.941, 1.000],
+      [0.302, 1.000, 0.690],
+      [0.780, 0.604, 1.000],
+      [1.000, 0.820, 0.400]
+    ];
+
+    var STEP = 0.40, THRESH = 0.14;
+    for (var x = -9.5; x <= 9.5; x += STEP) {
+      for (var y = -9.5; y <= 9.5; y += STEP) {
+        for (var z = -9.5; z <= 9.5; z += STEP) {
+          if (Math.abs(schwartzSDF(x, y, z)) < THRESH) {
+            positions.push(x, y, z);
+            var ci = Math.abs(Math.round(x * 1.2 + y * 0.8)) % 4;
+            colors.push(palette[ci][0], palette[ci][1], palette[ci][2]);
+          }
+        }
+      }
+    }
+
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+
+    var mat = new THREE.PointsMaterial({
+      size: 0.07,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.45,
+      sizeAttenuation: true
+    });
+
+    scene.add(new THREE.Points(geo, mat));
+
+    var frame = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      frame++;
+      scene.rotation.y = frame * 0.00025;
+      scene.rotation.x = Math.sin(frame * 0.000085) * 0.10;
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', function() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  // ================================================================
+  // INIT
+  // ================================================================
+  renderFleet();
+  renderVoid();
+  renderSchedule();
+  renderCabins();
+  renderCargo();
+  renderHubNetwork();
+  renderManifolds();
+  initBackground();
+  runLint();
+
+})();
+</script>
+</body>
+</html>

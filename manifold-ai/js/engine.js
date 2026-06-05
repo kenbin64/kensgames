@@ -171,15 +171,101 @@ class TransformersEngine {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// ApiEngine — any OpenAI-compatible endpoint: Groq, Together, Ollama, etc.
+// Uses the manifold DNA as system prompt. Free model, dimensional DNA.
+// ──────────────────────────────────────────────────────────────────────────
+class ApiEngine {
+  constructor(opts = {}) {
+    this.apiBase     = (opts.apiBase  || 'https://api.groq.com/openai/v1').replace(/\/$/, '');
+    this.apiKey      = opts.apiKey    || '';
+    this.model       = opts.model     || 'llama-3.1-70b-versatile';
+    this.maxTokens   = opts.maxTokens || 1024;
+    this.temperature = opts.temperature ?? 0.35;
+    this.ready       = true;
+  }
+
+  async init(progress) {
+    progress?.({ stage: 'ready', percent: 1, label: `api (${this.model})` });
+  }
+
+  async generate(messages, opts = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
+
+    const body = {
+      model:       opts.model       || this.model,
+      temperature: opts.temperature ?? this.temperature,
+      max_tokens:  opts.max_tokens  || this.maxTokens,
+      messages:    [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+    };
+    if (!opts.noJsonMode) body.response_format = { type: 'json_object' };
+
+    const res = await fetch(`${this.apiBase}/chat/completions`, {
+      method: 'POST', headers, body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const e = await res.text().catch(() => res.statusText);
+      throw new Error(`ApiEngine ${body.model}: ${res.status} ${e}`);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '{}';
+  }
+}
+
 // Factory.
-export function createEngine(kind) {
+// For api engines pass an opts object: { apiBase, apiKey, model, maxTokens }
+export function createEngine(kind, opts = {}) {
   switch (kind) {
+    // Qwen via WebLLM (WebGPU — uses the local GPU, zero cost).
+    // Size tiers follow the Fibonacci ladder: 1.5B → 3B → 7B.
     case 'webllm':
+    case 'qwen':
       return new WebLLMEngine('Qwen2.5-1.5B-Instruct-q4f16_1-MLC');
+    case 'qwen-3b':
     case 'webllm-3b':
-      return new WebLLMEngine('Llama-3.2-3B-Instruct-q4f16_1-MLC');
+      return new WebLLMEngine('Qwen2.5-3B-Instruct-q4f16_1-MLC');
+    case 'qwen-7b':
+      return new WebLLMEngine('Qwen2.5-7B-Instruct-q4f16_1-MLC');
     case 'transformers':
       return new TransformersEngine('HuggingFaceTB/SmolLM2-1.7B-Instruct');
+
+    // Free hosted models via OpenAI-compatible APIs.
+    // Groq: fast, generous free tier, Llama 3.1 70B / Mixtral 8x7B.
+    case 'groq':
+      return new ApiEngine({
+        apiBase:  'https://api.groq.com/openai/v1',
+        model:    opts.model || 'llama-3.1-70b-versatile',
+        apiKey:   opts.apiKey || '',
+        maxTokens: opts.maxTokens || 1024,
+      });
+
+    // Together.ai: broad model selection, free $25 credit.
+    case 'together':
+      return new ApiEngine({
+        apiBase:  'https://api.together.xyz/v1',
+        model:    opts.model || 'meta-llama/Llama-3-70b-chat-hf',
+        apiKey:   opts.apiKey || '',
+        maxTokens: opts.maxTokens || 1024,
+      });
+
+    // Qwen via Ollama: local GPU, any size.
+    // Install a model with: ollama pull qwen2.5:7b
+    // Fibonacci sizes: 1.5b, 3b, 7b, 14b, 32b, 72b
+    case 'ollama':
+    case 'ollama-qwen':
+      return new ApiEngine({
+        apiBase:    opts.apiBase  || 'http://localhost:11434/v1',
+        model:      opts.model    || 'qwen2.5:7b',
+        apiKey:     '',
+        maxTokens:  opts.maxTokens || 2048,
+        noJsonMode: true,   // Ollama ignores response_format, we parse best-effort
+      });
+
+    // Generic: any OpenAI-compatible endpoint.
+    case 'api':
+      return new ApiEngine(opts);
+
     case 'deterministic':
     default:
       return new DeterministicEngine();
