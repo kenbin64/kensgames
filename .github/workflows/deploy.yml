@@ -308,3 +308,129 @@ jobs:
       - name: Cleanup SSH key
         if: always()
         run: rm -f ~/.ssh/id_ed25519_mcp
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 4. Deploy dimensionalprogramming.com
+  #    Runs after kensgames.com so all source files are in the VPS repo.
+  #    Uses direct rsync (no nested heredocs) to push each directory,
+  #    then a minimal SSH call to enable + reload nginx.
+  #
+  #    First-time setup: run scripts/deploy-dimensionalprogramming.sh on
+  #    the VPS as root to write the nginx config and provision the cert.
+  #    Subsequent CI runs just sync files and reload.
+  # ──────────────────────────────────────────────────────────────────────
+  deploy-dimensionalprogramming:
+    name: Deploy dimensionalprogramming.com
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      inputs.dry_run != 'true'
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519_mcp
+          chmod 600 ~/.ssh/id_ed25519_mcp
+          ssh-keyscan -p "${{ env.VPS_PORT }}" -H "${{ env.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Ensure target directories exist
+        run: |
+          ssh -i ~/.ssh/id_ed25519_mcp -p "${{ env.VPS_PORT }}" \
+              -o StrictHostKeyChecking=no \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+              "mkdir -p /var/www/dimensionalprogramming.com/public/{docs,manifold-ai/js,manifold-ai/css,x-dimensional,js}"
+
+      - name: Deploy root pages
+        run: |
+          RSYNC="rsync -avz --checksum -e 'ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no'"
+          DST="${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/var/www/dimensionalprogramming.com/public"
+          rsync -avz --checksum \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no" \
+            dimensional-programming/index.html \
+            dimensional-programming/space-travel.html \
+            "$DST/"
+
+      - name: Deploy manifold-ai directory
+        run: |
+          rsync -avz --delete --checksum \
+            --exclude='*.test.js' \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no" \
+            manifold-ai/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/var/www/dimensionalprogramming.com/public/manifold-ai/
+
+      - name: Deploy x-dimensional directory
+        run: |
+          rsync -avz --delete --checksum \
+            -e "ssh -i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no" \
+            x-dimensional/ \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/var/www/dimensionalprogramming.com/public/x-dimensional/
+
+      - name: Deploy js utilities and docs
+        run: |
+          SSH_OPTS="-i ~/.ssh/id_ed25519_mcp -p ${{ env.VPS_PORT }} -o StrictHostKeyChecking=no"
+          DST="${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/var/www/dimensionalprogramming.com/public"
+          [ -d js ] && rsync -avz --checksum -e "ssh $SSH_OPTS" js/ "$DST/js/"
+          rsync -avz --checksum \
+            -e "ssh $SSH_OPTS" \
+            --include='*.md' --exclude='*' \
+            docs/ "$DST/docs/"
+
+      - name: Fix permissions, enable nginx config, reload
+        run: |
+          ssh -i ~/.ssh/id_ed25519_mcp -p "${{ env.VPS_PORT }}" \
+              -o StrictHostKeyChecking=no \
+              ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'ENDSSH'
+            set -e
+            DST=/var/www/dimensionalprogramming.com/public
+            NGINX_AVAIL=/etc/nginx/sites-available/dimensionalprogramming.com.conf
+            NGINX_ENABLED=/etc/nginx/sites-enabled/dimensionalprogramming.com.conf
+
+            # Fix permissions
+            chown -R butterfly:butterfly "$DST" 2>/dev/null || true
+            find "$DST" -type f -exec chmod 664 {} \;
+            find "$DST" -type d -exec chmod 775 {} \;
+            echo "permissions fixed"
+
+            # Symlink nginx config into sites-enabled if not already done
+            # (first-time config write is handled by deploy-dimensionalprogramming.sh)
+            if [ -f "$NGINX_AVAIL" ] && [ ! -L "$NGINX_ENABLED" ]; then
+              sudo ln -sf "$NGINX_AVAIL" "$NGINX_ENABLED"
+              echo "nginx config symlinked to sites-enabled"
+            elif [ ! -f "$NGINX_AVAIL" ]; then
+              echo "WARNING: $NGINX_AVAIL not found."
+              echo "Run: sudo bash /var/www/kensgames.com/public/scripts/deploy-dimensionalprogramming.sh"
+              echo "This writes the nginx config and provisions the SSL cert."
+            fi
+
+            # Test + reload nginx
+            if sudo -n nginx -t 2>/dev/null; then
+              sudo -n systemctl reload nginx
+              echo "nginx reloaded"
+            else
+              echo "nginx reload skipped (passwordless sudo not configured)"
+              echo "Run on VPS: sudo systemctl reload nginx"
+            fi
+          ENDSSH
+
+      - name: Verify dimensionalprogramming.com endpoints
+        run: |
+          sleep 4
+          for URL in \
+            "https://dimensionalprogramming.com/" \
+            "https://dimensionalprogramming.com/space-travel.html" \
+            "https://dimensionalprogramming.com/manifold-ai/agent.html" \
+            "https://dimensionalprogramming.com/manifold-ai/monitor.html" \
+            "https://dimensionalprogramming.com/x-dimensional/index.html"; do
+            CODE=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+            echo "  $CODE  $URL"
+            [ "$CODE" = "200" ] || echo "::warning::${URL} returned ${CODE}"
+          done
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519_mcp
