@@ -15,7 +15,7 @@
   <script src="/js/dimensional-session-bridge.js"></script>
 
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
-  <link rel="stylesheet" href="3d.css?v=20260518i">
+  <link rel="stylesheet" href="3d.css?v=20260605a">
   <script src="/js/analytics.js"></script>
   <script src="/js/kernel-client.js" defer></script>
   <script src="/js/player-panel.js" defer></script>
@@ -188,6 +188,19 @@
       <button type="button" role="menuitem" class="hm-cam-btn" data-cam="auto"
         onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto');">Auto</button>
     </div>
+    <div class="hm-section-label">Graphics <span id="hm-q-tier" class="hm-q-tier"></span></div>
+    <div class="hm-q-row">
+      <button type="button" role="menuitem" class="hm-q-btn active" data-q="auto"
+        onclick="ftSetQuality(this,'auto')">Auto</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="low"
+        onclick="ftSetQuality(this,'low')">Low</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="medium"
+        onclick="ftSetQuality(this,'medium')">Med</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="high"
+        onclick="ftSetQuality(this,'high')">High</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="ultra"
+        onclick="ftSetQuality(this,'ultra')">Ultra</button>
+    </div>
     <div class="hm-divider"></div>
     <button type="button" role="menuitem" id="hm-break"
       onclick="var b=document.getElementById('btn-break'); if(b){document.getElementById('hamburger-menu').classList.remove('open'); b.click();}">
@@ -314,14 +327,57 @@
   <!-- 🜂 JAZZ SPEAKEASY — procedural live music (walking bass + brushed drums + ii-V-I + hook) -->
   <script src="../js/jazz-speakeasy.js?v=20260510b"></script>
 
+  <!-- 🜂 DIMENSIONAL QUALITY MANIFOLD — one capability scalar regenerates the
+       whole render-settings vector (z = capability·demand). Must load BEFORE
+       the renderer so window.FT_QUALITY exists when init3D() runs. -->
+  <script src="fasttrack-quality.js?v=20260605a"></script>
+
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260518c"></script>
+  <script src="fasttrack-3d.js?v=20260605a"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
 
   <!-- Viewport chrome: emoji reactions, settings, replay overlay, leave game. -->
   <script src="3d-ui.js?v=20260518d"></script>
+
+  <!-- Graphics quality selector — drives the Dimensional Quality Manifold.
+       Auto lets the manifold detect + adapt; a tier pins it (governor off). -->
+  <script>
+    function ftSetQuality(btn, tier) {
+      try {
+        document.querySelectorAll('#hamburger-menu .hm-q-btn')
+          .forEach(b => b.classList.toggle('active', b === btn));
+        if (window.FT_QUALITY && window.FT_QUALITY.set) window.FT_QUALITY.set(tier);
+      } catch (_) {}
+      ftSyncQualityTier();
+    }
+    // Reflect the live tier next to the "Graphics" label (useful in Auto mode,
+    // where the manifold/governor picks the tier for you).
+    function ftSyncQualityTier() {
+      var el = document.getElementById('hm-q-tier');
+      if (el && window.FT_QUALITY) {
+        var s = window.FT_QUALITY.stats ? window.FT_QUALITY.stats() : null;
+        el.textContent = s ? ('· ' + s.tier + (s.pinned ? '' : ' (auto)')) : '';
+      }
+    }
+    (function initQualityButtons() {
+      function sync() {
+        var pinned = null;
+        try { pinned = localStorage.getItem('ft_quality'); } catch (_) {}
+        var want = pinned || 'auto';
+        document.querySelectorAll('#hamburger-menu .hm-q-btn').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-q') === want);
+        });
+        ftSyncQualityTier();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sync);
+      } else { sync(); }
+      // Keep the live tier label fresh while the governor adapts in Auto mode.
+      setInterval(ftSyncQualityTier, 2000);
+    })();
+  </script>
 
   <!-- Anchor the card panel flush against the bottom of the player panel. -->
   <script>

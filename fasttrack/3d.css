@@ -2840,6 +2840,40 @@ textarea,
   color: #eaf6ff;
 }
 
+/* ── Graphics quality row — mirrors the camera row, warm amber accent ── */
+#hamburger-menu .hm-q-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+}
+
+#hamburger-menu .hm-q-btn {
+  flex: 1 1 0;
+  padding: 8px 3px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(40, 30, 20, 0.6);
+  color: #f6f9ff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#hamburger-menu .hm-q-btn.active {
+  background: rgba(110, 70, 20, 0.85);
+  border-color: #ffb347;
+  box-shadow: 0 0 10px #ffb347, inset 0 0 6px rgba(255, 255, 255, 0.08);
+  color: #fff3e0;
+}
+
+#hamburger-menu .hm-q-tier {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffb347;
+  opacity: 0.85;
+}
+
 #hamburger-menu .hm-divider {
   height: 1px;
   margin: 4px 0;
