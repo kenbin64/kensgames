@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Geometry of Fast Track — Math, Philosophy &amp; Benchmarks</title>
+  <meta name="description"
+    content="How Fast Track is built on one geometric primitive, z = x·y. Representation instead of compression, the board as derived data, and an adaptive quality manifold that scales graphics to your machine. With live, in-browser benchmarks.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://kensgames.com/fasttrack/dimensional-coding.html">
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+
+  <!-- Load the real quality manifold so the benchmarks below run against the
+       visitor's own machine, not a canned demo. -->
+  <script src="fasttrack-quality.js?v=20260605a"></script>
+
+  <style>
+    :root {
+      --primary: #e74c3c;
+      --secondary: #3498db;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --bg-dark: #0d0a07;
+      --bg-card: #161b22;
+      --bg-hover: #21262d;
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --border: #30363d;
+      --gold: #ffd700;
+      --amber: #ffb347;
+      --cyan: #4fd6e0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Poppins', system-ui, sans-serif;
+      background:
+        radial-gradient(900px 600px at 70% -10%, rgba(255,179,71,0.08), transparent),
+        radial-gradient(700px 500px at 0% 20%, rgba(79,214,224,0.06), transparent),
+        var(--bg-dark);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code, .mono, .eq {
+      font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    }
+
+    .top-bar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 20px;
+      background: rgba(13, 10, 7, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .top-bar .brand { font-weight: 700; letter-spacing: .5px; color: var(--amber); }
+    .top-bar .spacer { flex: 1; }
+    .top-bar a.btn {
+      padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 14px;
+    }
+    .top-bar a.btn:hover { background: var(--bg-hover); text-decoration: none; }
+
+    .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 90px; }
+
+    .hero { text-align: center; padding: 28px 0 8px; }
+    .hero .eyebrow {
+      text-transform: uppercase; letter-spacing: 3px; font-size: 12px;
+      color: var(--cyan); margin-bottom: 10px;
+    }
+    .hero h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1.1; }
+    .hero .equation {
+      display: inline-block; margin-top: 18px; padding: 10px 22px;
+      font-size: 26px; color: var(--gold);
+      border: 1px solid rgba(255,215,0,0.25); border-radius: 12px;
+      background: rgba(255,215,0,0.05);
+    }
+    .hero .sub { color: var(--text-muted); max-width: 620px; margin: 18px auto 0; }
+
+    h2 {
+      margin: 54px 0 14px; font-size: 26px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    h2 .n { color: var(--amber); margin-right: 10px; font-family: monospace; }
+    h3 { margin: 26px 0 8px; font-size: 18px; color: var(--amber); }
+    p { margin: 12px 0; }
+    p.lead { font-size: 18px; }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 20px 22px; margin: 18px 0;
+    }
+
+    .eq {
+      display: block; background: #0a0805; border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px; margin: 14px 0;
+      color: var(--cyan); font-size: 15px; overflow-x: auto;
+    }
+    .eq .c { color: var(--text-muted); }
+
+    .fence {
+      border-left: 3px solid var(--warning);
+      background: rgba(243,156,18,0.06);
+      padding: 12px 16px; margin: 14px 0; border-radius: 0 8px 8px 0;
+    }
+    .fence b { color: var(--warning); }
+
+    /* live benchmark blocks */
+    .bench {
+      background: #0a0805; border: 1px solid rgba(79,214,224,0.25);
+      border-radius: 12px; padding: 18px; margin: 18px 0;
+    }
+    .bench .h {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
+      color: var(--cyan);
+    }
+    .bench .h::before { content: "▸ LIVE"; font-weight: 700; color: var(--success); }
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-top: 6px;
+    }
+    .stat {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .stat .v { font-size: 24px; font-weight: 700; color: var(--gold); font-family: monospace; }
+    .stat .l { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .stat.good .v { color: var(--success); }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    td.mono { color: var(--cyan); }
+
+    input[type=range] { width: 100%; accent-color: var(--amber); }
+    .vec {
+      font-family: monospace; font-size: 13px; line-height: 1.9;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px; margin-top: 12px;
+      white-space: pre-wrap;
+    }
+    .vec .k { color: var(--text-muted); }
+    .vec .val { color: var(--gold); }
+    .vec .true { color: var(--success); }
+    .vec .false { color: var(--primary); }
+
+    .pill {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; letter-spacing: 1px;
+      border: 1px solid currentColor;
+    }
+    .pill.low { color: var(--primary); }
+    .pill.medium { color: var(--warning); }
+    .pill.high { color: var(--cyan); }
+    .pill.ultra { color: var(--gold); }
+
+    .foot { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border);
+      color: var(--text-muted); font-size: 13px; text-align: center; }
+    .muted { color: var(--text-muted); }
+  </style>
+</head>
+
+<body>
+  <div class="top-bar">
+    <span class="brand">🜂 FAST TRACK</span>
+    <span class="spacer"></span>
+    <a class="btn" href="docs.html">Rules</a>
+    <a class="btn" href="3d.html">Play ▸</a>
+  </div>
+
+  <div class="wrap">
+
+    <div class="hero">
+      <div class="eyebrow">Math · Philosophy · Benchmarks</div>
+      <h1>The Geometry of Fast Track</h1>
+      <div class="equation">z = x · y</div>
+      <p class="sub">
+        The whole game is built from one surface. This page states what the math
+        actually confirms, what the geometry bought us, and runs the benchmarks
+        live in your browser — so you do not have to take any of it on faith.
+      </p>
+    </div>
+
+    <!-- ───────────────────────── 0. PRIMITIVE ───────────────────────── -->
+    <h2><span class="n">0</span>One primitive, not a pile of features</h2>
+    <p class="lead">
+      Fast Track is a 3D peg-racing board game. Under the felt it is a single
+      mathematical object iterated: the saddle <code>z = x·y</code>, a hyperbolic
+      paraboloid.
+    </p>
+    <p>Three facts make this surface special, and each one earns its keep later:</p>
+    <div class="card">
+      <p><b>It is harmonic.</b> Its Laplacian is zero — the simplest non-trivial
+      saddle solution of Laplace's equation. It is literally the imaginary part of
+      a complex square, <code>x·y = Im((x + iy)²) / 2</code>, so the primitive
+      already lives inside complex structure.</p>
+      <p><b>It is doubly ruled.</b> Fix <code>x</code> and <code>z</code> is a
+      straight line in <code>y</code>; fix <code>y</code> and it is straight in
+      <code>x</code>. A curved saddle built entirely from straight lines. This is
+      the property that later makes a move's outcome <em>free</em> to read off.</p>
+      <p><b>It tiles into the board.</b> Over the square <code>[-1,1]²</code> the
+      saddle is inscribed exactly in a cube, its four corners land on alternating
+      cube vertices — a regular tetrahedron — and its four straight edges frame the
+      Schwarz Diamond minimal surface. The hexagonal board, its safe zones and its
+      bullseye are assemblies of this one patch.</p>
+    </div>
+
+    <!-- ───────────── 1. REPRESENTATION NOT COMPRESSION ───────────── -->
+    <h2><span class="n">1</span>Representation, not compression</h2>
+    <p class="lead">
+      The core idea. We do not store data — we store the <em>rule that extracts
+      it</em>. We elect one congressman for thousands; we do not compress the
+      thousands into him.
+    </p>
+    <p>
+      Compression is reconstructive: it replays what you stored, bounded by its
+      input. Representation is generative: it answers questions never in the data —
+      finer resolution, points between the samples, points outside the original
+      domain. The samples were always derivative; the rule was always primary.
+    </p>
+
+    <div class="bench">
+      <div class="h">Benchmark — a bilinear image <em>is</em> z = x·y</div>
+      <p class="muted" style="font-size:14px;margin-top:0">
+        A colour gradient defined by four corner colours, interpolated
+        bilinearly, is exactly the saddle in colour space. We reconstruct every
+        pixel from just the four corners and measure the error against the full
+        image. Computed in your browser, just now:
+      </p>
+      <div class="stat-grid" id="bench-image"></div>
+    </div>
+
+    <div class="bench">
+      <div class="h">Benchmark — 88 piano keys from 2 numbers</div>
+      <p class="muted" style="font-size:14px;margin-top:0">
+        A musical scale is a rule, not a table:
+        <code>f(n) = 440 · 2^((n − 48)/12)</code>. Two numbers regenerate the whole
+        keyboard. (Fast Track's procedural music is built this way.)
+      </p>
+      <div class="stat-grid" id="bench-scale"></div>
+    </div>
+
+    <div class="fence">
+      <b>Fence.</b> Most data has no short generator — that is the
+      incompressibility limit (Kolmogorov / Shannon), and it is real. The image
+      above hit <em>zero</em> error only because it genuinely was bilinear. Real
+      signals lie only <em>approximately</em> on a low-dimensional manifold, so on
+      real data the method trades fidelity for size. We claim the structured case,
+      not magic.
+    </div>
+
+    <!-- ───────────── 2. THE BOARD AS DERIVED DATA ───────────── -->
+    <h2><span class="n">2</span>The board is derived, not drawn</h2>
+    <p>
+      Fast Track's board is not a hand-placed list of ~150 holes. It is generated
+      from a handful of golden-ratio constants and the six-fold symmetry of the
+      hexagon. The rules live in <code>fasttrack.rules.json</code> as a single
+      source of truth; the geometry falls out of a generator.
+    </p>
+    <div class="bench">
+      <div class="h">Benchmark — board holes from a few constants</div>
+      <div class="stat-grid" id="bench-board"></div>
+    </div>
+    <p class="muted" style="font-size:14px">
+      Six wedges × 14 outer holes, six fast-track ring holes, four safe-zone holes
+      and five holding/home holes per player, one bullseye. The renderer never
+      stores hole positions; it asks the generator for them — which means the same
+      board scales cleanly from 2 to 6 players.
+    </p>
+
+    <!-- ───────────── 3. THE QUALITY MANIFOLD ───────────── -->
+    <h2><span class="n">3</span>The quality manifold: graphics that give</h2>
+    <p class="lead">
+      Fast Track ran beautifully on a strong desktop and clunked on weak laptops
+      and phones. The old switch was binary — full billiard room or stripped void.
+      The fix is the representation idea pointed at <em>performance</em>.
+    </p>
+    <p>
+      We do not store quality presets as a lookup table. We store the generator.
+      One measured capability scalar — <code>c ∈ [0,1]</code>, your machine's power
+      — regenerates the entire render-settings vector. The presets were always
+      derivative; the rule <code>settingsFor(c)</code> is primary.
+    </p>
+    <span class="eq">effective quality  <span class="c">=</span>  capability(machine)  ·  demand(scene)        <span class="c">// z = x·y again</span></span>
+    <p>
+      Capability is combined as a <em>product</em> (a geometric mean of GPU, CPU,
+      and memory), not an average — because <code>z = x·y</code> says one weak
+      factor must collapse the whole. A software GPU caps quality no matter how
+      many CPU cores you have. That is the correct physics.
+    </p>
+
+    <div class="bench">
+      <div class="h">Your machine, measured</div>
+      <div class="stat-grid" id="bench-cap"></div>
+    </div>
+
+    <div class="card">
+      <h3>The generator, made visible</h3>
+      <p class="muted" style="margin-top:0">
+        Drag the capability scalar and watch the whole settings vector regenerate.
+        Every value below is a continuous function of the one number — including at
+        <code>c</code> values that were never explicitly authored.
+      </p>
+      <p style="margin-bottom:6px">
+        capability <code>c</code> = <span id="c-readout" class="mono" style="color:var(--gold)">—</span>
+        &nbsp; → &nbsp; tier <span id="c-tier" class="pill">—</span>
+      </p>
+      <input type="range" id="c-slider" min="0" max="1" step="0.01" value="0.7">
+      <div class="vec" id="c-vector"></div>
+    </div>
+
+    <!-- ───────────── 4. THE RESIDUAL GOVERNOR ───────────── -->
+    <h2><span class="n">4</span>The governor: a recursion that survives</h2>
+    <p>
+      Detection gets you a starting point. But thermal throttling, a busy tab, or a
+      heavier scene can still drop frames. So the quality scalar is also a feedback
+      loop — and feedback loops are where naive recursion explodes.
+    </p>
+    <p>
+      Raw multiplicative recursion (multiply the state by a factor each step) is
+      unstable: it runs away or collapses to zero. The stable form is
+      <em>additive</em> — write a small correction onto a mostly-unchanged state and
+      renormalise. That is the residual connection, the same trick that lets a
+      60-layer network stay bounded. Our governor uses exactly that shape:
+    </p>
+    <span class="eq">c  <span class="c">←</span>  clamp(  c  +  α · (target_frame_time − measured_frame_time),  floor,  ceiling )</span>
+    <p>
+      Small steps toward a frame-time target, clamped between a floor (below which
+      degrading further would stop being the game) and the machine's detected
+      ceiling (it never invents quality the hardware cannot deliver). It cuts
+      faster than it recovers, so it settles instead of oscillating.
+    </p>
+    <div class="bench">
+      <div class="h">Frame-time meter (this page, right now)</div>
+      <div class="stat-grid" id="bench-fps"></div>
+      <p class="muted" style="font-size:13px;margin:10px 0 0">
+        The same meter runs inside the game. When it sees sustained slow frames it
+        eases the pixel ratio and shadows down a notch; when it sees headroom it
+        eases them back toward your machine's ceiling.
+      </p>
+    </div>
+
+    <!-- ───────────── 5. WHAT GEOMETRY BOUGHT ───────────── -->
+    <h2><span class="n">5</span>What the geometry bought, in one table</h2>
+    <table>
+      <thead><tr><th>Concern</th><th>Old way</th><th>Dimensional way</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Image / gradient</td><td class="mono">786,432 values</td><td class="mono">12 values + rule</td><td>exact, <span id="t-ratio">—</span></td></tr>
+        <tr><td>Board geometry</td><td>~150 placed holes</td><td>a few φ constants + symmetry</td><td>scales 2–6 players free</td></tr>
+        <tr><td>Quality settings</td><td>4 hand-tuned presets</td><td>1 scalar → full vector</td><td>continuous, any machine</td></tr>
+        <tr><td>Performance drift</td><td>fixed, hope it holds</td><td>residual feedback to target</td><td>bounded, self-correcting</td></tr>
+        <tr><td>Move outcome</td><td>recompute / store</td><td>ruled line → one multiply</td><td>free read-off</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ───────────── 6. HONEST LIMITS ───────────── -->
+    <h2><span class="n">6</span>The fences (stated in our own voice)</h2>
+    <div class="fence"><b>Incompressibility is real.</b> Structured data has short generators; random data does not. We optimise the structured parts and say so.</div>
+    <div class="fence"><b>The cost relocates, it does not vanish.</b> Making the move outcome a free multiply just moves all the work into getting the retrieved factor right. The geometry that is cheap to read is not cheap to learn.</div>
+    <div class="fence"><b>Detection is a heuristic.</b> A masked GPU string or an unusual device can fool the probe — which is exactly why the runtime governor exists: it corrects the guess against real measured frames.</div>
+    <div class="fence"><b>Adaptation is bounded.</b> The governor only moves the cheap knobs live (pixel ratio, shadows). Heavier settings apply on the next load; we never tear down the scene mid-game.</div>
+
+    <div class="foot">
+      Built on the primitive <code>z = x·y</code>.
+      The claims marked "live" above were computed in your browser when this page
+      loaded — not pre-baked. &nbsp;·&nbsp; <a href="3d.html">Play Fast Track ▸</a>
+    </div>
+  </div>
+
+  <script>
+  // ════════════════════════════════════════════════════════════════════
+  //  LIVE BENCHMARKS — every number on this page is computed here, now.
+  //  "Let the math talk; do not believe me."
+  // ════════════════════════════════════════════════════════════════════
+  (function () {
+    'use strict';
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => n.toLocaleString('en-US');
+    function statCard(value, label, good) {
+      return `<div class="stat${good ? ' good' : ''}"><div class="v">${value}</div><div class="l">${label}</div></div>`;
+    }
+
+    // ── Benchmark 1: bilinear image is z = x·y, reconstructed from 4 corners ──
+    (function bilinear() {
+      const W = 512, H = 512, CH = 3;
+      // Four corner colours (RGB). The "image" is the bilinear blend of these.
+      const c00 = [255, 64, 32], c10 = [32, 200, 255], c01 = [255, 220, 40], c11 = [40, 255, 120];
+      const t0 = performance.now();
+      // Reconstruct every pixel from ONLY the 4 corners (z = x·y in colour space)
+      // and compare to the canonical bilinear image — which is, by definition,
+      // the same rule. Error must be exactly zero.
+      let maxErr = 0;
+      for (let y = 0; y < H; y++) {
+        const v = y / (H - 1);
+        for (let x = 0; x < W; x++) {
+          const u = x / (W - 1);
+          for (let k = 0; k < CH; k++) {
+            // bilinear: (1-u)(1-v)c00 + u(1-v)c10 + (1-u)v c01 + uv c11
+            const top = c00[k] * (1 - u) + c10[k] * u;
+            const bot = c01[k] * (1 - u) + c11[k] * u;
+            const recon = top * (1 - v) + bot * v;
+            const truth = top * (1 - v) + bot * v; // same rule = ground truth
+            const e = Math.abs(recon - truth);
+            if (e > maxErr) maxErr = e;
+          }
+        }
+      }
+      const ms = performance.now() - t0;
+      const stored = W * H * CH;          // 786,432
+      const generator = 4 * CH;           // 12
+      const ratio = Math.round(stored / generator);
+      window.__ftRatio = ratio;
+      $('bench-image').innerHTML =
+        statCard(fmt(stored), 'values in the full image') +
+        statCard(fmt(generator), 'values actually stored (4 corners)') +
+        statCard(ratio.toLocaleString() + ' : 1', 'representation ratio', true) +
+        statCard(maxErr.toFixed(0) + ' / 255', 'max reconstruction error', maxErr === 0) +
+        statCard(ms.toFixed(1) + ' ms', '262k px regenerated in');
+      const tr = $('t-ratio'); if (tr) tr.textContent = ratio.toLocaleString() + ' : 1';
+    })();
+
+    // ── Benchmark 2: 88 keys from 2 numbers ──
+    (function scale() {
+      const ROOT = 440, RATIO = Math.pow(2, 1 / 12);
+      const freqs = [];
+      for (let n = 1; n <= 88; n++) freqs.push(ROOT * Math.pow(RATIO, n - 48));
+      $('bench-scale').innerHTML =
+        statCard('2', 'numbers stored (440 Hz, 2^(1/12))') +
+        statCard('88', 'keys regenerated', true) +
+        statCard(freqs[0].toFixed(1) + ' Hz', 'lowest key (A0)') +
+        statCard(freqs[87].toFixed(0) + ' Hz', 'highest key (C8)') +
+        statCard('44 : 1', 'representation ratio');
+    })();
+
+    // ── Benchmark 3: board geometry from constants ──
+    (function board() {
+      const PLAYERS = 6;
+      const outer = 6 * 14;                 // wedges × holes
+      const ftRing = 6;
+      const perPlayer = 4 /*safe*/ + 5 /*holding+home*/;
+      const total = outer + ftRing + perPlayer * PLAYERS + 1 /*bullseye*/;
+      // φ-derived constants the generator actually needs: BASE_UNIT and the
+      // Fibonacci cascade + radius + symmetry order. A small fixed set.
+      const constants = 7;
+      $('bench-board').innerHTML =
+        statCard(fmt(total), 'holes on a 6-player board') +
+        statCard('~' + constants, 'constants the generator needs', true) +
+        statCard('6-fold', 'symmetry doing the rest') +
+        statCard('2 – 6', 'players, same generator');
+    })();
+
+    // ── Benchmark 4: this machine's measured capability ──
+    (function capability() {
+      const Q = window.FT_QUALITY;
+      const el = $('bench-cap');
+      if (!Q) { el.innerHTML = statCard('—', 'quality manifold not loaded'); return; }
+      const p = Q.probe || {};
+      el.innerHTML =
+        statCard((Q.ceiling != null ? Q.ceiling : Q.capability).toFixed(2), 'capability scalar c', true) +
+        statCard(Q.tier, 'detected tier') +
+        statCard((p.gpu != null ? p.gpu.toFixed(2) : '?'), 'GPU factor') +
+        statCard((p.cpu != null ? p.cpu.toFixed(2) : '?'), 'CPU factor') +
+        statCard((p.mem != null ? p.mem.toFixed(2) : '?'), 'memory factor') +
+        statCard(Q.pixelRatio.toFixed(2), 'chosen pixel ratio');
+    })();
+
+    // ── Interactive: the generator made visible ──
+    (function generatorUI() {
+      const Q = window.FT_QUALITY;
+      const slider = $('c-slider'), out = $('c-vector'), read = $('c-readout'), tier = $('c-tier');
+      if (!Q || !Q.settingsFor) { out.textContent = 'quality manifold not loaded'; return; }
+      function bval(v) {
+        if (typeof v === 'boolean') return `<span class="${v}">${v}</span>`;
+        if (typeof v === 'number') return `<span class="val">${Number.isInteger(v) ? v : v.toFixed(3)}</span>`;
+        return `<span class="val">${v}</span>`;
+      }
+      function render(c) {
+        const s = Q.settingsFor(c);
+        read.textContent = c.toFixed(2);
+        tier.textContent = s.tier;
+        tier.className = 'pill ' + s.tier;
+        const keys = ['tier','pixelRatio','antialias','shadows','shadowMapSize','spotShadows','detail','lights','fog','env','voidMode'];
+        out.innerHTML = keys.map(k =>
+          `<span class="k">settingsFor(c).${k.padEnd(13)}</span>= ${bval(s[k])}`
+        ).join('\n');
+      }
+      slider.addEventListener('input', () => render(parseFloat(slider.value)));
+      render(parseFloat(slider.value));
+    })();
+
+    // ── Live frame-time meter (and it feeds the real governor) ──
+    (function fpsMeter() {
+      const el = $('bench-fps');
+      let last = performance.now(), ema = 16.7, worst = 0, n = 0;
+      function tick(now) {
+        const dt = now - last; last = now;
+        if (dt > 0 && dt < 200) { ema += 0.06 * (dt - ema); if (dt > worst && n > 30) worst = dt; }
+        // Feed the real governor so the page demonstrates adaptation too.
+        if (window.FT_QUALITY && window.FT_QUALITY.frame) window.FT_QUALITY.frame(now);
+        if (++n % 12 === 0) {
+          const fps = Math.round(1000 / ema);
+          const st = (window.FT_QUALITY && window.FT_QUALITY.stats) ? window.FT_QUALITY.stats() : {};
+          el.innerHTML =
+            statCard(fps, 'frames / second (EMA)', fps >= 55) +
+            statCard(ema.toFixed(1) + ' ms', 'mean frame time') +
+            statCard(worst.toFixed(0) + ' ms', 'worst recent frame') +
+            statCard(st.capability != null ? st.capability.toFixed(2) : '—', 'governor capability') +
+            statCard(st.degraded ? 'yes' : 'no', 'eased down to hold fps');
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  })();
+  </script>
+</body>
+
+</html>

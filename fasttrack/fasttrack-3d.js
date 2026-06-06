@@ -2373,8 +2373,17 @@ async function init3D() {
   // uniform-light limits on phone GPUs were silently dropping the warm
   // sconce/neon point lights and making the room look unlit; the void
   // mode sidesteps the limit entirely.
-  const FT_MOBILE_VOID = (typeof window !== 'undefined') &&
-    (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches);
+  // Quality manifold (fasttrack-quality.js) — one capability scalar drives the
+  // whole render-settings vector. Fall back to safe defaults if it failed to load.
+  const Q = (typeof window !== 'undefined' && window.FT_QUALITY) || {
+    pixelRatio: Math.min((window.devicePixelRatio || 1), 2),
+    antialias: true, shadows: true, shadowMapSize: 2048, spotShadows: true,
+    detail: 1, fog: true, env: true, voidMode: false, onAdapt() {}, frame() {}
+  };
+
+  const FT_MOBILE_VOID = ((typeof window !== 'undefined') &&
+    (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches))
+    || Q.voidMode === true;   // very-weak desktops fall into void too (§3 boundary)
   window.FT_MOBILE_VOID = FT_MOBILE_VOID;
 
   // Scene - rich warm billiard room (desktop) / pure void (mobile)
@@ -2393,22 +2402,34 @@ async function init3D() {
 
   // Renderer — photo-realistic PBR
   renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: Q.antialias !== false,
     powerPreference: 'high-performance',
     alpha: false,
     stencil: false
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Q.pixelRatio);
   // Void mode has no floor/walls to receive shadows — skip the 2048² shadow
-  // pass and its per-frame cost.
-  renderer.shadowMap.enabled = !FT_MOBILE_VOID;
+  // pass and its per-frame cost. Weak tiers drop shadows even with a room.
+  renderer.shadowMap.enabled = !FT_MOBILE_VOID && Q.shadows !== false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.4;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.physicallyCorrectLights = true;
   container.appendChild(renderer.domElement);
+
+  // ── ADAPTIVE GOVERNOR HOOK (§5 residual feedback) ──
+  // The quality manifold may nudge capability down (or back up) at runtime
+  // when frame time drifts off target. Only the cheap knobs are live — pixel
+  // ratio and shadow on/off. Heavier settings (counts, map size) apply on the
+  // next load; we never tear down the scene mid-game.
+  if (Q.onAdapt) Q.onAdapt((q) => {
+    try {
+      renderer.setPixelRatio(q.pixelRatio);
+      renderer.shadowMap.enabled = !FT_MOBILE_VOID && q.shadows !== false;
+    } catch (_) {}
+  });
 
   // ── ENVIRONMENT MAP — warm room reflections for PBR materials ──
   // Skipped in void mode: no walls to reflect, and the cubemap allocation
@@ -3392,8 +3413,10 @@ function setupLighting() {
   // 2048² shadow map: visually indistinguishable from 4096² at this scene
   // scale, but ~4× cheaper to allocate, clear, and render on first frame —
   // the dominant cost of init3D. PCFSoft hides any residual aliasing.
-  keyLight.shadow.mapSize.width = 2048;
-  keyLight.shadow.mapSize.height = 2048;
+  // The quality manifold steps this down to 1024 on weaker machines.
+  const _ftKeyShadow = ((window.FT_QUALITY && window.FT_QUALITY.shadowMapSize) || 2048);
+  keyLight.shadow.mapSize.width = _ftKeyShadow;
+  keyLight.shadow.mapSize.height = _ftKeyShadow;
   keyLight.shadow.camera.left = -400;
   keyLight.shadow.camera.right = 400;
   keyLight.shadow.camera.top = 400;
@@ -3411,11 +3434,15 @@ function setupLighting() {
     { x: 120, z: -80 },
     { x: 0, z: 120 },
   ];
+  // The three table spotlights each carry their own shadow map (four shadow
+  // passes total with the key light). Only the strong tiers can afford them;
+  // below `spotShadows` they still light the table, just without casting.
+  const _ftSpotShadows = !window.FT_QUALITY || window.FT_QUALITY.spotShadows !== false;
   spotPositions.forEach(sp => {
     const spot = new THREE.SpotLight(0xffeedd, 150, 500, Math.PI / 5, 0.6, 1.5);
     spot.position.set(sp.x, ROOM_HEIGHT - 20, sp.z);
     spot.target.position.set(sp.x * 0.3, TABLE_HEIGHT, sp.z * 0.3);
-    spot.castShadow = true;
+    spot.castShadow = _ftSpotShadows;
     spot.shadow.mapSize.width = 1024;
     spot.shadow.mapSize.height = 1024;
     scene.add(spot);
@@ -5252,7 +5279,11 @@ function renderBoard3D() {
 // ATMOSPHERIC DUST MOTES — floating particles in light beams
 // ════════════════════════════════════════════════════════════════
 function createDustMotes() {
-  const MOTE_COUNT = 400;
+  // Atmospheric particle count scales with the quality manifold's detail
+  // multiplier — 400 on strong machines down to ~80 on the weakest.
+  const _ftDetail = (window.FT_QUALITY && typeof window.FT_QUALITY.detail === 'number')
+    ? window.FT_QUALITY.detail : 1;
+  const MOTE_COUNT = Math.max(60, Math.round(400 * _ftDetail));
   const positions = new Float32Array(MOTE_COUNT * 3);
   const velocities = new Float32Array(MOTE_COUNT * 3);
   const sizes = new Float32Array(MOTE_COUNT);
@@ -5513,9 +5544,20 @@ function publishDimensionalGraph(ctx = {}) {
 // ANIMATION LOOP & UTILITIES
 // ════════════════════════════════════════════════════════════════
 let _animTime = 0;
+// Scratch vector reused every frame by the chandelier fade — hoisted out of
+// the loop so the render path allocates nothing per frame (§5 discipline:
+// the hot loop must not generate garbage that the GC then has to reclaim).
+const _chandelierDir = new THREE.Vector3();
+
 function animate3D() {
   requestAnimationFrame(animate3D);
   _animTime += 0.016;
+
+  // Adaptive quality governor — residual correction toward the frame-time
+  // target. Cheap; bails immediately when the tier is pinned.
+  if (window.FT_QUALITY && window.FT_QUALITY.frame) {
+    window.FT_QUALITY.frame(performance.now());
+  }
 
   // Update atmospheric particles
   updateDustMotes(_animTime);
@@ -5525,10 +5567,9 @@ function animate3D() {
   // Fades meshes (opacity) AND point lights (intensity) together.
   const chandelier = scene.getObjectByName('chandelier');
   if (chandelier && camera) {
-    const _cDir = new THREE.Vector3();
-    camera.getWorldDirection(_cDir);
+    camera.getWorldDirection(_chandelierDir);
     // downAngle: 0 rad = looking straight down, π/2 = level, π = straight up
-    const downAngle = Math.acos(Math.max(-1, Math.min(1, -_cDir.y)));
+    const downAngle = Math.acos(Math.max(-1, Math.min(1, -_chandelierDir.y)));
     // Fade window: fully visible above 38°, fully hidden below 18°
     const t = Math.max(0, Math.min(1, (downAngle - 0.31) / 0.35)); // 0.31 rad≈18°, 0.66 rad≈38°
 

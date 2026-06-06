@@ -1193,12 +1193,33 @@ function getTrackSequence(peg, player, direction) {
       if (next === bp) { crossedOwnFt = true; break; }
     }
     if (crossedOwnFt) {
-      // Continue past own ft-{bp} into the home stretch. Own-peg occupancy
-      // in the stretch blocks further hops (MOV_NO_PASS_OWN).
-      for (let h = 1; h <= SAFE_ZONE_SIZE; h++) {
-        const stretchHole = `safe-${bp}-${h}`;
-        if (hasOwnPegOnHole(player, stretchHole, peg.id)) break;
-        seq.push(stretchHole);
+      // Continue past own ft-{bp} DOWN THE HOME STRETCH on the outer track,
+      // hole-by-hole (side-left-{bp}-4..1 → outer-{bp}-0,1 → outer-{bp}-2
+      // entrance → safe zone). Reaching own ft-{bp} completes the fast track,
+      // so the peg is eligible to divert into safe at the entrance. This is
+      // the SAME contiguous walk a perimeter approach makes — never a jump
+      // from ft-{bp} straight into the safe zone. (no-teleport rule)
+      const ownFtIdx = CLOCKWISE_TRACK.indexOf(`ft-${bp}`);
+      const homeSafeEntry = `outer-${bp}-2`;
+      for (let s = 1; s <= 12; s++) {
+        const hole = CLOCKWISE_TRACK[(ownFtIdx + s) % CLOCKWISE_TRACK.length];
+        if (hole === homeSafeEntry) {
+          seq.push(hole);
+          if (!safeZoneFull) {
+            for (let h = 1; h <= SAFE_ZONE_SIZE; h++) {
+              if (hasOwnPegOnHole(player, `safe-${bp}-${h}`, peg.id)) break;
+              seq.push(`safe-${bp}-${h}`);
+            }
+          } else {
+            // Safe zone full: 2 more holes to the winning hole, exact landing.
+            seq.push(`outer-${bp}-3`);
+            seq.push(`home-${bp}`);
+          }
+          break;
+        }
+        // Own peg blocks further travel (MOV_NO_PASS_OWN); ft-* are passable.
+        if (hasOwnPegOnHole(player, hole, peg.id) && !hole.startsWith('ft-')) break;
+        seq.push(hole);
       }
     }
     return seq;
@@ -1210,7 +1231,7 @@ function getTrackSequence(peg, player, direction) {
 
   const len = CLOCKWISE_TRACK.length;
   const fwd = dir === 'clockwise';
-  const safeEntry = `outer-${bp}-8`;
+  const safeEntry = `outer-${bp}-2`;   // safe-zone entrance (was stale -8; geometry: isSafeZoneEntry h===2)
 
   // IF the peg is already sitting exactly ON the safe entry gate,
   // and is eligible to enter, and is moving forward, build the safe sequence directly.
@@ -1294,7 +1315,7 @@ function calculateValidMoves() {
 
     const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
     const _safeZoneFull = _inSafe >= SAFE_ZONE_SIZE;
-    const _safeEntry = `outer-${bp}-8`;
+    const _safeEntry = `outer-${bp}-2`;   // safe-zone entrance (was stale -8; geometry: isSafeZoneEntry h===2)
     const _len = CLOCKWISE_TRACK.length;
     const walkOuter = (startFtIdx, hops) => {
       if (hops < 0) return null;
@@ -1302,11 +1323,15 @@ function calculateValidMoves() {
       const startHole = `ft-${startFtIdx}`;
       const startIdx = CLOCKWISE_TRACK.indexOf(startHole);
       if (startIdx < 0) return null;
+      // Leaving the ring at the player's OWN ft-{bp} means the peg just
+      // completed the fast track — it is eligible to enter its home stretch
+      // and safe zone on this move, even if its stored flag predates it.
+      const _elig = peg.eligibleForSafeZone || peg.lockedToSafeZone || startFtIdx === bp;
       const path = [];
       for (let s = 1; s <= hops; s++) {
         const ni = (startIdx + s) % _len;
         const hole = CLOCKWISE_TRACK[ni];
-        if (hole === _safeEntry && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
+        if (hole === _safeEntry && _elig) {
           path.push(hole);
           const remaining = hops - s;
           if (_safeZoneFull) {
@@ -1330,43 +1355,18 @@ function calculateValidMoves() {
       return { path, dest: path[path.length - 1] };
     };
 
-    // D == 0: peg already at own ft-{bp} → mandatory full-stretch consumption.
-    if (D === 0) {
-      if (N <= SAFE_ZONE_SIZE) {
-        const stretchPath = [];
-        let blocked = false;
-        for (let h = 1; h <= N; h++) {
-          const sh = `safe-${bp}-${h}`;
-          if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
-          stretchPath.push(sh);
-        }
-        if (!blocked) opts.push({ path: stretchPath, dest: stretchPath[N - 1] });
-      }
-      return opts;
-    }
-
-    // Enumerate k = 0..min(N, maxRing).
+    // Enumerate leave-at-k options for k = 0..min(N, maxRing).
+    // For EVERY k (including k === D, where the peg leaves the ring at its own
+    // ft-{bp}), the remaining N-k hops are the SAME contiguous outer-track
+    // walk via walkOuter. When k === D this walks the home stretch
+    // (side-left-{bp}-4..1 → outer-{bp}-0,1 → outer-{bp}-2 entrance → safe),
+    // hole-by-hole. There is no longer a special case that jumps from ft-{bp}
+    // straight into the safe zone — reaching safe is always a walked journey
+    // down the home stretch. (no-teleport rule; geometry-validated)
+    // D == 0 (peg already on own ft-{bp}) falls out naturally: maxRing is 0,
+    // so the only option is k = 0 → walkOuter(bp, N).
     for (let k = 0; k <= Math.min(N, maxRing); k++) {
       const ringSeg = ringDests.slice(0, k);
-
-      if (k === D) {
-        // Mandatory stretch exit.
-        const remaining = N - D;
-        if (remaining > SAFE_ZONE_SIZE) continue;
-        const stretchPath = [];
-        let blocked = false;
-        for (let h = 1; h <= remaining; h++) {
-          const sh = `safe-${bp}-${h}`;
-          if (hasOwnPegOnHole(player, sh, peg.id)) { blocked = true; break; }
-          stretchPath.push(sh);
-        }
-        if (blocked) continue;
-        const dest = remaining === 0 ? `ft-${bp}` : stretchPath[remaining - 1];
-        opts.push({ path: [...ringSeg, ...stretchPath], dest });
-        continue;
-      }
-
-      // k < D: leave ring at ft-(ftX+k) onto outer rim, continue N-k hops.
       const exitFt = (ftX + k) % 6;
       const w = walkOuter(exitFt, N - k);
       if (!w) continue;
@@ -1376,7 +1376,14 @@ function calculateValidMoves() {
     return opts;
   };
 
-  for (let pi = 0; pi < player.pegs.length; pi++) {
+  // ── PER-PEG MOVE COLLECTION ─────────────────────────────────────────
+  // Extracted from the former 630-line monolith for readability. This is the
+  // exact former `for (pi…)` loop body, now a named inner function so it still
+  // closes over player / bp / ci / rules / card / state / moves /
+  // _enumerateFtExitOptions. Behavior is byte-identical (verified against the
+  // deterministic test_card7_splits.js fingerprint). Drivers are at the
+  // bottom of calculateValidMoves, in the original execution order.
+  function collectPegMoves(pi) {
     const peg = player.pegs[pi];
 
     // ENTER from holding (A, 6, JOKER)
@@ -1598,6 +1605,11 @@ function calculateValidMoves() {
     }
   }
 
+  // ── SEVEN-SPLIT MOVE COLLECTION ──────────────────────────────────────
+  // Extracted for readability. All the split-only closures (_rimReachable,
+  // _bullPath, _ftRuleOK, _bullFree, _pushSplit, _halfOptions) live inside
+  // this function, scoped exactly as before. Behavior is byte-identical.
+  function collectSevenSplitMoves() {
   // ── 7-SPLIT LOGIC ──
   // rules.json :: CARD_7_SPLIT       (z=38) — 2 pegs, a+b=7, both clockwise, both legal.
   // rules.json :: CARD_7_SOLO        (z=40) — 1 peg in play → single 7-step move.
@@ -1815,6 +1827,13 @@ function calculateValidMoves() {
       }
     }
   }
+  } // end collectSevenSplitMoves
+
+  // ── DRIVERS ──────────────────────────────────────────────────────────
+  // Run the extracted collectors in the original order: every peg first,
+  // then the single 7-split pass (which reads the moves the peg loop pushed).
+  for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
+  collectSevenSplitMoves();
 
   // ── FT OVERTAKE CHECK (removed) ──
   // Previously rewrote FT 'move' moves into forced exits when an own peg
@@ -2526,7 +2545,7 @@ function executeMove(moveIdx) {
       // landed it.
       {
         const _bp = player.boardPosition;
-        const _safeEntry = `outer-${_bp}-8`;
+        const _safeEntry = `outer-${_bp}-2`;   // safe-zone entrance (was stale -8)
         const _traversed = move.path || [];
         if (!peg.eligibleForSafeZone && _traversed.includes(_safeEntry)) {
           peg.eligibleForSafeZone = true;
@@ -2541,7 +2560,12 @@ function executeMove(moveIdx) {
         }]);
       }
       log(`${getCurrentPlayerName()} exited FastTrack at ${move.dest}`);
-      if (window.ManifoldAudio) ManifoldAudio.playEnter();
+      // Sound side-effect guard: when the FT exit lands IN the safe zone the
+      // 'safeZone' cutscene queued just above already plays its own arrival
+      // sound. Firing the generic landing sound here too double-stacked the
+      // audio for one landing. Only play the generic sound for a plain
+      // outer-track / FT-hole landing.
+      if (window.ManifoldAudio && getHoleType(move.dest) !== 'safezone') ManifoldAudio.playEnter();
       break;
 
     case 'enterBullseye':
@@ -2568,7 +2592,7 @@ function executeMove(moveIdx) {
     case 'split': {
       // First peg moves
       const bp = player.boardPosition;
-      const safeEntry = `outer-${bp}-8`;
+      const safeEntry = `outer-${bp}-2`;   // safe-zone entrance (was stale -8)
       if (!peg.eligibleForSafeZone && move.path && move.path.includes(safeEntry)) {
         peg.eligibleForSafeZone = true;
       }
