@@ -2661,6 +2661,21 @@ async function init3D() {
       Object.assign(initConfig, dimensionalConfig);
     }
 
+    // ── Shared deterministic seed (manifold-first, Phase 1) ──────────────────
+    // Hand the game the ONE identifier every client in this session already
+    // holds — the session code (fallback session id) — so all clients derive
+    // the identical deck order instead of each shuffling with a private RNG.
+    // Solo / same-screen have no session code, so the core falls back to a
+    // stable per-game seed through the same code path. Only set if a seed
+    // wasn't already supplied (e.g. by dimensionalConfig).
+    if (initConfig.sessionSeed == null) {
+      const _seed = sessionCode
+        || (sessionCache && sessionCache.session_id)
+        || (runtimeCache && runtimeCache.session && runtimeCache.session.session_id)
+        || '';
+      initConfig.sessionSeed = _seed ? String(_seed) : null;
+    }
+
     const isDevObserver = usp.get('dev_observer') === '1' || kgGame?.devObserver === true;
     if (isDevObserver) {
       console.log('🛠️ DEV OBSERVER MODE: Forcing all AI players.');
@@ -5236,40 +5251,13 @@ function renderBoard3D() {
   //   before the move is even confirmed.
   //   Additionally, when GameSettings.showPegNames is on, label every
   //   on-board peg (legacy behaviour).
-  {
-    const pegNameMap = {};
-    // (a) ALWAYS-on: pegs eligible under the current validMoves.
-    const validMoves = core.state.turn.get('validMoves') || [];
-    const curIdx = core.state.players.get('current') || 0;
-    const curPlayer = players[curIdx];
-    if (curPlayer && Array.isArray(curPlayer.pegs) && validMoves.length) {
-      const eligibleIdx = new Set();
-      for (const m of validMoves) {
-        if (!m) continue;
-        if (Number.isFinite(m.pegIdx)) eligibleIdx.add(m.pegIdx);
-        if (Number.isFinite(m.peg2Idx)) eligibleIdx.add(m.peg2Idx);
-      }
-      eligibleIdx.forEach(i => {
-        const peg = curPlayer.pegs[i];
-        if (peg) pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
-      });
-    }
-    // (b) Legacy opt-in: label every on-board peg for all players.
-    if (GameSettings.showPegNames) {
-      players.forEach(player => {
-        for (const peg of player.pegs) {
-          if (peg.holeId !== 'holding') {
-            pegNameMap[peg.id] = peg.nickname || `Peg ${peg.id}`;
-          }
-        }
-      });
-    }
-    if (Object.keys(pegNameMap).length > 0) {
-      showPegNames(pegNameMap);
-    } else {
-      hidePegNames();
-    }
-  }
+  // Peg name labels removed (user_directive_2026-06-06). The floating
+  // nicknames were a remnant of text-based peg identification — players used
+  // to pick a peg by reading its name. Pegs are now picked by clicking
+  // gold-haloed holes directly on the board, so the labels carry no meaning
+  // and only clutter the table. The nickname DATA is still used in text
+  // hints / toasts / logs; only the on-board labels are suppressed here.
+  hidePegNames();
 
   // Lower animation barrier — if no anims were started, this fires _onAnimsDone immediately
   _lowerBarrier();
@@ -5870,12 +5858,19 @@ function highlightMovePaths(moves) {
     ? window.FastTrackCore.state.turn.get('validMoves') || [] : []);
   if (vm.length === 0) return;
 
-  const color = _activePlayerColorInt();
+  // Gold = a selectable/legal landing hole; green = the first leg the player
+  // has already committed (user_directive_2026-06-06). The gold/green palette
+  // applies whenever a 7-split is on offer; otherwise destinations keep the
+  // active player's colour.
+  const GOLD = 0xffd700;
+  const GREEN = 0x35ff7a;
+  const hasSplits = vm.some(m => m && m.type === 'split');
+  const color = hasSplits ? GOLD : _activePlayerColorInt();
   const index = _buildRouteIndex(vm);
 
-  // If split first leg is already chosen, keep it lit (solid) while
-  // second-leg choices pulse as clickable targets.
-  _drawCommittedSplitPath(vm, color);
+  // If split first leg is already chosen, lock it in GREEN (solid glow) while
+  // the remaining second-leg choices pulse gold as clickable targets.
+  _drawCommittedSplitPath(vm, GREEN);
 
   // ── BUILD COMMIT-DESTINATION SET ──
   // user_directive_2026-05-10b: when there is a choice, every choice glows
@@ -5899,8 +5894,13 @@ function highlightMovePaths(moves) {
         // Stage 2a: first-leg dest is the commit point
         if (m.pegIdx === choice.pegIdx) commitDests.add(m.dest);
         else if (m.peg2Idx === choice.pegIdx) commitDests.add(m.dest2);
+      } else {
+        // Stage 1 (hole-first): every first-leg destination of BOTH halves is
+        // a clickable gold landing. The 7-hop solo move (a regular 'move')
+        // adds its own dest below.
+        if (m.dest != null) commitDests.add(m.dest);
+        if (m.dest2 != null) commitDests.add(m.dest2);
       }
-      // Stage 1 (no choice yet) — peg halos pulse instead, no dest pulses
       return;
     }
     if (m.dest) commitDests.add(m.dest);
@@ -6039,12 +6039,25 @@ function _buildRouteIndex(moves) {
 
     if (m.type === 'split') {
       if (!choice) {
-        // Stage 1 of split: all eligible pegs pulse; route holes stay off.
-        const pegOptions = [m.pegIdx, m.peg2Idx];
-        for (const pegIdx of pegOptions) {
-          if (splitPegSeen.has(pegIdx)) continue;
-          splitPegSeen.add(pegIdx);
-          pushEntry(`peg:${pegIdx}`, { kind: 'split-first-peg', pegIdx, sampleIdx: i });
+        // Stage 1 (hole-first, user_directive_2026-06-06): every half of every
+        // split is a candidate FIRST leg — the player may commit a peg to any
+        // hop count 1..6 (the 7-hop solo move is a regular 'move' entry). Each
+        // (peg, steps) leg is exposed by its whole path + destination so any
+        // gold-haloed hole is directly clickable to pick that first leg. The
+        // split-first commit selects (peg, steps) in one go.
+        const legs = [
+          { pegIdx: m.pegIdx, steps: m.steps, dest: m.dest, path: m.path, from: m.from },
+          { pegIdx: m.peg2Idx, steps: m.steps2, dest: m.dest2, path: m.path2, from: m.from2 },
+        ];
+        for (const leg of legs) {
+          if (leg.pegIdx == null || leg.dest == null) continue;
+          const legKey = `${leg.pegIdx}:${leg.steps}:${leg.dest}`;
+          if (splitStepSeen.has(legKey)) continue;
+          splitStepSeen.add(legKey);
+          const e = { kind: 'split-first', pegIdx: leg.pegIdx, steps: leg.steps, sampleIdx: i };
+          if (leg.from && leg.from !== 'holding') pushEntry(leg.from, e);
+          if (Array.isArray(leg.path)) for (const hid of leg.path) pushEntry(hid, e);
+          pushEntry(leg.dest, e);
         }
       } else if (choice.steps == null) {
         // Stage 2a: peg chosen, now expose first-leg destination routes.

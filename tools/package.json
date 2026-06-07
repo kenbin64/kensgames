@@ -1,0 +1,40 @@
+{
+  "name": "bfx-ingest",
+  "version": "0.1.0",
+  "description": "Turn any codebase into clean, deterministic, AI-ready context. Dedup'd, token-counted, reproducible, and verifiable. No deps, no network. Part of the ButterflyFx toolkit.",
+  "bin": {
+    "bfx-ingest": "./bfx-ingest.js"
+  },
+  "main": "bfx-ingest.js",
+  "author": "Kenneth Bingham <ken.bingham64@gmail.com> (https://butterflyfx.us)",
+  "homepage": "https://butterflyfx.us",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kenbin64/bfx-ingest.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kenbin64/bfx-ingest/issues"
+  },
+  "scripts": {
+    "start": "node bfx-ingest.js",
+    "test": "node bfx-ingest.test.js",
+    "bench": "node bench.js",
+    "prepublishOnly": "node bfx-ingest.test.js"
+  },
+  "keywords": [
+    "ai", "llm", "chatgpt", "claude", "cursor", "context", "codebase",
+    "prompt", "repo-to-prompt", "code-context", "rag", "developer-tools",
+    "reproducible", "provenance"
+  ],
+  "files": [
+    "bfx-ingest.js",
+    "bench.js",
+    "README.md",
+    "CASE_STUDY.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy this to deploy.config.json (gitignored) and edit. Each top-level key is a target name you pass on the command line, e.g. `node deploy.mjs mysite`.",
+  "mysite": {
+    "local": "C:/path/to/your/site",
+    "host": "your.server.ip.or.host",
+    "port": 22,
+    "user": "youruser",
+    "remoteBase": "/var/www/example.com",
+    "serveDir": "public",
+    "health": ["https://example.com/"],
+    "keepBackups": 5
+  }
+}

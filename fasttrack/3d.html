@@ -82,10 +82,10 @@
   </div>
 
   <!-- ── Help tip — small pill above the peg bar explaining how to play.
-       Sits clear of the peg buttons AND their floating nicknames so it
-       never covers them. Dismissible (✕) and remembered in localStorage. ── -->
+       Sits clear of the peg buttons. Dismissible (✕) and remembered in
+       localStorage. ── -->
   <div id="ft-peg-help" role="note" aria-label="How to play">
-    <span class="ft-peg-help-text">Tap a <b>peg name</b> to toggle its choices — then hit <b>Confirm ✔</b>.</span>
+    <span class="ft-peg-help-text">Tap a <b>glowing hole</b> to move there. For a 7, tap a gold hole, then complete the split.</span>
     <button type="button" id="ft-peg-help-close" aria-label="Dismiss help">✕</button>
   </div>
 
@@ -314,6 +314,12 @@
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
   <script src="fasttrack-game-core.js?v=20260518d"></script>
+
+  <!-- 🜂 MANIFOLD ENGINE (opt-in via ?engine=manifold) — same board, pure-
+       derivation logic. ft-core-manifold.js self-activates only when the flag
+       is present and otherwise leaves the legacy core above untouched. -->
+  <script src="manifold/ft-manifold.js?v=20260606m"></script>
+  <script src="manifold/ft-core-manifold.js?v=20260606m"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer

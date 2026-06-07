@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fast Track — Manifold Edition (proof of concept)</title>
+<style>
+  :root { --gold:#ffd700; --green:#35ff7a; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:#0b0d12; color:#e8e8ef;
+    font-family: 'Rajdhani','Segoe UI',system-ui,sans-serif; }
+  #wrap { display:flex; gap:18px; padding:18px; height:100%; }
+  #boardPanel { flex:0 0 auto; }
+  svg { background: radial-gradient(circle at 50% 45%, #161a26 0%, #0b0d12 75%);
+    border:1px solid #222838; border-radius:14px; }
+  #side { flex:1 1 auto; min-width:280px; max-width:420px; display:flex; flex-direction:column; gap:14px; }
+  h1 { font-size:20px; margin:0; letter-spacing:1px; }
+  .sub { color:#7d86a0; font-size:12px; margin-top:2px; }
+  .card { background:#141826; border:1px solid #242c40; border-radius:12px; padding:14px; }
+  .row { display:flex; align-items:center; gap:10px; }
+  .pill { font-size:12px; color:#9aa3bd; }
+  button { font:inherit; font-weight:600; cursor:pointer; border:none; border-radius:10px;
+    padding:10px 16px; background:#2a3350; color:#e8e8ef; }
+  button:hover { background:#384572; }
+  button.primary { background:var(--gold); color:#1a1400; }
+  button.primary:hover { filter:brightness(1.08); }
+  button:disabled { opacity:.4; cursor:default; }
+  .cardface { width:54px; height:74px; border-radius:8px; background:#f6f4ec; color:#1a1a1a;
+    display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:800;
+    box-shadow:0 2px 10px #0008; }
+  .turnDot { width:12px; height:12px; border-radius:50%; box-shadow:0 0 8px currentColor; }
+  #log { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:#7d86a0;
+    height:140px; overflow:auto; white-space:pre-wrap; line-height:1.5; }
+  .win { color:var(--green); font-weight:800; font-size:18px; }
+  .seedbox { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:#9aa3bd; }
+  input { font:inherit; background:#0e1220; color:#e8e8ef; border:1px solid #2a3350;
+    border-radius:8px; padding:7px 9px; width:140px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="boardPanel">
+    <svg id="board" width="720" height="720" viewBox="0 0 720 720"></svg>
+  </div>
+  <div id="side">
+    <div>
+      <h1>FAST TRACK · MANIFOLD EDITION</h1>
+      <div class="sub">Every frame is z = derive(seed, action-log). Nothing stored, nothing per-client.</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row">
+          <span class="turnDot" id="turnDot"></span>
+          <strong id="turnName">—</strong>
+          <span class="pill" id="phasePill"></span>
+        </div>
+        <div class="cardface" id="cardFace">·</div>
+      </div>
+      <div class="row" style="margin-top:12px; gap:8px;">
+        <button class="primary" id="drawBtn">Draw</button>
+        <button id="passBtn">Pass</button>
+        <span class="pill" id="hint"></span>
+      </div>
+      <div id="winLine" class="win" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="seedbox">seed: <span id="seedLbl">—</span></div>
+        <div class="pill">actions: <span id="actCount">0</span></div>
+      </div>
+      <div class="row" style="margin-top:10px; gap:8px;">
+        <input id="seedInput" placeholder="seed (e.g. ROOM-7)" />
+        <button id="newBtn">New game</button>
+      </div>
+      <div class="pill" style="margin-top:8px;">You are <b id="meColor">Yellow</b>. The other seats are bots and play themselves.</div>
+    </div>
+
+    <div class="card" style="flex:1 1 auto; min-height:0;">
+      <div class="pill" style="margin-bottom:6px;">action log (y)</div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/manifold-codec.js"></script>
+<script src="ft-manifold.js"></script>
+<script>
+(function () {
+  const FT = window.FTManifold;
+  const SVG = document.getElementById('board');
+  const NS = 'http://www.w3.org/2000/svg';
+  const CENTER = 360, RING_R = 300, HOLE_R = 9, PEG_R = 11;
+
+  const ROSTER = [
+    { id: 'you', name: 'You', isBot: false },
+    { id: 'bot1', name: 'Beacon', isBot: true },
+    { id: 'bot2', name: 'Patch', isBot: true },
+  ];
+
+  // ── State of THIS client: just the genesis (x) and the action log (y). ──
+  let G = null;      // genesis
+  let LOG = [];      // action log
+  let busy = false;  // bot/animation lock
+
+  // ── Hole geometry: positions derived from the manifold's TRACK order. ──
+  const pos = {};    // holeId -> {x,y}
+  function buildGeometry() {
+    const N = FT.TRACK.length; // 84
+    FT.TRACK.forEach((h, i) => {
+      const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+      pos[h] = { x: CENTER + RING_R * Math.cos(a), y: CENTER + RING_R * Math.sin(a) };
+    });
+    // Safe zones + holding spokes, per board position.
+    for (let bp = 0; bp < 6; bp++) {
+      const homeIdx = bp * 14 + 9;
+      const a = (homeIdx / N) * Math.PI * 2 - Math.PI / 2;
+      for (let k = 1; k <= 4; k++) {
+        const r = RING_R - k * 46;
+        pos[`safe-${bp}-${k}`] = { x: CENTER + r * Math.cos(a), y: CENTER + r * Math.sin(a) };
+      }
+      for (let k = 0; k < 4; k++) {
+        const r = RING_R + 34;
+        const aa = a + (k - 1.5) * 0.045;
+        pos[`hold-${bp}-${k}`] = { x: CENTER + r * Math.cos(aa), y: CENTER + r * Math.sin(aa) };
+      }
+    }
+    pos['bullseye'] = { x: CENTER, y: CENTER };
+  }
+
+  function el(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function render() {
+    const z = FT.derive(G, LOG);
+    const v = FT.view(z, G);
+    SVG.innerHTML = '';
+
+    // static holes
+    for (const h of FT.TRACK) drawHole(h, holeType(h));
+    for (let bp = 0; bp < 6; bp++)
+      for (let k = 1; k <= 4; k++) drawHole(`safe-${bp}-${k}`, 'safe', FT.PLAYER_COLORS ? null : null, bp);
+    drawHole('bullseye', 'bullseye');
+
+    // legal-move destinations for the local human only
+    const myTurn = v.current === 0 && v.phase === 'move';
+    const dests = new Set();
+    if (myTurn) for (const m of v.legalMoves) dests.add(m.dest);
+    for (const d of dests) {
+      const p = pos[d]; if (!p) continue;
+      const ring = el('circle', { cx: p.x, cy: p.y, r: HOLE_R + 7, fill: 'none',
+        stroke: 'var(--gold)', 'stroke-width': 3, opacity: 0.95 });
+      ring.style.cursor = 'pointer';
+      ring.addEventListener('click', () => humanMove(d));
+      const halo = el('circle', { cx: p.x, cy: p.y, r: HOLE_R + 7, fill: 'var(--gold)', opacity: 0.12 });
+      SVG.appendChild(halo); SVG.appendChild(ring);
+    }
+
+    // pegs
+    for (const pl of v.players) {
+      let holdN = 0;
+      for (const peg of pl.pegs) {
+        let key = peg.hole;
+        if (key === 'holding') key = `hold-${pl.bp}-${holdN++}`;
+        const p = pos[key]; if (!p) continue;
+        const c = el('circle', { cx: p.x, cy: p.y, r: PEG_R, fill: pl.color,
+          stroke: peg.eligible ? 'var(--green)' : '#0008', 'stroke-width': peg.eligible ? 3 : 1.5 });
+        SVG.appendChild(c);
+      }
+    }
+
+    paintHUD(v);
+  }
+
+  function holeType(h) {
+    if (h.startsWith('ft-')) return 'ft';
+    if (h.startsWith('home-')) return 'home';
+    if (h.startsWith('outer-2')) return 'rim';
+    return 'rim';
+  }
+  function drawHole(h, type, _c, bp) {
+    const p = pos[h]; if (!p) return;
+    let fill = '#1c2233', stroke = '#2c3550';
+    if (type === 'ft') { fill = '#2a2440'; stroke = '#6a5acd'; }
+    if (type === 'home') { fill = '#332a12'; stroke = 'var(--gold)'; }
+    if (type === 'safe') { fill = '#16242a'; stroke = '#2e6e6e'; }
+    if (type === 'bullseye') {
+      SVG.appendChild(el('circle', { cx: p.x, cy: p.y, r: 22, fill: '#3a1414', stroke: '#cc0000', 'stroke-width': 2 }));
+      SVG.appendChild(el('circle', { cx: p.x, cy: p.y, r: 9, fill: '#cc0000' }));
+      return;
+    }
+    SVG.appendChild(el('circle', { cx: p.x, cy: p.y, r: HOLE_R, fill, stroke, 'stroke-width': 1.5 }));
+  }
+
+  function paintHUD(v) {
+    const seat = v.players[v.current];
+    document.getElementById('turnName').textContent = seat.name + (seat.isBot ? ' 🤖' : '');
+    document.getElementById('turnDot').style.color = seat.color;
+    document.getElementById('phasePill').textContent = v.winner != null ? '' : '· ' + v.phase;
+    document.getElementById('cardFace').textContent = v.card ? cardGlyph(v.card) : '·';
+    document.getElementById('actCount').textContent = LOG.length;
+    document.getElementById('seedLbl').textContent = v.seed;
+    document.getElementById('meColor').textContent = v.players[0].color === '#FFC000' ? 'Yellow' : v.players[0].name;
+
+    const myTurn = v.current === 0 && v.winner == null;
+    const canDraw = myTurn && v.phase === 'draw';
+    const inMove = myTurn && v.phase === 'move';
+    const myMoves = inMove ? v.legalMoves : [];
+    document.getElementById('drawBtn').disabled = !canDraw || busy;
+    document.getElementById('passBtn').disabled = !(inMove && myMoves.length === 0) || busy;
+    document.getElementById('hint').textContent =
+      v.winner != null ? '' :
+      !myTurn ? 'waiting for ' + seat.name + '…' :
+      canDraw ? 'your turn — draw a card' :
+      myMoves.length ? 'tap a gold hole to move' : 'no legal move — pass';
+
+    const winLine = document.getElementById('winLine');
+    winLine.textContent = v.winner != null ? `🏆 ${v.players[v.winner].name} wins!` : '';
+
+    const log = document.getElementById('log');
+    log.textContent = LOG.map((a, i) => `${String(i).padStart(3)}  ${fmt(a)}`).join('\n');
+    log.scrollTop = log.scrollHeight;
+  }
+  const fmt = (a) => a.type === 'move' ? `move ${a.pegId} → ${a.dest}` : a.type;
+  function cardGlyph(r) { return r === 'JOKER' ? '🃏' : r; }
+
+  // ── Actions append to the log; re-derive; (maybe) let bots run. ──
+  function push(action) { LOG = LOG.concat([action]); render(); }
+
+  function humanMove(dest) {
+    if (busy) return;
+    const z = FT.derive(G, LOG); const v = FT.view(z, G);
+    if (v.current !== 0 || v.phase !== 'move') return;
+    const m = v.legalMoves.find(x => x.dest === dest);
+    if (!m) return;
+    push({ type: 'move', pegId: m.pegId, dest: m.dest });
+    scheduleBots();
+  }
+  document.getElementById('drawBtn').addEventListener('click', () => {
+    if (busy) return; push({ type: 'draw' });
+    // After drawing, if the human has no legal move, surface pass.
+    render();
+  });
+  document.getElementById('passBtn').addEventListener('click', () => {
+    if (busy) return; push({ type: 'pass' }); scheduleBots();
+  });
+
+  // ── Deterministic bot driver: draw, take first legal move, else pass. ──
+  function scheduleBots() {
+    const z = FT.derive(G, LOG); const v = FT.view(z, G);
+    if (v.winner != null) return;
+    if (v.current === 0) return; // human's turn
+    busy = true;
+    setTimeout(botStep, 520);
+  }
+  function botStep() {
+    const z = FT.derive(G, LOG); const v = FT.view(z, G);
+    if (v.winner != null || v.current === 0) { busy = false; render(); return; }
+    if (v.phase === 'draw') { LOG = LOG.concat([{ type: 'draw' }]); render(); setTimeout(botStep, 420); return; }
+    const moves = v.legalMoves;
+    LOG = LOG.concat([moves.length ? { type: 'move', pegId: moves[0].pegId, dest: moves[0].dest } : { type: 'pass' }]);
+    render();
+    setTimeout(botStep, 520);
+  }
+
+  function newGame(seed) {
+    G = FT.genesis(seed, ROSTER);
+    LOG = [];
+    busy = false;
+    render();
+    // If seat 0 is the human, they start. (It is.)
+  }
+
+  document.getElementById('newBtn').addEventListener('click', () => {
+    const s = document.getElementById('seedInput').value.trim() || ('ROOM-' + Math.floor(Math.random() * 1e6));
+    document.getElementById('seedInput').value = s;
+    newGame(s);
+  });
+
+  buildGeometry();
+  const first = 'ROOM-' + Math.floor(Math.random() * 1e6);
+  document.getElementById('seedInput').value = first;
+  newGame(first);
+})();
+</script>
+</body>
+</html>

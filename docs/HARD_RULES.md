@@ -155,6 +155,18 @@ If content does not fit in the content plane at desktop/tablet:
   rail keeps controls reachable.
 Horizontal scrollbars to "make it fit" remain forbidden.
 
+**HR-6.3.** **Playfield zero-occlusion — gameplay is sacred.** This extends
+`HR-6` / `HR-6.2` from "controls" to **everything**: on every device, NO
+gameplay UI element may overlap, cover, or float on top of the board / play
+area. That includes buttons, control panels, move hints, the peg bar, **and the
+card deck / drawn-card display**. Every such element lives in the fixed control
+rail (`HR-6.2`) or hard against a screen edge, outside the board's bounds. The
+deck and the drawn card are either part of the board surface itself or docked
+into the rail; they are **never** an overlay across the playfield. The board is
+the one layer nothing is allowed to obscure. **Blocking:** a build where any
+element occludes the play area does not ship. *(User directive 2026-06-06: the
+mobile build's panels, buttons, and card deck violated this.)*
+
 ---
 
 ## 2. Wizards (Game Setup)

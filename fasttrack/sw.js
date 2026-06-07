@@ -1,125 +1,49 @@
 /**
- * Fast Track PWA Service Worker
- * NETWORK-FIRST for everything — cache is ONLY an offline fallback
+ * Fast Track service worker — KILL SWITCH (2026-06-06)
+ *
+ * The app no longer uses a service worker. State and assets are served live
+ * (manifold-first: nothing is precached or shadow-served, so a deploy is
+ * always what the browser runs). Nothing in the codebase registers this
+ * worker anymore — but a previously-registered worker keeps running and
+ * serving its stale precache until it is explicitly evicted, which is what
+ * caused old builds to keep loading after a deploy.
+ *
+ * This file replaces the old caching worker with one whose only job is to
+ * remove itself: on activate it deletes every cache, unregisters itself, and
+ * reloads any open page so it immediately picks up live files. Because the
+ * browser byte-compares sw.js on navigation, any client still holding the old
+ * worker will install this one on its next load and self-evict for good.
  */
 
-const CACHE_NAME = 'fasttrack-v3.2.1-local-libs';
-const PRECACHE_URLS = [
-  '/fasttrack/3d.html',
-  '/fasttrack/assets/images/ftLogo.png',
-  '/fasttrack/assets/images/icon-192.png',
-  '/fasttrack/assets/images/icon-512.png',
-  '/fasttrack/manifest.json',
-  // Three.js and OrbitControls are now served from /lib/ — no CDN dependency
-  '/lib/three/three.min.js',
-  '/lib/three/OrbitControls.js'
-];
-
-// Install — precache a small shell, then take over immediately
-self.addEventListener('install', (event) => {
-  console.log('[SW] Install v3 — network-first');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS.filter(u => !u.startsWith('http'))))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener('install', () => {
+  // Take over from the old worker as soon as possible.
+  self.skipWaiting();
 });
 
-// Activate — purge old caches only; do NOT claim() existing clients.
-// clients.claim() would hijack any page that's mid-load under the old (or no)
-// SW, causing the "void" blank-screen bug. Pages opened after this SW
-// activates will be controlled automatically; existing pages stay as-is until
-// they navigate or reload.
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activate v3 — no clients.claim() to avoid void-reset');
-  event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(names.filter(n => n !== CACHE_NAME).map(n => {
-        console.log('[SW] Purging old cache:', n);
-        return caches.delete(n);
-      }))
-    )
-  );
+  event.waitUntil((async () => {
+    // 1) Drop every cache this origin accumulated under the old worker.
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    } catch (_) { /* ignore */ }
+    // 2) Unregister self — nothing re-registers, so this is permanent.
+    try {
+      await self.registration.unregister();
+    } catch (_) { /* ignore */ }
+    // 3) Reload open pages so they re-fetch live (now uncontrolled) files.
+    try {
+      const windows = await self.clients.matchAll({ type: 'window' });
+      for (const client of windows) {
+        try { client.navigate(client.url); } catch (_) { /* ignore */ }
+      }
+    } catch (_) { /* ignore */ }
+  })());
 });
 
-// Fetch — ALWAYS try network first, cache result, fall back to cache only when offline
+// While winding down, never serve from cache — always go to the network so a
+// page loading under this worker gets live files.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/ws')) return;
-
-  // All third-party libraries (Three.js, Chart.js, jQuery, Bootstrap, Font Awesome)
-  // are now served locally from /lib/ — no external CDN requests to intercept.
-  // Only cache same-origin requests.
-  const url = event.request.url;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            if (url.startsWith(self.location.origin)) {
-              cache.put(event.request, clone);
-            }
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() =>
-        caches.match(event.request)
-          .then((cached) => cached || caches.match('/fasttrack/3d.html'))
-      )
-  );
-});
-
-// Background sync for game state (if supported)
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-game-state') {
-    console.log('[ServiceWorker] Syncing game state');
-    // Could sync saved game state when back online
-  }
-});
-
-// Push notifications for multiplayer
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  const data = event.data.json();
-  const options = {
-    body: data.body || 'Your turn!',
-    icon: '/fasttrack/assets/images/icon-192.png',
-    badge: '/fasttrack/assets/images/icon-72.png',
-    vibrate: [200, 100, 200],
-    data: { url: data.url || '/fasttrack/mobile.html' },
-    actions: [
-      { action: 'play', title: 'Play Now', icon: '/fasttrack/assets/images/icon-72.png' }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Fast Track', options)
-  );
-});
-
-// Notification click handler
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  const url = event.notification.data?.url || '/fasttrack/mobile.html';
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((windowClients) => {
-        // Focus existing window if open
-        for (const client of windowClients) {
-          if (client.url.includes('/fasttrack/') && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        // Open new window
-        if (clients.openWindow) {
-          return clients.openWindow(url);
-        }
-      })
-  );
+  event.respondWith(fetch(event.request));
 });

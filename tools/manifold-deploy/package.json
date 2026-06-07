@@ -1,0 +1,21 @@
+{
+  "name": "manifold-deploy",
+  "version": "0.1.0",
+  "description": "Atomic, content-addressed deploys from your laptop over plain SSH. Health-gated with automatic rollback. Zero dependencies. Part of the ButterflyFx toolkit.",
+  "type": "module",
+  "bin": {
+    "manifold-deploy": "./deploy.mjs"
+  },
+  "main": "deploy.mjs",
+  "author": "Kenneth Bingham <ken.bingham64@gmail.com> (https://butterflyfx.us)",
+  "homepage": "https://butterflyfx.us",
+  "keywords": [
+    "deploy", "deployment", "ssh", "scp", "atomic", "content-addressed",
+    "rollback", "zero-downtime", "static-site", "devops", "ci-cd"
+  ],
+  "files": ["deploy.mjs", "deploy.config.example.json", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

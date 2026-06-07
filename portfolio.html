@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kenneth Bingham — AI &amp; Software Engineer</title>
+<meta name="description" content="Kenneth Bingham, AI and software engineer. Real-time multiplayer systems, deterministic distributed state, 3D/WebGL graphics and shaders, AI developer tooling, and build pipelines — built and shipped." />
+<meta property="og:title" content="Kenneth Bingham — AI & Software Engineer" />
+<meta property="og:description" content="Real-time multiplayer, deterministic distributed state, 3D/WebGL, and AI developer tooling — built and shipped." />
+<style>
+  :root{
+    --cyan:#00ffff; --green:#00ff41; --purple:#9b5cff; --gold:#ffd24a; --ink:#e9ecff; --muted:#9aa3c7;
+    --bg:#05060c; --card:rgba(10,12,24,0.62); --line:rgba(120,140,220,0.18);
+    --font:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+    -webkit-font-smoothing:antialiased;line-height:1.55;}
+  #space{position:fixed;inset:0;z-index:-1;display:block;
+    background:radial-gradient(120% 90% at 50% 0%, #0a1030 0%, #05060c 60%, #02030a 100%);}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px;}
+  header.hero{padding:96px 0 40px;}
+  .eyebrow{letter-spacing:.28em;text-transform:uppercase;font-size:12px;color:var(--cyan);font-weight:600;}
+  h1{font-size:clamp(34px,6vw,60px);margin:.18em 0 .12em;font-weight:800;letter-spacing:-.5px;
+    background:linear-gradient(100deg,#fff,#bfe9ff 40%,#cdb4ff 75%,#ffe9a8);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .tagline{font-size:clamp(17px,2.4vw,22px);color:var(--ink);max-width:760px;font-weight:500;}
+  .caps{margin:22px 0 8px;display:flex;flex-wrap:wrap;gap:8px;}
+  .cap{font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:rgba(8,10,22,.5);}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px;}
+  .btn{display:inline-block;text-decoration:none;font-weight:600;font-size:15px;padding:11px 18px;border-radius:11px;border:1px solid var(--line);color:var(--ink);background:rgba(12,16,32,.6);}
+  .btn.primary{background:linear-gradient(100deg,var(--cyan),#3aa0ff);color:#04121a;border:none;}
+  .btn:hover{filter:brightness(1.08);}
+  section{padding:30px 0;}
+  h2{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 18px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;backdrop-filter:blur(8px);}
+  .card h3{margin:0 0 4px;font-size:19px;}
+  .card .one{color:var(--cyan);font-size:13.5px;font-weight:600;margin:0 0 10px;}
+  .card p{margin:0 0 12px;color:#d3d8f5;font-size:14.5px;}
+  .card .hard{color:var(--muted);font-size:13.5px;margin:0 0 12px;}
+  .stack{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .tag{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;}
+  .links a{color:var(--gold);text-decoration:none;font-size:13.5px;font-weight:600;margin-right:14px;}
+  .links a:hover{text-decoration:underline;}
+  .fill{color:#ff9a7a;}
+  .research{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:14px;}
+  .research a{color:var(--purple);font-weight:600;text-decoration:none;}
+  footer{padding:46px 0 70px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:24px;}
+  footer a{color:var(--ink);text-decoration:none;}
+  footer a:hover{color:var(--cyan);}
+</style>
+</head>
+<body>
+<canvas id="space"></canvas>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Kenneth Bingham</div>
+    <h1>AI &amp; Software Engineer</h1>
+    <p class="tagline">I build real-time, distributed, and AI systems — and ship them. Deterministic multiplayer netcode, 3D/WebGL graphics, content-addressed state engines, and developer tooling for LLM workflows.</p>
+    <div class="caps">
+      <span class="cap">Distributed systems</span>
+      <span class="cap">Real-time multiplayer</span>
+      <span class="cap">AI / agent infrastructure</span>
+      <span class="cap">3D / WebGL / shaders</span>
+      <span class="cap">Developer tooling</span>
+      <span class="cap">Build &amp; deploy pipelines</span>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="mailto:kenetics.art@gmail.com">Get in touch</a>
+      <a class="btn" href="https://github.com/" target="_blank" rel="noopener">GitHub <span class="fill">(add link)</span></a>
+      <a class="btn" href="https://www.linkedin.com/" target="_blank" rel="noopener">LinkedIn <span class="fill">(add link)</span></a>
+    </div>
+  </header>
+
+  <section>
+    <h2>Selected work</h2>
+    <div class="grid">
+
+      <article class="card">
+        <h3>KensGames</h3>
+        <p class="one">Real-time multiplayer game platform</p>
+        <p>A full multiplayer stack: lobby, auth, matchmaking, and a 3D WebGL board, with game state modeled as a pure derivation of a seed and an ordered action log.</p>
+        <p class="hard">Hard part: eliminating multiplayer state divergence by construction — same seed and action log yield a byte-identical board on every client, so there is nothing to reconcile.</p>
+        <div class="stack"><span class="tag">JavaScript</span><span class="tag">Node</span><span class="tag">Three.js / WebGL</span><span class="tag">WebSockets</span><span class="tag">Colyseus</span><span class="tag">event sourcing</span></div>
+        <div class="links"><a href="https://kensgames.com" target="_blank" rel="noopener">Live →</a><a href="#" class="fill">Repo (add link)</a></div>
+      </article>
+
+      <article class="card">
+        <h3>ButterflyFx</h3>
+        <p class="one">Reproducible, auditable state engine</p>
+        <p>Wrap any reducer and get a manifold-compliant entity: state derived from an action log, never stored or mutated, with a hash-chained history.</p>
+        <p class="hard">Hard part: reproducibility, audit, and tamper-evidence as architectural properties — no shared mutable state to corrupt, and a verifiable record of exactly what happened.</p>
+        <div class="stack"><span class="tag">JavaScript</span><span class="tag">zero-dependency</span><span class="tag">content-addressing</span><span class="tag">deterministic replay</span></div>
+        <div class="links"><a href="https://butterflyfx.us" target="_blank" rel="noopener">Live →</a><a href="#" class="fill">Repo (add link)</a></div>
+      </article>
+
+      <article class="card">
+        <h3>bfx-ingest</h3>
+        <p class="one">Codebase → clean, deterministic LLM context</p>
+        <p>A zero-dependency CLI that turns any repo into token-efficient AI context: model-shaped output (Markdown / XML / JSON), content dedup, and a reproducible hash.</p>
+        <p class="hard">Hard part: making AI context reproducible — pin the exact bytes for evals, hit prompt caches, and prove what the model saw. Tested, CI across four Node runtimes.</p>
+        <div class="stack"><span class="tag">Node</span><span class="tag">zero-dependency</span><span class="tag">LLM context</span><span class="tag">tests + CI</span></div>
+        <div class="links"><a href="#" class="fill">Repo (add link)</a><a href="#" class="fill">npm (publish)</a></div>
+      </article>
+
+      <article class="card">
+        <h3>TetraCubeDB</h3>
+        <p class="one">[one-line: what it is]</p>
+        <p class="fill">Add a 2–3 sentence description of the database project: what it stores, the model, and what you built.</p>
+        <p class="hard fill">Add the hard engineering bit (the query model, indexing, concurrency, whatever was nontrivial).</p>
+        <div class="stack"><span class="tag fill">stack…</span></div>
+        <div class="links"><a href="https://tetracubedb.com" target="_blank" rel="noopener">Live →</a><a href="#" class="fill">Repo</a></div>
+      </article>
+
+      <article class="card">
+        <h3>The Conduit</h3>
+        <p class="one fill">[one-line: what theconduit.me is]</p>
+        <p class="fill">Add a short description and the one engineering thing worth highlighting.</p>
+        <div class="links"><a href="https://theconduit.me" target="_blank" rel="noopener">Live →</a><a href="#" class="fill">Repo</a></div>
+      </article>
+
+      <article class="card">
+        <h3>More</h3>
+        <p class="one fill">ttlerecall.com · thetwistedsquaredot.com · zeqxy.com</p>
+        <p class="fill">Tell me what each of these is and I will turn them into proper case-study cards (or fold them in / retire them so the page stays focused).</p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Research</h2>
+    <div class="research">
+      <span>An exploratory programming model I work on for fun — deriving state and behavior from a single geometric source of truth.</span>
+      <a href="https://dimensionalprogramming.com" target="_blank" rel="noopener">Dimensional programming →</a>
+    </div>
+  </section>
+
+  <footer>
+    <div>Kenneth Bingham — Software Engineer · AI Specialist · Imagineer</div>
+    <div style="margin-top:8px;">
+      <a href="mailto:kenetics.art@gmail.com">kenetics.art@gmail.com</a> ·
+      <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="https://www.linkedin.com/" target="_blank" rel="noopener">LinkedIn</a> ·
+      <a href="#" class="fill">Résumé (add link)</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* ── Fabric of space: volumetric Schwarz-Diamond nebula + starfield ──────────
+   Self-contained WebGL2. Palette: cyan / green / purple / gold / white.
+   Falls back to the CSS gradient if WebGL is unavailable. */
+(function () {
+  const cv = document.getElementById('space');
+  const gl = cv.getContext('webgl2', { antialias: false, alpha: false });
+  if (!gl) return; // CSS radial gradient remains as the backdrop
+
+  const vs = `#version 300 es
+  void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); gl_Position = vec4(p*2.0-1.0,0,1); }`;
+
+  const fs = `#version 300 es
+  precision highp float;
+  out vec4 o; uniform vec2 R; uniform float T;
+  float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+  float diamond(vec3 p){ return cos(p.x)*cos(p.y)*cos(p.z) - sin(p.x)*sin(p.y)*sin(p.z); }
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*R)/R.y;
+    vec3 ro = vec3(0.0, 0.0, T*0.16);
+    vec3 rd = normalize(vec3(uv, 1.25));
+    float a = T*0.025; mat2 rot = mat2(cos(a),-sin(a),sin(a),cos(a));
+    vec3 c1=vec3(0.0,1.0,1.0), c2=vec3(0.0,1.0,0.26), c3=vec3(0.62,0.36,1.0), c4=vec3(1.0,0.82,0.20);
+    vec3 col=vec3(0.0); float t=0.6;
+    for(int i=0;i<64;i++){
+      vec3 p = ro + rd*t; p.xy = rot*p.xy; p.yz = rot*p.yz;
+      float f = diamond(p*1.25);
+      float g = exp(-abs(f)*3.6);
+      float m1 = 0.5+0.5*sin(p.x*0.5 + T*0.18);
+      float m2 = 0.5+0.5*sin(p.y*0.5 + T*0.13);
+      vec3 c = mix(mix(c1,c2,m1), mix(c3,c4,m2), 0.5+0.5*sin(p.z*0.42 + T*0.1));
+      col += c * g * 0.055;
+      t += 0.17;
+    }
+    vec2 sg = floor(gl_FragCoord.xy/2.6);
+    float s = h(sg);
+    float star = step(0.9955, s) * (0.55+0.45*sin(T*2.2 + s*40.0));
+    col += vec3(star);
+    col += vec3(1.0,0.9,0.6) * step(0.9982, h(sg+9.3));
+    col = col/(col+0.72);
+    col = pow(col, vec3(0.92));
+    o = vec4(col,1.0);
+  }`;
+
+  function sh(type, src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.warn(gl.getShaderInfoLog(s)); } return s; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ console.warn('link failed'); return; }
+  gl.useProgram(prog);
+  const uR = gl.getUniformLocation(prog,'R'), uT = gl.getUniformLocation(prog,'T');
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+
+  function resize(){ const dpr = Math.min(devicePixelRatio||1, 1.5);
+    cv.width = Math.floor(innerWidth*dpr); cv.height = Math.floor(innerHeight*dpr);
+    cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+    gl.viewport(0,0,cv.width,cv.height); }
+  addEventListener('resize', resize); resize();
+
+  const t0 = performance.now();
+  (function frame(){ const t=(performance.now()-t0)/1000;
+    gl.uniform2f(uR, cv.width, cv.height); gl.uniform1f(uT, t);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    requestAnimationFrame(frame); })();
+})();
+</script>
+</body>
+</html>

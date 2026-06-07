@@ -71,6 +71,17 @@ let _centerToastEl = null;
 let _centerToastTimer = null;
 let _centerToastReflow = null;
 let _lastNoLegalMoveTurnStamp = null; // dedupe across updateUI re-renders
+// When the active human draws a card with zero legal moves, relinquish the
+// turn automatically after a brief beat (so the "no legal move" toast is seen)
+// instead of forcing them to find the End-Turn hint or wait out the 12 s stuck
+// watchdog. Mirrors the bot path + rules.json CARD_NO_LEGAL_MOVE. Single-shot
+// per (player, card) via _lastNoLegalMoveTurnStamp; handle kept so a manual
+// pass / redraw / turn advance can cancel a still-pending auto-relinquish.
+let _noMoveAutoTimer = null;
+const NO_MOVE_AUTO_PASS_MS = 2000;
+function _clearNoMoveAutoTimer() {
+  if (_noMoveAutoTimer) { clearTimeout(_noMoveAutoTimer); _noMoveAutoTimer = null; }
+}
 
 function _ensureCenterToastEl() {
   if (_centerToastEl && document.body.contains(_centerToastEl)) return _centerToastEl;
@@ -509,7 +520,19 @@ function initGame(playerCount = 2, config = {}) {
 
   // Meta
   state.meta.set('winner', null);
-  state.meta.set('seed', Math.floor(Math.random() * 0xFFFFFFFF));
+  // ── Shared deterministic seed (manifold-first, Phase 1) ────────────────────
+  // The deck (and any future RNG) blooms from ONE seed that is identical for
+  // every client in a session, instead of each client running a private
+  // Math.random() shuffle — the root cause of "everyone gets a different
+  // board". In live MP the seed is the shared session code / id (every client
+  // already holds the same one). Solo / same-screen derive a stable per-game
+  // seed so the SAME code path runs for every mode (consistency across all
+  // games is the goal). The seed source is consistent; only its value differs.
+  const _sharedSeed = (config && config.sessionSeed != null && String(config.sessionSeed))
+    ? String(config.sessionSeed)
+    : ('solo-' + Math.floor(Math.random() * 0xFFFFFFFF).toString(16));
+  state.meta.set('seed', _sharedSeed);
+  state.meta.set('reshuffleCount', 0);
   state.meta.set('myUserId', config.myUserId || null);
   state.meta.set('gameMode', config.launchMode || 'solo');  // 'solo', 'private', 'same-screen'
 
@@ -735,6 +758,26 @@ function createDeck() {
 
 function shuffleDeck() {
   const deck = state.deck.get('cards') || [];
+  // Deterministic, seed-derived order (manifold-first, Phase 1): every client
+  // in a session derives the identical deck from the one shared seed, so the
+  // deck — and therefore the whole game — blooms the same on every board. The
+  // reshuffle counter advances the stream so each reshuffle of the discard
+  // pile is a fresh-but-reproducible order, identical across clients.
+  const seed = state.meta.get('seed');
+  const codec = (typeof ManifoldCodec !== 'undefined' && ManifoldCodec)
+    || (typeof window !== 'undefined' && window.ManifoldCodec)
+    || (typeof globalThis !== 'undefined' && globalThis.ManifoldCodec)
+    || null;
+  if (seed != null && codec && typeof codec.seededShuffle === 'function') {
+    const rc = state.meta.get('reshuffleCount') || 0;
+    const shuffled = codec.seededShuffle(deck, `${seed}:${rc}`);
+    state.meta.set('reshuffleCount', rc + 1);
+    state.deck.set('cards', shuffled);
+    return;
+  }
+  // Fallback (codec unavailable / no seed): legacy local shuffle. Non-
+  // deterministic — only reached in degraded contexts (e.g. a bare unit
+  // harness that didn't load the codec).
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -889,7 +932,17 @@ function updateSessionRoster(sessionPlayers) {
     const sp = sorted[i] || null;
     if (!sp) continue;
     players[i].userId = sp.user_id || players[i].userId || null;
-    players[i].isBot = !!sp.is_ai;
+    // A roster sync must NEVER flip an established HUMAN seat into a bot.
+    // Index-mapping a stale / slot-misaligned roster echo onto the seats and
+    // doing `isBot = sp.is_ai` is exactly what let "bots take over and skip
+    // me": the local player's seat got isBot=true, so enableTurn auto-played
+    // it (botTurn) and the turn advanced past the human. Human->bot only
+    // happens via the explicit Break button or a dedicated replace-with-bot
+    // event, never a routine roster refresh. Bot->human (a real player joining
+    // a bot slot) is still allowed.
+    if (!(players[i].isBot === false && !!sp.is_ai)) {
+      players[i].isBot = !!sp.is_ai;
+    }
     players[i].name = sp.username || sp.name || players[i].name;
     players[i].avatar = (sp.avatar && (sp.avatar.emoji || sp.avatar)) || sp.avatar_id || players[i].avatar;
   }
@@ -927,8 +980,24 @@ function _activePlayerUserId() {
   return (p && p.userId) || null;
 }
 
+// True when the local client is the ONLY human in the game (true solo,
+// solo-vs-bots, or a stale-cache game that came up in MP mode with no peer).
+// Such a game has nobody to coordinate with, so this client owns every
+// decision and the MP turn-gating must collapse to solo behaviour — otherwise
+// an ambiguous identity match locks the lone human out of drawing, moving, or
+// relinquishing. Real multiplayer (2+ humans) is unaffected.
+function _loneHuman() {
+  const players = state.players.get('list') || [];
+  return players.filter(p => p && !p.isBot).length <= 1;
+}
+
 function _isMyTurn() {
   if (!_isMpMode()) return true;
+  // Single-human authority: the lone human is never "not my turn". This keeps
+  // the local player able to draw / move / relinquish on their turn, and lets
+  // this client (the de-facto host) draw for the bots, regardless of how the
+  // stale session left the userId/roster.
+  if (_loneHuman()) return true;
   const me = _myUserId();
   const active = _activePlayerUserId();
   if (me && active) return String(me) === String(active);
@@ -963,6 +1032,17 @@ function _isMyTurn() {
 
 function _isHost() {
   if (!_mpClient) return true;
+  // Lone-client authority (user_directive_2026-06-06: "single games must be
+  // consistent"). A client attached to the relay but NOT inside an established
+  // session — a stale-cache "solo" that came up in MP mode, or a session that
+  // never formed — is its own authority. Without this it is neither the human
+  // nor a host, so no one drives the bots or advances past a bot's turn and
+  // the game stalls after the first turn. Defer to the server's host flag only
+  // when we are genuinely in a live session.
+  if (!_mpClient.session) return true;
+  // Single-human authority: a game with at most one human needs no remote
+  // host — this client drives its own bots and turns (mirrors _isMyTurn).
+  if (_loneHuman()) return true;
   return !!_mpClient.isHost;
 }
 
@@ -1619,16 +1699,22 @@ function calculateValidMoves() {
   if (rules.isWild && rules.movement === 7) {
     // user_directive_2026-05-18: "the 7 split can only happen when there are
     // 2 to n pegs ON THE BOARD. if there is only 1 peg a 7 is just another
-    // number." Pegs in holding, bullseye, the home/winner hole, and the
-    // private safe zone do NOT count as split-eligible — they're either
-    // not on the open board or physically can't absorb a meaningful split
-    // half. With <2 split-eligible pegs the engine skips the split block
-    // entirely and the regular 7-step move generated above stands alone.
+    // number." A peg is split-eligible iff it can legally absorb a split
+    // half:
+    //   - holding  → cannot move without an enter card (7 doesn't enter)  → out
+    //   - bullseye → can only leave on J/Q/K, never on a 7 half           → out
+    //   - home-{bp}→ the winner hole; the 5th peg parks here              → out
+    //   - safezone → forward_only within the zone with exact landing
+    //                (rules.json board.safe_zone) — a peg at safe-{bp}-k
+    //                legally advances 1..(4-k) holes, so it IS eligible for
+    //                a small split half. (bugfix 2026-06-06: previously
+    //                excluded, which dropped every safe-zone split option.)
+    // With <2 split-eligible pegs the engine skips the split block entirely
+    // and the regular 7-step move generated above stands alone.
     const activePegs = [];
     for (let pi = 0; pi < player.pegs.length; pi++) {
       const peg = player.pegs[pi];
       if (peg.holeType === 'holding') continue;
-      if (peg.holeType === 'safezone') continue;
       if (peg.holeId === 'bullseye') continue;
       if (peg.holeId === `home-${bp}`) continue;
       activePegs.push(pi);
@@ -1665,23 +1751,36 @@ function calculateValidMoves() {
       //      is authoritative: a peg on an ft-* hole IS on the ring even if
       //      the engine has stripped its .onFasttrack flag during a recalc
       //      pass (see FT priority + strip logic at end of calculateValidMoves).
-      const _bullPath = (seq, n, fromHole, peg) => {
+      // Bullseye entry (user_directive_2026-06-06). Two legal routes, both
+      // launching from a FOREIGN ft-* hole (never own ft-{bp} — reaching own
+      // ft means fast track is already COMPLETE, so the peg diverts into its
+      // home stretch and can no longer take the center). Geometry (holeId),
+      // not the .onFasttrack flag, is authoritative.
+      //   A) On-ring 1-hit: a peg ALREADY sitting on a foreign ft-* hole hops
+      //      straight to the center with a single step. For a peg on the ring
+      //      this is the ONLY route onto the bullseye (one hop, never multi).
+      //   B) Outer approach: a peg NOT on the ring travels clockwise and lands
+      //      on a foreign ft-* hole as its PENULTIMATE position, then hops to
+      //      the center on the final step. Intermediate own pegs block, except
+      //      passable own pegs sitting on ft-* holes (FT_RING_PASS_RELAX).
+      const _bullPath = (seq, n, fromHole) => {
+        const _ownFtHole = `ft-${bp}`;
         if (n === 1) {
-          // Scenario A: direct 1-step jump from ft-* hole to bullseye
           if (!fromHole || !fromHole.startsWith('ft-')) return null;
+          if (fromHole === _ownFtHole) return null;
           return ['bullseye'];
         }
         if (n < 2 || seq.length < n) return null;
-        // Scenario B forbidden for any peg sitting on the FT ring.
-        if (fromHole && fromHole.startsWith('ft-')) return null;
+        if (fromHole && fromHole.startsWith('ft-')) return null; // ring pegs: route A only
         const penult = seq[n - 2];
-        if (!penult || !penult.startsWith('ft-')) return null;
+        if (!penult || !penult.startsWith('ft-')) return null;   // penultimate must be a ring hole
+        if (penult === _ownFtHole) return null;                  // own ft completes FT, never bullseye
         for (let s = 0; s < n - 1; s++) {
           const h = seq[s];
           const o = state.board.get(h);
           if (!o || o.playerIdx !== ci) continue;
-          if (s === n - 2) return null;
-          if (!h.startsWith('ft-')) return null;
+          if (s === n - 2) return null;            // cannot land penultimate on an own peg
+          if (!h.startsWith('ft-')) return null;   // own peg blocks unless passable on the ring
         }
         return [...seq.slice(0, n - 1), 'bullseye'];
       };
@@ -1721,12 +1820,17 @@ function calculateValidMoves() {
       // delegated to `_enumerateFtExitOptions` (see _halfOptions below).
       // The 1-hit bullseye jump and the no-multi-hop-bullseye gate are
       // preserved via _bullPath (user_directive_2026-05-20d).
-      const _ftPegCount = player.pegs.filter(p => p.onFasttrack).length;
-      const _ftRuleOK = (path1, path2, peg1, peg2) => {
+      // Geometry-authoritative: a peg sitting on an ft-* hole is "on the ring"
+      // regardless of its .onFasttrack flag (a recalc pass can transiently
+      // clear it). Counting / gating on geometry keeps a flag-cleared ring
+      // peg's bullseye 1-hit and ring moves from being wrongly dropped, and
+      // matches rules.json's "geometrically on any ft-* hole" wording.
+      const _onRing = (p) => !!(p && p.holeId && p.holeId.startsWith('ft-'));
+      const _ftPegCount = player.pegs.filter(_onRing).length;
+      const _ftRuleOK = (peg1, peg2) => {
         if (_ftPegCount === 0) return true;
-        const ftInSplit = (peg1.onFasttrack ? 1 : 0) + (peg2.onFasttrack ? 1 : 0);
-        if (ftInSplit < Math.min(_ftPegCount, 2)) return false;
-        return true;
+        const ftInSplit = (_onRing(peg1) ? 1 : 0) + (_onRing(peg2) ? 1 : 0);
+        return ftInSplit >= Math.min(_ftPegCount, 2);
       };
 
       // Bullseye occupancy gate — own peg already on bullseye blocks variants.
@@ -1773,17 +1877,16 @@ function calculateValidMoves() {
             const pi1 = activePegs[i], pi2 = activePegs[j];
             const peg1 = player.pegs[pi1], peg2 = player.pegs[pi2];
 
-            // Rim full-seqs still used for bullseye-variant derivation
-            // (_bullPath needs the rim sequence for the n>=2 penultimate-ft
-            // scenario from a NON-FT peg). FT pegs only reach bullseye via
-            // the n=1 scenario, which _bullPath handles from `fromHole`.
+            // Clockwise perimeter sequences feed the outer-approach bullseye
+            // route (route B), where a non-ring peg's penultimate hole must be
+            // a foreign ft-* hole.
             const seq1 = getTrackSequence(peg1, player, 'clockwise');
             const seq2 = getTrackSequence(peg2, player, 'clockwise');
 
             const opts1 = _halfOptions(peg1, a);
             const opts2 = _halfOptions(peg2, b);
-            const path1Bull = _bullPath(seq1, a, peg1.holeId, peg1);
-            const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
+            const path1Bull = _bullPath(seq1, a, peg1.holeId);
+            const path2Bull = _bullPath(seq2, b, peg2.holeId);
             const bullOK = _bullFree();
 
             // VARIANT 1: STANDARD (rim/FT both halves — cartesian product of
@@ -1791,7 +1894,7 @@ function calculateValidMoves() {
             for (const o1 of opts1) {
               for (const o2 of opts2) {
                 if (o1.dest === o2.dest) continue;
-                if (!_ftRuleOK(o1.path, o2.path, peg1, peg2)) continue;
+                if (!_ftRuleOK(peg1, peg2)) continue;
                 _pushSplit(
                   `${pi1}:${a}@${o1.dest}-${pi2}:${b}@${o2.dest}`,
                   pi1, o1.dest, a, peg1.holeId, o1.path,
@@ -1803,7 +1906,7 @@ function calculateValidMoves() {
             if (path1Bull && bullOK) {
               for (const o2 of opts2) {
                 if (o2.dest === 'bullseye') continue;
-                if (!_ftRuleOK(path1Bull, o2.path, peg1, peg2)) continue;
+                if (!_ftRuleOK(peg1, peg2)) continue;
                 _pushSplit(
                   `${pi1}:${a}B-${pi2}:${b}@${o2.dest}`,
                   pi1, 'bullseye', a, peg1.holeId, path1Bull,
@@ -1815,7 +1918,7 @@ function calculateValidMoves() {
             if (path2Bull && bullOK) {
               for (const o1 of opts1) {
                 if (o1.dest === 'bullseye') continue;
-                if (!_ftRuleOK(o1.path, path2Bull, peg1, peg2)) continue;
+                if (!_ftRuleOK(peg1, peg2)) continue;
                 _pushSplit(
                   `${pi1}:${a}@${o1.dest}-${pi2}:${b}B`,
                   pi1, o1.dest, a, peg1.holeId, o1.path,
@@ -1886,11 +1989,19 @@ function calculateValidMoves() {
   // and drop to the regular track — then recalculate.
   const pegsOnFT = player.pegs.filter(p => p.onFasttrack);
   if (pegsOnFT.length > 0) {
+    // Geometry-authoritative keep: a move counts as "FT-related" when the
+    // moving peg sits on an ft-* hole (regardless of its .onFasttrack flag),
+    // so geometry-generated ring / bullseye split halves are not dropped here
+    // after the split block already enumerated them on the same basis.
+    const _moveOnRing = (idx) => {
+      const p = player.pegs[idx];
+      return !!(p && p.holeId && p.holeId.startsWith('ft-'));
+    };
     const ftMoves = moves.filter(m => {
-      const p = player.pegs[m.pegIdx];
-      if (p.onFasttrack || m.type === 'enterBullseye') return true;
-      // For splits, also keep if the second peg is on FastTrack
-      if (m.type === 'split' && player.pegs[m.peg2Idx] && player.pegs[m.peg2Idx].onFasttrack) return true;
+      if (m.type === 'enterBullseye') return true;
+      if (_moveOnRing(m.pegIdx)) return true;
+      // For splits, also keep if the second peg is on the ring.
+      if (m.type === 'split' && _moveOnRing(m.peg2Idx)) return true;
       return false;
     });
     if (ftMoves.length > 0) {
@@ -2059,30 +2170,54 @@ function showMoveHints() {
   const curPlayer = players[ci] || { name: PLAYER_NAMES[ci] || 'Player', pegs: [] };
 
   if (vm.length === 0) {
-    // No timers: require an explicit click to end the turn so MP stays in
-    // sync (the click triggers the standard executeMove/endTurn broadcast
-    // path on the active player only).
+    // No legal move. Per rules.json CARD_NO_LEGAL_MOVE the turn is forfeit
+    // (discard, end turn, no extra turn). Bots already auto-end via botTurn;
+    // a human shouldn't have to hunt for this hint button or wait out the
+    // 12 s stuck watchdog (whose countdown can reset on MP snapshots / re-
+    // renders, stalling relinquish indefinitely). Surface the End-Turn button
+    // as an instant-out, but also auto-relinquish after a short, toasted beat.
     hintsDiv.innerHTML = '<button id="ft-end-turn-btn" class="hint" style="cursor:pointer;font-weight:600;">No legal move — End Turn</button>';
     // user_directive_2026-05-18 — center-toast the no-legal-move state so
     // the player understands the End Turn button isn't a punishment.
     // Dedupe by (currentPlayer, currentCard) so updateUI re-renders don't
-    // re-fire the toast every frame.
+    // re-fire the toast (or re-arm the auto-relinquish) every frame.
     try {
       const card = state.deck.get('currentCard');
       const stamp = `${ci}|${card && card.id}|${card && card.value}`;
+      const canAct = !_isMpMode() || _isMyTurn();
       if (stamp !== _lastNoLegalMoveTurnStamp) {
         _lastNoLegalMoveTurnStamp = stamp;
         showNoLegalMoveToast(curPlayer.name, curPlayer.color);
+        // Auto-relinquish exactly once for this (player, card). Only the
+        // client whose turn it is schedules it — endTurn() then broadcasts the
+        // turn_advance on the active-player-authoritative path, identical to a
+        // manual click. Re-verify at fire time so a redraw / manual pass /
+        // snapshot that already moved on cancels it.
+        _clearNoMoveAutoTimer();
+        if (canAct) {
+          _noMoveAutoTimer = setTimeout(() => {
+            _noMoveAutoTimer = null;
+            const _ci = state.players.get('current') || 0;
+            const _card = state.deck.get('currentCard');
+            const _stampNow = `${_ci}|${_card && _card.id}|${_card && _card.value}`;
+            if (_stampNow !== stamp) return;                       // turn/card changed
+            if ((state.turn.get('validMoves') || []).length > 0) return; // moves appeared
+            if (state.turn.get('phase') === 'draw') return;        // already advanced
+            if (_isMpMode() && !_isMyTurn()) return;               // no longer our turn
+            endTurn();
+          }, NO_MOVE_AUTO_PASS_MS);
+        }
       }
     } catch (_) { /* ignore */ }
     const btn = document.getElementById('ft-end-turn-btn');
     if (btn) {
       btn.addEventListener('click', () => {
         if (_isMpMode() && !_isMyTurn()) return;
-        // Mark this as a "discard" move so endTurn runs once via the normal
-        // executeMove broadcast path. With validMoves empty there is no real
-        // move to play, so call endTurn directly and rely on the host's
-        // snapshot publisher to propagate the new current to peers.
+        // Manual instant-out: cancel the pending auto-relinquish and end now.
+        // With validMoves empty there is no real move to play, so call endTurn
+        // directly — it advances + broadcasts turn_advance on the active
+        // player's client only.
+        _clearNoMoveAutoTimer();
         endTurn();
       }, { once: true });
     }
@@ -2466,7 +2601,7 @@ function executeMove(moveIdx) {
 
     case 'move': {
       const bp = player.boardPosition;
-      const safeEntry = `outer-${bp}-8`;
+      const safeEntry = `outer-${bp}-2`;   // safe-zone entrance (was stale -8; engine geometry names it -2). Redundant with the universal circuit-completion block below, but kept consistent.
       // Circuit completion: passing the safe zone entrance in either direction
       // (including card 4 backward) makes peg eligible for safe zone on next forward turn
       const traversed = move.path || [];
@@ -3037,6 +3172,7 @@ function endTurn() {
 // Wipe the in-progress turn's local UI (card / hints / draw button) without
 // touching state.players.current. Used by non-host peers in endTurn().
 function _localTurnUiCleanup() {
+  _clearNoMoveAutoTimer();
   state.deck.set('currentCard', null);
   state.turn.set('phase', 'draw');
   state.turn.set('validMoves', []);
@@ -3066,7 +3202,10 @@ function _applyTurnAdvance(fromCi, next, seq) {
 
   state.deck.set('currentCard', null);
   state.players.set('current', next);
-  // Turn boundary: try to restore the next seat from AFK if they returned.
+  // Turn boundary: cancel any pending no-legal-move auto-relinquish from the
+  // seat we just left, and try to restore the next seat from AFK if they
+  // returned.
+  _clearNoMoveAutoTimer();
   _maybeRestoreFromAfk(next);
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(next);
 
@@ -3170,6 +3309,17 @@ function botTurn() {
         { ci: _ci, name: _cur && _cur.name, isBot: _cur && _cur.isBot });
       return;
     }
+    // Belt-and-suspenders: never auto-play the LOCAL human's OWN seat, even if
+    // a stray roster echo flipped its isBot flag true. Identify "my" seat by
+    // userId. Skipped in solo (no userId resolves) so real bots still run.
+    {
+      const _me = _myUserId();
+      if (_me != null && _cur.userId != null && String(_cur.userId) === String(_me)) {
+        console.warn('[BOT] botTurn() suppressed — current seat is the local human.',
+          { ci: _ci, name: _cur && _cur.name });
+        return;
+      }
+    }
     // In MP, only the host drives bot turns; double-check here too.
     if (_isMpMode() && !_isHost()) {
       console.warn('[BOT] botTurn() suppressed — not the host in MP mode.');
@@ -3224,7 +3374,7 @@ function botTurn() {
       // Circuit-completion lookups (used by scoring pass below)
       const _bpForBot = player.boardPosition;
       const _ownFTForBot = `ft-${_bpForBot}`;
-      const _safeEntryForBot = `outer-${_bpForBot}-8`;
+      const _safeEntryForBot = `outer-${_bpForBot}-2`;   // safe-zone entrance (was stale -8; engine geometry names it -2)
 
       // ── BULLSEYE RISK/REWARD (user_directive_2026-04-25) ──
       // Bullseye is high-risk/high-reward. Score adjustment factors:

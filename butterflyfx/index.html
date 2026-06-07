@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kenneth W. Bingham &mdash; AI Systems Architect &middot; Senior Software Engineer</title>
+  <title>Kenneth W. Bingham &mdash; AI Engineer &middot; Backend &amp; Platform Engineer</title>
   <meta name="description"
-    content="Portfolio of Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer. Directive engineering, agent loops routed by logic gates and Schwarz-D minimal-surface boundaries, dimensional / manifold programming.">
-  <meta name="keywords" content="AI Systems Architect, Senior Software Engineer, Directive Engineering, Agent Systems, Manifold Programming, Schwarz Diamond, Dimensional Programming, AI Routing">
+    content="Kenneth W. Bingham, AI engineer focused on the reliability layer around LLMs: deterministic pipelines, evaluation harnesses, reproducibility, and cost-efficiency. Open-source tools with real, reproducible benchmarks.">
+  <meta name="keywords" content="AI Engineer, LLM, RAG, evals, prompt caching, reproducibility, event sourcing, backend engineer, platform engineer, CI/CD, deterministic systems">
   <meta name="author" content="Kenneth W. Bingham">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://butterflyfx.us/">
@@ -15,25 +15,16 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://butterflyfx.us/">
-  <meta property="og:title" content="Kenneth W. Bingham &mdash; AI Systems Architect &middot; Senior Software Engineer">
-  <meta property="og:description" content="Portfolio of Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer. Directive engineering, agent loops, manifold programming.">
+  <meta property="og:title" content="Kenneth W. Bingham &mdash; AI Engineer &middot; Backend &amp; Platform Engineer">
+  <meta property="og:description" content="The reliability layer around LLMs: deterministic, reproducible, cost-efficient systems. Open-source tools with real benchmarks.">
   <meta property="og:image" content="https://butterflyfx.us/kennethbingham.jpg">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://butterflyfx.us/">
-  <meta property="twitter:title" content="Kenneth W. Bingham &mdash; AI Systems Architect &middot; Senior Software Engineer">
-  <meta property="twitter:description" content="Portfolio of Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer. Directive engineering, agent loops, manifold programming.">
+  <meta property="twitter:title" content="Kenneth W. Bingham &mdash; AI Engineer &middot; Backend &amp; Platform Engineer">
+  <meta property="twitter:description" content="The reliability layer around LLMs: deterministic, reproducible, cost-efficient systems. Open-source tools with real benchmarks.">
   <meta property="twitter:image" content="https://butterflyfx.us/kennethbingham.jpg">
-
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-XXXXXXXXXX');
-  </script>
 
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
@@ -46,18 +37,12 @@
 
   <nav class="navbar glass">
     <a href="index.html" class="active">Home</a>
-    <a href="about.html">About</a>
-    <a href="method.html">Method</a>
-    <a href="agents.html">Agents</a>
-    <a href="routing.html">Routing</a>
+    <a href="#work">Work</a>
+    <a href="bfx-ingest.html">bfx-ingest</a>
     <a href="projects.html">Projects</a>
-    <a href="directive.html">Directive</a>
-    <a href="dimensional-programming.html">Dimensional Programming</a>
-    <a href="research.html">Research</a>
-    <a href="search.html">Search</a>
     <a href="resume.html">Resume</a>
     <a href="contact.html">Contact</a>
-    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
+    <a href="https://github.com/kenbin64" target="_blank" rel="noopener">GitHub</a>
   </nav>
 
   <div class="content">
@@ -65,196 +50,142 @@
     <section class="hero glass">
       <img src="kennethbingham.webp" alt="Kenneth W. Bingham" class="hero-photo" />
       <div class="hero-title">Kenneth W. Bingham</div>
-      <div class="hero-subtitle">AI Systems Architect &middot; Senior Software Engineer</div>
-      <div class="hero-role">Kaysville, UT &middot; Available for full-time employment &middot; Open to remote</div>
+      <div class="hero-subtitle">AI Engineer &middot; Backend &amp; Platform Engineer</div>
+      <div class="hero-role">Kaysville, UT &middot; Available for full-time roles &middot; Open to remote</div>
       <div class="hero-tagline">
-        Ten-plus-year senior engineer who designs AI systems whose behavior is
-        <b>provable</b>, not hoped-for. Seeking a senior or staff role.
+        I build the <b>reliability layer around AI</b>: deterministic pipelines, evaluation harnesses,
+        and reproducible, cost-efficient systems. The work below runs, is tested, and is open to read and re-run yourself.
       </div>
-      <p class="hero-desc">
-        This site is an extended resume &mdash; a working portfolio of directive
-        frameworks, agent loops routed by logic gates and minimal-surface decision
-        boundaries, and full-stack platforms I have built end-to-end. The other
-        sites linked from here (KensGames, TTLRecall, the dimensional-programming
-        writeups) are <b>personal portfolio projects</b> demonstrating the same
-        skill set in different domains. None are commercial products, businesses,
-        or services for sale.
-      </p>
       <div class="hero-cta">
-        <a href="assets/KennethWBingham_Resume_2026.pdf" class="cta-btn" download>Download Resume (PDF)</a>
-        <a href="contact.html" class="cta-btn alt">Contact for Hiring</a>
+        <a href="assets/Kenneth_Bingham_Resume.pdf" class="cta-btn" download>Download resume (PDF)</a>
+        <a href="contact.html" class="cta-btn alt">Contact for hiring</a>
         <a href="https://www.linkedin.com/in/kenneth-bingham-11378b10" class="cta-btn alt" target="_blank" rel="noopener">LinkedIn</a>
-      </div>
-      <div class="hero-3d-hint">z = x &middot; y&sup2; &nbsp;&middot;&nbsp; stakes dominate quadratically &mdash; route accordingly</div>
-    </section>
-
-    <section class="section glass">
-      <h2 class="section-title">A Framework I Designed &mdash; The Butterfly Thesis</h2>
-      <div class="section-content">
-        <p style="font-size:1.18em;line-height:1.55;">
-          <b>A point becomes the whole. The whole becomes a point in a higher dimension.</b>
-        </p>
-        <p>
-          This is the architectural principle I developed across the portfolio projects below.
-          The butterfly effect taken literally &mdash; not "small thing causes big thing"
-          but <em>small thing IS big thing IS small thing,</em> depending on which octave you
-          address it from. A wing-flap is a point. A hurricane is the whole. A century of
-          climate data is the hurricane as a single point. Same substrate, three altitudes.
-        </p>
-        <p>
-          In code: a seed <code>x</code> is folded through a lens <code>y</code> to produce a
-          delta <code>z</code>; the closed manifold <code>m</code> becomes the seed
-          <code>x</code><sub>n+1</sub> of the next octave. <b>D7 of one breath is D0 of the next.</b>
-          The substrate is self-similar at every scale. I have used this discipline to keep
-          AI directives stable, route agent traffic deterministically, and structure data
-          stores around geometry instead of bespoke tables.
-        </p>
-        <p style="margin-top:1.2em;">
-          The other personal portfolio sites linked from here each apply this framework to a
-          different domain &mdash;
-          <a href="https://kensgames.com">KensGames</a> (the substrate at play),
-          <a href="https://dimensionalprogramming.com">DimensionalProgramming.com</a> (the
-          substrate formalized as a writeup), and several others in progress. They are
-          demonstrations of skill, not products for sale.
-        </p>
+        <a href="https://github.com/kenbin64" class="cta-btn alt" target="_blank" rel="noopener">GitHub</a>
       </div>
     </section>
 
-    <section class="section glass">
-      <h2 class="section-title">Core Skills</h2>
-      <div class="pillars-grid">
-
-        <article class="pillar-card span-2x2">
-          <h3>AI Directive Engineering</h3>
-          <p>
-            I write the reasoning frameworks that keep AI systems stable. Directives are
-            structured prompts plus governing rules &mdash; an algebra of allowed transformations
-            that prevents drift, hallucination, and brittle failure modes. Demonstrated across
-            the portfolio projects on this site.
-          </p>
-          <a href="directive.html" class="card-link">Read a full directive &rarr;</a>
-        </article>
-
-        <article class="pillar-card">
-          <h3>Agent Systems</h3>
-          <p>
-            I design agents whose job is to make other AI work better &mdash; verifier loops,
-            evaluation harnesses, retrieval-augmented pipelines, and rule engines that catch
-            what a single LLM call cannot. Practical orchestration over hype.
-          </p>
-          <a href="agents.html" class="card-link">How I design agents &rarr;</a>
-        </article>
-
-        <article class="pillar-card">
-          <h3>Logic &amp; Manifolds</h3>
-          <p>
-            Truth tables, logic gates, and decision trees give an AI system a hard skeleton
-            it cannot lie around. Manifolds &mdash; geometric surfaces governed by
-            <span class="math">z = x &middot; y</span> &mdash; give it a way to focus attention
-            on the small region of state that actually matters. Together they replace
-            guesswork with geometry.
-          </p>
-          <a href="method.html" class="card-link">How I think &rarr;</a>
-        </article>
-
-      </div>
-    </section>
-
-    <section class="section glass">
-      <h2 class="section-title">What I Optimize For</h2>
-      <div class="pillars-grid">
-        <article class="pillar-card span-2x2">
-          <h3>Maximum quality per dollar of AI spend</h3>
-          <p>
-            Route by regex pre-filter, truth-table constraints, decision-tree
-            shortcuts, and a <a href="routing.html">Schwarz-D minimal-surface
-            boundary</a> so frontier credits go only where frontier reasoning
-            is required. The router is real, tested, and live on this site.
-          </p>
-        </article>
-        <article class="pillar-card">
-          <h3>Determinism over fluency</h3>
-          <p>
-            Schema-validated outputs, retry budgets, verifier ensembles.
-            LLMs never return free text to the next stage. Drift dies at the
-            boundary.
-          </p>
-        </article>
-        <article class="pillar-card">
-          <h3>Ancestry-preserving systems</h3>
-          <p>
-            No destructive updates. Every state is traceable through its
-            lineage on the underlying manifold &mdash; debugging becomes
-            walking the path, not guessing the past.
-          </p>
-        </article>
-        <article class="pillar-card">
-          <h3>Sovereign over rented</h3>
-          <p>
-            I own the VPS, the deploy pipeline, the data model, the directive
-            doctrine. Vendor portability is a first-class requirement &mdash;
-            no primitive I cannot replace within one sprint.
-          </p>
-        </article>
-      </div>
-    </section>
-
-    <section class="section glass">
-      <h2 class="section-title">Portfolio Projects</h2>
-      <p style="margin:0 0 1em;opacity:0.85;">
-        Each link below is a personal portfolio piece &mdash; built end-to-end to demonstrate the
-        skills above. None are commercial products or services for sale.
+    <section class="section glass" id="work">
+      <h2 class="section-title">Proof, not promises</h2>
+      <p style="margin:0 0 1.2em;opacity:0.88;">
+        Every project here is something I built end to end. Each one names a standard pattern and a result you can verify.
+        Nothing asks to be trusted; it asks to be re-run.
       </p>
       <div class="projects-grid">
+
         <div class="project-card">
-          <h3>KensGames.com</h3>
-          <p class="project-summary">3D game platform with deterministic simulation, real-time
-            rendering, authentication, and multiplayer orchestration. Designed and built solo
-            as a portfolio piece.</p>
+          <h3>bfx-ingest</h3>
+          <p class="project-summary">
+            A zero-dependency CLI that turns a codebase into clean, deterministic LLM context in one command.
+            On a real 1,593-file repo it produced one verifiable artifact and reported it as ~4.55M tokens, so you
+            scope before wasting a call. Same input gives the same root hash, which makes context reproducible for
+            evals and byte-identical for prompt caching.
+          </p>
           <ul class="project-tech">
-            <li>Vanilla JS + WebGL2 + Web Audio</li>
-            <li>Node auth/lobby server, PM2, nginx</li>
-            <li>GitHub Actions CI/CD to VPS</li>
+            <li>Event sourcing &middot; content-addressed storage</li>
+            <li>Deterministic, verifiable, no deps, no network</li>
+            <li>Tested &middot; real benchmark included</li>
           </ul>
-          <a href="https://kensgames.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+          <a href="bfx-ingest.html" class="cta-btn">See it, with real numbers</a>
         </div>
+
         <div class="project-card">
-          <h3>TTLRecall.com</h3>
-          <p class="project-summary">Rapid-build challenge platform with AI-accelerated workflows
-            for scenario generation, scoring, and feedback. Personal portfolio project.</p>
+          <h3>Zero-downtime deployment system</h3>
+          <p class="project-summary">
+            An atomic, content-addressed release pipeline: each deploy is hashed into a verifiable manifest, promoted
+            by an atomic symlink swap, health-checked, and automatically rolled back on failure. It replaced in-place
+            deploys that left a site broken on partial failure with immutable releases and one-command rollback.
+          </p>
           <ul class="project-tech">
-            <li>AI workflow automation</li>
-            <li>Scenario engine, real-time feedback</li>
+            <li>Atomic releases &middot; health-gated auto-rollback</li>
+            <li>Reproducible, content-addressed manifests</li>
+            <li>GitHub Actions CI/CD across multiple domains</li>
           </ul>
-          <a href="https://ttlrecall.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+          <a href="https://github.com/kenbin64" class="cta-btn" target="_blank" rel="noopener">Source on GitHub</a>
         </div>
+
         <div class="project-card">
-          <h3>DimensionalProgramming.com</h3>
-          <p class="project-summary">A technical writeup site presenting the paradigm I developed
-            &mdash; z = x &middot; y as a substrate, breath verbs, the manifold-as-database.</p>
+          <h3>Deterministic multiplayer netcode</h3>
+          <p class="project-summary">
+            Real-time multiplayer where game state is derived from a seed and an append-only command log, so every
+            client replays identical events and converges on byte-identical state. It eliminates an entire class of
+            state-divergence bugs. Live as a playable demo at KensGames.
+          </p>
           <ul class="project-tech">
-            <li>Dimensional programming as a discipline</li>
-            <li>Explainable, non-drifting AI primitives</li>
+            <li>Event sourcing &middot; deterministic lockstep</li>
+            <li>WebGL2 / Three.js &middot; Node / WebSocket backend</li>
+            <li>Self-managed Linux VPS, PM2, nginx</li>
           </ul>
-          <a href="https://dimensionalprogramming.com" class="cta-btn" target="_blank" rel="noopener">View portfolio piece</a>
+          <a href="https://kensgames.com" class="cta-btn" target="_blank" rel="noopener">Play the demo</a>
         </div>
+
         <div class="project-card">
-          <h3>Open Source</h3>
-          <p class="project-summary">Public projects and code samples across AI tooling,
-            agent design, and dimensional programming.</p>
+          <h3>ButterflyFx runtime</h3>
+          <p class="project-summary">
+            A small event-sourcing runtime: wrap any reducer and get content-addressed, hash-chained, tamper-evident
+            state with deterministic replay. Reproducibility and auditability become architectural properties instead
+            of afterthoughts. Each property is covered by tests.
+          </p>
           <ul class="project-tech">
-            <li>github.com/kenbin64</li>
+            <li>Reducer in, reproducible state out</li>
+            <li>Hash-chained, tamper-evident log</li>
+            <li>Open source, tested</li>
           </ul>
-          <a href="https://github.com/kenbin64" class="cta-btn" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/kenbin64" class="cta-btn" target="_blank" rel="noopener">Source on GitHub</a>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Core skills</h2>
+      <div class="pillars-grid">
+        <article class="pillar-card span-2x2">
+          <h3>Reliability around an unreliable model</h3>
+          <p>
+            The model is nondeterministic; the system around it must not be. Schema-validated outputs, retry budgets,
+            verifier passes, and evaluation harnesses, so malformed or drifting output never reaches the next stage.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <h3>AI / LLM</h3>
+          <p>LLM integration, RAG, evals, structured outputs, tool / function calling, model routing, prompt caching, token budgeting.</p>
+        </article>
+        <article class="pillar-card">
+          <h3>Backend &amp; infrastructure</h3>
+          <p>Node.js, Python, REST, WebSockets, PostgreSQL, SQLite, Linux, nginx, Docker, CI/CD, zero-downtime deploys.</p>
+        </article>
+        <article class="pillar-card">
+          <h3>Cost and latency</h3>
+          <p>Route cheap calls to cheap models, cache byte-identical context, budget tokens, so frontier spend goes only where frontier reasoning is required.</p>
+        </article>
+        <article class="pillar-card">
+          <h3>Reproducibility &amp; provenance</h3>
+          <p>Content-addressed, hash-verified, deterministic replay, so you can prove exactly what a system did and recreate it on any machine.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section glass">
+      <h2 class="section-title">Looking for my next role</h2>
+      <div class="section-content">
+        <p>
+          I am seeking a full-time AI engineering or backend / platform role, and I am open to remote.
+          The projects on this site are <b>personal portfolio pieces</b>, built end to end to demonstrate the work
+          above. They are not commercial products or services for sale.
+        </p>
+        <div class="hero-cta">
+          <a href="contact.html" class="cta-btn">Contact for hiring</a>
+          <a href="mailto:ken.bingham64@gmail.com" class="cta-btn alt">ken.bingham64@gmail.com</a>
+          <a href="resume.html" class="cta-btn alt">Resume</a>
         </div>
       </div>
-      <p style="text-align:center;margin-top:1.5em;">
-        <a href="projects.html" class="card-link">See full project details &rarr;</a>
-      </p>
     </section>
 
     <footer>
-      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
+      <p>
+        &copy; 2026 Kenneth W. Bingham &middot; ButterflyFx
+        &middot; <a href="research.html" style="opacity:0.7;">Writing</a>
+      </p>
     </footer>
   </div>
 

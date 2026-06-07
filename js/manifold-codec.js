@@ -81,7 +81,36 @@ const ManifoldCodec = (() => {
     return hex;
   }
 
-  return { ALPHABET, fnv1a, canonical, codeFromSeed, idFromSeed };
+  // Deterministic PRNG (mulberry32) keyed off any seed shape. Returns a
+  // function that yields floats in [0, 1). The same seed produces the same
+  // stream on every surface (Node lobby, browser game), so all clients in a
+  // session derive identical sequences — the manifold-first cure for each
+  // client materialising its own board with a private Math.random().
+  function prng(seed) {
+    let a = (typeof seed === 'number' ? (seed >>> 0) : fnv1a(canonical(seed))) >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Deterministic Fisher–Yates shuffle. Returns a NEW array (input untouched).
+  // The same (array, seed) yields an identical ordering on every surface, so a
+  // single shared seed lets every client bloom the same deck / spawn order /
+  // any other RNG-derived sequence. This is THE shared shuffle for all games.
+  function seededShuffle(array, seed) {
+    const a = Array.isArray(array) ? array.slice() : [];
+    const rand = prng(seed);
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  return { ALPHABET, fnv1a, canonical, codeFromSeed, idFromSeed, prng, seededShuffle };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = ManifoldCodec;

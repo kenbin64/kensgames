@@ -1,0 +1,2 @@
+# Real config holds server host/user — keep it local, commit only the example.
+deploy.config.json
