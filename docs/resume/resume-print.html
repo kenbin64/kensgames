@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kenneth W. Bingham - Resume</title>
+<style>
+/* Clean, single-column, ATS-friendly. Open in a browser, then Print > Save as PDF (Letter). */
+*{box-sizing:border-box}
+html,body{margin:0;background:#fff;color:#1a1a1a;font-family:"Calibri","Segoe UI",Arial,sans-serif;font-size:10.6pt;line-height:1.42}
+.page{max-width:7.7in;margin:0 auto;padding:0.55in 0.62in}
+h1{font-size:21pt;margin:0;letter-spacing:.2px}
+.role{font-size:10.6pt;color:#0a5a8a;font-weight:700;margin:2px 0 3px}
+.contact{font-size:9.3pt;color:#333;margin:0 0 2px}
+.contact a{color:#0a5a8a;text-decoration:none}
+hr{border:none;border-top:1.5px solid #0a5a8a;margin:9px 0 11px}
+h2{font-size:11pt;color:#0a5a8a;text-transform:uppercase;letter-spacing:.6px;margin:13px 0 5px;border-bottom:1px solid #cdd6dd;padding-bottom:2px}
+p{margin:0 0 7px}
+ul{margin:3px 0 9px;padding-left:17px}
+li{margin:0 0 3px}
+.job{margin:0 0 1px;font-weight:700;font-size:10.8pt}
+.meta{font-size:9.2pt;color:#555;margin:0 0 3px}
+.proj{font-weight:700}
+.skills b{color:#1a1a1a}
+.lead{color:#222}
+strong{color:#111}
+@media print{.page{padding:0.5in 0.55in;max-width:none}a{color:#0a5a8a}}
+@page{margin:0.4in}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Kenneth W. Bingham</h1>
+  <div class="role">AI Engineer &middot; Backend &amp; Platform Engineer &middot; Full-Stack</div>
+  <div class="contact">United States &middot; Mountain Time &middot; Open to hybrid and remote</div>
+  <div class="contact">801-425-2652 &middot; <a href="mailto:ken.bingham64@gmail.com">ken.bingham64@gmail.com</a> &middot; <a href="https://linkedin.com/in/kenneth-bingham-11378b10">linkedin.com/in/kenneth-bingham-11378b10</a> &middot; <a href="https://github.com/kenbin64">github.com/kenbin64</a></div>
+  <hr>
+
+  <h2>Summary</h2>
+  <p class="lead">Software engineer with 10+ years building reliable systems end to end across regulated, high-stakes domains: U.S. Air Force programs (held a Secret clearance), healthcare and insurance, fintech, and fleet payments. Beginning August 2025, on my own initiative, I committed to AI engineering in depth, well beyond day-to-day use: how large language models actually work, and how to make them reliable through operating directives and geometric representation. I architect and ship real systems with measured results, full-stack from database to cloud deploy, and I prove my work with tests and reproducible numbers. Seeking an AI engineering or backend / platform role where reliability and cost-efficiency matter.</p>
+
+  <h2>Core Skills</h2>
+  <p class="skills"><b>Languages:</b> Python, JavaScript / TypeScript, C# / .NET, Java, SQL, GLSL<br>
+  <b>AI / LLM:</b> LLM integration, RAG, prompt engineering, evaluation and verification harnesses, structured / JSON outputs, tool and function calling, model routing, prompt caching, token budgeting, hallucination reduction; self-hosted local models (Llama, Qwen, DeepSeek, Mistral, Phi-3) via Ollama and LM Studio<br>
+  <b>Backend &amp; Infra:</b> Node.js, Express, Spring Boot, REST APIs, microservices, WebSockets, PostgreSQL, SQL Server, Oracle, MySQL, SQLite, Linux, nginx, Docker, PM2, zero-downtime deploys<br>
+  <b>CI/CD &amp; Cloud:</b> Azure DevOps pipelines, GitHub Actions, Azure, automated testing, observability<br>
+  <b>Front-end &amp; 3D:</b> Angular, React, WebGL2, Three.js, HTML / CSS<br>
+  <b>Practices:</b> Event sourcing, content-addressed storage, deterministic replay, test automation, HL7 / FHIR healthcare interoperability, secure SDLC in cleared environments</p>
+
+  <h2>Selected Achievements</h2>
+  <ul>
+    <li><strong>Cut repeated LLM input cost by roughly 85% in a typical iterative session</strong> through deterministic, cacheable context, proven by a reproducible benchmark (bfx-ingest).</li>
+    <li><strong>Took unsupported, hallucinated model output from about 39% to 0%</strong> by wrapping generation in a deterministic verifier, while best-of-N kept the answer rate high.</li>
+    <li><strong>Eliminated an entire class of multiplayer state-divergence bugs</strong> by re-architecting to event-sourced, deterministic netcode that replays byte-identical state from one seed.</li>
+    <li><strong>Shipped a water-system telemetry and compliance platform covered by 123 deterministic automated tests</strong>, with a signed go-live gate and a tamper-evident audit trail.</li>
+    <li><strong>Delivered mission-critical U.S. Air Force systems</strong> for aircraft-parts test and maintenance tracking, replacing an aging legacy platform; held a U.S. Air Force Secret clearance.</li>
+    <li><strong>Built a credit-union core banking and teller platform</strong> capable of running a credit union's day-to-day operations end to end.</li>
+  </ul>
+
+  <h2>Professional Experience</h2>
+
+  <div class="job">Software Developer &middot; DTSI</div>
+  <div class="meta">Apr 2024 to Present &middot; Hill Air Force Base, UT</div>
+  <ul>
+    <li>Modernize mission-critical U.S. Air Force systems in Java, .NET, and SQL Server under strict DoD change control.</li>
+    <li>Build deterministic test harnesses that reduce regression risk across legacy workflows.</li>
+    <li>Operate in cleared, high-security environments.</li>
+  </ul>
+
+  <div class="job">Software Developer &middot; Humana</div>
+  <div class="meta">Feb 2022 to Jan 2024 &middot; Remote</div>
+  <ul>
+    <li>Developed .NET 6 services and HL7 / FHIR healthcare-interoperability pipelines, and optimized SQL.</li>
+    <li>Built Python ETL automation and Linux admin workflows that cut manual cycles.</li>
+  </ul>
+
+  <div class="job">Software Developer &middot; Systems Implementers</div>
+  <div class="meta">Apr 2021 to Dec 2021 &middot; Hill Air Force Base, UT</div>
+  <ul>
+    <li>Built Java and Spring Boot services for aircraft-parts test, maintenance, and asset tracking, replacing an aging legacy platform.</li>
+    <li>Redesigned a dated but highly functional interface with modern iconography and visual design, which proved instrumental to user adoption.</li>
+    <li>Built a CRM for hazardous-waste tracking; held a U.S. Air Force Secret clearance.</li>
+  </ul>
+
+  <div class="job">Software Developer &middot; Gwinnett County School District</div>
+  <div class="meta">Feb 2020 to Aug 2020 &middot; Georgia</div>
+  <ul><li>Built automated test frameworks in Java and Selenium, improving QA coverage.</li></ul>
+
+  <div class="job">Software Developer &middot; Norfolk Southern Railroad</div>
+  <div class="meta">Aug 2019 to Jan 2020 &middot; Atlanta, GA</div>
+  <ul><li>Improved locomotive-optimization software and handled real-time data processing.</li></ul>
+
+  <div class="job">Software Developer &middot; Finicity (via STG)</div>
+  <div class="meta">Nov 2017 to Aug 2018 &middot; Murray, UT</div>
+  <ul><li>Built Java financial-data aggregation and secure API integrations, deriving insight from bank accounts, financial records, and public data beyond a standard credit report.</li></ul>
+
+  <div class="job">Java Programmer &middot; WEX</div>
+  <div class="meta">Feb 2017 to Sep 2017 &middot; Ogden, UT</div>
+  <ul><li>Owned the customer portal and CRM for a fleet fuel-card platform; delivered enterprise web portals and document-management workflows.</li></ul>
+
+  <div class="job">Java Programmer &middot; CUProdigy</div>
+  <div class="meta">Apr 2015 to Feb 2017 &middot; Utah</div>
+  <ul><li>Full-stack development on a credit-union core banking and teller system (Java, Spring, Hibernate, MySQL) supporting end-to-end credit union operations.</li></ul>
+
+  <h2>Self-Directed AI Engineering (Aug 2025 to Present)</h2>
+  <p>On my own initiative and outside of employment, I committed to AI engineering in depth. I did not learn it on a job; I sought out not only how to use large language models but how they work internally and how to optimize them. I get reliable output from stock models by directing them with explicit operating directives that demand proof and reject unverified claims, the same discipline that took a verifier's hallucinated output from about 39% to 0%. I architected and built real, tested systems with this approach (below), and I developed an original framework, dimensional programming, built on z = x &middot; y as an organizing manifold and exploring Fibonacci-based dimensional dynamics, with each idea demonstrated in a working tool and each claim labeled by how well it is supported.</p>
+
+  <h2>Independent Engineering Projects</h2>
+  <p>Personal projects built end to end to demonstrate the work. Each one runs, is tested, and carries a real number or a live link.</p>
+  <ul>
+    <li><span class="proj">bfx-ingest, Deterministic LLM Context Tool (Open Source, MIT).</span> Zero-dependency CLI that assembles deterministic, content-addressed context from a codebase, deduplicating by content hash to cut token usage and produce a reproducible root hash for pinned evals and prompt-cache hits. Model-specific formats with token estimates; CI across four Node.js versions.</li>
+    <li><span class="proj">The Conduit, Water-System Telemetry and Compliance (live: theconduit.me).</span> Scores one health number per station, gates real-time operation behind a signed go-live authorization, keeps a tamper-evident audit trail. Dependency-free JavaScript with a 3D network view; 123 deterministic automated tests.</li>
+    <li><span class="proj">KensGames, Deterministic Multiplayer Platform (live: kensgames.com).</span> Event-sourced netcode: state derived from a seed and an append-only log, every client converges on byte-identical state. Fast Track verifies 503 legal paths with 0 teleports. WebGL2 / Three.js, Node.js / WebSocket, self-managed Linux VPS.</li>
+    <li><span class="proj">Hallucination Verifier (Open Source).</span> A deterministic verifier wrapped around generation takes hallucinated output from about 39% to 0% while best-of-N keeps the answer rate high. Standard library only, measured and reproducible.</li>
+    <li><span class="proj">ButterflyFx Runtime, Reproducible State (Open Source).</span> Wraps any reducer to give content-addressed, hash-chained, tamper-evident state with deterministic replay. Each property covered by tests.</li>
+    <li><span class="proj">Zero-Downtime Deployment System.</span> Atomic, content-addressed releases promoted by symlink swap, health-checked, automatically rolled back on failure, with one-command manual rollback. Serves the live sites above.</li>
+  </ul>
+
+  <h2>Independent Research</h2>
+  <p>Geometric and representation-based computation (dimensional programming / manifold-as-data): representing data as derivable geometry so localized context is computed on demand instead of stored or re-sent, the same intuition as the manifold hypothesis, embeddings, and autoencoders. Demonstrated, not only theorized: a dependency-free API (dp.js) measures a roughly 99.7% token reduction answering localized questions over a large nested structure. Published openly at dimensionalprogramming.com, each claim labeled by how well it is supported.</p>
+
+  <h2>Education</h2>
+  <p>B.S., Computer Science and Software Engineering</p>
+
+</div>
+</body>
+</html>

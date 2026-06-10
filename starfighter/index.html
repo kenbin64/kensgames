@@ -165,14 +165,15 @@
     }
 
     /* ═══════════════════════════════════════
-       CROSSHAIR — centered on the rendered canvas, not the viewport.
-       Desktop reserves 64 px at the bottom for #sf-rail, so the canvas
-       center is 32 px above viewport center. Mobile hides the rail and
-       restores the crosshair to true viewport center via media query.
+       CROSSHAIR — always dead center. #game-canvas fills the full viewport
+       (100vh) and #sf-rail only overlays the bottom, so the 3D view is
+       centered on the true viewport center. (A former "top: calc(50% - 32px)"
+       offset assumed the rail shrank the canvas; it does not, which made the
+       crosshair sit 32px high and read as off-center.)
        ═══════════════════════════════════════ */
     #crosshair {
       position: absolute;
-      top: calc(50% - 32px);
+      top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       width: 44px;
