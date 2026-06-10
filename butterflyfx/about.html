@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About &mdash; Kenneth W. Bingham, AI Systems Architect</title>
+  <title>About &middot; Kenneth W. Bingham, AI Engineer</title>
   <meta name="description"
-    content="Background, skills, and experience of Kenneth W. Bingham &mdash; AI Systems Architect and Senior Software Engineer. Directive engineering, agent loops, manifold programming.">
+    content="About Kenneth W. Bingham, AI Engineer and Backend / Platform Engineer: 10+ years building reliable systems, now focused on the reliability layer around AI.">
   <link rel="canonical" href="https://butterflyfx.us/about.html">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
@@ -21,16 +21,10 @@
     <a href="index.html">Home</a>
     <a href="about.html" class="active">About</a>
     <a href="method.html">Method</a>
-    <a href="agents.html">Agents</a>
-    <a href="routing.html">Routing</a>
-    <a href="projects.html">Projects</a>
-    <a href="directive.html">Directive</a>
-    <a href="dimensional-programming.html">Dimensional Programming</a>
-    <a href="research.html">Research</a>
-    <a href="search.html">Search</a>
     <a href="resume.html">Resume</a>
+    <a href="research.html">Research</a>
     <a href="contact.html">Contact</a>
-    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
+    <a href="https://github.com/kenbin64" target="_blank" rel="noopener">GitHub</a>
   </nav>
 
   <div class="content">
@@ -39,209 +33,59 @@
       <img src="kennethbingham.webp" alt="Kenneth W. Bingham" class="hero-photo"
         style="width:120px;height:120px;margin-bottom:1em;" />
       <h1>Kenneth W. Bingham</h1>
-      <h2>AI Systems Architect &middot; Senior Software Engineer</h2>
-      <h3>Kaysville, UT &middot; Available for full-time employment &middot; Open to remote</h3>
+      <h2>AI Engineer &middot; Backend &amp; Platform Engineer</h2>
+      <h3>Open to hybrid and remote</h3>
     </header>
 
     <section class="section glass">
-      <h2 class="section-title">Summary</h2>
+      <h2 class="section-title">Who I am</h2>
       <div class="section-content">
-        <p>Ten-plus-year senior engineer who designs and ships AI systems whose behavior is
-          <b>provable</b>, not hoped-for. I build directive frameworks that hold against drift,
-          agent loops that route by logic gates and minimal-surface decision boundaries, and
-          full-stack platforms I own end-to-end &mdash; from manifold compiler to nginx config.
-          Recent focus: AI systems architecture, deterministic agent design, and dimensional /
-          manifold programming.</p>
-        <p>As personal portfolio work, I have designed and built complete production-grade
-          platforms end-to-end &mdash; KensGames.com, TTLRecall.com, DimensionalProgramming.com,
-          ButterflyFX.us &mdash; alongside multiple open-source projects on
-          <a href="https://github.com/kenbin64" target="_blank" rel="noopener">GitHub (kenbin64)</a>.
-          These are demonstrations of skill, not commercial products or services for sale.</p>
-        <p>I also publish technical writing on
-          <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack (@kbingh)</a>
-          covering AI architecture, dimensional computing, and system design.</p>
-        <p style="margin-top:1.5em;">
-          <a href="assets/KennethWBingham_Resume_2026.pdf" class="cta-btn" download>Download Resume (PDF)</a>
+        <p>
+          I am a software engineer with more than ten years building reliable systems end to end, across regulated,
+          high-stakes domains: U.S. Air Force programs (I held a Secret clearance), healthcare and insurance, fintech,
+          and fleet payments. I work full-stack, from database and API to a modern front end and the cloud deploy that
+          puts it in production.
+        </p>
+        <p>
+          Since August 2025, on my own initiative, I have gone deep into AI engineering: not only how to use large
+          language models, but how they work and how to make them reliable through operating directives and geometric
+          representation. I build the reliability layer around AI: deterministic pipelines, evaluation and verification
+          harnesses, and reproducible systems. I prove my work with tests and reproducible numbers, and I separate what is
+          established from what is a model from what is still a conjecture under test, so the bold ideas stay credible.
         </p>
       </div>
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">What I Optimize For</h2>
+      <h2 class="section-title">What I optimize for</h2>
       <div class="section-content">
         <ul>
-          <li><b>Maximum quality per dollar of AI spend.</b> Route by regex pre-filter,
-            truth-table constraints, decision-tree shortcuts, and a
-            <a href="routing.html">Schwarz-D minimal-surface boundary</a> so frontier
-            credits go only where frontier reasoning is required.</li>
-          <li><b>Determinism over fluency.</b> Schema-validated outputs, retry budgets,
-            verifier ensembles &mdash; LLMs never return free text to the next stage.</li>
-          <li><b>Ancestry-preserving systems.</b> No destructive updates; every state is
-            traceable through its lineage on the underlying manifold.</li>
-          <li><b>Sovereign over rented.</b> I own the VPS, the deploy pipeline, the data
-            model, the directive doctrine. Vendor portability is a first-class requirement.</li>
+          <li><b>Determinism over fluency.</b> The model is nondeterministic; the system around it must not be. Schema-validated outputs, retry budgets, and verifier passes, so malformed or drifting output never reaches the next stage.</li>
+          <li><b>Cost where it counts.</b> Route cheap calls to cheap models, cache byte-identical context, budget tokens, so frontier spend goes only where frontier reasoning is required.</li>
+          <li><b>Reproducibility and provenance.</b> Content-addressed, hash-verified, deterministic replay, so you can prove exactly what a system did and recreate it on any machine.</li>
+          <li><b>Ownership end to end.</b> I run my own Linux infrastructure with zero-downtime, auto-rollback deploys, and I own problems from architecture through production.</li>
         </ul>
       </div>
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">Core Technical Skills</h2>
-      <div class="section-content skills-grid">
-
-        <div class="skill-block">
-          <h4>AI &amp; Agents</h4>
-          <ul>
-            <li>Directive engineering, agent loops, evaluation harnesses, tool-use design</li>
-            <li>Retrieval-augmented generation, AWS Bedrock Knowledge Bases</li>
-            <li>Vector search (OpenSearch, Pinecone, Milvus, local bge)</li>
-            <li>Multi-model routing across Claude, GPT, Gemini, Llama, Copilot</li>
-            <li>Non-drifting, non-hallucinating behavior frameworks</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Languages</h4>
-          <ul>
-            <li>Java 8 / 11 / 17</li>
-            <li>C# / .NET 6 / ASP.NET Core</li>
-            <li>Python 3</li>
-            <li>TypeScript / JavaScript (ES2022+)</li>
-            <li>SQL &middot; Bash &middot; PowerShell</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Backend</h4>
-          <ul>
-            <li>Spring Boot, Quarkus</li>
-            <li>REST APIs, microservices, backend optimization</li>
-            <li>HL7, FHIR healthcare data workflows</li>
-            <li>Python ETL pipelines, automated content extraction</li>
-            <li>Deterministic state engines, SQLite-backed record layers</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Frontend / 3D</h4>
-          <ul>
-            <li>Angular, React, TypeScript</li>
-            <li>Three.js, WebGL, WebGPU</li>
-            <li>Interactive 3D, minimal-surface visualization</li>
-            <li>SVG instrumentation and lightweight rendering pipelines</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Cloud / DevOps</h4>
-          <ul>
-            <li>GitHub Actions, Azure Pipelines, CI/CD</li>
-            <li>Docker, Kubernetes, OpenShift</li>
-            <li>Linux (Ubuntu) administration, Bash scripting</li>
-            <li>NGINX, PM2, SSL, domain routing, VPS hosting end-to-end</li>
-            <li>Amazon S3 document pipelines and vector prep</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Data</h4>
-          <ul>
-            <li>SQL Server, Oracle, MySQL, Postgres, SQLite</li>
-            <li>MarkLogic, document &amp; vector stores</li>
-            <li>Schema design, indexing, query optimization</li>
-          </ul>
-        </div>
-
-        <div class="skill-block">
-          <h4>Security / Compliance</h4>
-          <ul>
-            <li>Mission-critical DoD systems</li>
-            <li>Healthcare HL7 / FHIR workflows</li>
-            <li>Financial-data parsing and secure authentication workflows</li>
-            <li>On-machine LLM routing for PII</li>
-          </ul>
-        </div>
-
-      </div>
-    </section>
-
-    <section class="section glass">
-      <h2 class="section-title">Experience &mdash; Last 10 Years</h2>
+      <h2 class="section-title">Beyond the keyboard</h2>
       <div class="section-content">
-        <div class="role">
-          <h4>Software Developer &mdash; DTSI <span class="role-meta">Apr 2024 &ndash; Present &middot; Hill Air Force Base</span></h4>
-          <p>Strengthened mission-critical Air Force systems using Java, .NET, SQL Server, and secure
-            DevOps practices. Modernized legacy workflows and improved backend reliability.</p>
-        </div>
-        <div class="role">
-          <h4>Software Developer &mdash; Humana <span class="role-meta">Feb 2022 &ndash; Feb 2024 &middot; Remote</span></h4>
-          <p>Enhanced large-scale healthcare platforms using .NET 6, Azure Pipelines, HL7/FHIR, and SQL
-            optimization. Automated deployments and expanded Python-based ETL and Linux administration.</p>
-        </div>
-        <div class="role">
-          <h4>Software Developer &mdash; Systems Implementers <span class="role-meta">Apr 2021 &ndash; Dec 2021 &middot; Hill AFB</span></h4>
-          <p>Developed Java/Spring Boot applications for aircraft maintenance and asset tracking.
-            Improved backend APIs and integrated with military workflows.</p>
-        </div>
-        <div class="role">
-          <h4>Software Developer &mdash; Gwinnett County School District <span class="role-meta">Feb 2020 &ndash; Aug 2020 &middot; GA</span></h4>
-          <p>Built automated testing frameworks using Java and Selenium WebDriver. Improved QA
-            workflows and test automation coverage.</p>
-        </div>
-        <div class="role">
-          <h4>Software Developer &mdash; Norfolk Southern Railroad <span class="role-meta">Aug 2019 &ndash; Jan 2020 &middot; Atlanta, GA</span></h4>
-          <p>Improved locomotive optimization systems using Java and JavaScript. Worked with
-            real-time data processing and legacy modernization.</p>
-        </div>
-        <div class="role">
-          <h4>Software Developer &mdash; Finicity (via STG) <span class="role-meta">Nov 2017 &ndash; Aug 2018 &middot; Murray, UT</span></h4>
-          <p>Developed Java-based financial data extraction tools. Strengthened API integration,
-            secure data handling, and parsing workflows.</p>
-        </div>
-        <div class="role">
-          <h4>Java Programmer &mdash; Wex <span class="role-meta">Feb 2017 &ndash; Sep 2017 &middot; Ogden, UT</span></h4>
-          <p>Built enterprise web portals and document management workflows. Worked with Oracle,
-            Spring, and enterprise messaging systems.</p>
-        </div>
-        <div class="role">
-          <h4>Java Programmer &mdash; CUProdigy <span class="role-meta">Apr 2015 &ndash; Feb 2017 &middot; UT</span></h4>
-          <p>Developed secure banking applications using Java, Spring, Hibernate, and MySQL.
-            Strengthened authentication workflows and backend reliability.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section glass">
-      <h2 class="section-title">Personal Portfolio Projects</h2>
-      <div class="section-content">
-        <p style="opacity:0.85;margin-bottom:1.2em;">
-          The following are personal portfolio sites I built end-to-end to demonstrate the skills
-          listed above. None are commercial products, businesses, or services for sale.
+        <p>
+          I am a drummer, a singer, and an acrylic painter, and an independent researcher in geometric, representation-based
+          computation. The same instinct runs through all of it: find the structure underneath, and let it carry the work.
         </p>
-        <p><strong>Designer &amp; Sole Developer &mdash; DimensionalProgramming.com.</strong> A technical
-          writeup site presenting dimensional programming as a discipline, including the
-          breath-verb algebra and the deploy pipeline.</p>
-        <p><strong>Designer &amp; Sole Developer &mdash; ButterflyFX.us.</strong> This site &mdash; an
-          extended portfolio exploring geometric computing, dimensional programming, and AI
-          system behavior.</p>
-        <p><strong>Designer &amp; Sole Developer &mdash; KensGames.com.</strong> A 3D game portfolio
-          piece with deterministic simulation, real-time rendering, and stateless computation:
-          backend logic, rendering pipelines, authentication, deployment, and long-term upkeep.</p>
-        <p><strong>Designer &amp; Sole Developer &mdash; TTLRecall.com.</strong> Built and deployed
-          two complete mock business platforms in ~30 minutes using AI-accelerated workflows.
-          Demonstrates speed, precision, and architectural clarity.</p>
+        <div class="hero-cta" style="margin-top:1.2em;">
+          <a href="resume.html" class="cta-btn">Full resume</a>
+          <a href="method.html" class="cta-btn alt">How I work</a>
+          <a href="research.html" class="cta-btn alt">Research and writing</a>
+          <a href="contact.html" class="cta-btn alt">Contact</a>
+        </div>
       </div>
     </section>
-
-    <section class="section glass">
-      <h2 class="section-title">Education</h2>
-      <div class="section-content">
-        <p><strong>B.S. Computer Science &amp; Software Engineering</strong></p>
-      </div>
-    </section>
-
 
     <footer>
-      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFX.us</p>
+      <p>&copy; 2026 Kenneth W. Bingham &middot; ButterflyFx</p>
     </footer>
   </div>
 

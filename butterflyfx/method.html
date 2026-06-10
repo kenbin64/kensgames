@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Method &mdash; How I Think About AI</title>
+  <title>Method, How I Think About AI</title>
   <meta name="description"
-    content="Logic gates, truth tables, decision trees, and manifold-based attention &mdash; how Kenneth W. Bingham designs AI systems that stay stable and explainable.">
+    content="Logic gates, truth tables, decision trees, and manifold-based attention, how Kenneth W. Bingham designs AI systems that stay stable and explainable.">
   <link rel="canonical" href="https://butterflyfx.us/method.html">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
@@ -21,16 +21,10 @@
     <a href="index.html">Home</a>
     <a href="about.html">About</a>
     <a href="method.html" class="active">Method</a>
-    <a href="agents.html">Agents</a>
-    <a href="routing.html">Routing</a>
-    <a href="projects.html">Projects</a>
-    <a href="directive.html">Directive</a>
-    <a href="dimensional-programming.html">Dimensional Programming</a>
-    <a href="research.html">Research</a>
-    <a href="search.html">Search</a>
     <a href="resume.html">Resume</a>
+    <a href="research.html">Research</a>
     <a href="contact.html">Contact</a>
-    <a href="https://substack.com/@kbingh" target="_blank" rel="noopener">Substack</a>
+    <a href="https://github.com/kenbin64" target="_blank" rel="noopener">GitHub</a>
   </nav>
 
   <div class="content">
@@ -44,27 +38,27 @@
     <section class="section glass">
       <h2 class="section-title">The Premise</h2>
       <div class="section-content">
-        <p>Most LLM failures &mdash; hallucination, drift, brittle answers under retries &mdash; are not
+        <p>Most LLM failures, hallucination, drift, brittle answers under retries, are not
           intelligence problems. They are <em>structure</em> problems. The model is asked to do
           two jobs at once: decide <strong>what is true</strong> and decide <strong>what to
             attend to</strong>. When those two jobs are fused inside one free-form response, both
           jobs degrade.</p>
-        <p>My method separates them. <strong>Logic</strong> &mdash; truth tables, gates, decision trees
-          &mdash; is the part of the system the model is not allowed to lie around. <strong>Manifolds</strong>
-          &mdash; smooth geometric surfaces governed by <span class="math">z = x &middot; y</span>
-          &mdash; are how the system decides which small region of state actually matters this turn.
+        <p>My method separates them. <strong>Logic</strong>, truth tables, gates, decision trees
+         , is the part of the system the model is not allowed to lie around. <strong>Manifolds</strong>
+         , smooth geometric surfaces governed by <span class="math">z = x &middot; y</span>
+         , are how the system decides which small region of state actually matters this turn.
           The model handles the rest: language, nuance, judgment under uncertainty.</p>
       </div>
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">1. Truth Tables &mdash; The Hard Skeleton</h2>
+      <h2 class="section-title">1. Truth Tables, The Hard Skeleton</h2>
       <div class="section-content">
         <p>Before any LLM call, I enumerate the propositions the system cares about and the
           combinations that are allowed to exist. A truth table is not a programming trick; it is
           a <em>contract</em>. Rows that produce illegal combinations are caught at the boundary,
           not in the model.</p>
-        <p>Example &mdash; gating an agent action on three signals (user-authorized,
+        <p>Example, gating an agent action on three signals (user-authorized,
           policy-compliant, evidence-grounded):</p>
         <table class="truth-table">
           <thead>
@@ -88,16 +82,16 @@
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">2. Logic Gates &mdash; Composability</h2>
+      <h2 class="section-title">2. Logic Gates, Composability</h2>
       <div class="section-content">
         <p>Gates (AND, OR, NOT, XOR, NAND) are the smallest reusable units of decision. I build
           agent pipelines as compositions of gates wrapping LLM calls, not as one giant prompt.
           Each gate has a single, falsifiable job:</p>
         <ul>
-          <li><strong>AND-of-verifiers</strong> &mdash; require N independent checks before commit.</li>
-          <li><strong>OR-of-retrievers</strong> &mdash; succeed if any trusted source returns a hit.</li>
-          <li><strong>NOT-classifier</strong> &mdash; one model whose only job is to say <em>no</em>.</li>
-          <li><strong>XOR-router</strong> &mdash; exactly one tool fires; never both, never neither.</li>
+          <li><strong>AND-of-verifiers</strong>, require N independent checks before commit.</li>
+          <li><strong>OR-of-retrievers</strong>, succeed if any trusted source returns a hit.</li>
+          <li><strong>NOT-classifier</strong>, one model whose only job is to say <em>no</em>.</li>
+          <li><strong>XOR-router</strong>, exactly one tool fires; never both, never neither.</li>
         </ul>
         <p>A gate is replaceable. A monolithic prompt is not. That is the operational
           difference between a system you can debug at 3am and one you cannot.</p>
@@ -105,7 +99,7 @@
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">3. Decision Trees &mdash; Cheap Where Logic Is Enough</h2>
+      <h2 class="section-title">3. Decision Trees, Cheap Where Logic Is Enough</h2>
       <div class="section-content">
         <p>An LLM is a poor classifier when a 12-node decision tree would already do the job
           deterministically and in microseconds. Before I add an LLM call, I ask: would a
@@ -117,7 +111,7 @@
     </section>
 
     <section class="section glass">
-      <h2 class="section-title">4. Manifolds &mdash; Aiming the Lens</h2>
+      <h2 class="section-title">4. Manifolds, Aiming the Lens</h2>
       <div class="section-content">
         <p>Logic decides <em>whether</em>. Manifolds decide <em>where to look</em>.</p>
         <p>A manifold is a smooth surface that encodes relationships geometrically. The governing
@@ -142,12 +136,12 @@
       <div class="section-content">
         <p>A request comes in. The truth table rejects illegal shapes at the door. A small
           decision tree routes the legal ones to the right tool family. Manifold geometry picks
-          the small region of state that matters. Only then does an LLM speak &mdash; against a
+          the small region of state that matters. Only then does an LLM speak, against a
           gate that requires its answer to satisfy the original truth table on the way out.</p>
         <p>The result is a system whose every decision has a name, a check, and a place on a
           surface. Not magic. Just structure.</p>
         <p style="margin-top:1.5em;">
-          <a href="agents.html" class="card-link">See how I assemble this into agents &rarr;</a>
+          <a href="research.html" class="card-link">See the research and live demos &rarr;</a>
         </p>
       </div>
     </section>
