@@ -151,6 +151,19 @@
             justify-content: space-between;
             align-items: center;
             gap: 20px;
+            position: relative;
+        }
+
+        .nav-toggle {
+            display: none;
+            background: rgba(0, 255, 255, 0.06);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-size: 20px;
+            line-height: 1;
+            border-radius: 6px;
+            padding: 4px 11px;
+            cursor: pointer;
         }
 
         .logo {
@@ -374,9 +387,13 @@
             margin: 0 auto;
             display: grid;
             grid-template-columns: 1.15fr 0.85fr;
-            gap: 50px;
-            align-items: center;
+            grid-template-areas: "brand arcade" "info arcade";
+            gap: 16px 50px;
+            align-items: start;
         }
+
+        .hero-brand { grid-area: brand; position: relative; z-index: 1; text-align: left; }
+        .hero-info { grid-area: info; position: relative; z-index: 1; text-align: left; }
 
         .scene {
             position: absolute;
@@ -511,6 +528,7 @@
         }
 
         .arcade-wall {
+            grid-area: arcade;
             position: relative;
             z-index: 1;
             display: grid;
@@ -1432,6 +1450,52 @@
                 grid-template-columns: 1fr 1fr;
                 gap: 14px;
             }
+
+            .hero-layout {
+                grid-template-columns: 1fr;
+                grid-template-areas: "brand" "arcade" "info";
+                gap: 22px;
+            }
+
+            .hero-brand,
+            .hero-info {
+                text-align: center;
+            }
+
+            .nav-toggle {
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .nav-links {
+                display: none;
+                position: absolute;
+                top: calc(100% + 10px);
+                right: 0;
+                left: 0;
+                flex-direction: column;
+                background: rgba(4, 4, 20, 0.98);
+                border: 1px solid var(--neon-cyan);
+                border-radius: 8px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+                padding: 8px;
+                gap: 2px;
+                z-index: 200;
+            }
+
+            .nav-links.open {
+                display: flex;
+            }
+
+            .nav-links li {
+                width: 100%;
+            }
+
+            .nav-links li a {
+                display: block;
+                padding: 11px 10px;
+                font-size: 12px;
+            }
         }
 
         @media (max-width: 640px) {
@@ -1531,6 +1595,7 @@
             <div class="nav-auth">
                 <div id="kg-player"></div>
             </div>
+            <button class="nav-toggle" aria-label="Menu" aria-expanded="false" onclick="var n=this.parentNode.querySelector('.nav-links');var o=n.classList.toggle('open');this.setAttribute('aria-expanded',o);">&#9776;</button>
         </nav>
     </header>
 
@@ -1565,9 +1630,11 @@
         </div>
 
         <div class="hero-layout">
-            <div class="hero-copy">
+            <div class="hero-brand">
                 <h1>KENS<span class="accent">GAMES</span></h1>
                 <div class="hero-sub">World Class Arcade Portal, Est. 2026</div>
+            </div>
+            <div class="hero-info">
                 <p class="hero-lede">
                     Five browser games — multiplayer, AI opponents, procedural audio — running from a
                     <strong>7.3&nbsp;MB</strong> code footprint. No installs, no downloads, no asset libraries.
@@ -2496,6 +2563,20 @@
                 document.addEventListener('DOMContentLoaded', run, { once: true });
             } else {
                 run();
+            }
+        })();
+    </script>
+    <script>
+        /* close the mobile hamburger menu after tapping a link */
+        (function () {
+            var links = document.querySelectorAll('.nav-links a');
+            for (var i = 0; i < links.length; i++) {
+                links[i].addEventListener('click', function () {
+                    var n = document.querySelector('.nav-links');
+                    if (n) n.classList.remove('open');
+                    var t = document.querySelector('.nav-toggle');
+                    if (t) t.setAttribute('aria-expanded', 'false');
+                });
             }
         })();
     </script>
