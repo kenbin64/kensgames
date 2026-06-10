@@ -4807,9 +4807,10 @@ function movePegAlongPath(pegId, path, onComplete) {
 const _animatingPegs = new Set();
 let _onAnimsDone = null;
 let _moveBarrier = false; // Set true before renderBoard, cleared when all anims done
+let _deferredAnimPending = false; // True when animations are deferred via CameraDirector.whenSettled
 
 function _checkAnimsDone() {
-  if (_animatingPegs.size === 0 && !_moveBarrier) {
+  if (_animatingPegs.size === 0 && !_moveBarrier && !_deferredAnimPending) {
     if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
   }
 }
@@ -4822,14 +4823,39 @@ window.raiseAnimationBarrier = function () {
 // Called by renderBoard3D after it finishes processing pending anims
 function _lowerBarrier() {
   _moveBarrier = false;
-  // If no animations were started, fire the callback now
+  // If no animations were started and none are pending, fire the callback now
   _checkAnimsDone();
+}
+
+// Safety timer: if waitForAnimations sets a callback and it doesn't fire
+// within 15 seconds, force-fire it so the game doesn't freeze.
+let _animTimeout = null;
+function _scheduleAnimSafetyTimeout(callback) {
+  if (_animTimeout) { clearTimeout(_animTimeout); _animTimeout = null; }
+  _animTimeout = setTimeout(() => {
+    _animTimeout = null;
+    // Force-clear any stuck animation tracking
+    _animatingPegs.clear();
+    _deferredAnimPending = false;
+    _moveBarrier = false;
+    console.warn('[SAFETY] Animation barrier timed out — force-advancing turn.');
+    if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
+  }, 15000);
+}
+function _clearAnimSafetyTimeout() {
+  if (_animTimeout) { clearTimeout(_animTimeout); _animTimeout = null; }
 }
 
 // Expose a way for game-core to wait until all hop animations finish
 window.waitForAnimations = function (callback) {
-  if (_animatingPegs.size === 0 && !_moveBarrier) { callback(); return; }
+  // Always check the condition: if nothing is blocking and no deferred
+  // animations are pending, fire immediately.
+  if (_animatingPegs.size === 0 && !_moveBarrier && !_deferredAnimPending) {
+    callback();
+    return;
+  }
   _onAnimsDone = callback;
+  _scheduleAnimSafetyTimeout(callback);
 };
 
 // True while a play is still resolving — pegs hopping or move barrier raised.
@@ -4838,6 +4864,8 @@ window.waitForAnimations = function (callback) {
 window.isPlayResolving = function () {
   // Only block if there are real peg animations in progress
   if (_animatingPegs && _animatingPegs.size > 0) return true;
+  // Also block if deferred animations are pending and haven't started yet
+  if (_deferredAnimPending) return true;
   // Ignore _moveBarrier for instant feedback; only use for true cutscenes
   return false;
 };
@@ -5212,10 +5240,13 @@ function renderBoard3D() {
 
   // ── Start animations only after camera has settled into position ──
   if (_deferredAnims.length > 0) {
+    _deferredAnimPending = true;
     const startAllAnims = () => {
+      _deferredAnimPending = false;
       for (const da of _deferredAnims) {
         const onDone = () => {
           _animatingPegs.delete(da.pegId);
+          _clearAnimSafetyTimeout();
           da.existing.holeId = da.holeId;
           if (_animatingPegs.size === 0) {
             CameraDirector.unlockCutscene();
@@ -6910,4 +6941,3 @@ async function startInit3D() {
 
 // Auto-initialize when DOM ready
 document.addEventListener('DOMContentLoaded', startInit3D);
-
