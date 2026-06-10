@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The SEAT and the Shadow Problem</title>
+<meta name="description" content="A geometric exploration: z = x times y squared as a real surface, the helix behind a wave, and why a formula has a body. A conjecture and a lens, clearly labeled, not established physics.">
+<style>
+:root{--bg:#0c1016;--panel:#141b24;--edge:#283441;--txt:#e7edf4;--mut:#93a1b1;--acc:#8fb7ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Georgia,"Times New Roman",serif;line-height:1.75;font-size:18px}
+.wrap{max-width:720px;margin:0 auto;padding:54px 22px 80px}
+.kicker{font-family:ui-monospace,Consolas,monospace;color:var(--acc);font-size:13px;letter-spacing:1px;text-transform:uppercase}
+h1{font-size:34px;line-height:1.2;margin:10px 0 6px;font-weight:700}
+.sub{color:var(--mut);font-size:17px;font-style:italic;margin-bottom:26px}
+.note{background:var(--panel);border:1px solid var(--edge);border-left:3px solid var(--acc);border-radius:8px;padding:14px 18px;color:var(--mut);font-size:15px;line-height:1.6;font-family:system-ui,sans-serif}
+h2{font-size:22px;margin:38px 0 8px}
+p{margin:0 0 16px}
+.eq{font-family:ui-monospace,Consolas,monospace;color:var(--acc);font-style:normal}
+b{color:#fff}
+.bound{background:#1a1410;border:1px solid #5a4326;border-left:3px solid #d9a441;border-radius:8px;padding:14px 18px;color:#e8d4b2;font-family:system-ui,sans-serif;font-size:15.5px;line-height:1.6}
+.bound b{color:#ffd98a}
+.foot{margin-top:48px;border-top:1px solid var(--edge);padding-top:18px;color:#6c7c8c;font-size:13px;font-family:system-ui,sans-serif}
+</style>
+</head>
+<body><div class="wrap">
+  <div class="kicker">A geometric exploration</div>
+  <h1>The SEAT and the Shadow Problem</h1>
+  <div class="sub">z = x &middot; y&sup2; as a real surface, the helix behind a wave, and why a formula has a body.</div>
+
+  <div class="note">
+    This is a conjecture and a lens, not established physics. Where it is plain mathematics, the algebraic form and the
+    helix behind a wave, it is exact and you can check it. Where it is interpretation it is offered for its interest and
+    its possible use, and it is labeled as interpretation. Trust the parts you can verify, and push on the rest.
+  </div>
+
+  <h2>The shadow problem</h2>
+  <p>Flat paper drops a dimension, and then we spend a lot of effort paying that debt back. A straight line, a perfect
+    square, a sine wave drawn as up-and-down ridges: none of these exist in nature. They are projections. A sine wave is
+    the shadow of circular motion. Trace that motion through time and you get a helix, and the wave is just its shadow on
+    one wall. The complex exponential <span class="eq">e^(i&omega;t)</span> is literally that helix, and the cosine is
+    its projection onto a single axis. Engineers already trade waveforms for phasors for exactly this reason. So a lot of
+    our "simplification" is really compensation for a flattening we performed in the first place.</p>
+
+  <h2>Multiplication has a surface</h2>
+  <p>We write the times table as a flat grid, but the product <span class="eq">z = x &middot; y</span> is a real surface
+    in three dimensions: a saddle, the hyperbolic paraboloid. Every cell of the times table is a height on that surface.
+    The grid is the shadow; the saddle is the body. Once you can see the surface, you can read things off it that the
+    grid hides: how it curves, the way it twists, where it is steep, and the diagonal ridge where the squares live.</p>
+
+  <h2>The SEAT: z = x &middot; y&sup2;</h2>
+  <p>Add the square and the surface changes into something that looks like a recliner, which is why I call it the SEAT.
+    It is a real object with real geometry: angles, distances, inflection points, a half twist, and when copies line up
+    along an axis they thread into a helix. Given only a definition of what you are looking at, you can <b>derive</b>
+    attributes from the shape instead of storing them. Set the object inside a cube and each of the six faces and eight
+    corners gives a different reading of the same thing.</p>
+
+  <h2>A formula has a body, and E = mc&sup2; shares this one</h2>
+  <p>In plain algebra, <span class="eq">E = mc&sup2;</span> is a member of the <span class="eq">z = x &middot; y&sup2;</span>
+    family: energy is mass times a factor squared, with z as E, x as m, and y as c. Kinetic energy
+    <span class="eq">&frac12;mv&sup2;</span> is in the family too, and so is a great deal of physics. The family is a lens.
+    It lets you see at a glance which laws share a body.</p>
+
+  <div class="bound">
+    <b>The boundary, kept bright on purpose.</b> This is not a claim that the geometry causes or derives the physics.
+    The c&sup2; in E = mc&sup2; comes from the structure of spacetime, not from the shape of a chair. Sharing an algebraic
+    form is a way of seeing, not a mechanism. The form unifies how these relationships look; it does not explain why the
+    physics is true.
+  </div>
+
+  <h2>Why a body is useful</h2>
+  <p>If a relationship has a geometric body, you can compute its attributes from the shape rather than keeping them in a
+    table: an angle, a distance, an inflection, a frequency along the helix. That is a representational idea, derive
+    instead of store, and it is honest to say it is not a speed claim. In raw computation this is often slower than a
+    lookup. Its value is consistency and derivation, one object read many ways, not throughput.</p>
+
+  <h2>Closing</h2>
+  <p>So the useful version of all this is geometry and representation: the multiplication surface, the SEAT, the helix
+    behind the wave, the cost of flattening three dimensions into two, and the form as a unifying lens across formulas.
+    The math is exact where it is math. The interpretation is a conjecture, offered openly and marked as one. That is the
+    honest shape of an idea worth keeping.</p>
+
+  <div class="foot">A geometric exploration by Kenneth W. Bingham &middot; dimensionalprogramming.com &middot; offered as a conjecture, not as established physics.
+  <br><br>Concept and direction: Kenneth W. Bingham. Built with the help of Claude AI under a standing directive to be skeptical, to insist on proof, and to allow no claim that is not demonstrated in tested code. The ideas are the author's; the AI implemented and verified them, it did not originate them.</div>
+</div></body>
+</html>
