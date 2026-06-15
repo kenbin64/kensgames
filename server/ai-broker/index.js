@@ -57,7 +57,11 @@ function createBroker(opts) {
       log({ kind: 'ceiling_block', role, sessionId, reason: ceilingCheck.reason });
     }
 
-    const provider = (ceilingCheck.ok ? resolveProvider(call.provider) : registry.get(heuristic.name));
+    // Route explicit tool requests to the 'tools' provider when it's registered,
+    // so deterministic tool calls don't fall through to the heuristic provider.
+    let wantId = call.provider;
+    if (!wantId && call && call.input && call.input.tool && registry.get('tools')) wantId = 'tools';
+    const provider = (ceilingCheck.ok ? resolveProvider(wantId) : registry.get(heuristic.name));
     const persona = call.persona || { name: config.transparency.defaultPersona };
 
     const primary = () => provider.invoke(role, call.input || {});
