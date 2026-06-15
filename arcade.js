@@ -14,6 +14,7 @@ const GAMES = {
     starfighter: { title: 'StarFighter', url: '/starfighter/lobby.html', multiplayer: true },
     '4dtictactoe': { title: '4D TicTacToe', url: '/4DTicTacToe/index.html?setup=1', multiplayer: true },
     cubic3d: { title: 'Cubic', url: '/cubic3d/lobby.html', multiplayer: true },
+    bugzapper: { title: 'Bug Zapper', url: '/bugzapper/', multiplayer: false },
 };
 
 // ── MANIFOLD REGISTRY ─────────────────────────────────────────
