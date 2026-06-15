@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Helix · KensGames</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #04060d; color: #e6edf3; overflow: hidden;
+      font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #hud { position: fixed; top: 14px; left: 16px; z-index: 5; line-height: 1.5; text-shadow: 0 1px 3px #000; }
+    #hud b { color: #00ffee; }
+    #help { position: fixed; bottom: 14px; left: 16px; right: 16px; z-index: 5; color: #8b98a5; font-size: 12px; line-height: 1.6; }
+    #over { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(2,6,14,.82); z-index: 10; flex-direction: column; gap: 12px; }
+    #over h1 { color: #ff4466; margin: 0; font-size: 2rem; letter-spacing: 2px; }
+    #over button { background: #00ffee; color: #04060d; border: 0; border-radius: 8px; padding: 10px 22px;
+      font-weight: 700; cursor: pointer; }
+    kbd { background: #11203a; border: 1px solid #24406a; border-radius: 4px; padding: 1px 6px; color: #cfe; }
+    #skip { position: fixed; top: 16px; right: 18px; z-index: 8; background: rgba(17,32,58,.7);
+      color: #cfe; border: 1px solid #2a5a8a; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+      font-weight: 600; backdrop-filter: blur(4px); }
+    #skip:hover { background: rgba(0,255,238,.18); }
+    #title { position: fixed; inset: 0; z-index: 7; display: none; flex-direction: column;
+      align-items: center; justify-content: flex-start; padding-top: 8vh; pointer-events: none; }
+    #title .t-word { font-size: clamp(48px, 12vw, 160px); font-weight: 800; letter-spacing: 14px;
+      color: #bfefff; text-shadow: 0 0 32px rgba(0,255,238,.55); }
+    #title .t-sub { margin-top: 10px; color: #8fb9d6; letter-spacing: 3px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div style="font-size:1.4rem;font-weight:800;letter-spacing:4px;color:#7fd4ff;margin-bottom:8px;">HELIX</div>
+    <div>Score <b id="score">0</b></div>
+    <div>Cleared <b id="cleared">0</b></div>
+    <div>Level <b id="level">1</b></div>
+    <div>Speed <b id="speed">1.0</b>/s</div>
+  </div>
+  <div id="help">
+    <kbd>← → ↑ ↓</kbd> move &nbsp; <kbd>Q</kbd>/<kbd>E</kbd> roll (Y) &nbsp; <kbd>W</kbd>/<kbd>S</kbd> tumble (X) &nbsp; <kbd>Space</kbd>/<kbd>click</kbd> drop &nbsp; <kbd>Shift</kbd> soft drop
+    <br><b>Saddles</b> interlock when perpendicular; <b>spirals</b> interlock when aligned — they don't mix (only the cube bridges them). Roll/tumble freely; they snap to 90° on landing. Connect 3+ to clear (<b>Fibonacci</b>: 3→3, 4→5, 5→8, 6→13…); misaligned ones redeem by forming a new 3+. Big clears (5+) earn a <b>perfect cube</b> wildcard (fast, connects to anything). Red line = <b>dead zone</b>.
+  </div>
+  <div id="over"><h1>DEAD ZONE</h1><div>Final score: <b id="final">0</b></div><button onclick="location.reload()">Play again</button></div>
+  <button id="skip">Skip intro ▶</button>
+  <div id="title"><div class="t-word">HELIX</div><div class="t-sub">drag to look around · click or any key to begin</div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script>
+    'use strict';
+    // ═══════════════════════════════════════════════════════════════════════
+    // HELIX (formerly "Cubic") — prototype
+    // Falling z = x·y saddle "crystals" inside a wireframe well. Each crystal has
+    // one of four 90° orientations about the vertical axis, but it ROLLS into the
+    // new orientation (eased animation, not an instant snap) — the motion is the
+    // point. Two face-adjacent crystals INTERLOCK when their orientations are
+    // perpendicular; a connected group of 3+ interlocking crystals clears, scored
+    // by FIBONACCI of cluster size (Fib(N+1): 3→3, 4→5, 5→8, 6→13…). The stack
+    // settles, cascades re-check, and the fall speeds up with height + level.
+    //
+    // A maneuver BUFFER (3× piece height) sits above the dead-zone LINE so there's
+    // always room to position incoming crystals; the stack reaching that line ends
+    // the game. Colours are a golden-angle gem palette (decorative — meshing is
+    // read from the rotation/shape, not colour).
+    //
+    // Feel-first prototype: tune GX/GZ/GY, BUFFER, speed, meshing, palette here,
+    // then graft onto the full Cubic shell (lobby/controller/music/multiplayer).
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ── Arena ───────────────────────────────────────────────────────────────
+    const GX = 4, GZ = 4;            // 4×4 footprint
+    const PIECE_H = 1;               // crystal height in cells
+    const BUFFER = 3 * PIECE_H;      // maneuver buffer above the dead-zone line
+    const PLAY_H = 11;               // playable height below the dead-zone line
+    const GY = PLAY_H + BUFFER;      // total well height (= 14)
+    const DEAD_Y = PLAY_H;           // dead-zone line: a settled tile at y ≥ DEAD_Y ends the game
+    const CELL = 1;
+
+    // board[y][x][z] = null | { orient:0..3, color:int }
+    const board = Array.from({ length: GY }, () =>
+      Array.from({ length: GX }, () => new Array(GZ).fill(null)));
+
+    let score = 0, cleared = 0, level = 1, gameOver = false;
+    let pendingCube = false;            // next spawn is a "perfect cube" (earned by a big clear)
+    const CUBE_REWARD_SIZE = 5;         // clear a cluster ≥ this → earn one cube (tunable; Ken suggested >3)
+    const CUBE_SPEED_MULT = 2.4;        // perfect cubes fall faster → quicker decisions
+    let intro = true, introT = 0, introAutoTimer = 0;   // cinematic attract intro
+    const INTRO_DUR = 7.0, TITLE_DUR = 3.0;             // spiral-descent seconds, then the title beat
+
+    // Orientation is a full 3D rotation — a crystal can tumble about X or Y like
+    // a die. Two adjacent crystals INTERLOCK when their saddle "marker" directions
+    // are more perpendicular than parallel (|dot| < 0.5). This generalises "a
+    // different 90°" to any tumble axis, and reduces to it for simple Y-rolls.
+    const REF = new THREE.Vector3(0, 0, 1);
+    const QX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const QXn = QX.clone().invert();
+    const QY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    const QYn = QY.clone().invert();
+    function dirOf(q) { const v = REF.clone().applyQuaternion(q); return [v.x, v.y, v.z]; }
+    function meshes(a, b) {
+      if (a.kind === 'cube' || b.kind === 'cube') return true;   // perfect cube connects to anything
+      if (a.kind !== b.kind) return false;                       // saddles and gyroids don't interlock with each other
+      const dot = a.dir[0] * b.dir[0] + a.dir[1] * b.dir[1] + a.dir[2] * b.dir[2];
+      if (a.kind === 'gyroid') return dot > 0.85;                // gyroids interlock when ALIGNED (build a helix)
+      return Math.abs(dot) < 0.5;                                // saddles interlock when PERPENDICULAR
+    }
+
+    // Fibonacci cluster scoring: a cleared cluster of size N scores Fib(N+1).
+    function fib(n) { let a = 1, b = 1; for (let i = 2; i < n; i++) { const t = a + b; a = b; b = t; } return n <= 1 ? 1 : b; }
+    function clusterScore(size) { return fib(size + 1); }
+
+    // ── THREE setup ───────────────────────────────────────────────────────────
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x04060d, 0.028);
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // Lighting tuned for translucent gem crystals.
+    scene.add(new THREE.HemisphereLight(0x88bbff, 0x202040, 0.7));
+    scene.add(new THREE.AmbientLight(0x335577, 0.35));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(6, 16, 8); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x66ffee, 0.5); rim.position.set(-7, 6, -5); scene.add(rim);
+
+    // Cell (x,y,z) → world position (origin at well center-bottom).
+    const ox = -(GX * CELL) / 2 + CELL / 2;
+    const oz = -(GZ * CELL) / 2 + CELL / 2;
+    function worldPos(x, y, z) { return new THREE.Vector3(ox + x * CELL, y * CELL + CELL / 2, oz + z * CELL); }
+
+    // ── Camera: free orbit during play (drag to look from any angle) ──────────
+    const TARGET = new THREE.Vector3(0, GY * CELL * 0.42, 0);
+    const orbit = { az: 0.6, pol: 1.05, r: GY * 1.7 };   // azimuth, polar, radius
+    function applyOrbit() {
+      const sp = Math.sin(orbit.pol);
+      camera.position.set(
+        TARGET.x + orbit.r * sp * Math.cos(orbit.az),
+        TARGET.y + orbit.r * Math.cos(orbit.pol),
+        TARGET.z + orbit.r * sp * Math.sin(orbit.az));
+      camera.lookAt(TARGET);
+    }
+    applyOrbit();
+
+    // Wireframe well.
+    const well = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(GX * CELL, GY * CELL, GZ * CELL)),
+      new THREE.LineBasicMaterial({ color: 0x2a5a8a }));
+    well.position.set(0, (GY * CELL) / 2, 0);
+    scene.add(well);
+
+    // Dead-zone line: a red rectangle around the arena at the buffer's base.
+    const hx = GX * CELL / 2, hz = GZ * CELL / 2, dy = DEAD_Y * CELL;
+    const deadLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-hx, dy, -hz), new THREE.Vector3(hx, dy, -hz),
+        new THREE.Vector3(hx, dy, hz), new THREE.Vector3(-hx, dy, hz),
+        new THREE.Vector3(-hx, dy, -hz)]),
+      new THREE.LineBasicMaterial({ color: 0xff2244 }));
+    scene.add(deadLine);
+
+    // ── Saddle geometry: z = x·y over [-1,1]² (the unit of dimensional collapse) ─
+    function makeSaddleGeometry() {
+      const N = 12, s = CELL * 0.46, h = CELL * 0.42;
+      const g = new THREE.PlaneGeometry(s * 2, s * 2, N, N);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const u = p.getX(i) / s, v = p.getY(i) / s; // u,v ∈ [-1,1]
+        p.setZ(i, u * v * h);                         // z = x·y saddle
+      }
+      g.computeVertexNormals();
+      g.rotateX(-Math.PI / 2); // lay the saddle flat in the XZ plane
+      return g;
+    }
+    const SADDLE_GEO = makeSaddleGeometry();
+
+    // Gyroid-family "spiral" crystal — a chiral helicoid ribbon, clearly distinct
+    // from the flat saddle. (Stylized stand-in: the true gyroid unit cell from
+    // procedural_gyroid.js via MarchingCubes, or winki.glb, slots in at integration.)
+    function makeGyroidGeometry() {
+      const segV = 18, segU = 6, s = CELL * 0.44, height = CELL * 0.74, sweep = Math.PI * 1.1;
+      const pos = [], idx = [];
+      for (let i = 0; i <= segV; i++) {
+        const t = i / segV, ang = (t - 0.5) * sweep, ca = Math.cos(ang), sa = Math.sin(ang);
+        for (let j = 0; j <= segU; j++) {
+          const r = ((j / segU) * 2 - 1) * s;
+          pos.push(ca * r, (t - 0.5) * height, sa * r);
+        }
+      }
+      const cols = segU + 1;
+      for (let i = 0; i < segV; i++) for (let j = 0; j < segU; j++) {
+        const a = i * cols + j, b = a + 1, c = a + cols, d = c + 1;
+        idx.push(a, c, b, b, c, d);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }
+    const GYROID_GEO = makeGyroidGeometry();
+
+    // Golden-angle gem palette — hues spaced by the golden angle (137.5°) so any
+    // run of crystals is harmoniously spread. Translucent, clearcoated "gems".
+    const GOLD_ANGLE = 137.50776;
+    const GEM_MATS = [];
+    for (let i = 0; i < 10; i++) {
+      const c = new THREE.Color().setHSL(((i * GOLD_ANGLE) % 360) / 360, 0.85, 0.6);
+      GEM_MATS.push(new THREE.MeshPhysicalMaterial({
+        color: c, emissive: c.clone().multiplyScalar(0.16),
+        metalness: 0.0, roughness: 0.12, clearcoat: 1.0, clearcoatRoughness: 0.12,
+        reflectivity: 0.8, transparent: true, opacity: 0.72, side: THREE.DoubleSide,
+      }));
+    }
+    function gemMat(colorIdx) { return GEM_MATS[colorIdx % GEM_MATS.length]; }
+
+    // The "perfect cube": a rare solid crystal that connects to ANY neighbour
+    // (a wildcard), does NOT tumble, and falls faster. Earned by big clears.
+    const CUBE_GEO = new THREE.BoxGeometry(CELL * 0.8, CELL * 0.8, CELL * 0.8);
+    const CUBE_MAT = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, emissive: 0x9fd8ff, emissiveIntensity: 0.7,
+      metalness: 0.1, roughness: 0.04, clearcoat: 1.0, reflectivity: 1.0,
+      transparent: true, opacity: 0.92, side: THREE.DoubleSide,
+    });
+
+    // Build the mesh for a piece/cell — saddle crystal or perfect cube.
+    function makeMesh(obj) {
+      if (obj.kind === 'cube') return new THREE.Mesh(CUBE_GEO, CUBE_MAT);
+      const m = new THREE.Mesh(obj.kind === 'gyroid' ? GYROID_GEO : SADDLE_GEO, gemMat(obj.color));
+      const q = obj.q; m.quaternion.set(q.x, q.y, q.z, q.w);
+      return m;
+    }
+
+    // Persistent meshes for locked board cells.
+    const boardMeshes = new Map();
+    const k = (x, y, z) => x + ',' + y + ',' + z;
+    function setCellMesh(x, y, z, cell) {
+      const key = k(x, y, z);
+      const old = boardMeshes.get(key);
+      if (old) { scene.remove(old); boardMeshes.delete(key); }
+      if (cell) {
+        const m = makeMesh(cell);
+        m.position.copy(worldPos(x, y, z));
+        scene.add(m); boardMeshes.set(key, m);
+      }
+    }
+    function rebuildAllMeshes() {
+      for (const m of boardMeshes.values()) scene.remove(m);
+      boardMeshes.clear();
+      for (let y = 0; y < GY; y++) for (let x = 0; x < GX; x++) for (let z = 0; z < GZ; z++)
+        if (board[y][x][z]) setCellMesh(x, y, z, board[y][x][z]);
+    }
+
+    // ── Clear "poof" particles ────────────────────────────────────────────────
+    // Each cleared crystal bursts into a short-lived, additive-blended puff in its
+    // own gem colour. Bursts are staggered by cascade wave so a single fill that
+    // collapses many rows/columns reads as a rippling chain, not one flat flash.
+    const effects = [];
+    function spawnPoof(pos, color3, delay) {
+      const COUNT = 16;
+      const geo = new THREE.BufferGeometry();
+      const arr = new Float32Array(COUNT * 3);
+      const vel = [];
+      for (let i = 0; i < COUNT; i++) {
+        arr[i * 3] = pos.x; arr[i * 3 + 1] = pos.y; arr[i * 3 + 2] = pos.z;
+        vel.push(new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1)
+          .normalize().multiplyScalar(1.4 + Math.random() * 1.8));
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      const mat = new THREE.PointsMaterial({
+        color: color3, size: 0.2,
+        transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const pts = new THREE.Points(geo, mat);
+      pts.visible = false; scene.add(pts);
+      effects.push({ pts, geo, mat, vel, age: 0, life: 0.6, delay: delay || 0, started: false });
+    }
+    function updateEffects(dt) {
+      for (let i = effects.length - 1; i >= 0; i--) {
+        const e = effects[i];
+        if (e.delay > 0) { e.delay -= dt; continue; }
+        if (!e.started) { e.started = true; e.pts.visible = true; }
+        e.age += dt;
+        const p = e.geo.attributes.position;
+        for (let j = 0; j < e.vel.length; j++) {
+          p.setXYZ(j, p.getX(j) + e.vel[j].x * dt, p.getY(j) + e.vel[j].y * dt + 0.6 * dt, p.getZ(j) + e.vel[j].z * dt);
+          e.vel[j].multiplyScalar(0.90); // drag
+        }
+        p.needsUpdate = true;
+        e.mat.opacity = Math.max(0, 1 - e.age / e.life);
+        if (e.age >= e.life) { scene.remove(e.pts); e.geo.dispose(); e.mat.dispose(); effects.splice(i, 1); }
+      }
+    }
+
+    // ── Falling crystal (persistent mesh + eased "dice-roll" rotation) ──────────
+    let piece = null;            // { x, y, z, q:THREE.Quaternion, color }
+    let pieceMesh = null;
+    const qVis = new THREE.Quaternion();   // animated orientation (slerps toward piece.q)
+    let colorSeq = 0;
+    function ensurePieceMesh() {
+      if (pieceMesh) { scene.remove(pieceMesh); pieceMesh = null; }
+      pieceMesh = makeMesh(piece);
+      pieceMesh.position.copy(worldPos(piece.x, piece.y, piece.z));
+      if (piece.kind !== 'cube') pieceMesh.quaternion.copy(qVis);
+      scene.add(pieceMesh);
+    }
+    function updatePiecePos() { if (pieceMesh && piece) pieceMesh.position.copy(worldPos(piece.x, piece.y, piece.z)); }
+    function cellFree(x, y, z) {
+      return x >= 0 && x < GX && z >= 0 && z < GZ && y >= 0 && y < GY && !board[y][x][z];
+    }
+    function spawn() {
+      const x = Math.floor(GX / 2), z = Math.floor(GZ / 2), y = GY - 1;
+      if (!cellFree(x, y, z)) { endGame(); return; }
+      if (pendingCube) {
+        // Earned perfect cube: no orientation, doesn't tumble, falls fast.
+        pendingCube = false;
+        piece = { x, y, z, kind: 'cube' };
+      } else {
+        // Default orientation is RANDOM — a random tumble about X and Y — so the
+        // player must roll it into a meshing orientation.
+        const q = new THREE.Quaternion();
+        for (let i = (Math.random() * 4) | 0; i > 0; i--) q.premultiply(QY);
+        for (let i = (Math.random() * 4) | 0; i > 0; i--) q.premultiply(QX);
+        const kind = Math.random() < 0.4 ? 'gyroid' : 'saddle';   // ~40% spirals, ~60% saddles
+        piece = { x, y, z, kind, q, color: (colorSeq++) % GEM_MATS.length };
+        qVis.copy(q);
+      }
+      ensurePieceMesh();
+    }
+
+    function lockPiece() {
+      const ry = piece.y;
+      if (piece.kind === 'cube') {
+        board[ry][piece.x][piece.z] = { kind: 'cube' };
+      } else {
+        const q = piece.q;
+        board[ry][piece.x][piece.z] = {
+          kind: piece.kind, q: { x: q.x, y: q.y, z: q.z, w: q.w }, dir: dirOf(q), color: piece.color
+        };
+      }
+      setCellMesh(piece.x, ry, piece.z, board[ry][piece.x][piece.z]);
+      piece = null;
+      if (pieceMesh) { scene.remove(pieceMesh); pieceMesh = null; }
+      // Dead zone is a HARD ceiling: even one crystal coming to rest at or beyond
+      // the line ends the game immediately — no clear-it-just-in-time reprieve.
+      if (ry >= DEAD_Y) { endGame(); return; }
+      resolveClears();
+      spawn();
+    }
+
+    // ── Interlock detection: connected components over meshing adjacencies ─────
+    const NEIGHBORS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    function resolveClears() {
+      let wave = 0, earnedCube = false;
+      for (;;) {
+        const seen = new Set();
+        const toClear = new Set();
+        let gained = 0;
+        for (let y = 0; y < GY; y++) for (let x = 0; x < GX; x++) for (let z = 0; z < GZ; z++) {
+          if (!board[y][x][z] || seen.has(k(x, y, z))) continue;
+          const comp = [], stack = [[x, y, z]]; seen.add(k(x, y, z));
+          while (stack.length) {
+            const [cx, cy, cz] = stack.pop(); comp.push([cx, cy, cz]);
+            const a = board[cy][cx][cz];
+            for (const [dx, dyy, dz] of NEIGHBORS) {
+              const nx = cx + dx, ny = cy + dyy, nz = cz + dz;
+              if (nx < 0 || nx >= GX || ny < 0 || ny >= GY || nz < 0 || nz >= GZ) continue;
+              const b = board[ny][nx][nz];
+              if (!b || seen.has(k(nx, ny, nz)) || !meshes(a, b)) continue;
+              seen.add(k(nx, ny, nz)); stack.push([nx, ny, nz]);
+            }
+          }
+          if (comp.length >= 3) {
+            gained += clusterScore(comp.length);
+            if (comp.length >= CUBE_REWARD_SIZE) earnedCube = true;   // big clear → earn a perfect cube
+            for (const c of comp) toClear.add(c.join(','));
+          }
+        }
+        if (!toClear.size) break;
+        for (const key of toClear) {
+          const [x, y, z] = key.split(',').map(Number);
+          const cell = board[y][x][z];
+          if (cell) spawnPoof(worldPos(x, y, z), cell.kind === 'cube' ? CUBE_MAT.color : GEM_MATS[cell.color].color, wave * 0.14);
+          board[y][x][z] = null;
+        }
+        score += gained; cleared += toClear.size;
+        level = 1 + Math.floor(cleared / 12);
+        settle();
+        rebuildAllMeshes();
+        updateHUD();
+        wave++;
+      }
+      if (earnedCube) pendingCube = true;   // next spawn is a perfect cube (one per play)
+    }
+
+    // Gravity: compact each column downward after a clear.
+    function settle() {
+      for (let x = 0; x < GX; x++) for (let z = 0; z < GZ; z++) {
+        let write = 0;
+        for (let y = 0; y < GY; y++) {
+          if (board[y][x][z]) {
+            if (y !== write) { board[write][x][z] = board[y][x][z]; board[y][x][z] = null; }
+            write++;
+          }
+        }
+      }
+    }
+
+    // ── Timing ──────────────────────────────────────────────────────────────
+    let fallAcc = 0, lastT = 0, softDrop = false;
+    function maxHeight() {
+      for (let y = GY - 1; y >= 0; y--)
+        for (let x = 0; x < GX; x++) for (let z = 0; z < GZ; z++)
+          if (board[y][x][z]) return y + 1;
+      return 0;
+    }
+    function fallRate() {
+      // Multi-piece model = "faster overlapping cadence": the stream gets denser
+      // and quicker as you level up (level is the primary driver), plus a height
+      // term so a tall stack falls faster. New pieces spawn immediately on lock,
+      // so at higher levels one is already entering as the last settles.
+      const cadence = 1 + (level - 1) * 0.28;        // steeper per-level pace
+      const stack = 1 + (maxHeight() / GY) * 3.0;
+      return cadence * stack;
+    }
+    function step() {
+      if (!piece) return;
+      const below = piece.y - 1;
+      if (below < 0 || board[below][piece.x][piece.z]) { lockPiece(); return; }
+      piece.y = below; updatePiecePos();
+    }
+
+    function updateHUD() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('cleared').textContent = cleared;
+      document.getElementById('level').textContent = level;
+      document.getElementById('speed').textContent = fallRate().toFixed(1);
+    }
+    function endGame() {
+      if (intro) { resetBoard(); spawn(); return; }   // keep the attract-mode demo alive
+      gameOver = true;
+      document.getElementById('final').textContent = score;
+      document.getElementById('over').style.display = 'flex';
+    }
+
+    // ── Input ───────────────────────────────────────────────────────────────
+    function tryMove(dx, dz) {
+      if (!piece) return;
+      if (cellFree(piece.x + dx, piece.y, piece.z + dz)) { piece.x += dx; piece.z += dz; updatePiecePos(); }
+    }
+    function tumble(qStep) {
+      // World-space 90° tumble about X or Y; the loop slerps qVis → piece.q so it
+      // ROLLS into place rather than snapping. (Mouse/gamepad/VR feed the same
+      // tumble() via the ControllerManifold once grafted onto the full Cubic.)
+      if (piece && piece.kind !== 'cube') piece.q.premultiply(qStep);   // perfect cubes don't tumble
+    }
+    function hardDrop() {
+      if (!piece) return;
+      while (piece.y - 1 >= 0 && !board[piece.y - 1][piece.x][piece.z]) piece.y--;
+      lockPiece();
+    }
+    addEventListener('keydown', (e) => {
+      if (intro) { startPlay(); return; }   // any key skips the intro
+      if (gameOver) return;
+      switch (e.key) {
+        case 'ArrowLeft': tryMove(-1, 0); break;
+        case 'ArrowRight': tryMove(1, 0); break;
+        case 'ArrowUp': tryMove(0, -1); break;
+        case 'ArrowDown': tryMove(0, 1); break;
+        case 'q': case 'Q': tumble(QYn); break;   // roll left (about Y)
+        case 'e': case 'E': tumble(QY); break;    // roll right (about Y)
+        case 'w': case 'W': tumble(QX); break;    // tumble forward (about X)
+        case 's': case 'S': tumble(QXn); break;   // tumble back (about X)
+        case ' ': hardDrop(); e.preventDefault(); break;
+        case 'Shift': softDrop = true; break;
+        default: return;
+      }
+    });
+    addEventListener('keyup', (e) => { if (e.key === 'Shift') softDrop = false; });
+
+    // Mouse: DRAG to orbit the arena (view from any angle), a plain CLICK drops,
+    // wheel zooms. The well is free-floating in 3D, so the player owns the camera.
+    let dragging = false, dragMoved = false, lastMX = 0, lastMY = 0;
+    const el = renderer.domElement;
+    el.addEventListener('mousedown', (e) => { dragging = true; dragMoved = false; lastMX = e.clientX; lastMY = e.clientY; });
+    addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastMX, dy = e.clientY - lastMY; lastMX = e.clientX; lastMY = e.clientY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+      orbit.az -= dx * 0.008;
+      orbit.pol = Math.min(Math.PI - 0.15, Math.max(0.15, orbit.pol - dy * 0.006));
+    });
+    addEventListener('mouseup', () => {
+      if (dragging && !dragMoved) { if (intro) startPlay(); else if (!gameOver) hardDrop(); }
+      dragging = false;
+    });
+    el.addEventListener('wheel', (e) => {
+      orbit.r = Math.min(GY * 4, Math.max(GY * 0.8, orbit.r + e.deltaY * 0.02)); e.preventDefault();
+    }, { passive: false });
+    document.getElementById('skip').addEventListener('click', (e) => { e.stopPropagation(); startPlay(); });
+
+    // ── Intro: logarithmic-spiral camera descent over a live demo, resolving on
+    // the HELIX title with the spinning z=xy logo. Skip button / any key starts. ─
+    const logoMesh = new THREE.Mesh(SADDLE_GEO, GEM_MATS[0]);
+    logoMesh.scale.setScalar(4.0);
+    logoMesh.position.copy(TARGET);
+    logoMesh.visible = false;
+    scene.add(logoMesh);
+
+    function resetBoard() {
+      for (let y = 0; y < GY; y++) for (let x = 0; x < GX; x++) for (let z = 0; z < GZ; z++) board[y][x][z] = null;
+      for (const m of boardMeshes.values()) scene.remove(m); boardMeshes.clear();
+      if (pieceMesh) { scene.remove(pieceMesh); pieceMesh = null; }
+      piece = null;
+    }
+    function startPlay() {
+      if (!intro) return;
+      intro = false;
+      logoMesh.visible = false;
+      document.getElementById('title').style.display = 'none';
+      document.getElementById('skip').style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      resetBoard();
+      score = 0; cleared = 0; level = 1; pendingCube = false; gameOver = false; fallAcc = 0;
+      updateHUD();
+      spawn();
+    }
+    function autoPlaceDemo() {   // light attract-mode AI: random column + spin
+      if (!piece) return;
+      piece.x = (Math.random() * GX) | 0; piece.z = (Math.random() * GZ) | 0;
+      if (piece.kind !== 'cube') for (let i = (Math.random() * 4) | 0; i > 0; i--) piece.q.premultiply(QY);
+      updatePiecePos();
+    }
+    function updateIntro(dt) {
+      introT += dt;
+      if (introT < INTRO_DUR) {
+        // Logarithmic spiral: horizontal radius tapers in exponentially as the
+        // camera spins down the arena, ending exactly on the play orbit (no jump).
+        const p = introT / INTRO_DUR;
+        const rStart = GY * 3.4, rEnd = orbit.r * Math.sin(orbit.pol);
+        const yTop = GY * CELL * 1.2, yEnd = TARGET.y + orbit.r * Math.cos(orbit.pol);
+        const ang = orbit.az + (1 - p) * 2.6 * Math.PI * 2;
+        const r = rStart * Math.pow(rEnd / rStart, p);
+        const y = yTop + (yEnd - yTop) * p;
+        camera.position.set(TARGET.x + r * Math.cos(ang), y, TARGET.z + r * Math.sin(ang));
+        camera.lookAt(TARGET);
+        // Live demo so the intro shows real play (and clears poof).
+        fallAcc += dt * 3.2;
+        while (fallAcc >= 1) { fallAcc -= 1; step(); }
+        introAutoTimer -= dt;
+        if (introAutoTimer <= 0) { autoPlaceDemo(); introAutoTimer = 0.45; }
+        if (piece && pieceMesh && piece.kind !== 'cube') { qVis.slerp(piece.q, Math.min(1, dt * 9)); pieceMesh.quaternion.copy(qVis); }
+      } else if (introT < INTRO_DUR + TITLE_DUR) {
+        applyOrbit();   // settled hero framing
+        if (!logoMesh.visible) { logoMesh.visible = true; document.getElementById('title').style.display = 'flex'; }
+      } else {
+        startPlay();
+      }
+    }
+
+    // ── Loop ──────────────────────────────────────────────────────────────────
+    function loop(t) {
+      requestAnimationFrame(loop);
+      const dt = lastT ? (t - lastT) / 1000 : 0; lastT = t;
+      if (intro) {
+        updateIntro(dt);
+      } else {
+        if (!gameOver) {
+          let rate = softDrop ? Math.max(fallRate(), 10) : fallRate();
+          if (piece && piece.kind === 'cube') rate *= CUBE_SPEED_MULT;   // cubes fall faster
+          fallAcc += dt * rate;
+          while (fallAcc >= 1) { fallAcc -= 1; step(); }
+        }
+        // Eased "dice-roll" rotation — saddle crystals turn then settle into 90°.
+        if (piece && pieceMesh && piece.kind !== 'cube') {
+          qVis.slerp(piece.q, Math.min(1, dt * 9));
+          pieceMesh.quaternion.copy(qVis);
+        }
+        applyOrbit();
+      }
+      updateEffects(dt);
+      if (logoMesh.visible) logoMesh.rotation.y += dt * 0.7;   // the turning z=xy logo (hourglass + node glide)
+      renderer.render(scene, camera);
+    }
+    document.getElementById('hud').style.display = 'none';   // hidden during the intro demo
+    spawn(); updateHUD(); requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

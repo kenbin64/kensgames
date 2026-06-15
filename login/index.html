@@ -5,12 +5,9 @@
   <script src="/js/session-identity.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KensGames — Game Portal</title>
-  <meta http-equiv="refresh" content="0; url=/lobby/">
-  <script>
-    // Login is handled by the lobby flow.
-    window.location.replace('/lobby/');
-  </script>
+  <title>Sign in — KensGames</title>
+  <!-- Google Identity Services (ID-token sign-in; no client secret needed). -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
   <link rel="stylesheet" href="/lib/fonts/fonts.css">
   <link rel="stylesheet" href="/lib/arcade-theme.css">
@@ -243,7 +240,72 @@
       } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
     }
 
-    function oauthLogin(p) { window.location.href = `${API}/${p}`; }
+    // ── Shared post-auth handler (used by password + Google sign-in) ─────────
+    function _onAuthSuccess(data) {
+      localStorage.setItem('user_token', data.token);
+      localStorage.setItem('user_id', data.userId);
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('display_name', data.displayName);
+      if (data.avatar) localStorage.setItem('kg_avatar', JSON.stringify({ emoji: data.avatar, name: data.displayName }));
+      const redir = new URLSearchParams(location.search).get('redirect') || '/lobby/';
+      setTimeout(() => window.location.href = redir, 500);
+    }
+
+    // ── Google Sign-In (ID-token flow) ───────────────────────────────────────
+    // The Client ID is public and comes from the server (/api/auth/config), so
+    // nothing is hardcoded and the button stays inert until Google is configured.
+    let _googleReady = false;
+    async function _initGoogle() {
+      try {
+        const cfg = await fetch(`${API}/config`).then(r => r.json()).catch(() => ({}));
+        if (!cfg.googleClientId || !window.google || !google.accounts || !google.accounts.id) return;
+        google.accounts.id.initialize({
+          client_id: cfg.googleClientId,
+          callback: (resp) => { _googleSubmit(resp.credential, null); },
+        });
+        _googleReady = true;
+      } catch { /* leave Google disabled */ }
+    }
+
+    // Posts the Google credential. On a first-time sign-in the server replies
+    // { needsUsername } — we ask the user to choose their PERMANENT username
+    // once (it can't be changed later), then resubmit with it.
+    async function _googleSubmit(credential, username) {
+      const msg = document.getElementById('l-msg');
+      msg.textContent = 'Signing in with Google…'; msg.className = 'arc-msg';
+      try {
+        const res = await fetch(`${API}/google`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(username ? { credential, username } : { credential })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) { msg.textContent = 'Welcome!'; msg.className = 'arc-msg ok'; _onAuthSuccess(data); return; }
+        if (data.needsUsername) {
+          const hint = data.error ? (data.error + '\n\n') : '';
+          const chosen = window.prompt(hint + 'Choose your permanent username (unique, cannot be changed later):', data.suggestedUsername || '');
+          if (chosen === null) { msg.textContent = 'Sign-in cancelled.'; msg.className = 'arc-msg'; return; }
+          return _googleSubmit(credential, chosen.trim());
+        }
+        msg.textContent = data.error || 'Google sign-in failed'; msg.className = 'arc-msg err';
+      } catch { msg.textContent = 'Connection error'; msg.className = 'arc-msg err'; }
+    }
+    // GSI loads async; retry init briefly until the library is present.
+    (function pollGoogle(n) {
+      if (window.google && google.accounts && google.accounts.id) { _initGoogle(); return; }
+      if (n > 0) setTimeout(() => pollGoogle(n - 1), 300);
+    })(20);
+
+    function oauthLogin(p) {
+      if (p === 'google') {
+        const msg = document.getElementById('l-msg');
+        if (!_googleReady) { msg.textContent = 'Google sign-in is not available yet.'; msg.className = 'arc-msg err'; return; }
+        // Show the Google account chooser / One Tap prompt.
+        google.accounts.id.prompt();
+        return;
+      }
+      // Other providers (Discord) still use the server redirect flow.
+      window.location.href = `${API}/${p}`;
+    }
   </script>
 </body>
 

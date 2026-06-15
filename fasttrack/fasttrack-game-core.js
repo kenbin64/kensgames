@@ -796,11 +796,15 @@ let _mpClient = null;
 let _applying = false;
 
 // ── Game Manager (host-authoritative turn control) ────────────────────────
-// The host is the sole authority on `state.players.current`. Non-host peers
-// never advance current locally; their endTurn() instead asks the host to
-// advance via a 'turn_request' relay. The host's endTurn() advances and
-// broadcasts a 'turn_advance' message. All clients (including the host) only
-// commit turn rotation when applying a 'turn_advance' with a fresh seq.
+// The host is the sole authority on `state.players.current`. It runs the full
+// simulation for every seat — its own turns and bots directly, every remote
+// human's turn by replaying their relayed draw/move under the _applying guard
+// — so its endTurn() fires once per turn for ALL players. The host's endTurn()
+// advances current and broadcasts a 'turn_advance'; non-host peers never
+// advance locally, they just clear their turn UI and commit the rotation when
+// the host's broadcast arrives (idempotent via a fresh seq). A genuinely
+// stalled remote seat is backstopped by the host's stuck-watchdog (which, on
+// the host, watches whichever seat is current — not only its own).
 // In solo / same-screen / non-MP modes, every endTurn advances directly.
 let _turnSeq = 0;
 let _lastAppliedTurnSeq = 0;
@@ -3038,9 +3042,12 @@ function passTurn(reason) {
       const ci = state.players.get('current') || 0;
       const cur = players[ci];
       const curIsBot = !!(cur && cur.isBot);
-      const allowed = curIsBot ? _isHost() : _isMyTurn();
+      // Host may pass whichever seat is current (it is the sole turn authority
+      // and backstops stalled remotes); a non-host may only pass its own human
+      // turn. Either way the actual rotation happens in the host's endTurn().
+      const allowed = _isHost() ? true : (!curIsBot && _isMyTurn());
       if (!allowed) {
-        console.warn('[PASS] Ignored — not active player and not host-for-bot.');
+        console.warn('[PASS] Ignored — not host and not own human turn.');
         return;
       }
     }
@@ -3097,7 +3104,10 @@ function _stuckWatchdogTick() {
     const ci = state.players.get('current') || 0;
     const cur = players[ci];
     if (!cur || cur.isBot) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
-    if (_isMpMode() && !_isMyTurn()) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
+    // Non-host clients only watch their OWN turn — they can't advance anyone
+    // else. The host watches whichever seat is current (its authority covers
+    // every seat) so it can backstop-pass a genuinely stalled remote human.
+    if (_isMpMode() && !_isHost() && !_isMyTurn()) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
     const phase = state.turn.get('phase');
     const vm = state.turn.get('validMoves') || [];
     const card = state.deck.get('currentCard');
@@ -3143,24 +3153,30 @@ function endTurn() {
   const ci = state.players.get('current') || 0;
   const next = (ci + 1) % players.length;
 
-  // ── Game Manager: active-player-authoritative turn rotation in MP ──────
-  // The ACTIVE PLAYER's own client is the sole authority on advancing past
-  // their own turn (they always know "it's my turn" reliably via _isMyTurn,
-  // independent of unreliable `mp.isHost` flags). Other clients wait for the
-  // 'turn_advance' broadcast and apply it idempotently via seq.
-  // Bots don't have a client of their own — the host drives bot turn ends.
+  // ── Host-authoritative turn rotation (MP) ─────────────────────────────
+  // The host runs the full game simulation for EVERY seat: its own turns and
+  // bot turns directly, and each remote human's turn by replaying their
+  // relayed draw/move under the _applying guard. Because of that, the host's
+  // endTurn() is reached exactly once per turn for ALL players — making the
+  // host the natural single authority. The host advances current and
+  // broadcasts 'turn_advance'; every client (host included) commits the
+  // rotation only when applying that broadcast's fresh seq. Non-host peers
+  // NEVER advance locally; they clear their in-progress turn UI and wait.
+  //
+  // This replaces the older "active player advances their own turn" model,
+  // which desynced whenever two clients both believed it was their turn (the
+  // _isMyTurn fallbacks are deliberately permissive), when per-client turn
+  // seqs collided, or when a self-broadcast was dropped or duplicated. With a
+  // single advancer, those whole failure classes disappear.
   if (_isMpMode()) {
-    const cur = players[ci];
-    const curIsBot = !!(cur && cur.isBot);
-    const shouldAdvance = curIsBot ? _isHost() : _isMyTurn();
-    console.log('[TURN] endTurn called. ci:', ci, 'next:', next, 'curIsBot:', curIsBot, 'shouldAdvance:', shouldAdvance, 'isHost:', _isHost(), 'isMyTurn:', _isMyTurn());
-    if (shouldAdvance) {
-      console.log('[TURN] Advancing turn locally and broadcasting turn_advance. seq:', _turnSeq + 1);
+    if (_isHost()) {
       _applyTurnAdvance(ci, next, ++_turnSeq);
+      _lastAppliedTurnSeq = _turnSeq; // our own advance counts as applied; reject any echo
       _broadcast('turn_advance', { from: ci, next, seq: _turnSeq });
+      console.log('[TURN] host advanced turn. ci:', ci, '-> next:', next, 'seq:', _turnSeq);
     } else {
-      console.log('[TURN] Not advancing turn locally. Waiting for turn_advance broadcast.');
       _localTurnUiCleanup();
+      console.log('[TURN] non-host endTurn — cleaned up; waiting for host turn_advance.');
     }
     return;
   }

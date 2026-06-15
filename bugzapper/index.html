@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Virtual Bug Zapper — on the fabric of space</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #03040a; overflow: hidden;
+      font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #cfe; }
+    #hud { position: fixed; top: 14px; left: 16px; z-index: 5; text-shadow: 0 1px 4px #000; }
+    #hud b { color: #b9a9ff; font-size: 1.4rem; }
+    #ctrls { position: fixed; top: 14px; right: 16px; z-index: 5; display: flex; gap: 8px; }
+    button { background: rgba(20,32,52,.7); color: #cfe; border: 1px solid #2a5a8a; border-radius: 8px;
+      padding: 8px 14px; cursor: pointer; font-weight: 600; backdrop-filter: blur(4px); }
+    button:hover { background: rgba(120,80,255,.25); }
+    #hint { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; pointer-events: none; }
+    #hint span { background: rgba(8,10,18,.7); padding: 14px 22px; border-radius: 12px; letter-spacing: 1px; color: #b9a9ff; }
+    #about { position: fixed; left: 16px; bottom: 16px; right: 16px; max-width: 580px; z-index: 7; display: none;
+      background: rgba(8,10,18,.93); border: 1px solid #2a3550; border-radius: 12px; padding: 16px 18px; line-height: 1.5; font-size: 13px; }
+    #about h3 { margin: 0 0 8px; color: #b9a9ff; }
+    #about p { margin: 6px 0; } #about b { color: #9fe8ff; }
+    #about .x { float: right; cursor: pointer; color: #8fb9d6; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div id="hud">Zapped <b id="score">0</b></div>
+  <div id="ctrls">
+    <button id="more">+ Release bugs</button>
+    <button id="mute">🔊 Sound</button>
+    <button id="aboutBtn">ⓘ About</button>
+  </div>
+  <div id="hint"><span>click anywhere to power on the buzz ⚡ (sound on)</span></div>
+  <div id="about">
+    <span class="x" id="aboutX">✕</span>
+    <h3>It's all geometry — honestly</h3>
+    <p>Everything you see and hear is generated from math. <b>No images. No sound files.</b></p>
+    <p><b>The surface:</b> the bugs ride an invisible <b>Schwarz Diamond</b> — a triply-periodic minimal surface, F(x,y,z)=0. Honest note: it's the <i>nodal approximation</i>, not the mathematically exact minimal surface.</p>
+    <p><b>The motion:</b> each bug flows <i>along</i> that surface — its velocity is projected onto the surface and re-snapped to it — while it's drawn to the light. The camera gimbals along the same geometry.</p>
+    <p><b>The sights:</b> the glow, sparks, lightning arcs and colour are all procedural — drawn, not loaded.</p>
+    <p><b>The sound:</b> every sound is synthesized live — the electric hum, the zap crackle, the crickets, the fly-bys — and the ambient <b>music's notes are sampled from the manifold itself</b> (the surface height picks the pitch). "From the manifold" means exactly that, nothing mystical.</p>
+    <p style="color:#8fb9d6">A relaxing toy, and a small demo of the idea — not a product. It claims nothing beyond being made of geometry.</p>
+    <p style="color:#6b8299;font-style:italic;margin-bottom:0">🪲 No bugs were harmed in the making of this program — except maybe the ones that flew into a wind-farm turbine or through a solar array. Those were real, and yes, they're dead. Not the ones in here.</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script>
+    'use strict';
+    // ── Virtual Bug Zapper, 3D, on an invisible manifold ────────────────────────
+    // The bugs ride an INVISIBLE Schwarz-Diamond-flavored surface — a "fabric of
+    // space" we never draw; you only see the bugs undulate over its hidden hills
+    // and saddles, and the camera is gimballed along that same surface. Touch the
+    // grid: vibrant sparks, a lightning arc, a *BZZT*. The whole soundscape —
+    // electric hum, cricket chirps, fly-bys, and an ambient music bed — is
+    // generated procedurally, with the music's notes chosen FROM the manifold
+    // (the surface height picks the pitch). No assets, no game code reused.
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x04030c, 0.016);
+    const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 500);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    scene.add(new THREE.AmbientLight(0x223044, 0.7));
+    const zapLight = new THREE.PointLight(0x9a6cff, 2.4, 140); scene.add(zapLight);
+
+    // ── The invisible surface (the "fabric"): bugs and camera ride it ───────────
+    const WARP = 4.2, DOM = 30;
+    function surfH(u, v) { return Math.sin(u * 0.45) * Math.cos(v * 0.45) * WARP + Math.cos((u - v) * 0.3) * WARP * 0.45; } // used by the manifold music
+    // The invisible Schwarz Diamond surface, F(x,y,z) = 0 — the "fabric" the bugs ride.
+    // The origin lies on it (F(0,0,0)=0), so that's where the zapper sits.
+    const K = 0.42;
+    function F(p) {
+      const x = p.x * K, y = p.y * K, z = p.z * K;
+      return Math.sin(x) * Math.sin(y) * Math.sin(z) + Math.sin(x) * Math.cos(y) * Math.cos(z)
+        + Math.cos(x) * Math.sin(y) * Math.cos(z) + Math.cos(x) * Math.cos(y) * Math.sin(z);
+    }
+    function gradF(p, o) {
+      const x = p.x * K, y = p.y * K, z = p.z * K, sx = Math.sin(x), sy = Math.sin(y), sz = Math.sin(z), cx = Math.cos(x), cy = Math.cos(y), cz = Math.cos(z);
+      o.x = K * (cx * sy * sz + cx * cy * cz - sx * sy * cz - sx * cy * sz);
+      o.y = K * (sx * cy * sz - sx * sy * cz + cx * cy * cz - cx * sy * sz);
+      o.z = K * (sx * sy * cz - sx * cy * sz - cx * sy * sz + cx * cy * cz);
+      return o;
+    }
+    function toSurface(p) { for (let k = 0; k < 6; k++) { const f = F(p); gradF(p, _grad); const g2 = _grad.lengthSq() || 1; p.addScaledVector(_grad, -f / g2); } return p; }
+    const zPos = new THREE.Vector3(0, 0, 0);   // on the surface
+
+    // ── Textures (generated; no files) ──────────────────────────────────────────
+    function tex(draw, s) { s = s || 64; const c = document.createElement('canvas'); c.width = c.height = s; draw(c.getContext('2d'), s); return new THREE.CanvasTexture(c); }
+    const bugTex = tex((x, s) => {
+      x.translate(s / 2, s / 2);
+      x.fillStyle = 'rgba(235,240,255,0.6)';                       // wings (light → tints vibrant)
+      x.beginPath(); x.ellipse(-10, -6, 14, 8, -0.5, 0, 7); x.fill();
+      x.beginPath(); x.ellipse(-10, 6, 14, 8, 0.5, 0, 7); x.fill();
+      x.fillStyle = '#b9c2e0';                                     // mid body → tint shows as colour
+      x.beginPath(); x.ellipse(2, 0, 12, 5, 0, 0, 7); x.fill(); x.beginPath(); x.arc(14, 0, 5, 0, 7); x.fill();
+      x.fillStyle = '#23252e'; x.beginPath(); x.arc(16, 0, 2, 0, 7); x.fill();
+    });
+    const glowTex = tex((x, s) => {
+      const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(180,150,255,0.6)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.fillRect(0, 0, s, s);
+    }, 128);
+
+    // vibrant nebula clouds for an enveloping, colorful space
+    [[0xff2e88, -90, 20, -120, 150], [0x16d6ff, 110, -10, -90, 170], [0x9b5cff, 20, 60, -160, 200]].forEach(([c, x, y, z, s]) => {
+      const n = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: c, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.22, depthWrite: false }));
+      n.position.set(x, y, z); n.scale.set(s, s, 1); scene.add(n);
+    });
+    (function stars() {
+      const g = new THREE.BufferGeometry(), n = 600, a = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { a[i * 3] = (Math.random() * 2 - 1) * 220; a[i * 3 + 1] = (Math.random() * 2 - 1) * 130; a[i * 3 + 2] = (Math.random() * 2 - 1) * 220; }
+      g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+      scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x8899bb, size: 0.6 })));
+    })();
+
+    // ── The zapper (the only visible structure) ─────────────────────────────────
+    const zapper = new THREE.Group(); zapper.position.copy(zPos); scene.add(zapper);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 7, 12), new THREE.MeshBasicMaterial({ color: 0xeae0ff })); core.position.y = 0; zapper.add(core);
+    const cage = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 7, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a6cff, wireframe: true, transparent: true, opacity: 0.65 })); cage.position.y = 0; zapper.add(cage);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xaa88ff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })); halo.scale.set(24, 24, 1); halo.position.y = 0; zapper.add(halo);
+    const coreTop = new THREE.Vector3(0, 3.5, 0);
+    const zc = new THREE.Vector3(0, 0, 0);   // kill point — on the surface, at the cage centre
+    const _up = new THREE.Vector3(0, 1, 0), _dir = new THREE.Vector3(), _tang = new THREE.Vector3(), _grad = new THREE.Vector3(), _n = new THREE.Vector3();
+    zapLight.position.set(0, 0, 0);
+
+    // ── Bugs (vibrant sprites riding the invisible surface) ─────────────────────
+    const bugs = [];
+    function spawnBug() {
+      // a random point on a sphere shell around the zapper → full 3D range of the lattice
+      const a = Math.random() * 7, b = Math.acos(Math.random() * 2 - 1), r = DOM * (0.25 + Math.random() * 0.85);
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: bugTex, transparent: true, depthWrite: false }));
+      m.material.color.setHSL(Math.random(), 0.95, 0.6);           // vibrant per-bug colour
+      m.scale.set(2.3, 2.3, 1); scene.add(m);
+      const p = new THREE.Vector3(zc.x + Math.sin(b) * Math.cos(a) * r, zc.y + Math.cos(b) * r, zc.z + Math.sin(b) * Math.sin(a) * r);
+      toSurface(p);                                                 // snap onto the Schwarz Diamond surface
+      m.position.copy(p);
+      bugs.push({ p, v: new THREE.Vector3((Math.random() * 2 - 1) * 4, (Math.random() * 2 - 1) * 4, (Math.random() * 2 - 1) * 4), spr: m });
+    }
+    for (let i = 0; i < 26; i++) spawnBug();
+    const KILL = 2.6, MAXV = 18;
+
+    // ── Sparks (vibrant additive Points; round-robin pool) ──────────────────────
+    const SPK = 420, spk = new THREE.BufferGeometry();
+    const spkPos = new Float32Array(SPK * 3), spkCol = new Float32Array(SPK * 3), spkVel = new Float32Array(SPK * 3), spkLife = new Float32Array(SPK), spkBase = new Float32Array(SPK * 3);
+    spk.setAttribute('position', new THREE.BufferAttribute(spkPos, 3));
+    spk.setAttribute('color', new THREE.BufferAttribute(spkCol, 3));
+    scene.add(new THREE.Points(spk, new THREE.PointsMaterial({ size: 0.8, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })));
+    let spkCur = 0;
+    function burst(p) {
+      const col = new THREE.Color().setHSL(Math.random(), 1, 0.6);   // vibrant per-burst colour
+      for (let k = 0; k < 18; k++) {
+        const i = spkCur; spkCur = (spkCur + 1) % SPK;
+        spkPos[i * 3] = p.x; spkPos[i * 3 + 1] = p.y; spkPos[i * 3 + 2] = p.z;
+        const a = Math.random() * 7, b = Math.acos(Math.random() * 2 - 1), s = 7 + Math.random() * 18;
+        spkVel[i * 3] = Math.sin(b) * Math.cos(a) * s; spkVel[i * 3 + 1] = Math.cos(b) * s; spkVel[i * 3 + 2] = Math.sin(b) * Math.sin(a) * s;
+        spkLife[i] = 1; spkBase[i * 3] = col.r; spkBase[i * 3 + 1] = col.g; spkBase[i * 3 + 2] = col.b;
+      }
+    }
+
+    // ── Lightning arcs (the electric "sight") ───────────────────────────────────
+    const arcs = [];
+    function arc(from, to) {
+      const pts = [], n = 9;
+      for (let i = 0; i <= n; i++) { const p = new THREE.Vector3().lerpVectors(from, to, i / n); if (i > 0 && i < n) { p.x += (Math.random() - 0.5) * 1.4; p.y += (Math.random() - 0.5) * 1.4; p.z += (Math.random() - 0.5) * 1.4; } pts.push(p); }
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xcdeaff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending }));
+      scene.add(l); arcs.push({ l, life: 1 });
+    }
+
+    // ── Audio: a generative soundscape, all synthesized ─────────────────────────
+    let ac = null, humGain = null, muted = false, audioStarted = false;
+    let musicTimer = 0, chirpTimer = 0, buzzTimer = 0;
+    const SCALE = [0, 2, 4, 7, 9];     // pentatonic
+    function pan(node, x) { if (ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, x)); node.connect(p); return p; } return node; }
+    function initAudio() {
+      if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 110;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 340;
+      humGain = ac.createGain(); humGain.gain.value = 0.045; o.connect(lp); lp.connect(humGain); humGain.connect(ac.destination); o.start();
+      if (!audioStarted) { audioStarted = true; music(); chirp(); buzzby(); }
+    }
+    function zapSound() {
+      if (!ac || muted) return; const t = ac.currentTime, dur = 0.18;
+      const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7;
+      const g = ac.createGain(); g.gain.setValueAtTime(0.6, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(bp); bp.connect(g); g.connect(ac.destination); src.start();
+      const o = ac.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(2000, t); o.frequency.exponentialRampToValueAtTime(360, t + 0.05);
+      const og = ac.createGain(); og.gain.setValueAtTime(0.22, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.06); o.connect(og); og.connect(ac.destination); o.start(t); o.stop(t + 0.07);
+    }
+    // music — notes chosen FROM the manifold (surface height → pitch)
+    function music() {
+      if (ac && !muted) {
+        const u = (Math.random() * 2 - 1) * DOM, v = (Math.random() * 2 - 1) * DOM, h = surfH(u, v);
+        const deg = SCALE[((Math.floor(h + 7) % SCALE.length) + SCALE.length) % SCALE.length];
+        const midi = (h > 0 ? 60 : 48) + deg + (h > 2.5 ? 12 : 0);
+        const t = ac.currentTime, dur = 2.6 + Math.random() * 2;
+        const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.06, t + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); pan(g, u / DOM).connect(ac.destination); o.start(t); o.stop(t + dur + 0.1);
+      }
+      musicTimer = setTimeout(music, 1300 + Math.random() * 1700);
+    }
+    function chirp() {                 // crickets
+      if (ac && !muted) {
+        const t = ac.currentTime, base = 4200 + Math.random() * 1400, pulses = 3 + (Math.random() * 4 | 0), px = (Math.random() * 2 - 1) * 0.85;
+        for (let k = 0; k < pulses; k++) {
+          const tt = t + k * 0.045, o = ac.createOscillator(); o.type = 'square'; o.frequency.value = base;
+          const g = ac.createGain(); g.gain.setValueAtTime(0, tt); g.gain.linearRampToValueAtTime(0.05, tt + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03);
+          o.connect(g); pan(g, px).connect(ac.destination); o.start(tt); o.stop(tt + 0.04);
+        }
+      }
+      chirpTimer = setTimeout(chirp, 700 + Math.random() * 2400);
+    }
+    function buzzby() {                // a fly buzzing across
+      if (ac && !muted) {
+        const t = ac.currentTime, dur = 0.5 + Math.random() * 0.6, o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 150 + Math.random() * 130;
+        const lfo = ac.createOscillator(); lfo.frequency.value = 28 + Math.random() * 22; const lg = ac.createGain(); lg.gain.value = 22; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.04, t + 0.12); g.gain.setValueAtTime(0.04, t + dur - 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); const p = pan(g, -0.85); if (p.pan) p.pan.linearRampToValueAtTime(0.85, t + dur); p.connect(ac.destination); o.start(t); o.stop(t + dur);
+      }
+      buzzTimer = setTimeout(buzzby, 2800 + Math.random() * 5200);
+    }
+
+    let score = 0, zapFlash = 0, camAng = 0, lastT = 0;
+    function zapBug(b) {
+      score++; document.getElementById('score').textContent = score;
+      zapFlash = 1; zapSound(); burst(b.spr.position); arc(coreTop, b.spr.position.clone());
+      scene.remove(b.spr); setTimeout(spawnBug, 600 + Math.random() * 1500);
+    }
+
+    function update(dt, t) {
+      for (let i = bugs.length - 1; i >= 0; i--) {
+        const b = bugs[i];
+        // surface normal at the bug, and the direction to the light
+        gradF(b.p, _grad); const gl = _grad.length() || 1; _n.copy(_grad).multiplyScalar(1 / gl);
+        _dir.copy(zc).sub(b.p); const dist = _dir.length() || 1; _dir.multiplyScalar(1 / dist);
+        _tang.crossVectors(_n, _dir);                              // a swirl direction lying IN the surface
+        // accelerate toward the light + swirl + erratic jitter (every angle)
+        b.v.x += (_dir.x * 16 + _tang.x * 6 + (Math.random() * 2 - 1) * 10) * dt;
+        b.v.y += (_dir.y * 16 + _tang.y * 6 + (Math.random() * 2 - 1) * 10) * dt;
+        b.v.z += (_dir.z * 16 + _tang.z * 6 + (Math.random() * 2 - 1) * 10) * dt;
+        b.v.addScaledVector(_n, -b.v.dot(_n));                     // keep motion ALONG the surface (tangent plane)
+        b.v.multiplyScalar(Math.max(0, 1 - 1.6 * dt));            // drag → they spiral in, not orbit forever
+        const sp = b.v.length(); if (sp > MAXV) b.v.multiplyScalar(MAXV / sp);
+        b.p.addScaledVector(b.v, dt);
+        toSurface(b.p);                                            // re-snap onto the Schwarz Diamond surface
+        const rr = b.p.distanceTo(zc); if (rr > DOM * 1.4) { b.p.sub(zc).multiplyScalar(DOM * 1.4 / rr).add(zc); toSurface(b.p); }
+        b.spr.position.copy(b.p);
+        if (dist < KILL) { zapBug(b); bugs.splice(i, 1); }
+      }
+      for (let i = 0; i < SPK; i++) {
+        if (spkLife[i] <= 0) { spkCol[i * 3] = spkCol[i * 3 + 1] = spkCol[i * 3 + 2] = 0; continue; }
+        spkLife[i] -= dt * 1.7;
+        spkPos[i * 3] += spkVel[i * 3] * dt; spkPos[i * 3 + 1] += spkVel[i * 3 + 1] * dt; spkPos[i * 3 + 2] += spkVel[i * 3 + 2] * dt;
+        spkVel[i * 3] *= 0.92; spkVel[i * 3 + 1] = spkVel[i * 3 + 1] * 0.92 - 9 * dt; spkVel[i * 3 + 2] *= 0.92;
+        const l = Math.max(0, spkLife[i]); spkCol[i * 3] = spkBase[i * 3] * l; spkCol[i * 3 + 1] = spkBase[i * 3 + 1] * l; spkCol[i * 3 + 2] = spkBase[i * 3 + 2] * l;
+      }
+      spk.attributes.position.needsUpdate = true; spk.attributes.color.needsUpdate = true;
+      for (let i = arcs.length - 1; i >= 0; i--) { const A = arcs[i]; A.life -= dt * 6; A.l.material.opacity = Math.max(0, A.life); if (A.life <= 0) { scene.remove(A.l); A.l.geometry.dispose(); A.l.material.dispose(); arcs.splice(i, 1); } }
+
+      zapFlash = Math.max(0, zapFlash - dt * 3.5);
+      zapLight.intensity = 2.4 + zapFlash * 7;
+      const hue = (t / 6000) % 1; halo.material.color.setHSL(hue, 0.7, 0.6); cage.material.color.setHSL(hue, 0.7, 0.65);
+      halo.material.opacity = 0.7 + zapFlash * 0.3; const hs = 24 + zapFlash * 12; halo.scale.set(hs, hs, 1);
+
+      // camera gimbals through the lattice: orbits, with the radius and height breathing
+      camAng += dt * 0.5;
+      const rc = 30 + Math.sin(t / 3500) * 12, cy = 6 + Math.sin(t / 2700) * 16;
+      camera.position.set(zc.x + Math.cos(camAng) * rc, zc.y + cy, zc.z + Math.sin(camAng) * rc);
+      camera.lookAt(zc);
+    }
+
+    function loop(t) { requestAnimationFrame(loop); const dt = lastT ? Math.min(.05, (t - lastT) / 1000) : 0; lastT = t; update(dt, t); renderer.render(scene, camera); }
+    requestAnimationFrame(loop);
+
+    addEventListener('pointerdown', () => { initAudio(); document.getElementById('hint').style.display = 'none'; });
+    document.getElementById('more').addEventListener('click', (e) => { e.stopPropagation(); for (let i = 0; i < 10; i++) spawnBug(); });
+    document.getElementById('mute').addEventListener('click', (e) => { e.stopPropagation(); muted = !muted; if (humGain) humGain.gain.value = muted ? 0 : 0.045; e.target.textContent = muted ? '🔇 Muted' : '🔊 Sound'; });
+    document.getElementById('aboutBtn').addEventListener('click', (e) => { e.stopPropagation(); const a = document.getElementById('about'); a.style.display = a.style.display === 'block' ? 'none' : 'block'; });
+    document.getElementById('aboutX').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('about').style.display = 'none'; });
+  </script>
+</body>
+</html>

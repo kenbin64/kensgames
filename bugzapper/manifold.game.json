@@ -1,0 +1,15 @@
+{
+  "_comment": "Bug Zapper — a 3D manifold toy. Bugs ride the invisible Schwarz Diamond surface, drawn to the light; touch the grid and they're zapped. The ambient music's notes are sampled from the manifold.",
+  "id": "bugzapper",
+  "name": "Bug Zapper",
+  "slug": "bugzapper",
+  "description": "Vibrant gem-bugs fly along an invisible Schwarz Diamond surface toward the light and get zapped — flash, sparks, and a synthesized buzz, with generative bug-music drawn from the manifold. A relaxing, single-player toy.",
+  "version": "1.0.0",
+  "path": "bugzapper/",
+  "entry": "index.html",
+  "server": "static",
+  "status": "production",
+  "players": "1",
+  "multiplayer": false,
+  "tags": ["1 Player", "Toy", "3D", "Ambient"]
+}

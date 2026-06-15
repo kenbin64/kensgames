@@ -50,6 +50,14 @@ class KGMultiplayer {
   // CONNECTION
   // ═══════════════════════════════════════════════════════════════════════
   _wsUrl() {
+    // Desktop/embedded override. The Electron loopback server injects
+    // window.__KG_WS_URL__ so a packaged build talks to a fixed relay instead
+    // of guessing from location (under the loopback origin we'd otherwise look
+    // like localhost and try a dev server). This is also the single seam where
+    // a future P2P/LAN-direct transport substitutes its own endpoint.
+    try {
+      if (typeof window !== 'undefined' && window.__KG_WS_URL__) return window.__KG_WS_URL__;
+    } catch (_) { /* non-browser context */ }
     const h = location.hostname;
     const secure = location.protocol === 'https:';
     if (h === 'localhost' || h === '127.0.0.1') return 'ws://' + h + ':8765/ws';

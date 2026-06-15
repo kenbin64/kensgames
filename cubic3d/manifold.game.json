@@ -3,7 +3,7 @@
   "id": "cubic3d",
   "name": "Cubic",
   "slug": "cubic3d",
-  "description": "3D Tetris — drop and rotate polycube pieces into an elongated 4×4×20 tower well. Every piece is a point in a higher dimension; every layer a whole in a lower.",
+  "description": "3D polycube puzzle — drop and rotate original polycube pieces into an elongated 4×4×20 tower well. Every piece is a point in a higher dimension; every layer a whole in a lower.",
   "version": "1.0.0",
   "path": "cubic3d/",
   "entry": "index.html",
@@ -59,7 +59,7 @@
     "tags": [
       "1 Player",
       "Puzzle",
-      "3D Tetris"
+      "3D Polycube"
     ]
   }
 }

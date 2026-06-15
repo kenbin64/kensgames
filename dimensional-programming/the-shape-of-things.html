@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Shape of Things</title>
+<meta name="description" content="Dimensional programming told in shapes and actions, not numbers: separate to bloom, gather to collapse, every point an identity that knows its neighbors. Each claim labeled by how well it is supported.">
+<style>
+:root{--bg:#0c1016;--panel:#141b24;--edge:#283441;--txt:#e7edf4;--mut:#93a1b1;--acc:#8fb7ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Georgia,"Times New Roman",serif;line-height:1.75;font-size:18px}
+.wrap{max-width:720px;margin:0 auto;padding:54px 22px 80px}
+.kicker{font-family:ui-monospace,Consolas,monospace;color:var(--acc);font-size:13px;letter-spacing:1px;text-transform:uppercase}
+h1{font-size:34px;line-height:1.2;margin:10px 0 6px;font-weight:700}
+.sub{color:var(--mut);font-size:17px;font-style:italic;margin-bottom:26px}
+.note{background:var(--panel);border:1px solid var(--edge);border-left:3px solid var(--acc);border-radius:8px;padding:14px 18px;color:var(--mut);font-size:15px;line-height:1.6;font-family:system-ui,sans-serif}
+h2{font-size:22px;margin:38px 0 8px}
+p{margin:0 0 16px}b{color:#fff}
+.tag{display:inline-block;font-family:ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.5px;text-transform:uppercase;border-radius:5px;padding:2px 8px;vertical-align:middle}
+.est{color:#0c1016;background:#5fd39a}.mdl{color:#0c1016;background:#8fb7ff}.mine{color:#1a1410;background:#e3b86b}
+.legend{font-family:system-ui,sans-serif;font-size:13px;color:var(--mut);margin:6px 0 0;line-height:1.7}
+.bound{background:#1a1410;border:1px solid #5a4326;border-left:3px solid #d9a441;border-radius:8px;padding:14px 18px;color:#e8d4b2;font-family:system-ui,sans-serif;font-size:15.5px;line-height:1.6}
+.bound b{color:#ffd98a}
+.ladder{font-family:ui-monospace,Consolas,monospace;color:var(--acc);font-size:14px;background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:14px 18px;line-height:1.9;font-style:normal;white-space:pre}
+a{color:var(--acc)}
+.foot{margin-top:48px;border-top:1px solid var(--edge);padding-top:18px;color:#6c7c8c;font-size:13px;font-family:system-ui,sans-serif}
+</style>
+</head>
+<body><div class="wrap">
+  <div class="kicker">Dimensional programming</div>
+  <h1>The Shape of Things</h1>
+  <div class="sub">Told in shapes and actions, not numbers. You do not need any math to follow it.</div>
+
+  <div class="note">
+    This is a way of seeing. Where it names something computing already knows, it says
+    <b style="color:#5fd39a">Established</b>. Where it is a way of organizing things, it says
+    <b style="color:#8fb7ff">Model</b>. Where the framing is my own, it says <b style="color:#e3b86b">Mine</b>.
+    There are no equations here on purpose; the ideas are shapes and moves, not symbols on paper.
+  </div>
+
+  <h2><span class="tag mine">Mine</span> A point is an identity</h2>
+  <p>A point is not a spot on a grid or a number. It is a thing with an <b>identity</b>. Without an identity
+    it is only potential, an abstraction waiting to become real. Give it an identity and it becomes a point you can
+    hold, move, and work with. Everything in this way of thinking is a point, and the first rule is that a point must
+    be a some-thing, not a maybe-thing.</p>
+  <p class="legend"><span class="tag est">Established</span> In software this is the difference between a type, which is
+    potential, and an instance, which is a real thing with its own identity.</p>
+
+  <h2><span class="tag est">Established</span><span class="tag mine">Mine</span> Two moves: separate and gather</h2>
+  <p>Everything runs on two moves, and they are just the shapes of dividing and multiplying.</p>
+  <p><b>Separate</b> a point and it <b>blooms</b> into its parts. One thing opening into many. That is division, seen as
+    a shape.</p>
+  <p><b>Gather</b> the parts and they <b>collapse</b> back into one point. Many drawn into one. That is multiplication,
+    seen as a shape. Gather an identity together with how it behaves and you get its state, and that state is the next
+    identity you carry forward. The work moves ahead by gathering.</p>
+  <p class="legend">Breaking a whole into parts and composing parts into a whole is everyday computing
+    (<span class="tag est">Established</span>). Naming the two as bloom and collapse, and treating the gathered state as
+    the next thing you act on, is my framing (<span class="tag mine">Mine</span>).</p>
+
+  <h2><span class="tag mdl">Model</span><span class="tag mine">Mine</span> We use the shape, not the sum</h2>
+  <p>When this says a thing has a shape, it means a real surface, not a sum on paper. The gather of an identity and its
+    behavior has one: a <b>saddle</b>, a twisted square, a surface that rises along one direction and falls along the
+    other, with a ridge running down its diagonal and a half twist through it.</p>
+  <p>You do not read a number off it. You lay a <b>lens</b> over it, and the lens reads one property at the place you are
+    standing: a height, a slope, a colour, a tone. Change the lens and the very same surface gives a different reading.
+    The shape decides what is possible; the lens decides what you see.</p>
+  <p>So gathering is not arithmetic. It is landing on a real surface and reading it through a chosen lens. That is the
+    whole reason this is told in shapes and not in symbols: the saddle is the thing, and the symbols are only its shadow.</p>
+  <p class="legend">The fuller picture of that surface, and why a formula can have a body, is in
+    <a href="the-seat-and-the-shadow.html">The SEAT and the Shadow</a>.</p>
+
+  <h2><span class="tag est">Established</span><span class="tag mine">Mine</span> Moving along, and moving between</h2>
+  <p>There are two kinds of motion, and this is the heart of why it is called dimensional.</p>
+  <p><b>Adding and taking away keep you on the line.</b> They move you <i>within</i> a level, back and forth, same scale.</p>
+  <p><b>Gathering and separating make area.</b> They move you <i>between</i> levels, up into a whole or down into the
+    parts. Those two are the dimensional moves; adding and subtracting are not.</p>
+  <p>And when a separation does not come out clean, what is left over is the <b>residual</b>, the little bit of disorder
+    you have to carry. (Computing calls this the remainder, or modulo.)</p>
+  <p class="legend"><span class="tag est">Established</span> Treating adding as sliding along a length and multiplying as
+    making an area is the oldest picture of arithmetic, older than the symbols. Calling one "within a level" and the other
+    "between levels" is the framing here (<span class="tag mine">Mine</span>).</p>
+
+  <h2><span class="tag est">Established</span><span class="tag mine">Mine</span> The ladder</h2>
+  <p>The same two moves build one ladder, and you climb the very same ladder whether you are shaping data, thinking
+    through a problem, or asking a question.</p>
+  <div class="ladder">point    a single idea, with its identity
+line     you give one thing, you get one thing back
+surface  the snapshot, the lay of the land, the view to the horizon
+volume   you go down into the nuance, the whole domain open and lit
+whole    the domain gathers back into one point at the next level up</div>
+  <p style="margin-top:16px">That last rung is the trick. Once a thing is fully understood, it <b>collapses back into a
+    single point</b> one level higher, a closed box again, reusable and measurable like any other point. Then you can
+    build on it without re-opening it. You went all the way out into the volume and came back with a point.</p>
+  <p style="margin-top:16px">A closed box is also a <b>security boundary</b>. The world sees only the box, the point, the
+    one value you expose; everything inside is <b>contained</b>, reachable only by opening it with the right access. The
+    same shape that makes a point reusable makes it safe: outsiders touch the face, not the inside.</p>
+  <p class="legend">A finished, fully-understood thing becoming a reusable closed box is <b>abstraction, encapsulation,
+    and information hiding</b> (<span class="tag est">Established</span>), and information hiding is a security principle:
+    you can only act on what you hold a reference to. Running the one ladder across data, thinking, and prompts with a single
+    vocabulary is the contribution here (<span class="tag mine">Mine</span>).</p>
+
+  <h2><span class="tag est">Established</span> Every point knows its neighbors</h2>
+  <p>Call it the Ms Kravitz rule: every point knows the points right next to it. From that small, local knowledge you get
+    two large things almost for free. <b>News travels</b>, because each point passes word to its neighbors until it has
+    reached everywhere. And <b>damage repairs itself</b>, because a point that loses its way can be patched from what the
+    points around it still hold. Nothing needs to see the whole; the whole takes care of itself from the edges in.</p>
+  <p class="legend"><span class="tag est">Established</span> Local-neighbor knowledge giving you propagation and
+    self-healing is how gossip protocols, mesh networks, and resilient distributed systems already work. The nosy-neighbor
+    name is just to make it stick.</p>
+
+  <h2><span class="tag est">Established</span> You only bloom when you look</h2>
+  <p>Nothing separates until it is observed. A point stays gathered and quiet until you ask for its parts, and then it
+    blooms just enough to answer the question, and no more. You hold the small definition and let the detail appear on
+    demand, rather than keeping it all spread out and stored.</p>
+  <p class="legend"><span class="tag est">Established</span> Deriving what you need only when you need it is lazy
+    evaluation, and computing it from a small definition instead of storing it is derive-not-store. Both are ordinary,
+    sturdy ideas.</p>
+
+  <div class="bound">
+    <b>The boundary, kept bright.</b> "Dimension" here is a way of talking about scope and depth, drawn onto shape. It is
+    a model, not a claim about literal geometry, and the ladder is a mnemonic, not a measurement. Underneath, the moving
+    parts are ordinary good engineering: bloom only when observed, keep each point's neighbors close, and let a finished
+    whole become a reusable point. There is no speed trick here. The whole gain is having <b>one clear way of seeing the
+    same thing at every scale</b>, which is worth a great deal on its own.
+  </div>
+
+  <h2>Closing</h2>
+  <p>So dimensional programming is two moves and one rule. <b>Separate</b> to bloom a point into its parts.
+    <b>Gather</b> to collapse parts into a point. And let every point keep its identity and know its neighbors. Told in
+    shapes, it stays small enough to hold in your head, which is the whole point.</p>
+
+  <div class="foot">A way of seeing by Kenneth W. Bingham &middot; dimensionalprogramming.com &middot; claims labeled by how well they are supported; told in shapes, not numbers.
+  <br><br>Concept and direction: Kenneth W. Bingham. Built with the help of Claude AI under a standing directive to be skeptical, to insist on proof, and to allow no claim that is not demonstrated in tested code. The ideas are the author's; the AI implemented and verified them, it did not originate them.</div>
+</div></body>
+</html>

@@ -5,7 +5,7 @@
   <script src="/js/session-identity.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cubit — Crystal 3D Tetris · KensGames</title>
+  <title>Cubit — 3D Crystal Polycube Puzzle · KensGames</title>
   <style>
     *,
     *::before,
@@ -342,24 +342,32 @@
 
     // Piece type → color hex, emissive hex  (hue-wheel 51° spacing — spectral crystal palette)
     const PIECE_COLORS = [
-      [0x00ffee, 0x004444], // 0 I — aqua-cyan    174°
-      [0x0077ff, 0x001a44], // 1 O — electric-blue 213°
-      [0x9922ff, 0x250055], // 2 T — violet        275°
-      [0xff0099, 0x440022], // 3 S — magenta       323°
-      [0xff5500, 0x441100], // 4 Z — orange          16°
-      [0xaaff00, 0x2a4400], // 5 J — lime            74°
-      [0x00ff77, 0x004422], // 6 L — emerald        151°
+      [0x00ffee, 0x004444], // 0 Line    — aqua-cyan    174°
+      [0x0077ff, 0x001a44], // 1 Cube    — electric-blue 213°
+      [0x9922ff, 0x250055], // 2 Tripod  — violet        275°
+      [0xff0099, 0x440022], // 3 R-Screw — magenta       323°
+      [0xff5500, 0x441100], // 4 L-Screw — orange          16°
+      [0xaaff00, 0x2a4400], // 5 Crystal — lime            74°
+      [0x00ff77, 0x004422], // 6 Helix   — emerald        151°
     ];
 
-    // Pieces defined as [dx,dy=0,dz] offsets lying flat in XZ plane
+    // ── Cubit pieces — original polycube set ─────────────────────────────────
+    // Cells are [dx,dy,dz] offsets. Deliberately NOT the flat tetrominoes: only
+    // the two generic shapes (a straight line, a square) are kept — every other
+    // piece uses the third dimension, so this is a genuine 3D polycube puzzle,
+    // not a 2D falling-block game with a 3D coat of paint. Rotation/collision
+    // are shape-agnostic, so any polycube that fits the 4×4 well works.
     const PIECE_DEFS = [
-      { cells: [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]] }, // I
-      { cells: [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]] }, // O
-      { cells: [[1, 0, 0], [0, 0, 1], [1, 0, 1], [2, 0, 1]] }, // T
-      { cells: [[1, 0, 0], [2, 0, 0], [0, 0, 1], [1, 0, 1]] }, // S
-      { cells: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [2, 0, 1]] }, // Z
-      { cells: [[2, 0, 0], [0, 0, 1], [1, 0, 1], [2, 0, 1]] }, // J
-      { cells: [[0, 0, 0], [0, 0, 1], [1, 0, 1], [2, 0, 1]] }, // L
+      // Generic, non-protectable shapes:
+      { cells: [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]] },            // Line   (4 in a row)
+      { cells: [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]] },            // Cube   (2×2 square)
+      // Genuinely 3D tetracubes (cannot be flattened — impossible in 2D):
+      { cells: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]] },            // Tripod (corner, 3 arms)
+      { cells: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },            // R-Screw (3D staircase)
+      { cells: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 1]] },            // L-Screw (mirror staircase)
+      // 3D pentacubes for variety:
+      { cells: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [1, 1, 1]] }, // Crystal (2×2 + one up)
+      { cells: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1], [2, 1, 1]] }, // Helix   (twisting climb)
     ];
 
     const LINE_SCORES = [0, 100, 300, 500, 800];
