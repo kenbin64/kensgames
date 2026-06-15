@@ -984,6 +984,15 @@ function _activePlayerUserId() {
   return (p && p.userId) || null;
 }
 
+// Stable cross-client identity for a seat. Prefer userId (assigned from the
+// server roster); fall back to the display name. Turn rotation targets a
+// PLAYER via this identity, not a raw seat index — peer roster ordering is not
+// guaranteed to match the host's, so a bare index can land on the wrong seat.
+function _seatIdentity(p) {
+  if (!p) return '';
+  return String(p.userId || p.name || '');
+}
+
 // True when the local client is the ONLY human in the game (true solo,
 // solo-vs-bots, or a stale-cache game that came up in MP mode with no peer).
 // Such a game has nobody to coordinate with, so this client owns every
@@ -991,6 +1000,19 @@ function _activePlayerUserId() {
 // an ambiguous identity match locks the lone human out of drawing, moving, or
 // relinquishing. Real multiplayer (2+ humans) is unaffected.
 function _loneHuman() {
+  // Prefer the SESSION's human count — the relay's player list is the source of
+  // truth for who is actually connected. The local players[] roster can come up
+  // stale/corrupted (a real 2nd human mislabeled as a bot); treating THAT as
+  // "lone" wrongly promotes this peer to host AND to always-my-turn, so it
+  // auto-plays other humans' seats — the exact "skipping players / extra turns /
+  // strayed moves" cluster. Fall back to the local roster only pre-session.
+  try {
+    const sess = _mpClient && _mpClient.session;
+    const sp = sess && Array.isArray(sess.players) ? sess.players : null;
+    if (sp && sp.length) {
+      return sp.filter(p => p && !p.is_ai).length <= 1;
+    }
+  } catch (_) { /* fall through to local roster */ }
   const players = state.players.get('list') || [];
   return players.filter(p => p && !p.isBot).length <= 1;
 }
@@ -1119,8 +1141,9 @@ function applyRemoteAction(action, payload) {
         // Idempotent via seq.
         const from = payload && Number.isFinite(payload.from) ? payload.from : null;
         const next = payload && Number.isFinite(payload.next) ? payload.next : null;
+        const nextId = payload && payload.nextId != null ? String(payload.nextId) : null;
         const seq = payload && Number.isFinite(payload.seq) ? payload.seq : 0;
-        console.log('[TURN] applyRemoteAction: turn_advance received. from:', from, 'next:', next, 'seq:', seq, 'lastApplied:', _lastAppliedTurnSeq, 'turnSeq:', _turnSeq);
+        console.log('[TURN] applyRemoteAction: turn_advance received. from:', from, 'next:', next, 'nextId:', nextId, 'seq:', seq, 'lastApplied:', _lastAppliedTurnSeq, 'turnSeq:', _turnSeq);
         if (from === null || next === null) break;
         if (seq && seq <= _lastAppliedTurnSeq) {
           console.log('[TURN] applyRemoteAction: turn_advance seq too old, ignoring.');
@@ -1128,7 +1151,26 @@ function applyRemoteAction(action, payload) {
         }
         _lastAppliedTurnSeq = seq || _lastAppliedTurnSeq;
         if (seq > _turnSeq) _turnSeq = seq;
-        _applyTurnAdvance(from, next, seq);
+        // Resolve the target seat by IDENTITY, not the raw index. Peer roster
+        // ordering isn't guaranteed identical to the host's, so the host's
+        // `next` index can point at a different player locally. Match nextId
+        // against our own roster; fall back to the raw index only when we
+        // can't resolve the identity. This is the fix for turns landing on the
+        // wrong seat (skipped humans / strayed moves / no relinquish).
+        let resolvedNext = next;
+        if (nextId) {
+          const list = state.players.get('list') || [];
+          const byId = list.findIndex(p => _seatIdentity(p) === nextId);
+          if (byId >= 0) {
+            if (byId !== next) {
+              console.warn('[TURN] turn_advance index/identity mismatch — host index', next, '→ local seat', byId, 'for', nextId, '(using identity)');
+            }
+            resolvedNext = byId;
+          } else {
+            console.warn('[TURN] turn_advance nextId', nextId, 'not in local roster; using raw index', next);
+          }
+        }
+        _applyTurnAdvance(from, resolvedNext, seq);
         break;
       }
     }
@@ -3170,10 +3212,11 @@ function endTurn() {
   // single advancer, those whole failure classes disappear.
   if (_isMpMode()) {
     if (_isHost()) {
+      const nextId = _seatIdentity(players[next]);
       _applyTurnAdvance(ci, next, ++_turnSeq);
       _lastAppliedTurnSeq = _turnSeq; // our own advance counts as applied; reject any echo
-      _broadcast('turn_advance', { from: ci, next, seq: _turnSeq });
-      console.log('[TURN] host advanced turn. ci:', ci, '-> next:', next, 'seq:', _turnSeq);
+      _broadcast('turn_advance', { from: ci, next, nextId, seq: _turnSeq });
+      console.log('[TURN] host advanced turn. ci:', ci, '-> next:', next, 'nextId:', nextId, 'seq:', _turnSeq);
     } else {
       _localTurnUiCleanup();
       console.log('[TURN] non-host endTurn — cleaned up; waiting for host turn_advance.');
