@@ -495,6 +495,14 @@ const FastTrackCore = {
 };
 
 window.FastTrackCore = FastTrackCore;
+// The legacy renderer (fasttrack-3d.js) is a NON-module script that reads several
+// core values as bare globals via the shared script scope. This adapter is an ES
+// MODULE, so its bindings are module-scoped and invisible to those bare refs —
+// which threw "state is not defined" and blacked out the whole scene. Re-publish
+// the ones the renderer reads bare onto window so the shared-global contract holds.
+window.state = state;
+window.getHoleType = getHoleType;
+window.PLAYER_COLORS = PLAYER_COLORS;
 window.initGame = initGame;
 window.drawCard = drawCard;
 window.executeMove = executeMove;
