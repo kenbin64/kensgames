@@ -40,8 +40,23 @@ Fix (in `fasttrack-game-core.js`): the **host is the sole turn authority**.
 Dependency: exactly one client must be flagged host. The lobby guarantees this
 (`server/lobby-server.js`: sets `host_id` on create, reassigns on host disconnect).
 
-NOT YET PROVEN: needs a live 2-human session to verify end-to-end. Solo tests
-(28 passing) only exercise `_applyTurnAdvance`, not the MP host/non-host branch.
+## Bug found + fixed by the host/non-host test (2026-06-17)
+The host-authoritative model above had one hole. `_broadcast()` early-returned on
+`_applying`, to stop a replayed peer action from echoing back. But the host reaches
+`endTurn()` WHILE `_applying` is true every time it replays a NON-HOST player's move,
+and `endTurn()` is exactly where the host sends `turn_advance`. So for every non-host
+player's turn, the `turn_advance` was swallowed: the host advanced locally but the
+peers never heard it, so the host skipped ahead while the peer kept its turn — the
+reported "skips some turns / gives multiple turns when the card has no redraw."
+Fix: `_broadcast()` now lets `turn_advance` through under `_applying` and echo-
+suppresses only the other actions (draw/move/reshuffle).
+
+NOW PROVEN HEADLESS: `test_mp_turn_sync.js` loads the engine twice (a real host and
+a real peer) wired through a fake relay and plays a full alternating game, asserting
+both clients agree on the current seat after every turn. It reproduced the desync
+before the fix (7 failures, all on non-host pass-turns) and is green after it (24/0).
+Still worth a live 2-human smoke test, but the host/non-host rotation branch is now
+covered by a regression test, not just `_applyTurnAdvance`.
 
 Transport unchanged (still the kensgames.com relay). P2P/LAN deferred per the
 "relay now, P2P later" decision.

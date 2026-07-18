@@ -1,0 +1,7 @@
+{
+  "name": "fasttrack-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FastTrack rewrite: modular, single-concern, rules driven by fasttrack.rules.json."
+}

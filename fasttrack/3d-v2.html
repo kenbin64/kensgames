@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script src="/js/session-identity.js"></script>
+  <script src="/js/kg-game-cache.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FastTrack 3D — Manifold Gaming</title>
+  <link rel="icon" href="/assets/images/logo/icon.png" type="image/png">
+  <!-- X-Dimensional bootstrap: resolves KG_Game / KG_Player before init3D. -->
+  <script src="3d-bootstrap.js?v=20260510l"></script>
+
+  <!-- X-Dimensional Session Bridge (loads before game init) -->
+  <script src="/js/dimensional-session-bridge.js"></script>
+
+  <link rel="stylesheet" href="../../lib/fonts/fonts.css">
+  <link rel="stylesheet" href="3d.css?v=20260605a">
+  <script src="/js/analytics.js"></script>
+  <script src="/js/kernel-client.js" defer></script>
+  <script src="/js/player-panel.js" defer></script>
+</head>
+
+<body>
+
+  <!-- ── BOARD LOADING SCREEN ──────────────────────────────────── -->
+  <div id="ft3d-loader" role="status" aria-label="Loading game board">
+    <!-- 80s horizon perspective grid -->
+    <div id="ft3d-loader-grid"></div>
+
+    <!-- Three counter-rotating neon rings -->
+    <div class="ft3d-spinner">
+      <div class="ft3d-ring"></div>
+      <div class="ft3d-ring"></div>
+      <div class="ft3d-ring"></div>
+      <div class="ft3d-dot"></div>
+    </div>
+
+    <div id="ft3d-loader-label">GENERATING BOARD&hellip;</div>
+  </div>
+
+  <script src="3d-loader.js"></script>
+
+  <div id="container"></div>
+
+  <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
+  <div id="ft-footer-bg" aria-hidden="true"></div>
+
+  <!-- ── Peg control bar — 5 peg buttons (per-peg nickname) + Confirm.
+       Replaces text-based move hints / instruction banner. JS in 3d-ui.js
+       maps clicks onto the engine's move-cycle staging (peg → cycle moves
+       → confirm). Centered between #panel-action (left) and #panel-cam
+       (right) so neither is covered (HR-6.2). ── -->
+  <div id="ft-peg-bar" role="region" aria-label="Choose peg and move">
+    <div id="ft-peg-buttons">
+      <button type="button" class="peg-btn" id="peg-btn-0" data-peg-idx="0" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-1" data-peg-idx="1" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-2" data-peg-idx="2" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-3" data-peg-idx="3" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+      <button type="button" class="peg-btn" id="peg-btn-4" data-peg-idx="4" disabled>
+        <span class="peg-glyph">●</span>
+        <span class="peg-nickname">—</span>
+      </button>
+    </div>
+    <button type="button" id="ft-peg-confirm" class="peg-confirm-btn" disabled aria-label="Confirm move"
+      title="Confirm move">
+      <span class="peg-confirm-check">✔</span>
+      <span class="peg-confirm-label">Confirm</span>
+    </button>
+  </div>
+
+  <!-- ── Help tip — small pill above the peg bar explaining how to play.
+       Sits clear of the peg buttons. Dismissible (✕) and remembered in
+       localStorage. ── -->
+  <div id="ft-peg-help" role="note" aria-label="How to play">
+    <span class="ft-peg-help-text">Tap a <b>glowing hole</b> to move there. For a 7, tap a gold hole, then complete the split.</span>
+    <button type="button" id="ft-peg-help-close" aria-label="Dismiss help">✕</button>
+  </div>
+
+  <!-- ── Move-cycle bar — always-visible footer control to toggle through every legal move ── -->
+  <div id="ft-confirm-bar" role="region" aria-label="Choose move" hidden>
+    <button id="ft-confirm-prev" type="button" aria-label="Previous move" title="Previous move">◀</button>
+    <span id="ft-confirm-label">No moves available</span>
+    <button id="ft-confirm-next" type="button" aria-label="Next move" title="Next move">▶</button>
+    <button id="ft-confirm-cancel" type="button" aria-label="Clear selection" title="Clear selection">✕</button>
+    <button id="ft-confirm-ok" type="button" aria-label="Confirm move" title="Confirm move">Confirm ✓</button>
+  </div>
+
+  <!-- ── Big instruction banner — tells the player exactly what to tap next ── -->
+  <div id="ft-instruction-banner" role="status" aria-live="polite" hidden>
+    <span class="ft-ib-icon" aria-hidden="true">👉</span>
+    <span class="ft-ib-text">Tap a glowing peg</span>
+  </div>
+
+  <!-- ── Player strip — top-left ── -->
+  <div id="panel-players" class="glass-panel">
+    <div id="game-status">Your turn</div>
+    <div id="player-list"></div>
+    <div id="helix-viz">
+      <div class="helix-section" style="background:#ff4444;" title="Players">P</div>
+      <div class="helix-section" style="background:#ffaa00;" title="Board">B</div>
+      <div class="helix-section" style="background:#44cc44;" title="Deck">D</div>
+      <div class="helix-section" style="background:#4488ff;" title="Turn">T</div>
+      <div class="helix-section" style="background:#cc44cc;" title="Movement">M</div>
+      <div class="helix-section" style="background:#ff8844;" title="SafeZone">S</div>
+      <div class="helix-section" style="background:#888888;" title="Meta">Z</div>
+    </div>
+  </div>
+
+  <!-- ── Action panel — bottom-left ── -->
+  <div id="panel-action" class="glass-panel">
+    <div id="card-area" onclick="drawCard()" role="button" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();drawCard();}" title="Draw a card"
+      aria-label="Draw a card">
+      <div id="card-label">Card</div>
+      <div id="current-card">
+        <div class="card-back"></div>
+      </div>
+      <div id="card-info">Draw a card</div>
+    </div>
+    <button id="draw-btn" onclick="drawCard()">🃏 Draw</button>
+    <button id="btn-break" class="hidden"
+      onclick="(function(){ var b=document.getElementById('btn-break'); if (b.textContent.indexOf('Resume')>=0) { window.resumeFromAfk && window.resumeFromAfk(); } else { window.takeBreak && window.takeBreak('manual'); } })()">☕
+      Break</button>
+    <!-- Pass Turn safety button (user_directive_2026-05-19): always available
+         escape hatch if the game gets stuck on the current player's turn
+         (no legal moves not auto-detected, split selection wedged, etc.).
+         Per rules.json CARD_NO_LEGAL_MOVE this discards the card and ends
+         the turn with no extra-turn award. -->
+    <button id="btn-pass-turn" title="Pass this turn (use if stuck)" aria-label="Pass this turn"
+      onclick="if (window.passTurn) window.passTurn('manual');">⏭ Pass</button>
+  </div>
+
+  <!-- ── Move options panel — separate so choices never hide selected card ── -->
+  <div id="panel-options" class="glass-panel">
+    <div id="move-hints"></div>
+  </div>
+
+  <!-- ── Music toggle — always visible, top-right ── -->
+  <button id="btn-music-toggle" onclick="toggleMusic()" title="Toggle Music" aria-label="Toggle Music">🎵</button>
+
+  <!-- ── Camera mode — round icon top-right, opens a small popup ── -->
+  <button id="btn-camera-toggle" type="button"
+    onclick="(function(){var p=document.getElementById('camera-panel');if(p){p.classList.toggle('open');}}).call(this)"
+    title="Camera" aria-label="Camera mode" aria-haspopup="true" aria-controls="camera-panel">🎥</button>
+  <div id="camera-panel" role="menu" aria-label="Camera mode">
+    <button type="button" role="menuitem" class="cam-pop-btn active" data-cam="manual"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual'); document.getElementById('camera-panel').classList.remove('open');">Manual</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="top"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top'); document.getElementById('camera-panel').classList.remove('open');">Top</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="angle"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle'); document.getElementById('camera-panel').classList.remove('open');">Angle</button>
+    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="auto"
+      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto'); document.getElementById('camera-panel').classList.remove('open');">Auto</button>
+  </div>
+
+  <!-- ── Leave Game — always visible, top-right next to gear ── -->
+  <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
+
+  <!-- ── Settings gear — top-right ── -->
+  <button id="btn-settings" onclick="toggleSettings()" title="Settings">⚙</button>
+
+  <!-- ── Hamburger (mobile only) — collapses the top-right buttons ── -->
+  <button id="btn-hamburger" type="button"
+    onclick="(function(){var m=document.getElementById('hamburger-menu');if(m)m.classList.toggle('open');}).call(this)"
+    title="Menu" aria-label="Menu" aria-haspopup="true" aria-controls="hamburger-menu">☰</button>
+  <div id="hamburger-menu" role="menu" aria-label="Game menu">
+    <div class="hm-section-label">Camera</div>
+    <div class="hm-cam-row">
+      <button type="button" role="menuitem" class="hm-cam-btn active" data-cam="manual"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual');">Manual</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="top"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top');">Top</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="angle"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle');">Angle</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="auto"
+        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto');">Auto</button>
+    </div>
+    <div class="hm-section-label">Graphics <span id="hm-q-tier" class="hm-q-tier"></span></div>
+    <div class="hm-q-row">
+      <button type="button" role="menuitem" class="hm-q-btn active" data-q="auto"
+        onclick="ftSetQuality(this,'auto')">Auto</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="low"
+        onclick="ftSetQuality(this,'low')">Low</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="medium"
+        onclick="ftSetQuality(this,'medium')">Med</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="high"
+        onclick="ftSetQuality(this,'high')">High</button>
+      <button type="button" role="menuitem" class="hm-q-btn" data-q="ultra"
+        onclick="ftSetQuality(this,'ultra')">Ultra</button>
+    </div>
+    <div class="hm-divider"></div>
+    <button type="button" role="menuitem" id="hm-break"
+      onclick="var b=document.getElementById('btn-break'); if(b){document.getElementById('hamburger-menu').classList.remove('open'); b.click();}">
+      <span class="hm-icon">☕</span><span class="hm-label">Break</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleMusic();">
+      <span class="hm-icon">🎵</span><span class="hm-label">Music</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleSettings();">
+      <span class="hm-icon">⚙</span><span class="hm-label">Settings</span>
+    </button>
+    <button type="button" role="menuitem"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); toggleEmojiPanel && toggleEmojiPanel();">
+      <span class="hm-icon">🙂</span><span class="hm-label">Emoji</span>
+    </button>
+    <button type="button" role="menuitem" class="hm-danger"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open'); exitGame();">
+      <span class="hm-icon">✕</span><span class="hm-label">Leave Game</span>
+    </button>
+  </div>
+
+  <!-- ── Emoji reactions: hidden tray, opened by button (desktop) ── -->
+  <div id="emoji-ui" aria-label="Emoji reactions">
+    <button id="btn-emoji-toggle" onclick="toggleEmojiPanel()" title="Emoji Reactions"
+      aria-label="Emoji Reactions">🙂</button>
+    <div id="emoji-panel" role="menu" aria-label="Emoji reactions panel"></div>
+  </div>
+
+  <div id="emoji-feed" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- ── Replay overlay — shown after game ends ── -->
+  <div id="replay-overlay" onclick="if(event.target===this)hideReplayPrompt()">
+    <div id="replay-panel">
+      <h2>🏆 Game Over</h2>
+      <p id="replay-winner">A new round awaits.</p>
+      <button id="btn-replay-again" onclick="playAgain()">↻ Play Again</button>
+      <p id="replay-wait" style="display:none;color:#9fb;font-size:.9em;margin:.5em 0;">Waiting for the host to start a
+        replay…</p>
+      <button id="btn-replay-leave" onclick="leaveFromReplay()">✕ Leave Game</button>
+    </div>
+  </div>
+
+  <!-- ── Settings overlay ── -->
+  <div id="settings-overlay" onclick="if(event.target===this)toggleSettings()">
+    <div id="settings-panel">
+      <h2>⚙ Settings</h2>
+
+      <div class="setting-row">
+        <label>Music</label>
+        <input type="range" id="vol-music" min="0" max="100" value="50" oninput="setMusicVolume(this.value)">
+      </div>
+      <div class="setting-row">
+        <label>Sound FX</label>
+        <input type="range" id="vol-sfx" min="0" max="100" value="70" oninput="setSfxVolume(this.value)">
+      </div>
+
+      <div class="setting-row" id="settings-emoji-launch">
+        <label>Reactions</label>
+        <button id="btn-open-emoji-mobile" onclick="openEmojiFromSettings()"
+          style="padding:6px 10px;border-radius:8px;border:1px solid rgba(80,220,255,0.35);background:rgba(20,76,98,0.35);color:#dff8ff;cursor:pointer;">🙂
+          Open</button>
+      </div>
+
+      <hr class="settings-divider">
+
+      <button id="btn-exit-game" onclick="exitGame()">✕ Exit Game</button>
+      <button id="btn-close-settings" onclick="toggleSettings()">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Camera controls — bottom-right ── -->
+  <div id="panel-cam" class="glass-panel">
+    <button class="cam-btn active" onclick="setCameraView('manual')">Manual</button>
+    <button class="cam-btn" onclick="setCameraView('top')">Top</button>
+    <button class="cam-btn" onclick="setCameraView('angle')">Angle</button>
+    <button class="cam-btn" onclick="setCameraView('auto')">Auto</button>
+  </div>
+
+  <!-- ── Manifold Metrics — dev only (?dev in URL) ── -->
+  <div id="panel-metrics" class="glass-panel" style="display:none;" onclick="this.classList.toggle('expanded')">
+    <div id="metrics-toggle">🌀 Manifold Metrics</div>
+    <div id="metrics-body">
+      <div style="padding:4px;color:rgba(255,255,255,0.3);text-align:center;">Waiting for game data…</div>
+    </div>
+  </div>
+
+  <!-- Game log retained off-DOM only; rendered to hidden node so engine writes don't crash -->
+  <div id="panel-log" hidden aria-hidden="true" style="display:none !important;">
+    <div id="log-toggle"></div>
+    <div id="game-log"></div>
+  </div>
+
+  <!-- Self-hosted Three.js + OrbitControls + BufferGeometryUtils -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+  <script src="/js/multiplayer-client.js?v=20260507c"></script>
+
+  <!-- 🜂 MANIFOLD ENGINE — z = x · y sacred primitive + Schwarz Diamond geometry -->
+  <script src="../../js/manifold.js?v=7"></script>
+  <script src="../../js/substrates/manifold_ingestor.js"></script>
+
+  <!-- 🜂 MANIFOLD KERNEL — codec, field, loop, instrument (audio = field samples) -->
+  <script src="../../js/manifold-codec.js"></script>
+  <script src="../../js/manifold-field.js"></script>
+  <script src="../../js/manifold-loop.js"></script>
+  <script src="../../js/manifold-instrument.js"></script>
+  <script src="../../js/manifold-conductor.js"></script>
+
+  <!-- Game engine — FastTrack v2 (engine-backed). The clean, tested v2 engine owns all rules,
+       peg positions, and TURN ROTATION; this module presents the exact window.FastTrackCore
+       surface the renderer already reads, so the 3D scene is unchanged. Turn rotation is
+       render-decoupled by construction, which removes the skip / wrong-extra-turn bug class.
+       Loaded as type="module": it runs after parsing but before DOMContentLoaded, so
+       window.FastTrackCore exists in time for init3D. The legacy fasttrack-game-core.js and the
+       manifold alternate engine are intentionally NOT loaded here (they would reclaim
+       window.initGame / window.FastTrackCore). -->
+  <script type="module" src="v2/browser/fasttrack-core-v2.js?v=20260704e"></script>
+
+  <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
+       Loaded after game-core (so it can observe state) but before 3D renderer
+       (so ManifoldBus is hot when ft3d:ready fires).
+       Load order: ManifoldIngestor → GameCore → Substrate → Diamond → 3D -->
+  <script src="fasttrack_manifold_substrate.js?v=20260501"></script>
+
+  <!-- 🜂 SCHWARZ DIAMOND RENDERER — Three.js particle surface, z=x·y driven -->
+  <script src="schwarz_diamond_renderer.js?v=20260501"></script>
+
+  <!-- 🜂 JAZZ SPEAKEASY — procedural live music (walking bass + brushed drums + ii-V-I + hook) -->
+  <script src="../js/jazz-speakeasy.js?v=20260510b"></script>
+
+  <!-- 🜂 DIMENSIONAL QUALITY MANIFOLD — one capability scalar regenerates the
+       whole render-settings vector (z = capability·demand). Must load BEFORE
+       the renderer so window.FT_QUALITY exists when init3D() runs. -->
+  <script src="fasttrack-quality.js?v=20260605a"></script>
+
+  <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
+  <script src="fasttrack-3d.js?v=20260605a"></script>
+
+  <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
+  <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
+
+  <!-- Viewport chrome: emoji reactions, settings, replay overlay, leave game. -->
+  <script src="3d-ui.js?v=20260518d"></script>
+
+  <!-- Graphics quality selector — drives the Dimensional Quality Manifold.
+       Auto lets the manifold detect + adapt; a tier pins it (governor off). -->
+  <script>
+    function ftSetQuality(btn, tier) {
+      try {
+        document.querySelectorAll('#hamburger-menu .hm-q-btn')
+          .forEach(b => b.classList.toggle('active', b === btn));
+        if (window.FT_QUALITY && window.FT_QUALITY.set) window.FT_QUALITY.set(tier);
+      } catch (_) {}
+      ftSyncQualityTier();
+    }
+    // Reflect the live tier next to the "Graphics" label (useful in Auto mode,
+    // where the manifold/governor picks the tier for you).
+    function ftSyncQualityTier() {
+      var el = document.getElementById('hm-q-tier');
+      if (el && window.FT_QUALITY) {
+        var s = window.FT_QUALITY.stats ? window.FT_QUALITY.stats() : null;
+        el.textContent = s ? ('· ' + s.tier + (s.pinned ? '' : ' (auto)')) : '';
+      }
+    }
+    (function initQualityButtons() {
+      function sync() {
+        var pinned = null;
+        try { pinned = localStorage.getItem('ft_quality'); } catch (_) {}
+        var want = pinned || 'auto';
+        document.querySelectorAll('#hamburger-menu .hm-q-btn').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-q') === want);
+        });
+        ftSyncQualityTier();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sync);
+      } else { sync(); }
+      // Keep the live tier label fresh while the governor adapts in Auto mode.
+      setInterval(ftSyncQualityTier, 2000);
+    })();
+  </script>
+
+  <!-- Anchor the card panel flush against the bottom of the player panel. -->
+  <script>
+    (function () {
+      function anchorCardPanel() {
+        var p = document.getElementById('panel-players');
+        var c = document.getElementById('panel-action');
+        if (!p || !c) return;
+        var r = p.getBoundingClientRect();
+        // 8px from the left viewport edge, 6px below the player panel bottom.
+        c.style.setProperty('top', Math.round(r.bottom + 6) + 'px', 'important');
+        c.style.setProperty('left', '8px', 'important');
+      }
+      var ro;
+      function start() {
+        anchorCardPanel();
+        var p = document.getElementById('panel-players');
+        if (p && 'ResizeObserver' in window) {
+          ro = new ResizeObserver(anchorCardPanel);
+          ro.observe(p);
+        }
+        window.addEventListener('resize', anchorCardPanel);
+        // Re-anchor periodically in case player list mutates without resize.
+        setInterval(anchorCardPanel, 750);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+      } else { start(); }
+    })();
+  </script>
+</body>
+
+</html>
