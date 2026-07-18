@@ -477,7 +477,6 @@ function initGame(playerCount = 2, config = {}) {
   // Reset host-authoritative turn-rotation counters for the new game.
   _turnSeq = 0;
   _lastAppliedTurnSeq = 0;
-  _turnAdvanceCommitted = false;
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(0);
 
   // ─── Card Matrix (substrate) ───
@@ -596,6 +595,22 @@ function initGame(playerCount = 2, config = {}) {
   }
   state.players.set('list', players);
 
+  // ── Roster integrity check (user_directive_2026-07-18d) ────────────
+  // Player count, players[] array size, and the number of seats that actually
+  // hold a peg on the board must all agree, in seat order. A mismatch means a
+  // desync (a missing / extra seat) that would corrupt the round-robin — surface
+  // it loudly instead of seeding a turn order we can't trust.
+  (function _validateRoster() {
+    const arr = state.players.get('list') || [];
+    const withPeg = arr.filter(p => (p.pegs || []).some(pg => pg.holeId && pg.holeId !== 'holding')).length;
+    const inOrder = arr.every((p, i) => p && p.index === i);
+    if (arr.length !== effectiveCount || withPeg !== effectiveCount || !inOrder) {
+      console.error(`[INIT] roster integrity FAILED — players=${effectiveCount} arraySize=${arr.length} seatsWithPeg=${withPeg} inSeatOrder=${inOrder}`);
+    } else {
+      console.log(`[INIT] roster OK — ${effectiveCount} players, each with a peg on the board, in seat order.`);
+    }
+  })();
+
   // ── Starting-player selection (user_directive_2026-05-18) ──────────
   // Priority:
   //   1. Explicit override via config.startingPlayer (host-authoritative MP).
@@ -632,21 +647,11 @@ function initGame(playerCount = 2, config = {}) {
         }
       }
       if (startingIdx < 0) {
-        // user_directive_2026-05-20c: solo (single human) → human ALWAYS
-        // goes first. Random pick only when there is more than one human
-        // (same-screen / live MP with multiple humans). All-bot rosters
-        // (dev-observer) still random.
-        const humanSeats = [];
-        for (let i = 0; i < players.length; i++) {
-          if (!players[i].isBot) humanSeats.push(i);
-        }
-        if (humanSeats.length === 1) {
-          startingIdx = humanSeats[0];
-        } else if (humanSeats.length > 1) {
-          startingIdx = humanSeats[Math.floor(Math.random() * humanSeats.length)];
-        } else {
-          startingIdx = Math.floor(Math.random() * effectiveCount);
-        }
+        // user_directive_2026-07-18d: the FIRST game of a session opens on a
+        // uniformly random seat among ALL players; the randomiser is used ONLY
+        // for the first game. Replays open on the previous winner (the rematch
+        // branch above). No seat is privileged.
+        startingIdx = Math.floor(Math.random() * effectiveCount);
       }
     }
     state.players.set('current', startingIdx);
@@ -717,7 +722,12 @@ function initGame(playerCount = 2, config = {}) {
     };
 
     if (window.CameraDirector && window.CameraDirector.mode === 'auto') {
-      window.CameraDirector.whenSettled(startBlink);
+      // Same freeze-proofing as _applyTurnAdvance: the opener must be enabled
+      // even if the camera never reports settled. Fire on settle OR fallback, once.
+      let _blinkStarted = false;
+      const _startBlinkOnce = () => { if (_blinkStarted) return; _blinkStarted = true; startBlink(); };
+      window.CameraDirector.whenSettled(_startBlinkOnce);
+      setTimeout(_startBlinkOnce, 1200);
     } else {
       startBlink();
     }
@@ -809,14 +819,15 @@ let _applying = false;
 // In solo / same-screen / non-MP modes, every endTurn advances directly.
 let _turnSeq = 0;
 let _lastAppliedTurnSeq = 0;
-// Exactly-once turn-resolution guard. Set true the moment a drawn card's turn is
-// resolved (advanced, or a redraw card reopens the draw), reset when the next
-// card is drawn (see _drawCardCommit). This is what stops the async race —
-// animation callback vs the 15s animation safety timeout vs the 12s stuck
-// watchdog — from advancing a seat twice (a "skip") or firing a redraw twice
-// (an unearned extra turn). Rotation math and the redraw table stay untouched;
-// this only guarantees each drawn card resolves the turn exactly one time.
-let _turnAdvanceCommitted = false;
+// NOTE: turn advancement is made exactly-once at the SOURCE — the `advanced`
+// latch inside waitForAll() (see executeMove) fires advanceTurn a single time per
+// move, no matter how many async callbacks (animation-done, cutscene-drain, the
+// safety timeouts) end up calling it. There is deliberately NO persistent
+// "already advanced" boolean: such a flag leaked across the turn boundary and
+// blocked the NEXT player's legitimate pass/advance — and the manual host advance
+// button — freezing the game (bug 2026-07-18). Rotation math + the redraw table
+// are untouched; the watchdog/no-move fallbacks stay single-fire via their own
+// state re-checks.
 
 // ── Kernel adapter (slice 2 of the per-game GameKernel rollout) ──────────
 // In hybrid mode the host client still owns the deck and broadcasts the popped
@@ -1221,6 +1232,36 @@ function applyRemoteAction(action, payload) {
         _applyTurnAdvance(from, resolvedNext, seq);
         break;
       }
+      case 'notice': {
+        // Host broadcast: show a transient alert (idle warning / relinquish) to
+        // every player so the whole table sees the same messaging.
+        const msg = payload && payload.msg;
+        if (msg) {
+          try { if (typeof showCenterToast === 'function') showCenterToast(msg, (payload && payload.color) || '#ffcf6b', 3200); } catch (_) {}
+          try { log(msg); } catch (_) {}
+        }
+        break;
+      }
+      case 'relinquish': {
+        // Host replaced an idle player with a bot. Apply the roster change locally,
+        // resolving the seat by identity when possible (peer ordering may differ),
+        // else the raw index.
+        const seatRaw = payload && Number.isFinite(payload.seat) ? payload.seat : null;
+        const id = payload && payload.id != null ? String(payload.id) : null;
+        const list = state.players.get('list') || [];
+        let seat = seatRaw;
+        if (id) { const byId = list.findIndex(p => _seatIdentity(p) === id); if (byId >= 0) seat = byId; }
+        const cp = (seat != null) ? list[seat] : null;
+        if (cp && !cp.isBot) {
+          _AFK.away.set(seat, { name: cp.name, avatar: cp.avatar, isBot: cp.isBot, userId: cp.userId, reason: 'host-relinquish', at: Date.now() });
+          cp.name = `${(payload && payload.name) || cp.name} (bot)`;
+          cp.avatar = '🤖';
+          cp.isBot = true;
+          state.players.set('list', list);
+          updateUI();
+        }
+        break;
+      }
     }
   } finally {
     _applying = false;
@@ -1266,9 +1307,6 @@ function drawCard() {
 // Commit a drawn card into local state + UI. Shared by drawCard (local actor)
 // and applyRemoteAction (peer) so visual side-effects stay consistent.
 function _drawCardCommit(card) {
-  // A fresh card begins a new turn resolution — re-arm the exactly-once guard so
-  // this card is allowed to advance (or redraw) the turn a single time.
-  _turnAdvanceCommitted = false;
   state.deck.set('currentCard', card);
   state.turn.set('phase', 'move');
   _splitPegIdx = null;
@@ -2293,6 +2331,7 @@ function showMoveHints() {
         // snapshot that already moved on cancels it.
         _clearNoMoveAutoTimer();
         if (canAct) {
+          const _noMoveEpoch = _turnEpoch;   // the turn this auto-pass belongs to
           _noMoveAutoTimer = setTimeout(() => {
             _noMoveAutoTimer = null;
             const _ci = state.players.get('current') || 0;
@@ -2302,7 +2341,7 @@ function showMoveHints() {
             if ((state.turn.get('validMoves') || []).length > 0) return; // moves appeared
             if (state.turn.get('phase') === 'draw') return;        // already advanced
             if (_isMpMode() && !_isMyTurn()) return;               // no longer our turn
-            endTurn();
+            endTurn(_noMoveEpoch);                                 // epoch-verified (dropped if stale)
           }, NO_MOVE_AUTO_PASS_MS);
         }
       }
@@ -2316,7 +2355,7 @@ function showMoveHints() {
         // directly — it advances + broadcasts turn_advance on the active
         // player's client only.
         _clearNoMoveAutoTimer();
-        endTurn();
+        endTurn(_turnEpoch);   // the live turn
       }, { once: true });
     }
     return;
@@ -3049,82 +3088,82 @@ function executeMove(moveIdx) {
     }
   };
 
-  // ── All cutscenes must complete before the next turn begins ──
-  const advanceTurn = () => {
-    // Exactly-once: resolve this drawn card's turn a single time, whatever async
-    // path fires it (the animation-done callback, the 15s animation safety
-    // timeout, or a stray re-entry). A duplicate fire here is exactly what
-    // skipped seats (double advance) and handed out unearned extra turns
-    // (double redraw). We only CHECK the flag here — it is SET by endTurn() (the
-    // rotate path) or by the redraw/winner branches below, so the ordinary
-    // non-redraw path can still fall through to endTurn() and actually rotate.
-    // Re-armed on the next draw in _drawCardCommit.
-    if (_turnAdvanceCommitted) return;
-    if (state.meta.get('winner') !== null) {
-      _turnAdvanceCommitted = true; // game over — this drawn card is resolved
-      const winnerName = getCurrentPlayerName();
-      const gs = document.getElementById('game-status');
-      if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
-      // Game is over — drop cached runtime so a refresh / re-launch from
-      // any tab cannot resurrect the dead session. Identity is preserved
-      // so the player doesn't have to re-enter their name + avatar.
-      try {
-        if (typeof window !== 'undefined' && window.KGGameCache) {
-          window.KGGameCache.purgeRuntime('game_winner');
-        }
-      } catch (_) { /* ignore */ }
-      // Tell the lobby + peers the game is over so they can purge too.
-      try {
-        if (_mpClient && typeof _mpClient.sendGameOver === 'function' && _isHost()) {
-          _mpClient.sendGameOver('win', winnerName, null, `${winnerName} wins!`);
-        }
-      } catch (_) { /* ignore */ }
-      if (typeof window !== 'undefined' && window.showReplayPrompt && !window._replayPromptShown) {
-        window._replayPromptShown = true;
-        // Defer so any in-flight cutscene/animation can play first
-        setTimeout(() => window.showReplayPrompt(winnerName), 1200);
-      }
-      return;
-    }
-
-    const rules = CARDS[card.value];
-    if (rules.extraTurn) {
-      // A redraw resolves this card WITHOUT rotating — it reopens the draw for
-      // the SAME player. Mark resolved so no second async fire can reopen twice.
-      _turnAdvanceCommitted = true;
-      log(`${getCurrentPlayerName()} gets another turn!`);
-      // user_directive_2026-05-18 — surface the extra turn as a center toast
-      // so the player sees WHY the draw phase is reopening.
-      try {
-        const players = state.players.get('list') || [];
-        const ci = state.players.get('current') || 0;
-        const cp = players[ci];
-        showRedrawToast(cp && cp.name, cp && cp.color);
-      } catch (_) { /* ignore */ }
-      state.deck.set('currentCard', null);
-      state.turn.set('phase', 'draw');
-      updateUI();
-      // If the current player is a bot, trigger another bot turn
-      const players = state.players.get('list') || [];
-      const ci = state.players.get('current') || 0;
-      if (players[ci] && players[ci].isBot) {
-        // In MP, only the host (game manager) drives bot turns.
-        if (!_isMpMode() || _isHost()) setTimeout(botTurn, 800);
-      }
-    } else {
-      endTurn();
-    }
-  };
-
-  // Wait for hop animations → fire deferred cutscenes → wait for cutscenes → advance turn
+  // ── Resolve the turn once every peg move + cutscene is complete ──
+  // Capture the turn instance this move belongs to. resolveTurn() is the SINGLE
+  // authority for what happens next (advance vs replay); the async layer below
+  // only decides WHEN it runs. resolveTurn() drops the call if the turn has since
+  // moved on (epoch changed) — a stale bot move can never advance the human.
+  const _moveEpoch = _turnEpoch;
   const waitForAll = () => {
     const waitAnims = (cb) => window.waitForAnimations ? window.waitForAnimations(cb) : cb();
     waitAnims(() => {
       fireDeferredCutscenes();
-      CutsceneManager.whenDrained(advanceTurn);
+      // Resolve when the cutscene queue drains; the fallback guarantees the turn
+      // is never stranded if a cutscene fails to report "drained". Firing twice or
+      // late is harmless — resolveTurn() is idempotent by epoch.
+      CutsceneManager.whenDrained(() => resolveTurn(_moveEpoch));
+      setTimeout(() => resolveTurn(_moveEpoch), 6000);
     });
   };
   waitForAll();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTHORITATIVE TURN MACHINE (user_directive_2026-07-18c)
+// ──────────────────────────────────────────────────────────────────────────────
+// Unfoolable turn control. The next player is a PURE round-robin function of the
+// current seat (see endTurn: next = (current + 1) % N) — WHO can never be wrong.
+// Async callbacks only choose WHEN the deterministic advance runs. Every turn
+// instance carries a monotonic epoch, bumped on every seat change (_applyTurnAdvance)
+// AND every replay reopen (_replaySameSeat). A resolve tagged with an old epoch is
+// a stale/duplicate call and is dropped — the stopgap verifier that makes
+// "advance the wrong seat / run away / double-advance" impossible.
+//   ADVANCE  ⇔  card is NOT a replay  AND  the turn is fully complete
+//               (resolveTurn is only called once every peg move + cutscene is done).
+//   REPLAY   ⇔  card IS a replay (A, 6, J, Q, K, JOKER) → same seat draws again.
+let _turnEpoch = 0;
+
+// cardReplay: the drawn card grants the same player another draw (no rotation).
+function _cardIsReplay(card) {
+  const r = card && CARDS[card.value];
+  return !!(r && r.extraTurn);
+}
+
+// Resolve the CURRENT turn exactly once. `epoch` was captured when the move was
+// made; if the turn has already moved on this call is stale and is dropped.
+function resolveTurn(epoch) {
+  if (epoch !== _turnEpoch) return;              // stopgap verifier: stale / duplicate
+  if (state.meta.get('winner') !== null) { _resolveWinner(); return; }
+  const card = state.deck.get('currentCard');
+  if (_cardIsReplay(card)) _replaySameSeat();    // replay → same seat draws again
+  else endTurn(epoch);                           // deterministic round-robin advance (epoch-verified)
+}
+
+// Replay: reopen the draw for the SAME seat as a fresh turn instance.
+function _replaySameSeat() {
+  _turnEpoch++;                                  // new instance; the old move's resolve is now stale
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cp = players[ci];
+  log(`${getCurrentPlayerName()} gets another turn!`);
+  try { showRedrawToast(cp && cp.name, cp && cp.color); } catch (_) { /* ignore */ }
+  state.deck.set('currentCard', null);
+  state.turn.set('phase', 'draw');
+  updateUI();
+  if (cp && cp.isBot && (!_isMpMode() || _isHost())) setTimeout(botTurn, 800);
+}
+
+// Game over: announce the winner, do NOT rotate.
+function _resolveWinner() {
+  const winnerName = getCurrentPlayerName();
+  const gs = (typeof document !== 'undefined') && document.getElementById('game-status');
+  if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
+  try { if (typeof window !== 'undefined' && window.KGGameCache) window.KGGameCache.purgeRuntime('game_winner'); } catch (_) { /* ignore */ }
+  try { if (_mpClient && typeof _mpClient.sendGameOver === 'function' && _isHost()) _mpClient.sendGameOver('win', winnerName, null, `${winnerName} wins!`); } catch (_) { /* ignore */ }
+  if (typeof window !== 'undefined' && window.showReplayPrompt && !window._replayPromptShown) {
+    window._replayPromptShown = true;
+    setTimeout(() => window.showReplayPrompt(winnerName), 1200); // let the last animation play
+  }
 }
 
 
@@ -3159,13 +3198,12 @@ function passTurn(reason) {
         return;
       }
     }
-    // Exactly-once: if the drawn card's move already resolved this turn, a pass
-    // here (manual, stuck-watchdog, or the no-legal-move path racing the move's
-    // animation callback) would try to advance a SECOND time and skip the next
-    // seat. Swallow it early so we don't even flash a spurious "turn passed"
-    // toast. endTurn()'s own guard is the real backstop for the rotation, so we
-    // deliberately do NOT set the flag here — endTurn() sets it as it rotates.
-    if (_turnAdvanceCommitted) { console.warn('[PASS] Ignored — turn already resolved.'); return; }
+    // RECOVERY / forfeit path (stuck-watchdog, no-legal-move, host relinquish,
+    // manual). It advances the CURRENT turn deterministically. Capture the live
+    // epoch NOW and hand it to endTurn(): if two passes race, only the first (this
+    // epoch) advances — the second finds the epoch already bumped and is dropped.
+    // It is never blocked by prior state (gating it froze the game before).
+    const _passEpoch = _turnEpoch;
     // Clear in-progress split selection so the next turn starts fresh.
     if (typeof _splitPegIdx !== 'undefined') _splitPegIdx = null;
     if (typeof _splitStepChoice !== 'undefined') _splitStepChoice = null;
@@ -3186,11 +3224,11 @@ function passTurn(reason) {
       1800
     );
     log(`⏭ ${curPlayer.name || 'Player'} passed their turn${reason ? ' (' + reason + ')' : ''}.`);
-    endTurn();
+    endTurn(_passEpoch);
   } catch (err) {
     console.error('[PASS] passTurn() failed:', err);
     // Last-ditch: try to advance turn anyway so the game doesn't freeze.
-    try { endTurn(); } catch (_) { }
+    try { endTurn(_turnEpoch); } catch (_) { }
   }
 }
 if (typeof window !== 'undefined') window.passTurn = passTurn;
@@ -3249,7 +3287,7 @@ function _stuckWatchdogTick() {
 }
 function _ensureStuckWatchdog() {
   if (_stuckWatchdogTimer) return;
-  _stuckWatchdogTimer = setInterval(_stuckWatchdogTick, 2000);
+  _stuckWatchdogTimer = setInterval(() => { _stuckWatchdogTick(); _idleTick(); }, 2000);
 }
 if (typeof window !== 'undefined') {
   if (document.readyState === 'loading') {
@@ -3259,17 +3297,154 @@ if (typeof window !== 'undefined') {
   }
 }
 
+// ─── IDLE-RELINQUISH (host abandonment recovery, user_directive_2026-07-18) ───
+// Fast Track has NO voluntary passes — skipping a turn could be a strategic dodge
+// (avoid making a peg vulnerable, or keep a rival from becoming vulnerable). The
+// ONLY way a turn is taken from a player is host-initiated abandonment recovery,
+// staged to be fair to someone who just stepped away:
+//   1. The current HUMAN sits idle for _IDLE_TO_WARN_MS (default 2 min).
+//   2. A 30s WARNING (_WARN_MS) begins: ALL players are alerted that this player
+//      may be relinquished, and the host's ⏭ button APPEARS but stays DISABLED
+//      (bathroom-break grace — the host can simply wait it out).
+//   3. After the 30s the button ENABLES. The host may relinquish the player to a
+//      bot and advance, OR keep waiting. ANY action by the player at any point
+//      cancels the whole thing and hides the button.
+// Only applies with 2+ humans (solo / vs-bots have nothing to abandon). Authority:
+// the host online, or the shared device in same-screen. Timers are overridable via
+// state.meta (idleWarnMs / idleWarnWindowMs) for tuning + tests.
+const _IDLE_TO_WARN_MS = 120_000; // 2 min before the warning begins
+const _WARN_MS = 30_000;          // 30s warning window before the host can act
+let _idleSince = 0;
+let _idleSig = '';
+let _idleSeat = null;             // seat currently in warning/relinquishable state
+let _idleStage = 'none';         // 'none' | 'warning' | 'relinquishable'
+let _idleWarnedSig = '';         // sig we've already alerted for (alert once per turn)
 
-function endTurn() {
-  // Exactly-once rotation guard — the single place a seat advances. Blocks the
-  // double-rotate (a skipped seat) whenever more than one path tries to end the
-  // same drawn card's turn: the move's advanceTurn, the stuck-watchdog or the
-  // no-legal-move fallbacks (human auto-relinquish, End Turn button, bot no-move),
-  // or a late animation safety timeout. Re-armed on the next draw in
-  // _drawCardCommit. (advanceTurn's redraw branch sets the flag itself, since a
-  // redraw resolves the card without ever reaching here.)
-  if (_turnAdvanceCommitted) return;
-  _turnAdvanceCommitted = true;
+const _idleWarnAt = () => Number(state.meta.get('idleWarnMs')) || _IDLE_TO_WARN_MS;
+const _idleWinMs = () => Number(state.meta.get('idleWarnWindowMs')) || _WARN_MS;
+
+function _sameScreen() { return (state.meta.get('gameMode') || 'solo') === 'same-screen'; }
+
+// Who may relinquish an idle player: the host online (never their OWN turn), or the
+// shared device in same-screen. Never in solo / vs-bots.
+function _canRelinquishCurrent() {
+  if (_sameScreen()) return true;
+  return _isMpMode() && _isHost() && !_isMyTurn();
+}
+
+function _idleRelevant() {
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cur = players[ci];
+  if (!cur || cur.isBot) return false;
+  return players.filter(p => p && !p.isBot).length >= 2; // 2+ humans only
+}
+
+function _resetIdle() {
+  _idleSince = 0; _idleSig = '';
+  if (_idleStage !== 'none' || _idleSeat !== null) {
+    _idleStage = 'none'; _idleSeat = null;
+    _updateHostAdvanceButton();
+  }
+}
+
+function _idleTick() {
+  try {
+    if (!_idleRelevant()) { _resetIdle(); return; }
+    const ci = state.players.get('current') || 0;
+    const card = state.deck.get('currentCard');
+    const sig = `${ci}|${state.turn.get('phase')}|${card && card.id}`;
+    if (sig !== _idleSig) {                       // any activity resets the idle clock
+      _idleSig = sig; _idleSince = Date.now();
+      if (_idleStage !== 'none') { _idleStage = 'none'; _idleSeat = null; _updateHostAdvanceButton(); }
+      return;
+    }
+    if (!_idleSince) _idleSince = Date.now();
+    const idle = Date.now() - _idleSince;
+    let stage = 'none';
+    if (idle >= _idleWarnAt() + _idleWinMs()) stage = 'relinquishable';
+    else if (idle >= _idleWarnAt()) stage = 'warning';
+    if (stage !== _idleStage || (stage !== 'none' && _idleSeat !== ci)) {
+      _idleStage = stage;
+      _idleSeat = (stage === 'none') ? null : ci;
+      if (stage === 'warning' && _idleWarnedSig !== sig) {
+        _idleWarnedSig = sig;
+        const players = state.players.get('list') || [];
+        const nm = (players[ci] && players[ci].name) || `Player ${ci + 1}`;
+        _alertAllPlayers(`⏳ ${nm} has 30 seconds to take their turn, or the host may hand it to a bot.`);
+      }
+      _updateHostAdvanceButton();
+    }
+  } catch (_) { /* ignore */ }
+}
+
+// Show/label/enable the host ⏭ button per the idle stage. Hidden unless the
+// current human is idle AND this client may relinquish them.
+function _updateHostAdvanceButton() {
+  const btn = (typeof document !== 'undefined') && document.getElementById('btn-pass-turn');
+  if (!btn) return;
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cur = players[ci];
+  const show = _idleRelevant() && _canRelinquishCurrent() && _idleSeat === ci && _idleStage !== 'none' && cur && !cur.isBot;
+  btn.style.display = show ? '' : 'none';
+  if (!show) { btn.disabled = true; return; }
+  const nm = (cur && cur.name) || `Player ${ci + 1}`;
+  btn.disabled = (_idleStage !== 'relinquishable');   // disabled during the 30s grace
+  btn.textContent = (_idleStage === 'relinquishable') ? `⏭ Relinquish ${nm} to bot` : `⏳ ${nm} idle — 30s…`;
+  btn.title = (_idleStage === 'relinquishable')
+    ? `Host: replace ${nm} (idle) with a bot and advance. Fast Track has no voluntary passes.`
+    : `${nm} is idle. If they don't act within 30 seconds you can relinquish them to a bot.`;
+}
+if (typeof window !== 'undefined') window._updateHostAdvanceButton = _updateHostAdvanceButton;
+
+// Alert every player (local toast + log; host also broadcasts so peers see it).
+function _alertAllPlayers(msg, color) {
+  try { if (typeof showCenterToast === 'function') showCenterToast(msg, color || '#ffcf6b', 3200); } catch (_) {}
+  try { log(msg); } catch (_) {}
+  if (!_applying && _isMpMode() && _isHost()) {
+    try { _broadcast('notice', { msg, color: color || '#ffcf6b' }); } catch (_) {}
+  }
+}
+
+// Host action: replace the idle current player with a bot, alert everyone, advance.
+// Only fires once the 30s warning has fully elapsed (button is enabled).
+function hostRelinquishToBot() {
+  if (!_canRelinquishCurrent()) return;
+  if (_idleStage !== 'relinquishable') return;
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cp = players[ci];
+  if (!cp || cp.isBot) return;
+  const origName = cp.name;
+  // Stash identity so a returning player could be restored (see _maybeRestoreFromAfk).
+  _AFK.away.set(ci, { name: cp.name, avatar: cp.avatar, isBot: cp.isBot, userId: cp.userId, reason: 'host-relinquish', at: Date.now() });
+  cp.name = `${origName} (bot)`;
+  cp.avatar = '🤖';
+  cp.isBot = true;
+  state.players.set('list', players);
+  _alertAllPlayers(`🤖 ${origName} was idle and has been handed to a bot by the host.`);
+  if (!_applying && _isMpMode() && _isHost()) { try { _broadcast('relinquish', { seat: ci, id: _seatIdentity(cp), name: origName }); } catch (_) {} }
+  _resetIdle();
+  updateUI();
+  passTurn('host-relinquish'); // advance to the next player
+}
+if (typeof window !== 'undefined') { window.hostRelinquishToBot = hostRelinquishToBot; window._idleTick = _idleTick; window._getTurnEpoch = () => _turnEpoch; window.resolveTurn = resolveTurn; }
+
+
+function endTurn(epoch) {
+  // ── THE single, epoch-verified rotation choke point ──────────────────────
+  // EVERY advance passes the epoch of the turn it is resolving. If that turn has
+  // already moved on (epoch bumped by a prior advance in _applyTurnAdvance), this
+  // call is a STALE or DUPLICATE advance and is DROPPED. That is what makes a
+  // skipped seat (double-advance) structurally impossible — the exact "it can
+  // never not be the next player" verifier. Recovery / no-move callers pass the
+  // CURRENT epoch, so they always advance the live turn (never a freeze). The
+  // rotation itself is deterministic: next = (current + 1) % N (below).
+  if (epoch !== undefined && epoch !== _turnEpoch) {
+    console.warn(`[TURN] stale/duplicate endTurn dropped — epoch ${epoch} != live ${_turnEpoch}`);
+    return;
+  }
   // Clear any lingering path highlights
   if (window.clearHighlights) window.clearHighlights();
 
@@ -3343,6 +3518,8 @@ function _applyTurnAdvance(fromCi, next, seq) {
 
   state.deck.set('currentCard', null);
   state.players.set('current', next);
+  _turnEpoch++; // new turn instance — any pending resolve for the old seat is now stale
+  const _advEpoch = _turnEpoch; // this turn's epoch; the enable-gate below verifies against it
   // Turn boundary: cancel any pending no-legal-move auto-relinquish from the
   // seat we just left, and try to restore the next seat from AFK if they
   // returned.
@@ -3368,6 +3545,12 @@ function _applyTurnAdvance(fromCi, next, seq) {
 
   // Gate: wait for camera to settle, THEN blink avatar 3 times, THEN enable turn
   const enableTurn = () => {
+    // Stale-gate (same epoch counter as the rest of the turn machine): this enable
+    // was scheduled for the turn whose epoch is _advEpoch. If the turn has already
+    // rotated on (epoch bumped), this enable is for a dead turn — do nothing, or it
+    // would trigger a redundant botTurn / enable the wrong seat. The live turn has
+    // its own enable-gate, so nothing is stranded.
+    if (_turnEpoch !== _advEpoch) return;
     if (players[next] && players[next].isBot) {
       // Bot's turn — dismiss the prompt; bot will drive itself.
       dismissYourTurnPopup();
@@ -3419,7 +3602,15 @@ function _applyTurnAdvance(fromCi, next, seq) {
   };
 
   if (window.CameraDirector && window.CameraDirector.mode === 'auto') {
-    window.CameraDirector.whenSettled(startBlink);
+    // Never let a camera that fails to settle (or a clobbered settled-callback)
+    // strand the turn: startBlink -> blinkPlayerMarker -> enableTurn MUST run so
+    // the next player can act, else the game freezes with no legal way forward
+    // (the stuck-watchdog can't help — phase is 'draw'). Fire on settle OR a
+    // short fallback, whichever comes first, exactly once.
+    let _blinkStarted = false;
+    const _startBlinkOnce = () => { if (_blinkStarted) return; _blinkStarted = true; startBlink(); };
+    window.CameraDirector.whenSettled(_startBlinkOnce);
+    setTimeout(_startBlinkOnce, 1200);
   } else {
     startBlink();
   }
@@ -3467,6 +3658,9 @@ function botTurn() {
       return;
     }
   }
+  const _botEpoch = _turnEpoch; // the turn this bot is playing (drawing doesn't bump it) —
+                                // used to epoch-verify a no-move forfeit so a stale/duplicate
+                                // bot trigger can't double-advance and skip the next seat.
   log(`${getCurrentPlayerName()} is thinking...`);
   setTimeout(() => {
     // ── Inner re-verify: between the "thinking" log and actually drawing,
@@ -3493,9 +3687,11 @@ function botTurn() {
       }
       const vm = state.turn.get('validMoves') || [];
       if (vm.length === 0) {
-        // No valid moves: end turn so game can continue
+        // No valid moves: forfeit this turn. Epoch-verified with the epoch captured
+        // when this bot turn began, so a stale/duplicate bot trigger is dropped
+        // instead of double-advancing and skipping the next seat.
         log('🤖 Bot has no valid moves, ending turn.');
-        endTurn();
+        endTurn(_botEpoch);
         return;
       }
 
@@ -3948,6 +4144,9 @@ function updateUI() {
 
   // Refresh manifold metrics panel
   updateMetricsPanel();
+
+  // Keep the host idle-relinquish button in sync (hides the instant a player acts).
+  try { _updateHostAdvanceButton(); } catch (_) { /* ignore */ }
 }
 
 function log(message) {

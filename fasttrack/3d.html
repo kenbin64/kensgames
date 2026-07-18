@@ -134,13 +134,18 @@
     <button id="btn-break" class="hidden"
       onclick="(function(){ var b=document.getElementById('btn-break'); if (b.textContent.indexOf('Resume')>=0) { window.resumeFromAfk && window.resumeFromAfk(); } else { window.takeBreak && window.takeBreak('manual'); } })()">☕
       Break</button>
-    <!-- Pass Turn safety button (user_directive_2026-05-19): always available
-         escape hatch if the game gets stuck on the current player's turn
-         (no legal moves not auto-detected, split selection wedged, etc.).
-         Per rules.json CARD_NO_LEGAL_MOVE this discards the card and ends
-         the turn with no extra-turn award. -->
-    <button id="btn-pass-turn" title="Pass this turn (use if stuck)" aria-label="Pass this turn"
-      onclick="if (window.passTurn) window.passTurn('manual');">⏭ Pass</button>
+    <!-- Host-only abandonment-recovery button (user_directive_2026-07-18).
+         NOT a pass: Fast Track has NO voluntary passes — skipping a turn could be a
+         strategic dodge (e.g. to avoid making a peg vulnerable, or to keep a rival
+         from becoming vulnerable). This exists ONLY so the HOST can keep the game
+         moving if another player abandons / goes AFK. Hidden by default;
+         _updateHostAdvanceButton() reveals it only to the host, in multiplayer, on
+         a remote human player's turn — never the host's own turn, never solo,
+         never a bot. -->
+    <button id="btn-pass-turn" style="display:none"
+      title="Host only: advance the turn if this player has abandoned the game. Not a pass — players cannot skip their own turn."
+      aria-label="Advance an abandoned player's turn (host only)"
+      onclick="if (window.hostRelinquishToBot) window.hostRelinquishToBot();">⏭ Advance</button>
   </div>
 
   <!-- ── Move options panel — separate so choices never hide selected card ── -->
@@ -313,7 +318,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260518d"></script>
+  <script src="fasttrack-game-core.js?v=20260718e"></script>
 
   <!-- 🜂 MANIFOLD ENGINE (opt-in via ?engine=manifold) — same board, pure-
        derivation logic. ft-core-manifold.js self-activates only when the flag
@@ -339,7 +344,7 @@
   <script src="fasttrack-quality.js?v=20260605a"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260605a"></script>
+  <script src="fasttrack-3d.js?v=20260718e"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>

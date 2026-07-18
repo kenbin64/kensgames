@@ -114,33 +114,41 @@ console.log('\n── 2. winner that is a bot still goes first ──');
   ok(r.isBot === true, `2: and that opener is indeed the bot`);
 }
 
-// ── 3. No stash, solo (1 human + bots): the human always opens ──
-console.log('\n── 3. no stash, solo → human opens (never waits behind a bot) ──');
+// ── 3. No stash (FIRST game of session): opener is a uniformly RANDOM seat
+//      among ALL players (user_directive_2026-07-18d — no seat is privileged) ──
+console.log('\n── 3. no stash, first game → random seat among ALL players ──');
 {
   localStorage.removeItem('ft.rematchWinnerName');
-  for (let t = 0; t < 5; t++) {
+  const seats = new Set();
+  let outOfRange = false;
+  for (let t = 0; t < 60; t++) {
+    const r = startGame({ sessionPlayers: humans('Alice', 'Bob', 'Carol') });
+    if (typeof r.cur !== 'number' || r.cur < 0 || r.cur >= 3) { outOfRange = true; break; }
+    seats.add(r.cur);
+  }
+  ok(!outOfRange, `3: opener is always a valid seat 0..N-1`);
+  ok(seats.size === 3, `3: over 60 runs every seat can open (seen seats: ${[...seats].sort().join(',')})`);
+}
+
+// ── 4. First game may open on a BOT too (random over ALL seats, not just humans) ──
+console.log('\n── 4. first game randomiser includes bot seats ──');
+{
+  localStorage.removeItem('ft.rematchWinnerName');
+  let sawBotOpener = false, sawHumanOpener = false;
+  for (let t = 0; t < 80; t++) {
     const r = startGame({
       sessionPlayers: [
         { username: 'You', is_ai: false, slot: 0 },
         { username: 'B1', is_ai: true, slot: 1 },
         { username: 'B2', is_ai: true, slot: 2 },
+        { username: 'B3', is_ai: true, slot: 3 },
       ],
     });
-    ok(r.isBot === false, `3.${t + 1}: solo opener is the human (${r.name})`);
+    if (r.isBot) sawBotOpener = true; else sawHumanOpener = true;
+    if (sawBotOpener && sawHumanOpener) break;
   }
-}
-
-// ── 4. No stash, multi-human: opener is random but ALWAYS a human seat ──
-console.log('\n── 4. no stash, multi-human → opener is a human seat (random) ──');
-{
-  localStorage.removeItem('ft.rematchWinnerName');
-  const seen = new Set();
-  for (let t = 0; t < 30; t++) {
-    const r = startGame({ sessionPlayers: humans('Alice', 'Bob', 'Carol') });
-    if (r.isBot !== false) { ok(false, `4: opener was a bot (${r.name}) — should never happen`); break; }
-    seen.add(r.name);
-  }
-  ok(seen.size >= 1, `4: opener always a human across 30 runs (distinct openers seen: ${[...seen].join(', ')})`);
+  ok(sawHumanOpener, `4: the human can open the first game`);
+  ok(sawBotOpener, `4: a bot can also open the first game (pure random over all seats)`);
 }
 
 console.log('\n══════════════════════');
