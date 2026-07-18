@@ -411,8 +411,20 @@ function initGame(playerCount = 2, config = {}) {
   _deco = buildDeco(descs);
   const seed = (config.sessionSeed && hashSeed(config.sessionSeed))
     || (config.deckSeed && hashSeed(config.deckSeed)) || 1 + descs.length;
-  const firstPlayer = Number.isInteger(config.startingPlayer) ? config.startingPlayer
-    : descs.findIndex((d) => !d.isAI);   // solo/first human opens; -1 (all bots) -> 0 below
+  // Starting seat (user_directive_2026-07-18d): an explicit override wins; else a
+  // REPLAY opens on the previous winner (one-shot, matched by name); else the FIRST
+  // game of the session opens on a uniformly RANDOM seat among ALL players.
+  let firstPlayer = Number.isInteger(config.startingPlayer) ? config.startingPlayer : -1;
+  if (firstPlayer < 0) {
+    let rematch = null;
+    try { rematch = localStorage.getItem('ft.rematchWinnerName'); } catch (_) {}
+    try { localStorage.removeItem('ft.rematchWinnerName'); } catch (_) {}
+    if (rematch) {
+      const target = String(rematch).trim().toLowerCase();
+      firstPlayer = descs.findIndex((d) => String(_deco.names[d.index] || '').trim().toLowerCase() === target);
+    }
+    if (firstPlayer < 0) firstPlayer = Math.floor(Math.random() * descs.length);
+  }
   _engine = createState({
     rules: R,
     players: descs.map((d) => ({ name: _deco.names[d.index], isAI: d.isAI, color: _deco.colors[d.index] })),
