@@ -456,7 +456,9 @@ const CameraDirector = {
   _followMode: null,        // 'peg' | 'split' | 'cut-victim' | 'cut-victor' | null
   _cutsceneLock: false,     // True while cutscene is active — never relinquish
   _splitPegIds: null,       // [peg1Id, peg2Id] for split camera
-  _settledCallback: null,   // Called once when camera reaches target
+  _settledCallbacks: [],    // Fired when camera reaches target — a QUEUE, not a
+                            // single slot: the turn-enable gate + deferred peg
+                            // anims both register and must not clobber each other.
   _activePlayerIdx: -1,     // Current player index for auto-focus
 
   // Default beginning poses for each fixed mode. All chosen to frame the
@@ -594,11 +596,16 @@ const CameraDirector = {
 
   // Wait for camera to settle, then call callback
   whenSettled(callback) {
+    if (typeof callback !== 'function') return;
     if (this.mode === 'manual' || this.isSettled()) {
       callback();
       return;
     }
-    this._settledCallback = callback;
+    // Queue, never overwrite. A single slot let a later registration clobber an
+    // earlier one — e.g. a deferred peg animation overwriting the turn-enable
+    // startBlink — which stranded the next turn and froze the game.
+    if (!Array.isArray(this._settledCallbacks)) this._settledCallbacks = [];
+    this._settledCallbacks.push(callback);
   },
 
   update(dt) {
@@ -636,11 +643,12 @@ const CameraDirector = {
     controls.target.copy(this._look);
     camera.lookAt(this._look);
 
-    // Check settled callback
-    if (this._settledCallback && this.isSettled()) {
-      const cb = this._settledCallback;
-      this._settledCallback = null;
-      cb();
+    // Fire ALL queued settled callbacks (see whenSettled). Snapshot + clear
+    // first so a callback that re-registers waits for the NEXT settle.
+    if (this._settledCallbacks && this._settledCallbacks.length && this.isSettled()) {
+      const cbs = this._settledCallbacks;
+      this._settledCallbacks = [];
+      for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[CAM] settled cb failed', e); } }
     }
   },
 
