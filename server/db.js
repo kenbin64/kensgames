@@ -300,6 +300,7 @@ const users = {
     const ALIASES = {
       passwordHash: 'password_hash',
       displayName: 'display_name',
+      avatar: 'avatar_json',        // accept {avatar} from PUT /api/profile so avatar stays changeable
       avatarJson: 'avatar_json',
       emailVerified: 'email_verified',
       verificationCodeHash: 'verification_code_hash',

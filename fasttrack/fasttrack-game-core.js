@@ -477,6 +477,7 @@ function initGame(playerCount = 2, config = {}) {
   // Reset host-authoritative turn-rotation counters for the new game.
   _turnSeq = 0;
   _lastAppliedTurnSeq = 0;
+  _turnAdvanceCommitted = false;
   if (window.CameraDirector) window.CameraDirector.setActivePlayer(0);
 
   // ─── Card Matrix (substrate) ───
@@ -796,14 +797,26 @@ let _mpClient = null;
 let _applying = false;
 
 // ── Game Manager (host-authoritative turn control) ────────────────────────
-// The host is the sole authority on `state.players.current`. Non-host peers
-// never advance current locally; their endTurn() instead asks the host to
-// advance via a 'turn_request' relay. The host's endTurn() advances and
-// broadcasts a 'turn_advance' message. All clients (including the host) only
-// commit turn rotation when applying a 'turn_advance' with a fresh seq.
+// The host is the sole authority on `state.players.current`. It runs the full
+// simulation for every seat — its own turns and bots directly, every remote
+// human's turn by replaying their relayed draw/move under the _applying guard
+// — so its endTurn() fires once per turn for ALL players. The host's endTurn()
+// advances current and broadcasts a 'turn_advance'; non-host peers never
+// advance locally, they just clear their turn UI and commit the rotation when
+// the host's broadcast arrives (idempotent via a fresh seq). A genuinely
+// stalled remote seat is backstopped by the host's stuck-watchdog (which, on
+// the host, watches whichever seat is current — not only its own).
 // In solo / same-screen / non-MP modes, every endTurn advances directly.
 let _turnSeq = 0;
 let _lastAppliedTurnSeq = 0;
+// Exactly-once turn-resolution guard. Set true the moment a drawn card's turn is
+// resolved (advanced, or a redraw card reopens the draw), reset when the next
+// card is drawn (see _drawCardCommit). This is what stops the async race —
+// animation callback vs the 15s animation safety timeout vs the 12s stuck
+// watchdog — from advancing a seat twice (a "skip") or firing a redraw twice
+// (an unearned extra turn). Rotation math and the redraw table stay untouched;
+// this only guarantees each drawn card resolves the turn exactly one time.
+let _turnAdvanceCommitted = false;
 
 // ── Kernel adapter (slice 2 of the per-game GameKernel rollout) ──────────
 // In hybrid mode the host client still owns the deck and broadcasts the popped
@@ -980,6 +993,15 @@ function _activePlayerUserId() {
   return (p && p.userId) || null;
 }
 
+// Stable cross-client identity for a seat. Prefer userId (assigned from the
+// server roster); fall back to the display name. Turn rotation targets a
+// PLAYER via this identity, not a raw seat index — peer roster ordering is not
+// guaranteed to match the host's, so a bare index can land on the wrong seat.
+function _seatIdentity(p) {
+  if (!p) return '';
+  return String(p.userId || p.name || '');
+}
+
 // True when the local client is the ONLY human in the game (true solo,
 // solo-vs-bots, or a stale-cache game that came up in MP mode with no peer).
 // Such a game has nobody to coordinate with, so this client owns every
@@ -987,6 +1009,19 @@ function _activePlayerUserId() {
 // an ambiguous identity match locks the lone human out of drawing, moving, or
 // relinquishing. Real multiplayer (2+ humans) is unaffected.
 function _loneHuman() {
+  // Prefer the SESSION's human count — the relay's player list is the source of
+  // truth for who is actually connected. The local players[] roster can come up
+  // stale/corrupted (a real 2nd human mislabeled as a bot); treating THAT as
+  // "lone" wrongly promotes this peer to host AND to always-my-turn, so it
+  // auto-plays other humans' seats — the exact "skipping players / extra turns /
+  // strayed moves" cluster. Fall back to the local roster only pre-session.
+  try {
+    const sess = _mpClient && _mpClient.session;
+    const sp = sess && Array.isArray(sess.players) ? sess.players : null;
+    if (sp && sp.length) {
+      return sp.filter(p => p && !p.is_ai).length <= 1;
+    }
+  } catch (_) { /* fall through to local roster */ }
   const players = state.players.get('list') || [];
   return players.filter(p => p && !p.isBot).length <= 1;
 }
@@ -1046,8 +1081,47 @@ function _isHost() {
   return !!_mpClient.isHost;
 }
 
+// True when THIS client is allowed to drive (draw / move for) whoever is the
+// CURRENT seat right now. Two cases:
+//   1. It is genuinely my own turn (_isMyTurn), or
+//   2. the current seat is a BOT and I am the host. The host is the sole
+//      authority that runs bot turns in MP (see enableTurn / botTurn, which
+//      both gate bot play on `_isHost()`).
+//
+// BUGFIX (bot-skip in MP with 2+ humans): drawCard() and executeMove() used to
+// gate purely on `!_isMyTurn()`. When the host drove a bot's turn, the active
+// seat was the BOT, so _isMyTurn() returned false (active userId = the bot, not
+// the host) and BOTH the draw and the move bailed out. botTurn() then saw an
+// empty validMoves and called endTurn(), rotating PAST the bot without it ever
+// playing, i.e. the bot's turn was silently skipped (the user's "skips
+// others"). The lone-human-plus-bots case happened to work only because
+// _loneHuman() makes _isMyTurn() return true for every seat; with a second
+// human present that shortcut is (correctly) gone, which is why the bug only
+// showed up once a real peer joined. Allowing the host to act for a bot seat
+// here closes the gap without touching real human turn gating: a non-host can
+// still never act outside its own turn, and the host can still never act on
+// another HUMAN's seat (that path is driven by replaying the peer's relayed
+// draw/move under the _applying guard, not by this client deciding locally).
+function _canDriveActiveSeat() {
+  if (_isMyTurn()) return true;
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cur = players[ci];
+  return !!(cur && cur.isBot && _isHost());
+}
+
 function _broadcast(action, payload) {
-  if (!_isMpMode() || _applying) return;
+  if (!_isMpMode()) return;
+  // Echo-suppression: while _applying (re-running a peer's relayed action) we
+  // must NOT re-broadcast that same draw/move back out. BUT 'turn_advance' is
+  // generated authoritatively by the host, and the host reaches endTurn() WHILE
+  // _applying is true whenever it is replaying a NON-HOST player's move. If we
+  // suppressed it there, the host would advance locally but never tell the
+  // peers, so a non-host player's turn-end never rotated on the other clients —
+  // the host skipped ahead while the peer kept its turn. That is the
+  // "skips some turns / gives multiple turns" desync. So let turn_advance
+  // through under _applying; suppress every other action. (test_mp_turn_sync.js)
+  if (_applying && action !== 'turn_advance') return;
   try { _mpClient.sendAction(action, payload || {}); }
   catch (err) { console.warn('[ft-mp] broadcast failed', action, err); }
   // Hybrid kernel pass: server-validated turn rotation + audit log.
@@ -1115,8 +1189,9 @@ function applyRemoteAction(action, payload) {
         // Idempotent via seq.
         const from = payload && Number.isFinite(payload.from) ? payload.from : null;
         const next = payload && Number.isFinite(payload.next) ? payload.next : null;
+        const nextId = payload && payload.nextId != null ? String(payload.nextId) : null;
         const seq = payload && Number.isFinite(payload.seq) ? payload.seq : 0;
-        console.log('[TURN] applyRemoteAction: turn_advance received. from:', from, 'next:', next, 'seq:', seq, 'lastApplied:', _lastAppliedTurnSeq, 'turnSeq:', _turnSeq);
+        console.log('[TURN] applyRemoteAction: turn_advance received. from:', from, 'next:', next, 'nextId:', nextId, 'seq:', seq, 'lastApplied:', _lastAppliedTurnSeq, 'turnSeq:', _turnSeq);
         if (from === null || next === null) break;
         if (seq && seq <= _lastAppliedTurnSeq) {
           console.log('[TURN] applyRemoteAction: turn_advance seq too old, ignoring.');
@@ -1124,7 +1199,26 @@ function applyRemoteAction(action, payload) {
         }
         _lastAppliedTurnSeq = seq || _lastAppliedTurnSeq;
         if (seq > _turnSeq) _turnSeq = seq;
-        _applyTurnAdvance(from, next, seq);
+        // Resolve the target seat by IDENTITY, not the raw index. Peer roster
+        // ordering isn't guaranteed identical to the host's, so the host's
+        // `next` index can point at a different player locally. Match nextId
+        // against our own roster; fall back to the raw index only when we
+        // can't resolve the identity. This is the fix for turns landing on the
+        // wrong seat (skipped humans / strayed moves / no relinquish).
+        let resolvedNext = next;
+        if (nextId) {
+          const list = state.players.get('list') || [];
+          const byId = list.findIndex(p => _seatIdentity(p) === nextId);
+          if (byId >= 0) {
+            if (byId !== next) {
+              console.warn('[TURN] turn_advance index/identity mismatch — host index', next, '→ local seat', byId, 'for', nextId, '(using identity)');
+            }
+            resolvedNext = byId;
+          } else {
+            console.warn('[TURN] turn_advance nextId', nextId, 'not in local roster; using raw index', next);
+          }
+        }
+        _applyTurnAdvance(from, resolvedNext, seq);
         break;
       }
     }
@@ -1143,9 +1237,10 @@ function drawCard() {
   // again. The phase flips back to 'draw' only after waitForAll, but this is a
   // defense-in-depth check in case any code path skips that.
   if (typeof window.isPlayResolving === 'function' && window.isPlayResolving()) return;
-  // Multiplayer: only the active player drives the draw locally; remote peers
-  // receive the card via applyRemoteAction and replay it under the _applying guard.
-  if (!_applying && _isMpMode() && !_isMyTurn()) return;
+  // Multiplayer: only the active player (or the host driving a bot seat) draws
+  // locally; remote peers receive the card via applyRemoteAction and replay it
+  // under the _applying guard. See _canDriveActiveSeat for the bot-skip bugfix.
+  if (!_applying && _isMpMode() && !_canDriveActiveSeat()) return;
   dismissYourTurnPopup();
 
   let deck = state.deck.get('cards') || [];
@@ -1171,6 +1266,9 @@ function drawCard() {
 // Commit a drawn card into local state + UI. Shared by drawCard (local actor)
 // and applyRemoteAction (peer) so visual side-effects stay consistent.
 function _drawCardCommit(card) {
+  // A fresh card begins a new turn resolution — re-arm the exactly-once guard so
+  // this card is allowed to advance (or redraw) the turn a single time.
+  _turnAdvanceCommitted = false;
   state.deck.set('currentCard', card);
   state.turn.set('phase', 'move');
   _splitPegIdx = null;
@@ -2562,9 +2660,10 @@ function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
 }
 
 function executeMove(moveIdx) {
-  // Multiplayer: only the active player drives a move locally; remote peers
-  // receive the resolved move via applyRemoteAction and replay it under guard.
-  if (!_applying && _isMpMode() && !_isMyTurn()) return;
+  // Multiplayer: only the active player (or the host driving a bot seat) plays a
+  // move locally; remote peers receive the resolved move via applyRemoteAction
+  // and replay it under guard. See _canDriveActiveSeat for the bot-skip bugfix.
+  if (!_applying && _isMpMode() && !_canDriveActiveSeat()) return;
 
   // Clear path highlights when a move is chosen
   if (window.clearHighlights) window.clearHighlights();
@@ -2952,7 +3051,17 @@ function executeMove(moveIdx) {
 
   // ── All cutscenes must complete before the next turn begins ──
   const advanceTurn = () => {
+    // Exactly-once: resolve this drawn card's turn a single time, whatever async
+    // path fires it (the animation-done callback, the 15s animation safety
+    // timeout, or a stray re-entry). A duplicate fire here is exactly what
+    // skipped seats (double advance) and handed out unearned extra turns
+    // (double redraw). We only CHECK the flag here — it is SET by endTurn() (the
+    // rotate path) or by the redraw/winner branches below, so the ordinary
+    // non-redraw path can still fall through to endTurn() and actually rotate.
+    // Re-armed on the next draw in _drawCardCommit.
+    if (_turnAdvanceCommitted) return;
     if (state.meta.get('winner') !== null) {
+      _turnAdvanceCommitted = true; // game over — this drawn card is resolved
       const winnerName = getCurrentPlayerName();
       const gs = document.getElementById('game-status');
       if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
@@ -2980,6 +3089,9 @@ function executeMove(moveIdx) {
 
     const rules = CARDS[card.value];
     if (rules.extraTurn) {
+      // A redraw resolves this card WITHOUT rotating — it reopens the draw for
+      // the SAME player. Mark resolved so no second async fire can reopen twice.
+      _turnAdvanceCommitted = true;
       log(`${getCurrentPlayerName()} gets another turn!`);
       // user_directive_2026-05-18 — surface the extra turn as a center toast
       // so the player sees WHY the draw phase is reopening.
@@ -3038,12 +3150,22 @@ function passTurn(reason) {
       const ci = state.players.get('current') || 0;
       const cur = players[ci];
       const curIsBot = !!(cur && cur.isBot);
-      const allowed = curIsBot ? _isHost() : _isMyTurn();
+      // Host may pass whichever seat is current (it is the sole turn authority
+      // and backstops stalled remotes); a non-host may only pass its own human
+      // turn. Either way the actual rotation happens in the host's endTurn().
+      const allowed = _isHost() ? true : (!curIsBot && _isMyTurn());
       if (!allowed) {
-        console.warn('[PASS] Ignored — not active player and not host-for-bot.');
+        console.warn('[PASS] Ignored — not host and not own human turn.');
         return;
       }
     }
+    // Exactly-once: if the drawn card's move already resolved this turn, a pass
+    // here (manual, stuck-watchdog, or the no-legal-move path racing the move's
+    // animation callback) would try to advance a SECOND time and skip the next
+    // seat. Swallow it early so we don't even flash a spurious "turn passed"
+    // toast. endTurn()'s own guard is the real backstop for the rotation, so we
+    // deliberately do NOT set the flag here — endTurn() sets it as it rotates.
+    if (_turnAdvanceCommitted) { console.warn('[PASS] Ignored — turn already resolved.'); return; }
     // Clear in-progress split selection so the next turn starts fresh.
     if (typeof _splitPegIdx !== 'undefined') _splitPegIdx = null;
     if (typeof _splitStepChoice !== 'undefined') _splitStepChoice = null;
@@ -3097,7 +3219,10 @@ function _stuckWatchdogTick() {
     const ci = state.players.get('current') || 0;
     const cur = players[ci];
     if (!cur || cur.isBot) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
-    if (_isMpMode() && !_isMyTurn()) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
+    // Non-host clients only watch their OWN turn — they can't advance anyone
+    // else. The host watches whichever seat is current (its authority covers
+    // every seat) so it can backstop-pass a genuinely stalled remote human.
+    if (_isMpMode() && !_isHost() && !_isMyTurn()) { _stuckSinceMs = 0; _stuckLastSig = _stuckSig(); return; }
     const phase = state.turn.get('phase');
     const vm = state.turn.get('validMoves') || [];
     const card = state.deck.get('currentCard');
@@ -3136,6 +3261,15 @@ if (typeof window !== 'undefined') {
 
 
 function endTurn() {
+  // Exactly-once rotation guard — the single place a seat advances. Blocks the
+  // double-rotate (a skipped seat) whenever more than one path tries to end the
+  // same drawn card's turn: the move's advanceTurn, the stuck-watchdog or the
+  // no-legal-move fallbacks (human auto-relinquish, End Turn button, bot no-move),
+  // or a late animation safety timeout. Re-armed on the next draw in
+  // _drawCardCommit. (advanceTurn's redraw branch sets the flag itself, since a
+  // redraw resolves the card without ever reaching here.)
+  if (_turnAdvanceCommitted) return;
+  _turnAdvanceCommitted = true;
   // Clear any lingering path highlights
   if (window.clearHighlights) window.clearHighlights();
 
@@ -3143,24 +3277,31 @@ function endTurn() {
   const ci = state.players.get('current') || 0;
   const next = (ci + 1) % players.length;
 
-  // ── Game Manager: active-player-authoritative turn rotation in MP ──────
-  // The ACTIVE PLAYER's own client is the sole authority on advancing past
-  // their own turn (they always know "it's my turn" reliably via _isMyTurn,
-  // independent of unreliable `mp.isHost` flags). Other clients wait for the
-  // 'turn_advance' broadcast and apply it idempotently via seq.
-  // Bots don't have a client of their own — the host drives bot turn ends.
+  // ── Host-authoritative turn rotation (MP) ─────────────────────────────
+  // The host runs the full game simulation for EVERY seat: its own turns and
+  // bot turns directly, and each remote human's turn by replaying their
+  // relayed draw/move under the _applying guard. Because of that, the host's
+  // endTurn() is reached exactly once per turn for ALL players — making the
+  // host the natural single authority. The host advances current and
+  // broadcasts 'turn_advance'; every client (host included) commits the
+  // rotation only when applying that broadcast's fresh seq. Non-host peers
+  // NEVER advance locally; they clear their in-progress turn UI and wait.
+  //
+  // This replaces the older "active player advances their own turn" model,
+  // which desynced whenever two clients both believed it was their turn (the
+  // _isMyTurn fallbacks are deliberately permissive), when per-client turn
+  // seqs collided, or when a self-broadcast was dropped or duplicated. With a
+  // single advancer, those whole failure classes disappear.
   if (_isMpMode()) {
-    const cur = players[ci];
-    const curIsBot = !!(cur && cur.isBot);
-    const shouldAdvance = curIsBot ? _isHost() : _isMyTurn();
-    console.log('[TURN] endTurn called. ci:', ci, 'next:', next, 'curIsBot:', curIsBot, 'shouldAdvance:', shouldAdvance, 'isHost:', _isHost(), 'isMyTurn:', _isMyTurn());
-    if (shouldAdvance) {
-      console.log('[TURN] Advancing turn locally and broadcasting turn_advance. seq:', _turnSeq + 1);
+    if (_isHost()) {
+      const nextId = _seatIdentity(players[next]);
       _applyTurnAdvance(ci, next, ++_turnSeq);
-      _broadcast('turn_advance', { from: ci, next, seq: _turnSeq });
+      _lastAppliedTurnSeq = _turnSeq; // our own advance counts as applied; reject any echo
+      _broadcast('turn_advance', { from: ci, next, nextId, seq: _turnSeq });
+      console.log('[TURN] host advanced turn. ci:', ci, '-> next:', next, 'nextId:', nextId, 'seq:', _turnSeq);
     } else {
-      console.log('[TURN] Not advancing turn locally. Waiting for turn_advance broadcast.');
       _localTurnUiCleanup();
+      console.log('[TURN] non-host endTurn — cleaned up; waiting for host turn_advance.');
     }
     return;
   }
@@ -4302,6 +4443,7 @@ window.FastTrackCore = {
   state,
   initGame,
   drawCard,
+  _drawCardCommit, // exposed for headless tests: the real draw path that re-arms the turn guard
   executeMove,
   endTurn,
   botTurn,

@@ -27,21 +27,29 @@
     "files": [
       "main.js",
       "preload.js",
-      "assets/**",
-      "../index.html",
-      "../fasttrack-game.js",
-      "../fasttrack-game-core.js",
-      "../fasttrack-3d.js",
-      "../fasttrack-sound.js",
-      "../board_manifold.js",
-      "../substrate_manifold.js",
-      "../fasttrack_manifold_substrate.js",
-      "../analytics_substrate.js",
-      "../growth_substrate.js",
-      "../manifold.game.json",
-      "../board_inventory.json",
-      "../fasttrack.rules.json",
-      "../assets/**"
+      "loopback-server.js",
+      "assets/**"
+    ],
+    "extraResources": [
+      { "from": "../../js", "to": "app-root/js" },
+      { "from": "../../lib", "to": "app-root/lib" },
+      { "from": "../../assets", "to": "app-root/assets" },
+      {
+        "from": "../",
+        "to": "app-root/fasttrack",
+        "filter": [
+          "**/*",
+          "!electron/**",
+          "!node_modules/**",
+          "!_archive/**",
+          "!_backups/**",
+          "!scripts/**",
+          "!test_*.js",
+          "!**/*.test.js",
+          "!push-to-vps.sh",
+          "!start_vr_server.sh"
+        ]
+      }
     ],
     "win": {
       "target": [

@@ -1,4 +1,8 @@
-{
+// AUTO-GENERATED from fasttrack/fasttrack.rules.json — do not edit by hand.
+// Regenerate: node -e (read ../../fasttrack.rules.json) > browser/rules-data.js
+// The rules doc as an ES module so the browser adapter imports it synchronously
+// (no fetch, no async, no timing race with init3D). Source of truth stays the JSON.
+export default {
   "$schema": "manifold-rules/1.0",
   "_meta": {
     "id": "fasttrack",
@@ -1190,4 +1194,4 @@
     "five_card_draw": "Awaiting authoritative rules from user before encoding.",
     "two_dice": "Awaiting authoritative rules from user before encoding."
   }
-}
+};

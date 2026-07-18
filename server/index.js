@@ -17,12 +17,19 @@ const AuthHandler = require('./auth-handler');
 const EncryptionService = require('./encryption');
 const EmailService = require('./email-service');
 const db = require('./db');
+const { OAuth2Client } = require('google-auth-library');
 
 // Initialize Express
 const app = express();
 const authHandler = new AuthHandler();
 const encryptionService = new EncryptionService();
 const emailService = new EmailService();
+
+// Google Sign-In (ID-token flow). Public Client ID comes from env; no client
+// secret is needed for this flow — we only verify the ID token's signature and
+// audience. Sign-in is simply disabled until GOOGLE_CLIENT_ID is set.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 // Middleware
 app.use(express.json());
@@ -202,6 +209,109 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ success: false, error: 'Login failed' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: GET /api/auth/config
+// Public client config for the login page (currently just the Google Client ID,
+// which is not secret). Returns null when Google sign-in isn't configured.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/auth/config', (_req, res) => {
+  res.json({ googleClientId: GOOGLE_CLIENT_ID || null });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDPOINT: POST /api/auth/google
+// Google Sign-In (ID-token flow). The client posts a Google ID token as
+// { credential }. We verify it, then:
+//   • existing account (by verified email) → issue our session JWT (log in)
+//   • new account, no username yet         → reply { needsUsername } + a suggestion
+//   • new account, with { username }       → validate + create, then issue JWT
+// Username is permanent and unique (chosen once here); email is the account key,
+// so a different email = a different account = a different username. One sign-on
+// serves every game. We never receive or store a password. (See /privacy, /dmca.)
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    if (!googleClient) {
+      return res.status(503).json({ success: false, error: 'Google sign-in is not configured' });
+    }
+    const { credential, username } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ success: false, error: 'Missing Google credential' });
+    }
+
+    // Verify the ID token's signature + audience against our Client ID.
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
+      payload = ticket.getPayload();
+    } catch (_) {
+      return res.status(401).json({ success: false, error: 'Invalid Google credential' });
+    }
+    if (!payload || !payload.email || payload.email_verified === false) {
+      return res.status(401).json({ success: false, error: 'Google account email not verified' });
+    }
+
+    const email = payload.email;
+    const googleName = payload.name || email.split('@')[0];
+
+    let userData = db.users.findByEmail(email);
+
+    // New account: a permanent, unique username is chosen ONCE. If the client
+    // hasn't supplied one yet, ask for it (with a suggestion derived from the
+    // Google name). There is no rename path afterwards.
+    if (!userData) {
+      const suggestedUsername = (googleName || email.split('@')[0] || 'player')
+        .replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'player';
+
+      const chosen = (username || '').trim();
+      if (!chosen) {
+        return res.status(200).json({ success: false, needsUsername: true, suggestedUsername, email });
+      }
+
+      const check = authHandler.validateUsername(chosen);
+      if (!check.valid) {
+        return res.status(400).json({ success: false, needsUsername: true, suggestedUsername, error: check.error });
+      }
+      if (db.users.usernameExists(chosen)) {
+        return res.status(409).json({ success: false, needsUsername: true, suggestedUsername, error: 'Username already taken' });
+      }
+
+      const newUserId = db.users.create({
+        username: chosen,
+        email,
+        passwordHash: null,        // Google accounts have no local password
+        displayName: chosen,       // the unique username is the shown name
+        avatar: '🎮',             // default emoji avatar; changeable in-game via the picker
+        status: 'active',
+        emailVerified: true,       // Google already verified the email
+        adminLevel: 0,
+      });
+      userData = db.users.findById(newUserId);
+    }
+
+    if (userData.status === 'banned' || userData.status === 'suspended') {
+      return res.status(403).json({ success: false, error: 'Account not available' });
+    }
+
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const token = authHandler.generateToken(userData.userId, sessionId);
+    db.users.update(userData.username, { last_login_at: Date.now() });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      userId: userData.userId,
+      username: userData.username,
+      displayName: userData.displayName || googleName,
+      avatar: userData.avatar || googlePicture,
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    return res.status(500).json({ success: false, error: 'Google sign-in failed' });
   }
 });
 

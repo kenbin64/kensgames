@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Focused Query</title>
+<meta name="description" content="How to form a focused query using dimensions: ask at the right dimension, strip pronouns, adjectives, and filler, and make focus the default with a concise directive you can paste into a chatbot, load at startup, or update live.">
+<link rel="canonical" href="https://dimensionalprogramming.com/the-focused-query.html">
+<style>
+:root{--bg:#0c1016;--panel:#141b24;--edge:#283441;--txt:#e7edf4;--mut:#93a1b1;--acc:#8fb7ff;--ok:#5fd39a;--hot:#ff8d8d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Georgia,"Times New Roman",serif;line-height:1.72;font-size:18px}
+.wrap{max-width:740px;margin:0 auto;padding:54px 22px 80px}
+.kicker{font-family:ui-monospace,Consolas,monospace;color:var(--acc);font-size:13px;letter-spacing:1px;text-transform:uppercase}
+h1{font-size:34px;line-height:1.2;margin:10px 0 6px;font-weight:700}
+.sub{color:var(--mut);font-size:17px;font-style:italic;margin-bottom:26px}
+.note{background:var(--panel);border:1px solid var(--edge);border-left:3px solid var(--acc);border-radius:8px;padding:14px 18px;color:var(--mut);font-size:15px;line-height:1.6;font-family:system-ui,sans-serif}
+h2{font-size:22px;margin:38px 0 10px}p{margin:0 0 16px}b{color:#fff}
+.dim{display:grid;grid-template-columns:96px 1fr;gap:6px 16px;font-family:system-ui,sans-serif;font-size:15px;margin:0 0 8px}
+.dim .k{font-family:ui-monospace,monospace;color:var(--acc);font-size:13.5px}
+.rules{font-family:system-ui,sans-serif;font-size:15.5px}
+.rules li{margin:0 0 7px}
+.ex{font-family:system-ui,sans-serif;font-size:15px;border:1px solid var(--edge);border-radius:8px;padding:12px 15px;margin:8px 0}
+.ex .bad{color:var(--hot)}.ex .good{color:var(--ok)}.ex .lbl{font-family:ui-monospace,monospace;font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+.codewrap{position:relative;margin:8px 0 18px}
+.copy{position:absolute;top:8px;right:8px;font-family:system-ui,sans-serif;font-size:12px;cursor:pointer;background:#0c1118;border:1px solid var(--edge);color:var(--acc);border-radius:6px;padding:3px 10px}
+pre{background:#0c1118;border:1px solid var(--edge);border-radius:9px;padding:15px 16px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.55;color:#d6e0ee;margin:0;white-space:pre-wrap}
+.bound{background:#1a1410;border:1px solid #5a4326;border-left:3px solid #d9a441;border-radius:8px;padding:14px 18px;color:#e8d4b2;font-family:system-ui,sans-serif;font-size:15px;line-height:1.6}
+.bound b{color:#ffd98a}
+a{color:var(--acc)}
+.foot{margin-top:46px;border-top:1px solid var(--edge);padding-top:18px;color:#6c7c8c;font-size:12.5px;font-family:system-ui,sans-serif;line-height:1.6}
+</style>
+</head>
+<body><div class="wrap">
+  <div class="kicker">Dimensional thinking, applied to asking</div>
+  <h1>The Focused Query</h1>
+  <div class="sub">Ask at the right dimension. Cut the filler. Make focus the default.</div>
+
+  <div class="note">
+    A vague question fans out flat and the model guesses how wide and how deep to go. A focused query names the
+    dimension it wants and uses only load-bearing words, so the model reads less and wanders less. That is the whole
+    benefit, lower in plain terms: <b>fewer tokens</b> (cost) and <b>fewer made-up answers</b> (reliability). It costs
+    nothing to do; it is only how you ask.
+  </div>
+
+  <h2>1. Ask at the dimension you want</h2>
+  <p>Tell the model the shape of the answer, and it stops over-answering and under-answering.</p>
+  <div class="dim"><span class="k">point</span><span>one fact. "Return the current value of X."</span></div>
+  <div class="dim"><span class="k">line</span><span>one transform, input to output. "Convert A to B."</span></div>
+  <div class="dim"><span class="k">surface</span><span>breadth, the options across the top. "List the approaches to Y."</span></div>
+  <div class="dim"><span class="k">volume</span><span>depth, the full chain with tradeoffs. "Trace how Z fails, and the cost of each fix."</span></div>
+  <p style="margin-top:10px">Name the dimension and the model matches it. Leave it out and it picks for you, usually too wide.</p>
+
+  <h2>2. Strip the query to load-bearing words</h2>
+  <p>Every extra word is something the model has to resolve, and resolving is where it drifts.</p>
+  <ul class="rules">
+    <li><b>No pronouns.</b> "It", "this", "they" force the model to guess the referent. Name the thing.</li>
+    <li><b>Few adjectives.</b> "Good", "robust", "nice" are opinions, not targets. Use measurable terms.</li>
+    <li><b>No filler.</b> Drop "please", "I was wondering if you could", "kind of", "just".</li>
+    <li><b>Imperative, not request.</b> "Return", "List", "Compare", "Trace", not "could you maybe".</li>
+    <li><b>One subject per query.</b> Two questions in one sentence get one muddled answer.</li>
+  </ul>
+  <div class="ex">
+    <div class="lbl">vague</div>
+    <div class="bad">"Could you maybe give me some good ideas on how I might make this thing run a bit faster?"</div>
+    <div class="lbl" style="margin-top:8px">focused</div>
+    <div class="good">"List three changes that cut checkout-service p95 latency. For each: the change, the expected effect, the risk."</div>
+  </div>
+
+  <h2>3. Make focus the default: a directive</h2>
+  <p>The rules above are a one-time habit for you. To make the <i>model</i> hold them on every turn, give it an operating
+    directive. Concise on purpose, no filler, the way it asks the model to answer.</p>
+  <div class="codewrap">
+    <button class="copy">Copy</button>
+    <pre>DIRECTIVE: FOCUSED
+
+1. Answer at the dimension asked.
+   point   = one fact.
+   line    = one transform (input to output).
+   surface = breadth, the options across the top.
+   volume  = depth, the full chain with tradeoffs.
+   If the dimension is unclear, ask which in one line. Do not guess wide.
+
+2. Load-bearing words only. No filler, no hedging, no restating the
+   question. Imperative and concrete. Name things; do not lean on pronouns.
+
+3. No invention. Any claim not derivable from the given context is
+   labeled or cited. If unknown, say "unknown". Refuse rather than fabricate.
+
+4. Give the smallest answer that fully covers the question. Stop when covered.</pre>
+  </div>
+
+  <h2>4. Three ways to use it</h2>
+  <p><b>a. Paste it into a chatbot.</b> In ChatGPT, put it under Settings, Personalization, Custom Instructions, in the
+    "how should it respond" box. In Claude, put it in a Project's custom instructions, or the system prompt field. From
+    then on, every reply in that chat obeys the directive.</p>
+  <p><b>b. Load it at startup.</b> For an app or agent, send the directive as the first <code>system</code> message of
+    every session, before any user turn, so focus is the default from the first token.</p>
+  <div class="codewrap">
+    <button class="copy">Copy</button>
+    <pre>messages = [
+  { role: "system", content: DIRECTIVE_FOCUSED },   // loaded first, every session
+  { role: "user",   content: query }
+]</pre>
+  </div>
+  <p>Or have the agent read a <code>directive.md</code> file at boot and prepend it. Same effect: the instance starts
+    focused.</p>
+  <p><b>c. Update it live.</b> The directive lives in your instance, so you can change it mid-session. Send an update and
+    the instance adopts it from the next turn; you never touched the provider's model, only the instance you were given.</p>
+  <div class="codewrap">
+    <button class="copy">Copy</button>
+    <pre>UPDATE DIRECTIVE: add rule 5. Answers over 5 lines must start with a
+one-line summary. Treat this as authoritative from now on.</pre>
+  </div>
+  <p>In an agent, hot-reload the directive file and re-prepend it; the next turn runs under the new rules.</p>
+
+  <div class="bound">
+    <b>What this is, and is not.</b> A directive does not change the AI provider's model, which no one without direct
+    access can change. It shapes <b>your instance</b> of it, the session you were given. It makes that instance cheaper
+    (smaller questions and answers, fewer tokens) and more reliable (a dimension to stay inside and a no-invention rule),
+    which a person reads as a sharper assistant. It does not make the model smarter; it focuses it.
+  </div>
+
+  <div class="foot">
+    A way of seeing by Kenneth W. Bingham · dimensionalprogramming.com
+    <br><br>Concept and direction: Kenneth W. Bingham. Built with the help of Claude AI under a standing directive to be skeptical, to insist on proof, and to allow no claim that is not demonstrated in tested code. The ideas are the author's; the AI implemented and verified them, it did not originate them.
+  </div>
+</div>
+<script>
+  (function () {
+    var btns = document.querySelectorAll('.copy');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function () {
+        var pre = this.parentNode.querySelector('pre'), b = this;
+        navigator.clipboard.writeText(pre.textContent).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1200); });
+      });
+    }
+  })();
+</script>
+</body>
+</html>
