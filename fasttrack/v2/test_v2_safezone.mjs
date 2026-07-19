@@ -112,5 +112,26 @@ ok(!crownPresent(crownSetup(4, 'outer-2-1', true), 0), 'crown OFF: final peg sti
 ok(checkWin(crownSetup(4, 'home-0', true), 0) === 0, 'WIN awarded: 4 in the safe zone + final peg home + crown present');
 ok(checkWin(crownSetup(3, 'home-0', true), 0) == null, 'NO win: final peg on home but only 3 in the safe zone (no crown)');
 
+console.log('\n== final approach: crown STAYS past the entrance to the win hole; no peg goes beyond it ==');
+// Going past the safe-zone entrance toward the win hole is NOT "leaving the stretch" — the crown
+// holds until the peg lands home exactly. And no peg may ever pass the win hole: a card that would
+// overshoot yields no move (the turn is over if that is the only peg that could move).
+ok(crownPresent(crownSetup(4, 'outer-0-3', true), 0), 'crown STAYS: final peg on outer-0-3, past the entrance on the run to home');
+{
+  const s = crownSetup(4, 'outer-0-3', true);
+  const to = calculateValidMoves(s, R, { rank: 'A' }).filter((m) => m.peg === 4).map((m) => m.dest);
+  ok(to.length === 1 && to[0] === 'home-0', 'exact landing: from outer-0-3 a 1 lands precisely on the win hole');
+}
+{
+  const s = crownSetup(4, 'outer-0-3', true);
+  ok(calculateValidMoves(s, R, { rank: '2' }).filter((m) => m.peg === 4).length === 0, 'no overshoot: from outer-0-3 a 2 has NO legal move — cannot pass the win hole, turn is over');
+}
+{
+  const s = crownSetup(4, 'outer-0-3', true);
+  const m = calculateValidMoves(s, R, { rank: 'A' }).find((mm) => mm.peg === 4 && mm.dest === 'home-0');
+  if (m) applyMove(s, R, m);
+  ok(crownPresent(s, 0) && s.winner === 0, 'crown still present at the instant the final peg lands home, and the win is awarded');
+}
+
 console.log(`\n══════════════════════\n  ${pass} passed, ${fail} failed\n══════════════════════\n`);
 process.exit(fail ? 1 : 0);
