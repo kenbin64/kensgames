@@ -15,6 +15,7 @@
 import rulesDoc from './rules-data.js';
 import { loadRules } from '../engine/rules.js';
 import { createState, occupantOf } from '../engine/state.js';
+import { crownPresent } from '../engine/apply.js';
 import { drawCard as engineDraw, legalMoves, playMove, forfeit } from '../engine/turn.js';
 import { buildPlayersList, buildBoardEntries, translateMoves, hopHints } from './project.js';
 import { cardFace, cardDescription, toRenderHole } from './holemap.js';
@@ -99,6 +100,9 @@ function syncState() {
   state.deck.set('currentCard', cardFace(_engine.turn.card));
   state.deck.set('deckCount', _engine.deck.drawPile.length);
   state.meta.set('winner', _engine.winner);
+  // CROWN per player: computed live from the engine so the renderer can place a crown on home-{p}
+  // the moment the final peg reaches the home stretch, and drop it if that peg is cut or leaves.
+  state.meta.set('crowns', _engine.players.map((_pl, p) => crownPresent(_engine, p)));
 }
 
 function render() { if (typeof _renderBoard === 'function') _renderBoard(); }

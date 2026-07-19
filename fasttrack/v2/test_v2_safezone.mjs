@@ -10,7 +10,7 @@ import { dirname, join } from 'path';
 import { loadRules } from './engine/rules.js';
 import { createState, pegByPlayerN } from './engine/state.js';
 import { calculateValidMoves } from './engine/moves.js';
-import { applyMove } from './engine/apply.js';
+import { applyMove, crownPresent, checkWin } from './engine/apply.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const R = loadRules(JSON.parse(readFileSync(join(here, '..', 'fasttrack.rules.json'), 'utf8')));
@@ -92,6 +92,25 @@ console.log('\n== traversal: TOUCHING the entrance hole (either direction) compl
   if (m) applyMove(s, R, m);
   ok(peg.hasCircuited === true, 'the forward divert also flags the traversal');
 }
+
+console.log('\n== crown: all 4 safe holes filled + final peg on the home stretch, and it gates the win ==');
+function crownSetup(safeCount, fifthLoc, circuited) {
+  const s = createState({ rules: R, players: [{ name: 'A' }, { name: 'B' }], seed: 3 });
+  const pegs = [0, 1, 2, 3, 4].map((n) => pegByPlayerN(s, 0, n));
+  for (const pg of pegs) pg.location = 'hold-0-1';
+  for (let i = 0; i < safeCount; i++) pegs[i].location = `safe-0-${i + 1}`;
+  pegs[4].location = fifthLoc; pegs[4].hasCircuited = !!circuited;
+  return s;
+}
+ok(crownPresent(crownSetup(4, 'ft-0', true), 0), 'crown ON: 4 in the safe zone + final peg enters the stretch at its own ft-0');
+ok(crownPresent(crownSetup(4, 'outer-0-2', true), 0), 'crown ON: final peg sitting on the entrance hole');
+ok(crownPresent(crownSetup(4, 'home-0', true), 0), 'crown ON: final peg on the home hole');
+ok(!crownPresent(crownSetup(3, 'ft-0', true), 0), 'crown OFF: only 3 safe holes filled (not all 4)');
+ok(!crownPresent(crownSetup(4, 'hold-0-1', false), 0), 'crown OFF: final peg was cut back to holding');
+ok(!crownPresent(crownSetup(4, 'side-right-0-2', true), 0), 'crown OFF: final peg on the exit side (side-right), not the run-in');
+ok(!crownPresent(crownSetup(4, 'outer-2-1', true), 0), 'crown OFF: final peg still way out on the far track');
+ok(checkWin(crownSetup(4, 'home-0', true), 0) === 0, 'WIN awarded: 4 in the safe zone + final peg home + crown present');
+ok(checkWin(crownSetup(3, 'home-0', true), 0) == null, 'NO win: final peg on home but only 3 in the safe zone (no crown)');
 
 console.log(`\n══════════════════════\n  ${pass} passed, ${fail} failed\n══════════════════════\n`);
 process.exit(fail ? 1 : 0);

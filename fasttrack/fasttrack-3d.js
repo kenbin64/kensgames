@@ -4444,6 +4444,51 @@ function updatePlayerMarkers() {
   });
 }
 
+// ── WIN CROWN ────────────────────────────────────────────────────────────────
+// A gold crown that floats over home-{p} while that player is on the home stretch:
+// all four safe holes filled and the final peg on its run-in (engine crownPresent,
+// surfaced as state.meta 'crowns'). It appears the instant that peg reaches the
+// stretch and vanishes if the peg is cut or leaves. The crown must be present for
+// the win to be awarded, so it doubles as the player's "one landing from winning" tell.
+let _crownSprites = {};
+function makeCrownSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = '92px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(255, 205, 60, 0.95)';   // warm gold glow so it reads on the dark board
+  ctx.shadowBlur = 20;
+  ctx.fillText('👑', 64, 72);
+  ctx.fillText('👑', 64, 72);                      // second pass deepens the glow
+  const texture = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(15, 15, 1);
+  sprite.renderOrder = 130;
+  return sprite;
+}
+
+function updateCrowns() {
+  if (!window.FastTrackCore || !boardGroup) return;
+  const crowns = window.FastTrackCore.state.meta.get('crowns') || [];
+  for (let p = 0; p < 6; p++) {
+    const present = !!crowns[p];
+    let spr = _crownSprites[p];
+    if (present && !spr) {
+      const home = holeRegistry.get(`home-${p}`);
+      if (!home || !home.position) continue;
+      spr = makeCrownSprite();
+      // Added to boardGroup so it shares the holes' local space; float it just above the hole.
+      spr.position.set(home.position.x, home.position.y + 14, home.position.z);
+      boardGroup.add(spr);
+      _crownSprites[p] = spr;
+    }
+    if (spr) spr.visible = present;
+  }
+}
+
 function blinkPlayerMarker(playerIdx, onDone) {
   if (!window.FastTrackCore) { if (onDone) onDone(); return; }
   const players = window.FastTrackCore.state.players.get('list') || [];
@@ -5147,6 +5192,7 @@ function renderBoard3D() {
   const core = window.FastTrackCore;
   const players = core.state.players.get('list') || [];
   const boardY = boardGroup ? boardGroup.position.y : 90;
+  updateCrowns();   // place/clear the home-stretch crown on each render
 
   // Consume pending hop animation if any
   const pendingAnim = window._pendingHopAnim;
