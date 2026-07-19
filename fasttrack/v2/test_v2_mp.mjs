@@ -87,5 +87,20 @@ ok(sent.length === 0, 'applying a remote pass does not echo either');
 // the pass resolves the card: either the pointer rotates, or (a redraw card) the same seat re-draws.
 ok(JSON.stringify([seat(), phase()]) !== before, 'applying the peer\'s pass resolved the card (turn state changed)');
 
+console.log('\n== snapshot counter-gating: a STALE host snapshot must not revert an advanced client ==');
+{
+  const stale = FTC.getStateSnapshot();          // capture at applied = A
+  FTC.applyRemoteAction('draw', {});             // advance two deltas
+  FTC.applyRemoteAction('pass', {});
+  const advanced = FTC.getStateSnapshot();       // applied = B > A
+  ok(advanced.applied > stale.applied, `the game advanced past the snapshot (applied ${stale.applied} -> ${advanced.applied})`);
+  FTC.applyStateSnapshot(stale);                 // the host's periodic 5s snapshot, now stale — MUST be ignored
+  ok(FTC.getStateSnapshot().applied === advanced.applied, 'stale snapshot ignored — the client did NOT revert (the mid-game jitter fix)');
+  // a snapshot AHEAD of us (a genuine catch-up after a missed delta) IS adopted
+  const ahead = FTC.getStateSnapshot(); ahead.applied = advanced.applied + 3;
+  FTC.applyStateSnapshot(ahead);
+  ok(FTC.getStateSnapshot().applied === advanced.applied + 3, 'an ahead snapshot IS adopted (catch-up / late-join still works)');
+}
+
 console.log(`\n══════════════════════\n  ${pass} passed, ${fail} failed\n══════════════════════\n`);
 process.exit(fail ? 1 : 0);
