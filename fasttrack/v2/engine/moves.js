@@ -28,18 +28,23 @@ function trackSequence(state, peg, p, backward) {
   const entrance = safeEntranceId(p);            // outer-{p}-2
   const full = safeZoneFull(state, p);
   const home = homeId(p);
-  const eligible = !!peg.hasCircuited;           // may divert into own safe zone only after a circuit
   const seq = [];
   const divert = () => {
     if (!full) { for (let h = 1; h <= SAFE_SIZE; h++) seq.push(safeId(p, h)); }
     else { seq.push(outerId(p, 3)); seq.push(home); }
   };
 
-  if (peg.location === entrance && fwd && eligible) { divert(); return seq; }
+  // Reaching your OWN entrance (outer-{p}-2) going clockwise IS completing the circuit:
+  // in normal play a peg only arrives here after travelling the whole loop from home. So
+  // the diversion must fire the moment the walk touches the entrance, NOT gated on a
+  // pre-move hasCircuited flag. That flag is only set AFTER the move (apply.js), so gating
+  // on it made the peg completing its lap sail past the entrance instead of turning in.
+  // (Backward card-4 is excluded by `fwd`; it can flag the circuit but never diverts.)
+  if (peg.location === entrance && fwd) { divert(); return seq; }
   for (let i = 1; i <= 30; i++) {
     const ni = fwd ? (idx + i) % LOOP.length : (idx - i + LOOP.length) % LOOP.length;
     const hole = LOOP[ni];
-    if (hole === entrance && fwd && eligible) { seq.push(hole); divert(); break; }
+    if (hole === entrance && fwd) { seq.push(hole); divert(); break; }
     seq.push(hole);
     if (full && fwd && hole === home) break;     // when the safe zone is full, home is terminal
   }
