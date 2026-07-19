@@ -247,11 +247,24 @@ function kickTurn() {
 // step) and it cancels any lingering bot-move timer, so the next seat runs exactly once.
 function afterResolve() {
   syncState();
-  render();          // cosmetic hop plays here; the turn is ALREADY rotated in the engine
+  render();          // cosmetic hop STARTS here; the turn is ALREADY rotated in the engine
   updateUI();
   syncCardDom();
   clearTimeout(_turnTimer);
-  _turnTimer = setTimeout(kickTurn, NEXT_TURN_MS);
+  // Pace the NEXT seat to begin only AFTER this seat's hop animation finishes, so
+  // seats never animate on top of each other (bots all moving at once). This is
+  // VISUAL pacing only — the turn already rotated in the engine, so a missed/late
+  // animation callback can never corrupt the turn. A fallback timer guarantees
+  // play never stalls even if the renderer never reports the animation done.
+  const tok = _turnToken;
+  let advanced = false;
+  const nextSeat = () => { if (advanced || tok !== _turnToken) return; advanced = true; kickTurn(); };
+  if (typeof window.waitForAnimations === 'function') {
+    try { window.waitForAnimations(nextSeat); } catch (_) { /* fall through to the timer */ }
+    _turnTimer = setTimeout(nextSeat, 3000);       // hard cap so a lost callback can't hang the game
+  } else {
+    _turnTimer = setTimeout(nextSeat, NEXT_TURN_MS);
+  }
 }
 
 // ── public: draw a card ───────────────────────────────────────────────────────────────────────────
