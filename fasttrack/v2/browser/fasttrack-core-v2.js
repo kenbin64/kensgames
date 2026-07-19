@@ -82,6 +82,11 @@ let _hasReplay = false;     // true when the current drawn card grants a replay 
 // delta, which both suppresses re-broadcast and bypasses the "is it my seat" origination guard.
 let _mpClient = null;       // the KGMultiplayer instance (set by the renderer via setMultiplayerClient)
 let _applying = false;      // true while applyRemoteAction is replaying a peer's delta
+// Monotonic count of applied deltas (draw/move/pass), identical on every client because all apply
+// the same ordered deltas. It gates the host's periodic full-state snapshot: a snapshot only
+// applies when it is AHEAD of us (a genuine catch-up / late-join), never to REVERT a client that
+// is momentarily ahead of the host — the cause of the mid-game state jitter over the socket.
+let _appliedCount = 0;
 
 // ── build the cosmetic layer once, from the roster ────────────────────────────────────────────────
 function buildDeco(playerDescs) {
@@ -288,7 +293,7 @@ function drawCard() {
   if (!_applying && _isMpMode() && !_canDrive(turnPointer())) return;   // MP: only the seat's driver draws
   const tok = _turnToken;
   if (typeof window.dismissYourTurnPopup === 'function') { try { window.dismissYourTurnPopup(); } catch (_) {} }
-  engineDraw(_engine);                    // engine draws + flips to the play phase
+  engineDraw(_engine); _appliedCount++;   // engine draws + flips to the play phase (count the delta)
   syncState(); syncCardDom();
   if (typeof window.ManifoldAudio !== 'undefined' && window.ManifoldAudio) {
     try { window.ManifoldAudio.playCardDraw(); } catch (_) {}
@@ -325,7 +330,7 @@ function executeMove(moveIdx) {
   window._pendingHopAnim2 = hints.secondary;
   state.turn.set('validMoves', []);      // clear immediately so the UI can't double-commit
   _v2Moves = [];
-  playMove(_engine, R, m);               // <-- applies the move AND advances the pointer, synchronously
+  playMove(_engine, R, m); _appliedCount++;   // applies the move AND advances the pointer, synchronously (count the delta)
   assertAdvance(before, turnPointer(), _hasReplay);   // pointer moved by exactly 0 (replay) or +1
   _log(`seat ${player} played ${m.type}${_engine.winner != null ? ' (WIN)' : ` -> pointer ${turnPointer()}`}`);
   afterResolve();
@@ -338,7 +343,7 @@ function passTurn(reason) {
   if (!_applying) _broadcast('pass', { reason });      // MP: relay so all clients forfeit in lockstep
   const player = _engine.turn.current;
   const before = turnPointer();
-  forfeit(_engine, R);                    // discards the card and resolves (redraw cards still redraw)
+  forfeit(_engine, R); _appliedCount++;   // discards the card and resolves (redraw cards still redraw); count the delta
   assertAdvance(before, turnPointer(), _hasReplay);
   state.turn.set('validMoves', []);
   _v2Moves = [];
@@ -573,6 +578,7 @@ function initGame(playerCount = 2, config = {}) {
     seed,
     firstPlayer: firstPlayer < 0 ? 0 : firstPlayer,
   });
+  _appliedCount = 0;                       // fresh game → no deltas applied yet
   // rebuild board+holes tables once (holes are static; board updates every sync).
   seedHoleTable();
   syncState();
@@ -608,10 +614,15 @@ function seedHoleTable() {
 }
 
 // ── multiplayer snapshot hooks (minimal; MP transport is Phase 3) ─────────────────────────────────
-function getStateSnapshot() { return JSON.parse(JSON.stringify({ engine: _engine, deco: _deco, config: _config })); }
+function getStateSnapshot() { return JSON.parse(JSON.stringify({ engine: _engine, deco: _deco, config: _config, applied: _appliedCount })); }
 function applyStateSnapshot(snap) {
   if (!snap || !snap.engine) return;
+  // Only adopt a snapshot that is AHEAD of us (a catch-up after a missed delta, or a late-join with
+  // no engine yet). A snapshot at or behind our applied-delta count is stale — applying it would
+  // REVERT a client that is momentarily ahead of the host and cause the mid-game jitter. Ignore it.
+  if (_engine && snap.applied != null && snap.applied <= _appliedCount) return;
   _engine = snap.engine; _deco = snap.deco; _config = snap.config || _config;
+  _appliedCount = (snap.applied != null) ? snap.applied : _appliedCount;
   syncState(); updateUI(); syncCardDom(); render();
 }
 
