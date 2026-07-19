@@ -5,7 +5,7 @@
 // non-fast-track-move loss cascade), and detect the win. PURE state mutation, no DOM, no render.
 // Ported from the proven placePeg/bumpOccupant/executeMove. Each move is a delta; apply replays
 // one delta onto the state.
-import { homeId, holdId, safeEntranceId, holeRole, HOLDING_SIZE, SAFE_SIZE } from './board.js';
+import { homeId, holdId, safeEntranceId, holeRole, HOLDING_SIZE, SAFE_SIZE, ftId, sideLeftId, outerId } from './board.js';
 import { pegsOf, occupantOf, pegByPlayerN } from './state.js';
 
 function firstOpenHold(state, player) {
@@ -78,11 +78,33 @@ export function applyMove(state, R, move) {
   checkWin(state, p);
 }
 
-// WIN_CONDITION: four own pegs in the safe zone and the fifth on the home/winner hole, that peg
-// having completed a circuit (WIN_CIRCUIT_REQUIRED, so the peg that starts on home cannot win instantly).
-export function checkWin(state, p) {
+// The HOME STRETCH (run-in): the player's own ft-{p}, down the side-left holes, along the outer
+// holes through the safe-zone entrance (outer-{p}-2), on to the win hole home-{p}. This is the ONLY
+// legitimate approach to home. The side-right holes (the exit side, immediately AFTER home, where a
+// peg sits just after leaving holding) are deliberately excluded — sitting there is not a run-in.
+export function homeStretchHoles(p) {
+  return [ftId(p), sideLeftId(p, 1), sideLeftId(p, 2), sideLeftId(p, 3), sideLeftId(p, 4),
+    outerId(p, 0), outerId(p, 1), outerId(p, 2), outerId(p, 3), homeId(p)];
+}
+
+// CROWN: sits on home-{p} once all four safe holes are filled AND the final (circuited) peg is on
+// the home stretch — the player is one exact landing from the win. Computed live from the board, so
+// it appears the moment that peg enters the stretch and CLEARS ITSELF the instant the peg is cut
+// back to holding or moves off the stretch (Ken's rule — no stored flag to go stale). The crown MUST
+// be present to award the win.
+export function crownPresent(state, p) {
   const inSafe = pegsOf(state, p).filter((pg) => pg.location.startsWith(`safe-${p}-`)).length;
+  if (inSafe < SAFE_SIZE) return false;
+  const stretch = new Set(homeStretchHoles(p));
+  return pegsOf(state, p).some((pg) => pg.hasCircuited && stretch.has(pg.location));
+}
+
+// WIN_CONDITION: four own pegs in the safe zone and the fifth landed EXACTLY on the home/winner hole
+// (having completed a circuit, WIN_CIRCUIT_REQUIRED, so the peg that starts on home cannot win
+// instantly). The crown must be present — which, being the final peg on the home stretch, it is by
+// the time that peg reaches home; the gate rejects any peg that arrived at home some other way.
+export function checkWin(state, p) {
   const onHome = pegsOf(state, p).some((pg) => pg.location === homeId(p) && pg.hasCircuited);
-  if (inSafe >= SAFE_SIZE && onHome) state.winner = p;
+  if (onHome && crownPresent(state, p)) state.winner = p;
   return state.winner;
 }

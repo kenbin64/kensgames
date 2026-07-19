@@ -2,6 +2,29 @@
 <html lang="en">
 
 <head>
+  <!-- DEV error catcher (v2 bring-up): surface any init/module error on the black
+       screen so we can see it without DevTools. Remove once v2 is stable. -->
+  <script>
+    (function () {
+      function show(kind, msg) {
+        var b = document.getElementById('__ftv2err');
+        if (!b) {
+          b = document.createElement('div'); b.id = '__ftv2err';
+          b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999999;max-height:60vh;overflow:auto;'
+            + 'background:#2a0000;color:#ffd7d7;font:12px/1.5 ui-monospace,monospace;padding:10px 14px;'
+            + 'border-bottom:2px solid #ff5555;white-space:pre-wrap;';
+          (document.body || document.documentElement).appendChild(b);
+        }
+        b.textContent += '[' + kind + '] ' + msg + '\n';
+      }
+      window.addEventListener('error', function (e) {
+        show('error', (e.message || e.error) + (e.filename ? '  @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; show('promise', (r && (r.stack || r.message)) || String(r));
+      });
+    })();
+  </script>
   <script src="/js/session-identity.js"></script>
   <script src="/js/kg-game-cache.js"></script>
   <meta charset="UTF-8">
@@ -320,7 +343,7 @@
        window.FastTrackCore exists in time for init3D. The legacy fasttrack-game-core.js and the
        manifold alternate engine are intentionally NOT loaded here (they would reclaim
        window.initGame / window.FastTrackCore). -->
-  <script type="module" src="v2/browser/fasttrack-core-v2.js?v=20260704e"></script>
+  <script type="module" src="v2/browser/fasttrack-core-v2.js?v=20260718j"></script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
@@ -340,7 +363,7 @@
   <script src="fasttrack-quality.js?v=20260605a"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260605a"></script>
+  <script src="fasttrack-3d.js?v=20260718i"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>

@@ -15,6 +15,7 @@
 import rulesDoc from './rules-data.js';
 import { loadRules } from '../engine/rules.js';
 import { createState, occupantOf } from '../engine/state.js';
+import { crownPresent } from '../engine/apply.js';
 import { drawCard as engineDraw, legalMoves, playMove, forfeit } from '../engine/turn.js';
 import { buildPlayersList, buildBoardEntries, translateMoves, hopHints } from './project.js';
 import { cardFace, cardDescription, toRenderHole } from './holemap.js';
@@ -72,6 +73,16 @@ let _turnTimer = null;      // the SINGLE pending turn-driver timer — never mo
 let _turnToken = 0;         // bumped when a new seat's turn begins; stale scheduled callbacks bail
 let _hasReplay = false;     // true when the current drawn card grants a replay (extra turn)
 
+// ── multiplayer (deterministic lockstep over the relay) ───────────────────────────────────────────
+// The engine is a pure function of seed + ordered deltas, so MP is: every client runs the same
+// engine and applies the same draw/move/pass deltas. The turn pointer advances INSIDE playMove/
+// forfeit, so there is no separate turn-rotation message — applying the same move rotates every
+// client identically. Only the seat's owner (or the host, for a bot seat) originates + broadcasts a
+// delta; everyone else applies what they receive. `_applying` is true while replaying a received
+// delta, which both suppresses re-broadcast and bypasses the "is it my seat" origination guard.
+let _mpClient = null;       // the KGMultiplayer instance (set by the renderer via setMultiplayerClient)
+let _applying = false;      // true while applyRemoteAction is replaying a peer's delta
+
 // ── build the cosmetic layer once, from the roster ────────────────────────────────────────────────
 function buildDeco(playerDescs) {
   const names = [], avatars = [], colors = [], isBot = [], userIds = [], pegMeta = {};
@@ -99,6 +110,9 @@ function syncState() {
   state.deck.set('currentCard', cardFace(_engine.turn.card));
   state.deck.set('deckCount', _engine.deck.drawPile.length);
   state.meta.set('winner', _engine.winner);
+  // CROWN per player: computed live from the engine so the renderer can place a crown on home-{p}
+  // the moment the final peg reaches the home stretch, and drop it if that peg is cut or leaves.
+  state.meta.set('crowns', _engine.players.map((_pl, p) => crownPresent(_engine, p)));
 }
 
 function render() { if (typeof _renderBoard === 'function') _renderBoard(); }
@@ -236,7 +250,8 @@ function kickTurn() {
   const cp = currentPlayer();
   _log(`turn -> pointer ${seat} of [${activeOrder().join(',')}] (${cp.name}, ${cp.isAI ? 'bot' : 'human'})`);
   if (cp.isAI) {
-    schedule(() => botTurn(seat), BOT_THINK_MS, tok);
+    // MP: exactly ONE client drives a bot seat — the host — and its draw/move relay to peers.
+    if (!_isMpMode() || _isHost()) schedule(() => botTurn(seat), BOT_THINK_MS, tok);
   } else if (typeof window.showYourTurnPopup === 'function') {
     try { window.showYourTurnPopup(cp.name, _deco.colors[seat]); } catch (_) {}
   }
@@ -247,16 +262,30 @@ function kickTurn() {
 // step) and it cancels any lingering bot-move timer, so the next seat runs exactly once.
 function afterResolve() {
   syncState();
-  render();          // cosmetic hop plays here; the turn is ALREADY rotated in the engine
+  render();          // cosmetic hop STARTS here; the turn is ALREADY rotated in the engine
   updateUI();
   syncCardDom();
   clearTimeout(_turnTimer);
-  _turnTimer = setTimeout(kickTurn, NEXT_TURN_MS);
+  // Pace the NEXT seat to begin only AFTER this seat's hop animation finishes, so
+  // seats never animate on top of each other (bots all moving at once). This is
+  // VISUAL pacing only — the turn already rotated in the engine, so a missed/late
+  // animation callback can never corrupt the turn. A fallback timer guarantees
+  // play never stalls even if the renderer never reports the animation done.
+  const tok = _turnToken;
+  let advanced = false;
+  const nextSeat = () => { if (advanced || tok !== _turnToken) return; advanced = true; kickTurn(); };
+  if (typeof window.waitForAnimations === 'function') {
+    try { window.waitForAnimations(nextSeat); } catch (_) { /* fall through to the timer */ }
+    _turnTimer = setTimeout(nextSeat, 3000);       // hard cap so a lost callback can't hang the game
+  } else {
+    _turnTimer = setTimeout(nextSeat, NEXT_TURN_MS);
+  }
 }
 
 // ── public: draw a card ───────────────────────────────────────────────────────────────────────────
 function drawCard() {
   if (!_engine || _engine.turn.phase !== 'draw' || _engine.winner != null) return;
+  if (!_applying && _isMpMode() && !_canDrive(turnPointer())) return;   // MP: only the seat's driver draws
   const tok = _turnToken;
   if (typeof window.dismissYourTurnPopup === 'function') { try { window.dismissYourTurnPopup(); } catch (_) {} }
   engineDraw(_engine);                    // engine draws + flips to the play phase
@@ -271,10 +300,11 @@ function drawCard() {
   _log(`draw pointer ${_engine.turn.current}: ${_engine.turn.card ? _engine.turn.card.rank : '?'} (${vm.length} legal, replay=${_hasReplay})`);
   // A dead card for a HUMAN auto-passes after a beat (a bot's dead card is handled in botAct). The
   // engine's forfeit still grants a redraw for redraw cards.
-  if (vm.length === 0 && !currentPlayer().isAI) {
+  if (vm.length === 0 && !currentPlayer().isAI && !_applying) {
     schedule(() => { if (_engine.turn.phase === 'play' && _engine.turn.card) passTurn('human-no-move'); }, NO_MOVE_MS, tok);
   }
   // exactly-one-move auto-commit is handled by the renderer's move cycle.
+  if (!_applying) _broadcast('draw', { card: _engine.turn.card });   // MP: relay the (deterministic) draw
 }
 
 // ── public: play validMoves[idx] ─────────────────────────────────────────────────────────────────
@@ -283,8 +313,10 @@ function drawCard() {
 // call a no-op, so the auto-commit and the bot timer can never both advance the turn.
 function executeMove(moveIdx) {
   if (!_engine || _engine.turn.phase !== 'play') return;
+  if (!_applying && _isMpMode() && !_canDrive(turnPointer())) return;   // MP: only the seat's driver moves
   const m = _v2Moves[moveIdx];
   if (!m) return;
+  if (!_applying) _broadcast('move', { move: m });    // MP: relay the exact chosen move (a choice, not deterministic)
   const player = _engine.turn.current;
   const before = turnPointer();
   // stage the cosmetic hop BEFORE applying, so the renderer arcs along the path.
@@ -302,6 +334,8 @@ function executeMove(moveIdx) {
 // ── public: pass / forfeit the current card ───────────────────────────────────────────────────────
 function passTurn(reason) {
   if (!_engine || _engine.turn.phase !== 'play') return;
+  if (!_applying && _isMpMode() && !_canDrive(turnPointer())) return;   // MP: only the seat's driver passes
+  if (!_applying) _broadcast('pass', { reason });      // MP: relay so all clients forfeit in lockstep
   const player = _engine.turn.current;
   const before = turnPointer();
   forfeit(_engine, R);                    // discards the card and resolves (redraw cards still redraw)
@@ -384,6 +418,112 @@ function showWinner() {
 }
 
 // ── init / restart ────────────────────────────────────────────────────────────────────────────────
+// ── multiplayer: helpers, relay, and the receive path ─────────────────────────────────────────────
+function _isMpMode() {
+  if (_mpClient) return true;
+  const m = state.meta.get('gameMode');
+  return m === 'private' || m === 'public' || m === 'multiplayer';
+}
+function _myUid() {
+  const m = state.meta.get('myUserId');
+  if (m != null) return String(m);
+  if (_mpClient && _mpClient.userId != null) return String(_mpClient.userId);
+  return null;
+}
+function _seatUid(seat) {
+  const u = _deco && _deco.userIds ? _deco.userIds[seat] : null;
+  return u != null ? String(u) : null;
+}
+function _humanCount() { return _engine ? _engine.players.filter((p) => !p.isAI).length : 0; }
+function _isHost() {
+  if (!_mpClient) return true;              // no live client → sole authority (solo / same-screen)
+  if (!_mpClient.session) return true;      // attached but no session yet → own authority
+  if (_humanCount() <= 1) return true;      // only one human → drive your own bots
+  return !!_mpClient.isHost;                // else defer to the server's host flag
+}
+// Who may ORIGINATE the current seat's action: its human owner, or the host for a bot seat.
+function _canDrive(seat) {
+  if (!_isMpMode()) return true;            // solo / same-screen: this client drives every seat
+  const su = _seatUid(seat);
+  if (su != null && su === _myUid()) return true;
+  const cp = _engine.players[seat];
+  return !!(cp && cp.isAI && _isHost());
+}
+
+// Relay one delta to peers. No-op while replaying a received delta (never echo) or outside MP.
+function _broadcast(action, payload) {
+  if (_applying || !_isMpMode() || !_mpClient) return;
+  try { _mpClient.sendAction(action, payload || {}); }
+  catch (e) { console.warn('[FT v2 mp] broadcast failed:', action, e); }
+}
+
+// Apply a peer's delta onto our identical engine. draw/pass are deterministic (the seeded deck);
+// move carries the exact chosen engine move. `_applying` suppresses re-broadcast during replay and
+// lets the origination guard through so the delta always applies regardless of whose seat it is.
+function applyRemoteAction(action, payload) {
+  if (!action || !_engine) return;
+  _applying = true;
+  try {
+    if (action === 'draw') {
+      drawCard();
+      const got = _engine.turn.card, want = payload && payload.card;
+      if (want && got && got.rank !== want.rank) {
+        console.warn('[FT v2 mp] DESYNC: drew', got.rank, 'but peer sent', want.rank);
+      }
+    } else if (action === 'move') {
+      const move = payload && payload.move;
+      if (move) { _v2Moves = [move]; state.turn.set('validMoves', [move]); executeMove(0); }
+    } else if (action === 'pass') {
+      passTurn((payload && payload.reason) || 'remote');
+    }
+  } finally { _applying = false; }
+}
+
+function setMultiplayerClient(client) {
+  _mpClient = client || null;
+  if (client) {
+    try {
+      const cur = state.meta.get('gameMode');
+      if (cur !== 'private' && cur !== 'public' && cur !== 'multiplayer') state.meta.set('gameMode', 'multiplayer');
+    } catch (_) {}
+  }
+}
+function setMyUserId(userId) { state.meta.set('myUserId', userId != null ? String(userId) : null); }
+
+// Live roster refresh from the lobby: map sessionPlayers (sorted by slot) onto our seats. A refresh
+// must never flip an established human seat into a bot (only an explicit relinquish does that).
+function updateSessionRoster(sessionPlayers) {
+  if (!_deco || !_engine || !Array.isArray(sessionPlayers) || sessionPlayers.length < 2) return;
+  const sorted = sessionPlayers.slice().sort((a, b) => {
+    const sa = Number.isFinite(a && a.slot) ? a.slot : 1e9;
+    const sb = Number.isFinite(b && b.slot) ? b.slot : 1e9;
+    return sa - sb;
+  });
+  const n = Math.min(_engine.players.length, sorted.length);
+  for (let i = 0; i < n; i++) {
+    const sp = sorted[i]; if (!sp) continue;
+    if (sp.user_id != null) _deco.userIds[i] = String(sp.user_id);
+    if (!(_deco.isBot[i] === false && !!sp.is_ai)) {   // never demote a human → bot on a routine refresh
+      _deco.isBot[i] = !!sp.is_ai;
+      _engine.players[i].isAI = !!sp.is_ai;
+    }
+    if (sp.username || sp.name) { _deco.names[i] = sp.username || sp.name; _engine.players[i].name = _deco.names[i]; }
+    const av = sp.avatar && (sp.avatar.emoji || sp.avatar);
+    if (av || sp.avatar_id) _deco.avatars[i] = av || sp.avatar_id;
+  }
+  syncState(); updateUI();
+}
+
+// One deterministic draw (mulberry32) so every client opens on the SAME seat in MP — replaces the
+// non-deterministic Math.random() that would desync lockstep at seat zero.
+function _seededPick(seed, n) {
+  let t = (seed + 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  const r = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return Math.floor(r * n);
+}
+
 function rosterFromConfig(playerCount, config) {
   const count = Math.max(2, Math.min(6, config.sessionPlayers ? config.sessionPlayers.length : (playerCount || 2)));
   const sp = config.sessionPlayers || null;
@@ -411,8 +551,22 @@ function initGame(playerCount = 2, config = {}) {
   _deco = buildDeco(descs);
   const seed = (config.sessionSeed && hashSeed(config.sessionSeed))
     || (config.deckSeed && hashSeed(config.deckSeed)) || 1 + descs.length;
-  const firstPlayer = Number.isInteger(config.startingPlayer) ? config.startingPlayer
-    : descs.findIndex((d) => !d.isAI);   // solo/first human opens; -1 (all bots) -> 0 below
+  // Starting seat (user_directive_2026-07-18d): an explicit override wins; else a
+  // REPLAY opens on the previous winner (one-shot, matched by name); else the FIRST
+  // game of the session opens on a uniformly RANDOM seat among ALL players.
+  let firstPlayer = Number.isInteger(config.startingPlayer) ? config.startingPlayer : -1;
+  if (firstPlayer < 0) {
+    let rematch = null;
+    try { rematch = localStorage.getItem('ft.rematchWinnerName'); } catch (_) {}
+    try { localStorage.removeItem('ft.rematchWinnerName'); } catch (_) {}
+    if (rematch) {
+      const target = String(rematch).trim().toLowerCase();
+      firstPlayer = descs.findIndex((d) => String(_deco.names[d.index] || '').trim().toLowerCase() === target);
+    }
+    // MP must be deterministic: derive the opening seat from the SHARED session seed so every client
+    // agrees (Math.random would desync lockstep at seat zero). Solo keeps a fresh pick each game.
+    if (firstPlayer < 0) firstPlayer = config.sessionSeed ? _seededPick(seed, descs.length) : Math.floor(Math.random() * descs.length);
+  }
   _engine = createState({
     rules: R,
     players: descs.map((d) => ({ name: _deco.names[d.index], isAI: d.isAI, color: _deco.colors[d.index] })),
@@ -476,6 +630,11 @@ const FastTrackCore = {
   setRenderer(fn) { _renderBoard = fn; },
   getStateSnapshot,
   applyStateSnapshot,
+  // multiplayer: the renderer's socket wiring (fasttrack-3d.js) calls these
+  setMultiplayerClient,
+  setMyUserId,
+  updateSessionRoster,
+  applyRemoteAction,
   // read-only helpers a few UI paths reference
   getHoleType,
   PLAYER_COLORS,
@@ -483,6 +642,14 @@ const FastTrackCore = {
 };
 
 window.FastTrackCore = FastTrackCore;
+// The legacy renderer (fasttrack-3d.js) is a NON-module script that reads several
+// core values as bare globals via the shared script scope. This adapter is an ES
+// MODULE, so its bindings are module-scoped and invisible to those bare refs —
+// which threw "state is not defined" and blacked out the whole scene. Re-publish
+// the ones the renderer reads bare onto window so the shared-global contract holds.
+window.state = state;
+window.getHoleType = getHoleType;
+window.PLAYER_COLORS = PLAYER_COLORS;
 window.initGame = initGame;
 window.drawCard = drawCard;
 window.executeMove = executeMove;

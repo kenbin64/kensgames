@@ -53,11 +53,17 @@ ok(movesOf(s, '3').filter((m) => m.from === 'home-0').length === 0, 'cannot land
 s = fresh(); pegByPlayerN(s, 0, 0).location = 'side-right-0-2';
 ok(movesOf(s, '3').filter((m) => m.from === 'home-0').length === 0, 'cannot pass an own peg in the path (side-right-0-2 occupied)');
 
-console.log('\n== perimeter: safe-zone diversion only after a circuit ==');
-s = fresh(); const lp = pegByPlayerN(s, 0, 4); lp.location = 'outer-0-1';
-ok(movesOf(s, '2').some((m) => m.from === 'outer-0-1' && m.dest === 'outer-0-3'), 'not yet circuited: a 2 stays on the track to outer-0-3');
-lp.hasCircuited = true;
-ok(movesOf(s, '2').some((m) => m.from === 'outer-0-1' && m.dest === 'safe-0-1'), 'after a circuit: a 2 diverts at the entrance into safe-0-1');
+console.log('\n== perimeter: reaching your own entrance diverts into the safe zone (circuit completes) ==');
+// A peg only ever reaches outer-0-1 (index 6) after travelling ~81 of the 84 loop holes from
+// home, so arriving at its own entrance ALWAYS completes the circuit and MUST divert. It may
+// not sail past onto the main track (Ken's safe-zone bug). Note hasCircuited is left false here
+// on purpose: the flag is set only AFTER a move whose path includes the entrance, so gating the
+// divert on it would be one move too late.
+s = fresh(); pegByPlayerN(s, 0, 0).location = 'outer-2-1';   // mid-board, far from player 0's OWN entrance
+ok(movesOf(s, '2').some((m) => m.from === 'outer-2-1' && m.dest === 'outer-2-3'), 'mid-board: a 2 stays on the track (outer-2-3) — no divert at another wedge\'s entrance');
+s = fresh(); pegByPlayerN(s, 0, 4).location = 'outer-0-1';   // one hop before player 0's own entrance (outer-0-2)
+ok(movesOf(s, '2').some((m) => m.from === 'outer-0-1' && m.dest === 'safe-0-1'), 'reaching your own entrance: a 2 diverts into safe-0-1 (completing the circuit this move)');
+ok(!movesOf(s, '2').some((m) => m.from === 'outer-0-1' && m.dest === 'outer-0-3'), 'reaching your own entrance: it may NOT sail past onto outer-0-3');
 
 console.log('\n== card 4 goes backward ==');
 s = fresh();
@@ -82,14 +88,16 @@ ok(movesOf(s, '4').filter((m) => m.type === 'exitFastTrack').length === 0, 'card
 ok(movesOf(s, '4').some((m) => m.type === 'move' && m.from === 'ft-0' && m.dest === 'side-right-5-1'), 'card 4 from ft-0 walks backward to side-right-5-1');
 
 console.log('\n== card 7: single-peg-7 and a+b=7 splits ==');
+// Park both pegs mid-board in EMPTY wedges (2 and 3 have no pegs in a 2-player game) so the
+// split mechanics are tested without a safe-zone divert or a home-hole cut skewing the paths.
 s = fresh();
-pegByPlayerN(s, 0, 0).location = 'outer-0-1';
-pegByPlayerN(s, 0, 1).location = 'outer-1-1';
+pegByPlayerN(s, 0, 0).location = 'outer-2-1';
+pegByPlayerN(s, 0, 1).location = 'outer-3-1';
 pegByPlayerN(s, 0, 4).location = 'safe-0-1';   // move the home peg off the loop so it does not block
 const m7 = movesOf(s, '7');
-ok(m7.some((m) => m.type !== 'split' && m.from === 'outer-0-1' && m.steps === 7), 'one peg can take all 7 (outer-0-1 moves 7)');
+ok(m7.some((m) => m.type !== 'split' && m.from === 'outer-2-1' && m.steps === 7), 'one peg can take all 7 (outer-2-1 moves 7)');
 ok(m7.some((m) => m.type === 'split'), 'card 7 emits split moves');
-ok(m7.some((m) => m.type === 'split' && m.from === 'outer-0-1' && m.a === 3 && m.from2 === 'outer-1-1' && m.b === 4), 'a 3+4 split across outer-0-1 and outer-1-1 exists');
+ok(m7.some((m) => m.type === 'split' && m.from === 'outer-2-1' && m.a === 3 && m.from2 === 'outer-3-1' && m.b === 4), 'a 3+4 split across outer-2-1 and outer-3-1 exists');
 ok(!m7.some((m) => (m.from && m.from.startsWith('hold-')) || (m.from2 && m.from2.startsWith('hold-'))), 'holding pegs never participate in a 7');
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
