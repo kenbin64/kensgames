@@ -2401,7 +2401,7 @@ async function init3D() {
 
   // Camera — vertical FOV widens automatically on narrow/portrait viewports
   // so the whole board stays in frame on phones.
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 6000);
+  camera = new THREE.PerspectiveCamera(45, (_viewSize().w / _viewSize().h) || 1, 1, 6000);
   fitVerticalFovToAspect(camera);
   camera.position.set(0, 480, 380);
   camera.lookAt(0, TABLE_HEIGHT, 0);
@@ -2415,7 +2415,7 @@ async function init3D() {
     alpha: false,
     stencil: false
   });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  { const v = _viewSize(); renderer.setSize(v.w, v.h); }
   renderer.setPixelRatio(Q.pixelRatio);
   // Void mode has no floor/walls to receive shadows — skip the 2048² shadow
   // pass and its per-frame cost. Weak tiers drop shadows even with a room.
@@ -5712,14 +5712,20 @@ function fitVerticalFovToAspect(cam) {
   cam.fov = Math.max(45, Math.min(80, minVFov));
 }
 
+// The board renders into #container, which CSS insets between the fixed header (deck)
+// and footer (controls) bars. Sizing to the container, not the whole window, keeps the
+// board entirely in the clear middle band, so a control bar can never cover a hole on any
+// screen size. Falls back to the window if the container isn't measurable yet.
+function _viewSize() {
+  const c = document.getElementById('container');
+  const w = (c && c.clientWidth) || window.innerWidth;
+  const h = (c && c.clientHeight) || window.innerHeight;
+  return { w, h };
+}
+
 function onWindowResize() {
   if (!renderer || !camera) return;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  // HR-6.2: UI controls float over the peripheries of the board.
-  // The renderer draws the FULL viewport — no reserved bottom/top
-  // void. Any letterbox at the bottom would violate the no-cover
-  // rule by leaving dead space where the board should be.
+  const { w, h } = _viewSize();
   renderer.setSize(w, h);
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, w, h);

@@ -3343,18 +3343,12 @@ textarea,
   cursor: not-allowed;
 }
 
-/* Card deck — pinned to the UPPER-LEFT, just under the player
-   header strip. The bottom row is now exclusively for peg buttons. */
+/* NOTE: the deck's authoritative styling is the "CARD PANEL / FIXED HEADER" block lower
+   in this file (later source order, so its !important wins). This older block no longer
+   positions the deck; it is kept minimal so the rules between here and there do not shift. */
 #panel-action {
   position: fixed !important;
-  top: 56px !important;
-  left: 12px !important;
-  right: auto !important;
-  bottom: auto !important;
   z-index: 230 !important;
-  width: auto !important;
-  max-width: 100px !important;
-  padding: 4px 6px !important;
   transform: none !important;
   background: transparent !important;
   border: 0 !important;
@@ -3789,43 +3783,62 @@ textarea,
 }
 
 /* ════════════════════════════════════════════════════════════════
-   CARD PANEL (user_directive_2026-05-18)
-   HARD RULE: buttons/forms must never cover other buttons or forms.
-   The player panel lives top-left and grows downward with each
-   added player row, so the card panel was anchored at top:140
-   and overlapped it. Relocate the card to the TOP-RIGHT corner,
-   tucked under the icon strip (music/leave/gear/cam at top:12,
-   ~36px tall), so it can never overlap the player panel.
+   CARD PANEL / FIXED HEADER DECK  (user_directive_2026-07-18, supersedes 2026-05-18)
+   The deck lives in the fixed header band on EVERY screen size, so shrinking the
+   screen can never move or hide it. It is a horizontal row pinned to the header,
+   right of the turn status and left of the icon strip. The board renders only in
+   #container, which is inset below this header (see the last block of this file and
+   _viewSize in fasttrack-3d.js), so the deck can never cover a board hole.
 
-   Also: only the word "DRAW" appears, painted ON the card itself
-   via ::after. The legacy #card-info text label and #draw-btn
-   button are hidden — clicking the card itself draws.
+   Only the word "DRAW" appears, painted ON the card itself via ::after. The legacy
+   #card-info label and #draw-btn button stay hidden: clicking the card draws. The
+   Pass button sits in the same header row. Card is sized to fit the header height.
    ════════════════════════════════════════════════════════════════ */
 #panel-action {
   position: fixed !important;
-  top: 56px !important;
-  /* clears 36px icon row + 8px gap */
-  right: 12px !important;
+  top: 0 !important;
+  right: 190px !important;   /* clears the 4-icon strip (music/camera/leave/settings) top-right on desktop */
   left: auto !important;
   bottom: auto !important;
+  height: var(--ft-header-h) !important;
   z-index: 230 !important;
   width: auto !important;
-  max-width: none !important;
+  max-width: 62vw !important;
   padding: 0 !important;
   margin: 0 !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   transform: none !important;
-  display: block !important;
-  /* don't lay out hidden children */
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 7px !important;
 }
 
-/* Hide the standalone label/button — card itself is the draw control. */
+/* Below 760px the icon strip collapses to a single hamburger, so the deck only needs
+   to clear that: pull it back to the far right, leaving the hamburger its corner. */
+@media (max-width: 760px) {
+  #panel-action { right: 58px !important; }
+}
+
+/* Hide the standalone label/button: the card itself is the draw control. */
 #panel-action #card-label,
 #panel-action #card-info,
 #panel-action #draw-btn {
   display: none !important;
+}
+
+/* Pass button sits in the header row, compact so the whole deck fits the header height. */
+#panel-action #btn-pass-turn {
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  font-size: 0.8em !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: center !important;
 }
 
 #panel-action #card-area {
@@ -3836,8 +3849,8 @@ textarea,
   box-shadow: none !important;
   border-radius: 8px !important;
   display: block !important;
-  width: 60px !important;
-  height: 84px !important;
+  width: 40px !important;
+  height: 56px !important;
 }
 
 #panel-action #current-card {
@@ -3845,32 +3858,32 @@ textarea,
   padding: 0 !important;
   line-height: 0 !important;
   font-size: 0 !important;
-  width: 60px !important;
-  height: 84px !important;
+  width: 40px !important;
+  height: 56px !important;
   display: block !important;
 }
 
 #panel-action #current-card .card-back,
 #panel-action #current-card .card-face {
-  width: 60px !important;
-  height: 84px !important;
-  min-width: 60px !important;
-  min-height: 84px !important;
-  max-width: 60px !important;
-  max-height: 84px !important;
-  padding: 4px 4px !important;
+  width: 40px !important;
+  height: 56px !important;
+  min-width: 40px !important;
+  min-height: 56px !important;
+  max-width: 40px !important;
+  max-height: 56px !important;
+  padding: 3px !important;
   border-width: 2px !important;
-  border-radius: 6px !important;
+  border-radius: 5px !important;
   box-sizing: border-box !important;
 }
 
 #panel-action #current-card .card-face .cf-rank {
-  font-size: 22px !important;
+  font-size: 16px !important;
   line-height: 1 !important;
 }
 
 #panel-action #current-card .card-face .cf-suit {
-  font-size: 18px !important;
+  font-size: 12px !important;
   line-height: 1 !important;
 }
 
@@ -3889,8 +3902,8 @@ textarea,
   justify-content: center;
   font-family: 'Rajdhani', 'Segoe UI', sans-serif;
   font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  letter-spacing: 0.08em;
   color: #fff8d8;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(255, 214, 51, 0.55);
   pointer-events: none;
@@ -4001,3 +4014,52 @@ textarea,
     padding: 6px 8px 6px 12px;
   }
 }
+
+/* ===========================================================================
+   FIXED HEADER (deck) + FOOTER (controls): the board renders ONLY between them.
+   user_directive_2026-07-18: the deck of cards lives in a fixed header on EVERY
+   screen size, and the renderer sizes to #container (see _viewSize in fasttrack-3d.js).
+   #container is inset between these two bars, so no control panel can EVER cover a
+   board hole (the reason phones were unplayable). This block is intentionally last so
+   it wins the cascade over the older float-over-the-peripheries rules above.
+   =========================================================================== */
+:root { --ft-header-h: 66px; --ft-footer-h: 62px; }
+
+#container { inset: auto; top: var(--ft-header-h); bottom: var(--ft-footer-h); left: 0; right: 0; }
+
+#ft-header-bg {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--ft-header-h); z-index: 40;
+  pointer-events: none; background: rgba(8, 16, 30, 0.62);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+#ft-footer-bg {
+  position: fixed; top: auto; left: 0; right: 0; bottom: 0; height: var(--ft-footer-h); z-index: 10;
+  pointer-events: none; background: rgba(8, 16, 30, 0.6);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* player / turn status: left of the header */
+#panel-players {
+  position: fixed; top: 0; left: 0; right: auto; bottom: auto; height: var(--ft-header-h);
+  max-width: 54vw; transform: none; border: none; border-radius: 0;
+  background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  display: flex; align-items: center; gap: 8px; padding: 0 10px; z-index: 45; overflow: hidden;
+}
+#panel-players:hover { transform: none; }
+
+/* show the turn status in the header (an older rule hid #game-status for the previous layout) */
+#panel-players #game-status {
+  display: block !important; border-bottom: none !important;
+  padding: 0 !important; margin: 0 !important; white-space: nowrap !important;
+}
+
+/* the DECK itself (position + card + buttons) is defined in the "Card deck" block above,
+   which keeps the !important it needs to win the cascade. Nothing for it here on purpose. */
+
+/* keep the move-choices panel and camera buttons out of the board, tucked just above the footer */
+#panel-options { bottom: calc(var(--ft-footer-h) + 6px); left: 8px; max-height: 38vh; transform: none; }
+#panel-cam { bottom: calc(var(--ft-footer-h) + 6px); right: 8px; top: auto; transform: none; }
+
+/* narrower phones: the peg bar wraps to two rows, so the footer band grows */
+@media (max-width: 560px) { :root { --ft-header-h: 58px; --ft-footer-h: 94px; } }
