@@ -5,9 +5,9 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { loadRules } from '../engine/rules.js';
-import { createState, pegByPlayerN, pegsOf, occupantOf } from '../engine/state.js';
-import { applyMove } from '../engine/apply.js';
+import { loadRules } from '../logic/rules.js';
+import { createState, pegByPlayerN, pegsOf, occupantOf } from '../logic/state.js';
+import { applyMove } from '../logic/apply.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const doc = JSON.parse(readFileSync(join(here, '..', '..', 'fasttrack.rules.json'), 'utf8'));

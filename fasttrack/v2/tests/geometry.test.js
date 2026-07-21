@@ -4,7 +4,7 @@
 // wedge, so: position 1 = ft, position 8 = the safe-zone entrance (the semantic outer-{p}-2),
 // position 10 = home. This is the mapping the data layer uses; the engine speaks semantic.
 // Run: node tests/geometry.test.js   (from fasttrack/v2)
-import { wedgeSegment, safeEntranceId, ftId, homeId, outerId } from '../engine/board.js';
+import { wedgeSegment, safeEntranceId, ftId, homeId, outerId } from '../logic/board.js';
 
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  PASS ' + n); } else { fail++; console.log('  FAIL ' + n); } };
