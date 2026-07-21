@@ -13,10 +13,10 @@
 // Loaded as an ES module (type="module"), which runs after parsing but BEFORE DOMContentLoaded, so
 // window.FastTrackCore exists in time for init3D's DOMContentLoaded handler.
 import rulesDoc from './rules-data.js';
-import { loadRules } from '../engine/rules.js';
-import { createState, occupantOf } from '../engine/state.js';
-import { crownPresent } from '../engine/apply.js';
-import { drawCard as engineDraw, legalMoves, playMove, forfeit } from '../engine/turn.js';
+import { loadRules } from '../logic/rules.js';
+import { createState, occupantOf } from '../logic/state.js';
+import { crownPresent } from '../logic/apply.js';
+import { drawCard as engineDraw, legalMoves, playMove, forfeit } from '../logic/turn.js';
 import { buildPlayersList, buildBoardEntries, translateMoves, hopHints } from './project.js';
 import { cardFace, cardDescription, toRenderHole } from './holemap.js';
 

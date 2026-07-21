@@ -13,9 +13,9 @@ import { spawn } from 'child_process';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { loadRules } from './engine/rules.js';
-import { createState } from './engine/state.js';
-import { drawCard, legalMoves, playMove, forfeit } from './engine/turn.js';
+import { loadRules } from './logic/rules.js';
+import { createState } from './logic/state.js';
+import { drawCard, legalMoves, playMove, forfeit } from './logic/turn.js';
 
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
