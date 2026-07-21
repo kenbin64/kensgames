@@ -518,6 +518,8 @@
     }
   </script>
   <script src="/js/multiplayer-client.js?v=20260507c"></script>
+  <script src="/js/substrates/presence_roster.js?v=20260720"></script>
+  <script src="/js/substrates/invite_lobby.js?v=20260720"></script>
   <!-- viewport-lock: no-scroll -->
   <script src="/js/substrates/multiplayer_panel.js?v=20260516a"></script>
   <script src="/js/substrates/game_setup.js?v=20260516a"></script>
@@ -589,6 +591,14 @@
         window.location.href = '/fasttrack/3d.html?launch=1';
       },
     });
+
+    // Desktop "play with friends" lobby: presence + create / invite / ready / start.
+    // Desktop only (the login-gated world); the web lobby stays untouched.
+    try {
+      if (window.KGInviteLobby && window.__KENSGAMES_PLATFORM__ === 'desktop') {
+        KGInviteLobby.mount(null, { gameId: 'fasttrack' });
+      }
+    } catch (_) { /* lobby panel is non-critical */ }
   </script>
 </body>
 

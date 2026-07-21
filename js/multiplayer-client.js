@@ -370,6 +370,22 @@ class KGMultiplayer {
     this._send({ type: 'list_sessions' }); // no game_id filter
   }
 
+  /** Request the roster of players currently online (server replies `presence`) */
+  listPresence() {
+    this._send({ type: 'list_presence' });
+  }
+
+  /** Host: invite an online player to the current (waiting) session */
+  invitePlayer(userId) {
+    if (!this.session) return;
+    this._send({ type: 'invite_player', target_user_id: userId, session_id: this.session.session_id });
+  }
+
+  /** Invitee: decline an invite (best-effort notify to the host) */
+  declineInvite(sessionId) {
+    this._send({ type: 'decline_invite', session_id: sessionId });
+  }
+
   /** Resolve a code to find which game it belongs to */
   resolveCode(code) {
     this._send({ type: 'resolve_code', code: code.toUpperCase().trim() });
@@ -553,6 +569,23 @@ class KGMultiplayer {
       case 'session_list':
         this.sessionList = data.sessions || [];
         this._emit('session_list', this.sessionList);
+        break;
+
+      case 'presence':
+        this.presence = data.users || [];
+        this._emit('presence', this.presence);
+        break;
+
+      case 'game_invite':
+        this._emit('game_invite', data);
+        break;
+
+      case 'invite_sent':
+        this._emit('invite_sent', data);
+        break;
+
+      case 'invite_declined':
+        this._emit('invite_declined', data);
         break;
 
       case 'game_object':

@@ -108,11 +108,15 @@ function startStaticServer(opts) {
       }
       const ext = path.extname(filePath).toLowerCase();
       const type = MIME[ext] || 'application/octet-stream';
+      // injectHtml may be a function (pathname) => snippet, so the injected
+      // globals (e.g. the current login token) can change between navigations
+      // without restarting the server.
+      const snippet = (typeof injectHtml === 'function') ? injectHtml(pathname) : injectHtml;
 
-      if (ext === '.html' && injectHtml) {
+      if (ext === '.html' && snippet) {
         fs.readFile(filePath, 'utf8', (rErr, html) => {
           if (rErr) { res.writeHead(404); res.end('Not found'); return; }
-          const out = injectIntoHtml(html, injectHtml);
+          const out = injectIntoHtml(html, snippet);
           res.writeHead(200, { 'Content-Type': type });
           res.end(out);
         });

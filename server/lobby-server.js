@@ -30,6 +30,26 @@ const UserRegistry = require('./user-registry.js');
 const GameObject = require('./game-object.js');
 const KernelRouter = require('./game-kernel/lobby-router.js');
 const { ForkTable } = require('./fork-table.js');
+const { buildPresenceList, presenceSignature } = require('./presence.js');
+const { canInvite } = require('./invites.js');
+
+// ── Account identity (login) ─────────────────────────────────────────────────
+// The relay is a transport and historically ran every connection as a guest.
+// This wires the account DB + JWT verifier so a valid site login runs the
+// connection as the REAL account (unique playername + avatar taken from the DB,
+// never the client). Loaded defensively: if the account modules are unavailable
+// the relay still boots guest-only. KG_REQUIRE_LOGIN=1 refuses connections
+// without a valid login (used by the desktop build and login-gated portals).
+let resolveIdentity = () => null;
+try {
+  const AuthHandler = require('./auth-handler.js');
+  const accountDb = require('./db.js');
+  const { makeIdentityResolver } = require('./relay-auth.js');
+  resolveIdentity = makeIdentityResolver({ authHandler: new AuthHandler(), db: accountDb });
+} catch (e) {
+  console.warn('[lobby] account identity disabled, running guest-only:', e && e.message);
+}
+const REQUIRE_LOGIN = String(process.env.KG_REQUIRE_LOGIN || '') === '1';
 
 // ── Colyseus room factory (optional; degrades gracefully if not running) ─────
 const COLYSEUS_PORT = parseInt(process.env.COLYSEUS_PORT || '2567', 10);
@@ -310,6 +330,26 @@ function broadcastAll(data) {
   for (const peer of activePeers) send(peer, data);
 }
 
+// ── Presence roster: the list of players currently online ─────────────────────
+let _presenceSig = '';
+function broadcastPresence(force) {
+  const list = buildPresenceList(connections);
+  const sig = presenceSignature(list);
+  if (!force && sig === _presenceSig) return;
+  _presenceSig = sig;
+  broadcastAll({ type: 'presence', users: list });
+}
+
+// All peers currently held by a given user_id (a user may have multiple sockets).
+function peersByUserId(userId) {
+  const out = [];
+  if (!userId) return out;
+  for (const [peer, conn] of connections.entries()) {
+    if (conn && conn.user_id === userId) out.push(peer);
+  }
+  return out;
+}
+
 function sessionByCode(code) {
   // First try the live cache (newest), then fall back to a pure observe of
   // the seed log frontier — proves the "code is observable, not stored" path.
@@ -540,8 +580,64 @@ function techBotName(seedName, aiCount) {
   return `${base}_bot`;
 }
 
+// Resume a live session this user is already a member of (page nav / reconnect).
+function resumeExistingSession(ws, userId) {
+  for (const s of liveSessions.values()) {
+    if (!s.players.some(p => p.user_id === userId)) continue;
+    // Cancel any pending lobby-disconnect grace timer for this user/session so a
+    // quick reconnect (page navigation, network blip) does not later remove them
+    // from a waiting lobby they have just rejoined.
+    cancelPendingLobbyDisconnect(s.session_id, userId);
+    connections.get(ws).session_x_id = s.session_id;
+    ws.join(s.session_id);
+    send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
+    emitGameObject(s, { toSocket: ws });
+    if (s.status === 'playing') {
+      send(ws, { type: 'game_started', session: sanitize(s) });
+      pm.registerConnection(userId, ws);
+    }
+    break;
+  }
+}
+
 handlers.guest_login = (ws, data) => {
   const token = data && data.token ? String(data.token) : '';
+
+  // 1) Real account — a valid site login runs the connection as the account,
+  //    with the unique playername + avatar taken from the DB, not the client.
+  const account = resolveIdentity(token);
+  if (account) {
+    const userId = 'user_' + account.account_id;
+    // The stored account avatar may be a plain emoji string OR an { id, emoji, name }
+    // object, depending on how it was set. Accept both.
+    const rawAvatar = account.avatar;
+    const avatarId = normalizeAvatarId(
+      (typeof rawAvatar === 'string'
+        ? rawAvatar
+        : (rawAvatar && (rawAvatar.emoji || rawAvatar.id))) || 'person_smile'
+    );
+    const user = {
+      user_id: userId, id: userId, account_id: account.account_id,
+      username: account.username, display_name: account.display_name,
+      avatar_id: avatarId, is_guest: false, admin_level: account.admin_level,
+      is_superuser: !!account.is_superuser,
+      prestige_level: 'bronze', prestige_points: 0, games_played: 0, games_won: 0, guild_id: null,
+    };
+    connections.set(ws, { user_id: userId, user, session_x_id: null });
+    send(ws, { type: 'auth_success', action: 'login', user, user_id: userId, username: user.username });
+    resumeExistingSession(ws, userId);
+    broadcastPresence(true);
+    return;
+  }
+
+  // 2) No valid account. When login is required (desktop / gated portals) refuse;
+  //    otherwise fall back to the anonymous guest identity (unchanged behavior).
+  if (REQUIRE_LOGIN) {
+    send(ws, { type: 'auth_error', action: 'login_required', code: 'LOGIN_REQUIRED',
+      message: 'Please sign in to play online.' });
+    return;
+  }
+
   const userId = stableGuestId(token) || ('guest_' + crypto.randomBytes(6).toString('hex'));
   const rawName = String((data && (data.name || data.username || data.guest_name)) || '').trim();
   const username = sanitizeUsername(rawName, `Player-${userId.slice(-4)}`);
@@ -552,23 +648,8 @@ handlers.guest_login = (ws, data) => {
   };
   connections.set(ws, { user_id: userId, user, session_x_id: null });
   send(ws, { type: 'auth_success', action: 'guest_login', user, user_id: userId, username });
-  for (const s of liveSessions.values()) {
-    if (s.players.some(p => p.user_id === userId)) {
-      // Cancel any pending lobby-disconnect grace timer for this user/session
-      // so a quick reconnect (page navigation, network blip) does not later
-      // remove them from a waiting lobby they have just rejoined.
-      cancelPendingLobbyDisconnect(s.session_id, userId);
-      connections.get(ws).session_x_id = s.session_id;
-      ws.join(s.session_id);
-      send(ws, { type: 'session_update', session: sanitize(s), action: 'resume' });
-      emitGameObject(s, { toSocket: ws });
-      if (s.status === 'playing') send(ws, { type: 'game_started', session: sanitize(s) });
-      if (s.status === 'playing') {
-        pm.registerConnection(userId, ws);
-      }
-      break;
-    }
-  }
+  resumeExistingSession(ws, userId);
+  broadcastPresence(true);
 };
 handlers.auth = (ws, data) => handlers.guest_login(ws, {
   token: data && data.token, name: data && (data.username || data.guest_name),
@@ -576,6 +657,7 @@ handlers.auth = (ws, data) => handlers.guest_login(ws, {
 });
 handlers.login = (ws, data) => handlers.guest_login(ws, data);
 handlers.register = (ws, data) => handlers.guest_login(ws, data);
+handlers.list_presence = (ws) => send(ws, { type: 'presence', users: buildPresenceList(connections) });
 handlers.logout = (ws) => {
   const conn = connections.get(ws);
   if (conn) { leaveCurrentSession(ws, conn); connections.delete(ws); }
@@ -604,6 +686,52 @@ handlers.update_profile = (ws, data) => {
   send(ws, { type: 'profile_updated', user: conn.user });
 };
 handlers.update_player_info = handlers.update_profile;
+
+// ── Private-game invites ──────────────────────────────────────────────────────
+// The host of a waiting session invites a specific online player. The invitee
+// gets a `game_invite` and accepts by JOINING the session (existing join_session)
+// then readying up, so the ready/start machinery is fully reused.
+handlers.invite_player = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const sessionId = data && data.session_id;
+  const targetId = data && data.target_user_id;
+  const s = sessionId ? liveSessions.get(sessionId) : null;
+  const targetPeers = peersByUserId(targetId);
+  const verdict = canInvite({
+    session: s, hostUserId: conn.user_id, targetUserId: targetId, targetOnline: targetPeers.length > 0,
+  });
+  if (!verdict.ok) {
+    if (verdict.already_in) return send(ws, { type: 'invite_sent', target_user_id: targetId, already_in: true });
+    return send(ws, { type: 'error', message: verdict.reason });
+  }
+  const invite = {
+    type: 'game_invite',
+    session_id: s.session_id,
+    code: s.session_code || null,
+    game: s.game_id,
+    from: { user_id: conn.user_id, username: conn.user && conn.user.username },
+    max_players: s.max_players,
+    session: sanitize(s),
+  };
+  for (const peer of targetPeers) send(peer, invite);
+  send(ws, { type: 'invite_sent', target_user_id: targetId });
+};
+
+// Invitee declines: best-effort notify to the host's sockets.
+handlers.decline_invite = (ws, data) => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const s = data && data.session_id ? liveSessions.get(data.session_id) : null;
+  if (!s) return;
+  for (const peer of peersByUserId(s.host_id)) {
+    send(peer, {
+      type: 'invite_declined',
+      session_id: s.session_id,
+      from: { user_id: conn.user_id, username: conn.user && conn.user.username },
+    });
+  }
+};
 
 handlers.create_session = (ws, data) => {
   const conn = connections.get(ws);
@@ -1632,6 +1760,7 @@ function initWsAdapter() {
             connections.delete(peer);
           }
           activePeers.delete(peer);
+          broadcastPresence(true);
           console.log(`[Lobby] Disconnected (total: ${activePeers.size})`);
         },
 
@@ -1640,6 +1769,7 @@ function initWsAdapter() {
           if (peer) {
             activePeers.delete(peer);
             connections.delete(peer);
+            broadcastPresence(true);
           }
         },
       },
