@@ -117,6 +117,7 @@ class FastTrackRoom extends Room {
     this._userToClient = new Map();  // userId → clientSessionId (latest)
     this._turnOrder = [];        // ordered userId array for turn rotation
     this._prevSnapshots = {};    // table → prev plain object (for delta guard)
+    this._hostSessionId = null;  // the ONE client allowed to push_state
 
     // ── Message handlers ────────────────────────────────────────────────────
 
@@ -147,14 +148,28 @@ class FastTrackRoom extends Room {
     });
 
     /**
-     * push_state: host pushes a full table snapshot.
-     * Server writes it into Schema so Colyseus can diff and send only
-     * changed keys to each subscriber.  Accepted from any connected client
-     * (host authority is enforced client-side by FastTrack game core).
+     * push_state: the host pushes a full table snapshot.
+     *
+     * ONLY the room's recognised host may do this. Previously any connected
+     * client could overwrite the entire table, including currentTurnUserId,
+     * because host authority was "enforced client-side" - which is to say not
+     * enforced. A lagging or buggy client could stomp the turn pointer and the
+     * board out from under everyone, which is one cause of turns arriving out
+     * of order and of players seeing different boards.
+     *
+     * This is not a security boundary. isHost is still claimed by the client at
+     * join time, so a deliberately hostile client could assert it. What this
+     * does stop is the accidental case, which is the one actually biting.
      */
     this.onMessage('push_state', (client, msg) => {
       const info = this._players.get(client.sessionId);
       if (!info) return;
+
+      if (client.sessionId !== this._hostSessionId) {
+        // Not an error worth throwing: late or duplicate pushes are normal.
+        // Dropping them silently is the whole point.
+        return;
+      }
 
       const snapshot = msg && msg.state;
       if (!snapshot || typeof snapshot !== 'object') return;
@@ -237,6 +252,14 @@ class FastTrackRoom extends Room {
     this._players.set(client.sessionId, info);
     this._userToClient.set(userId, client.sessionId);
 
+    // Record ONE host for the room. First claimant wins; later claims are
+    // ignored so a reconnecting or confused client cannot seize authority
+    // mid-game. If nobody claims it, fall back to the first player to join,
+    // which keeps single-player and legacy clients working unchanged.
+    if (this._hostSessionId === null && (isHost || this._players.size === 1)) {
+      this._hostSessionId = client.sessionId;
+    }
+
     // Immediately sync turn info to the joining client
     client.send('joined', {
       userId,
@@ -254,13 +277,51 @@ class FastTrackRoom extends Room {
     if (!info) return;
 
     if (consented || this.state.phase !== 'playing') {
+      const wasTheirTurn = this.state.currentTurnUserId === info.userId;
+
+      // Work out who is genuinely NEXT while the leaver is still in the order.
+      //
+      // The previous version filtered first and then called _advanceTurn(),
+      // which looks up indexOf(currentTurnUserId) - by then removed, so it
+      // returned -1, and (-1 + 1) % length is 0. The turn jumped to player
+      // ZERO and every player between the leaver and the front was skipped.
+      // That is the skipped-turn bug.
+      let nextUserId = null;
+      if (wasTheirTurn) {
+        const idx = this._turnOrder.indexOf(info.userId);
+        if (idx !== -1) {
+          for (let k = 1; k <= this._turnOrder.length; k++) {
+            const cand = this._turnOrder[(idx + k) % this._turnOrder.length];
+            if (cand !== info.userId) { nextUserId = cand; break; }
+          }
+        }
+      }
+
       this._players.delete(client.sessionId);
       this._userToClient.delete(info.userId);
-      // Remove from turn order
       this._turnOrder = this._turnOrder.filter(uid => uid !== info.userId);
-      // If it was their turn, advance
-      if (this.state.currentTurnUserId === info.userId && this._turnOrder.length > 0) {
-        this._advanceTurn();
+
+      // If the host left, promote the lowest remaining slot so push_state does
+      // not go dead for the rest of the game.
+      if (client.sessionId === this._hostSessionId) {
+        const remaining = Array.from(this._players.values()).sort((a, b) => a.slot - b.slot);
+        this._hostSessionId = remaining.length ? remaining[0].clientSessionId : null;
+        if (this._hostSessionId) {
+          this.broadcast('host_changed', {
+            userId: this._players.get(this._hostSessionId).userId,
+          });
+        }
+      }
+
+      if (wasTheirTurn && this._turnOrder.length > 0) {
+        this.state.currentTurnUserId = nextUserId || this._turnOrder[0];
+        this.state.turnNumber += 1;
+        this.state.seq += 1;
+        this.broadcast('turn_change', {
+          x: this.state.currentTurnUserId,
+          turnNumber: this.state.turnNumber,
+          seq: this.state.seq,
+        });
       }
     }
     // If not consented and playing, keep the slot for reconnect (allowReconnection)
@@ -333,7 +394,22 @@ class FastTrackRoom extends Room {
     if (this._turnOrder.length === 0) return;
 
     const currentIdx = this._turnOrder.indexOf(this.state.currentTurnUserId);
-    const nextIdx = (currentIdx + 1) % this._turnOrder.length;
+
+    // currentIdx === -1 means the turn holder is not in the order at all: they
+    // left, or the order was rebuilt under them. Falling through to
+    // (-1 + 1) % length silently sends the turn to player zero and skips
+    // everyone in between, which is exactly the bug fixed in onLeave. Callers
+    // should not reach here in that state, so make it visible rather than
+    // quietly wrong.
+    if (currentIdx === -1) {
+      console.warn(
+        '[FastTrackRoom] _advanceTurn: currentTurnUserId %s is not in _turnOrder %j. ' +
+        'Falling back to the first player. This should not happen - check the caller.',
+        this.state.currentTurnUserId, this._turnOrder
+      );
+    }
+
+    const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % this._turnOrder.length;
     const nextUserId = this._turnOrder[nextIdx];
 
     this.state.currentTurnUserId = nextUserId;
