@@ -251,7 +251,9 @@
       "extra_turn": false,
       "can_enter_from_holding": false,
       "can_exit_bullseye": false,
-      "can_split": true,
+      "can_split": false,
+      "wild_range": [1, 7],
+      "note": "2026-07-23: the 7 is a wild single-peg move of any distance 1..7; the two-peg split was retired (see fasttrack-game-core.js CARD 7 driver).",
       "is_special": true
     },
     "8": {

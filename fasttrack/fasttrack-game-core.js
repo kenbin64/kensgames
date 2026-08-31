@@ -1339,7 +1339,7 @@ function _drawCardCommit(card) {
 function getCardDescription(v) {
   return {
     A: 'Move 1 or enter', '2': 'Move 2', '3': 'Move 3', '4': 'Move 4 BACKWARD',
-    '5': 'Move 5', '6': 'Move 6 or enter', '7': 'Split 7 (wild)', '8': 'Move 8',
+    '5': 'Move 5', '6': 'Move 6 or enter', '7': 'Wild: move 1 to 7', '8': 'Move 8',
     '9': 'Move 9', '10': 'Move 10', J: 'Move 1 / exit bullseye', Q: 'Move 1 / exit bullseye',
     K: 'Move 1 / exit bullseye', JOKER: 'Wild! Enter or move 1'
   }[v] || '';
@@ -2070,9 +2070,35 @@ function calculateValidMoves() {
 
   // ── DRIVERS ──────────────────────────────────────────────────────────
   // Run the extracted collectors in the original order: every peg first,
-  // then the single 7-split pass (which reads the moves the peg loop pushed).
-  for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
-  collectSevenSplitMoves();
+  // ── CARD 7: WILD 1..7, SINGLE PEG (2026-07-23) ───────────────────────
+  // The 7 no longer splits across two pegs. It is a wild move: the player
+  // moves ONE peg any distance from 1 to 7. We reuse the normal per-peg
+  // generator at each distance d, temporarily pinning rules.movement so every
+  // nested reader (getTrackSequence, the FT-exit enumerator) sees the same d.
+  // Each generated move already carries its own dest/path, so distinct
+  // distances surface as distinct destinations and executeMove needs no
+  // change. The split pass is intentionally not called.
+  if (rules.isWild && rules.movement === 7) {
+    const _seven = rules.movement;
+    for (let d = 1; d <= 7; d++) {
+      rules.movement = d;
+      for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
+    }
+    rules.movement = _seven;
+
+    // De-duplicate: different distances can occasionally resolve to the same
+    // (type, peg, destination). Keep the first, drop exact repeats.
+    const _seen = new Set();
+    moves = moves.filter(m => {
+      const k = `${m.type}|${m.pegIdx}|${m.dest}`;
+      if (_seen.has(k)) return false;
+      _seen.add(k);
+      return true;
+    });
+  } else {
+    for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
+    collectSevenSplitMoves();
+  }
 
   // ── FT OVERTAKE CHECK (removed) ──
   // Previously rewrote FT 'move' moves into forced exits when an own peg
