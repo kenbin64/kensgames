@@ -44,3 +44,18 @@ downloads/
 starfighter/electron/dist/
 starfighter/electron/node_modules/
 starfighter/native/
+
+# 3D models and large media - NOT in git.
+# .glb is already-compressed binary, so git cannot delta it: every re-export
+# stored another full copy. AlienMotherShip.glb sat in the history four times
+# at 82, 66, 54 and 31 MB. That is why the repo reached 1.2 GB.
+# These are deployed by scripts/push-assets.sh instead. See that file.
+*.glb
+*.gltf
+*.fbx
+*.obj
+*.blend
+*.blend1
+*.mp4
+*.mov
+starfighter/assets/models/zorgonWarrior
