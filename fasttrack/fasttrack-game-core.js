@@ -332,6 +332,32 @@ const RANK_GLYPHS = {
   '8': '8', '9': '9', '10': '10', J: 'J', Q: 'Q', K: 'K', JOKER: '🃏'
 };
 
+// ── CARD 7 MODE ────────────────────────────────────────────────────────────
+// The single switch that decides what a 7 does. Mirrors
+// fasttrack.rules.json :: cards.7.mode, and test_card7_splits.js Scenario 10
+// fails CI if the two drift apart.
+//
+//   'classic' — THE RULE. One playable peg moves exactly 7. With two or more
+//               playable pegs the 7 may instead be split a + b = 7 across two
+//               of them, each half independently legal. When both a solo 7 and
+//               a split are legal, both are offered and the player chooses.
+//   'wild'    — one peg moves any distance 1..7, no split. Retired 2026-09-04.
+//
+// This exists because the 7 rule has been changed several times and each change
+// used to be made by editing the driver in one build, which left the other
+// build, the dead code and the tests describing the previous rule. Changing the
+// rule is now a one word edit here plus the same word in rules.json. Never add
+// a second code path or a build flag for it.
+const SEVEN_MODE = 'classic';
+
+// The 7 is the only card carrying isWild, so this is really "is this a 7".
+// It reads `moves` rather than `movement` on purpose: 'wild' mode temporarily
+// pins `movement`, and a predicate that flipped to false mid-generation is
+// exactly the kind of bug this file has had before.
+function isSevenCard(r) {
+  return !!(r && r.isWild && r.moves === 7);
+}
+
 // Build the card matrix into the substrate.
 // Single source of truth: fasttrack.rules.json :: cards.{rank}.
 // Each row is z-tagged with its rule coordinate (z = x*y, x=2 = card category).
@@ -1339,7 +1365,7 @@ function _drawCardCommit(card) {
 function getCardDescription(v) {
   return {
     A: 'Move 1 or enter', '2': 'Move 2', '3': 'Move 3', '4': 'Move 4 BACKWARD',
-    '5': 'Move 5', '6': 'Move 6 or enter', '7': 'Split 7 (wild)', '8': 'Move 8',
+    '5': 'Move 5', '6': 'Move 6 or enter', '7': 'Move 7, or split 7 between two pegs', '8': 'Move 8',
     '9': 'Move 9', '10': 'Move 10', J: 'Move 1 / exit bullseye', Q: 'Move 1 / exit bullseye',
     K: 'Move 1 / exit bullseye', JOKER: 'Wild! Enter or move 1'
   }[v] || '';
@@ -1832,7 +1858,12 @@ function calculateValidMoves() {
   // rules.json :: CARD_7_FT_HANDOFF  (z=42) — FT-priority + on-ring constraint.
   // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are passable.
   // Three variants per (a, b, pi1, pi2): STANDARD | BULL-LEFT | BULL-RIGHT.
-  if (rules.isWild && rules.movement === 7) {
+  //
+  // The caller already establishes that this is a 7 in classic mode. This guard
+  // used to read `rules.isWild && rules.movement === 7`, which silently became
+  // unreachable when the wild driver moved the call into its else branch, and
+  // every split in the game quietly stopped being generated.
+  if (isSevenCard(rules)) {
     // user_directive_2026-05-18: "the 7 split can only happen when there are
     // 2 to n pegs ON THE BOARD. if there is only 1 peg a 7 is just another
     // number." A peg is split-eligible iff it can legally absorb a split
@@ -2069,10 +2100,48 @@ function calculateValidMoves() {
   } // end collectSevenSplitMoves
 
   // ── DRIVERS ──────────────────────────────────────────────────────────
-  // Run the extracted collectors in the original order: every peg first,
-  // then the single 7-split pass (which reads the moves the peg loop pushed).
-  for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
-  collectSevenSplitMoves();
+  // Run the collectors in order: every peg first, then (for a 7 in classic
+  // mode) the split pass, which reads the moves the peg loop already pushed.
+  const _collectAllPegs = () => {
+    for (let pi = 0; pi < player.pegs.length; pi++) collectPegMoves(pi);
+  };
+
+  if (isSevenCard(rules) && SEVEN_MODE === 'wild') {
+    // WILD 1..7, single peg. Retired, kept behind SEVEN_MODE so the rule can
+    // be switched back without reintroducing a second code path.
+    //
+    // `rules` is a live reference to the shared CARDS['7'] object, not a copy,
+    // so movement is restored in a finally. Without it, one throw anywhere in
+    // the collectors would leave the card matrix pinned at d for the rest of
+    // the session and every later 7 would move the wrong distance.
+    const _savedMovement = rules.movement;
+    try {
+      for (let d = 1; d <= 7; d++) {
+        rules.movement = d;
+        _collectAllPegs();
+      }
+    } finally {
+      rules.movement = _savedMovement;
+    }
+
+    // De-duplicate: different distances can resolve to the same
+    // (type, peg, destination). Keep the first, drop exact repeats.
+    const _seen = new Set();
+    moves = moves.filter(m => {
+      const k = `${m.type}|${m.pegIdx}|${m.dest}`;
+      if (_seen.has(k)) return false;
+      _seen.add(k);
+      return true;
+    });
+  } else {
+    // CLASSIC. The peg loop runs at movement=7 and yields the solo seven for
+    // every peg that can legally travel all 7. collectSevenSplitMoves then adds
+    // the two-peg a+b=7 options, and gates itself on there being at least two
+    // split-eligible pegs, which is what makes "one playable peg must move the
+    // full 7" fall out rather than needing a special case.
+    _collectAllPegs();
+    if (isSevenCard(rules)) collectSevenSplitMoves();
+  }
 
   // ── FT OVERTAKE CHECK (removed) ──
   // Previously rewrote FT 'move' moves into forced exits when an own peg

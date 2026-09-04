@@ -189,3 +189,6 @@ console.log(`\n═════════════════════�
 console.log(`  ${pass} passed, ${fail} failed`);
 console.log(`══════════════════════`);
 if (fail) { console.log('\nFailures:'); failures.forEach(f => console.log(`  - ${f.name}${f.detail ? `: ${f.detail}` : ''}`)); process.exit(1); }
+// Exit explicitly: the suite passed, but a lingering timer from the game core
+// keeps the event loop alive and CI would hang on a green run.
+process.exit(0);
