@@ -943,6 +943,32 @@ function applyStateSnapshot(snapshot) {
   return true;
 }
 
+// ── STATE COMMIT HOOK ──────────────────────────────────────────────────────
+// Fires after any delta that changes authoritative game state: a draw, a move,
+// a turn rotation. The transport layer subscribes to it and broadcasts the
+// resulting state to every participant, which is what keeps all seats holding
+// the SAME game.
+//
+// Why a hook rather than calling the publisher directly: the core must stay
+// transport agnostic. It knows when state changed; it must not know whether
+// that goes out over Colyseus, the socket relay, or nothing at all in solo.
+//
+// It deliberately fires even while _applying is true. When the host replays a
+// peer's move it is _applying, but the result IS the authoritative outcome and
+// is exactly the delta the other seats need. Suppressing it there is what left
+// peers to re-simulate on their own and drift apart.
+let _onStateCommitted = null;
+
+function setStateCommittedHandler(fn) {
+  _onStateCommitted = typeof fn === 'function' ? fn : null;
+}
+
+function _commitState(reason) {
+  if (!_onStateCommitted) return;
+  try { _onStateCommitted(reason); }
+  catch (err) { console.warn('[ft-mp] state-committed handler failed', reason, err); }
+}
+
 function setMultiplayerClient(client) {
   _mpClient = client || null;
   // Tear down any previous kernel adapter (e.g. on rematch / new session).
@@ -1386,6 +1412,7 @@ function _drawCardCommit(card) {
   _manifoldStateUpdate();
   calculateValidMoves();
   updateUI();
+  _commitState('draw');
 }
 
 function getCardDescription(v) {
@@ -3189,6 +3216,12 @@ function executeMove(moveIdx) {
   // only decides WHEN it runs. resolveTurn() drops the call if the turn has since
   // moved on (epoch changed) — a stale bot move can never advance the human.
   const _moveEpoch = _turnEpoch;
+  // The move is applied and the turn is resolving: publish the resulting state
+  // so every seat converges on it. Peers defer APPLYING a snapshot until their
+  // own hop animations drain (see the pending-snapshot buffer in
+  // fasttrack-3d.js), so publishing now cannot yank a peg mid-hop.
+  _commitState('move');
+
   const waitForAll = () => {
     const waitAnims = (cb) => window.waitForAnimations ? window.waitForAnimations(cb) : cb();
     waitAnims(() => {
@@ -3245,6 +3278,11 @@ function _replaySameSeat() {
   state.deck.set('currentCard', null);
   state.turn.set('phase', 'draw');
   updateUI();
+  // A replay card resolves the turn just as much as a rotation does: the card
+  // is cleared and the seat reopens for a fresh draw. Without this the last
+  // state peers received was the mid-move snapshot, so on every A/6/J/Q/K/JOKER
+  // they were left holding a card the host had already discarded.
+  _commitState('replay');
   if (cp && cp.isBot && (!_isMpMode() || _isHost())) setTimeout(botTurn, 800);
 }
 
@@ -3637,6 +3675,10 @@ function _applyTurnAdvance(fromCi, next, seq) {
   if (hintsDiv) hintsDiv.innerHTML = '';
   setOptionsPanelVisible(false);
   updateUI();
+
+  // The seat has rotated. Publish before the presentation chain below, so the
+  // authoritative turn reaches every seat without waiting on a camera or a blink.
+  _commitState('turn');
 
   // Gate: wait for camera to settle, THEN blink avatar 3 times, THEN enable turn
   const enableTurn = () => {
@@ -4769,6 +4811,7 @@ window.FastTrackCore = {
   // Multiplayer wiring — set by 3d.html after initGame so the live KGMultiplayer
   // socket can broadcast moves and replay peer actions under the _applying guard.
   setMultiplayerClient,
+  setStateCommittedHandler,
   setMyUserId,
   updateSessionRoster,
   getStateSnapshot,

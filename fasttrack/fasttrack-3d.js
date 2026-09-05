@@ -2926,6 +2926,27 @@ async function init3D() {
           }
         };
 
+        // ── STATE ON EVERY DELTA ────────────────────────────────────────
+        // The core fires this after every draw, move and turn rotation. The
+        // host answers by publishing the resulting authoritative state, so all
+        // seats hold the SAME game rather than each re-simulating and drifting.
+        //
+        // The earlier objection to publishing this often was that snapshots
+        // teleported peer pegs mid-hop. That is no longer true: the receiving
+        // side buffers a snapshot while `isPlayResolving()` and flushes it once
+        // `waitForAnimations` drains, keeping only the latest frame (see the
+        // pending-snapshot buffer below). So state converges immediately while
+        // the visuals still finish the hop they were playing.
+        //
+        // publishAuthoritativeState already no-ops when we are not the host and
+        // dedupes on lastPublishedState, so a delta that changed nothing costs
+        // one JSON.stringify and no traffic.
+        try {
+          window.FastTrackCore.setStateCommittedHandler(() => publishAuthoritativeState());
+        } catch (err) {
+          console.warn('[ft-mp] could not register the state-committed publisher', err);
+        }
+
         const ensurePublisher = () => {
           if (statePublisherTimer) return;
           // Delta-only broadcast: every move/draw/turn_advance already goes
@@ -2935,6 +2956,8 @@ async function init3D() {
           // peer pegs mid-hop. Keep the periodic publisher only as a slow
           // catch-up safety net (5 s) — `lastPublishedState` dedupe means
           // it usually emits nothing.
+          // Now only a backstop: the delta hook above is the primary path.
+          // Kept so a dropped delta still reconciles within a few seconds.
           statePublisherTimer = setInterval(publishAuthoritativeState, 5000);
         };
         const ensureJoined = () => {
@@ -2963,6 +2986,10 @@ async function init3D() {
             // positions, producing chaotic motion. The periodic 5 s
             // catch-up publisher (with dedupe) is sufficient.
             window.FastTrackCore.applyRemoteAction(msg.action, msg.payload);
+            // applyRemoteAction runs the core, which fires the state-committed
+            // hook, which publishes when we are the host. Nothing extra needed
+            // here; this comment exists because the old code deliberately did
+            // NOT republish and the reason no longer holds.
           }
           catch (err) { console.warn('[ft-mp] applyRemoteAction failed', msg.action, err); }
         });
