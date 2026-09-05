@@ -677,7 +677,33 @@ function initGame(playerCount = 2, config = {}) {
         // uniformly random seat among ALL players; the randomiser is used ONLY
         // for the first game. Replays open on the previous winner (the rematch
         // branch above). No seat is privileged.
-        startingIdx = Math.floor(Math.random() * effectiveCount);
+        //
+        // BUGFIX 2026-09-05: this used a private Math.random(), so every client
+        // in a session picked its OWN starting seat and the participants began
+        // in different games before a single card was drawn. The deck was
+        // already derived from the shared session seed; the starting seat was
+        // not. That is the "everyone gets their own game" bug at its source, and
+        // it also reads as skipped turns, because each client believes a
+        // different seat is active. Reproduced by test_mp_convergence.js, which
+        // caught participants disagreeing on `current` at turn zero.
+        //
+        // The seat now blooms from the SAME shared seed as the deck, using a
+        // distinct sub-stream so it does not consume the deck's randomness.
+        const _seed = state.meta.get('seed');
+        const _codec = (typeof ManifoldCodec !== 'undefined' && ManifoldCodec)
+          || (typeof window !== 'undefined' && window.ManifoldCodec)
+          || (typeof globalThis !== 'undefined' && globalThis.ManifoldCodec)
+          || null;
+        if (_seed != null && _codec && typeof _codec.prng === 'function') {
+          startingIdx = Math.floor(_codec.prng(`${_seed}:startingSeat`)() * effectiveCount);
+        } else {
+          // Loud on purpose. A silent fallback here is what let the original
+          // divergence hide: the game looks fine locally and only breaks when a
+          // second participant disagrees.
+          console.warn('[INIT] no seeded RNG available — starting seat falls back to '
+            + 'Math.random() and will NOT match other clients in a session');
+          startingIdx = Math.floor(Math.random() * effectiveCount);
+        }
       }
     }
     state.players.set('current', startingIdx);
