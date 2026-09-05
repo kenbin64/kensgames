@@ -22,6 +22,8 @@
 
 const { createEngine } = require('./engine/headless');
 
+const NL = String.fromCharCode(10);
+
 let pass = 0, fail = 0;
 const failures = [];
 function ok(cond, name, detail = '') {
@@ -62,22 +64,28 @@ ok(players.length === 4, 'four seats created', `got ${players.length}`);
 ok(players.every(p => p.pegs && p.pegs.length === g.PEGS_PER_PLAYER),
    `every seat has ${g.PEGS_PER_PLAYER} pegs`);
 
-let movesExecuted = 0, thrown = null;
+// executeMove takes an INDEX into validMoves, not the move object. Passing the
+// object silently hits `if (!move) return` and does nothing, which is a very
+// easy way to write a harness that proves nothing.
+let turnsResolved = 0, thrown = null;
+const seatsSeen = new Set();
 try {
-  g.drawCard();
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < 40; i++) {
+    if (g.state.meta.get('winner') != null) break;
+    seatsSeen.add(g.state.players.get('current'));
+    if (!g.state.deck.get('currentCard')) g.drawCard();
     const vm = g.state.turn.get('validMoves') || [];
-    if (!vm.length) break;
-    g.executeMove(vm[0]);
-    movesExecuted++;
-    g.calculateValidMoves();
+    if (vm.length) g.executeMove(0); else g.endTurn();
+    turnsResolved++;
   }
 } catch (e) {
   thrown = String(e && e.stack || e);
 }
-ok(thrown === null, 'drawing and applying moves throws nothing server-side',
+ok(thrown === null, 'playing real turns throws nothing server-side',
    thrown ? thrown.slice(0, 200) : '');
-ok(movesExecuted > 0, 'moves executed with no renderer present', `${movesExecuted} moves`);
+ok(turnsResolved > 10, 'turns were played with no renderer present', `${turnsResolved} turns`);
+ok(seatsSeen.size === 4, 'the turn reached all four seats server-side',
+   `seats: ${[...seatsSeen].sort().join(',')}`);
 
 // ───────────────────────────────────────────────────────────
 section('3. Two tables in one process are isolated');
@@ -156,57 +164,56 @@ c.initGame(2);
 }
 
 // ───────────────────────────────────────────────────────────
-// MEASURED GAP: turn advancement is not yet server-safe.
+// Turn resolution, measured with the correct call convention.
 //
-// This section reports rather than asserts, because it tracks known work rather
-// than a regression. It keeps the numbers visible, and the day the turn machine
-// is decoupled from presentation it should start showing 3/3 on its own.
+// An earlier version of this file called executeMove(moveObject) instead of
+// executeMove(index). Every move silently no-opped on the `if (!move) return`
+// guard, which made the turn machine look like it stalled. It does not. With
+// indices, turns resolve synchronously headless, because there is no
+// waitForAnimations and no cutscene queue to wait on, so the deferred callbacks
+// in executeMove run straight through.
 //
-// Measured 2026-09-05, headless, across four configurations (solo, same-screen,
-// private, and 4-player): the first turn advances and then the machine stalls.
-// Turns that did advance took between 1.1 and 5.9 seconds. That latency is the
-// tell. executeMove ends with:
-//
-//     CutsceneManager.whenDrained(() => resolveTurn(_moveEpoch));
-//     setTimeout(() => resolveTurn(_moveEpoch), 6000);
-//
-// so a turn advances when animations and cutscenes report finished, with a six
-// second wall-clock fallback behind them. That is a timing race, not a rule, and
-// the epoch guard exists to suppress the duplicate fires the race produces. Over
-// a socket every client runs that race against its own clock, which is where the
-// skipped turns come from.
-//
-// For server authority the turn must advance synchronously as part of applying
-// the move, with animation demoted to presentation that can never gate
-// authoritative state.
-// ───────────────────────────────────────────────────────────
+// Replay cards (A, 6, J, Q, K, JOKER) correctly reopen the draw for the SAME
+// seat rather than rotating, so a correct check has to allow for both outcomes.
 (async () => {
-  section('MEASURED GAP: turn advancement (reported, not asserted)');
+  section('6. Turns resolve promptly server-side');
 
+  const REPLAY = new Set(['A', '6', 'J', 'Q', 'K', 'JOKER']);
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const t = createEngine();
-  t.initGame(2, { sessionSeed: 'gap-check' });
-  const results = [];
-  for (let i = 0; i < 3; i++) {
-    const seat = t.state.players.get('current');
+  t.initGame(2, { sessionSeed: 'turn-resolution' });
+
+  let resolved = 0, mismatched = 0, slowest = 0;
+  for (let i = 0; i < 12; i++) {
     if (!t.state.deck.get('currentCard')) t.drawCard();
+    const rank = String((t.state.deck.get('currentCard') || {}).value);
+    const seat0 = t.state.players.get('current');
     const vm = t.state.turn.get('validMoves') || [];
     const t0 = Date.now();
-    if (vm.length) t.executeMove(vm[0]); else t.endTurn();
-    let w = 0;
-    while (t.state.players.get('current') === seat && w < 7000) { await wait(25); w += 25; }
-    results.push({ moved: t.state.players.get('current') !== seat, ms: Date.now() - t0 });
-  }
-  const adv = results.filter(r => r.moved).length;
-  console.log(`  MEASURED  ${adv}/${results.length} turns advanced; ms: ${results.map(r => r.ms).join(', ')}`);
-  console.log('  NOTE      turn advance is timer-driven and stalls after the first turn.');
-  console.log('            This is the blocker for server-authoritative multiplayer.');
+    if (vm.length) t.executeMove(0); else t.endTurn();
 
-  console.log('\n' + '='.repeat(62));
+    let w = 0, how = null;
+    while (w < 8000 && !how) {
+      if (t.state.players.get('current') !== seat0) how = 'advanced';
+      else if (t.state.turn.get('phase') === 'draw' && t.state.deck.get('currentCard') == null) how = 'replay';
+      else { await wait(20); w += 20; }
+    }
+    slowest = Math.max(slowest, Date.now() - t0);
+    if (how) {
+      resolved++;
+      if (how !== (REPLAY.has(rank) ? 'replay' : 'advanced')) mismatched++;
+    }
+  }
+
+  ok(resolved === 12, 'every turn resolved', `${resolved}/12`);
+  ok(mismatched === 0, 'replay cards replayed and the rest advanced', `${mismatched} mismatches`);
+  ok(slowest < 1000, 'turns resolve without waiting on a timer', `slowest ${slowest} ms`);
+
+  console.log(NL + '='.repeat(62));
   console.log(`  ${pass} passed, ${fail} failed`);
   console.log('='.repeat(62));
   if (fail) {
-    console.log('\nFailures:');
+    console.log(NL + 'Failures:');
     failures.forEach(f => console.log(`  - ${f.name}${f.detail ? `: ${f.detail}` : ''}`));
     process.exit(1);
   }
