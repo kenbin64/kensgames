@@ -2745,6 +2745,30 @@ async function init3D() {
       };
     }
 
+    // ── NO GAME, NO BOARD ────────────────────────────────────────────────
+    // The board must never render unless a game was actually created: players
+    // and bots chosen, and the host starting it. Opening 3d.html cold used to
+    // fall through to a synthesized 2-player game, so the board came up in a
+    // generic state with nobody real in it.
+    //
+    // A real launch always leaves a roster in sessionStorage, which is per-tab
+    // and therefore cannot be a leftover: the lobby writes kg_session or
+    // kg_fasttrack_runtime, same-screen and the solo setup write
+    // ft_session_players. localStorage keys like KG_Game are NOT an acceptable
+    // signal, because they survive across sessions and a stale one would look
+    // exactly like a fresh launch.
+    //
+    // dev_observer is the one deliberate exception: it builds its own all-AI
+    // roster above for recording, and is opted into explicitly by URL.
+    const hasRealRoster = useRuntimeRoster || useSessionRoster || useSameScreenRoster
+      || (Array.isArray(initConfig.sessionPlayers) && initConfig.sessionPlayers.length >= 2);
+
+    if (!hasRealRoster && !isDevObserver) {
+      console.warn('[ft] No game to render: reached the board without a roster from the lobby.');
+      showNoGamePanel();
+      return;
+    }
+
     window.FastTrackCore.initGame(playerCount, initConfig);
     window.FastTrackCore.updateUI();
     renderBoard3D();
@@ -7035,3 +7059,36 @@ async function startInit3D() {
 
 // Auto-initialize when DOM ready
 document.addEventListener('DOMContentLoaded', startInit3D);
+
+// Shown instead of the board when someone reaches 3d.html without a game.
+// Plain DOM on purpose: this has to work even if three.js or the board never
+// initialised, which is exactly the situation it exists for.
+function showNoGamePanel() {
+  try {
+    if (document.getElementById('ft-no-game')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'ft-no-game';
+    wrap.setAttribute('role', 'alert');
+    wrap.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:100000',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'background:#0d0f14', 'color:#e9edf2',
+      'font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif',
+      'padding:24px', 'text-align:center',
+    ].join(';');
+    wrap.innerHTML =
+      '<div style="max-width:460px">'
+      + '<h1 style="margin:0 0 10px;font-size:1.4rem;font-weight:650">No game to join</h1>'
+      + '<p style="margin:0 0 20px;color:#a8b3c1">'
+      + 'A FastTrack table is created in the lobby: pick your players and bots, '
+      + 'then the host starts the game. Opening the board directly does not make one.'
+      + '</p>'
+      + '<a href="/lobby/" style="display:inline-block;background:#0f6d94;color:#fff;'
+      + 'text-decoration:none;padding:.6rem 1.2rem;border-radius:8px;font-weight:600">'
+      + 'Go to the lobby</a>'
+      + '</div>';
+    document.body.appendChild(wrap);
+  } catch (err) {
+    console.error('[ft] could not show the no-game panel', err);
+  }
+}

@@ -938,6 +938,48 @@
 
             localStorage.setItem('KG_Game', JSON.stringify(KG_Game));
             localStorage.setItem('KG_Player', JSON.stringify(KG_Player));
+            // Build an explicit roster: one human plus the chosen number of
+            // bots at the chosen difficulty.
+            //
+            // The board refuses to render without a roster, so opening
+            // 3d.html cold can no longer come up as a generic table with
+            // nobody real in it. It lives in sessionStorage rather than
+            // localStorage because sessionStorage is per-tab and dies with
+            // the tab, so it cannot be a leftover from a previous game
+            // masquerading as a fresh launch. Same handoff the lobby's
+            // same-screen mode uses.
+            var ftRoster = [{
+                slot: 0,
+                user_id: KG_Player.user_id,
+                username: KG_Player.name,
+                name: KG_Player.name,
+                avatar: KG_Player.avatar,
+                is_ai: false,
+                is_host: true,
+                level: null
+            }];
+            for (var b = 1; b < KG_Game.playerCount; b++) {
+                ftRoster.push({
+                    slot: b,
+                    user_id: 'bot-' + b,
+                    username: 'Bot ' + b,
+                    name: 'Bot ' + b,
+                    avatar: '\uD83E\uDD16',
+                    is_ai: true,
+                    is_host: false,
+                    level: KG_Game.aiDifficulty
+                });
+            }
+            try {
+                sessionStorage.setItem('ft_session_players', JSON.stringify(ftRoster));
+                sessionStorage.setItem('kg_fasttrack_runtime', JSON.stringify({
+                    game: { code: null, mode: KG_Game.mode },
+                    players: ftRoster,
+                    session: { my_user_id: KG_Player.user_id }
+                }));
+            } catch (e) {
+                console.warn('[ft-setup] could not stash the roster', e);
+            }
             localStorage.setItem('fasttrack-lobby', JSON.stringify({
                 mode: KG_Game.mode,
                 code: null,
