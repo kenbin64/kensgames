@@ -2660,6 +2660,13 @@ async function init3D() {
           avatar_id: p.avatar_id || (p.avatarObj && p.avatarObj.id) || null,
           is_ai: !!(p.is_ai || p.isAI || p.is_bot),
           is_host: !!p.is_host,
+          // Bot difficulty. initGame reads this off the session player
+          // (`sp.level || sp.aiDifficulty`) and it keys AI_PROFILES in the game
+          // core. It was being stripped here, so a difficulty chosen in the
+          // lobby never survived the handoff and every bot came up 'normal'.
+          level: (p.is_ai || p.isAI || p.is_bot)
+            ? (p.level || p.aiDifficulty || p.difficulty || null)
+            : null,
         })),
       }
       : { humanName, humanAvatar, aiDifficulty, launchMode: gameMode };

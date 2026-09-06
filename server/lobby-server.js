@@ -265,6 +265,18 @@ function freshSession(sx, gameId, hostUser, isPrivate) {
   };
 }
 
+// Bot difficulty. These four strings are the contract with the game engine:
+// fasttrack-game-core.js AI_PROFILES is keyed by exactly these, and initGame
+// reads the value off the session player as `level`. Anything else is coerced to
+// 'normal' rather than passed through, because the engine would silently fall
+// back anyway and a typo would then be invisible.
+const AI_LEVELS = ['easy', 'normal', 'hard', 'expert'];
+const DEFAULT_AI_LEVEL = 'normal';
+function normalizeAiLevel(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  return AI_LEVELS.includes(v) ? v : DEFAULT_AI_LEVEL;
+}
+
 function sanitize(s) {
   return {
     session_id: s.session_id,
@@ -282,6 +294,10 @@ function sanitize(s) {
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
       is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      // `level` is the bot's difficulty. It was missing here, so the host could
+      // pick a difficulty in the lobby and it never reached the game: initGame
+      // reads it off the session player and every bot came up 'normal'.
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null,
     })),
     settings: s.settings,
     status: s.status,
@@ -403,7 +419,8 @@ function removePlayerFromWaitingSession(sessionId, userId, username) {
     type: 'player_left', username: username || 'Player',
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null
     }))
   });
   emitGameObject(s);
@@ -455,7 +472,8 @@ function leaveCurrentSession(ws, conn) {
     type: 'player_left', username: conn.user.username,
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null
     }))
   });
   emitGameObject(s);
@@ -728,7 +746,8 @@ function joinExisting(ws, conn, s) {
     type: 'player_joined', username: conn.user.username,
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null
     }))
   }, ws);
   emitGameObject(s);
@@ -926,7 +945,9 @@ handlers.add_ai_player = (ws, data) => {
   const aiName = techBotName((data && data.name) || TECH_BOT_NAMES[aiCount % TECH_BOT_NAMES.length], aiCount);
   s.players.push({
     user_id: aiId, username: aiName, avatar_id: 'robot',
-    is_host: false, is_ai: true, slot: s.players.length, ready: true
+    is_host: false, is_ai: true, slot: s.players.length, ready: true,
+    // The client sends this as `level`. It used to be dropped on the floor.
+    level: normalizeAiLevel(data && (data.level || data.difficulty)),
   });
   s.settings.lobby_accepted = false;
   syncGameObjectSession(s);
@@ -934,7 +955,8 @@ handlers.add_ai_player = (ws, data) => {
     type: 'player_joined', username: aiName,
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null
     }))
   });
   emitGameObject(s);
@@ -946,7 +968,9 @@ handlers.remove_ai_player = (ws, data) => {
   if (!conn) return;
   const s = liveSessions.get(conn.session_x_id);
   if (!s || s.host_id !== conn.user_id) return;
-  const aiId = data && data.user_id;
+  // The client's removeBot() sends `player_id`; older callers send `user_id`.
+  // Reading only one of them meant remove-bot silently did nothing.
+  const aiId = data && (data.player_id || data.user_id);
   const idx = s.players.findIndex(p => p.is_ai && p.user_id === aiId);
   if (idx < 0) return;
   const removed = s.players.splice(idx, 1)[0];
@@ -957,7 +981,8 @@ handlers.remove_ai_player = (ws, data) => {
     type: 'player_left', username: removed.username,
     players: s.players.map(p => ({
       user_id: p.user_id, username: p.username, avatar_id: p.avatar_id,
-      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready
+      is_host: p.is_host, is_ai: p.is_ai, slot: p.slot, ready: p.ready,
+      level: p.is_ai ? (p.level || DEFAULT_AI_LEVEL) : null
     }))
   });
   emitGameObject(s);

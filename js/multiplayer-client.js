@@ -410,16 +410,28 @@ class KGMultiplayer {
   /** Start the game (host only) */
   startGame() { this._send({ type: 'start_game' }); }
 
-  /** Add an AI bot to the session (host only) */
+  /**
+   * Add an AI bot to the session (host only).
+   *
+   * `difficulty` must be one of easy | normal | hard | expert. Those four are
+   * the contract with the game engine: fasttrack-game-core.js keys AI_PROFILES
+   * by exactly these strings. This used to default to 'medium', which is not a
+   * profile, so every bot added without an explicit choice silently fell back
+   * to normal and the setting looked broken.
+   */
   addBot(difficulty) {
-    // Server supports both add_ai and add_ai_player
-    this._send({ type: 'add_ai_player', level: difficulty || 'medium' });
+    const LEVELS = ['easy', 'normal', 'hard', 'expert'];
+    const level = LEVELS.includes(String(difficulty || '').toLowerCase())
+      ? String(difficulty).toLowerCase()
+      : 'normal';
+    this._send({ type: 'add_ai_player', level });
   }
 
   /** Remove an AI bot (host only) */
   removeBot(playerId) {
-    // Server supports both remove_ai and remove_ai_player
-    this._send({ type: 'remove_ai_player', player_id: playerId });
+    // Send both field names: the server historically read `user_id` here while
+    // this sent only `player_id`, so removing a bot silently did nothing.
+    this._send({ type: 'remove_ai_player', player_id: playerId, user_id: playerId });
   }
 
   /**

@@ -555,6 +555,16 @@
 
         <div class="row" style="margin-top:14px;flex-wrap:wrap;gap:10px">
           <button class="btn btn-warm hidden" id="btn-add-bot">＋ Add Bot</button>
+          <!-- Bot difficulty. These four values are the contract with the game
+               engine: fasttrack-game-core.js keys AI_PROFILES by exactly these.
+               Host only, shown and hidden alongside the Add Bot button. -->
+          <select class="input hidden" id="mp-bot-difficulty" style="width:auto"
+                  title="Difficulty for the next bot you add">
+            <option value="easy">Easy — only cuts as a last resort</option>
+            <option value="normal" selected>Normal — cuts when it is worth it</option>
+            <option value="hard">Hard — hunts you down</option>
+            <option value="expert">Expert — hunts you down, sharper</option>
+          </select>
           <button class="btn" id="btn-ready">Ready</button>
           <button class="btn btn-lime hidden" id="btn-launch">▶ Launch Game</button>
           <button class="btn btn-danger hidden" id="btn-cancel-host"
@@ -587,9 +597,10 @@
       </div>
       <h3>Bot Difficulty</h3>
       <select class="input" id="ss-difficulty" style="width:auto">
-        <option value="easy">Easy</option>
-        <option value="normal" selected>Normal</option>
-        <option value="hard">Hard</option>
+        <option value="easy">Easy — only cuts as a last resort</option>
+        <option value="normal" selected>Normal — cuts when it is worth it</option>
+        <option value="hard">Hard — hunts you down</option>
+        <option value="expert">Expert — hunts you down, sharper</option>
       </select>
       <div class="row" style="margin-top:14px;gap:10px">
         <button class="btn btn-primary" id="ss-start" style="flex:1">▶ Start Same-Screen Game</button>
@@ -806,6 +817,7 @@
 
         const isHost = mp && mp.isHost;
         document.getElementById('btn-add-bot').classList.toggle('hidden', !isHost);
+        document.getElementById('mp-bot-difficulty').classList.toggle('hidden', !isHost);
         // Host can launch any time 2+ players are seated. Always show the button
         // to the host — disable it (with a tooltip) until it's launchable so
         // the host can see what's needed instead of waiting for an invisible
@@ -1036,7 +1048,15 @@
         document.getElementById('join-code').addEventListener('keydown', e => { if (e.key === 'Enter') joinByCode(); });
         document.getElementById('btn-refresh').onclick = refreshPublic;
 
-        document.getElementById('btn-add-bot').onclick = () => { if (mp) mp.addBot('medium'); };
+        document.getElementById('btn-add-bot').onclick = () => {
+          if (!mp) return;
+          // Use whatever difficulty the host has selected. 'medium' was
+          // hardcoded here and is not one of the engine's four levels
+          // (easy | normal | hard | expert), so every bot added from this
+          // button silently fell back to normal.
+          const sel = document.getElementById('mp-bot-difficulty');
+          mp.addBot((sel && sel.value) || 'normal');
+        };
         document.getElementById('btn-ready').onclick = () => { if (mp) mp.toggleReady(); };
         document.getElementById('btn-launch').onclick = () => {
           console.log('[lobby] Launch clicked. mp=', !!mp, 'connected=', mp && mp.connected, 'isHost=', mp && mp.isHost, 'session=', mp && mp.session);
