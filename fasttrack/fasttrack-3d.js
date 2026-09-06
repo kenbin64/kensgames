@@ -806,6 +806,48 @@ const CameraDirector = {
   }
 };
 
+// MOBILE STARFIELD (Google Play build only — window.FT_MOBILE === true)
+// A starry skydome replaces the speakeasy billiard room. The 3D board is
+// untouched; only the surrounding environment changes. Reuses the ceiling's
+// colored-star canvas technique ("80s wizard night sky") on an inward-facing
+// sphere so stars wrap the board in every direction. Unlit (MeshBasicMaterial)
+// so stars stay bright in the void without depending on room lighting.
+// ════════════════════════════════════════════════════════════════
+function createMobileStarfield() {
+  if (typeof THREE === 'undefined' || !scene) return;
+  const cv = document.createElement('canvas');
+  cv.width = 2048; cv.height = 1024;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#020108';
+  c.fillRect(0, 0, cv.width, cv.height);
+  const starColors = ['#00ffff', '#39ff14', '#bf00ff', '#ffee00', '#ffffff'];
+  for (let s = 0; s < 1400; s++) {
+    const sx = Math.random() * cv.width;
+    const sy = Math.random() * cv.height;
+    const col = starColors[Math.floor(Math.random() * starColors.length)];
+    const r = 0.4 + Math.random() * 1.8;
+    c.globalAlpha = 0.3 + Math.random() * 0.7;
+    const grad = c.createRadialGradient(sx, sy, 0, sx, sy, r * 4);
+    grad.addColorStop(0, col);
+    grad.addColorStop(0.3, col);
+    grad.addColorStop(1, 'transparent');
+    c.fillStyle = grad;
+    c.fillRect(sx - r * 4, sy - r * 4, r * 8, r * 8);
+    c.globalAlpha = 0.7 + Math.random() * 0.3;
+    c.fillStyle = col;
+    c.beginPath();
+    c.arc(sx, sy, r, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1.0;
+  const tex = new THREE.CanvasTexture(cv);
+  const geo = new THREE.SphereGeometry(4000, 48, 32);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false });
+  const dome = new THREE.Mesh(geo, mat);
+  dome.name = 'mobileStarfield';
+  scene.add(dome);
+}
+
 // ════════════════════════════════════════════════════════════════
 // BILLIARD ROOM ENVIRONMENT
 // ════════════════════════════════════════════════════════════════
@@ -2390,7 +2432,8 @@ async function init3D() {
   };
 
   const FT_MOBILE_VOID = ((typeof window !== 'undefined') &&
-    (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches))
+    ((window.FT_MOBILE === true) ||   // Google Play build: always void + starry, any screen size
+     (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches)))
     || Q.voidMode === true;   // very-weak desktops fall into void too (§3 boundary)
   window.FT_MOBILE_VOID = FT_MOBILE_VOID;
 
@@ -2470,6 +2513,10 @@ async function init3D() {
   // ingestArt() now applies each texture to its canvas mesh as it lands.
   try { ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
   if (!FT_MOBILE_VOID) createBilliardRoom();
+  // Google Play build: starry skydome instead of the speakeasy room (board unchanged).
+  else if (typeof window !== 'undefined' && window.FT_MOBILE === true) {
+    try { createMobileStarfield(); } catch (e) { console.warn('starfield error:', e); }
+  }
 
   // Lighting (billiard table lamp style)
   setupLighting();
