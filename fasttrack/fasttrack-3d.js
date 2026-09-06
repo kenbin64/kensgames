@@ -7159,3 +7159,69 @@ function showNoGamePanel() {
     console.error('[ft] could not show the no-game panel', err);
   }
 }
+
+// ═
+// TURN MARQUEE — the seating order, always visible in the footer strip
+// ═
+// Lists every player in ARRAY ORDER with the one holding isTurn lit up, so the
+// current player and who is next are readable at a glance.
+//
+// Why it exists: a bot turn can resolve in milliseconds, and bots deliberately
+// never get the turn banner, so a fast bot turn left NOTHING on screen and was
+// indistinguishable from that seat being skipped.
+//
+// It reads player.isTurn, the same flag the game rotates, so what is on screen
+// is the real turn state rather than a second copy that could drift.
+function renderTurnMarquee() {
+  const track = document.getElementById("ft-turn-marquee-track");
+  if (!track || !window.FastTrackCore) return;
+  const players = window.FastTrackCore.state.players.get("list") || [];
+  if (!players.length) { track.innerHTML = ""; return; }
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const seat = (p, i) => {
+    const active = !!p.isTurn;
+    const tag = active ? "now playing" : (p.isBot ? "bot" : "you");
+    return '<span class="ft-mq-seat' + (active ? " is-turn" : "") + '"'
+      + ' style="color:' + esc(active ? "#fff" : (p.color || "#9fb0c4")) + '">'
+      + '<span class="ft-mq-dot" style="background:' + esc(p.color || "#9fb0c4") + '"></span>'
+      + esc(p.name || ("Seat " + (i + 1)))
+      + ' <span class="ft-mq-tag">' + esc(tag) + "</span></span>";
+  };
+
+  // Rendered twice so the loop reads continuously rather than snapping back to
+  // an empty strip at the end of each pass.
+  const once = players.map(seat).join('<span class="ft-mq-sep">\u2022</span>');
+  const sep = '<span class="ft-mq-sep">\u2022</span>';
+  track.innerHTML = once + sep + once + sep;
+}
+
+// Keep it in step with the turn. Polling rather than an event because the turn
+// changes from several places (a move resolving, a redraw, a bot forfeit, a
+// snapshot from a peer) and a missed subscription would silently show a stale
+// seat, which is the exact class of bug this is meant to make visible.
+let _marqueeLastKey = "";
+function startTurnMarquee() {
+  const tick = () => {
+    try {
+      const C = window.FastTrackCore;
+      if (!C) return;
+      const players = C.state.players.get("list") || [];
+      const key = players.length + "|" + players.map((p) => (p.isTurn ? "1" : "0")).join("")
+        + "|" + players.map((p) => p.name).join(",");
+      if (key !== _marqueeLastKey) { _marqueeLastKey = key; renderTurnMarquee(); }
+    } catch (_) { /* the marquee must never break the game */ }
+  };
+  tick();
+  setInterval(tick, 250);
+}
+if (typeof window !== "undefined") {
+  window.renderTurnMarquee = renderTurnMarquee;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startTurnMarquee);
+  } else {
+    startTurnMarquee();
+  }
+}

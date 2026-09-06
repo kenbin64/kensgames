@@ -49,6 +49,15 @@
   <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
   <div id="ft-footer-bg" aria-hidden="true"></div>
 
+  <!-- ── Turn marquee — the seating order, scrolling in the footer strip.
+       Shows every player in ARRAY ORDER with the one holding isTurn lit up, so
+       whose turn it is, and who is next, is always visible. Bot turns can
+       resolve in milliseconds and previously left nothing on screen at all,
+       which is what made a fast bot turn look like a skipped seat. ── -->
+  <div id="ft-turn-marquee" role="status" aria-live="polite" aria-label="Turn order">
+    <div id="ft-turn-marquee-track"></div>
+  </div>
+
   <!-- ── Peg control bar — 5 peg buttons (per-peg nickname) + Confirm.
        Replaces text-based move hints / instruction banner. JS in 3d-ui.js
        maps clicks onto the engine's move-cycle staging (peg → cycle moves

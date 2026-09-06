@@ -4063,3 +4063,54 @@ textarea,
 
 /* narrower phones: the peg bar wraps to two rows, so the footer band grows */
 @media (max-width: 560px) { :root { --ft-header-h: 58px; --ft-footer-h: 94px; } }
+
+/* ── TURN MARQUEE — seating order scrolling across the footer strip ── */
+/* Sits above #ft-footer-bg (z-index 10) but below the controls, and never
+   takes pointer events so it cannot block a click on the board. */
+#ft-turn-marquee {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  height: var(--ft-footer-h, 44px);
+  z-index: 11; pointer-events: none; overflow: hidden;
+  display: flex; align-items: center;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: .02em; white-space: nowrap;
+}
+#ft-turn-marquee-track {
+  display: inline-flex; align-items: center; gap: 26px;
+  padding-left: 100%;
+  will-change: transform;
+  animation: ft-marquee-scroll 26s linear infinite;
+}
+@keyframes ft-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+/* Someone who prefers less motion still needs to SEE the order, so the strip
+   stays and only the scrolling stops. */
+@media (prefers-reduced-motion: reduce) {
+  #ft-turn-marquee-track { animation: none; padding-left: 12px; }
+}
+.ft-mq-seat {
+  display: inline-flex; align-items: center; gap: 7px;
+  color: rgba(233, 237, 242, .55);
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid transparent;
+}
+.ft-mq-seat .ft-mq-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: currentColor; opacity: .5; flex: none;
+}
+/* The player holding isTurn. Colour alone is not enough, so the active seat
+   also gets a ring, full-strength text and a pulse. */
+.ft-mq-seat.is-turn {
+  color: #fff;
+  background: rgba(255, 255, 255, .10);
+  border-color: rgba(255, 255, 255, .35);
+}
+.ft-mq-seat.is-turn .ft-mq-dot { opacity: 1; animation: ft-mq-pulse 1.1s ease-in-out infinite; }
+@keyframes ft-mq-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .ft-mq-seat.is-turn .ft-mq-dot { animation: none; }
+}
+.ft-mq-seat .ft-mq-tag { opacity: .6; font-weight: 500; font-size: 11px; }
+.ft-mq-sep { color: rgba(233, 237, 242, .25); }
