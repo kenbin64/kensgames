@@ -3273,16 +3273,40 @@ function executeMove(moveIdx) {
   // fasttrack-3d.js), so publishing now cannot yank a peg mid-hop.
   _commitState('move');
 
+  // ── THE TURN IS NOT GIVEN UP UNTIL THE TURN IS FINISHED ──
+  // Every peg movement must land and every cutscene must play out before the
+  // seat is relinquished. For a Card 7 split that means BOTH hops, not just the
+  // first.
+  //
+  // This used to end with a flat `setTimeout(resolveTurn, 6000)` alongside the
+  // drain callback. That fallback fired whether or not anything was still
+  // running, so a long cutscene, or a slow machine dropping frames, had its turn
+  // taken away mid-scene. The safety net was cutting off legitimate play.
+  //
+  // Replaced with a watchdog that WATCHES rather than counts: it keeps waiting
+  // while animations or cutscenes are actually in progress, and only forces the
+  // issue when nothing has been progressing at all. A hard ceiling remains so a
+  // genuinely wedged animation can never freeze the table, and hitting it is
+  // logged loudly because it means something is broken, not merely slow.
   const waitForAll = () => {
     const waitAnims = (cb) => window.waitForAnimations ? window.waitForAnimations(cb) : cb();
     waitAnims(() => {
+      // Must happen BEFORE anything asks whether the table is busy. Until they
+      // are flushed these cutscenes exist only in this local buffer, so the
+      // cutscene queue would report itself empty and the turn could resolve in
+      // the gap before a cut or bullseye scene was ever queued.
       fireDeferredCutscenes();
-      // Resolve when the cutscene queue drains; the fallback guarantees the turn
-      // is never stranded if a cutscene fails to report "drained". Firing twice or
-      // late is harmless — resolveTurn() is idempotent by epoch.
+      // Both of these are only PROMPTS to try resolving. resolveTurn does the
+      // waiting itself and drops any call whose epoch is stale, so whichever
+      // arrives first wins and the rest are no-ops.
       CutsceneManager.whenDrained(() => resolveTurn(_moveEpoch));
-      setTimeout(() => resolveTurn(_moveEpoch), 6000);
+      resolveTurn(_moveEpoch);
     });
+    // waitForAnimations only fires its callback when the animation barrier
+    // comes down. If that never happens the callback above is lost, so prompt
+    // once from out here as well; resolveTurn waits for real motion to finish
+    // regardless of which prompt reaches it.
+    resolveTurn(_moveEpoch);
   };
   waitForAll();
 }
@@ -3431,6 +3455,10 @@ const TurnManager = {
 };
 
 if (typeof window !== 'undefined') window.FastTrackTurns = TurnManager;
+// Exposed so the rule "a turn is not relinquished until the player has finished
+// moving" can be checked from outside, by a test or from the console, rather
+// than only being trusted.
+if (typeof window !== 'undefined') window.isTableBusy = () => _isTableBusy();
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTHORITATIVE TURN MACHINE (user_directive_2026-07-18c)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -3452,11 +3480,61 @@ function _cardIsReplay(card) {
   return !!(r && r.extraTurn);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// IS THE TABLE STILL BUSY?
+// ───────────────────────────────────────────────────────────────────────────
+// A turn is not over when the move is APPLIED, it is over when the player has
+// finished MOVING. Peg hops and cutscenes both run after state has changed, so
+// a turn that rotates the moment the move lands hands over while the previous
+// player is still visibly moving across the board.
+//
+// This predicate is deliberately module level rather than local to executeMove,
+// because executeMove is not the only way a turn is given up. The no-move auto
+// pass, the manual end-turn button and the stuck-turn watchdog all relinquish
+// too, and each one used to do it on a bare timer with no idea whether anything
+// was still in motion. They all route through resolveTurn, so enforcing the
+// rule there covers every path with one check instead of four copies.
+function _isTableBusy() {
+  try {
+    if (typeof window !== 'undefined') {
+      if (typeof window.isPlayResolving === 'function' && window.isPlayResolving()) return true;
+    }
+  } catch (_) { /* an unreadable renderer counts as idle, never as stuck */ }
+  try {
+    if (CutsceneManager && (CutsceneManager.isPlaying
+        || (CutsceneManager.queue && CutsceneManager.queue.length > 0))) return true;
+  } catch (_) { /* same */ }
+  return false;
+}
+
+// How long to keep waiting, and how often to look. The ceiling exists so a
+// genuinely wedged animation can never freeze the table forever; reaching it
+// means something is broken rather than merely slow, so it is logged loudly.
+const TURN_SETTLE_POLL_MS = 120;
+const TURN_SETTLE_CEILING_MS = 45000;
+
 // Resolve the CURRENT turn exactly once. `epoch` was captured when the move was
 // made; if the turn has already moved on this call is stale and is dropped.
-function resolveTurn(epoch) {
+// `waitedMs` is internal: how long this particular resolve has already spent
+// waiting for the table to go quiet.
+function resolveTurn(epoch, waitedMs) {
   if (epoch !== _turnEpoch) return;              // stopgap verifier: stale / duplicate
   if (state.meta.get('winner') !== null) { _resolveWinner(); return; }
+
+  // -- THE RULE: no turn is relinquished while the table is still moving --
+  // Poll rather than subscribe, because the things being waited on are several
+  // independent systems (peg hops, deferred animation starts, the cutscene
+  // queue) with no single completion event between them.
+  if (_isTableBusy()) {
+    const waited = waitedMs || 0;
+    if (waited < TURN_SETTLE_CEILING_MS) {
+      setTimeout(() => resolveTurn(epoch, waited + TURN_SETTLE_POLL_MS), TURN_SETTLE_POLL_MS);
+      return;
+    }
+    console.warn('[TURN] settle ceiling reached after '
+      + Math.round(waited / 1000) + 's with animations or cutscenes still'
+      + ' reporting busy. Ending the turn to avoid a freeze; something is wedged.');
+  }
   const card = state.deck.get('currentCard');
   if (_cardIsReplay(card)) _replaySameSeat();    // replay → same seat draws again
   else endTurn(epoch);                           // deterministic round-robin advance (epoch-verified)
@@ -4241,7 +4319,19 @@ function botTurn() {
             1600
           );
         } catch (_) { /* a missing toast must never block the turn */ }
-        endTurn(_botEpoch);
+        // resolveTurn, NOT endTurn. Two things were wrong with going straight
+        // to endTurn here.
+        //
+        // 1. It is the one relinquish path that skipped the "wait until the
+        //    table has stopped moving" rule, so a bot with no legal move handed
+        //    the turn on in a few milliseconds while the previous player was
+        //    still visibly moving. Measured: every single mid-motion turn change
+        //    in a four seat game came through this line.
+        // 2. A, 6, J, Q, K and JOKER grant a redraw EVERY time they are drawn,
+        //    including when they produce no legal move. The human no-move path
+        //    already routes through resolveTurn and gets that redraw; this line
+        //    rotated unconditionally, so bots silently lost it.
+        resolveTurn(_botEpoch);
         return;
       }
 
@@ -5132,6 +5222,12 @@ const CutsceneManager = {
     }
   }
 };
+
+// Exposed for the same reason as TurnManager. A top level const lives in the
+// script's lexical scope and never lands on the global, so anything outside
+// this file asking whether a cutscene was playing read undefined and quietly
+// got "no", including the check that holds a turn back until scenes finish.
+if (typeof window !== 'undefined') window.CutsceneManager = CutsceneManager;
 
 // ── Cutscene CSS animations ──
 (function injectCutsceneCSS() {
