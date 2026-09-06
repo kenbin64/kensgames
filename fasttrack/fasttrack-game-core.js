@@ -1755,18 +1755,23 @@ function calculateValidMoves() {
       if (safeMatch) {
         const safeBp = parseInt(safeMatch[1]);
         const safeSlot = parseInt(safeMatch[2]);
-        // Only move forward (higher slot number) within safe zone
+        // Forward only (higher slot number), and the landing must be exact.
+        //
+        // The stop condition used to be inverted: it scanned forward and broke
+        // at the first EMPTY hole, so only a move of one hole was ever
+        // considered. A peg in slot 1 drawing a 3 into an empty zone produced
+        // no safe-zone option at all and the engine quietly moved a different
+        // peg. An empty hole is what a peg moves THROUGH; an occupied one is
+        // what blocks it, and that is what ends the walk.
         for (let h = safeSlot + 1; h <= SAFE_ZONE_SIZE; h++) {
           const nextSafe = `safe-${safeBp}-${h}`;
-          const occ = state.board.get(nextSafe);
-          if (!occ) {
-            const dist = h - safeSlot;
-            if (dist === rules.movement) {
-              const path = [];
-              for (let s = safeSlot + 1; s <= h; s++) path.push(`safe-${safeBp}-${s}`);
-              moves.push({ type: 'move', pegIdx: pi, dest: nextSafe, steps: dist, from: peg.holeId, path });
-            }
-            break; // can't jump over unoccupied holes
+          if (state.board.get(nextSafe)) break;   // a peg in the way blocks the path
+          const dist = h - safeSlot;
+          if (dist === rules.movement) {
+            const path = [];
+            for (let s = safeSlot + 1; s <= h; s++) path.push(`safe-${safeBp}-${s}`);
+            moves.push({ type: 'move', pegIdx: pi, dest: nextSafe, steps: dist, from: peg.holeId, path });
+            break;                               // exact landing found; nothing further can match
           }
         }
       }
