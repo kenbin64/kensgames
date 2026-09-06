@@ -499,7 +499,8 @@ function initGame(playerCount = 2, config = {}) {
   // Provisional — final starting seat is chosen AFTER the roster is built
   // (so winner-name lookup can match against the new roster). See the
   // "Starting-player selection" block lower in this function.
-  state.players.set('current', 0);
+  TurnManager.reset();
+  TurnManager.set(0, 'init');
   // Reset host-authoritative turn-rotation counters for the new game.
   _turnSeq = 0;
   _lastAppliedTurnSeq = 0;
@@ -713,13 +714,15 @@ function initGame(playerCount = 2, config = {}) {
         }
       }
     }
-    state.players.set('current', startingIdx);
+    TurnManager.set(startingIdx, 'init');
     if (window.CameraDirector) window.CameraDirector.setActivePlayer(startingIdx);
     log(`Starting player: ${players[startingIdx]?.name || `Seat ${startingIdx + 1}`}`);
   })();
 
   // ─── Peg Matrix (substrate) ───
   // peg(id) | color | position(hole) | state
+  // A snapshot legitimately relocates the turn; do not judge it as a jump.
+  try { TurnManager._history.push({ from: -1, to: TurnManager.current(), reason: 'restore', at: Date.now(), seats: TurnManager.count() }); } catch (_) {}
   syncPegMatrix();
 
   // Deck
@@ -3277,6 +3280,102 @@ function executeMove(moveIdx) {
   waitForAll();
 }
 
+// ═
+// TURN MANAGER — one owner of whose turn it is, and it checks itself
+// ═
+// Whose turn it is has exactly ONE representation: the index
+// state.players.current. Deliberately an index and not an isTurn boolean per
+// player, because an index CANNOT represent two seats holding the turn at once,
+// or none holding it. N booleans can, and then a desync between them is a whole
+// new class of bug. isTurn(i) below is derived from the index, so the two can
+// never disagree.
+//
+// What was missing was not a different data shape, it was ENFORCEMENT. Nothing
+// checked that the turn actually rotates by one, so a skipped seat left no
+// evidence and could only be caught by someone watching the screen. Every
+// change of turn now goes through set(), which validates the transition and
+// records it. A violation is logged loudly and kept, so a player who sees a
+// seat skipped can run FastTrackTurns.report() and hand over proof instead of
+// a description.
+const TurnManager = {
+  _history: [],      // every accepted transition, newest last
+  _violations: [],   // transitions that broke the rules
+  _max: 400,
+
+  seats() { return state.players.get('list') || []; },
+  count() { return this.seats().length; },
+  current() { const c = state.players.get('current'); return Number.isInteger(c) ? c : 0; },
+
+  /** Derived, so it can never disagree with the index. */
+  isTurn(seatIdx) { return this.current() === Number(seatIdx); },
+
+  /** The seat whose turn it is, or null before the game starts. */
+  activeSeat() { return this.seats()[this.current()] || null; },
+
+  /** What the next seat must be. Pure round robin, no exceptions. */
+  nextSeat() { const n = this.count(); return n ? (this.current() + 1) % n : 0; },
+
+  /**
+   * The ONLY place the turn changes.
+   * reason: 'init' | 'advance' | 'restore'
+   *   init     game start, any seat is legal
+   *   advance  must be exactly the next seat in array order
+   *   restore  applying an authoritative snapshot from elsewhere
+   */
+  set(next, reason) {
+    const n = this.count();
+    const from = this.current();
+    const to = Number(next);
+    const entry = { from, to, reason, at: Date.now(), seats: n };
+
+    if (!Number.isInteger(to) || to < 0 || (n && to >= n)) {
+      entry.error = `seat ${next} is not a valid index for ${n} players`;
+    } else if (reason === 'advance' && n > 1) {
+      const expected = (from + 1) % n;
+      if (to !== expected) {
+        const skipped = [];
+        for (let s = (from + 1) % n; s !== to; s = (s + 1) % n) {
+          skipped.push(s);
+          if (skipped.length >= n) break;
+        }
+        entry.error = `turn jumped ${from} -> ${to}, expected ${expected}; skipped seat(s) ${skipped.join(',')}`;
+        entry.skipped = skipped;
+      }
+    }
+
+    if (entry.error) {
+      entry.stack = (new Error('turn-order violation')).stack;
+      this._violations.push(entry);
+      console.error('[TURN][VIOLATION]', entry.error);
+      console.error(entry.stack);
+      // Deliberately NOT blocked. Refusing the write here would freeze the game
+      // on a bad transition, which is worse than a skipped seat. Record and
+      // continue; the whole point is evidence, not enforcement by veto.
+    }
+
+    this._history.push(entry);
+    if (this._history.length > this._max) this._history.shift();
+    state.players.set('current', to);
+    return to;
+  },
+
+  /** Hand to a player who just saw a seat skipped. */
+  report() {
+    const names = this.seats().map((p, i) => `${i}:${p.name}${p.isBot ? '(bot)' : ''}`);
+    return {
+      seats: names,
+      current: this.current(),
+      activeIsBot: !!(this.activeSeat() || {}).isBot,
+      violations: this._violations.slice(-20),
+      recent: this._history.slice(-40).map(h =>
+        `${h.from}->${h.to} (${h.reason})${h.error ? '  !! ' + h.error : ''}`),
+    };
+  },
+
+  reset() { this._history = []; this._violations = []; },
+};
+
+if (typeof window !== 'undefined') window.FastTrackTurns = TurnManager;
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTHORITATIVE TURN MACHINE (user_directive_2026-07-18c)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -3714,7 +3813,9 @@ function _applyTurnAdvance(fromCi, next, seq) {
   console.log('[TURN] _applyTurnAdvance called. fromCi:', fromCi, 'next:', next, 'seq:', seq, 'players:', players.map(p => p && p.name));
 
   state.deck.set('currentCard', null);
-  state.players.set('current', next);
+  // Through the manager so a jump that is not exactly +1 is recorded with a
+  // stack trace instead of vanishing.
+  TurnManager.set(next, 'advance');
   _turnEpoch++; // new turn instance — any pending resolve for the old seat is now stale
   const _advEpoch = _turnEpoch; // this turn's epoch; the enable-gate below verifies against it
   // Turn boundary: cancel any pending no-legal-move auto-relinquish from the
