@@ -3816,6 +3816,161 @@ function getCurrentPlayerName() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// BOT STRATEGY — difficulty profiles and positional play
+// ═══════════════════════════════════════════════════════════════════════════
+// player.aiDifficulty was already set on every bot at init, but nothing read it,
+// so all four settings played identically. These profiles are what make the
+// setting mean something.
+//
+// DIFFICULTY IS THE CUTTING AXIS, per the house rules:
+//   easy    only cuts when there is no other legal move
+//   normal  cuts when it is strategically worth it
+//   hard    hunts other pegs, humans first, and will go out of its way to do it
+//   expert  hard, with sharper positional play on top
+//
+// Positional play is a separate thing from aggression, so it scales in by
+// weight rather than switching on and off.
+const AI_PROFILES = {
+  easy: {
+    cutMode: 'last-resort',
+    cutBonus: 0,
+    huntWeight: 0,
+    humanPreference: 0,
+    stagingWeight: 0,
+    bullseyeAppetite: 0.35,
+  },
+  normal: {
+    cutMode: 'strategic',
+    cutBonus: 0,            // the peg personality's own w.capture decides
+    huntWeight: 0,
+    humanPreference: 0,
+    stagingWeight: 45,
+    bullseyeAppetite: 1.0,
+  },
+  hard: {
+    cutMode: 'aggressive',
+    cutBonus: 55,
+    huntWeight: 40,
+    humanPreference: 35,
+    stagingWeight: 55,
+    bullseyeAppetite: 1.15,
+  },
+  expert: {
+    cutMode: 'aggressive',
+    cutBonus: 70,
+    huntWeight: 55,
+    humanPreference: 45,
+    stagingWeight: 70,
+    bullseyeAppetite: 1.25,
+  },
+};
+
+// How far a capture is pushed down when the profile says "last resort". It has
+// to exceed anything the rest of the scoring can award, so that ANY non-capture
+// outranks ANY capture. Only when every legal move is a cut does one win.
+const LAST_RESORT_CUT_PENALTY = 100000;
+
+function _aiProfile(player) {
+  const key = String((player && player.aiDifficulty) || 'normal').toLowerCase();
+  return AI_PROFILES[key] || AI_PROFILES.normal;
+}
+
+// Clockwise distance along the shared track from one hole to another. Null when
+// either hole is off the track (holding, safe zone, home, bullseye), because
+// distance is meaningless there.
+function _trackGap(fromHole, toHole) {
+  if (!fromHole || !toHole) return null;
+  const a = CLOCKWISE_TRACK.indexOf(fromHole);
+  const b = CLOCKWISE_TRACK.indexOf(toHole);
+  if (a < 0 || b < 0) return null;
+  const n = CLOCKWISE_TRACK.length;
+  return ((b - a) % n + n) % n;
+}
+
+// ── THE FOUR-BACK STAGING RULE ─────────────────────────────────────────────
+// A peg only becomes eligible for the safe zone by crossing its own entrance,
+// outer-{bp}-2. Card 4 moves BACKWARD, so a peg parked 1 to 4 holes PAST its
+// entrance can play a 4, cross back over it, and be eligible to enter the safe
+// zone on a later turn. That turns the 4 from a setback into a shortcut, and it
+// is the most useful piece of positional play in the game.
+//
+// Only worth anything to a peg that is not eligible yet. Once a peg has crossed,
+// parking there does nothing for it.
+const SAFE_ENTRY_STAGING_BAND = 4;
+
+function _holesPastSafeEntry(holeId, boardPosition) {
+  return _trackGap(`outer-${boardPosition}-2`, holeId);
+}
+
+function _isStagedForFour(holeId, boardPosition) {
+  const past = _holesPastSafeEntry(holeId, boardPosition);
+  return past !== null && past >= 1 && past <= SAFE_ENTRY_STAGING_BAND;
+}
+
+// Does this move land an opponent peg under one of ours?
+function _moveCutsSomeone(move, ci) {
+  const hit = (dest) => {
+    if (!dest) return false;
+    const occ = state.board.get(dest);
+    return !!(occ && occ.playerIdx !== ci);
+  };
+  return hit(move.dest) || (move.type === 'split' && hit(move.dest2));
+}
+
+// ── HUNTING (hard and expert) ──────────────────────────────────────────────
+// Closing on prey matters even when this turn cannot cut, because a peg sitting
+// a few holes behind an opponent threatens it on the next draw. Humans are
+// worth more than bots, because that is what makes a hard bot feel hard to a
+// person. Returns a bonus for ending at `dest`.
+function _huntBonus(dest, ci, players, profile) {
+  if (!profile.huntWeight || !dest) return 0;
+  let best = 0;
+  for (let pi = 0; pi < players.length; pi++) {
+    if (pi === ci) continue;
+    const isHuman = !players[pi].isBot;
+    for (const peg of players[pi].pegs) {
+      // Only pegs that can actually be cut are worth chasing.
+      if (peg.holeType === 'holding' || peg.holeType === 'safezone'
+        || peg.holeType === 'home') continue;
+      const d = _trackGap(dest, peg.holeId);
+      // d === 0 is the cut itself, scored elsewhere. Past ten holes the threat
+      // is too far off to steer for.
+      if (d === null || d === 0 || d > 10) continue;
+      const closeness = (11 - d) / 10;            // 1.0 adjacent, 0.1 at ten
+      let value = profile.huntWeight * closeness;
+      if (isHuman) value += profile.humanPreference * closeness;
+      if (value > best) best = value;
+    }
+  }
+  return best;
+}
+
+// ── HOW FAR BEHIND ARE WE ──────────────────────────────────────────────────
+// Used for the bullseye decision: a peg that is behind and needs a quick
+// advance can justify the risk of sitting in the centre. Returns 0 when this
+// player is leading and approaches 1 when they are furthest back.
+function _behindFactor(players, ci) {
+  const progress = (pl) => {
+    let n = 0;
+    for (const pg of pl.pegs) {
+      if (pg.holeType === 'home') n += 3;
+      else if (pg.holeType === 'safezone') n += 2;
+      else if (pg.holeType !== 'holding') n += 1;
+    }
+    return n;
+  };
+  const mine = progress(players[ci]);
+  let best = mine;
+  for (let pi = 0; pi < players.length; pi++) {
+    if (pi === ci) continue;
+    const p = progress(players[pi]);
+    if (p > best) best = p;
+  }
+  if (best <= 0) return 0;
+  return Math.max(0, Math.min(1, (best - mine) / best));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // BOT AI
 // ═══════════════════════════════════════════════════════════════════════════
 function botTurn() {
@@ -3935,6 +4090,20 @@ function botTurn() {
       const _bullseyeAdjust = Math.max(-90,
         _safeBoardBonus - _threatPenalty * (1 - _lateGameRatio * 0.7));
 
+      // ── DIFFICULTY + POSITIONAL STRATEGY ──────────────────────────────
+      const _profile = _aiProfile(player);
+      const _behind = _behindFactor(players, ci);
+      // "Less likely for someone to cut a peg on the bullseye when few other
+      // pegs are on the board", and "towards the end of the game a peg that is
+      // behind can take it for a quick advance". _bullseyeAdjust already
+      // measures the board; appetite scales it by difficulty and the behind
+      // term adds the catch-up case.
+      const _bullseyeBias = (_bullseyeAdjust * _profile.bullseyeAppetite)
+        + (_behind * 40 * _profile.bullseyeAppetite);
+      // Easy only cuts as a last resort, which is only meaningful if some other
+      // move exists. Computed once per turn, not per move.
+      const _anyNonCaptureMove = vm.some(mv => !_moveCutsSomeone(mv, ci));
+
       let bestIdx = 0, bestScore = -Infinity;
       for (let i = 0; i < vm.length; i++) {
         const m = vm[i];
@@ -3942,7 +4111,7 @@ function botTurn() {
 
         if (m.type === 'enterFastTrack') score += w.fasttrack + 50;
         else if (m.type === 'enterBullseye') {
-          score += w.fasttrack + 80 + _bullseyeAdjust;
+          score += w.fasttrack + 80 + _bullseyeBias;
           // FT peg → bullseye is usually wasteful: traversing FT is faster.
           // Only valuable if there's an opponent on bullseye to cut.
           const _enterPeg = player.pegs[m.pegIdx];
@@ -4031,7 +4200,7 @@ function botTurn() {
             // Bullseye landing — high-risk/high-reward: scaled by board state.
             // FT-peg-to-bullseye on a split is usually wasteful unless cutting.
             if (dest === 'bullseye') {
-              score += w.fasttrack + 50 + _bullseyeAdjust;
+              score += w.fasttrack + 50 + _bullseyeBias;
               m.toBullseye = true;
               const _movePeg = player.pegs[pegIdx];
               const _bOcc = state.board.get('bullseye');
@@ -4065,6 +4234,56 @@ function botTurn() {
               (_peg1?.onFasttrack && (m.dest === _ownFT || _path1.includes(_ownFT))) ||
               (_peg2?.onFasttrack && (m.dest2 === _ownFT || _path2b.includes(_ownFT)));
             if (_ftReached) score += 40;
+          }
+        }
+
+        // ── DIFFICULTY: how this bot feels about cutting ──────────────
+        const _cuts = _moveCutsSomeone(m, ci);
+        if (_cuts) {
+          if (_profile.cutMode === 'last-resort' && _anyNonCaptureMove) {
+            // Easy: never cut while anything else is playable. The penalty is
+            // larger than any bonus above it, so every non-capture outranks
+            // every capture. When all moves are cuts, one still wins.
+            score -= LAST_RESORT_CUT_PENALTY;
+          } else if (_profile.cutMode === 'aggressive') {
+            score += _profile.cutBonus;
+            // Hard and expert prefer a human's peg over a bot's.
+            if (_profile.humanPreference) {
+              for (const dest of [m.dest, m.dest2]) {
+                if (!dest) continue;
+                const occ = state.board.get(dest);
+                if (occ && occ.playerIdx !== ci && players[occ.playerIdx]
+                  && !players[occ.playerIdx].isBot) {
+                  score += _profile.humanPreference;
+                  break;
+                }
+              }
+            }
+          }
+        } else if (_profile.huntWeight) {
+          // No cut available on this move, so value getting CLOSE to prey. Only
+          // hard and expert do this, and it is what "goes out of its way" means.
+          score += _huntBonus(m.dest, ci, players, _profile);
+          if (m.type === 'split') score += _huntBonus(m.dest2, ci, players, _profile) * 0.6;
+        }
+
+        // ── POSITIONAL: the four-back staging rule ────────────────────
+        // Park a not-yet-eligible peg 1 to 4 holes past its own safe-zone
+        // entrance, so a Card 4 carries it back across and makes it eligible.
+        if (_profile.stagingWeight) {
+          const _stagePeg = player.pegs[m.pegIdx];
+          if (_stagePeg && !_stagePeg.eligibleForSafeZone
+            && _isStagedForFour(m.dest, _bpForBot)) {
+            score += _profile.stagingWeight;
+            m.stagesForFour = true;   // surfaced for LogicLens / debugging
+          }
+          if (m.type === 'split') {
+            const _stagePeg2 = player.pegs[m.peg2Idx];
+            if (_stagePeg2 && !_stagePeg2.eligibleForSafeZone
+              && _isStagedForFour(m.dest2, _bpForBot)) {
+              score += _profile.stagingWeight * 0.6;
+              m.stagesForFour = true;
+            }
           }
         }
 
