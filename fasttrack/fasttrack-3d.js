@@ -5418,16 +5418,21 @@ function renderBoard3D() {
             const anim = (pendingAnim && pendingAnim.pegId === pegId) ? pendingAnim
               : (pendingAnim2 && pendingAnim2.pegId === pegId) ? pendingAnim2
                 : null;
+            // A Card 7 split moves TWO pegs. Both used to set off at the same
+            // instant, so there was no way to see which peg took which half of
+            // the seven. leg 1 runs first and leg 2 waits for it (see
+            // startAllAnims), which is what makes the split readable.
+            const leg = (pendingAnim2 && pendingAnim2.pegId === pegId) ? 1 : 0;
             if (anim && anim.path && anim.path.length > 0) {
               // Defer animation start until camera is in place
               _animatingPegs.add(pegId);
               CameraDirector.followPeg(pegId);
-              _deferredAnims.push({ pegId, path: anim.path, existing, holeId });
+              _deferredAnims.push({ pegId, path: anim.path, existing, holeId, leg });
             } else if (!_animatingPegs.has(pegId)) {
               // No path — single hop to destination (also deferred)
               _animatingPegs.add(pegId);
               CameraDirector.followPeg(pegId);
-              _deferredAnims.push({ pegId, path: null, existing, holeId });
+              _deferredAnims.push({ pegId, path: null, existing, holeId, leg });
             }
           }
           existing.mesh.visible = true;
@@ -5443,11 +5448,23 @@ function renderBoard3D() {
     _deferredAnimPending = true;
     const startAllAnims = () => {
       _deferredAnimPending = false;
-      for (const da of _deferredAnims) {
+
+      // Everything runs together EXCEPT the second leg of a Card 7 split,
+      // which waits for the first leg to land. Two pegs setting off at the
+      // same instant is what made a split unreadable: you could see seven
+      // holes worth of movement happen and not know which peg took which
+      // half. A cut peg heading home still runs alongside leg 1, because
+      // that is one event (a peg was knocked off) rather than two choices.
+      const legOf = (da) => (da && da.leg === 1) ? 1 : 0;
+      const firstLeg = _deferredAnims.filter(da => legOf(da) === 0);
+      const secondLeg = _deferredAnims.filter(da => legOf(da) === 1);
+
+      const runOne = (da, after) => {
         const onDone = () => {
           _animatingPegs.delete(da.pegId);
           _clearAnimSafetyTimeout();
           da.existing.holeId = da.holeId;
+          if (after) after();
           if (_animatingPegs.size === 0) {
             CameraDirector.unlockCutscene();
             if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
@@ -5458,6 +5475,28 @@ function renderBoard3D() {
         } else {
           movePeg(da.pegId, da.holeId, onDone);
         }
+      };
+
+      // The second leg is held until every animation in the first has landed.
+      // Counted rather than hung off one callback, because the first group can
+      // hold both the moving peg and a peg it just cut.
+      let remaining = firstLeg.length;
+      const startSecondLeg = () => {
+        if (--remaining > 0) return;
+        for (const da of secondLeg) {
+          CameraDirector.followPeg(da.pegId);
+          runOne(da, null);
+        }
+      };
+
+      if (firstLeg.length === 0) {
+        // Nothing to wait for. Should not happen for a real split, but a
+        // second leg with no first must still move rather than stall the turn.
+        for (const da of secondLeg) runOne(da, null);
+        return;
+      }
+      for (const da of firstLeg) {
+        runOne(da, secondLeg.length ? startSecondLeg : null);
       }
     };
     // Wait for camera to smoothly arrive, then start hopping
@@ -5927,11 +5966,31 @@ function _boostHoleEmissive(holeId, hexColor) {
   hole.mesh.material.emissiveIntensity = 1.4;
 }
 
+// Free one object's GPU resources. Separate from the loop below because a
+// highlight is not always a single mesh: the split ghost peg is a cloned
+// GROUP whose geometry and materials hang off its children, and the step
+// count is a sprite that owns a canvas texture. Disposing only the top level
+// object leaked all of that, and highlights are rebuilt on every refresh.
+function _disposeHighlightObject(obj) {
+  const dropMaterial = (m) => {
+    if (!m) return;
+    if (m.map && m.map.dispose) m.map.dispose();
+    if (m.dispose) m.dispose();
+  };
+  const dropOne = (o) => {
+    if (!o) return;
+    if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+    if (Array.isArray(o.material)) o.material.forEach(dropMaterial);
+    else dropMaterial(o.material);
+  };
+  if (obj.traverse) obj.traverse(dropOne);
+  else dropOne(obj);
+}
+
 function clearHighlights() {
   for (const mesh of highlightMeshes) {
     if (mesh.parent) mesh.parent.remove(mesh);
-    if (mesh.geometry) mesh.geometry.dispose();
-    if (mesh.material) mesh.material.dispose();
+    _disposeHighlightObject(mesh);
   }
   highlightMeshes.length = 0;
   _restoreBoostedHoles();
@@ -6087,6 +6146,101 @@ function _drawCommittedSplitPath(vm, color) {
   if (Array.isArray(path)) {
     for (const hid of path) createGlowRing(hid, color, hid === (path[path.length - 1]), { pulsing: false });
   }
+
+  // A trail of green rings says a route was picked, but not WHICH peg is
+  // going or WHERE it ends up, and with seven holes lit at once that was the
+  // confusing part. So show the committed leg as an object rather than a
+  // trail: the peg itself haloed at its start, a ghost of it standing on the
+  // landing hole, and the number of steps still to spend floating above it.
+  const dest = Array.isArray(path) && path.length ? path[path.length - 1] : null;
+  const steps = firstIsLeg1 ? first.steps : first.steps2;
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ci = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('current') || 0 : 0;
+  const peg = players[ci] && players[ci].pegs ? players[ci].pegs[choice.pegIdx] : null;
+
+  // Solid, not pulsing: the gold pulse means "you may still choose this".
+  // This one is settled, and it should not compete with the live choices.
+  if (peg && peg.id) createPegHalo(peg.id, color, { pulsing: false });
+  if (peg && peg.id && dest) _createGhostPeg(peg.id, dest, color);
+  if (dest && steps != null) _createSplitCountLabel(dest, 7 - steps);
+}
+
+// A translucent copy of the peg standing on the hole it is committed to.
+// Cloned from the real mesh so it is unmistakably the same peg rather than a
+// generic marker.
+function _createGhostPeg(pegId, holeId, color) {
+  const peg = pegRegistry.get(pegId);
+  const hole = holeRegistry.get(holeId);
+  if (!peg || !peg.mesh || !hole) return null;
+  let ghost;
+  try { ghost = peg.mesh.clone(true); } catch (_) { return null; }
+
+  // Clone shares materials with the real peg, so give every one of them a
+  // private translucent copy. Without this the peg on the board would go
+  // see-through too, and disposing the highlight would break its material.
+  ghost.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    const src = Array.isArray(o.material) ? o.material : [o.material];
+    const ghosted = src.map((m) => {
+      const c = m.clone();
+      c.transparent = true;
+      c.opacity = 0.34;
+      c.depthWrite = false;
+      if (c.emissive && c.emissive.setHex) { c.emissive.setHex(color); c.emissiveIntensity = 0.55; }
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? ghosted : ghosted[0];
+    o.renderOrder = 12;
+  });
+
+  // Pegs and glow rings live in DIFFERENT spaces, and mixing them up puts the
+  // ghost 90 units above the table where nothing can see it. Rings go into
+  // boardGroup and use the hole's own y; a peg mesh is parented to pegGroup
+  // and positioned in scene space at boardY + LINE_HEIGHT + 1. The ghost is a
+  // peg, so it follows the peg convention exactly, taken from createPeg.
+  const boardY = boardGroup ? boardGroup.position.y : 90;
+  ghost.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
+  ghost.userData.pulsing = false;
+  (peg.mesh.parent || scene).add(ghost);
+  highlightMeshes.push(ghost);
+  return ghost;
+}
+
+// "4 LEFT" over the committed landing hole. The rail says the same thing in
+// words, but the player is looking at the board, not the rail.
+function _createSplitCountLabel(holeId, remaining) {
+  const hole = holeRegistry.get(holeId);
+  if (!hole || typeof THREE === 'undefined' || !THREE.Sprite) return null;
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 128;
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.font = 'bold 76px system-ui, -apple-system, Segoe UI, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineWidth = 10; c.strokeStyle = 'rgba(0,0,0,0.85)';
+  c.strokeText(String(remaining), 128, 48);
+  c.fillStyle = '#ffd700';
+  c.fillText(String(remaining), 128, 48);
+  c.font = 'bold 30px system-ui, -apple-system, Segoe UI, sans-serif';
+  c.lineWidth = 6;
+  c.strokeText('LEFT', 128, 100);
+  c.fillStyle = '#ffffff';
+  c.fillText('LEFT', 128, 100);
+
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  // Scene space, to sit above the ghost peg rather than above the board plane.
+  const boardY = boardGroup ? boardGroup.position.y : 90;
+  sprite.position.set(hole.position.x, boardY + LINE_HEIGHT + 42, hole.position.z);
+  sprite.scale.set(46, 23, 1);
+  sprite.renderOrder = 30;
+  sprite.userData.pulsing = false;
+  scene.add(sprite);
+  highlightMeshes.push(sprite);
+  return sprite;
 }
 
 function highlightMovePaths(moves) {
