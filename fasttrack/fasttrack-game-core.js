@@ -4135,6 +4135,22 @@ function _behindFactor(players, ci) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BOT AI
+// ── BOT PACING — how long a bot takes, so a person can SEE it happen ──
+// A bot needs no time to decide anything; these pauses exist purely so the
+// table is followable. Previously 500 + 600 = 1.1s per bot turn, and with three
+// bots a whole round was over in about three seconds. Reported as bots being
+// 'skipped': the turn genuinely reached every seat, it was just gone before it
+// registered. A bot that FORFEITS is the worst case, because there is no peg
+// animation to watch either, just a toast.
+//
+// Tunable live from the console without a redeploy:
+//     FastTrackPace.think = 1400; FastTrackPace.decide = 1600;
+// Set both low (say 120) to fast-forward a game while testing.
+const BOT_PACE = {
+  think: 900,    // before the bot draws its card
+  decide: 1100,  // between the draw landing and the move being played
+};
+if (typeof window !== 'undefined') window.FastTrackPace = BOT_PACE;
 // ═══════════════════════════════════════════════════════════════════════════
 function botTurn() {
   // ── HARD GUARD (user_directive_2026-05-18: "bots taking over human turns")
@@ -4483,8 +4499,8 @@ function botTurn() {
       }
 
       executeMove(bestIdx);
-    }, 600);
-  }, 500);
+    }, BOT_PACE.decide);
+  }, BOT_PACE.think);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

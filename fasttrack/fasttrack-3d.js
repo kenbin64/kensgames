@@ -7183,7 +7183,17 @@ function renderTurnMarquee() {
 
   const seat = (p, i) => {
     const active = !!p.isTurn;
-    const tag = active ? "now playing" : (p.isBot ? "bot" : "you");
+    // The active seat shows WHICH BEAT of its turn it is on, so a bot reads the
+    // same way a human turn does: first "drawing" with no card up, then the card
+    // it drew, then the move. Bots always had those two beats; they were simply
+    // too fast to register, which is what made a bot turn look like no turn.
+    let tag;
+    if (active) {
+      const c = window.FastTrackCore.state.deck.get("currentCard");
+      tag = c ? ("drew " + (c.display || c.value)) : "drawing...";
+    } else {
+      tag = p.isBot ? "bot" : "you";
+    }
     return '<span class="ft-mq-seat' + (active ? " is-turn" : "") + '"'
       + ' style="color:' + esc(active ? "#fff" : (p.color || "#9fb0c4")) + '">'
       + '<span class="ft-mq-dot" style="background:' + esc(p.color || "#9fb0c4") + '"></span>'
@@ -7209,8 +7219,11 @@ function startTurnMarquee() {
       const C = window.FastTrackCore;
       if (!C) return;
       const players = C.state.players.get("list") || [];
+      // The card is part of the key, or the draw beat would never be redrawn.
+      const c = C.state.deck.get("currentCard");
       const key = players.length + "|" + players.map((p) => (p.isTurn ? "1" : "0")).join("")
-        + "|" + players.map((p) => p.name).join(",");
+        + "|" + players.map((p) => p.name).join(",")
+        + "|" + (c ? (c.display || c.value) : "-");
       if (key !== _marqueeLastKey) { _marqueeLastKey = key; renderTurnMarquee(); }
     } catch (_) { /* the marquee must never break the game */ }
   };
