@@ -2760,10 +2760,18 @@ async function init3D() {
     //
     // dev_observer is the one deliberate exception: it builds its own all-AI
     // roster above for recording, and is opted into explicitly by URL.
+    // A roster is the strongest signal, but not the only legitimate one. The
+    // lobby's own Play Solo button navigates to 3d.html?mode=solo&players=N
+    // with no roster at all, and that IS an intentional launch. What a cold
+    // open looks like is a bare URL with no query string whatsoever, so the
+    // presence of launch params is what separates the two.
+    const launchedExplicitly = usp.has('mode') || usp.has('players')
+      || usp.has('session') || usp.has('code');
+
     const hasRealRoster = useRuntimeRoster || useSessionRoster || useSameScreenRoster
       || (Array.isArray(initConfig.sessionPlayers) && initConfig.sessionPlayers.length >= 2);
 
-    if (!hasRealRoster && !isDevObserver) {
+    if (!hasRealRoster && !launchedExplicitly && !isDevObserver) {
       console.warn('[ft] No game to render: reached the board without a roster from the lobby.');
       showNoGamePanel();
       return;

@@ -588,7 +588,14 @@ function initGame(playerCount = 2, config = {}) {
       name,
       avatar,
       userId: sp ? sp.user_id : null,
-      aiDifficulty: isBot ? (sp && (sp.level || sp.aiDifficulty || aiDifficulty)) : null,
+      // Per-seat level first, then the game-wide setting. The old form was
+      //   sp && (sp.level || sp.aiDifficulty || aiDifficulty)
+      // which short-circuits to undefined when there is no session player at
+      // all, so a solo game launched without a roster gave every bot a null
+      // difficulty and quietly ignored the one the player picked.
+      aiDifficulty: isBot
+        ? ((sp && (sp.level || sp.aiDifficulty)) || aiDifficulty || 'normal')
+        : null,
       color: PLAYER_COLORS[bp],
       boardPosition: bp,
       isBot,
