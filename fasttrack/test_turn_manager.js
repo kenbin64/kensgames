@@ -145,6 +145,76 @@ section('5. Real play produces no violations');
   ok(Array.isArray(rep.recent) && rep.recent.length > 0, 'report() shows recent transitions');
 }
 
+// ───────────────────────────────────────────────────────────
+section('6. The spec, stated as the rule: random start, +1, wrap to 0');
+{
+  // "when a game initializes the array will show all players and it will choose
+  //  a random player to start, then increment 1 each time when a turn changes.
+  //  once it gets to the length of the array it starts at 0 again. That player
+  //  will hold the isTurn boolean to true while the others will be false."
+  const g = createEngine();
+  g.initGame(4, { sessionSeed: 'spec' });
+  const TM = g.sandbox.FastTrackTurns;
+  const players = g.state.players.get('list') || [];
+
+  ok(players.every(p => typeof p.isTurn === 'boolean'),
+     'every player in the array carries an isTurn boolean');
+
+  const holders = players.filter(p => p.isTurn).length;
+  ok(holders === 1, 'at game start exactly one player holds isTurn', `got ${holders}`);
+  ok(players[TM.current()].isTurn === true,
+     'and it is the seat the game started on');
+
+  // Walk a full lap and check the flag moves one seat at a time and wraps.
+  const order = [];
+  for (let i = 0; i < 8; i++) {
+    order.push(players.findIndex(p => p.isTurn));
+    TM.set(TM.nextSeat(), 'advance');
+  }
+  const expected = [];
+  let s = order[0];
+  for (let i = 0; i < 8; i++) { expected.push(s); s = (s + 1) % 4; }
+  ok(order.join(',') === expected.join(','),
+     'the flag advances by one and wraps to 0 at the end of the array',
+     `got ${order.join(',')} expected ${expected.join(',')}`);
+
+  // The invariant holds at every single step, not just at the ends.
+  let everBroken = null;
+  for (let i = 0; i < 12; i++) {
+    TM.set(TM.nextSeat(), 'advance');
+    const problem = TM.checkFlags();
+    if (problem && !everBroken) everBroken = problem;
+  }
+  ok(everBroken === null, 'exactly one player holds isTurn at every step', everBroken || '');
+}
+
+// ───────────────────────────────────────────────────────────
+section('7. A desynced flag is caught, which is why the invariant exists');
+{
+  const g = createEngine();
+  g.initGame(4, { sessionSeed: 'desync' });
+  const TM = g.sandbox.FastTrackTurns;
+  const players = g.state.players.get('list') || [];
+
+  // Force the exact failure mode a per-player boolean makes possible, and that
+  // a bare index could not represent: two seats holding the turn.
+  players[0].isTurn = true;
+  players[1].isTurn = true;
+  const problem = TM.checkFlags();
+  ok(typeof problem === 'string' && /2 players hold isTurn/.test(problem),
+     'two holders is detected and described', String(problem));
+
+  // And none holding it.
+  players.forEach(p => { p.isTurn = false; });
+  const problem2 = TM.checkFlags();
+  ok(typeof problem2 === 'string' && /0 players hold isTurn/.test(problem2),
+     'zero holders is detected too', String(problem2));
+
+  // The next legal transition repairs the array.
+  TM.set(TM.nextSeat(), 'advance');
+  ok(TM.checkFlags() === null, 'the next turn change restamps the whole array clean');
+}
+
 console.log(NL + '='.repeat(62));
 console.log(`  ${pass} passed, ${fail} failed`);
 console.log('='.repeat(62));

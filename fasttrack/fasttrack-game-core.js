@@ -597,6 +597,9 @@ function initGame(playerCount = 2, config = {}) {
       aiDifficulty: isBot
         ? ((sp && (sp.level || sp.aiDifficulty)) || aiDifficulty || 'normal')
         : null,
+      // Whose turn it is. Exactly one player in the array carries true.
+      // Only TurnManager._writeFlags may set this; nothing else writes it.
+      isTurn: false,
       color: PLAYER_COLORS[bp],
       boardPosition: bp,
       isBot,
@@ -721,6 +724,10 @@ function initGame(playerCount = 2, config = {}) {
 
   // ─── Peg Matrix (substrate) ───
   // peg(id) | color | position(hole) | state
+  // A snapshot replaces the players array wholesale, so the isTurn flags that
+  // arrived belong to the SENDER's array. Re-stamp them from the turn index,
+  // which is the value the snapshot is authoritative about.
+  try { TurnManager._writeFlags(TurnManager.current()); } catch (_) {}
   // A snapshot legitimately relocates the turn; do not judge it as a jump.
   try { TurnManager._history.push({ from: -1, to: TurnManager.current(), reason: 'restore', at: Date.now(), seats: TurnManager.count() }); } catch (_) {}
   syncPegMatrix();
@@ -3306,8 +3313,44 @@ const TurnManager = {
   count() { return this.seats().length; },
   current() { const c = state.players.get('current'); return Number.isInteger(c) ? c : 0; },
 
-  /** Derived, so it can never disagree with the index. */
-  isTurn(seatIdx) { return this.current() === Number(seatIdx); },
+  /**
+   * Whose turn it is, read off the player's own isTurn flag.
+   * Exactly one player in the array carries true; every other carries false.
+   */
+  isTurn(seatIdx) {
+    const p = this.seats()[Number(seatIdx)];
+    return !!(p && p.isTurn);
+  },
+
+  /**
+   * Stamp the flags across the whole array in ONE pass: the seat at `idx` gets
+   * true, everyone else false. Writing them together is what keeps them
+   * consistent; nothing else in the codebase may set isTurn.
+   */
+  _writeFlags(idx) {
+    const seats = this.seats();
+    for (let i = 0; i < seats.length; i++) {
+      if (seats[i]) seats[i].isTurn = (i === Number(idx));
+    }
+  },
+
+  /**
+   * The invariant: exactly one player holds the turn, and it is the one the
+   * index names. Returns null when healthy, or a description when not.
+   */
+  checkFlags() {
+    const seats = this.seats();
+    if (!seats.length) return null;
+    const holders = [];
+    for (let i = 0; i < seats.length; i++) if (seats[i] && seats[i].isTurn) holders.push(i);
+    if (holders.length !== 1) {
+      return `${holders.length} players hold isTurn (${holders.join(',') || 'none'}); exactly 1 must`;
+    }
+    if (holders[0] !== this.current()) {
+      return `isTurn is on seat ${holders[0]} but the turn index says ${this.current()}`;
+    }
+    return null;
+  },
 
   /** The seat whose turn it is, or null before the game starts. */
   activeSeat() { return this.seats()[this.current()] || null; },
@@ -3356,6 +3399,16 @@ const TurnManager = {
     this._history.push(entry);
     if (this._history.length > this._max) this._history.shift();
     state.players.set('current', to);
+    this._writeFlags(to);
+
+    // The flags are the visible state, so they get checked every single time.
+    const flagProblem = this.checkFlags();
+    if (flagProblem) {
+      const bad = { from, to, reason, at: Date.now(), error: `isTurn invariant broken: ${flagProblem}`,
+                    stack: (new Error('isTurn invariant')).stack };
+      this._violations.push(bad);
+      console.error('[TURN][VIOLATION]', bad.error);
+    }
     return to;
   },
 
@@ -3365,6 +3418,8 @@ const TurnManager = {
     return {
       seats: names,
       current: this.current(),
+      isTurnFlags: this.seats().map((p, i) => `${i}:${p.isTurn ? 'TRUE' : 'false'}`),
+      flagInvariant: this.checkFlags() || 'ok',
       activeIsBot: !!(this.activeSeat() || {}).isBot,
       violations: this._violations.slice(-20),
       recent: this._history.slice(-40).map(h =>
