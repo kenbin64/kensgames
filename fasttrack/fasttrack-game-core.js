@@ -4047,6 +4047,28 @@ function botTurn() {
         // when this bot turn began, so a stale/duplicate bot trigger is dropped
         // instead of double-advancing and skipping the next seat.
         log('🤖 Bot has no valid moves, ending turn.');
+        // SHOW IT. A bot that moves is visible because its peg animates; a bot
+        // that forfeits used to show nothing at all and resolve in a few
+        // milliseconds, because bots never get the turn indicator
+        // (shouldShowIndicator is false for them). With three bots at the table
+        // that happens most rounds, and from the player's chair a seat that
+        // silently does nothing is indistinguishable from a seat being skipped.
+        // Reported exactly that way: "it ignores the 3rd bot".
+        //
+        // The toast is fire-and-forget. It deliberately does NOT delay endTurn:
+        // the turn machine must never wait on presentation, which is the bug
+        // class this file already suffers from elsewhere.
+        try {
+          const _bp = state.players.get('list') || [];
+          const _bc = _bp[state.players.get('current') || 0] || {};
+          const _bcard = state.deck.get('currentCard');
+          showCenterToast(
+            _bcard ? `${_bc.name || 'Bot'} drew ${_bcard.display} — no legal move`
+                   : `${_bc.name || 'Bot'} has no legal move`,
+            _bc.color || '#9fb0c4',
+            1600
+          );
+        } catch (_) { /* a missing toast must never block the turn */ }
         endTurn(_botEpoch);
         return;
       }
