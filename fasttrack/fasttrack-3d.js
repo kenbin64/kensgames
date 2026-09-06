@@ -806,8 +806,9 @@ const CameraDirector = {
   }
 };
 
-// MOBILE STARFIELD (Google Play build only — window.FT_MOBILE === true)
-// A starry skydome replaces the speakeasy billiard room. The 3D board is
+// STARFIELD ENVIRONMENT (every build; set window.FT_BILLIARD_ROOM = true for
+// the old speakeasy room instead)
+// A starry skydome in place of the speakeasy billiard room. The 3D board is
 // untouched; only the surrounding environment changes. Reuses the ceiling's
 // colored-star canvas technique ("80s wizard night sky") on an inward-facing
 // sphere so stars wrap the board in every direction. Unlit (MeshBasicMaterial)
@@ -2431,10 +2432,20 @@ async function init3D() {
     detail: 1, fog: true, env: true, voidMode: false, onAdapt() {}, frame() {}
   };
 
-  const FT_MOBILE_VOID = ((typeof window !== 'undefined') &&
-    ((window.FT_MOBILE === true) ||   // Google Play build: always void + starry, any screen size
-     (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches)))
-    || Q.voidMode === true;   // very-weak desktops fall into void too (§3 boundary)
+  // ── THE SHIPPED ENVIRONMENT IS THE STARFIELD ────────────────────────────
+  // The speakeasy billiard room was the original desktop environment: a lit
+  // room, an environment map, shadows and fog, plus roughly 50MB of art
+  // textures. The starfield was built while chasing the turn bugs and is the
+  // lighter of the two by a wide margin, so it is now what every build shows.
+  //
+  // The room is NOT deleted. It is opt-in through window.FT_BILLIARD_ROOM,
+  // set before the game scripts load, so switching back is one line rather
+  // than a revert. Q.voidMode still forces the light path on weak hardware.
+  const FT_BILLIARD_ROOM = (typeof window !== 'undefined')
+    && window.FT_BILLIARD_ROOM === true
+    && window.FT_MOBILE !== true    // the Play build never loads the heavy room
+    && Q.voidMode !== true;         // nor does weak hardware
+  const FT_MOBILE_VOID = !FT_BILLIARD_ROOM;
   window.FT_MOBILE_VOID = FT_MOBILE_VOID;
 
   // Scene - rich warm billiard room (desktop) / pure void (mobile)
@@ -2508,13 +2519,23 @@ async function init3D() {
   } catch (_) { }
 
   // Ingest art images onto the manifold, then create the room.
-  // user_directive_2026-05-18 — DO NOT await. The art set is ~50MB of PNG;
+  // user_directive_2026-05-18: DO NOT await. The art set is ~50MB of PNG;
   // awaiting it stalled init3D for up to 20 seconds behind a black screen.
   // ingestArt() now applies each texture to its canvas mesh as it lands.
-  try { ingestArt(); } catch (e) { console.warn('🎨 Art ingestion error:', e); }
+  //
+  // Only fetched when the room is actually being built. Those textures exist
+  // to be hung on the speakeasy walls, so in the starfield there is nothing
+  // for them to land on and downloading them is pure cost. This is where most
+  // of the weight saving in the starfield environment comes from.
+  if (!FT_MOBILE_VOID) {
+    try { ingestArt(); } catch (e) { console.warn('Art ingestion error:', e); }
+  }
   if (!FT_MOBILE_VOID) createBilliardRoom();
-  // Google Play build: starry skydome instead of the speakeasy room (board unchanged).
-  else if (typeof window !== 'undefined' && window.FT_MOBILE === true) {
+  // The starfield now stands in for the room on every build. Previously this
+  // was gated on FT_MOBILE, which only the Google Play build set, so mobile
+  // web fell into void mode and got a bare black nothing with no skydome at
+  // all. Anything not showing the room shows the stars.
+  else {
     try { createMobileStarfield(); } catch (e) { console.warn('starfield error:', e); }
   }
 
