@@ -38,19 +38,33 @@ function sanitizeAvatar(raw, fallback) {
 
 // ── Player ────────────────────────────────────────────────────────────────────
 
+// Bot difficulty. These four are the contract with the game engine:
+// fasttrack-game-core.js keys AI_PROFILES by exactly these strings, and initGame
+// reads the value off the session player as `level`.
+const AI_LEVELS = ['easy', 'normal', 'hard', 'expert'];
+const DEFAULT_AI_LEVEL = 'normal';
+function sanitizeAiLevel(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  return AI_LEVELS.includes(v) ? v : DEFAULT_AI_LEVEL;
+}
+
 class Player {
-  constructor({ userId, name, avatar, isHost = false, isAI = false, slot = 0 }) {
+  constructor({ userId, name, avatar, isHost = false, isAI = false, slot = 0, level = null }) {
     this.userId = String(userId || '');
     this.name = sanitizeName(name, `Player-${String(userId || '').slice(-4)}`);
     this.avatar = sanitizeAvatar(avatar, '👤');
     this.isHost = !!isHost;
     this.isAI = !!isAI;
+    // Difficulty is meaningless for a human, so it stays null there rather than
+    // defaulting to something a UI might then display.
+    this.level = this.isAI ? sanitizeAiLevel(level) : null;
     this.isReady = false;
     this.isConnected = true;
     this.slot = Number(slot) || 0;
   }
 
-  update({ name, avatar, isReady, isConnected, isHost }) {
+  update({ name, avatar, isReady, isConnected, isHost, level }) {
+    if (level !== undefined && this.isAI) this.level = sanitizeAiLevel(level);
     if (name !== undefined) this.name = sanitizeName(name, this.name);
     if (avatar !== undefined) this.avatar = sanitizeAvatar(avatar, this.avatar);
     if (isReady !== undefined) this.isReady = !!isReady;
@@ -65,6 +79,7 @@ class Player {
       avatar: this.avatar,
       isHost: this.isHost,
       isAI: this.isAI,
+      level: this.level,
       isReady: this.isReady,
       isConnected: this.isConnected,
       slot: this.slot,
@@ -258,6 +273,7 @@ function upsertFromSession(session) {
       name: p.username,
       avatar: p.avatar_id,
       isAI: !!p.is_ai,
+      level: p.level || p.aiDifficulty || null,
       slot: Number.isFinite(p.slot) ? p.slot : idx,
     });
     const gp = g.getPlayer(userId);
@@ -265,6 +281,7 @@ function upsertFromSession(session) {
     gp.update({
       name: p.username,
       avatar: p.avatar_id,
+      level: p.level || p.aiDifficulty || undefined,
       isReady: !!p.ready,
       isConnected: true,
       isHost: !!p.is_host,

@@ -522,6 +522,10 @@ function toSessionPlayersFromGame(gameJson) {
     avatar_id: p.avatar,
     is_host: !!p.isHost,
     is_ai: !!p.isAI,
+    // Map the bot's difficulty back out. syncGameObjectSession REBUILDS
+    // session.players from the GameObject, so anything not mapped here is
+    // silently discarded no matter what the handler pushed.
+    level: p.isAI ? (p.level || DEFAULT_AI_LEVEL) : null,
     slot: Number(p.slot) || 0,
     ready: !!p.isReady,
   }));
