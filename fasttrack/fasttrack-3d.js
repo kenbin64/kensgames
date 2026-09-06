@@ -4659,6 +4659,9 @@ function blinkPlayerMarker(playerIdx, onDone) {
 // ════════════════════════════════════════════════════════════════
 // PEG NAME TOOLTIPS — floating name labels above pegs
 // ════════════════════════════════════════════════════════════════
+// Which peg is currently showing its name because the pointer is over it.
+let _hoveredPegId = null;
+
 function createPegNameSprite(name) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -4743,6 +4746,148 @@ function hidePegNames() {
       peg.nameSprite.visible = false;
     }
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PEG NAME TOOLTIPS
+// ──────────────────────────────────────────────────────────────
+// Hover a peg on desktop to see whose it is and what it is called. On a
+// phone there is no hover, so every peg wears its name all the time.
+//
+// Built on 3D sprites rather than a DOM tooltip because the always-on case
+// needs a label per peg, each following its own peg as it hops. A DOM tooltip
+// can only follow the cursor, which a touch screen does not have.
+//
+// Note on history: floating nicknames used to be shown on every peg and were
+// removed on 2026-06-06 as clutter, because pegs are picked by clicking holes
+// and the names had stopped meaning anything. This is narrower on purpose. On
+// a pointer device a name appears only for the peg under the cursor.
+
+// Every peg on the board, not just the current player's. _pegIdxForPegId
+// resolves against the active seat alone, which is right for routing and
+// wrong here: an opponent's peg has a name too.
+function _pegInfoById(pegId) {
+  const players = (window.FastTrackCore && window.FastTrackCore.state)
+    ? window.FastTrackCore.state.players.get('list') || [] : [];
+  for (let pi = 0; pi < players.length; pi++) {
+    const pl = players[pi];
+    if (!pl || !Array.isArray(pl.pegs)) continue;
+    for (let k = 0; k < pl.pegs.length; k++) {
+      const pg = pl.pegs[k];
+      if (pg && pg.id === pegId) {
+        const nick = (pg.nickname && String(pg.nickname).trim()) || `Peg ${k + 1}`;
+        const owner = (pl.name && String(pl.name).trim()) || `Player ${pi + 1}`;
+        return { playerIdx: pi, pegIdx: k, nickname: nick, owner, holeId: pg.holeId,
+          label: `${nick} (${owner})` };
+      }
+    }
+  }
+  return null;
+}
+
+// Created once per peg and cached. showPegNames() rebuilds the canvas and
+// texture on every call, which is fine for a one-off but not for something
+// that fires on pointer movement.
+function _ensurePegNameSprite(pegId) {
+  const peg = pegRegistry.get(pegId);
+  if (!peg || !peg.mesh) return null;
+  const info = _pegInfoById(pegId);
+  if (!info) return null;
+  if (peg.nameSprite && peg._nameSpriteLabel === info.label) return peg.nameSprite;
+  if (peg.nameSprite) {
+    peg.mesh.remove(peg.nameSprite);
+    if (peg.nameSprite.material) {
+      if (peg.nameSprite.material.map) peg.nameSprite.material.map.dispose();
+      peg.nameSprite.material.dispose();
+    }
+  }
+  const sprite = createPegNameSprite(info.label);
+  // One label at a time can afford to be big. Every peg wearing one at once,
+  // on a phone, cannot: at the hover size they overlapped each other and ran
+  // off the edge of the board.
+  if (_pegNamesAlwaysOn()) sprite.scale.set(56, 56, 1);
+  sprite.position.y = PEG_HEIGHT + 20;
+  sprite.visible = false;
+  peg.mesh.add(sprite);
+  peg.nameSprite = sprite;
+  peg._nameSpriteLabel = info.label;
+  return sprite;
+}
+
+// A phone, or anything else without a pointer to hover with.
+function _pegNamesAlwaysOn() {
+  if (typeof window === 'undefined') return false;
+  if (window.FT_PEG_NAMES_ALWAYS === true) return true;   // escape hatch for testing
+  try {
+    if (window.matchMedia
+      && window.matchMedia('(hover: none), (pointer: coarse), (max-width: 760px)').matches) return true;
+  } catch (_) { /* fall through */ }
+  return false;
+}
+
+// Show the name over one peg only. Passing null clears them all.
+function _setHoveredPegName(pegId) {
+  if (_pegNamesAlwaysOn()) return;   // phones keep every name up
+  if (_hoveredPegId === pegId) return;
+  _hoveredPegId = pegId;
+  pegRegistry.forEach((peg, id) => {
+    if (id === pegId) return;
+    if (peg.nameSprite) peg.nameSprite.visible = false;
+  });
+  if (!pegId) return;
+  const sprite = _ensurePegNameSprite(pegId);
+  if (sprite) sprite.visible = true;
+}
+
+// Every peg wears its name. Called on each render so pegs created or removed
+// since the last one are covered.
+// Hide every name except the one the pointer is over. renderBoard3D runs
+// while the cursor is sitting still, and a blanket hide there wiped the label
+// with the hover state left believing it was still shown, so it never came
+// back until the pointer moved to a different peg.
+function _hidePegNamesExceptHovered() {
+  pegRegistry.forEach((peg, id) => {
+    if (!peg.nameSprite) return;
+    peg.nameSprite.visible = (_hoveredPegId != null && id === _hoveredPegId);
+  });
+}
+
+function refreshAlwaysOnPegNames() {
+  if (!_pegNamesAlwaysOn()) return;
+  pegRegistry.forEach((peg, id) => {
+    // Pegs waiting in holding are stacked on top of each other, so labelling
+    // them produces a pile of overlapping pills that name nothing usefully.
+    // They are already listed by name in the peg bar along the bottom.
+    const info = _pegInfoById(id);
+    const onBoard = !!(info && info.holeId && info.holeId !== 'holding');
+    if (!onBoard) {
+      if (peg.nameSprite) peg.nameSprite.visible = false;
+      return;
+    }
+    const sprite = _ensurePegNameSprite(id);
+    if (sprite) sprite.visible = true;
+  });
+}
+
+// Raycast pegs ONLY. _pickTargetAtClient tests holes first and returns a hole
+// hit whenever the ray passes through one, so a peg standing on a hole can be
+// reported as the hole underneath it. For routing that is the desired answer;
+// for naming the thing under the cursor it is the wrong one.
+function _pegIdAtClient(clientX, clientY) {
+  if (!_pickRaycaster || !renderer || !camera) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _pickMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  _pickMouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  _pickRaycaster.setFromCamera(_pickMouse, camera);
+  const roots = [];
+  pegRegistry.forEach((peg) => { if (peg && peg.mesh) roots.push(peg.mesh); });
+  if (!roots.length) return null;
+  const hits = _pickRaycaster.intersectObjects(roots, true);
+  if (!hits.length) return null;
+  let n = hits[0].object;
+  // The name sprite is a child of the peg and must never swallow its own hit.
+  while (n && !(n.userData && n.userData.pegId)) n = n.parent;
+  return (n && n.userData) ? n.userData.pegId : null;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -5527,7 +5672,12 @@ function renderBoard3D() {
   // gold-haloed holes directly on the board, so the labels carry no meaning
   // and only clutter the table. The nickname DATA is still used in text
   // hints / toasts / logs; only the on-board labels are suppressed here.
-  hidePegNames();
+  //
+  // The exception is a device with no pointer to hover with. There a peg can
+  // only be identified by a label that is always up, so on phones every peg
+  // wears its name and this render keeps newly created pegs covered.
+  if (_pegNamesAlwaysOn()) refreshAlwaysOnPegNames();
+  else _hidePegNamesExceptHovered();
 
   // Lower animation barrier — if no anims were started, this fires _onAnimsDone immediately
   _lowerBarrier();
@@ -6182,6 +6332,14 @@ function _createGhostPeg(pegId, holeId, color) {
   if (!peg || !peg.mesh || !hole) return null;
   let ghost;
   try { ghost = peg.mesh.clone(true); } catch (_) { return null; }
+
+  // Strip any label the clone inherited. A ghost peg is a preview of a
+  // position, not a second peg, so it should not be named. More importantly a
+  // cloned sprite shares its canvas TEXTURE with the real one, and disposing
+  // the highlight would take the real peg's name with it.
+  const labels = [];
+  ghost.traverse((o) => { if (o.isSprite) labels.push(o); });
+  for (const s of labels) { if (s.parent) s.parent.remove(s); }
 
   // Clone shares materials with the real peg, so give every one of them a
   // private translucent copy. Without this the peg on the board would go
@@ -6928,6 +7086,7 @@ function setupBoardPickHandler() {
   let lastHoverKey = '';
 
   const clearHover = () => {
+    _setHoveredPegName(null);
     if (lastHoverKey !== '') {
       lastHoverKey = '';
       // Don't disturb a staged preview while a confirmation is pending.
@@ -6938,9 +7097,16 @@ function setupBoardPickHandler() {
   };
 
   dom.addEventListener('pointermove', (e) => {
-    if (artOverlayOpen()) { _hideHoverTip(); return; }
+    if (artOverlayOpen()) { _hideHoverTip(); _setHoveredPegName(null); return; }
     // Skip while user is rotating/dragging the camera (any mouse button held).
-    if (e.buttons !== 0) { _hideHoverTip(); return; }
+    if (e.buttons !== 0) { _hideHoverTip(); _setHoveredPegName(null); return; }
+
+    // Peg names come first and are independent of whose turn it is. Naming a
+    // peg is not a move, so it must not be gated on there being legal moves;
+    // the route index below returns empty when it is not your turn, and that
+    // used to take the name with it.
+    _setHoveredPegName(_pegIdAtClient(e.clientX, e.clientY));
+
     const idx = _refreshRouteIndex();
     if (idx.size === 0) { clearHover(); return; }
     const target = _pickTargetAtClient(e.clientX, e.clientY);
