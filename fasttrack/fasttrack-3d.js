@@ -2620,7 +2620,14 @@ async function init3D() {
     // accepted only 'private', which silently dropped public games into a
     // 2-player solo+bot game per browser.
     const isLiveMode = (gameMode === 'private' || gameMode === 'public' || gameMode === 'multiplayer');
-    const useRuntimeRoster = isLiveMode && sameInviteSession && runtimeHasRoster;
+    // A runtime roster is authoritative in EVERY mode, not just the live ones.
+    // This used to require isLiveMode (private/public/multiplayer), so a solo or
+    // ai launch that HAD a full roster in kg_fasttrack_runtime had it ignored,
+    // and the game rebuilt a generic table instead of seating the players and
+    // bots the setup flow had just resolved. lobby-simple.html launches exactly
+    // that way: it persists the runtime with mode 'solo' and navigates to
+    // ?launch=1.
+    const useRuntimeRoster = sameInviteSession && runtimeHasRoster;
     const useSessionRoster = !useRuntimeRoster && isLiveMode && sameInviteSession && hasSessionRoster;
 
     // Same-screen: read full roster from runtime or ft_session_players
@@ -2765,7 +2772,12 @@ async function init3D() {
     // with no roster at all, and that IS an intentional launch. What a cold
     // open looks like is a bare URL with no query string whatsoever, so the
     // presence of launch params is what separates the two.
-    const launchedExplicitly = usp.has('mode') || usp.has('players')
+    // ?launch=1 is this codebase's established launch marker: see
+    // js/substrates/game_setup.js consumeRuntime(), which treats its absence as
+    // 'no game'. lobby-simple.html and the setup substrate both navigate with
+    // it. mode/players/session/code cover the older direct-link contract.
+    const launchedExplicitly = usp.get('launch') === '1'
+      || usp.has('mode') || usp.has('players')
       || usp.has('session') || usp.has('code');
 
     const hasRealRoster = useRuntimeRoster || useSessionRoster || useSameScreenRoster
