@@ -89,6 +89,15 @@ section('3. The ghost cannot damage the real peg it was cloned from');
     'so a cloned GROUP releases its children');
   ok(/if \(m\.map && m\.map\.dispose\) m\.map\.dispose\(\);/.test(threed),
     'and the count label releases its canvas texture');
+
+  // The one that actually bit. three.js clone() copies the object tree but
+  // REUSES the geometry, so disposing the ghost was destroying the geometry the
+  // real peg draws with. It wedged the renderer: the page stopped responding
+  // and two browser runs had to be killed before the cause was found.
+  ok(/ghost\.userData\.sharesGeometry = true;/.test(threed),
+    'the ghost is marked as borrowing its geometry');
+  ok(/if \(!sharesGeometry && o\.geometry && o\.geometry\.dispose\)/.test(threed),
+    'and disposal leaves borrowed geometry alone, because the real peg still needs it');
 }
 
 // ───────────────────────────────────────────────────────────

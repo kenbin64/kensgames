@@ -5972,6 +5972,12 @@ function _boostHoleEmissive(holeId, hexColor) {
 // count is a sprite that owns a canvas texture. Disposing only the top level
 // object leaked all of that, and highlights are rebuilt on every refresh.
 function _disposeHighlightObject(obj) {
+  // A cloned peg SHARES its geometry with the peg it was cloned from. three.js
+  // clone() copies the object tree but reuses the geometry objects, so
+  // disposing them here destroys the geometry the REAL peg is still drawing
+  // with. Its materials are a different matter: those were cloned deliberately
+  // so the ghost could be made translucent, and they are ours to release.
+  const sharesGeometry = !!(obj.userData && obj.userData.sharesGeometry);
   const dropMaterial = (m) => {
     if (!m) return;
     if (m.map && m.map.dispose) m.map.dispose();
@@ -5979,7 +5985,7 @@ function _disposeHighlightObject(obj) {
   };
   const dropOne = (o) => {
     if (!o) return;
-    if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+    if (!sharesGeometry && o.geometry && o.geometry.dispose) o.geometry.dispose();
     if (Array.isArray(o.material)) o.material.forEach(dropMaterial);
     else dropMaterial(o.material);
   };
@@ -6186,7 +6192,7 @@ function _createGhostPeg(pegId, holeId, color) {
     const ghosted = src.map((m) => {
       const c = m.clone();
       c.transparent = true;
-      c.opacity = 0.34;
+      c.opacity = 0.46;
       c.depthWrite = false;
       if (c.emissive && c.emissive.setHex) { c.emissive.setHex(color); c.emissiveIntensity = 0.55; }
       return c;
@@ -6203,6 +6209,8 @@ function _createGhostPeg(pegId, holeId, color) {
   const boardY = boardGroup ? boardGroup.position.y : 90;
   ghost.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
   ghost.userData.pulsing = false;
+  // Tells disposal to leave the geometry alone; it belongs to the real peg.
+  ghost.userData.sharesGeometry = true;
   (peg.mesh.parent || scene).add(ghost);
   highlightMeshes.push(ghost);
   return ghost;
@@ -6234,8 +6242,8 @@ function _createSplitCountLabel(holeId, remaining) {
   const sprite = new THREE.Sprite(mat);
   // Scene space, to sit above the ghost peg rather than above the board plane.
   const boardY = boardGroup ? boardGroup.position.y : 90;
-  sprite.position.set(hole.position.x, boardY + LINE_HEIGHT + 42, hole.position.z);
-  sprite.scale.set(46, 23, 1);
+  sprite.position.set(hole.position.x, boardY + LINE_HEIGHT + 58, hole.position.z);
+  sprite.scale.set(104, 52, 1);
   sprite.renderOrder = 30;
   sprite.userData.pulsing = false;
   scene.add(sprite);
