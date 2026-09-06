@@ -265,26 +265,20 @@ console.log('='.repeat(64));
 console.log('Invariant: every participant holds identical state after every delta.');
 
 const results = {};
-// Action replay is the current transport: reported as a baseline.
-results.actions2 = runMode('2 players, ACTIONS only (today)', 2, false, 40, false);
-results.actions4 = runMode('4 players, ACTIONS only (today)', 4, false, 40, false);
-// Snapshot on every delta is the target design and IS asserted.
-// Snapshot-on-every-delta is the TARGET design. It does not converge yet, for
-// two reasons this harness pinned down, both reported below rather than
-// asserted so they do not block the rest of the suite:
+// All four are now ASSERTED. They were reported-only while two turn-handoff
+// bugs were open (a non-host finishing without a move told nobody, and a redraw
+// card with no legal move rotated the turn away instead of granting the
+// redraw). Both are fixed, see test_turn_handoff.js, and every mode now holds
+// the invariant for 40 turns.
 //
-//   1. A non-host seat with NO legal moves calls endTurn(), which for a non-host
-//      runs _localTurnUiCleanup() and returns. It broadcasts nothing and commits
-//      nothing, so the host is never told and sits believing that seat is still
-//      deciding. That is a skipped turn, and no amount of state broadcasting
-//      fixes it, because no delta is ever produced to broadcast.
-//
-//   2. In the same trace the host did not rotate after applying a peer's move,
-//      so its own authoritative turn never advanced either.
-//
-// Flip these last two arguments back to `true` once both are fixed.
-results.snapshot2 = runMode('2 players, SNAPSHOT on every delta', 2, true, 40, false);
-results.snapshot4 = runMode('4 players, SNAPSHOT on every delta', 4, true, 40, false);
+// Action replay converging on its own is the interesting result: once every
+// seat's turn actually ends in a message, the peers stay in step without
+// needing a snapshot at all. Snapshot-on-delta remains valuable as the
+// self-healing path for a dropped or reordered message, not as a crutch.
+results.actions2 = runMode('2 players, ACTIONS only', 2, false, 40, true);
+results.actions4 = runMode('4 players, ACTIONS only', 4, false, 40, true);
+results.snapshot2 = runMode('2 players, SNAPSHOT on every delta', 2, true, 40, true);
+results.snapshot4 = runMode('4 players, SNAPSHOT on every delta', 4, true, 40, true);
 
 console.log(NL + '='.repeat(64));
 console.log('  SUMMARY');

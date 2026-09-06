@@ -1265,6 +1265,31 @@ function applyRemoteAction(action, payload) {
         executeMove(0);
         break;
       }
+      case 'turn_done': {
+        // A non-host reports that its seat has finished. Only the host acts on
+        // it, because the host is the sole rotator.
+        //
+        // Idempotent by seat identity: if we already rotated (normally because
+        // we applied that player's move a moment earlier) then the seat named
+        // here is no longer the active one and this is a no-op. That is what
+        // lets the sender fire it unconditionally at the end of every non-host
+        // turn without any risk of double-advancing.
+        if (!_isHost()) break;
+        const players = state.players.get('list') || [];
+        const ci = state.players.get('current') || 0;
+        const cur = players[ci];
+        if (!cur) break;
+        const seatId = payload && payload.seatId != null ? String(payload.seatId) : null;
+        if (seatId && _seatIdentity(cur) !== seatId) {
+          console.log('[TURN] turn_done ignored — seat', seatId, 'already rotated off.');
+          break;
+        }
+        console.log('[TURN] turn_done from', seatId, '— host rotating on its behalf.');
+        // endTurn broadcasts turn_advance even under _applying (see _broadcast),
+        // which is exactly the path this needs.
+        endTurn(_turnEpoch);
+        break;
+      }
       case 'reshuffle': {
         const cards = payload && Array.isArray(payload.cards) ? payload.cards : null;
         if (!cards) break;
@@ -2463,7 +2488,15 @@ function showMoveHints() {
             if ((state.turn.get('validMoves') || []).length > 0) return; // moves appeared
             if (state.turn.get('phase') === 'draw') return;        // already advanced
             if (_isMpMode() && !_isMyTurn()) return;               // no longer our turn
-            endTurn(_noMoveEpoch);                                 // epoch-verified (dropped if stale)
+            // resolveTurn, NOT endTurn. House rule: A, 6, J, Q, K and JOKER
+            // grant a redraw EVERY time they are drawn, and that holds even
+            // when the card produced no legal move. endTurn rotates
+            // unconditionally, so calling it here silently ate the redraw and
+            // handed the turn away, which is indistinguishable from a skipped
+            // turn to the player it happened to. resolveTurn is the single
+            // authority that knows the difference: replay card reopens the same
+            // seat, anything else rotates.
+            resolveTurn(_noMoveEpoch);                             // epoch-verified (dropped if stale)
           }, NO_MOVE_AUTO_PASS_MS);
         }
       }
@@ -2473,11 +2506,12 @@ function showMoveHints() {
       btn.addEventListener('click', () => {
         if (_isMpMode() && !_isMyTurn()) return;
         // Manual instant-out: cancel the pending auto-relinquish and end now.
-        // With validMoves empty there is no real move to play, so call endTurn
-        // directly — it advances + broadcasts turn_advance on the active
-        // player's client only.
+        // With validMoves empty there is no real move to play. Route through
+        // resolveTurn so a redraw card (A, 6, J, Q, K, JOKER) still grants its
+        // redraw rather than rotating the turn away; resolveTurn falls through
+        // to endTurn for every other card.
         _clearNoMoveAutoTimer();
-        endTurn(_turnEpoch);   // the live turn
+        resolveTurn(_turnEpoch);   // the live turn
       }, { once: true });
     }
     return;
@@ -3609,7 +3643,30 @@ function endTurn(epoch) {
       console.log('[TURN] host advanced turn. ci:', ci, '-> next:', next, 'nextId:', nextId, 'seq:', _turnSeq);
     } else {
       _localTurnUiCleanup();
-      console.log('[TURN] non-host endTurn — cleaned up; waiting for host turn_advance.');
+      // BUGFIX 2026-09-05 (skipped / stuck turns): tell the host this seat is
+      // finished.
+      //
+      // A non-host ends its turn through several paths that never produce a
+      // move: no legal moves for the drawn card, the manual end-turn button,
+      // the stuck watchdog, an idle relinquish. Every one of them lands here.
+      // Previously this branch cleaned up the local UI and returned, sending
+      // NOTHING. The host, which is the only seat allowed to rotate, was never
+      // told the turn was over, so it sat on that seat forever and the table
+      // stopped. Isolated and reproduced: a peer holding a 2 with all pegs in
+      // holding has zero legal moves, ends its turn, and not one byte goes on
+      // the wire.
+      //
+      // After a MOVE this is redundant, because the host rotates when it
+      // applies the broadcast move. Sending it anyway is deliberate and safe:
+      // the handler ignores it unless the reported seat is still the active
+      // one, so a late or duplicate turn_done can never rotate twice.
+      const _doneSeat = players[ci];
+      _broadcast('turn_done', {
+        seat: ci,
+        seatId: _seatIdentity(_doneSeat),
+        epoch: epoch !== undefined ? epoch : _turnEpoch,
+      });
+      console.log('[TURN] non-host endTurn — cleaned up; told the host this seat is done.');
     }
     return;
   }
