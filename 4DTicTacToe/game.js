@@ -1919,21 +1919,33 @@ function onBallSettled() {
   const p = physBall.p;
   Audio4D.onSettle();
   boardGlow.intensity = 0;
-  // Resolution order — no teleport rule: always prefer the column-gravity target.
-  // 1. Predicted landing cell (computed by predictLanding at drop time — the canonical gravity target).
+  // Resolution order: WHERE THE BALL ACTUALLY STOPPED comes first.
+  //
+  // This used to lead with the cell predicted at drop time, on the reasoning
+  // that a predicted column target could never look like a teleport. That held
+  // only while the ball slid straight down its column, which it did because
+  // restitution was 0.06 and the lattice barely deflected anything. The moment
+  // the walls were made to deflect properly, the prediction stopped matching
+  // where the ball went, and the snap became exactly the teleport the rule was
+  // written to prevent: the ball would bounce its way into one chamber and then
+  // be yanked across the board into the cell someone guessed at drop time.
+  //
+  // Deflection is the point of the lattice, so physics decides and the guess is
+  // demoted to a fallback for when the resting place is unusable.
   let cell = null;
-  if (physBall.predicted) {
-    const [pgx, pgy, pgz] = physBall.predicted;
-    if (pgx >= 0 && pgx < G && pgy >= 0 && pgy < G && pgz >= 0 && pgz < G && !BM.getCell(pgx, pgy, pgz))
-      cell = physBall.predicted;
-  }
-  // 2. Column nearest-free (gravity stack within the drop column — no cross-column teleport).
+  // 1. Exact physics resting segment — the chamber it actually came to rest in.
+  cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
+  // 2. Column nearest-free (gravity stack within the drop column).
   if (!cell && physBall.dropColumn) {
     const colCell = nearestFreeCellInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z, physBall.y + SADDLE_CELL * 0.6);
     if (colCell) cell = colCell;
   }
-  // 3. Exact physics resting segment (where the ball physically came to rest).
-  if (!cell) cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
+  // 3. The drop-time prediction, only if physics gave us nothing usable.
+  if (!cell && physBall.predicted) {
+    const [pgx, pgy, pgz] = physBall.predicted;
+    if (pgx >= 0 && pgx < G && pgy >= 0 && pgy < G && pgz >= 0 && pgz < G && !BM.getCell(pgx, pgy, pgz))
+      cell = physBall.predicted;
+  }
   // 4. Face-adjacent cells only — one step from the resting segment, no further.
   if (!cell) {
     const seed = settledSegmentFromWorld(physBall.x, physBall.y, physBall.z);
