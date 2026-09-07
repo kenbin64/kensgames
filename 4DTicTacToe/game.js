@@ -368,13 +368,19 @@ function _makeWinkiGeo(cellSize) {
 }
 function _winkiInstancedMesh(geo) {
   const saddleInstanceCount = G * G * G;
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x88bbff, emissive: 0x335577, emissiveIntensity: 0.55,
-    metalness: 0.35, roughness: 0.18,
-    envMap, envMapIntensity: 1.2,
+  // Sparkle comes from sharp reflections, not from brightness. A clearcoat over
+  // a low roughness surface gives the lattice a wet, faceted glint that catches
+  // the environment as the cube turns, and the higher envMap intensity is what
+  // actually does the sparkling. Opacity drops so the ball stays visible through
+  // several layers of it.
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0x9fd0ff, emissive: 0x2b4f77, emissiveIntensity: 0.42,
+    metalness: 0.28, roughness: 0.045,
+    clearcoat: 1.0, clearcoatRoughness: 0.03,
+    envMap, envMapIntensity: 2.6,
     side: THREE.FrontSide,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.11,
     depthWrite: false
   });
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
@@ -527,7 +533,11 @@ const glbReady = Promise.resolve('procedural');
 // jamming an adjacent chamber's neighbourhood.
 // CELL is the chamber edge in world units (kept fixed across grid sizes so the lattice
 // reads the same regardless of edge length). BALL_R = chamber/4 -> diameter == half chamber.
-let CELL = 2.8, BALL_R = SADDLE_CELL * 0.25;
+// 0.20 of a chamber, not 0.25. A smaller stone leaves room to see the lattice
+// around it and to follow it down through the structure, which is the whole
+// point of the drop. The substep count in physStep is raised to match, so the
+// smaller radius does not weaken the anti-tunnelling guarantee.
+let CELL = 2.8, BALL_R = SADDLE_CELL * 0.20;
 // Connect-4 cell positions are now identical to winki chamber centres (board-local space).
 // This lets a settled ball snap exactly to the chamber it physically came to rest in.
 function nodePos(gx, gy, gz) {
@@ -565,13 +575,17 @@ let BGEO = new THREE.SphereGeometry(BALL_R, 28, 28),
 function makeBallMat(p, ei, opts) {
   const c = BCOLS[p], o = opts || {};
   return new THREE.MeshStandardMaterial({
-    color: c.base, emissive: o.emissive != null ? o.emissive : c.emissive, emissiveIntensity: ei != null ? ei : 0.12,
-    metalness: 0.95, roughness: 0.06,
-    envMap, envMapIntensity: 1.6
+    color: c.base, emissive: o.emissive != null ? o.emissive : c.emissive,
+    emissiveIntensity: ei != null ? ei : 0.85,
+    // Pulled back from 0.95. A near perfect mirror shows only what is around it,
+    // and inside a dim lattice that is very little, so the stone disappeared. A
+    // little less metal lets its own emission carry it.
+    metalness: 0.62, roughness: 0.10,
+    envMap, envMapIntensity: 1.8
   });
 }
-function makeFallingBallMat(p) { return makeBallMat(p, 0.18); }
-function makeHaloMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.035), side: THREE.BackSide, depthWrite: false }); }
+function makeFallingBallMat(p) { return makeBallMat(p, 1.35); }
+function makeHaloMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.16), side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending }); }
 // Outer corona shell sized between halo and win-glow so the placed stone reads from any angle.
 function makeCoronaMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.18), side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending }); }
 const placedBalls = [];
@@ -1004,7 +1018,7 @@ function rebuildWorld(newG) {
   GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;
   SADDLE_CELL = (2 * GY_HALF) / G;
   SADDLE_HALF = SADDLE_CELL * 0.5;
-  BALL_R = SADDLE_CELL * 0.25;
+  BALL_R = SADDLE_CELL * 0.20;   // keep in step with the declaration above
   PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;
   PLAY_HZ = (G - 1) * 0.5 * CELL + BALL_R;
   TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;
@@ -1606,10 +1620,26 @@ function dropBall(gx, gz) {
 }
 function physStep(dt) {
   if (!physBall || physBall.settled) return;
-  // 16 substeps so each integration step moves the ball less than one ball-diameter even
-  // at terminal velocity (roughly 30 m/s). This prevents tunneling through the Diamond
-  // membrane in narrow passage segments where the surface curves rapidly.
-  const STEPS = 16, hdt = dt / STEPS;
+  // Substeps so each integration step moves the ball less than one ball-diameter
+  // even at terminal velocity, which is what prevents tunnelling through the
+  // membrane in narrow passages where the surface curves rapidly.
+  //
+  // This was a flat 16, chosen for the old larger ball, and the guarantee is
+  // about distance per step measured against the ball's SIZE. Checked rather
+  // than assumed when the ball shrank: at the 0.05s frame cap and 60 m/s, a
+  // fixed 16 gives 0.188 per step against a radius of 0.438, so 16 was still
+  // sufficient and the smaller ball did NOT reintroduce tunnelling.
+  //
+  // It is derived anyway, because the number had no stated relationship to the
+  // ball and would have gone stale silently the next time either changed. In
+  // normal play this evaluates to the 16 floor; it only climbs if something
+  // moves far faster than the game currently produces.
+  const speed = Math.sqrt(physBall.vx * physBall.vx + physBall.vy * physBall.vy + physBall.vz * physBall.vz);
+  // Half a radius of travel per substep, with 16 kept as the floor so slow balls
+  // are no cheaper to simulate than they were, and a ceiling so a pathological
+  // speed cannot stall a frame.
+  const STEPS = Math.max(16, Math.min(96, Math.ceil((speed * dt) / (BALL_R * 0.5))));
+  const hdt = dt / STEPS;
   for (let s = 0; s < STEPS; s++) { if (!physBall || physBall.settled) break; physSubstep(hdt); }
   if (!physBall) return;
   physBall.mesh.position.set(physBall.x, physBall.y, physBall.z);
