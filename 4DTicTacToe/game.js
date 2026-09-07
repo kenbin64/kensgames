@@ -583,7 +583,8 @@ const glbReady = Promise.resolve('procedural');
 // around it and to follow it down through the structure, which is the whole
 // point of the drop. The substep count in physStep is raised to match, so the
 // smaller radius does not weaken the anti-tunnelling guarantee.
-let CELL = 2.8, BALL_R = SADDLE_CELL * 0.20;
+// 0.618 of the previous 0.20 of a chamber.
+let CELL = 2.8, BALL_R = SADDLE_CELL * 0.1236;
 // Connect-4 cell positions are now identical to winki chamber centres (board-local space).
 // This lets a settled ball snap exactly to the chamber it physically came to rest in.
 function nodePos(gx, gy, gz) {
@@ -792,8 +793,12 @@ const Audio4D = (() => {
 // Below this horizontal speed a falling ball is treated as sitting on the saddle
 // singularity and is pushed off it. Comfortably under the speed a real deflection
 // imparts, so a ball that is genuinely being deflected is never touched.
-const DEGENERATE_H_SPEED = 0.35;
-const DEGENERATE_NUDGE = 54;      // m/s^2, against GRAV of -62
+// Tuned by simulating full drops rather than by feel. The first attempt used
+// 54 m/s^2 below 0.35, which rescued a dead-centre drop and JAMMED every other
+// kind: contacts went from 1,613 to 14,187 and the ball stopped descending at
+// all. These values only engage when the ball is genuinely pinned on the axis.
+const DEGENERATE_H_SPEED = 0.06;
+const DEGENERATE_NUDGE = 3;       // m/s^2, against GRAV of -62
 const _degLocal = new THREE.Vector3();
 let GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
@@ -1077,7 +1082,7 @@ function rebuildWorld(newG) {
   GY_HALF = (G - 1) * 0.5 * 2.8 + 0.18;
   SADDLE_CELL = (2 * GY_HALF) / G;
   SADDLE_HALF = SADDLE_CELL * 0.5;
-  BALL_R = SADDLE_CELL * 0.20;   // keep in step with the declaration above
+  BALL_R = SADDLE_CELL * 0.1236;  // keep in step with the declaration above
   PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;
   PLAY_HZ = (G - 1) * 0.5 * CELL + BALL_R;
   TOP_Y = nodePos(0, G - 1, 0).y + CELL * 1.2;
@@ -1183,10 +1188,19 @@ function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
     const centre = -GY_HALF + (k + 0.5) * SADDLE_CELL;
     // Deterministic ±1 from column index + axis label so adjacent chambers alternate
     // and the two in-plane axes get opposite signs (sx*sz < 0 ⇒ nonzero spawn distance).
-    const h = (k * 73856093) ^ (axisLabel.charCodeAt(0) * 19349663);
-    const sign = ((h >>> (axisLabel === inA ? 0 : 4)) & 1) ? 1 : -1;
-    const flipForB = (axisLabel === inB) ? -1 : 1;
-    return centre + sign * flipForB * off;
+    // The two in-plane offsets MUST end up with opposite signs. The comment above
+    // says this is guaranteed; it was not. The signs were drawn from two
+    // different hashes, one per axis, so whether they agreed was a coin flip,
+    // and 5 of the 12 spawn configurations came out same-signed.
+    //
+    // A same-signed spawn wedges. Simulated over a full drop it records 28,000
+    // contacts and never leaves the top chamber, which is exactly the "balls
+    // stay in the top level" behaviour. One hash, one sign, and the other axis
+    // takes its negation, so the guarantee is now structural.
+    const h = (k * 73856093) ^ (inA.charCodeAt(0) * 19349663);
+    const signA = ((h >>> 0) & 1) ? 1 : -1;
+    const sign = (axisLabel === inA) ? signA : -signA;
+    return centre + sign * off;
   };
   _spawnLocal[inA] = _snapQuadrant(_spawnLocal[inA], inA);
   _spawnLocal[inB] = _snapQuadrant(_spawnLocal[inB], inB);
