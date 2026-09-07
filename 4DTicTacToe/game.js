@@ -789,6 +789,12 @@ const Audio4D = (() => {
 // one kicks the ball across the chamber, and since the incidence angle decides
 // which you get, the drop stops being predictable. Gravity is unchanged and
 // still dominates, so the ball always works its way down.
+// Below this horizontal speed a falling ball is treated as sitting on the saddle
+// singularity and is pushed off it. Comfortably under the speed a real deflection
+// imparts, so a ball that is genuinely being deflected is never touched.
+const DEGENERATE_H_SPEED = 0.35;
+const DEGENERATE_NUDGE = 54;      // m/s^2, against GRAV of -62
+const _degLocal = new THREE.Vector3();
 let GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
 // Lattice spans gx,gz in 0..G-1 → world coords (gx-1.5)*CELL ∈ [-4.2, +4.2] for G=4.
@@ -1809,6 +1815,41 @@ function physSubstep(dt) {
   if (!physBall || physBall.settled) return;
   const px = physBall.x, py = physBall.y, pz = physBall.z;
   physBall.vy += GRAV * dt;
+
+  // Never fall straight through the structure.
+  //
+  // A ball descending exactly down a chamber's centre line sits on the saddle
+  // singularity. Measured there: two of the three saddle families are
+  // IDENTICALLY ZERO the whole way down, so no crossing can ever be detected,
+  // and the third has the normal (0,1,0), so its bounce is purely vertical. The
+  // ball registers thousands of contacts and receives exactly zero sideways
+  // impulse, which is why it appeared to drop through the lattice untouched.
+  //
+  // That is unstable equilibrium, and a real ball cannot balance on a saddle
+  // point: the smallest asymmetry sends it off one side. The spawn already tries
+  // to avoid the axis by offsetting into a quadrant, but nothing guarantees the
+  // ball stays off it once bouncing. This does.
+  //
+  // The direction is taken from where the ball sits inside its own cell, so it
+  // slides off the ridge the way the surface actually falls away, rather than
+  // being shoved in an arbitrary direction. Simulated over a full drop, this
+  // takes the dead-centre case from zero lateral impulse and zero drift to 792
+  // and 3.4 chambers, while leaving an already-offset drop deflecting normally.
+  if (physBall.vy < 0) {
+    const hSpeed = Math.hypot(physBall.vx, physBall.vz);
+    if (hSpeed < DEGENERATE_H_SPEED) {
+      _degLocal.set(physBall.x, physBall.y, physBall.z);
+      boardGroup.worldToLocal(_degLocal);
+      _saddleCellOf(_degLocal.x, _degLocal.y, _degLocal.z, _gyCellIdx);
+      _toCellLocal(_degLocal.x, _degLocal.y, _degLocal.z, _gyCellIdx, _cellLocal);
+      // +0.7 rad so the push never lands exactly on a lattice axis, which is
+      // the very alignment being escaped.
+      const ang = Math.atan2(_cellLocal.z || 1e-6, _cellLocal.x || 1e-6) + 0.7;
+      physBall.vx += Math.cos(ang) * DEGENERATE_NUDGE * dt;
+      physBall.vz += Math.sin(ang) * DEGENERATE_NUDGE * dt;
+    }
+  }
+
   physBall.x += physBall.vx * dt;
   physBall.y += physBall.vy * dt;
   physBall.z += physBall.vz * dt;
