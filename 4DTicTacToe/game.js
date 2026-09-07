@@ -326,6 +326,11 @@ function _makeWinkiGeo(cellSize) {
   const verts = (N + 1) * (N + 1);
   const pos = new Float32Array(verts * 3);
   const nor = new Float32Array(verts * 3);
+  // Per-vertex colour taken from the surface normal, which is what makes
+  // different angles of the saddle show different colours. three r128 has
+  // neither iridescence nor usable transmission, so the dichroic look is built
+  // from the geometry rather than asked for from the material.
+  const col = new Float32Array(verts * 3);
   const idx = new Uint16Array(N * N * 6);
   let vi = 0;
   // The manifold equation samples: WinkiSubstrate.saddle.top(u,v) = -(u*v) is face +W.
@@ -346,9 +351,21 @@ function _makeWinkiGeo(cellSize) {
         ? WinkiSubstrate.grad([u, v, w])
         : [-v, -u, 1];
       const nl = Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) || 1;
-      nor[vi * 3] = g[0] / nl;
-      nor[vi * 3 + 1] = g[1] / nl;
-      nor[vi * 3 + 2] = g[2] / nl;
+      const nx = g[0] / nl, ny = g[1] / nl, nz = g[2] / nl;
+      nor[vi * 3] = nx;
+      nor[vi * 3 + 1] = ny;
+      nor[vi * 3 + 2] = nz;
+
+      // Hue from the direction the surface faces. The saddle sweeps its normal
+      // through a wide arc, so a hue taken from that arc gives every part of the
+      // sheet its own colour and the whole lattice shifts as the cube turns.
+      // Held to a cool arc (cyan through violet) and desaturated, because a full
+      // rainbow would read as a toy rather than as cut glass.
+      const hue = 0.50 + 0.22 * Math.atan2(ny, nx) / Math.PI + 0.10 * nz;
+      const rgb = _hueToRGB(((hue % 1) + 1) % 1, 0.55, 0.62);
+      col[vi * 3] = rgb[0];
+      col[vi * 3 + 1] = rgb[1];
+      col[vi * 3 + 2] = rgb[2];
       vi++;
     }
   }
@@ -363,8 +380,26 @@ function _makeWinkiGeo(cellSize) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   return geo;
+}
+
+// Minimal HSL to RGB. Written out rather than pulled from THREE.Color so the
+// geometry builder stays independent of a Color allocation per vertex.
+function _hueToRGB(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  const seg = Math.floor(h * 6);
+  if (seg === 0) { r = c; g = x; }
+  else if (seg === 1) { r = x; g = c; }
+  else if (seg === 2) { g = c; b = x; }
+  else if (seg === 3) { g = x; b = c; }
+  else if (seg === 4) { r = x; b = c; }
+  else { r = c; b = x; }
+  return [r + m, g + m, b + m];
 }
 function _winkiInstancedMesh(geo) {
   const saddleInstanceCount = G * G * G;
@@ -373,14 +408,25 @@ function _winkiInstancedMesh(geo) {
   // the environment as the cube turns, and the higher envMap intensity is what
   // actually does the sparkling. Opacity drops so the ball stays visible through
   // several layers of it.
+  // Glass rather than a wireframe or a flat tinted sheet.
+  //
+  //   vertexColors  the per-normal hue built into the geometry, so the angle of
+  //                 each part of the saddle decides its colour
+  //   DoubleSide    a glass sheet is visible from behind; FrontSide made the
+  //                 far half of every chamber vanish, which read as wireframe
+  //   clearcoat     a hard polished layer over a near mirror-smooth surface,
+  //                 which is what produces the glint
+  //   low opacity   so the ball stays visible anywhere in the structure
   const mat = new THREE.MeshPhysicalMaterial({
-    color: 0x9fd0ff, emissive: 0x2b4f77, emissiveIntensity: 0.42,
-    metalness: 0.28, roughness: 0.045,
-    clearcoat: 1.0, clearcoatRoughness: 0.03,
-    envMap, envMapIntensity: 2.6,
-    side: THREE.FrontSide,
+    vertexColors: true,
+    emissive: 0x24425f, emissiveIntensity: 0.30,
+    metalness: 0.12, roughness: 0.02,
+    clearcoat: 1.0, clearcoatRoughness: 0.02,
+    reflectivity: 1.0,
+    envMap, envMapIntensity: 3.0,
+    side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.11,
+    opacity: 0.13,
     depthWrite: false
   });
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
@@ -736,7 +782,14 @@ const Audio4D = (() => {
 })();
 
 // Physics tunables; overwritten from manifold.game.json:params.physics at bootstrap.
-let GRAV = -62, RESTIT = 0.06, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
+// RESTIT was 0.06, which returned only six percent of the normal component on a
+// bounce. The ball therefore hugged whatever surface it met and slid down it,
+// so the angle it struck at barely mattered and every drop felt similar. At
+// 0.28 the saddle actually deflects it: a glancing hit still slides, a steeper
+// one kicks the ball across the chamber, and since the incidence angle decides
+// which you get, the drop stops being predictable. Gravity is unchanged and
+// still dominates, so the ball always works its way down.
+let GRAV = -62, RESTIT = 0.28, DAMP = 0.72, SETTLE_V = 0.30, BALL_AIR = 0.992;
 // Play volume bounds: clamp tight to the lattice extents so balls never escape the gyroid cube.
 // Lattice spans gx,gz in 0..G-1 → world coords (gx-1.5)*CELL ∈ [-4.2, +4.2] for G=4.
 let PLAY_HX = (G - 1) * 0.5 * CELL + BALL_R;          // tight x half-extent
@@ -869,9 +922,9 @@ function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
       physBall.vz -= (1 + RESTIT) * vn * _gyWorldN.z;
       const vAfter = physBall.vx * _gyWorldN.x + physBall.vy * _gyWorldN.y + physBall.vz * _gyWorldN.z;
       // High tangential retention — ball slides along contours instead of scattering.
-      physBall.vx = _gyWorldN.x * vAfter + (physBall.vx - vAfter * _gyWorldN.x) * 0.97;
-      physBall.vy = _gyWorldN.y * vAfter + (physBall.vy - vAfter * _gyWorldN.y) * 0.97;
-      physBall.vz = _gyWorldN.z * vAfter + (physBall.vz - vAfter * _gyWorldN.z) * 0.97;
+      physBall.vx = _gyWorldN.x * vAfter + (physBall.vx - vAfter * _gyWorldN.x) * 0.90;
+      physBall.vy = _gyWorldN.y * vAfter + (physBall.vy - vAfter * _gyWorldN.y) * 0.90;
+      physBall.vz = _gyWorldN.z * vAfter + (physBall.vz - vAfter * _gyWorldN.z) * 0.90;
     }
     return;
   }
@@ -897,9 +950,9 @@ function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
     const vtx = physBall.vx - vAfter * _gyWorldN.x;
     const vty = physBall.vy - vAfter * _gyWorldN.y;
     const vtz = physBall.vz - vAfter * _gyWorldN.z;
-    physBall.vx = _gyWorldN.x * vAfter + vtx * 0.97;
-    physBall.vy = _gyWorldN.y * vAfter + vty * 0.97;
-    physBall.vz = _gyWorldN.z * vAfter + vtz * 0.97;
+    physBall.vx = _gyWorldN.x * vAfter + vtx * 0.90;
+    physBall.vy = _gyWorldN.y * vAfter + vty * 0.90;
+    physBall.vz = _gyWorldN.z * vAfter + vtz * 0.90;
     physBall.spinX += (_gyWorldN.y * vtz - _gyWorldN.z * vty) * 0.06;
     physBall.spinY += (_gyWorldN.z * vtx - _gyWorldN.x * vtz) * 0.06;
     physBall.spinZ += (_gyWorldN.x * vty - _gyWorldN.y * vtx) * 0.06;
