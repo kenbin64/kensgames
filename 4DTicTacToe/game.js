@@ -748,6 +748,8 @@ const _gyN = new THREE.Vector3();
 const _gyWorldN = new THREE.Vector3();
 const _gyWorldPos = new THREE.Vector3();
 const _gyCellIdx = new THREE.Vector3();
+const _gyCellPrevIdx = new THREE.Vector3();
+const _gyCellCurrIdx = new THREE.Vector3();
 const _gyCellCenter = new THREE.Vector3();
 const _gyTmp = new THREE.Vector3();
 function _saddleCellOf(lx, ly, lz, out) {
@@ -791,12 +793,40 @@ function _saddleSignedAtY(blx, bly, blz) {
 // sideKey: physBall property storing the home side for this family ('side'|'sideX'|'sideY').
 // prevBL / currBL: board-local prev / curr positions (Vector3). currBL is corrected in-place.
 function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
-  const home = physBall[sideKey];
+  let home = physBall[sideKey];
   if (!home) return;
-  const dPrev = fullDistFn(prevBL.x, prevBL.y, prevBL.z);
+
+  // The signed distance is evaluated in CELL-LOCAL coordinates, so it is only
+  // continuous WITHIN a cell. Crossing a cell boundary makes the local
+  // coordinates jump (x' goes from +half to -half), and f = z' - x'y'/h jumps
+  // with them, sign included.
+  //
+  // The crossing test below compares only signs, so it cannot tell a real
+  // membrane crossing from that jump. That is the whole bug: a ball moving
+  // between two chambers registered a phantom crossing, got binary searched to
+  // a "surface" that was not there, and was shoved out by a full radius, which
+  // is the teleport. The mirror case is a genuine crossing that happens to
+  // coincide with a cell change, where the two sign flips cancel and the ball
+  // sails through a wall.
+  //
+  // So: only trust the comparison when both ends of the segment sit in the same
+  // cell. When the cell changes, re-base the home side from where the ball
+  // actually is and skip the crossing test for this substep. With 16 substeps a
+  // cell change is rare, and the thickness push below still runs, so contact is
+  // not lost.
+  _saddleCellOf(prevBL.x, prevBL.y, prevBL.z, _gyCellPrevIdx);
+  _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellCurrIdx);
+  const sameCell = _gyCellPrevIdx.equals(_gyCellCurrIdx);
+
   const dCurr = fullDistFn(currBL.x, currBL.y, currBL.z);
+  if (!sameCell) {
+    home = dCurr >= 0 ? 1 : -1;
+    physBall[sideKey] = home;
+  }
+  const dPrev = sameCell ? fullDistFn(prevBL.x, prevBL.y, prevBL.z) : dCurr;
+
   // --- Tunneling: ball crossed the membrane this substep ---
-  if ((home * dPrev) > 0 && (home * dCurr) <= 0) {
+  if (sameCell && (home * dPrev) > 0 && (home * dCurr) <= 0) {
     let lo = 0, hi = 1;
     for (let i = 0; i < 14; i++) {
       const mid = (lo + hi) * 0.5;
@@ -883,7 +913,10 @@ function gyroidGuide(dt, pwx, pwy, pwz) {
   // GLB bypass (always empty — procedural lattice; saddle collision is fully analytic).
   if (glbColliders.length) return;
   // --- 2. Three saddle families: Z (z=xy/h), X (x=yz/h), Y (y=xz/h). ---
-  // All cells share identity quaternion so home-side values from spawn are valid everywhere.
+  // Every cell uses the identity quaternion, but that does NOT make a home side
+  // computed at spawn valid everywhere: the cell-local coordinates still jump at
+  // each cell boundary, so the field is discontinuous there. The side is re-based
+  // per cell inside _collideSaddleFamily.
   _gyPrev.set(pwx, pwy, pwz); boardGroup.worldToLocal(_gyPrev);
   _collideSaddleFamily(_saddleSignedAt, saddleGrad, 'side', _gyPrev, _gyLocal);
   _collideSaddleFamily(_saddleSignedAtX, saddleGradX, 'sideX', _gyPrev, _gyLocal);
