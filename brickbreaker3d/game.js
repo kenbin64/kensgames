@@ -906,6 +906,36 @@ function setupPlayers() {
     }
 }
 
+// A soft round glow, as a texture.
+//
+// A SpriteMaterial with no map draws a solid rectangle, which is why the first
+// version of this put a square behind the ball. The falloff has to live in the
+// image: a radial gradient from opaque centre to fully transparent edge, so what
+// reaches the screen is light rather than a card.
+//
+// Built once and shared. Every ball points at the same texture, so this costs
+// one small canvas for the whole game.
+let _glowTexture = null;
+function getGlowTexture() {
+    if (_glowTexture) return _glowTexture;
+    const size = 128;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const ctx = cv.getContext('2d');
+    const half = size / 2;
+    const g = ctx.createRadialGradient(half, half, 0, half, half, half);
+    // Weighted toward the centre so the edge is genuinely gone by the rim and
+    // there is no visible boundary where the sprite stops.
+    g.addColorStop(0.00, 'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.16)');
+    g.addColorStop(1.00, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    _glowTexture = new THREE.CanvasTexture(cv);
+    return _glowTexture;
+}
+
 function spawnBall(ownerIdx, baseSpeed, isMulti) {
     // In multiplayer: ball starts neutral (not scored) but is *liable* to an owner.
     const color = isMulti ? 0xcccccc : 0xcccccc;
@@ -946,6 +976,7 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     // moment's warning before the bounce. Kept as an additive sprite so it reads
     // as light on the surface rather than as an object stuck to it.
     const glowMat = new THREE.SpriteMaterial({
+        map: getGlowTexture(),
         color: 0x88ccff, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
     });
@@ -1292,7 +1323,7 @@ function updateBallMarkers() {
             } else {
                 b.wallGlow.visible = true;
                 const strength = 1 - Math.max(0, near) / range;
-                b.wallGlow.material.opacity = 0.5 * strength * strength;
+                b.wallGlow.material.opacity = 0.38 * strength * strength;
                 // Sit the glow ON the wall the ball is closest to.
                 if (dx <= dz) {
                     const sx = b.position.x >= 0 ? WALL_INNER : -WALL_INNER;
