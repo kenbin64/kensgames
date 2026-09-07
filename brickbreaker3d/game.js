@@ -106,14 +106,19 @@ const MOBILE_INPUT = {
 
 // Ball speeds (φ-scaled — coefficients come from the seed ladder).
 // Ladder: easy → hard ratio ≈ φ (0.24/0.15 = 1.6 ≈ φ). Max = 0.50*φ ≈ 0.81.
-let SPEED_EASY = __pick('speedEasyPhi', 0.15) * PHI;
-let SPEED_HARD = __pick('speedHardPhi', 0.24) * PHI;
-let SPEED_MULTI = __pick('speedMultiPhi', 0.19) * PHI;
+// Raised across the board. The red layer boost below was already working; the
+// problem was the speed it was boosting FROM, which made the long climb through
+// green, yellow and orange a slog. The easy to hard ratio stays near phi.
+let SPEED_EASY = __pick('speedEasyPhi', 0.23) * PHI;
+let SPEED_HARD = __pick('speedHardPhi', 0.34) * PHI;
+let SPEED_MULTI = __pick('speedMultiPhi', 0.28) * PHI;
 
 // Ball dynamics (pseudo-physics) — ALL derived from the seed.
 const GRAVITY = __pick('gravity', 0.00075);
 const FREE_FLIGHT_DRAG = __pick('freeFlightDrag', 0.99935);
-let MIN_BALL_SPEED = __pick('minBallSpeedPhi', 0.12) * PHI;
+// The floor matters as much as the start: drag and brick absorption pull the
+// ball down toward this value, and it was low enough to feel like wading.
+let MIN_BALL_SPEED = __pick('minBallSpeedPhi', 0.20) * PHI;
 let MAX_BALL_SPEED = __pick('maxBallSpeedPhi', 0.50) * PHI;
 // Boost per bounce: was 1.035/1.06 (compounded to 4-31× after many bounces).
 // Now 1.008/1.013 — 100 bounces ≈ 2.2× which feels earned, not runaway.
@@ -136,7 +141,12 @@ const PADDLE_LAUNCH_MULTI = __pick('paddleLaunchMulti', 0.25);
 const FINAL_LAYER_INDEX = 0;
 // √φ ≈ 1.272 — still golden-ratio derived but half the spike of the old φ = 1.618.
 const FINAL_LAYER_SPEED_MULT = __pick('finalLayerSpeedMult', 1.272);
-const PADDLE_SHRINK_FACTOR = __pick('paddleShrinkFactor', 0.618);
+const PADDLE_SHRINK_FACTOR = __pick('paddleShrinkFactor', 0.628);
+// How hard the paddle chases the pointer, per frame. 1 would be the old
+// teleport; below about 0.2 it feels like steering a boat.
+const PADDLE_FOLLOW = __pick('paddleFollow', 0.38);
+// World units per frame under keyboard control.
+const PADDLE_KEY_SPEED = __pick('paddleKeySpeed', 0.85);
 
 function fib1to4(n) {
     // Fibonacci starting at F1=1, F2=1
@@ -158,6 +168,38 @@ function clampBallEnergyAndSpeed(ball) {
     ball.baseSpeed = THREE.MathUtils.clamp(ball.baseSpeed ?? SPEED_EASY, MIN_BALL_SPEED, MAX_BALL_SPEED);
     const spd = ball.velocity.length();
     if (spd > 0.0001) ball.velocity.multiplyScalar(ball.baseSpeed / spd);
+}
+
+// A ball travelling upward must always carry enough vertical speed to reach the
+// ceiling, if nothing is in the way.
+//
+// Without this it could bleed energy on a wall, arc over short of the stack, and
+// fall back to the paddle having achieved nothing. That is not a difficulty
+// setting, it is a dead rally, and it happened most often right after a wall
+// bounce near the floor, which is exactly when the player has least control.
+//
+// Ballistics: to climb h under constant gravity g needs vy >= sqrt(2*g*h). The
+// margin covers the per frame drag that the closed form ignores. Only the
+// VERTICAL component is raised; the speed clamp afterwards keeps total speed
+// where it belongs, so the ball trades a little horizontal for the climb rather
+// than being handed free energy.
+const CEILING_REACH_MARGIN = __pick('ceilingReachMargin', 1.08);
+
+function ceilingReachSpeed(fromY) {
+    const ceilingY = HALF_H - BALL_RADIUS;
+    const h = ceilingY - fromY;
+    if (h <= 0) return 0;
+    return Math.sqrt(2 * GRAVITY * h) * CEILING_REACH_MARGIN;
+}
+
+function ensureCeilingReach(ball) {
+    if (!ball || !ball.velocity) return;
+    if (ball.velocity.y <= 0) return;            // falling: gravity is doing its job
+    const need = ceilingReachSpeed(ball.position.y);
+    if (ball.velocity.y < need) ball.velocity.y = need;
+    // The clamp normalises to baseSpeed, so baseSpeed itself has to be able to
+    // contain that vertical component or the normalisation would shrink it back.
+    if (ball.baseSpeed < need) ball.baseSpeed = Math.min(MAX_BALL_SPEED, need);
 }
 
 function nudgeVelocity(ball, amount) {
@@ -220,11 +262,16 @@ function fitCameraToArena() {
     const aspect = Math.max(0.6, window.innerWidth / Math.max(1, window.innerHeight));
     const vFov = THREE.MathUtils.degToRad(camera.fov);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const halfW = HALF_W + 6;
-    const halfH = HALF_H + 6;
+    // Margin, not decoration. The fit was arithmetically right and still framed
+    // the arena too tightly to play: a 6 unit border around a 50 to 80 unit
+    // arena leaves the walls at the very edge of the screen, so players had to
+    // pull the camera back themselves before they could see what they were
+    // doing. This starts them where they were dragging it to anyway.
+    const halfW = HALF_W * 1.28 + 10;
+    const halfH = HALF_H * 1.28 + 10;
     const distByW = halfW / Math.tan(hFov / 2);
     const distByH = halfH / Math.tan(vFov / 2);
-    const dist = Math.max(distByW, distByH, 48);
+    const dist = Math.max(distByW, distByH, 72);
     camera.position.set(0, -2, dist);
     controls.target.set(0, -3, 0);
 }
@@ -242,7 +289,9 @@ function initScene() {
 
     // Camera
     camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-    camera.position.set(0, -2, 85);
+    // Starting point only; fitCameraToArena() sets the real distance once the
+    // arena size is known. Kept in step with it so the first frame is not a jump.
+    camera.position.set(0, -2, 120);
     camera.lookAt(0, -3, 0);
 
     // Renderer
@@ -717,22 +766,34 @@ function createArenaWalls() {
     });
 }
 
-function createBricks() {
-    const colors = [BRICK_COLORS.red, BRICK_COLORS.orange, BRICK_COLORS.yellow, BRICK_COLORS.green];
-
-    // Fit bricks to arena width — compute how many fit
+// The brick grid geometry, in one place.
+//
+// createBricks() builds the stack and serveBall() has to place a ball just
+// under it. Those were two separate copies of the same arithmetic, which is a
+// standing invitation for them to disagree: change the brick height in one and
+// balls get served inside the bricks. One function, one answer.
+function brickMetrics() {
     const gap = 0.15;
-    const brickH = 1.0;
+    const brickH = 1.75;                              // thicker: was 1.0
     const brickW = PHI * 3;                           // ≈ 4.854
     const brickD = brickW;
     const gridSpacing = brickW + gap;
     const layerStride = brickH + gap;
-    const ceilingGap = PHI * PHI * PHI;               // ≈ 4.236
+    // Room between the ceiling and the top layer. At the old phi^3 a ball that
+    // got above the stack was immediately pinched back into it; with this gap it
+    // can run along the ceiling, deflect off it repeatedly, and come back down
+    // only once it finds a lane with no bricks left in it.
+    const ceilingGap = PHI * PHI * PHI * 1.75;        // ≈ 7.41
     const topLayerY = HALF_H - ceilingGap - brickH / 2;
+    const numAcross = Math.max(1, Math.floor(ARENA_WIDTH / gridSpacing));
+    const offset = (numAcross - 1) * gridSpacing / 2;
+    return { gap, brickH, brickW, brickD, gridSpacing, layerStride, ceilingGap, topLayerY, numAcross, offset };
+}
 
-    // Number of bricks that fit across the arena width
-    const numAcross = Math.floor(ARENA_WIDTH / gridSpacing);
-    const offset = (numAcross - 1) * gridSpacing / 2; // center the grid
+function createBricks() {
+    const colors = [BRICK_COLORS.red, BRICK_COLORS.orange, BRICK_COLORS.yellow, BRICK_COLORS.green];
+
+    const { brickH, brickW, brickD, gridSpacing, layerStride, topLayerY, numAcross, offset } = brickMetrics();
 
     for (let layer = 0; layer < 4; layer++) {
         const yPos = topLayerY - layer * layerStride;
@@ -768,7 +829,11 @@ function createBricks() {
 
 function setupPlayers() {
     // Clean up old objects
-    balls.forEach(b => scene.remove(b));
+    balls.forEach(b => {
+        scene.remove(b);
+        if (b.groundMarker) scene.remove(b.groundMarker);
+        if (b.wallGlow) scene.remove(b.wallGlow);
+    });
     paddles.forEach(p => scene.remove(p));
     balls = []; paddles = []; players = [];
 
@@ -796,15 +861,13 @@ function setupPlayers() {
         [0, 0], [-10, -10], [10, 10], [-10, 10]
     ];
     for (let i = 0; i < numPlayers; i++) {
-        // Flat circular paddle with a subtle bevel
-        const geo = new THREE.CylinderGeometry(
-            basePaddleRadius * PADDLE_BEVEL,
-            basePaddleRadius,
-            PADDLE_THICKNESS,
-            48,
-            1,
-            false
-        );
+        // Square paddle. A disc gives no flat edge to aim along and its corners
+        // are wherever the player imagines them; a square reads its own hit area
+        // honestly, and the collision below matches the shape you can see.
+        // paddleRadius stays the name for the HALF EXTENT, because the AI, the
+        // penalty and the paddle separation code all key off it.
+        const side = basePaddleRadius * 2;
+        const geo = new THREE.BoxGeometry(side, PADDLE_THICKNESS, side);
         const mat = new THREE.MeshPhysicalMaterial({
             color: PLAYER_COLORS[i],
             metalness: 0.35,
@@ -860,24 +923,46 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     b.castShadow = true;
     b.receiveShadow = true;
 
+    // A marker on the floor directly under the ball.
+    //
+    // The real directional light already casts a shadow, but in a 3D arena that
+    // shadow is not reliably where the ball is: it depends on the light angle,
+    // it lands on bricks as often as the floor, and it disappears entirely when
+    // the ball is above the stack. This is not lighting, it is an instrument.
+    // It sits exactly under the ball in x and z, so depth becomes readable and
+    // you can tell where a falling ball is going to arrive.
+    const shGeo = new THREE.CircleGeometry(BALL_RADIUS * 1.6, 28);
+    shGeo.rotateX(-Math.PI / 2);
+    const shMat = new THREE.MeshBasicMaterial({
+        color: 0x000000, transparent: true, opacity: 0.34,
+        depthWrite: false,
+    });
+    const shadow = new THREE.Mesh(shGeo, shMat);
+    shadow.renderOrder = 2;
+    scene.add(shadow);
+    b.groundMarker = shadow;
+
+    // A soft reflection that brightens as the ball nears a wall, giving a
+    // moment's warning before the bounce. Kept as an additive sprite so it reads
+    // as light on the surface rather than as an object stuck to it.
+    const glowMat = new THREE.SpriteMaterial({
+        color: 0x88ccff, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const glow = new THREE.Sprite(glowMat);
+    glow.scale.set(BALL_RADIUS * 5, BALL_RADIUS * 5, 1);
+    scene.add(glow);
+    b.wallGlow = glow;
+
     const angle = Math.random() * Math.PI * 2;
     const vx = Math.sin(angle) * baseSpeed * 0.6;
     const vz = Math.cos(angle) * baseSpeed * 0.4;
     b.velocity = new THREE.Vector3(vx, baseSpeed, vz);
 
     // Serve point: always random X/Z just under the bottom brick layer.
-    const gap = 0.15;
-    const brickH = 1.0;
-    const brickW = PHI * 3;
-    const gridSpacing = brickW + gap;
-    const layerStride = brickH + gap;
-    const ceilingGap = PHI * PHI * PHI;
-    const topLayerY = HALF_H - ceilingGap - brickH / 2;
+    const { brickH, layerStride, topLayerY, offset } = brickMetrics();
     const bottomLayerY = topLayerY - 3 * layerStride;
     const serveY = bottomLayerY - (brickH * 0.5 + BALL_RADIUS + 0.25);
-
-    const numAcross = Math.max(1, Math.floor(ARENA_WIDTH / gridSpacing));
-    const offset = (numAcross - 1) * gridSpacing / 2;
     const randX = (Math.random() * 2 - 1) * Math.max(1, offset);
     const randZ = (Math.random() * 2 - 1) * Math.max(1, offset);
     b.position.set(randX, serveY, randZ);
@@ -895,11 +980,31 @@ function spawnBall(ownerIdx, baseSpeed, isMulti) {
     b.turbulence = 0;
     b.finalLayerSpeedApplied = false;
     b.ceilingPenaltyApplied = false;
+    // Scoped to this ball's life on purpose. Losing the ball clears it, so the
+    // paddle comes back to full size and shrinks again only when a new ball
+    // fights its way up to red.
+    b.redPenaltyApplied = false;
     b.spin = new THREE.Vector3(0, 0, 0); // angular velocity (spin axis × magnitude)
     scene.add(b);
     balls.push(b);
     return b;
 }
+
+// Where the player wants paddle 0 to be. The paddle moves TOWARD this each
+// frame rather than being teleported onto it.
+//
+// The old code set the position directly from the mouse every mousemove, which
+// has three problems: the paddle jitters with the pointer instead of gliding,
+// a fast flick teleports it straight through a ball it should have hit, and
+// there is no way to make a small correction because the smallest input is one
+// pixel of raw pointer movement. Steering a target and chasing it fixes all
+// three and costs one lerp.
+let paddleTarget = { x: 0, z: 0, set: false };
+
+// Keyboard is a first class control here, not a fallback. A mouse is better for
+// crossing the arena; keys are better for the small adjustments that actually
+// save a ball, and some people simply prefer them.
+const keyHeld = Object.create(null);
 
 function onMouseMove(e) {
     if (!gameActive || paddles.length === 0) return;
@@ -914,15 +1019,62 @@ function onMouseMove(e) {
     raycaster.ray.intersectPlane(floorPlane, intersection);
     if (!intersection) return;
 
-    // Player 0 paddle always follows mouse
     const p = paddles[0];
     if (!p || !players[0].alive) return;
 
-    let tx = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, intersection.x));
-    let tz = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, intersection.z));
+    paddleTarget.x = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, intersection.x));
+    paddleTarget.z = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, intersection.z));
+    paddleTarget.set = true;
+}
 
-    // Try to move there, but stop at collision boundary with other paddles
-    movePaddleTo(0, tx, tz);
+// Move paddle 0 toward its target, and let the keys push that target around.
+//
+// Key movement is CAMERA RELATIVE. The arena can be orbited, and with world
+// axes a player who has swung the camera around finds that "left" now moves the
+// paddle right, which feels broken even though it is technically consistent.
+// Projecting the camera's own right and forward onto the floor keeps "left"
+// meaning left from wherever you happen to be looking.
+function updateLocalPaddle() {
+    const p = paddles[0];
+    if (!p || !players[0] || !players[0].alive) return;
+
+    if (!paddleTarget.set) {
+        paddleTarget.x = p.position.x;
+        paddleTarget.z = p.position.z;
+        paddleTarget.set = true;
+    }
+
+    const left  = keyHeld.ArrowLeft  || keyHeld.KeyA;
+    const right = keyHeld.ArrowRight || keyHeld.KeyD;
+    const up    = keyHeld.ArrowUp    || keyHeld.KeyW;
+    const down  = keyHeld.ArrowDown  || keyHeld.KeyS;
+
+    if (left || right || up || down) {
+        const step = PADDLE_KEY_SPEED;
+        const camRight = new THREE.Vector3();
+        camera.getWorldDirection(camRight);
+        camRight.y = 0;
+        camRight.normalize();
+        const forward = camRight.clone();
+        // cross(forward, up) is screen-right for this camera. Verified against the
+        // real orientation rather than guessed: the camera sits on +z looking at
+        // the origin, so forward is (0,0,-1) and forward x up is (1,0,0) = +x.
+        camRight.cross(new THREE.Vector3(0, 1, 0)).normalize();
+
+        if (right) { paddleTarget.x += camRight.x * step; paddleTarget.z += camRight.z * step; }
+        if (left)  { paddleTarget.x -= camRight.x * step; paddleTarget.z -= camRight.z * step; }
+        if (up)    { paddleTarget.x += forward.x * step;  paddleTarget.z += forward.z * step; }
+        if (down)  { paddleTarget.x -= forward.x * step;  paddleTarget.z -= forward.z * step; }
+
+        paddleTarget.x = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, paddleTarget.x));
+        paddleTarget.z = Math.max(-PADDLE_BOUND, Math.min(PADDLE_BOUND, paddleTarget.z));
+    }
+
+    // Chase the target. Fast enough to feel direct, damped enough that the
+    // paddle has weight and cannot teleport through a ball between frames.
+    const nx = p.position.x + (paddleTarget.x - p.position.x) * PADDLE_FOLLOW;
+    const nz = p.position.z + (paddleTarget.z - p.position.z) * PADDLE_FOLLOW;
+    movePaddleTo(0, nx, nz);
 }
 
 function onWindowResize() {
@@ -1103,6 +1255,57 @@ let _bbLastInputAt = 0;
 
 // Physics-based paddle separation — equal and opposite nudge
 // Runs after ALL paddles have moved. Resolves overlaps with equal push on both.
+// Keep each ball's floor marker and wall glow in step with it.
+//
+// Both are readability aids rather than physics: the marker says where the ball
+// is horizontally so height is legible, and the glow warns that a wall is about
+// to be hit. Neither influences the simulation.
+function updateBallMarkers() {
+    const floorY = -HALF_H + 0.06;
+    for (const b of balls) {
+        if (!b.alive) {
+            if (b.groundMarker) b.groundMarker.visible = false;
+            if (b.wallGlow) b.wallGlow.visible = false;
+            continue;
+        }
+
+        if (b.groundMarker) {
+            b.groundMarker.visible = true;
+            b.groundMarker.position.set(b.position.x, floorY, b.position.z);
+            // Higher ball, larger and fainter marker. That is how a real shadow
+            // behaves, and it is also the cue that carries the height.
+            const height = Math.max(0, b.position.y - floorY);
+            const t = Math.min(1, height / Math.max(1, HALF_H * 2));
+            const scale = 1 + t * 1.6;
+            b.groundMarker.scale.set(scale, scale, scale);
+            b.groundMarker.material.opacity = 0.36 * (1 - t * 0.62);
+        }
+
+        if (b.wallGlow) {
+            // Nearest wall in x or z, and how close as a 0..1 ramp.
+            const dx = WALL_INNER - Math.abs(b.position.x);
+            const dz = WALL_INNER - Math.abs(b.position.z);
+            const near = Math.min(dx, dz);
+            const range = BALL_RADIUS * 9;
+            if (near > range) {
+                b.wallGlow.visible = false;
+            } else {
+                b.wallGlow.visible = true;
+                const strength = 1 - Math.max(0, near) / range;
+                b.wallGlow.material.opacity = 0.5 * strength * strength;
+                // Sit the glow ON the wall the ball is closest to.
+                if (dx <= dz) {
+                    const sx = b.position.x >= 0 ? WALL_INNER : -WALL_INNER;
+                    b.wallGlow.position.set(sx, b.position.y, b.position.z);
+                } else {
+                    const sz = b.position.z >= 0 ? WALL_INNER : -WALL_INNER;
+                    b.wallGlow.position.set(b.position.x, b.position.y, sz);
+                }
+            }
+        }
+    }
+}
+
 function resolvePaddleCollisions() {
     // Soft phase gives the “nudge” feel; hard phase guarantees no overlap.
     const softIterations = 8;
@@ -1200,17 +1403,24 @@ function animate() {
     if (isMulti) updateAIPaddles();
 
     // Resolve paddle overlaps — equal and opposite nudge, every frame
+    updateBallMarkers();
+    updateLocalPaddle();
     resolvePaddleCollisions();
 
-    // Brick actual half-dimensions (no ball radius padding — we do sphere-AABB properly)
-    const brickHW = (PHI * 3) / 2;   // half width  ≈ 2.427
-    const brickHH = 0.5;              // half height = 0.5
-    const brickHD = (PHI * 3) / 2;   // half depth  ≈ 2.427
+    // Brick half-dimensions for the sphere-AABB test, taken from the SAME source
+    // the bricks are built from. These were hardcoded, and the half height of
+    // 0.5 was simply the old brick height divided by two. Making bricks thicker
+    // without this would have left the ball passing through the top and bottom
+    // of every brick, because the collision box would still have been the old
+    // size while the visible brick had grown.
+    const _bm = brickMetrics();
+    const brickHW = _bm.brickW / 2;
+    const brickHH = _bm.brickH / 2;
+    const brickHD = _bm.brickD / 2;
 
     // Top 2 layers Y range (for hard mode speed boost)
-    const ceilingGap = PHI * PHI * PHI;
-    const topLayerY = HALF_H - ceilingGap - 0.5;
-    const layer2Y = topLayerY - (1.0 + 0.15);
+    const topLayerY = _bm.topLayerY;
+    const layer2Y = topLayerY - _bm.layerStride;
 
     // Update each ball
     balls.forEach(b => {
@@ -1238,6 +1448,11 @@ function animate() {
 
         // Gravity adds a visible arc
         b.velocity.y -= GRAVITY;
+
+        // ...but never so much arc that a rising ball falls short of the ceiling
+        // with nothing above it. Applied every frame while ascending, so drag,
+        // turbulence and a glancing wall cannot quietly bleed the climb away.
+        ensureCeilingReach(b);
 
         // Turbulence adds small unpredictable curving so trajectories aren't precomputable
         if (b.turbulence && b.turbulence > 0.00001) {
@@ -1305,13 +1520,10 @@ function animate() {
             b.turbulence = Math.min(TURBULENCE_MAX, (b.turbulence || 0) + TURBULENCE_WALL_ADD);
             nudgeVelocity(b, WALL_DEFLECT);
 
-            // Reduce the paddle of whoever last touched this ball by golden ratio (.618)
-            // only once for this specific ball life.
-            const owner = paddles[b.lastTouchedBy];
-            if (owner && !b.ceilingPenaltyApplied) {
-                setPaddlePenalty(b.lastTouchedBy, true);
-                b.ceilingPenaltyApplied = true;
-            }
+            // The paddle penalty used to fire here, on the ceiling. It now fires
+            // on the first red brick instead (see the brick handler), because
+            // reaching the red layer is an achievement worth a cost, whereas
+            // touching the ceiling is something the ball does constantly.
 
             clampBallEnergyAndSpeed(b);
         }
@@ -1337,21 +1549,27 @@ function animate() {
 
                 const dx = b.position.x - paddle.position.x;
                 const dz = b.position.z - paddle.position.z;
-                const dist = Math.sqrt(dx * dx + dz * dz);
 
+                // Square paddle, square test. The old radial check meant the ball
+                // bounced off an invisible circle while the player saw corners, so
+                // near-corner hits missed for no reason the player could see.
                 const pR = paddle.paddleRadius;
-                if (dist < pR + BALL_RADIUS) {
+                const overlapX = Math.abs(dx) - pR;
+                const overlapZ = Math.abs(dz) - pR;
+                if (overlapX < BALL_RADIUS && overlapZ < BALL_RADIUS) {
                     // Paddle re-energizes the ball: always enough to reach the ceiling if unobstructed
                     const launch = isMulti ? PADDLE_LAUNCH_MULTI : (gameMode === 'easy' ? PADDLE_LAUNCH_EASY : PADDLE_LAUNCH_HARD);
                     b.baseSpeed = Math.max(b.baseSpeed, launch);
 
                     // Aim upward with a controllable horizontal component based on hit offset
                     const upBias = 1.35;
-                    let dirX = 0, dirZ = 0;
-                    if (dist > 0.001) {
-                        dirX = dx / dist;
-                        dirZ = dz / dist;
-                    }
+                    // Aim from WHERE on the paddle it struck, per axis, rather
+                    // than radially from the centre. Hitting the right edge sends
+                    // it right, the middle sends it straight up, and the two axes
+                    // are independent, which is what makes a square paddle
+                    // steerable instead of merely present.
+                    const dirX = Math.max(-1, Math.min(1, dx / Math.max(0.001, pR)));
+                    const dirZ = Math.max(-1, Math.min(1, dz / Math.max(0.001, pR)));
                     b.velocity.set(
                         dirX * 0.75 + b.velocity.x * 0.25,
                         upBias,
@@ -1398,6 +1616,8 @@ function animate() {
                     b.alive = false;
                     b.visible = false;
                     scene.remove(b);
+                    if (b.groundMarker) scene.remove(b.groundMarker);
+                    if (b.wallGlow) scene.remove(b.wallGlow);
 
                     if (liable >= 0 && players[liable] && players[liable].alive) {
                         players[liable].lives = Math.max(0, (players[liable].lives || 0) - 1);
@@ -1447,6 +1667,8 @@ function animate() {
                     b.alive = false;
                     b.visible = false;
                     scene.remove(b);
+                    if (b.groundMarker) scene.remove(b.groundMarker);
+                    if (b.wallGlow) scene.remove(b.wallGlow);
                     if (players[0].lives <= 0) {
                         endGame('Game Over');
                     } else {
@@ -1541,6 +1763,19 @@ function animate() {
                 if (!b.finalLayerSpeedApplied && brick.layer === FINAL_LAYER_INDEX) {
                     b.baseSpeed = Math.min(MAX_BALL_SPEED, b.baseSpeed * FINAL_LAYER_SPEED_MULT);
                     b.finalLayerSpeedApplied = true;
+
+                    // Reaching red costs you paddle. Once only: the flag lives on
+                    // the BALL, so a second red brick does not shrink it again,
+                    // and losing the ball restores full size until the next ball
+                    // works its way back up to red.
+                    //
+                    // In multiplayer the paddle that pays is the one that last
+                    // touched this ball, which is the paddle that earned the hit.
+                    const liableIdx = isMulti ? b.lastTouchedBy : 0;
+                    if (paddles[liableIdx] && !b.redPenaltyApplied) {
+                        setPaddlePenalty(liableIdx, true);
+                        b.redPenaltyApplied = true;
+                    }
                 }
 
                 // Never allow energy to fall below the safe minimum
@@ -1702,7 +1937,28 @@ window.addEventListener('load', async () => {
 });
 
 // Keyboard
+const PADDLE_KEYS = new Set([
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
+]);
+
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') { gamePaused = !gamePaused; e.preventDefault(); }
     if (e.code === 'Escape') endGame();
+    if (PADDLE_KEYS.has(e.code)) {
+        keyHeld[e.code] = true;
+        // The arrow keys scroll the page otherwise, which drags the board out
+        // from under the player mid rally.
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (PADDLE_KEYS.has(e.code)) keyHeld[e.code] = false;
+});
+
+// Releasing focus must release the keys. Without this, alt-tabbing while holding
+// left leaves the paddle drifting left forever, because the keyup lands on
+// another window.
+window.addEventListener('blur', () => {
+    for (const k of PADDLE_KEYS) keyHeld[k] = false;
 });
