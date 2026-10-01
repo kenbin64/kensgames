@@ -75,7 +75,8 @@ function lastState(c) {
   const code = sc.code || (sc.session && sc.session.session_code);
   if (!code) throw new Error('no share code');
 
-  host.send({ type: 'toggle_ready' });
+  // The host is created already ready (lobby-server create_session), so the
+  // host must NOT toggle: toggling would switch the host to not-ready.
   guest.send({ type: 'join_by_code', code });
   await guest.waitFor((e) => e.type === 'session_joined' || e.type === 'session_update');
   guest.send({ type: 'toggle_ready' });

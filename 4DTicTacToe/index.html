@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -56,10 +56,6 @@
   </header>
   <canvas id="c"></canvas>
   <aside id="kg-rail">
-    <button class="btn-ghost on" id="btn-cama" onclick="setCam('A')">CAM A</button>
-    <button class="btn-ghost" id="btn-camb" onclick="setCam('B')">CAM B</button>
-    <button class="btn-ghost" id="btn-follow" onclick="toggleFollow()">FOLLOW</button>
-    <button class="btn-ghost" onclick="resetCam()">RESET</button>
     <span class="kg-rail-grow"></span>
     <button class="btn-orient" id="btn-orient" hidden onclick="snapToUpright()">&#8679; ORIENT</button>
     <span class="kg-rail-grow"></span>
@@ -115,7 +111,7 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="manifold.js?v=20260907a"></script>
-  <script src="game.js?v=20260907a"></script>
+  <script src="game.js?v=20261001a"></script>
 
 
 
@@ -158,67 +154,108 @@
       margin-bottom: 12px;
     }
 
+    #orientation-guard-4d .og-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
     #orientation-guard-4d .og-btn {
       border: 1px solid rgba(0, 210, 255, 0.6);
       background: rgba(0, 110, 150, 0.32);
       color: #9be8ff;
       border-radius: 10px;
-      padding: 10px 12px;
+      padding: 12px 14px;
+      min-height: 44px;
       font-family: inherit;
-      font-size: 10px;
+      font-size: 11px;
       letter-spacing: 1.4px;
       cursor: pointer;
     }
+
+    #orientation-guard-4d .og-btn.og-primary {
+      background: rgba(0, 170, 220, 0.55);
+      color: #ffffff;
+    }
+
+    #orientation-guard-4d .og-note {
+      font-size: 10px;
+      color: #ffcf8a;
+      margin-top: 10px;
+      min-height: 1em;
+    }
   </style>
-  <div id="orientation-guard-4d" aria-live="polite">
+  <!--
+    Landscape SUGGESTION for phones held upright. It must never trap anyone:
+    "Play upright" always gets through, and the game re-frames the camera for
+    tall screens (fitFov in game.js). "Turn to landscape" only appears where
+    the browser can actually turn the screen (Android Chrome); iPhones can't,
+    so there the card just says to turn the phone.
+  -->
+  <div id="orientation-guard-4d" aria-live="polite" role="dialog" aria-labelledby="og-title-4d">
     <div class="og-card">
-      <div class="og-title">ROTATE TO LANDSCAPE</div>
-      <div class="og-copy">4D Connect is designed for horizontal play so the full cube stays inside view.</div>
-      <button id="orientation-guard-4d-btn" class="og-btn" type="button">ENTER LANDSCAPE</button>
+      <div class="og-title" id="og-title-4d">BEST IN LANDSCAPE</div>
+      <div class="og-copy" id="orientation-guard-4d-copy">Turn your phone sideways for the biggest view of the cube, or play upright.</div>
+      <div class="og-actions">
+        <button id="orientation-guard-4d-btn" class="og-btn og-primary" type="button" hidden>TURN TO LANDSCAPE</button>
+        <button id="orientation-guard-4d-skip" class="og-btn" type="button">PLAY UPRIGHT</button>
+      </div>
+      <div class="og-note" id="orientation-guard-4d-note"></div>
     </div>
   </div>
   <script>
-    (function enforceLandscape4D() {
+    (function suggestLandscape4D() {
       const guard = document.getElementById('orientation-guard-4d');
-      const btn = document.getElementById('orientation-guard-4d-btn');
+      const lockBtn = document.getElementById('orientation-guard-4d-btn');
+      const skipBtn = document.getElementById('orientation-guard-4d-skip');
+      const copy = document.getElementById('orientation-guard-4d-copy');
+      const note = document.getElementById('orientation-guard-4d-note');
       const setupOverlay = document.getElementById('mp-panel-overlay');
       const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 900);
+      const portraitQuery = window.matchMedia('(orientation: portrait)');
+      const SKIP_KEY = 'kg4d.playUpright';
 
-      async function tryLockLandscape() {
-        try {
-          if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-            await document.documentElement.requestFullscreen();
-          }
-        } catch (_) { }
-        try {
-          if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
-        } catch (_) { }
+      // Only offer the button where the browser can really turn the screen.
+      // iOS has neither fullscreen for pages nor orientation lock, so the old
+      // button silently did nothing there.
+      const canLock = !!(document.documentElement.requestFullscreen && screen.orientation && screen.orientation.lock);
+      lockBtn.hidden = !canLock;
+      if (!canLock) {
+        copy.textContent = 'Turn your phone sideways for the biggest view of the cube. If the screen doesn\'t turn, rotation lock is on: switch it off, or just play upright.';
+      }
+
+      function skipped() {
+        try { return sessionStorage.getItem(SKIP_KEY) === '1'; } catch (_) { return false; }
       }
 
       function updateGuard() {
-        if (!isMobile) {
-          guard.style.display = 'none';
-          return;
-        }
-
         const setupOpen = !!(setupOverlay && setupOverlay.style.display !== 'none');
-        if (setupOpen) {
-          guard.style.display = 'none';
-          return;
-        }
-
-        const portrait = window.innerHeight > window.innerWidth;
-        guard.style.display = portrait ? 'flex' : 'none';
+        const show = isMobile && !setupOpen && !skipped() && portraitQuery.matches;
+        guard.style.display = show ? 'flex' : 'none';
       }
 
-      btn.addEventListener('click', async () => {
-        await tryLockLandscape();
+      lockBtn.addEventListener('click', async () => {
+        note.textContent = '';
+        try {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+          await screen.orientation.lock('landscape');
+        } catch (_) {
+          note.textContent = 'This browser won\'t turn the screen for us. Turn the phone, or play upright.';
+        }
         updateGuard();
       });
 
-      window.addEventListener('orientationchange', updateGuard);
+      skipBtn.addEventListener('click', () => {
+        try { sessionStorage.setItem(SKIP_KEY, '1'); } catch (_) { }
+        guard.style.display = 'none';
+      });
+
+      portraitQuery.addEventListener('change', updateGuard);
       window.addEventListener('resize', updateGuard);
       document.addEventListener('fullscreenchange', updateGuard);
+      // The setup panel opens and closes without a resize; re-check when it does.
+      if (setupOverlay) new MutationObserver(updateGuard).observe(setupOverlay, { attributes: true, attributeFilter: ['style', 'class'] });
       updateGuard();
     })();
   </script>

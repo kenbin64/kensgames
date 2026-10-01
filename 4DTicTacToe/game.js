@@ -156,7 +156,7 @@ const KGSync = {
     if (isGameOver || BM.getCell(gx, gy, gz)) return;
     if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; }
     if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
-    snapAnim = null; isDropping = true; clearTurnTimer();
+    isDropping = true; clearTurnTimer();
     this._applying = true;
     try { finishPlacement(p, [gx, gy, gz]); }
     finally { this._applying = false; }
@@ -208,7 +208,9 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000008);
 scene.fog = new THREE.FogExp2(0x00000C, 0.007);
-const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 900);
+// A fixed 54deg lens. frameStaticCamera() moves the camera back far enough for
+// the whole cube to fit on any screen shape, tall phones included.
+const camera = new THREE.PerspectiveCamera(54, window.innerWidth / _canvasH(), 0.1, 900);
 function makeEnvTex() { const W = 256, H = 128, d = new Uint8Array(W * H * 4); for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; d[i] = 2; d[i + 1] = 1; d[i + 2] = 10; d[i + 3] = 255; const n = Math.sin(x * 7.31 + y * 13.7) * Math.cos(x * 11.1 - y * 5.93); if (n > 0.975) { d[i] = 220; d[i + 1] = 235; d[i + 2] = 255; } else if (n > 0.96) { d[i] = 0; d[i + 1] = 180; d[i + 2] = 230; } else if (n > 0.955) { d[i] = 255; d[i + 1] = 220; d[i + 2] = 80; } const lat = Math.abs((y / H) - 0.5) * 2; d[i + 2] = Math.min(255, d[i + 2] + Math.max(0, 1 - lat * 3.5) * 30); } const tex = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); tex.mapping = THREE.EquirectangularReflectionMapping; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.needsUpdate = true; return tex; }
 // Pre-process the equirect starfield through PMREMGenerator so it can be used as both
 // scene.environment (IBL for every MeshStandardMaterial) and per-material envMap (mirror
@@ -271,10 +273,18 @@ function saddleCellCenter(cx, cy, cz, out) {
     (cy + 0.5 - G * 0.5) * SADDLE_CELL,
     (cz + 0.5 - G * 0.5) * SADDLE_CELL);
 }
-function saddleCellQuaternion(_cx, _cy, _cz, out) {
-  // Winki primitive tiles cleanly with no per-cell rotation -- its built-in folding
-  // handles continuity between adjacent chambers. Identity quaternion for every cell.
-  return out.set(0, 0, 0, 1);
+// How each chamber's saddle wall is turned. Neighbours alternate: every other
+// chamber (by cx + cy) is turned 90deg about the local z axis, which turns
+// z = xy into z = -xy. Measured (zxy_helix_test.js): that is exactly the turn
+// that makes neighbouring saddles meet edge to edge with no gap, so the wall is
+// one continuous sheet across x and y. The old identity tiling left a broken
+// seam (z = y meeting z = -y) at every chamber boundary, where the collision
+// could not tell a real crossing from the seam.
+// Used by BOTH the drawn glass and the collision, so walls you see are the
+// walls the ball hits.
+const _saddleTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+function saddleCellQuaternion(cx, cy, _cz, out) {
+  return ((cx + cy) % 2 === 0) ? out.set(0, 0, 0, 1) : out.copy(_saddleTurn);
 }
 // Saddle field in cell-local coords. The visual lattice (_makeWinkiGeo) always renders the
 // +W face surface z = x·y/h, so collision MUST use the same +W analytic formula or the ball
@@ -293,28 +303,6 @@ function saddleGrad(lx, ly, lz, out) {
   // vertical normal component and a vertically-falling ball never collides.
   const h = SADDLE_HALF;
   return out.set(-ly / h, -lx / h, 1);
-}
-// X-family saddle wall: f_X = x - yz/h. Normal ≈ (1, 0, 0). Stops motion in the X direction.
-function saddleSignedDistanceX(lx, ly, lz) {
-  const h = SADDLE_HALF;
-  const f = lx - (ly * lz) / h;
-  const gMag = Math.sqrt(1 + (ly * ly + lz * lz) / (h * h));
-  return f / gMag;
-}
-function saddleGradX(lx, ly, lz, out) {
-  const h = SADDLE_HALF;
-  return out.set(1, -lz / h, -ly / h);
-}
-// Y-family saddle wall: f_Y = y - xz/h. Normal ≈ (0, 1, 0). Stops motion in the Y direction.
-function saddleSignedDistanceY(lx, ly, lz) {
-  const h = SADDLE_HALF;
-  const f = ly - (lx * lz) / h;
-  const gMag = Math.sqrt(1 + (lx * lx + lz * lz) / (h * h));
-  return f / gMag;
-}
-function saddleGradY(lx, ly, lz, out) {
-  const h = SADDLE_HALF;
-  return out.set(-lz / h, 1, -lx / h);
 }
 // Visual lattice: each cell is a saddle surface z = xy/h derived directly from the
 // Winki manifold equation (the +W face: w = uv, normalized to cell half-extent h).
@@ -432,10 +420,11 @@ function _winkiInstancedMesh(geo) {
   const inst = new THREE.InstancedMesh(geo, mat, saddleInstanceCount);
   inst.renderOrder = 1;
   const _m = new THREE.Matrix4(), _t = new THREE.Vector3();
-  const _q = new THREE.Quaternion(0, 0, 0, 1), _s = new THREE.Vector3(1, 1, 1);
+  const _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1);
   let i = 0;
   for (let cz = 0; cz < G; cz++) for (let cy = 0; cy < G; cy++) for (let cx = 0; cx < G; cx++) {
     saddleCellCenter(cx, cy, cz, _t);
+    saddleCellQuaternion(cx, cy, cz, _q);   // same turn the collision uses
     _m.compose(_t, _q, _s);
     inst.setMatrixAt(i++, _m);
   }
@@ -522,7 +511,9 @@ function makeManifoldLattice() {
       color: fc.color, emissive: fc.emissive, emissiveIntensity: 0.5,
       metalness: 0.9, roughness: 0.06,
       envMap, envMapIntensity: 1.8,
-      transparent: true, opacity: 0.5, side: THREE.BackSide,
+      // 0.5 tinted the whole interior and hid balls behind the far walls.
+      // A faint tint keeps the coloured-walls look while every ball shows through.
+      transparent: true, opacity: 0.10, side: THREE.BackSide,
       depthWrite: false,
     });
     const plane = new THREE.Mesh(planeGeo, planeMat);
@@ -543,11 +534,14 @@ function makeManifoldLattice() {
   group.add(inst);
   group.userData.surfaceMesh = inst;
 
-  // ── Wireframe overlay — all 6 saddle faces per cell, player-colored ───────
-  // Each cell tinted by the player color at that cell's (cx+cy+cz) parity mod 4
-  // so the grid shimmers with all 4 colors — no single cell dominates.
+  // ── Wireframe overlay: the wall itself, one saddle per cell, player-coloured ──
+  // Traces exactly the surface the ball collides with, turned the same way
+  // (saddleCellQuaternion). It used to draw all 6 saddle faces per cell, the
+  // "star", five of which were not walls at all, so the ball appeared to pass
+  // through drawn walls. Each cell is tinted by (cx+cy+cz) mod 4 so the grid
+  // shimmers with all 4 colours.
   if (typeof WinkiSubstrate !== 'undefined') {
-    const wfData = WinkiSubstrate.makeFullWireframe(SADDLE_HALF, 12);
+    const wfData = WinkiSubstrate.makeSaddleWireframe(SADDLE_HALF, 12);
     const _wfT = new THREE.Vector3();
     for (let cx = 0; cx < G; cx++) {
       for (let cy = 0; cy < G; cy++) {
@@ -555,10 +549,12 @@ function makeManifoldLattice() {
           const color = PGLOW[(cx + cy + cz) % PGLOW.length];
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.BufferAttribute(wfData.positions.slice(), 3));
-          const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
+          // depthWrite off so a line can never hide a ball behind it.
+          const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false });
           const wfCell = new THREE.LineSegments(geo, mat);
           saddleCellCenter(cx, cy, cz, _wfT);
           wfCell.position.copy(_wfT);
+          saddleCellQuaternion(cx, cy, cz, wfCell.quaternion);
           group.add(wfCell);
         }
       }
@@ -636,7 +632,10 @@ function makeHaloMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[
 // Outer corona shell sized between halo and win-glow so the placed stone reads from any angle.
 function makeCoronaMat(p, op) { return new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: (op != null ? op : 0.18), side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending }); }
 const placedBalls = [];
-function addPlacedBall(gx, gy, gz, p) {
+// restLocal (optional, board-local): where the ball physically came to rest. The stone stays
+// exactly there; no snap to the chamber centre. Without it (a remote player's move, which
+// arrives as a cell only), the stone sits at the chamber centre.
+function addPlacedBall(gx, gy, gz, p, restLocal) {
   // Settled stones glow from within (emissive == glow colour, intensity 1.4) and are wrapped
   // in a halo + corona + equatorial ring. The corona uses additive blending so multiple balls
   // packed together stack brightness rather than occluding each other.
@@ -644,13 +643,22 @@ function addPlacedBall(gx, gy, gz, p) {
   const halo = new THREE.Mesh(HGEO, makeHaloMat(p, 0.32));
   const corona = new THREE.Mesh(WGEO, makeCoronaMat(p, 0.18));
   const ring = new THREE.Mesh(RGEO, new THREE.MeshBasicMaterial({ color: BCOLS[p].glow, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
-  const pos = nodePos(gx, gy, gz);
+  const center = nodePos(gx, gy, gz);
+  const pos = restLocal ? restLocal.clone() : center;
   [mesh, halo, corona, ring].forEach(o => { o.position.copy(pos); boardGroup.add(o); });
   ring.rotation.x = Math.PI / 2;
-  placedBalls.push({ mesh, halo, corona, ring, gx, gy, gz, p });
+  placedBalls.push({ mesh, halo, corona, ring, gx, gy, gz, p, center });
 }
 const winGlows = [];
-function showWinGlows(cells) { cells.forEach(([gx, gy, gz]) => { const m = new THREE.Mesh(WGEO, new THREE.MeshBasicMaterial({ color: 0xffee00, transparent: true, opacity: 0.42, side: THREE.BackSide, depthWrite: false })); m.position.copy(nodePos(gx, gy, gz)); boardGroup.add(m); winGlows.push(m); }); }
+// The glow wraps the stone where it actually rests (stones are no longer centred in their chamber).
+function showWinGlows(cells) {
+  cells.forEach(([gx, gy, gz]) => {
+    const m = new THREE.Mesh(WGEO, new THREE.MeshBasicMaterial({ color: 0xffee00, transparent: true, opacity: 0.42, side: THREE.BackSide, depthWrite: false }));
+    const stone = placedBalls.find(b => b.gx === gx && b.gy === gy && b.gz === gz);
+    m.position.copy(stone ? stone.mesh.position : nodePos(gx, gy, gz));
+    boardGroup.add(m); winGlows.push(m);
+  });
+}
 function clearWinGlows() { winGlows.forEach(m => boardGroup.remove(m)); winGlows.length = 0; }
 // Audio4D: tactile SFX + section-aware ensemble (piano, bass, drums, marimba, oboe, violin).
 // Lazy WebAudio init on first user interaction; section schedule advances every 4 beats.
@@ -853,58 +861,39 @@ function _saddleSignedAt(blx, bly, blz) {
   _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
   return saddleSignedDistance(_cellLocal.x, _cellLocal.y, _cellLocal.z);
 }
-// X-family signed distance at board-local point.
-function _saddleSignedAtX(blx, bly, blz) {
-  _saddleCellOf(blx, bly, blz, _gyCellIdx);
-  _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
-  return saddleSignedDistanceX(_cellLocal.x, _cellLocal.y, _cellLocal.z);
-}
-// Y-family signed distance at board-local point.
-function _saddleSignedAtY(blx, bly, blz) {
-  _saddleCellOf(blx, bly, blz, _gyCellIdx);
-  _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
-  return saddleSignedDistanceY(_cellLocal.x, _cellLocal.y, _cellLocal.z);
-}
 // Apply one saddle-family collision in board-local space.
 // fullDistFn: (bx,by,bz)->signed_dist using board-local coords (handles cell lookup internally).
 // gradFn: (lx,ly,lz, out)->gradient in cell-local coords.
-// sideKey: physBall property storing the home side for this family ('side'|'sideX'|'sideY').
+// sideKey: physBall property storing which side of the wall the ball is on ('side').
 // prevBL / currBL: board-local prev / curr positions (Vector3). currBL is corrected in-place.
 function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
   let home = physBall[sideKey];
   if (!home) return;
 
-  // The signed distance is evaluated in CELL-LOCAL coordinates, so it is only
-  // continuous WITHIN a cell. Crossing a cell boundary makes the local
-  // coordinates jump (x' goes from +half to -half), and f = z' - x'y'/h jumps
-  // with them, sign included.
+  // With alternating 90deg turns (saddleCellQuaternion) the wall is one
+  // CONTINUOUS sheet across x and y chamber boundaries: neighbours meet edge to
+  // edge, and the signed distance carries over with the same sign. So crossing
+  // an x or y boundary is still a real crossing test. The wall is solid there,
+  // and the ball must not slip through it at a seam.
   //
-  // The crossing test below compares only signs, so it cannot tell a real
-  // membrane crossing from that jump. That is the whole bug: a ball moving
-  // between two chambers registered a phantom crossing, got binary searched to
-  // a "surface" that was not there, and was shoved out by a full radius, which
-  // is the teleport. The mirror case is a genuine crossing that happens to
-  // coincide with a cell change, where the two sign flips cancel and the ball
-  // sails through a wall.
-  //
-  // So: only trust the comparison when both ends of the segment sit in the same
-  // cell. When the cell changes, re-base the home side from where the ball
-  // actually is and skip the crossing test for this substep. With 16 substeps a
-  // cell change is rare, and the thickness push below still runs, so contact is
-  // not lost.
+  // Along z it is different. The sheet z = +-xy/h reaches a chamber's z faces
+  // only at two corner points, so a z boundary is OPEN: that's a passage. The
+  // next chamber in z has its own sheet, and which side of it the ball is on
+  // starts fresh. So when the z layer changes, re-base the home side from
+  // where the ball actually is instead of treating it as a crossing.
   _saddleCellOf(prevBL.x, prevBL.y, prevBL.z, _gyCellPrevIdx);
   _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellCurrIdx);
-  const sameCell = _gyCellPrevIdx.equals(_gyCellCurrIdx);
+  const sameSheet = _gyCellPrevIdx.z === _gyCellCurrIdx.z;
 
   const dCurr = fullDistFn(currBL.x, currBL.y, currBL.z);
-  if (!sameCell) {
+  if (!sameSheet) {
     home = dCurr >= 0 ? 1 : -1;
     physBall[sideKey] = home;
   }
-  const dPrev = sameCell ? fullDistFn(prevBL.x, prevBL.y, prevBL.z) : dCurr;
+  const dPrev = sameSheet ? fullDistFn(prevBL.x, prevBL.y, prevBL.z) : dCurr;
 
   // --- Tunneling: ball crossed the membrane this substep ---
-  if (sameCell && (home * dPrev) > 0 && (home * dCurr) <= 0) {
+  if (sameSheet && (home * dPrev) > 0 && (home * dCurr) <= 0) {
     let lo = 0, hi = 1;
     for (let i = 0; i < 14; i++) {
       const mid = (lo + hi) * 0.5;
@@ -984,9 +973,14 @@ function gyroidGuide(dt, pwx, pwy, pwz) {
   if (cubeBounced) {
     _gyWorldPos.copy(_gyLocal); boardGroup.localToWorld(_gyWorldPos);
     physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
-    if (cubeBounced & 1) { _gyWorldN.set(Math.sign(_gyLocal.x), 0, 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
-    if (cubeBounced & 2) { _gyWorldN.set(0, Math.sign(_gyLocal.y), 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.10); }
-    if (cubeBounced & 4) { _gyWorldN.set(0, 0, Math.sign(_gyLocal.z)).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
+    // Normals point INTO the cube (the minus sign). reflectVel only bounces a ball
+    // moving against its normal; with outward normals (as before) a ball moving into
+    // a wall never counted as hitting it. The walls clamped position but never took
+    // away the speed going into them: a ball on the floor kept -6 m/s of downward
+    // speed forever (gravity piling up against friction) and could not settle.
+    if (cubeBounced & 1) { _gyWorldN.set(-Math.sign(_gyLocal.x), 0, 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
+    if (cubeBounced & 2) { _gyWorldN.set(0, -Math.sign(_gyLocal.y), 0).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.10); }
+    if (cubeBounced & 4) { _gyWorldN.set(0, 0, -Math.sign(_gyLocal.z)).transformDirection(boardGroup.matrixWorld); reflectVel(_gyWorldN, 0.20); }
   }
   // GLB bypass (always empty — procedural lattice; saddle collision is fully analytic).
   if (glbColliders.length) return;
@@ -996,9 +990,11 @@ function gyroidGuide(dt, pwx, pwy, pwz) {
   // each cell boundary, so the field is discontinuous there. The side is re-based
   // per cell inside _collideSaddleFamily.
   _gyPrev.set(pwx, pwy, pwz); boardGroup.worldToLocal(_gyPrev);
+  // Only the drawn wall collides. There used to be two more saddle families here
+  // (x = yz/h and y = xz/h) that were never drawn: invisible walls that boxed
+  // the ball into pockets, so it never fell (measured: the first ball on an
+  // empty board stopped at its spawn height).
   _collideSaddleFamily(_saddleSignedAt, saddleGrad, 'side', _gyPrev, _gyLocal);
-  _collideSaddleFamily(_saddleSignedAtX, saddleGradX, 'sideX', _gyPrev, _gyLocal);
-  _collideSaddleFamily(_saddleSignedAtY, saddleGradY, 'sideY', _gyPrev, _gyLocal);
 }
 function reflectVel(n, restit) {
   const vn = physBall.vx * n.x + physBall.vy * n.y + physBall.vz * n.z;
@@ -1011,7 +1007,7 @@ function reflectVel(n, restit) {
 // Lattice-node sphere obstacles (visible saddle tiles): ball bounces off them.
 // Cell-sphere collision disabled: with the Schwartz Diamond walls now providing the meander,
 // a 4x4x4 grid of bumper spheres acts as a "lid" that catches the ball on the top face.
-// nodePositions still drives the final cell-snap in nearestFreeCell; only the per-substep
+// nodePositions is kept for the lattice layout; only the per-substep
 // collision loop is short-circuited by NODE_R = 0.
 const NODE_R = 0;
 // Each node stores its local lattice position (lp) AND a world-space cache (p) that is
@@ -1206,13 +1202,11 @@ function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
   _spawnLocal[inB] = _snapQuadrant(_spawnLocal[inB], inB);
   const dSpawn = _saddleSignedAt(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z);
   const side = dSpawn >= 0 ? 1 : -1;
-  const sideX = _saddleSignedAtX(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z) >= 0 ? 1 : -1;
-  const sideY = _saddleSignedAtY(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z) >= 0 ? 1 : -1;
   const v0 = -1;                                   // m/s downward in world
   boardGroup.localToWorld(_spawnLocal);
   mesh.position.copy(_spawnLocal); halo.position.copy(mesh.position);
   scene.add(mesh); scene.add(halo);
-  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, sideX, sideY, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null, dropColumn: dropColumn || null };
+  physBall = { mesh, halo, x: _spawnLocal.x, y: _spawnLocal.y, z: _spawnLocal.z, vx: 0, vy: v0, vz: 0, p, side, settled: false, settleTimer: 0, spinX: 0, spinY: 0, spinZ: 0, lowY: _spawnLocal.y, stuckTime: 0, predicted: predicted || null, dropColumn: dropColumn || null };
   return true;
 }
 // Snap the cube's rotation to the nearest cube symmetry so that one local axis aligns to world-up.
@@ -1312,30 +1306,70 @@ function columnCells(dropColumn) {
   return cells;
 }
 
-function nearestFreeNodeInColumn(dropColumn, x, y, z, yLimit) {
-  if (!dropColumn) return null;
-  const cap = yLimit != null ? yLimit : Infinity;
-  let best = null, bestD = Infinity;
-  const cells = columnCells(dropColumn);
-  for (let i = 0; i < cells.length; i++) {
-    const [gx, gy, gz] = cells[i];
-    if (BM.getCell(gx, gy, gz)) continue;
-    const wp = nodePos(gx, gy, gz);
-    boardGroup.localToWorld(wp);
-    if (wp.y > cap) continue;
-    const dx = x - wp.x, dy = y - wp.y, dz = z - wp.z;
-    const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestD) {
-      bestD = d;
-      best = { gx, gy, gz, p: wp };
-    }
-  }
-  return best;
+
+
+// ── Physics decides where a ball ends up ─────────────────────────────────────
+// A ball starts inside the TOP chamber of the column it is dropped into, so a
+// column is open only while that chamber is free. Physics may leave chambers
+// below it empty (a ball can come to rest high up), so "a free cell somewhere
+// in the column" is no longer the test.
+function columnTopCell(latA, latB, faceIdx) {
+  const cells = columnCells({ latA, latB, faceIdx });   // ordered bottom -> top
+  return cells[cells.length - 1];
+}
+function isColumnOpen(latA, latB, faceIdx) {
+  const [gx, gy, gz] = columnTopCell(latA, latB, faceIdx);
+  return !BM.getCell(gx, gy, gz);
+}
+function openColumnsOnTop() {
+  const face = localUpAxis(), out = [];
+  for (let a = 0; a < G; a++) for (let b = 0; b < G; b++) if (isColumnOpen(a, b, face)) out.push([a, b]);
+  return out;
 }
 
-function nearestFreeCellInColumn(dropColumn, x, y, z, yLimit) {
-  const node = nearestFreeNodeInColumn(dropColumn, x, y, z, yLimit);
-  return node ? [node.gx, node.gy, node.gz] : null;
+// Claimed chambers are SOLID. A falling ball bounces off a claimed chamber's
+// walls (an axis-aligned box in board-local space), so it can only come to rest
+// in a free chamber, and the game never has to move it somewhere else. This
+// replaces the old ball-against-ball push, which shoved the falling ball by up
+// to 1.7 units in a single frame when it overlapped a placed ball.
+const _clmLocal = new THREE.Vector3(), _clmN = new THREE.Vector3();
+function collideClaimedChambers() {
+  if (!physBall || !placedBalls.length) return;
+  _clmLocal.set(physBall.x, physBall.y, physBall.z); boardGroup.worldToLocal(_clmLocal);
+  const h = SADDLE_CELL * 0.5;
+  let moved = false;
+  for (let i = 0; i < placedBalls.length; i++) {
+    const c = placedBalls[i].center;   // chamber centre, board-local
+    // Closest point on the chamber box to the ball centre.
+    const qx = Math.max(c.x - h, Math.min(c.x + h, _clmLocal.x));
+    const qy = Math.max(c.y - h, Math.min(c.y + h, _clmLocal.y));
+    const qz = Math.max(c.z - h, Math.min(c.z + h, _clmLocal.z));
+    let nx = _clmLocal.x - qx, ny = _clmLocal.y - qy, nz = _clmLocal.z - qz;
+    const d = Math.hypot(nx, ny, nz);
+    if (d >= BALL_R) continue;
+    let push;
+    if (d > 1e-6) {
+      nx /= d; ny /= d; nz /= d;
+      push = BALL_R - d;
+    } else {
+      // Centre already inside the box (rare with small substeps): leave by the nearest face.
+      const ox = h - Math.abs(_clmLocal.x - c.x), oy = h - Math.abs(_clmLocal.y - c.y), oz = h - Math.abs(_clmLocal.z - c.z);
+      nx = ny = nz = 0;
+      if (ox <= oy && ox <= oz) { nx = Math.sign(_clmLocal.x - c.x) || 1; push = ox + BALL_R; }
+      else if (oy <= oz) { ny = Math.sign(_clmLocal.y - c.y) || 1; push = oy + BALL_R; }
+      else { nz = Math.sign(_clmLocal.z - c.z) || 1; push = oz + BALL_R; }
+    }
+    _clmLocal.x += nx * push; _clmLocal.y += ny * push; _clmLocal.z += nz * push;
+    _clmN.set(nx, ny, nz).transformDirection(boardGroup.matrixWorld);
+    const vn = physBall.vx * _clmN.x + physBall.vy * _clmN.y + physBall.vz * _clmN.z;
+    if (vn < -2) Audio4D.onTap(-vn);
+    reflectVel(_clmN, RESTIT);
+    moved = true;
+  }
+  if (moved) {
+    boardGroup.localToWorld(_clmLocal);
+    physBall.x = _clmLocal.x; physBall.y = _clmLocal.y; physBall.z = _clmLocal.z;
+  }
 }
 
 function segmentIndexFromLocal(v) {
@@ -1353,21 +1387,7 @@ function settledSegmentFromWorld(x, y, z) {
   };
 }
 
-function resolveSettledSegmentCell(x, y, z) {
-  const seed = settledSegmentFromWorld(x, y, z);
-  // Strict mode: only accept the exact segment — no adjacency fallback.
-  if (!BM.getCell(seed.gx, seed.gy, seed.gz)) return [seed.gx, seed.gy, seed.gz];
-  return null;
-}
 
-function settledSegmentTargetNode(x, y, z) {
-  const cell = resolveSettledSegmentCell(x, y, z);
-  if (!cell) return null;
-  const [gx, gy, gz] = cell;
-  const wp = nodePos(gx, gy, gz);
-  boardGroup.localToWorld(wp);
-  return { gx, gy, gz, p: wp };
-}
 
 function releaseBall() {
   if (!ghostBall || isDropping || isGameOver) return;
@@ -1376,14 +1396,6 @@ function releaseBall() {
     const btn = document.getElementById('btn-orient');
     if (btn) { btn.hidden = false; btn.classList.add('orient-pulse'); setTimeout(() => btn.classList.remove('orient-pulse'), 700); }
     return;
-  }
-
-  // Force follow during drop so “camera follows the ball down” works on touch.
-  if (!camFollow) {
-    camFollow = true;
-    const bf = document.getElementById('btn-follow'); if (bf) bf.classList.add('on');
-    const ba = document.getElementById('btn-cama'); if (ba) ba.classList.remove('on');
-    const bb = document.getElementById('btn-camb'); if (bb) bb.classList.remove('on');
   }
 
   // Capture the ghost's current world-space aim point BEFORE we snap, so the ball spawns
@@ -1402,6 +1414,14 @@ function releaseBall() {
   const aimLocal = aimWorld.clone(); boardGroup.worldToLocal(aimLocal);
   const faceIdx = localUpAxis();
   const col = snapAimToColumn(aimLocal, faceIdx);
+  if (!isColumnOpen(col.latA, col.latB, col.faceIdx)) {
+    // The ball would start inside a claimed chamber. Hand it back; the turn isn't lost.
+    isDropping = false;
+    spawnGhostBall(p);
+    startTurnTimer();
+    flashNotice('COLUMN FULL');
+    return;
+  }
   const wp = topFaceWorldPos(col.latA, col.latB, col.faceIdx);
   const spawnW = wp.clone(); boardGroup.localToWorld(spawnW);
   // Predict the landing cell at release. Stored on physBall so onBallSettled can snap straight
@@ -1411,7 +1431,6 @@ function releaseBall() {
   const predicted = predictLanding(col.latA, col.latB, col.faceIdx);
   spawnPhysBall(spawnW.x, _aimYWorld, spawnW.z, p, predicted, col);
   Audio4D.onRelease();
-  if (camFollow) { camLookT.set(spawnW.x, 3, spawnW.z); camPosT.set(spawnW.x * 0.5 + 6, _aimYWorld + 4, spawnW.z * 0.5 + 12); }
 }
 const MAX_PARTS = 160, partPos = new Float32Array(MAX_PARTS * 3), partGeo = new THREE.BufferGeometry();
 partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
@@ -1420,22 +1439,29 @@ scene.add(new THREE.Points(partGeo, partMat));
 const partPool = Array.from({ length: MAX_PARTS }, (_, i) => ({ i, active: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1 }));
 function emitParticles(pos, count, color) { partMat.color.setHex(color); let em = 0; for (const p of partPool) { if (!p.active && em < count) { p.active = true; p.x = pos.x; p.y = pos.y; p.z = pos.z; const spd = 2 + TRNG.f() * 5; const th = TRNG.f() * Math.PI * 2, ph = TRNG.f() * Math.PI; p.vx = Math.sin(ph) * Math.cos(th) * spd; p.vy = Math.sin(ph) * Math.sin(th) * spd + 1.5; p.vz = Math.cos(ph) * spd; p.life = 0; p.maxLife = 0.6 + TRNG.f() * 0.5; em++; } } }
 function updateParticles(dt) { let any = false; for (const p of partPool) { if (!p.active) { partPos[p.i * 3 + 1] = -9999; continue; } p.life += dt; p.vy -= 9 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; partPos[p.i * 3] = p.x; partPos[p.i * 3 + 1] = p.y; partPos[p.i * 3 + 2] = p.z; if (p.life >= p.maxLife) { p.active = false; partPos[p.i * 3 + 1] = -9999; } else any = true; } if (any) partGeo.attributes.position.needsUpdate = true; }
-const CAM_PRESETS = {
-  A: { pos: new THREE.Vector3(8.5, 9, 8.5), target: new THREE.Vector3(0, 2.5, 0) },
-  B: { pos: new THREE.Vector3(22, 9, 4), target: new THREE.Vector3(0, 2.5, 0) }
-};
-let camFollow = true;
-const _camAOff = new THREE.Vector3().subVectors(CAM_PRESETS.A.pos, CAM_PRESETS.A.target);
-let camRadius = _camAOff.length();
-let camTheta = Math.atan2(_camAOff.z, _camAOff.x);
-let camPhi = Math.acos(Math.max(-1, Math.min(1, _camAOff.y / Math.max(camRadius, 1e-6))));
-let camTarget = CAM_PRESETS.A.target.clone();
-let camPos = CAM_PRESETS.A.pos.clone(), camPosT = CAM_PRESETS.A.pos.clone();
-let camLookT = CAM_PRESETS.A.target.clone(), camLookC = CAM_PRESETS.A.target.clone();
+// ── Static camera ─────────────────────────────────────────────────────────────
+// One fixed three-quarter view. The camera never follows the ball or moves on
+// its own (it used to chase each drop, swing back after placement and fly to
+// the winning line: four moves a turn). The arena is see-through instead, so
+// every ball and where it lands is visible from here.
+// The distance comes from the cube's bounding sphere and the screen shape, so
+// the whole cube fits on any screen, wide or tall, at the same 54deg lens.
+const CAM_VIEW_DIR = new THREE.Vector3(0.62, 0.5, 0.75).normalize();
+const CAM_TARGET = new THREE.Vector3(0, 0.6, 0);   // a touch above centre: the drop plane sits on top
+const camPos = new THREE.Vector3(), camPosT = new THREE.Vector3();
+const camLookC = CAM_TARGET.clone(), camLookT = CAM_TARGET.clone();
+function frameStaticCamera() {
+  const radius = GY_HALF * Math.sqrt(3) + BALL_R * 4;   // reaches the cube's corners, plus room for the drop plane
+  const halfV = camera.fov * Math.PI / 360;
+  const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+  const dist = radius / Math.sin(Math.min(halfV, halfH));   // the narrower of the two angles decides
+  camPosT.copy(CAM_VIEW_DIR).multiplyScalar(dist).add(CAM_TARGET);
+  camPos.copy(camPosT);
+  camLookT.copy(CAM_TARGET); camLookC.copy(CAM_TARGET);
+  camera.position.copy(camPos); camera.lookAt(camLookC);
+}
 let cDrag = false, cLX = 0, cLY = 0, cDownX = 0, cDownY = 0, cMoved = 0, cBtn = 0;
-const ORBIT_SENS = 0.0045;
 const parallax = { x: 0, y: 0, tx: 0, ty: 0 };
-function setCam(p) { document.getElementById('btn-cama').classList.toggle('on', p === 'A'); document.getElementById('btn-camb').classList.toggle('on', p === 'B'); document.getElementById('btn-follow').classList.remove('on'); camFollow = false; camPosT.copy(CAM_PRESETS[p].pos); camLookT.copy(CAM_PRESETS[p].target); }
 // Toggle a player panel between expanded and collapsed (thin tab) states.
 // Collapsed panels show only the dismiss/re-open button, never covering the board.
 function togglePanel(pid) {
@@ -1453,8 +1479,6 @@ document.addEventListener('click', function (e) {
   const pid = panel.id.replace('panel-', '');
   togglePanel(pid);
 });
-function toggleFollow() { camFollow = !camFollow; document.getElementById('btn-follow').classList.toggle('on', camFollow); if (camFollow) { document.getElementById('btn-cama').classList.remove('on'); document.getElementById('btn-camb').classList.remove('on'); } }
-function resetCam() { setCam('A'); }
 // Right-button drag (or any drag past 6px) ROTATES THE CUBE about world axes. Left-click without
 // drag drops the ball. Rotation is locked while a ball is in flight (isDropping) so physics stay
 // deterministic; the cube also snaps to the nearest 90deg orientation at release time.
@@ -1499,21 +1523,7 @@ window.addEventListener('pointermove', e => {
   lastMouseX = e.clientX; lastMouseY = e.clientY;
   syncGhostToCursor();
 });
-// Mouse wheel pans the camera target front/back along the view direction (XZ plane).
-const _wheelFwd = new THREE.Vector3();
-canvas.addEventListener('wheel', e => {
-  _wheelFwd.subVectors(camTarget, camPos); _wheelFwd.y = 0;
-  if (_wheelFwd.lengthSq() < 1e-6) _wheelFwd.set(0, 0, -1); else _wheelFwd.normalize();
-  const step = -e.deltaY * 0.02;
-  camTarget.addScaledVector(_wheelFwd, step);
-  const LIM = CELL * G;
-  camTarget.x = Math.max(-LIM, Math.min(LIM, camTarget.x));
-  camTarget.z = Math.max(-LIM, Math.min(LIM, camTarget.z));
-  camPosT.set(camTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta), camTarget.y + camRadius * Math.cos(camPhi), camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta));
-  camLookT.copy(camTarget);
-  camFollow = false; document.getElementById('btn-follow').classList.remove('on');
-  e.preventDefault();
-}, { passive: false });
+
 canvas.addEventListener('touchstart', e => { cDrag = true; cLX = e.touches[0].clientX; cLY = e.touches[0].clientY; cDownX = cLX; cDownY = cLY; cMoved = 0; cBtn = 0; moveGhostFromClient(cLX, cLY); }, { passive: true });
 canvas.addEventListener('touchend', () => { if (cDrag) releaseBall(); cDrag = false; });
 canvas.addEventListener('touchmove', e => {
@@ -1541,7 +1551,11 @@ function aiSim(fn) { const snap = BM.snapshot(); const r = fn(); BM.restore(snap
 // among them rather than just the single "other" player from the original 2-player code.
 function opponentsOf(p) { const out = []; for (let i = 1; i <= numPlayers; i++) if (i !== p) out.push(i); return out; }
 function aiPickColumn() {
-  const cols = BM.openColumns(); if (!cols.length) return null;
+  // Only columns whose top chamber is free can take a ball now. The AI still
+  // plans with the classic "lowest free cell" model; physics may land the ball
+  // elsewhere, which is the point of the game.
+  const open = new Set(openColumnsOnTop().map(([a, b]) => a + ',' + b));
+  const cols = BM.openColumns().filter(([gx, gz]) => open.has(gx + ',' + gz)); if (!cols.length) return null;
   if (aiDiff === 'easy' || TRNG.f() < 0.18) return TRNG.pick(cols);
   const opps = opponentsOf(currentPlayer);
   // Win if we can.
@@ -1572,6 +1586,16 @@ const PLAYER_HEX = ['#ff2244', '#22aa44', '#9966ff', '#ddaa33'];
 // Track the last player we announced so updateHUD can fire the turn banner only on actual turn
 // transitions, not on every HUD refresh (move-count tick, threat recount, etc.).
 let _lastAnnouncedPlayer = 0, _turnAnnounceHide = null;
+// A short message in the turn banner (e.g. "COLUMN FULL").
+function flashNotice(text) {
+  const el = document.getElementById('turn-announce'); if (!el) return;
+  el.textContent = text;
+  el.style.color = '#ffcf8a';
+  el.style.boxShadow = '0 0 28px #ffcf8a55';
+  el.classList.add('show');
+  if (_turnAnnounceHide) clearTimeout(_turnAnnounceHide);
+  _turnAnnounceHide = setTimeout(() => el.classList.remove('show'), 1200);
+}
 function announceTurn(p) {
   const el = document.getElementById('turn-announce'); if (!el) return;
   const nm = document.getElementById('name-p' + p);
@@ -1678,6 +1702,7 @@ function topFaceWorldPos(latA, latB, faceIdx) {
 function dropBall(gx, gz) {
   if (isDropping || isGameOver) return;
   if (!KGSync.canActLocally()) return;
+  if (!isColumnOpen(gx, gz, localUpAxis())) return;   // top chamber claimed: nowhere to start
   clearTurnTimer(); isDropping = true;
   if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; }
   snapBoardRotation();
@@ -1689,7 +1714,6 @@ function dropBall(gx, gz) {
   boardGroup.localToWorld(wp);
   spawnPhysBall(wp.x, _aimYWorld, wp.z, currentPlayer);
   Audio4D.onRelease();
-  if (camFollow) { camLookT.set(wp.x, 3, wp.z); camPosT.set(wp.x * 0.5 + 6, _aimYWorld + 4, wp.z * 0.5 + 12); }
 }
 function physStep(dt) {
   if (!physBall || physBall.settled) return;
@@ -1722,12 +1746,6 @@ function physStep(dt) {
   physBall.spinX *= 0.985; physBall.spinY *= 0.985; physBall.spinZ *= 0.985;
   physBall.halo.position.copy(physBall.mesh.position);
   boardGlow.intensity = Math.max(0, 2 - physBall.y * 0.2);
-  if (camFollow) {
-    camLookT.x += (physBall.x - camLookT.x) * 0.08;
-    camLookT.y += (physBall.y - camLookT.y) * 0.08;
-    camLookT.z += (physBall.z - camLookT.z) * 0.08;
-    camPosT.y += (physBall.y + 8 - camPosT.y) * 0.05;
-  }
 }
 // Safety scan: after every substep, fire 6 axis rays from the ball center outward by BALL_R.
 // If any ray hits a GLB face within radius, push the ball back along that face's world normal
@@ -1849,7 +1867,12 @@ function physSubstep(dt) {
   // being shoved in an arbitrary direction. Simulated over a full drop, this
   // takes the dead-centre case from zero lateral impulse and zero drift to 792
   // and 3.4 chambers, while leaving an already-offset drop deflecting normally.
-  if (physBall.vy < 0) {
+  // Only for a ball that is genuinely FALLING. A ball resting on the floor (or on a
+  // claimed chamber) also picks up a tiny downward speed every substep from gravity
+  // before the contact stops it; with a plain "vy < 0" this nudge kept pushing
+  // resting balls sideways at 3 m/s^2, friction balanced it at about the settle
+  // speed, and 16 of 40 measured drops never settled until the 12 s backstop.
+  if (physBall.vy < -1) {
     const hSpeed = Math.hypot(physBall.vx, physBall.vz);
     if (hSpeed < DEGENERATE_H_SPEED) {
       _degLocal.set(physBall.x, physBall.y, physBall.z);
@@ -1871,184 +1894,73 @@ function physSubstep(dt) {
   collideBallVsGlb(px, py, pz);
   safetyScanGlb();
   gyroidGuide(dt, px, py, pz);
-  // Lattice node sphere collision intentionally skipped (NODE_R = 0); the saddle membrane
-  // provides all the meander, and nodePositions is only used for final cell-snap on settle.
-  // Collide against already-placed balls so cells are sealed.
-  for (let i = 0; i < placedBalls.length; i++) {
-    const b = placedBalls[i].mesh.position;
-    const dx = physBall.x - b.x, dy = physBall.y - b.y, dz = physBall.z - b.z;
-    const d2 = dx * dx + dy * dy + dz * dz;
-    const minD = BALL_R * 2;
-    if (d2 < minD * minD && d2 > 1e-8) {
-      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d;
-      const overlap = minD - d;
-      physBall.x += nx * overlap; physBall.y += ny * overlap; physBall.z += nz * overlap;
-      const vn = physBall.vx * nx + physBall.vy * ny + physBall.vz * nz;
-      if (vn < 0) {
-        physBall.vx -= (1 + RESTIT) * vn * nx;
-        physBall.vy -= (1 + RESTIT) * vn * ny;
-        physBall.vz -= (1 + RESTIT) * vn * nz;
-      }
-    }
-  }
+  // Claimed chambers are solid (see collideClaimedChambers), so the ball can only
+  // come to rest in a free one.
+  collideClaimedChambers();
   // Cube hard wall is enforced inside gyroidGuide() in local space (handles rotated cubes
-  // correctly). The previous world-space AABB clamps were redundant and pinned the ball to
-  // the wrong boundary when the cube was rotated, so they have been removed.
-  const speed2 = physBall.vx * physBall.vx + physBall.vy * physBall.vy + physBall.vz * physBall.vz;
-  // Slow-phase chamber-centre attractor. Once the ball is moving slowly enough that bouncing
-  // is essentially over, apply a gentle pull toward the nearest free chamber centre at-or-below
-  // the current Y. The pull strength ramps up as speed approaches zero, so fast bounces are
-  // unaffected and slow drift is steered into a void centre. By the time the ball satisfies
-  // the SETTLE_V/timer condition it is already at (or very near) the chamber centre, making
-  // the post-settle snap visually a no-op instead of a teleport/lerp.
-  const ATTRACT_GATE = SETTLE_V * 3;            // start nudging once below ~3x settle speed
-  const ATTRACT_MAX = 26;                       // m/s^2 at zero speed; gentle compared to GRAV (-62)
-  if (speed2 < ATTRACT_GATE * ATTRACT_GATE) {
-    const tgt = settledSegmentTargetNode(physBall.x, physBall.y, physBall.z);
-    if (tgt) {
-      const tx = tgt.p.x;
-      const ty = tgt.p.y;
-      const tz = tgt.p.z;
-      const dx = tx - physBall.x, dy = ty - physBall.y, dz = tz - physBall.z;
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > 1e-3) {
-        const slow = 1 - Math.sqrt(speed2) / ATTRACT_GATE;   // 0..1, peak at standstill
-        const a = ATTRACT_MAX * slow;
-        physBall.vx += (dx / d) * a * dt;
-        physBall.vy += (dy / d) * a * dt;
-        physBall.vz += (dz / d) * a * dt;
-      }
-    }
+  // correctly).
+  //
+  // No pull toward chamber centres and no forced settle: where the ball stops is
+  // decided by gravity and collisions alone, and it stays there. Both used to
+  // move the ball by forces the player can't see, and the forced settle was
+  // followed by a snap of up to 5 units (measured), the "teleport".
+  //
+  // A ball wedged in a saddle throat can rattle without ever slowing down. Rather
+  // than give up on it, friction rises gradually once it stops making progress
+  // downward, so it slows and comes to rest by itself, smoothly, where it is.
+  physBall.age = (physBall.age || 0) + dt;
+  if (physBall.y < physBall.lowY - 0.05) { physBall.lowY = physBall.y; physBall.stuckTime = 0; }
+  else { physBall.stuckTime += dt; }
+  const FRICTION_DELAY = 0.6;   // seconds without progress before friction starts rising
+  if (physBall.stuckTime > FRICTION_DELAY) {
+    const k = Math.min(10, (physBall.stuckTime - FRICTION_DELAY) * 6);   // per second, ramps 0 -> 10
+    const keep = Math.max(0, 1 - k * dt);
+    physBall.vx *= keep; physBall.vy *= keep; physBall.vz *= keep;
   }
+  const speed2 = physBall.vx * physBall.vx + physBall.vy * physBall.vy + physBall.vz * physBall.vz;
   if (speed2 < SETTLE_V * SETTLE_V) {
     physBall.settleTimer += dt;
     if (physBall.settleTimer > 0.4) { physBall.settled = true; onBallSettled(); return; }
   } else { physBall.settleTimer = 0; }
-  // Stuck-detect: a ball wedged between two saddle walls in a tight throat will keep
-  // bouncing with non-zero speed forever. If world-Y stops decreasing for a sustained
-  // window (ball isn't making progress to the bottom), force a settle so it snaps to
-  // the nearest empty cell via nearestFreeCell.
-  if (physBall.y < physBall.lowY - 0.05) { physBall.lowY = physBall.y; physBall.stuckTime = 0; }
-  else { physBall.stuckTime += dt; }
-  if (physBall.stuckTime > 0.9) { physBall.settled = true; onBallSettled(); }
-}
-// Find the nearest unoccupied lattice node. `yLimit` (optional) excludes nodes whose world-Y
-// is above the limit so callers can enforce "no upward motion against gravity". Returns the
-// nodePositions entry (with cached world-space `.p`), or null. Shared by the settle-snap and
-// the slow-phase chamber-centre attractor so both agree on the destination.
-function nearestFreeNode(x, y, z, yLimit) {
-  let best = null, bestD = Infinity;
-  const cap = yLimit != null ? yLimit : Infinity;
-  for (let i = 0; i < nodePositions.length; i++) {
-    const n = nodePositions[i];
-    if (BM.getCell(n.gx, n.gy, n.gz)) continue;
-    if (n.p.y > cap) continue;
-    const dx = x - n.p.x, dy = y - n.p.y, dz = z - n.p.z;
-    const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestD) { bestD = d; best = n; }
-  }
-  return best;
-}
-function nearestFreeCell(x, y, z, yLimit) {
-  const n = nearestFreeNode(x, y, z, yLimit);
-  return n ? [n.gx, n.gy, n.gz] : null;
-}
-function predictedWorldTarget(predictedCell) {
-  if (!predictedCell) return null;
-  const [gx, gy, gz] = predictedCell;
-  if (BM.getCell(gx, gy, gz)) return null;
-  const wp = nodePos(gx, gy, gz);
-  boardGroup.localToWorld(wp);
-  return wp;
+  // Backstop only: by now friction has the ball essentially still, so ending the
+  // drop here moves nothing.
+  if (physBall.age > 12) { physBall.settled = true; onBallSettled(); }
 }
 function describeWin(cells, sc) { return sc.special === 'cube' ? 'PERFECT CUBE COMPLETED!' : (BM.dirLabel(cells) || '').toUpperCase(); }
 function nameOf(p) { return document.getElementById(`name-p${p}`).textContent; }
 function tallyStr() { const out = []; for (let p = 1; p <= numPlayers; p++) out.push(`P${p}: ${TS.score(p)}`); return out.join('  |  '); }
-// Snap-animation state. While non-null, the falling physBall mesh is being lerped from where
-// the ball physically rested to the chamber-centre world position. animate() advances `t` and
-// fires `onDone` (which runs finishPlacement) when the lerp completes. We keep `physBall` alive
-// during the animation so the existing mesh is what the player sees moving -- no flicker.
-let snapAnim = null;
-const _snapTmp = new THREE.Vector3();
+// Physics decides: the ball claims the chamber it came to rest in and stays
+// exactly where it stopped. There is no search for "a better cell" and no snap.
+// Claimed chambers are solid, so the chamber it rests in is free by
+// construction.
 function onBallSettled() {
   const p = physBall.p;
+  const seed = settledSegmentFromWorld(physBall.x, physBall.y, physBall.z);
+  if (BM.getCell(seed.gx, seed.gy, seed.gz)) {
+    // Should be impossible (claimed chambers are solid). If it happens, don't
+    // teleport: give the ball a small upward kick and let physics carry on.
+    physBall.settled = false; physBall.settleTimer = 0; physBall.stuckTime = 0;
+    physBall.vy += 4;
+    physBall.vx += (TRNG.f() - 0.5) * 2; physBall.vz += (TRNG.f() - 0.5) * 2;
+    return;
+  }
   Audio4D.onSettle();
   boardGlow.intensity = 0;
-  // Resolution order: WHERE THE BALL ACTUALLY STOPPED comes first.
-  //
-  // This used to lead with the cell predicted at drop time, on the reasoning
-  // that a predicted column target could never look like a teleport. That held
-  // only while the ball slid straight down its column, which it did because
-  // restitution was 0.06 and the lattice barely deflected anything. The moment
-  // the walls were made to deflect properly, the prediction stopped matching
-  // where the ball went, and the snap became exactly the teleport the rule was
-  // written to prevent: the ball would bounce its way into one chamber and then
-  // be yanked across the board into the cell someone guessed at drop time.
-  //
-  // Deflection is the point of the lattice, so physics decides and the guess is
-  // demoted to a fallback for when the resting place is unusable.
-  let cell = null;
-  // 1. Exact physics resting segment — the chamber it actually came to rest in.
-  cell = resolveSettledSegmentCell(physBall.x, physBall.y, physBall.z);
-  // 2. Column nearest-free (gravity stack within the drop column).
-  if (!cell && physBall.dropColumn) {
-    const colCell = nearestFreeCellInColumn(physBall.dropColumn, physBall.x, physBall.y, physBall.z, physBall.y + SADDLE_CELL * 0.6);
-    if (colCell) cell = colCell;
-  }
-  // 3. The drop-time prediction, only if physics gave us nothing usable.
-  if (!cell && physBall.predicted) {
-    const [pgx, pgy, pgz] = physBall.predicted;
-    if (pgx >= 0 && pgx < G && pgy >= 0 && pgy < G && pgz >= 0 && pgz < G && !BM.getCell(pgx, pgy, pgz))
-      cell = physBall.predicted;
-  }
-  // 4. Face-adjacent cells only — one step from the resting segment, no further.
-  if (!cell) {
-    const seed = settledSegmentFromWorld(physBall.x, physBall.y, physBall.z);
-    const adj = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-    for (const [dx, dy, dz] of adj) {
-      const ax = seed.gx + dx, ay = seed.gy + dy, az = seed.gz + dz;
-      if (ax < 0 || ax >= G || ay < 0 || ay >= G || az < 0 || az >= G) continue;
-      if (!BM.getCell(ax, ay, az)) { cell = [ax, ay, az]; break; }
-    }
-  }
-  if (!cell) {
-    // No valid adjacent cell — the column is full; discard the ball and continue.
-    scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null;
-    isDropping = false; if (!isGameOver) maybeSpawnTurnBall(); return;
-  }
-  const [gx, gy, gz] = cell;
-  const toWorld = nodePos(gx, gy, gz); boardGroup.localToWorld(toWorld);
-  snapAnim = {
-    mesh: physBall.mesh, halo: physBall.halo,
-    from: new THREE.Vector3(physBall.x, physBall.y, physBall.z),
-    to: toWorld,
-    t: 0, dur: 0.32,                    // ~320ms feels continuous, not teleport-y
-    onDone: () => finishPlacement(p, cell)
-  };
+  const restLocal = new THREE.Vector3(physBall.x, physBall.y, physBall.z);
+  boardGroup.worldToLocal(restLocal);
+  finishPlacement(p, [seed.gx, seed.gy, seed.gz], restLocal);
 }
-// Advance the active snap animation. Smoothstep easing means the ball decelerates into its
-// chamber rather than snapping linearly. Called from animate() once per frame.
-function stepSnapAnim(dt) {
-  if (!snapAnim) return;
-  snapAnim.t += dt;
-  const a = Math.min(snapAnim.t / snapAnim.dur, 1);
-  const e = a * a * (3 - 2 * a);
-  _snapTmp.lerpVectors(snapAnim.from, snapAnim.to, e);
-  snapAnim.mesh.position.copy(_snapTmp);
-  snapAnim.halo.position.copy(_snapTmp);
-  if (a >= 1) { const cb = snapAnim.onDone; snapAnim = null; cb(); }
-}
-function finishPlacement(p, cell) {
+function finishPlacement(p, cell, restLocal) {
   const [gx, gy, gz] = cell;
-  // Now that the visual has arrived at the chamber centre, swap the falling-ball mesh out for
-  // the permanent placedBall (with its emissive shells). Keeping the previous mesh until this
-  // point avoids a one-frame gap where the ball would disappear before the glowing version pops in.
+  // Swap the falling-ball mesh for the permanent glowing stone in the same spot, in the same
+  // frame, so there is no gap and no movement.
   if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; }
   BM.setCell(gx, gy, gz, p);
   KGSync.broadcast(gx, gy, gz, p);
-  addPlacedBall(gx, gy, gz, p);
+  addPlacedBall(gx, gy, gz, p, restLocal);
   Audio4D.onPlace(p);
-  emitParticles(nodePos(gx, gy, gz), 28, BCOLS[p].glow);
+  const burstAt = (restLocal ? restLocal.clone() : nodePos(gx, gy, gz)); boardGroup.localToWorld(burstAt);
+  emitParticles(burstAt, 28, BCOLS[p].glow);
   boardGlow.color.setHex(BCOLS[p].glow); boardGlow.intensity = 4;
   setTimeout(() => { boardGlow.intensity = 0; }, 350);
   const winCells = BM.checkWin(p, currentScenario);
@@ -2057,18 +1969,14 @@ function finishPlacement(p, cell) {
   if (winCells) {
     isGameOver = true; renderScores(); showWinGlows(winCells);
     Audio4D.onWin(p); Audio4D.stopMusic();
-    emitParticles(nodePos(gx, gy, gz), 60, 0xffee00);
+    emitParticles(burstAt, 60, 0xffee00);
     const hex = '#' + BCOLS[p].glow.toString(16).padStart(6, '0');
     setTimeout(() => showResult(`${nameOf(p)} WINS`, describeWin(winCells, currentScenario), tallyStr(), hex), 700);
-    if (camFollow) {
-      const cx = winCells.reduce((a, [x]) => a + x / winCells.length, 0),
-        cy = winCells.reduce((a, [, y]) => a + y / winCells.length, 0),
-        cz = winCells.reduce((a, [, , z]) => a + z / winCells.length, 0);
-      const wp = nodePos(cx, cy, cz); camLookT.set(wp.x, wp.y, wp.z); camPosT.set(wp.x + 8, wp.y + 8, wp.z + 14);
-    }
     isDropping = false; refreshColBtns(); updateHUD(); return;
   }
-  if (BM.boardFull()) {
+  // The game also ends when no column is open: physics can leave chambers empty
+  // underneath claimed ones, and those can't be reached any more.
+  if (BM.boardFull() || openColumnsOnTop().length === 0) {
     isGameOver = true;
     Audio4D.stopMusic();
     if (currentScenario.special === 'territory') {
@@ -2083,7 +1991,7 @@ function finishPlacement(p, cell) {
       const breakdown = lines.map(x => `P${x.p}=${x.n}`).join('  ');
       setTimeout(() => showResult(wn, `Lines: ${breakdown}`, 'TERRITORY WAR COMPLETE', color), 700);
     } else {
-      setTimeout(() => showResult('DRAW', 'The lattice is full', tallyStr(), '#ffee00'), 500);
+      setTimeout(() => showResult('DRAW', BM.boardFull() ? 'The lattice is full' : 'No open columns left', tallyStr(), '#ffee00'), 500);
     }
     isDropping = false; refreshColBtns(); updateHUD(); return;
   }
@@ -2091,8 +1999,6 @@ function finishPlacement(p, cell) {
   currentPlayer = numPlayers <= 1 ? P1 : ((currentPlayer % numPlayers) + 1);
   isDropping = false;
   updateHUD();
-  // Smooth auto-camera on mobile: avoid delayed hard snaps; per-frame lerp handles easing.
-  if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); }
   maybeSpawnTurnBall();
 }
 // Hand control to the next actor: AI auto-drops, a human gets a cursor ball.
@@ -2107,8 +2013,8 @@ function maybeSpawnTurnBall() {
       let col = null;
       try { col = aiPickColumn(); } catch (err) { console.warn('aiPickColumn threw', err); }
       if (!col) {
-        const free = nodePositions.filter(n => !BM.getCell(n.gx, n.gy, n.gz));
-        if (free.length) col = [free[(Math.random() * free.length) | 0].gx, free[(Math.random() * free.length) | 0].gz];
+        const open = openColumnsOnTop();   // any column a ball can actually start in
+        if (open.length) col = open[(Math.random() * open.length) | 0];
       }
       if (col) dropBall(col[0], col[1]);
       else { console.warn('AI: no moves available'); }
@@ -2330,16 +2236,15 @@ function _autoStartDefaultSolo() {
 }
 
 function rematch() { document.getElementById('result-overlay').classList.remove('show'); resetGame(false); Audio4D.startMusic(); }
-function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); snapAnim = null; _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); if (camFollow) { camPosT.copy(CAM_PRESETS.A.pos); camLookT.copy(CAM_PRESETS.A.target); } boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') setPlayerIdentity(2, 'AI OPPONENT', 'AI'); maybeSpawnTurnBall(); }
+function resetGame(resetScores) { BM.reset(); TS.reset({ resetScores }); currentPlayer = P1; isGameOver = false; isDropping = false; clearTurnTimer(); _lastAnnouncedPlayer = 0; placedBalls.forEach(b => { boardGroup.remove(b.mesh); boardGroup.remove(b.halo); if (b.corona) boardGroup.remove(b.corona); boardGroup.remove(b.ring); }); placedBalls.length = 0; clearWinGlows(); if (physBall) { scene.remove(physBall.mesh); scene.remove(physBall.halo); physBall = null; } if (ghostBall) { scene.remove(ghostBall.mesh); scene.remove(ghostBall.halo); ghostBall = null; } boardGroup.quaternion.identity(); boardGlow.intensity = 0; renderScores(); renderLogs(); updateHUD(); boardGlow.color.setHex(0x4422ff); boardGlow.intensity = 5; setTimeout(() => { boardGlow.intensity = 0; }, 500); if (vsMode === 'ai') setPlayerIdentity(2, 'AI OPPONENT', 'AI'); maybeSpawnTurnBall(); }
 let lastT = 0;
-function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); stepSnapAnim(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); updateOrientBtn(); renderer.render(scene, camera); }
-window.addEventListener('resize', () => { camera.aspect = window.innerWidth / _canvasH(); camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, _canvasH()); });
+function animate(t) { requestAnimationFrame(animate); const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t; const uTime = t * 0.001; parallax.x += (parallax.tx - parallax.x) * 0.04; parallax.y += (parallax.ty - parallax.y) * 0.04; starLayers.forEach(layer => { layer.material.uniforms.uTime.value = uTime; layer.position.x = parallax.x * layer.userData.parallax; layer.position.y = -parallax.y * layer.userData.parallax * 0.5; }); haloMeshes.forEach((m, i) => { m.rotation.y += m.userData.speed * dt; m.material.opacity = 0.35 + 0.25 * Math.sin(uTime * 1.1 + i * 2.1); }); atmoMat.uniforms.uTime.value = uTime; if (saturn) saturn.rotation.y += 0.003 * dt; if (jupiter) jupiter.rotation.y += 0.008 * dt; updateAimPlane(); syncGhostToCursor(); placedBalls.forEach((b, i) => { b.halo.material.opacity = 0.28 + 0.12 * Math.sin(uTime * 1.8 + i * 1.3); if (b.corona) b.corona.material.opacity = 0.14 + 0.10 * Math.sin(uTime * 1.3 + i * 0.7); b.ring.material.opacity = 0.45 + 0.20 * Math.sin(uTime * 2.2 + i * 0.9); }); physStep(dt); updateParticles(dt); camPos.lerp(camPosT, 0.06); camLookC.lerp(camLookT, 0.07); camera.position.copy(camPos); camera.lookAt(camLookC); updateOrientBtn(); renderer.render(scene, camera); }
+window.addEventListener('resize', () => { camera.aspect = window.innerWidth / _canvasH(); camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, _canvasH()); frameStaticCamera(); });
 function setPreloadProgress(p) { document.getElementById('pre-bar').style.width = p + '%'; }
 function setPreloadMsg(m) { const el = document.getElementById('pre-msg'); if (el) el.textContent = m; }
 function finishPreload() { const pre = document.getElementById('preloader'); pre.style.opacity = '0'; setTimeout(() => pre.style.display = 'none', 850); }
 // Bootstrap: load scenarios from manifest, then settle the manifold lattice before fading.
-camera.position.copy(CAM_PRESETS.A.pos); camera.lookAt(CAM_PRESETS.A.target);
-camPos.copy(CAM_PRESETS.A.pos); camPosT.copy(CAM_PRESETS.A.pos);
+frameStaticCamera();
 requestAnimationFrame(animate);
 for (let p = 1; p <= 4; p++) setPlayerIdentity(p, `PLAYER ${p}`, String(p));
 initMobilePlayerStrip();

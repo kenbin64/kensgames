@@ -259,3 +259,24 @@ body.kg-header-active {
     padding-top: env(safe-area-inset-top, 0px);
   }
 }
+
+/* Narrow screens: when the buttons don't fit, scroll the rail sideways
+   instead of clipping both ends. A centered row that overflows spills past
+   the LEFT edge too, where it can't be scrolled to ("safe center" centers
+   only while everything fits). Buttons also get a little more compact. */
+@media (max-width: 600px) {
+  #kg-rail {
+    justify-content: flex-start;
+    justify-content: safe center;
+    overflow-x: auto;
+    gap: 6px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  #kg-rail button {
+    font-size: 11px;
+    padding: 0 10px;
+    letter-spacing: 0;
+  }
+}

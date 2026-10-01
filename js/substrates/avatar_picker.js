@@ -132,12 +132,12 @@ const AvatarPicker = (() => {
         const div = document.createElement('div');
         div.id = 'av-modal';
         div.innerHTML = `
-<div id="av-overlay" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
-    <div style="background:rgba(4,4,20,.97);border:2px solid #00FFFF;box-shadow:0 0 24px #00FFFF,0 0 48px #00FFFF;border-radius:6px;padding:18px;width:100%;max-width:540px;height:min(96dvh,96vh);overflow:hidden;position:relative;display:flex;flex-direction:column;">
+<div id="av-overlay" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:8px;box-sizing:border-box;">
+    <div style="background:rgba(4,4,20,.97);border:2px solid #00FFFF;box-shadow:0 0 24px #00FFFF,0 0 48px #00FFFF;border-radius:6px;padding:18px;width:100%;max-width:540px;max-height:min(96dvh,96vh);overflow-y:auto;box-sizing:border-box;position:relative;display:flex;flex-direction:column;">
     <div style="font-family:'Orbitron',monospace;font-size:18px;color:#00FFFF;text-shadow:0 0 24px #00FFFF;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">&#127917; Choose Your Avatar</div>
     <div id="av-req-msg" style="font-size:12px;color:#FF00FF;margin-bottom:16px;display:none;">You must choose an avatar to enter the game.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;" id="av-cats"></div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px;" id="av-grid"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin-bottom:12px;" id="av-grid"></div>
         <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,255,255,.06);border:1px solid rgba(0,255,255,.2);border-radius:4px;margin-bottom:10px;">
             <span id="av-preview" style="font-size:30px;">?</span>
       <div>
@@ -176,7 +176,7 @@ const AvatarPicker = (() => {
         // variation selectors (U+FE0F) and ZWJ sequences perfectly.
         el.innerHTML = cat.emojis.map((pair, i) => `
             <button data-idx="${i}" title="${pair[1]}"
-                style="font-size:28px;padding:10px;background:rgba(0,255,255,.04);
+                style="font-size:28px;padding:8px 0;min-width:0;background:rgba(0,255,255,.04);
                 border:1px solid rgba(0,255,255,.15);border-radius:4px;cursor:pointer;
                 transition:all .15s;"
                 onmouseover="this.style.background='rgba(0,255,255,.15)';this.style.borderColor='#00FFFF'"
