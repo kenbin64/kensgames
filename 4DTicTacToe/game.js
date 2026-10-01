@@ -1372,6 +1372,46 @@ function collideClaimedChambers() {
   }
 }
 
+// Every ball must come to rest WHOLLY inside one cell. Between two free cells
+// there is no wall (that boundary is a passage), so a slow ball could roll to
+// a stop straddling two cells (measured: 7 of 64 on a full board). Each cell
+// therefore has a gentle "lip" at its boundaries, felt only by a slow ball
+// (never in flight): if the ball pokes over a boundary it is eased back into
+// the cell its centre is in, like a slightly dished cell floor. A smooth push,
+// not a jump.
+const LIP_SPEED_GATE = 2.5;   // m/s: faster than this the ball is still travelling; leave it alone
+const LIP_STIFFNESS = 220;    // m/s^2 per unit of overhang (full overhang ~ 60 m/s^2, about gravity)
+const _lipLocal = new THREE.Vector3(), _lipCell = new THREE.Vector3(), _lipCentre = new THREE.Vector3(), _lipPush = new THREE.Vector3();
+// How far the ball's body sticks out of its own cell (0 when wholly inside), per axis, board-local.
+function overhangOutOfOwnCell(out) {
+  _lipLocal.set(physBall.x, physBall.y, physBall.z); boardGroup.worldToLocal(_lipLocal);
+  _saddleCellOf(_lipLocal.x, _lipLocal.y, _lipLocal.z, _lipCell);
+  saddleCellCenter(_lipCell.x, _lipCell.y, _lipCell.z, _lipCentre);
+  const inner = SADDLE_CELL * 0.5 - BALL_R;   // centre may be this far from the cell centre
+  for (const ax of ['x', 'y', 'z']) {
+    const d = _lipLocal[ax] - _lipCentre[ax];
+    const over = Math.abs(d) - inner;
+    out[ax] = over > 0 ? -Math.sign(d) * over : 0;   // points back toward the cell's inside
+  }
+  return out;
+}
+function keepInOwnCell(dt) {
+  const speed = Math.hypot(physBall.vx, physBall.vy, physBall.vz);
+  if (speed > LIP_SPEED_GATE) return;
+  overhangOutOfOwnCell(_lipPush);
+  const over = _lipPush.length();
+  if (over === 0) return;
+  const accel = LIP_STIFFNESS * over;
+  _lipPush.transformDirection(boardGroup.matrixWorld);   // direction only (three.js normalises it)
+  physBall.vx += _lipPush.x * accel * dt;
+  physBall.vy += _lipPush.y * accel * dt;
+  physBall.vz += _lipPush.z * accel * dt;
+}
+function isWhollyInOwnCell() {
+  overhangOutOfOwnCell(_lipPush);
+  return _lipPush.length() < 0.01;
+}
+
 function segmentIndexFromLocal(v) {
   const idx = Math.floor((v + GY_HALF) / SADDLE_CELL);
   return Math.max(0, Math.min(G - 1, idx));
@@ -1843,8 +1883,41 @@ function collideBallVsGlb(px, py, pz) {
   }
   return true;
 }
+// ── Seating: perfect alignment ─────────────────────────────────────────────────
+// Physics chooses the cell; once the ball has come to rest wholly inside it, the
+// ball glides into the cell's centre, the saddle point where the cell's wall
+// crosses itself. Every ball then sits exactly on the 4x4x4 grid, so rows,
+// columns and diagonals line up perfectly (and a remote player's move, which
+// arrives as a cell, appears in the same place).
+// The glide is a critically damped spring: it eases in and stops exactly, with
+// no overshoot, in about half a second. Gravity and walls are paused for it: the
+// ball has already settled, and its cell is locked to everyone else.
+const SEAT_OMEGA = 10;   // spring frequency (1/s); critically damped, ~0.5 s to seat
+function beginSeating() {
+  const local = new THREE.Vector3(physBall.x, physBall.y, physBall.z); boardGroup.worldToLocal(local);
+  const cell = new THREE.Vector3(); _saddleCellOf(local.x, local.y, local.z, cell);
+  const centre = nodePos(cell.x, cell.y, cell.z); boardGroup.localToWorld(centre);
+  physBall.seat = { cell: [cell.x, cell.y, cell.z], centre };
+}
+function seatStep(dt) {
+  const s = physBall.seat;
+  const ex = physBall.x - s.centre.x, ey = physBall.y - s.centre.y, ez = physBall.z - s.centre.z;
+  const k = SEAT_OMEGA * SEAT_OMEGA, c = 2 * SEAT_OMEGA;
+  physBall.vx += (-k * ex - c * physBall.vx) * dt;
+  physBall.vy += (-k * ey - c * physBall.vy) * dt;
+  physBall.vz += (-k * ez - c * physBall.vz) * dt;
+  physBall.x += physBall.vx * dt; physBall.y += physBall.vy * dt; physBall.z += physBall.vz * dt;
+  const err = Math.hypot(physBall.x - s.centre.x, physBall.y - s.centre.y, physBall.z - s.centre.z);
+  if (err < 0.002 && Math.hypot(physBall.vx, physBall.vy, physBall.vz) < 0.05) {
+    physBall.x = s.centre.x; physBall.y = s.centre.y; physBall.z = s.centre.z;   // last 2 mm: exact centre
+    physBall.settled = true;
+    onBallSettled();
+  }
+}
+
 function physSubstep(dt) {
   if (!physBall || physBall.settled) return;
+  if (physBall.seat) { seatStep(dt); return; }
   const px = physBall.x, py = physBall.y, pz = physBall.z;
   physBall.vy += GRAV * dt;
 
@@ -1897,6 +1970,7 @@ function physSubstep(dt) {
   // Claimed chambers are solid (see collideClaimedChambers), so the ball can only
   // come to rest in a free one.
   collideClaimedChambers();
+  keepInOwnCell(dt);
   // Cube hard wall is enforced inside gyroidGuide() in local space (handles rotated cubes
   // correctly).
   //
@@ -1918,13 +1992,15 @@ function physSubstep(dt) {
     physBall.vx *= keep; physBall.vy *= keep; physBall.vz *= keep;
   }
   const speed2 = physBall.vx * physBall.vx + physBall.vy * physBall.vy + physBall.vz * physBall.vz;
-  if (speed2 < SETTLE_V * SETTLE_V) {
+  // Came to rest = still for 0.4 s AND wholly inside one cell (the lip keeps working
+  // until it is). Then the ball seats itself at its cell's centre (beginSeating).
+  if (speed2 < SETTLE_V * SETTLE_V && isWhollyInOwnCell()) {
     physBall.settleTimer += dt;
-    if (physBall.settleTimer > 0.4) { physBall.settled = true; onBallSettled(); return; }
+    if (physBall.settleTimer > 0.4) { beginSeating(); return; }
   } else { physBall.settleTimer = 0; }
   // Backstop only: by now friction has the ball essentially still, so ending the
   // drop here moves nothing.
-  if (physBall.age > 12) { physBall.settled = true; onBallSettled(); }
+  if (physBall.age > 12) beginSeating();
 }
 function describeWin(cells, sc) { return sc.special === 'cube' ? 'PERFECT CUBE COMPLETED!' : (BM.dirLabel(cells) || '').toUpperCase(); }
 function nameOf(p) { return document.getElementById(`name-p${p}`).textContent; }
