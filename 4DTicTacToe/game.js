@@ -252,10 +252,9 @@ const saturn = makeSaturn();
 // Procedural gas giant -- replaces jupiter.glb (3.5 MB). Banded vertex colors, same style as makeSaturn.
 function makeJupiter() { const g = new THREE.SphereGeometry(7, 48, 32); const cols = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < g.attributes.position.count; i++) { const y = g.attributes.position.getY(i); const band = Math.sin(y * 2.6) * 0.5 + 0.5; const storm = Math.sin(y * 1.1 + Math.cos(y * 5.2) * 1.8) * 0.5 + 0.5; cols[i * 3] = 0.82 + storm * .12 - band * .08; cols[i * 3 + 1] = 0.58 + band * .18; cols[i * 3 + 2] = 0.30 + storm * .10; } g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 10 })); m.position.set(-75, -18, -80); scene.add(m); return m; }
 const jupiter = makeJupiter();
-// Saddle lattice: GxGxG chambers tiling the play cube. Each chamber holds a single
-// z = x*y saddle patch in cell-local coords. Adjacent chambers are rotated 90deg
-// (about X for +X steps, about Y for +Y steps, 0 along Z) so the saddle edges meet
-// continuously across cell faces -- this is the "Blender array tool" composition rule.
+// Saddle lattice: GxGxG chambers tiling the play cube. Each walled chamber holds a
+// single z = x*y saddle patch in cell-local coords, turned per the Schwarz D
+// tiling below so the patches meet edge to edge across shared faces.
 // The membrane surface is f_cell(p_local) = z' - x' * y', with grad (-y', -x', 1).
 // |grad| >= 1 everywhere => no critical-point collision singularities (the failure
 // mode of the previous Schwartz Diamond field).
@@ -273,18 +272,113 @@ function saddleCellCenter(cx, cy, cz, out) {
     (cy + 0.5 - G * 0.5) * SADDLE_CELL,
     (cz + 0.5 - G * 0.5) * SADDLE_CELL);
 }
-// How each chamber's saddle wall is turned. Neighbours alternate: every other
-// chamber (by cx + cy) is turned 90deg about the local z axis, which turns
-// z = xy into z = -xy. Measured (zxy_helix_test.js): that is exactly the turn
-// that makes neighbouring saddles meet edge to edge with no gap, so the wall is
-// one continuous sheet across x and y. The old identity tiling left a broken
-// seam (z = y meeting z = -y) at every chamber boundary, where the collision
-// could not tell a real crossing from the seam.
-// Used by BOTH the drawn glass and the collision, so walls you see are the
+// The arena is a Schwarz D labyrinth built from z = xy itself, by Schwarz's own
+// rule. A z = xy patch is bounded by four straight edges; turning the patch 180
+// degrees about any one of them gives the next patch, which carries the wall on
+// into the neighbouring chamber. Grown out from one chamber, that rule fills the
+// cube with two interwoven tunnel systems. Chambers the rule never reaches stay
+// EMPTY: open junction rooms where several passages meet. Which passage a ball
+// takes depends on how it arrives, and that is what makes the drop hard to call.
+// (Checked offline for G=4: 48 walled chambers, 16 open, one orientation per
+// chamber whatever path reaches it, and the sides agree across every shared face.)
+//
+// Per walled chamber the table keeps:
+//   M, q   which way its patch is turned (a 90-degree rotation, as matrix and quaternion)
+//   s      +1 or -1, so "which side of the wall" means the same thing here and
+//          in every chamber this wall continues into
+//   rise   the axis the patch rises along (its own z). The two faces across that
+//          axis are open passages; the other four carry the wall on.
+// Drawing and collision both read this table, so the walls you see are the
 // walls the ball hits.
-const _saddleTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-function saddleCellQuaternion(cx, cy, _cz, out) {
-  return ((cx + cy) % 2 === 0) ? out.set(0, 0, 0, 1) : out.copy(_saddleTurn);
+let _schwarz = null;   // { n, cells: [{ M, q, s, rise } or null], indexed (cz*n + cy)*n + cx }
+function buildSchwarzTiling(n) {
+  const mul = (M, p) => [0, 1, 2].map(i => M[i][0] * p[0] + M[i][1] * p[1] + M[i][2] * p[2]);
+  const mulT = (M, p) => [0, 1, 2].map(j => M[0][j] * p[0] + M[1][j] * p[1] + M[2][j] * p[2]);
+  // Unit chamber [-1,1]^3, wall z = xy. Signed field of a turned chamber: s * f(M^T p).
+  const field = (M, s, p) => { const c = mulT(M, p); return s * (c[2] - c[0] * c[1]); };
+  const onWall = (M, p) => Math.abs(field(M, 1, p)) < 1e-9;
+  // The four straight edges of the patch, on faces x = +-1 and y = +-1.
+  const EDGES = [t => [1, t, t], t => [-1, t, -t], t => [t, 1, t], t => [t, -1, -t]];
+  const samples = [];
+  for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) {
+    const u = -1 + i / 4, v = -1 + j / 4;
+    samples.push([u, v, u * v]);
+  }
+  // The 24 turns of a cube (entries 0/+-1, determinant +1).
+  const ROTS = [];
+  for (const perm of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      M[0][perm[0]] = sx; M[1][perm[1]] = sy; M[2][perm[2]] = sz;
+      const det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+      if (det === 1) ROTS.push(M);
+    }
+  // 180-degree turn about the line through a toward b.
+  const halfTurn = (a, b) => {
+    const d = b.map((x, i) => x - a[i]); const len = Math.hypot(...d); const u = d.map(x => x / len);
+    return q => {
+      const r = q.map((x, i) => x - a[i]);
+      const dot = u[0] * r[0] + u[1] * r[1] + u[2] * r[2];
+      return r.map((x, i) => 2 * dot * u[i] - x + a[i]);
+    };
+  };
+  const cells = new Array(n * n * n).fill(null);
+  const at = (x, y, z) => (z * n + y) * n + x;
+  cells[at(0, 0, 0)] = { M: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], s: 1 };
+  const queue = [[0, 0, 0]];
+  while (queue.length) {
+    const [cx, cy, cz] = queue.shift();
+    const { M, s } = cells[at(cx, cy, cz)];
+    for (const edge of EDGES) {
+      const a = mul(M, edge(-1)), b = mul(M, edge(1));
+      const ax = [0, 1, 2].find(i => Math.abs(a[i]) === 1 && a[i] === b[i]);   // the face this edge lies on
+      const out = [0, 0, 0]; out[ax] = a[ax];
+      const nb = [cx + out[0], cy + out[1], cz + out[2]];
+      if (nb.some(v => v < 0 || v >= n) || cells[at(...nb)]) continue;
+      // Turn this patch about the edge, move it into the neighbour's frame, and
+      // find which of the 24 turns reproduces it there.
+      const turn = halfTurn(a, b);
+      const moved = samples.map(p => turn(mul(M, p)).map((x, i) => x - 2 * out[i]));
+      const M2 = ROTS.find(R => moved.every(p => onWall(R, p)));
+      // Side sign: the field must agree just either side of the shared face.
+      const probe = [0.3, -0.6, 0.45]; probe[ax] = a[ax] * 0.999;
+      const here = field(M, s, probe);
+      const there = field(M2, 1, probe.map((x, i) => x - 2 * out[i]));
+      cells[at(...nb)] = { M: M2, s: Math.sign(here) === Math.sign(there) ? 1 : -1 };
+      queue.push(nb);
+    }
+  }
+  const m4 = new THREE.Matrix4();
+  for (const c of cells) {
+    if (!c) continue;
+    const M = c.M;
+    m4.set(M[0][0], M[0][1], M[0][2], 0, M[1][0], M[1][1], M[1][2], 0, M[2][0], M[2][1], M[2][2], 0, 0, 0, 0, 1);
+    c.q = new THREE.Quaternion().setFromRotationMatrix(m4);
+    c.rise = [0, 1, 2].find(i => M[i][2] !== 0);
+  }
+  return { n, cells };
+}
+// The chamber's wall, or null for an open junction chamber.
+function schwarzCell(cx, cy, cz) {
+  if (!_schwarz || _schwarz.n !== G) _schwarz = buildSchwarzTiling(G);
+  return _schwarz.cells[(cz * G + cy) * G + cx];
+}
+function saddleCellQuaternion(cx, cy, cz, out) {
+  const cell = schwarzCell(cx, cy, cz);
+  return cell ? out.copy(cell.q) : out.set(0, 0, 0, 1);
+}
+// Does the wall in chamber a carry on, unbroken, into chamber b? Yes when they
+// are the same chamber, or face neighbours across a face the wall runs through.
+// The faces across a patch's rise axis are passages: the wall only touches them
+// at two corners, so whichever wall the ball meets beyond starts fresh.
+function _sameWall(a, b) {
+  const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y), dz = Math.abs(a.z - b.z);
+  if (dx + dy + dz === 0) return true;
+  if (dx + dy + dz !== 1) return false;
+  const ca = schwarzCell(a.x, a.y, a.z), cb = schwarzCell(b.x, b.y, b.z);
+  if (!ca || !cb) return false;
+  const axis = dx ? 0 : (dy ? 1 : 2);
+  return ca.rise !== axis && cb.rise !== axis;
 }
 // Saddle field in cell-local coords. The visual lattice (_makeWinkiGeo) always renders the
 // +W face surface z = x·y/h, so collision MUST use the same +W analytic formula or the ball
@@ -423,11 +517,13 @@ function _winkiInstancedMesh(geo) {
   const _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1);
   let i = 0;
   for (let cz = 0; cz < G; cz++) for (let cy = 0; cy < G; cy++) for (let cx = 0; cx < G; cx++) {
+    if (!schwarzCell(cx, cy, cz)) continue;   // open junction chamber: nothing to draw
     saddleCellCenter(cx, cy, cz, _t);
     saddleCellQuaternion(cx, cy, cz, _q);   // same turn the collision uses
     _m.compose(_t, _q, _s);
     inst.setMatrixAt(i++, _m);
   }
+  inst.count = i;
   inst.instanceMatrix.needsUpdate = true;
   return inst;
 }
@@ -546,6 +642,7 @@ function makeManifoldLattice() {
     for (let cx = 0; cx < G; cx++) {
       for (let cy = 0; cy < G; cy++) {
         for (let cz = 0; cz < G; cz++) {
+          if (!schwarzCell(cx, cy, cz)) continue;   // open junction chamber
           const color = PGLOW[(cx + cy + cz) % PGLOW.length];
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.BufferAttribute(wfData.positions.slice(), 3));
@@ -856,10 +953,20 @@ function _toCellLocal(blx, bly, blz, cellIdx, out) {
   return out.applyQuaternion(_cellQInv);
 }
 // Signed distance to the saddle in the cell containing board-local (blx,bly,blz).
+// Returns null inside an open junction chamber, which has no wall.
 function _saddleSignedAt(blx, bly, blz) {
   _saddleCellOf(blx, bly, blz, _gyCellIdx);
+  const cell = schwarzCell(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z);
+  if (!cell) return null;
   _toCellLocal(blx, bly, blz, _gyCellIdx, _cellLocal);
-  return saddleSignedDistance(_cellLocal.x, _cellLocal.y, _cellLocal.z);
+  return cell.s * saddleSignedDistance(_cellLocal.x, _cellLocal.y, _cellLocal.z);
+}
+// Wall normal (board-local, unit length, pointing to the +field side) at the
+// chamber in _gyCellIdx, for the cell-local point in _cellLocal.
+function _saddleNormalAt(gradFn, out) {
+  const cell = schwarzCell(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z);
+  gradFn(_cellLocal.x, _cellLocal.y, _cellLocal.z, out);
+  return out.applyQuaternion(cell.q).normalize().multiplyScalar(cell.s);
 }
 // Apply one saddle-family collision in board-local space.
 // fullDistFn: (bx,by,bz)->signed_dist using board-local coords (handles cell lookup internally).
@@ -867,26 +974,20 @@ function _saddleSignedAt(blx, bly, blz) {
 // sideKey: physBall property storing which side of the wall the ball is on ('side').
 // prevBL / currBL: board-local prev / curr positions (Vector3). currBL is corrected in-place.
 function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
-  let home = physBall[sideKey];
-  if (!home) return;
-
-  // With alternating 90deg turns (saddleCellQuaternion) the wall is one
-  // CONTINUOUS sheet across x and y chamber boundaries: neighbours meet edge to
-  // edge, and the signed distance carries over with the same sign. So crossing
-  // an x or y boundary is still a real crossing test. The wall is solid there,
-  // and the ball must not slip through it at a seam.
+  // Where the wall carries on from one chamber into the next (_sameWall), the
+  // signed field carries over with the same sign, so a change of sign is a real
+  // crossing and the ball must not slip through at the seam.
   //
-  // Along z it is different. The sheet z = +-xy/h reaches a chamber's z faces
-  // only at two corner points, so a z boundary is OPEN: that's a passage. The
-  // next chamber in z has its own sheet, and which side of it the ball is on
-  // starts fresh. So when the z layer changes, re-base the home side from
-  // where the ball actually is instead of treating it as a crossing.
+  // Through a passage face, or into or out of an open junction chamber, there
+  // is no shared wall: whichever wall the ball meets next starts fresh. There
+  // the home side is re-based from where the ball actually is.
   _saddleCellOf(prevBL.x, prevBL.y, prevBL.z, _gyCellPrevIdx);
   _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellCurrIdx);
-  const sameSheet = _gyCellPrevIdx.z === _gyCellCurrIdx.z;
-
   const dCurr = fullDistFn(currBL.x, currBL.y, currBL.z);
-  if (!sameSheet) {
+  if (dCurr === null) { physBall[sideKey] = 0; return; }   // open junction chamber: no wall
+  const sameSheet = _sameWall(_gyCellPrevIdx, _gyCellCurrIdx);
+  let home = physBall[sideKey];
+  if (!sameSheet || !home) {
     home = dCurr >= 0 ? 1 : -1;
     physBall[sideKey] = home;
   }
@@ -907,9 +1008,7 @@ function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
     currBL.z = prevBL.z + (currBL.z - prevBL.z) * lo;
     _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellIdx);
     _toCellLocal(currBL.x, currBL.y, currBL.z, _gyCellIdx, _cellLocal);
-    gradFn(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
-    saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
-    _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+    _saddleNormalAt(gradFn, _gyN).multiplyScalar(home);
     currBL.x += _gyN.x * BALL_R; currBL.y += _gyN.y * BALL_R; currBL.z += _gyN.z * BALL_R;
     _gyWorldPos.copy(currBL); boardGroup.localToWorld(_gyWorldPos);
     physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
@@ -933,9 +1032,7 @@ function _collideSaddleFamily(fullDistFn, gradFn, sideKey, prevBL, currBL) {
   const overshoot = BALL_R - home * dCurr;
   _saddleCellOf(currBL.x, currBL.y, currBL.z, _gyCellIdx);
   _toCellLocal(currBL.x, currBL.y, currBL.z, _gyCellIdx, _cellLocal);
-  gradFn(_cellLocal.x, _cellLocal.y, _cellLocal.z, _gyN);
-  saddleCellQuaternion(_gyCellIdx.x, _gyCellIdx.y, _gyCellIdx.z, _cellQ);
-  _gyN.applyQuaternion(_cellQ).normalize().multiplyScalar(home);
+  _saddleNormalAt(gradFn, _gyN).multiplyScalar(home);
   currBL.x += _gyN.x * overshoot; currBL.y += _gyN.y * overshoot; currBL.z += _gyN.z * overshoot;
   _gyWorldPos.copy(currBL); boardGroup.localToWorld(_gyWorldPos);
   physBall.x = _gyWorldPos.x; physBall.y = _gyWorldPos.y; physBall.z = _gyWorldPos.z;
@@ -984,11 +1081,9 @@ function gyroidGuide(dt, pwx, pwy, pwz) {
   }
   // GLB bypass (always empty — procedural lattice; saddle collision is fully analytic).
   if (glbColliders.length) return;
-  // --- 2. Three saddle families: Z (z=xy/h), X (x=yz/h), Y (y=xz/h). ---
-  // Every cell uses the identity quaternion, but that does NOT make a home side
-  // computed at spawn valid everywhere: the cell-local coordinates still jump at
-  // each cell boundary, so the field is discontinuous there. The side is re-based
-  // per cell inside _collideSaddleFamily.
+  // --- 2. The Schwarz D wall (one z = xy patch per walled chamber, turned per
+  // the tiling table). The home side is re-based inside _collideSaddleFamily
+  // wherever the ball leaves one continuous wall for another.
   _gyPrev.set(pwx, pwy, pwz); boardGroup.worldToLocal(_gyPrev);
   // Only the drawn wall collides. There used to be two more saddle families here
   // (x = yz/h and y = xz/h) that were never drawn: invisible walls that boxed
@@ -1201,7 +1296,7 @@ function spawnPhysBall(x, y, z, p, predicted, dropColumn) {
   _spawnLocal[inA] = _snapQuadrant(_spawnLocal[inA], inA);
   _spawnLocal[inB] = _snapQuadrant(_spawnLocal[inB], inB);
   const dSpawn = _saddleSignedAt(_spawnLocal.x, _spawnLocal.y, _spawnLocal.z);
-  const side = dSpawn >= 0 ? 1 : -1;
+  const side = dSpawn === null ? 0 : (dSpawn >= 0 ? 1 : -1);   // 0: spawned in an open chamber
   const v0 = -1;                                   // m/s downward in world
   boardGroup.localToWorld(_spawnLocal);
   mesh.position.copy(_spawnLocal); halo.position.copy(mesh.position);
