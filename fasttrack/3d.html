@@ -15,7 +15,7 @@
   <script src="/js/dimensional-session-bridge.js"></script>
 
   <link rel="stylesheet" href="../../lib/fonts/fonts.css">
-  <link rel="stylesheet" href="3d.css?v=20260719a">
+  <link rel="stylesheet" href="3d.css?v=20261001d">
   <script src="/js/analytics.js"></script>
   <script src="/js/kernel-client.js" defer></script>
   <script src="/js/player-panel.js" defer></script>
@@ -44,6 +44,34 @@
   <!-- Header band: fixed strip hosting the deck (left: turn status, right: draw pile) -->
   <div id="ft-header-bg" aria-hidden="true"></div>
 
+  <!-- Which build is this? Worked out here rather than hard-coded, so one file
+       serves the web and the store builds and there is nothing to remember not to
+       deploy. The previous version of this set FT_MOBILE = true literally, which
+       meant the web copy and the packaged copy differed by an edit.
+
+       It no longer decides appearance. The billiard room is opt-in through
+       FT_BILLIARD_ROOM, nothing sets that, so the void room is already what every
+       build renders and this flag was inert for art long before anyone noticed.
+
+       What it does decide is input: the packaged app plays by touch alone, with no
+       bottom toolbar. A phone browser reaches the same place through a coarse
+       pointer, which is checked separately in fasttrack-3d.js, so this only has to
+       catch the native shell where a tablet might report a fine pointer.
+
+       Set FT_FORCE_TOUCH or FT_FORCE_DESKTOP in the console to try either mode. -->
+  <script>
+    (function () {
+      var native = false;
+      try {
+        native = !!(window.Capacitor && (
+          (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
+          || window.Capacitor.isNative === true));
+      } catch (e) {}
+      if (window.FT_FORCE_DESKTOP === true) native = false;
+      else if (window.FT_FORCE_TOUCH === true) native = true;
+      window.FT_MOBILE = native;
+    }());
+  </script>
   <div id="container"></div>
 
   <!-- ── Footer band — full-width transparent strip hosting action / hints / cam ── -->
@@ -108,6 +136,40 @@
     <button id="ft-confirm-next" type="button" aria-label="Next move" title="Next move">▶</button>
     <button id="ft-confirm-cancel" type="button" aria-label="Clear selection" title="Clear selection">✕</button>
     <button id="ft-confirm-ok" type="button" aria-label="Confirm move" title="Confirm move">Confirm ✓</button>
+  </div>
+
+  <!-- ── Split dial: shown when a 7 can be split. Pick the two pegs, slide to
+       share the 7 between them, watch both routes light up, then Play. It only
+       ever offers splits the rules engine says are legal. ── -->
+  <div id="ft-split-dial" role="region" aria-label="Split your 7" hidden>
+    <div class="ft-sd-title">✂ Split your 7</div>
+    <div class="ft-sd-pairs" id="ft-sd-pairs" role="group" aria-label="Which two pegs"></div>
+    <div class="ft-sd-row">
+      <div class="ft-sd-side"><span class="ft-sd-name" id="ft-sd-name-a"></span><b class="ft-sd-steps" id="ft-sd-steps-a"></b></div>
+      <button type="button" id="ft-sd-less" aria-label="One less for the first peg">−</button>
+      <input type="range" id="ft-sd-range" min="1" max="6" step="1" aria-label="Steps for the first peg">
+      <button type="button" id="ft-sd-more" aria-label="One more for the first peg">+</button>
+      <div class="ft-sd-side"><b class="ft-sd-steps" id="ft-sd-steps-b"></b><span class="ft-sd-name" id="ft-sd-name-b"></span></div>
+    </div>
+    <div class="ft-sd-note" id="ft-sd-note"></div>
+    <div class="ft-sd-actions">
+      <button type="button" id="ft-sd-route" hidden></button>
+      <button type="button" id="ft-sd-play">Play split ✓</button>
+    </div>
+  </div>
+
+  <!-- ── Undo offer: from the moment your move starts until a few seconds
+       after it lands you can take it back. The ring empties as the time runs
+       out; untouched, the turn passes by itself. "Keep" ends the wait at once. Solo and local play only. ── -->
+  <div id="ft-undo-offer" role="region" aria-label="Take back your move" hidden>
+    <button id="ft-undo-btn" type="button" aria-label="Undo move">
+      <svg class="ft-undo-ring" viewBox="0 0 36 36" aria-hidden="true">
+        <circle class="ft-undo-ring-track" cx="18" cy="18" r="16"></circle>
+        <circle class="ft-undo-ring-fill" id="ft-undo-ring-fill" cx="18" cy="18" r="16"></circle>
+      </svg>
+      <span class="ft-undo-label">↶ Undo</span>
+    </button>
+    <button id="ft-keep-btn" type="button" aria-label="Keep move and end turn">Keep ✓</button>
   </div>
 
   <!-- ── Big instruction banner — tells the player exactly what to tap next ── -->
@@ -330,7 +392,7 @@
   <script src="../../js/manifold-conductor.js"></script>
 
   <!-- Game engine (pure logic, reads/writes RepresentationTables) -->
-  <script src="fasttrack-game-core.js?v=20260718e"></script>
+  <script src="fasttrack-game-core.js?v=20261001d"></script>
 
   <!-- 🜂 MANIFOLD ENGINE (opt-in via ?engine=manifold) — same board, pure-
        derivation logic. ft-core-manifold.js self-activates only when the flag
@@ -356,7 +418,7 @@
   <script src="fasttrack-quality.js?v=20260605a"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20260718e"></script>
+  <script src="fasttrack-3d.js?v=20261001d"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
@@ -410,9 +472,10 @@
         var c = document.getElementById('panel-action');
         if (!p || !c) return;
         var r = p.getBoundingClientRect();
-        // 8px from the left viewport edge, 6px below the player panel bottom.
+        // 6px below the player panel bottom, and in from the screen edge by
+        // --ft-card-inset (set beside the card size at the end of 3d.css).
         c.style.setProperty('top', Math.round(r.bottom + 6) + 'px', 'important');
-        c.style.setProperty('left', '8px', 'important');
+        c.style.setProperty('left', 'var(--ft-card-inset, 24px)', 'important');
       }
       var ro;
       function start() {

@@ -2620,11 +2620,14 @@ function renderSplitSelector(splitMoves, allMoves) {
   // clicks). Just emit instructions + a cancel pill in the rail.
   const isDesktop = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(min-width: 601px)').matches;
-  if (isDesktop) {
+  // Where the split dial exists (fasttrack-3d.js) it is the one split control on
+  // every screen size, so the rail only needs the short instructions.
+  const hasDial = typeof document !== 'undefined' && !!document.getElementById('ft-split-dial');
+  if (isDesktop || hasDial) {
     let html = '<div class="split-header">✂️ Split 7</div>';
     if (_splitPegIdx == null || _splitStepChoice == null) {
       html += '<div style="font-size:0.82em;color:#9fdcff;text-align:center;padding:6px 4px;">'
-        + 'Click any glowing hole on the board — that route\'s peg + step count becomes your <b>first leg</b>.'
+        + 'Use the dial to share the 7 between two pegs, or tap a glowing hole on the board.'
         + '</div>';
     } else {
       const pegName = safeUiText(player && player.pegs && player.pegs[_splitPegIdx]
@@ -2888,6 +2891,10 @@ function executeMove(moveIdx) {
   const vm = state.turn.get('validMoves') || [];
   const move = vm[moveIdx];
   if (!move) return;
+
+  // Take the "before" picture for Undo while the card and its legal moves are
+  // still in state, so taking the move back puts the player exactly here.
+  _armUndo();
 
   // Broadcast the resolved move BEFORE applying so peers see it the moment we do.
   // The local actor is gated above; this only runs when we're the deciding peer.
@@ -3208,6 +3215,7 @@ function executeMove(moveIdx) {
   ).length;
   if (inSafe >= SAFE_ZONE_SIZE && onHome > 0) {
     state.meta.set('winner', ci);
+    _endUndoOffer();   // a winning move is final
     log(`🏆 ${getCurrentPlayerName()} WINS!`);
     _deferredCutscenes.push(['win', {
       peg, playerColor: player.color, playerName: player.name,
@@ -3261,6 +3269,7 @@ function executeMove(moveIdx) {
 
   // ── DEFERRED CUTSCENES: fire only AFTER hop animations complete ──
   const fireDeferredCutscenes = () => {
+    if (_undo && _undo.requested) return;   // the move is being taken back: no fanfare for it
     for (const [type, data] of _deferredCutscenes) {
       CutsceneManager.queueCutscene(type, data);
     }
@@ -3512,6 +3521,121 @@ function _isTableBusy() {
   return false;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// UNDO (grace window)
+// ───────────────────────────────────────────────────────────────────────────
+// A mis-tap used to cost the turn. Now, as at a real table, a move can be taken
+// back for as long as the turn has not been given up. The Undo button appears
+// the moment a human's move starts, stays up while the pegs travel, and for
+// UNDO_GRACE_MS after they land. Untouched, the turn then passes by itself, so
+// nobody has to press "end turn" and nobody can stall.
+//
+// Pressed while a peg is still travelling, the undo is remembered and carried
+// out the moment the peg lands (state is never restored under a moving peg; the
+// renderer holds back snapshots mid-hop for the same reason). The cutscenes
+// that move would have earned are skipped; one already playing is allowed to
+// finish first.
+//
+// The rules that keep it fair:
+//   - Undo never crosses a card draw. The window closes BEFORE a replay card
+//     (A, 6, J, Q, K, Joker) reopens the draw, so it cannot be used to peek.
+//   - A Card 7 split is one move, so it is taken back whole.
+//   - A winning move is final.
+//   - Solo and local play only. Online, the host would have to hold the move
+//     before announcing it; that belongs with the multiplayer work.
+//   - Bots do not get one, and no one waits on a bot's turn.
+//   - With no screen to show the button (server, headless tests) there is no window.
+//
+// How it works: executeMove takes a full state snapshot before it changes
+// anything. Undo restores that snapshot and starts a new turn instance (epoch),
+// which makes the undone move's pending resolve stale so it can never end the turn.
+const UNDO_GRACE_MS = 4000;
+let _undo = null;   // { epoch, snapshot, offeredAt }  offeredAt = 0 until the pegs have landed
+
+function _armUndo() {
+  _undo = null;
+  if (_applying || _isMpMode()) return;
+  // No screen to show the button on (a server room, a headless test): there is
+  // nobody to offer it to, so do not hold the turn for it.
+  if (typeof window === 'undefined' || typeof window.showUndoOffer !== 'function') return;
+  const players = state.players.get('list') || [];
+  const cur = players[state.players.get('current') || 0];
+  if (!cur || cur.isBot) return;
+  _undo = { epoch: _turnEpoch, snapshot: getStateSnapshot(), offeredAt: 0, requested: false, kept: false };
+  _showUndoOffer(0);   // on screen at once; the countdown starts when the pegs land
+}
+
+// Called by resolveTurn once the table is quiet. True while the turn must wait.
+function _undoHoldsTurn(epoch) {
+  if (!_undo || _undo.epoch !== epoch) return false;
+  if (_undo.requested) { _performUndo(); return true; }   // asked for mid-move; the pegs have now landed
+  if (!_undo.kept) {
+    if (!_undo.offeredAt) {
+      _undo.offeredAt = Date.now();
+      _showUndoOffer(UNDO_GRACE_MS);
+    }
+    if (Date.now() - _undo.offeredAt < UNDO_GRACE_MS) return true;
+  }
+  _endUndoOffer();
+  return false;
+}
+
+function _endUndoOffer() {
+  _undo = null;
+  if (typeof window !== 'undefined' && typeof window.hideUndoOffer === 'function') {
+    try { window.hideUndoOffer(); } catch (_) { /* the offer is cosmetic; the turn must go on */ }
+  }
+}
+
+// countdownMs = 0 shows the button with no countdown (pegs still travelling).
+function _showUndoOffer(countdownMs) {
+  if (typeof window !== 'undefined' && typeof window.showUndoOffer === 'function') {
+    try { window.showUndoOffer(countdownMs); } catch (_) { /* same */ }
+  }
+}
+
+function canUndoMove() {
+  return !!(_undo && !_undo.requested && _undo.epoch === _turnEpoch);
+}
+
+// Take the last move back. Returns true if the undo was accepted. While the
+// table is still moving it is carried out as soon as the pegs land.
+function undoMove() {
+  if (!canUndoMove()) return false;
+  if (_isTableBusy()) {
+    _undo.requested = true;
+    // Cutscenes still waiting their turn are dropped. One already on screen is
+    // left to finish (they run a second or two); cutting it off mid-scene would
+    // strand its overlay and camera move.
+    try { CutsceneManager.queue.length = 0; } catch (_) { /* nothing queued */ }
+    return true;
+  }
+  _performUndo();
+  return true;
+}
+
+function _performUndo() {
+  const snapshot = _undo.snapshot;
+  _endUndoOffer();
+  _turnEpoch++;                 // new turn instance: the undone move's resolve is now stale
+  _splitPegIdx = null;
+  _splitStepChoice = null;
+  applyStateSnapshot(snapshot); // pegs, card, discard pile and legal moves, all as they were
+  log(`${getCurrentPlayerName()} took the move back`);
+  showMoveHints();
+  _commitState('undo');
+}
+
+// "I'm sure": give the turn up as soon as the pegs have landed, with no wait.
+function keepMove() {
+  if (!canUndoMove()) return false;
+  _undo.kept = true;
+  return true;
+}
+if (typeof window !== 'undefined') {
+  window.undoMove = undoMove; window.keepMove = keepMove; window.canUndoMove = canUndoMove;
+}
+
 // How long to keep waiting, and how often to look. The ceiling exists so a
 // genuinely wedged animation can never freeze the table forever; reaching it
 // means something is broken rather than merely slow, so it is logged loudly.
@@ -3524,7 +3648,7 @@ const TURN_SETTLE_CEILING_MS = 45000;
 // waiting for the table to go quiet.
 function resolveTurn(epoch, waitedMs) {
   if (epoch !== _turnEpoch) return;              // stopgap verifier: stale / duplicate
-  if (state.meta.get('winner') !== null) { _resolveWinner(); return; }
+  if (state.meta.get('winner') !== null) { _endUndoOffer(); _resolveWinner(); return; }
 
   // -- THE RULE: no turn is relinquished while the table is still moving --
   // Poll rather than subscribe, because the things being waited on are several
@@ -3539,6 +3663,11 @@ function resolveTurn(epoch, waitedMs) {
     console.warn('[TURN] settle ceiling reached after '
       + Math.round(waited / 1000) + 's with animations or cutscenes still'
       + ' reporting busy. Ending the turn to avoid a freeze; something is wedged.');
+  }
+  // -- UNDO GRACE: the move has landed; hold the turn briefly so it can be taken back --
+  if (_undoHoldsTurn(epoch)) {
+    setTimeout(() => resolveTurn(epoch, waitedMs), TURN_SETTLE_POLL_MS);
+    return;
   }
   const card = state.deck.get('currentCard');
   if (_cardIsReplay(card)) _replaySameSeat();    // replay → same seat draws again

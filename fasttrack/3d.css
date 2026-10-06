@@ -4114,3 +4114,126 @@ textarea,
 }
 .ft-mq-seat .ft-mq-tag { opacity: .6; font-weight: 500; font-size: 11px; }
 .ft-mq-sep { color: rgba(233, 237, 242, .25); }
+
+/* ── Touch: the board owns its gestures ──────────────────────────
+   Without this the browser is free to read a tap as the start of a scroll or a
+   pinch and never deliver it to the game, which is one half of why taps were
+   being lost on a phone. The other half was waiting for a 'click' that
+   OrbitControls suppresses; see the TOUCH INPUT notes in fasttrack-3d.js. */
+canvas { touch-action: none; }
+
+/* The choice box and the hint sit above the board furniture. */
+#ft-move-choices { -webkit-tap-highlight-color: transparent; }
+#ft-move-choices button:focus-visible { outline: 3px solid #00c8ff; outline-offset: 2px; }
+
+/* ── Undo offer ─────────────────────────────────────────────────────────────
+   Shown for a few seconds after a human's move lands. Sits above the footer,
+   centred, clear of the board centre. Buttons are 48px tall for thumbs. */
+#ft-undo-offer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--ft-footer-h, 56px) + 14px);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+#ft-undo-offer[hidden] { display: none; }
+#ft-undo-offer button {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(12, 18, 34, 0.92);
+  color: #fff;
+  font: 600 16px/1 system-ui, sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+#ft-undo-btn { border-color: #ffcf5a; }
+#ft-undo-offer button:hover,
+#ft-undo-offer button:focus-visible { background: rgba(30, 44, 78, 0.96); outline: none; }
+.ft-undo-ring { width: 28px; height: 28px; transform: rotate(-90deg); }
+.ft-undo-ring circle { fill: none; stroke-width: 4; }
+.ft-undo-ring-track { stroke: rgba(255, 255, 255, 0.18); }
+/* r = 16, so the circumference is about 100.5: the dash offset runs 0 -> 100.5. */
+.ft-undo-ring-fill { stroke: #ffcf5a; stroke-dasharray: 100.5; stroke-dashoffset: 0; }
+
+/* ── Split dial ─────────────────────────────────────────────────────────────
+   One compact panel for the 7 split: two pegs, one slider, one Play button.
+   Sits above the footer like the undo offer (the two never show together). */
+#ft-split-dial {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--ft-footer-h, 56px) + 14px);
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(440px, calc(100vw - 16px));
+  padding: 10px 12px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 207, 90, 0.55);
+  background: rgba(12, 18, 34, 0.94);
+  color: #fff;
+  font: 500 15px/1.25 system-ui, sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+#ft-split-dial[hidden] { display: none; }
+.ft-sd-title { text-align: center; font-weight: 700; color: #ffe566; margin-bottom: 6px; }
+.ft-sd-pairs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.ft-sd-pairs:empty { display: none; }
+.ft-sd-pairs button {
+  min-height: 40px; padding: 0 12px; border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3); background: transparent; color: #dfe9ff;
+  font: inherit; cursor: pointer;
+}
+.ft-sd-pairs button[aria-pressed="true"] { border-color: #ffcf5a; background: rgba(255, 207, 90, 0.18); color: #fff; }
+.ft-sd-row { display: flex; align-items: center; gap: 8px; }
+.ft-sd-side { display: flex; flex-direction: column; align-items: center; min-width: 64px; max-width: 92px; }
+.ft-sd-name { font-size: 13px; color: #c9d6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ft-sd-steps { font-size: 28px; line-height: 1.1; color: #ffe566; }
+#ft-sd-range { flex: 1; min-width: 0; height: 44px; accent-color: #ffcf5a; }
+#ft-sd-less, #ft-sd-more {
+  width: 44px; height: 44px; flex: none; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.06);
+  color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+}
+#ft-sd-less:disabled, #ft-sd-more:disabled { opacity: 0.3; cursor: default; }
+.ft-sd-note { min-height: 1.25em; margin: 6px 0 8px; text-align: center; font-size: 13px; color: #b7ffd6; }
+.ft-sd-actions { display: flex; gap: 8px; justify-content: center; }
+.ft-sd-actions button {
+  min-height: 48px; padding: 0 18px; border-radius: 24px; font: 600 16px/1 system-ui, sans-serif; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.06); color: #fff;
+}
+#ft-sd-play { border-color: #ffcf5a; background: rgba(255, 207, 90, 0.22); flex: 1; max-width: 240px; }
+
+/* ── Card draw: size and distance from the screen edge ──────────────────────
+   Testers wanted the draw card bigger and not jammed against the edge. These
+   three numbers are the only place its size and inset are set; the rules below
+   apply them over the older fixed 40 x 56 sizing. Rank and suit scale with it. */
+:root { --ft-card-w: 64px; --ft-card-h: 90px; --ft-card-inset: 24px; }
+@media (max-width: 560px) { :root { --ft-card-w: 52px; --ft-card-h: 73px; --ft-card-inset: 14px; } }
+
+/* right: auto lets the panel shrink to the card, so it does not lie across the board. */
+#panel-action { height: auto !important; max-width: none !important; right: auto !important; }
+#panel-action #card-area,
+#panel-action #current-card {
+  width: var(--ft-card-w) !important;
+  height: var(--ft-card-h) !important;
+}
+#panel-action #current-card .card-back,
+#panel-action #current-card .card-face {
+  width: var(--ft-card-w) !important;
+  height: var(--ft-card-h) !important;
+  min-width: var(--ft-card-w) !important;
+  min-height: var(--ft-card-h) !important;
+  max-width: var(--ft-card-w) !important;
+  max-height: var(--ft-card-h) !important;
+  border-radius: 8px !important;
+}
+#panel-action #current-card .card-face .cf-rank { font-size: calc(var(--ft-card-w) * 0.42) !important; }
+#panel-action #current-card .card-face .cf-suit { font-size: calc(var(--ft-card-w) * 0.32) !important; }
+#panel-action #current-card:has(.card-back)::after { font-size: calc(var(--ft-card-w) * 0.24); }

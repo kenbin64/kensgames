@@ -6878,7 +6878,100 @@ function _pegIdxForPegId(pegId) {
   return idx >= 0 ? idx : null;
 }
 
-function _pickTargetAtClient(clientX, clientY) {
+// ════════════════════════════════════════════════════════════════
+// TOUCH INPUT
+// ════════════════════════════════════════════════════════════════
+// Two things made taps unreliable on a phone.
+//
+// OrbitControls is bound to the same canvas as the board handler, and on touch
+// it preventDefaults the gesture. If a finger drifts even a couple of pixels
+// between landing and lifting, the browser decides it was a drag and never
+// synthesises a 'click' at all, so the tap is silently lost. That is why it
+// worked sometimes: it depended on how still the finger was. So the board no
+// longer waits for 'click'. It watches pointerdown and pointerup itself and
+// decides what counts as a tap.
+//
+// And the pick was an exact ray against the mesh. A mouse is pixel accurate; a
+// fingertip covers forty or fifty pixels and the spot the player feels they
+// touched is not the spot the browser reports. Landing slightly off a peg
+// returned nothing. So a coarse pointer gets a ring of nearby tries before the
+// tap is given up on.
+//
+// The rules themselves are kept as plain functions with no DOM in them, so they
+// can be tested outside a browser. test_tap_input.js does exactly that.
+
+const TAP_SLOP_FINE = 6;      // a mouse barely moves between press and release
+const TAP_SLOP_COARSE = 14;   // a finger always moves
+const TAP_HOLD_MS = 600;      // longer than this and it was a hold, not a tap
+const TAP_PICK_SLOP = 24;     // how far from the finger to look for a target
+
+function _isCoarsePointer(pointerType) {
+  return pointerType === 'touch' || pointerType === 'pen';
+}
+
+function _tapSlopFor(pointerType) {
+  return _isCoarsePointer(pointerType) ? TAP_SLOP_COARSE : TAP_SLOP_FINE;
+}
+
+// Was that a tap, or was the player turning the camera? Anything that travelled
+// belongs to OrbitControls and is not ours to act on.
+function _isTap(down, up, pointerType) {
+  if (!down || !up) return false;
+  const moved = Math.hypot(up.x - down.x, up.y - down.y);
+  const held = up.t - down.t;
+  return moved <= _tapSlopFor(pointerType) && held <= TAP_HOLD_MS;
+}
+
+// Where to look for something pickable: the exact point first, then outward.
+function _tapRing(x, y, slopPx) {
+  const out = [{ x, y }];
+  if (!(slopPx > 0)) return out;
+  for (const r of [slopPx * 0.55, slopPx]) {
+    for (let a = 0; a < 8; a++) {
+      const th = (a / 8) * Math.PI * 2;
+      out.push({ x: x + Math.cos(th) * r, y: y + Math.sin(th) * r });
+    }
+  }
+  return out;
+}
+
+// Exposed so the tests can reach them without a browser.
+if (typeof window !== 'undefined') {
+  window.FastTrackInput = { _isTap, _tapRing, _tapSlopFor, _isCoarsePointer,
+    TAP_SLOP_FINE, TAP_SLOP_COARSE, TAP_HOLD_MS, TAP_PICK_SLOP };
+}
+
+// Touch first: the Play build sets FT_MOBILE, and a phone browser reports a
+// coarse pointer. Either way the bottom toolbar goes and the board becomes the
+// only control. Tapping is the whole interface: one move commits, several open a
+// list, and tapping nothing backs out.
+//
+// The desktop keeps its toolbar. This is a different way to play rather than a
+// replacement for the old one.
+let _touchFirstCache = null;
+function _touchFirst() {
+  if (_touchFirstCache !== null) return _touchFirstCache;
+  // An explicit override wins, for testing either mode on either machine.
+  if (window.FT_FORCE_DESKTOP === true) { _touchFirstCache = false; return false; }
+  if (window.FT_FORCE_TOUCH === true) { _touchFirstCache = true; return true; }
+  let coarse = false;
+  try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  _touchFirstCache = window.FT_MOBILE === true || coarse;
+  return _touchFirstCache;
+}
+if (typeof window !== 'undefined') window.FastTrackTouchFirst = _touchFirst;
+
+// The tolerant picker. slopPx of 0 is the old exact behaviour, which is what
+// hover still wants: a hover that snapped to nearby pegs would feel possessed.
+function _pickTargetAtClient(clientX, clientY, slopPx = 0) {
+  for (const p of _tapRing(clientX, clientY, slopPx)) {
+    const hit = _pickTargetExact(p.x, p.y);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function _pickTargetExact(clientX, clientY) {
   if (!_pickRaycaster || !renderer || !camera) return null;
   const rect = renderer.domElement.getBoundingClientRect();
   _pickMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -7145,14 +7238,53 @@ function setupBoardPickHandler() {
 
   dom.addEventListener('pointerleave', () => { clearHover(); });
 
-  dom.addEventListener('click', (e) => {
+  // A tap is decided here rather than waited for. See the TOUCH INPUT notes above:
+  // OrbitControls swallows 'click' on touch whenever the finger drifts, which is
+  // most of the time.
+  let _tapDown = null;
+  dom.addEventListener('pointerdown', (e) => {
+    _tapDown = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+  }, { passive: true });
+  dom.addEventListener('pointercancel', () => { _tapDown = null; }, { passive: true });
+  dom.addEventListener('pointerup', (e) => {
+    const down = _tapDown;
+    _tapDown = null;
+    if (!down || down.id !== e.pointerId) return;
+    const up = { x: e.clientX, y: e.clientY, t: performance.now() };
+    // Moved or held: the camera has it. Leave it alone and say nothing, because
+    // the player was turning the board and knows it.
+    if (!_isTap(down, up, e.pointerType)) return;
+    _handleBoardTap(e.clientX, e.clientY, e.pointerType);
+  });
+
+  function _handleBoardTap(clientX, clientY, pointerType) {
     if (artOverlayOpen()) return;
     const idx = _refreshRouteIndex();
-    if (idx.size === 0) return;
-    const target = _pickTargetAtClient(e.clientX, e.clientY);
+    if (idx.size === 0) { _sayBoardHint(_whyNothingToPick()); return; }
+    const slop = _isCoarsePointer(pointerType) ? TAP_PICK_SLOP : 0;
+    const target = _pickTargetAtClient(clientX, clientY, slop);
+    if (!target) {
+      // With no cancel button on a phone, tapping the empty board is how you back
+      // out. Mid split that walks the split state machine back a stage, which is
+      // what the cancel button used to do.
+      if (_touchFirst() && (_pendingEntry || _getSplitChoice())) {
+        _hideMoveChoices();
+        _clearPendingEntry(true);
+        _sayBoardHint('Cleared. Tap a glowing peg to start again.');
+        return;
+      }
+      _sayBoardHint('Nothing there. Tap a peg or a hole.');
+      return;
+    }
     const matches = _entriesForTarget(target, idx);
-    if (matches.length === 0) return;
+    if (matches.length === 0) {
+      _sayBoardHint(target.kind === 'peg'
+        ? 'That peg has no move this turn.'
+        : 'No move reaches that hole.');
+      return;
+    }
     _hideHoverTip();
+    const e = { clientX, clientY };
     // Board click is a shortcut — sync the cycle to this target.
     const tKey = target ? (target.kind === 'peg' ? `peg:${target.pegIdx}` : `hole:${target.holeId}`) : '';
     let nextIdx = 0;
@@ -7171,10 +7303,20 @@ function setupBoardPickHandler() {
     // re-clicking the same target after it's already staged commits.
     const isReclick = _pendingEntry && _entryKey(_pendingEntry) === _entryKey(entry);
     _stagePendingEntry(entry);
-    if (matches.length === 1 || isReclick) {
+    if (matches.length === 1) {
+      // Only one way through here, so there is nothing to ask about. It just moves.
       _commitPendingEntry();
+    } else if (isReclick && !_touchFirst()) {
+      // On a mouse, tapping the same target twice was how you accepted the staged
+      // move. On a phone that is a trap: the list is the only place a choice gets
+      // made, so a second tap reopens it rather than quietly playing something.
+      _commitPendingEntry();
+    } else {
+      // Several moves run through what was tapped. Rather than make the player
+      // cycle blind with the arrows, show them and let one be chosen.
+      _showMoveChoices(matches, target);
     }
-  });
+  }
 
   // Footer toolbar buttons — primary input on touch and desktop.
   const okBtn = document.getElementById('ft-confirm-ok');
@@ -7200,6 +7342,147 @@ function setupBoardPickHandler() {
   // Initialize the bar state for whatever moves are currently available.
   _refreshRouteIndex();
   _refreshConfirmBar();
+}
+
+// ── Telling the player what happened ───────────────────────────
+// Every path that used to end in a bare `return` now ends here instead. A tap
+// that does nothing and says nothing is indistinguishable from a broken game,
+// and that is most of what "it doesn't acknowledge my choice" actually was.
+
+let _hintTimer = null;
+
+function _boardHintEl() {
+  let el = document.getElementById('ft-board-hint');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'ft-board-hint';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.style.cssText = [
+    'position:fixed', 'left:50%', 'transform:translateX(-50%)',
+    'bottom:calc(env(safe-area-inset-bottom, 0px) + 92px)',
+    'background:rgba(12,16,22,.92)', 'color:#eef3fa',
+    'border:1px solid rgba(255,255,255,.18)', 'border-radius:.6rem',
+    'padding:.55rem .95rem', 'font:600 15px/1.35 system-ui,-apple-system,sans-serif',
+    'max-width:min(90vw,26rem)', 'text-align:center', 'pointer-events:none',
+    'opacity:0', 'transition:opacity .16s ease', 'z-index:60',
+  ].join(';');
+  document.body.appendChild(el);
+  return el;
+}
+
+function _sayBoardHint(message) {
+  if (!message) return;
+  const el = _boardHintEl();
+  el.textContent = message;
+  el.style.opacity = '1';
+  if (_hintTimer) clearTimeout(_hintTimer);
+  _hintTimer = setTimeout(() => { el.style.opacity = '0'; _hintTimer = null; }, 2200);
+}
+
+// Why is there nothing to pick? The route index being empty has several very
+// different causes and the player deserves to know which one.
+function _whyNothingToPick() {
+  const core = window.FastTrackCore;
+  if (!core || !core.state) return 'Waiting for the game to start.';
+  const players = core.state.players.get('list') || [];
+  const ci = core.state.players.get('current') || 0;
+  const cur = players[ci];
+  if (cur && cur.isBot) return `${cur.name || 'The bot'} is taking their turn.`;
+  const vm = _currentValidMoves();
+  if (!vm || vm.length === 0) return 'No legal move with this card.';
+  return 'Draw a card to begin your turn.';
+}
+
+// ── Choosing between several moves ─────────────────────────────
+// user_directive: when more than one move runs through the peg or hole that was
+// tapped, ask which one rather than making the player cycle through them blind.
+// Previewing on the board as each is considered, so the list and the board agree.
+
+let _choiceBox = null;
+
+function _hideMoveChoices() {
+  if (_choiceBox) { _choiceBox.remove(); _choiceBox = null; }
+}
+
+function _showMoveChoices(matches, target) {
+  _hideMoveChoices();
+  if (!matches || matches.length < 2) return;
+  const vm = _currentValidMoves();
+
+  const box = document.createElement('div');
+  _choiceBox = box;
+  box.id = 'ft-move-choices';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  box.setAttribute('aria-label', 'Choose which move');
+  box.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:70', 'display:flex',
+    'align-items:center', 'justify-content:center',
+    'background:rgba(6,9,13,.55)', 'padding:16px',
+  ].join(';');
+
+  const panel = document.createElement('div');
+  panel.style.cssText = [
+    'background:#131922', 'color:#eef3fa', 'border:1px solid rgba(255,255,255,.16)',
+    'border-radius:.8rem', 'padding:.9rem', 'width:min(92vw,24rem)',
+    'max-height:min(78vh,34rem)', 'overflow-y:auto',
+    'font:15px/1.45 system-ui,-apple-system,sans-serif',
+    'box-shadow:0 18px 50px rgba(0,0,0,.55)',
+  ].join(';');
+
+  const title = document.createElement('p');
+  title.textContent = target && target.kind === 'peg'
+    ? `${matches.length} moves for this peg` : `${matches.length} moves reach that hole`;
+  title.style.cssText = 'margin:.1rem 0 .7rem;font-weight:700;font-size:1rem';
+  panel.appendChild(title);
+
+  matches.forEach((entry, i) => {
+    const desc = _describeEntry(entry, vm);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = (desc && desc.text) ? desc.text : `Move ${i + 1}`;
+    // Big enough for a thumb, which is the whole point of this box.
+    b.style.cssText = [
+      'display:block', 'width:100%', 'text-align:left', 'margin:0 0 .45rem',
+      'padding:.7rem .8rem', 'min-height:44px', 'border-radius:.55rem',
+      'border:1px solid rgba(255,255,255,.18)', 'background:#1b2330',
+      'color:#eef3fa', 'font:inherit', 'cursor:pointer',
+    ].join(';');
+    if (desc && desc.color) b.style.borderLeft = `4px solid ${desc.color}`;
+    // Show it on the board while it is being considered.
+    const preview = () => { try { _stagePendingEntry(entry); } catch (err) {} };
+    b.addEventListener('pointerenter', preview);
+    b.addEventListener('focus', preview);
+    b.addEventListener('click', () => {
+      _hideMoveChoices();
+      _stagePendingEntry(entry);
+      _commitPendingEntry();
+    });
+    panel.appendChild(b);
+  });
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  cancel.style.cssText = [
+    'display:block', 'width:100%', 'margin-top:.35rem', 'padding:.65rem',
+    'min-height:44px', 'border-radius:.55rem', 'border:1px solid rgba(255,255,255,.14)',
+    'background:transparent', 'color:#9fb0c4', 'font:inherit', 'cursor:pointer',
+  ].join(';');
+  cancel.addEventListener('click', () => { _hideMoveChoices(); _clearPendingEntry(true); });
+  panel.appendChild(cancel);
+
+  box.appendChild(panel);
+  box.addEventListener('click', (ev) => {
+    if (ev.target === box) { _hideMoveChoices(); _clearPendingEntry(true); }
+  });
+  document.addEventListener('keydown', function esc(ev) {
+    if (ev.key === 'Escape') { _hideMoveChoices(); _clearPendingEntry(true); document.removeEventListener('keydown', esc); }
+  });
+  document.body.appendChild(box);
+  const first = panel.querySelector('button');
+  if (first) first.focus();
 }
 
 // ── Confirmation staging ───────────────────────────────────────
@@ -7235,6 +7518,7 @@ function _stepMoveCycle(delta) {
 // player exactly what to tap next, in plain language, at every stage. This is
 // the primary "the board is interactive" affordance for new players.
 function _refreshInstructionBanner() {
+  _refreshSplitDial();
   const banner = document.getElementById('ft-instruction-banner');
   if (!banner) return;
   const textEl = banner.querySelector('.ft-ib-text');
@@ -7269,7 +7553,7 @@ function _refreshInstructionBanner() {
       // button is live), swap the "tap a glowing…" prompt for the
       // confirm-move description so the player knows exactly what they
       // are about to commit.
-      if (_pendingEntry) {
+      if (_pendingEntry && !_touchFirst()) {
         const desc = _describeEntry(_pendingEntry, _currentValidMoves());
         if (desc && desc.text) {
           text = `Confirm move: ${desc.text}`;
@@ -7279,6 +7563,14 @@ function _refreshInstructionBanner() {
           text = 'Confirm move';
           icon = '✓';
         }
+      } else if (_pendingEntry) {
+        // Touch first has nothing to confirm: a staged move is only ever a
+        // preview under the open list, and choosing from the list commits it.
+        // Telling the player to confirm would point at a button that is gone.
+        const desc = _describeEntry(_pendingEntry, _currentValidMoves());
+        text = desc && desc.text ? desc.text : 'Choose a move';
+        icon = '👆';
+        if (desc && desc.color) accent = desc.color;
       } else if (kind === 'split-first-peg') {
         text = total > 1 ? 'Tap a glowing peg to split your 7' : 'Splitting your 7…';
       } else if (kind === 'split-first') {
@@ -7317,7 +7609,12 @@ function _refreshConfirmBar() {
   // Show the bar whenever the move cycle has any entries; hide otherwise.
   // (Bots clear validMoves before they animate, so this never lights up
   // during a bot turn.)
-  const shouldShow = total > 0;
+  //
+  // On a phone it never shows at all. The prev, next, cancel and confirm buttons
+  // are a mouse idea: they exist so a pointer can cycle through moves it cannot
+  // easily point at. A finger can point at the board directly, so the board is
+  // the interface and the buttons are in the way of it.
+  const shouldShow = total > 0 && !_touchFirst();
   if (shouldShow) {
     bar.removeAttribute('hidden');
     bar.hidden = false;
@@ -7405,7 +7702,13 @@ function _commitPendingEntry() {
   // _refreshRouteIndex() on the next tick will rebuild the cycle for the new state.
 }
 window._clearPendingEntry = () => _clearPendingEntry(true);
-window._refreshFastTrackToolbar = () => { _refreshRouteIndex(); _refreshConfirmBar(); };
+window._refreshFastTrackToolbar = () => {
+  // A choice box left standing after the state moved on would offer moves that
+  // no longer exist, so it goes whenever the toolbar is rebuilt.
+  _hideMoveChoices();
+  _refreshRouteIndex();
+  _refreshConfirmBar();
+};
 
 // ════════════════════════════════════════════════════════════════
 // 🜂 MANIFOLD SUBSTRATE INTEGRATION
@@ -7441,6 +7744,200 @@ window.CameraDirector = CameraDirector;
 window.highlightMovePaths = highlightMovePaths;
 window.highlightSinglePath = highlightSinglePath;
 window.clearHighlights = clearHighlights;
+
+// ════════════════════════════════════════════════════════════════
+// SPLIT DIAL — share a 7 between two pegs with one slider.
+//
+// Testers found the 7 clunky: you tapped a hole to imply "this peg goes 3",
+// then hunted for the other peg's hole, and the numbers were never shown.
+// The dial shows the numbers and lets you change them directly:
+//
+//     Rex  3  ( − ────●──── + )  4  Milo        [ Play split ]
+//
+// It invents nothing. Every position of the slider is one of the 'split'
+// moves the rules engine already produced; values the engine did not
+// produce cannot be selected. Tapping the board still works as before.
+// ════════════════════════════════════════════════════════════════
+
+// Group the engine's split moves so the dial can look one up:
+//   pairs: [{ a, b, bySteps: Map(stepsForA -> [moveIdx, ...]) }]   with a < b (peg indexes)
+// More than one moveIdx under the same steps means the same share can be
+// walked by different routes (a fast track exit, a bullseye turn-in).
+function _splitDialModel(vm) {
+  const pairs = new Map();
+  vm.forEach((m, idx) => {
+    if (!m || m.type !== 'split') return;
+    const a = Math.min(m.pegIdx, m.peg2Idx), b = Math.max(m.pegIdx, m.peg2Idx);
+    const stepsA = (m.pegIdx === a) ? m.steps : m.steps2;
+    const key = a + ':' + b;
+    if (!pairs.has(key)) pairs.set(key, { key, a, b, bySteps: new Map() });
+    const bySteps = pairs.get(key).bySteps;
+    if (!bySteps.has(stepsA)) bySteps.set(stepsA, []);
+    bySteps.get(stepsA).push(idx);
+  });
+  return [...pairs.values()];
+}
+
+// What the player has dialled in. Kept while the same 7 is on the table.
+const _splitDial = { movesHash: '', pairKey: '', stepsA: 0, route: 0, touched: false };
+
+function _splitDialSelection(vm) {
+  const pairs = _splitDialModel(vm);
+  const pair = pairs.find(p => p.key === _splitDial.pairKey) || pairs[0];
+  if (!pair) return null;
+  const legal = [...pair.bySteps.keys()].sort((x, y) => x - y);
+  // Keep the dialled value if it is legal; otherwise start nearest an even share.
+  let stepsA = legal.includes(_splitDial.stepsA) ? _splitDial.stepsA
+    : legal.reduce((best, s) => (Math.abs(s - 3.5) < Math.abs(best - 3.5) ? s : best), legal[0]);
+  const routes = pair.bySteps.get(stepsA);
+  const route = Math.min(_splitDial.route, routes.length - 1);
+  _splitDial.pairKey = pair.key; _splitDial.stepsA = stepsA; _splitDial.route = route;
+  return { pairs, pair, legal, stepsA, routes, route, moveIdx: routes[route] };
+}
+
+function _refreshSplitDial() {
+  const box = document.getElementById('ft-split-dial');
+  if (!box) return;
+  const core = window.FastTrackCore;
+  const vm = _currentValidMoves();
+  const players = (core && core.state) ? (core.state.players.get('list') || []) : [];
+  const player = players[(core && core.state) ? (core.state.players.get('current') || 0) : 0];
+  // Same gate as the instruction banner: a human whose move it is on this screen.
+  const mine = !!(player && !player.isBot && _moveCycle && _moveCycle.length > 0);
+  const hash = vm.map(m => (m.type === 'split' ? `${m.pegIdx}:${m.steps}:${m.dest}:${m.peg2Idx}:${m.dest2}` : '')).join('|');
+  if (hash !== _splitDial.movesHash) {          // a different 7 (or none): start fresh
+    _splitDial.movesHash = hash; _splitDial.pairKey = ''; _splitDial.stepsA = 0; _splitDial.route = 0; _splitDial.touched = false;
+  }
+  const sel = mine ? _splitDialSelection(vm) : null;
+  if (!sel) { box.hidden = true; return; }
+  box.hidden = false;
+
+  const pegName = (i) => (player.pegs[i] && player.pegs[i].nickname) || `Peg ${i + 1}`;
+  const move = vm[sel.moveIdx];
+  const destOf = (pegIdx) => (move.pegIdx === pegIdx ? move.dest : move.dest2);
+  const place = (holeId) => (typeof describeHole === 'function' ? describeHole(holeId) : holeId);
+
+  // Pair chips, only when there is a choice of pegs.
+  const pairsEl = document.getElementById('ft-sd-pairs');
+  const chips = sel.pairs.length > 1
+    ? sel.pairs.map(p => `<button type="button" data-pair="${p.key}" aria-pressed="${p.key === sel.pair.key}">${escapeHtmlText(pegName(p.a))} + ${escapeHtmlText(pegName(p.b))}</button>`).join('')
+    : '';
+  if (pairsEl.innerHTML !== chips) pairsEl.innerHTML = chips;
+
+  document.getElementById('ft-sd-name-a').textContent = pegName(sel.pair.a);
+  document.getElementById('ft-sd-name-b').textContent = pegName(sel.pair.b);
+  document.getElementById('ft-sd-steps-a').textContent = sel.stepsA;
+  document.getElementById('ft-sd-steps-b').textContent = 7 - sel.stepsA;
+  const range = document.getElementById('ft-sd-range');
+  if (Number(range.value) !== sel.stepsA) range.value = sel.stepsA;
+  document.getElementById('ft-sd-less').disabled = sel.legal[0] === sel.stepsA;
+  document.getElementById('ft-sd-more').disabled = sel.legal[sel.legal.length - 1] === sel.stepsA;
+  document.getElementById('ft-sd-note').textContent =
+    `${pegName(sel.pair.a)} → ${place(destOf(sel.pair.a))}   ·   ${pegName(sel.pair.b)} → ${place(destOf(sel.pair.b))}`;
+  const routeBtn = document.getElementById('ft-sd-route');
+  routeBtn.hidden = sel.routes.length < 2;
+  routeBtn.textContent = `Route ${sel.route + 1} of ${sel.routes.length} ↻`;
+
+  // Once the player has used the dial, light up exactly the split it shows.
+  if (_splitDial.touched) highlightMovePaths([move]);
+}
+
+// Plain-text escape for names placed into innerHTML.
+function escapeHtmlText(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+(function wireSplitDial() {
+  const box = document.getElementById('ft-split-dial');
+  if (!box) return;
+  const range = document.getElementById('ft-sd-range');
+
+  // Move the dial to the nearest legal share in the direction asked for.
+  function setSteps(wanted, direction) {
+    const sel = _splitDialSelection(_currentValidMoves());
+    if (!sel) return;
+    let pick;
+    if (direction > 0) pick = sel.legal.find(s => s >= wanted);
+    else if (direction < 0) pick = [...sel.legal].reverse().find(s => s <= wanted);
+    if (pick == null) pick = sel.legal.reduce((best, s) => (Math.abs(s - wanted) < Math.abs(best - wanted) ? s : best), sel.legal[0]);
+    _splitDial.stepsA = pick; _splitDial.route = 0; _splitDial.touched = true;
+    _refreshSplitDial();
+  }
+  range.addEventListener('input', () => {
+    const wanted = Number(range.value);
+    setSteps(wanted, Math.sign(wanted - _splitDial.stepsA));
+  });
+  document.getElementById('ft-sd-less').addEventListener('click', () => setSteps(_splitDial.stepsA - 1, -1));
+  document.getElementById('ft-sd-more').addEventListener('click', () => setSteps(_splitDial.stepsA + 1, +1));
+  document.getElementById('ft-sd-pairs').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-pair]');
+    if (!btn) return;
+    _splitDial.pairKey = btn.dataset.pair; _splitDial.stepsA = 0; _splitDial.route = 0; _splitDial.touched = true;
+    _refreshSplitDial();
+  });
+  document.getElementById('ft-sd-route').addEventListener('click', () => {
+    const sel = _splitDialSelection(_currentValidMoves());
+    if (!sel) return;
+    _splitDial.route = (sel.route + 1) % sel.routes.length; _splitDial.touched = true;
+    _refreshSplitDial();
+  });
+  document.getElementById('ft-sd-play').addEventListener('click', () => {
+    const sel = _splitDialSelection(_currentValidMoves());
+    if (!sel || typeof window.executeMove !== 'function') return;
+    box.hidden = true;
+    window.executeMove(sel.moveIdx);
+  });
+})();
+
+// ── Undo offer (the engine decides WHEN; this only shows and hides it) ──────
+// fasttrack-game-core.js calls showUndoOffer(ms) once a human's move has landed
+// and hideUndoOffer() when the window closes or the move is taken back.
+(function wireUndoOffer() {
+  const box = document.getElementById('ft-undo-offer');
+  const undoBtn = document.getElementById('ft-undo-btn');
+  const keepBtn = document.getElementById('ft-keep-btn');
+  const ring = document.getElementById('ft-undo-ring-fill');
+  if (!box || !undoBtn || !keepBtn) return;   // no markup: the engine then skips the window
+  const RING_LENGTH = 100.5;                  // circumference of the r = 16 ring in 3d.css
+  let ringAnim = null;
+
+  const label = undoBtn.querySelector('.ft-undo-label');
+  const IDLE_LABEL = label ? label.textContent : '';
+
+  // ms = 0: the pegs are still travelling, show the button with a full ring.
+  // ms > 0: the pegs have landed, start the countdown.
+  window.showUndoOffer = function (ms) {
+    box.hidden = false;
+    undoBtn.disabled = false; keepBtn.disabled = false;
+    if (label) label.textContent = IDLE_LABEL;
+    if (ringAnim) { ringAnim.cancel(); ringAnim = null; }
+    if (ms > 0 && ring && ring.animate) {
+      ringAnim = ring.animate(
+        [{ strokeDashoffset: 0 }, { strokeDashoffset: RING_LENGTH }],
+        { duration: ms, easing: 'linear', fill: 'forwards' });
+    }
+  };
+  window.hideUndoOffer = function () {
+    box.hidden = true;
+    if (ringAnim) { ringAnim.cancel(); ringAnim = null; }
+  };
+  undoBtn.addEventListener('click', () => {
+    if (!window.undoMove || !window.undoMove()) return;
+    // Still on screen means the pegs have not landed yet: the undo is queued.
+    if (!box.hidden) {
+      undoBtn.disabled = true; keepBtn.disabled = true;
+      if (label) label.textContent = 'Undoing…';
+    }
+  });
+  keepBtn.addEventListener('click', () => { if (window.keepMove) window.keepMove(); });
+  // Ctrl+Z / Cmd+Z takes the move back too.
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && window.canUndoMove && window.canUndoMove()) {
+      e.preventDefault();
+      window.undoMove();
+    }
+  });
+})();
 window.showPegNames = showPegNames;
 window.hidePegNames = hidePegNames;
 window.updatePlayerMarkers = updatePlayerMarkers;
