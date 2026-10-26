@@ -397,8 +397,9 @@
   <!-- 🜂 MANIFOLD ENGINE (opt-in via ?engine=manifold) — same board, pure-
        derivation logic. ft-core-manifold.js self-activates only when the flag
        is present and otherwise leaves the legacy core above untouched. -->
-  <script src="manifold/ft-manifold.js?v=20260606m"></script>
-  <script src="manifold/ft-core-manifold.js?v=20260606m"></script>
+  <!-- Loaded only with ?engine=manifold in the address (2026-10-26): otherwise they never ran, and every visit
+       downloaded them for nothing. -->
+  <script>if (/[?&]engine=manifold(&|$)/.test(location.search)) document.write('<script src="manifold/ft-manifold.js?v=20260606m"><\/script><script src="manifold/ft-core-manifold.js?v=20260606m"><\/script>');</script>
 
   <!-- 🜂 MANIFOLD SUBSTRATE — 5 SubstrateLenses on the Schwarz Diamond surface
        Loaded after game-core (so it can observe state) but before 3D renderer
@@ -418,7 +419,9 @@
   <script src="fasttrack-quality.js?v=20260605a"></script>
 
   <!-- 3D renderer (reads from state tables, renders via Three.js; dispatches ft3d:ready) -->
-  <script src="fasttrack-3d.js?v=20261001d"></script>
+  <!-- The billiard room, only when switched on (window.FT_BILLIARD_ROOM = true, set before this point). -->
+  <script>if (window.FT_BILLIARD_ROOM === true) document.write('<script src="fasttrack-billiard.js?v=20261026"><\/script>');</script>
+  <script src="fasttrack-3d.js?v=20261026"></script>
 
   <!-- 🜂 X-CODE HUD — additive 2D overlay driven by manifold-projected state -->
   <script src="fasttrack-xcode-hud.js?v=20260512a"></script>
