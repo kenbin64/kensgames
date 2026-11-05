@@ -409,9 +409,33 @@
       pick.signature = signature;
       resetPick();
       hideMeter();
-      if (isHumanTurn()) paint([]);
+      if (isHumanTurn()) { paint([]); playIfOnlyOne(signature); }
     }
     render();
+  }
+
+  // Only one legal play (Ken, 2026-11-05): the game just makes it, with no button to press. One play means one
+  // distinct result: the same peg to the same hole by two routes is one play, and a 7 that can only be split one
+  // way is one play even though it moves two pegs. Waits a moment so the card can be seen, then checks again.
+  const ONE_PLAY_DELAY_MS = 600;
+
+  function distinctPlays(moves) {
+    const plays = new Map();
+    moves.forEach((m, moveIdx) => {
+      if (!m) return;
+      const key = m.type === 'split' ? `split:${m.pegIdx}:${m.dest}:${m.peg2Idx}:${m.dest2}` : `move:${m.pegIdx}:${m.dest}`;
+      if (!plays.has(key)) plays.set(key, moveIdx);
+    });
+    return [...plays.values()];
+  }
+
+  function playIfOnlyOne(signature) {
+    if (distinctPlays(readMoves()).length !== 1) return;
+    setTimeout(() => {
+      if (pick.signature !== signatureNow() || pick.signature !== signature || !isHumanTurn() || undo.open) return;
+      const plays = distinctPlays(readMoves());
+      if (plays.length === 1 && typeof window.executeMove === 'function') window.executeMove(plays[0]);
+    }, ONE_PLAY_DELAY_MS);
   }
 
   function wire() {
