@@ -3407,14 +3407,43 @@ function refreshAlwaysOnPegNames() {
     // They are already listed by name in the peg bar along the bottom.
     const info = _pegInfoById(id);
     const onBoard = !!(info && info.holeId && info.holeId !== 'holding');
-    if (!onBoard) {
+    // Exception (Ken, 2026-11-05): when the card can bring a peg out of holding, each waiting peg that can come
+    // out shows its number, so it matches its footer button.
+    if (!onBoard && !_canLeaveHoldingNow(info)) {
       if (peg.nameSprite) peg.nameSprite.visible = false;
       return;
     }
     const sprite = _ensurePegNameSprite(id);
-    if (sprite) sprite.visible = true;
+    if (!sprite) return;
+    sprite.visible = true;
+    // Waiting pegs stand close together, so their numbers go up in a short column (lowest number at the bottom)
+    // rather than piling on top of each other. Pegs on the board keep the usual height and size.
+    const rank = onBoard ? 0 : _holdingRank(info);
+    sprite.position.y = PEG_HEIGHT + 20 + rank * 24;
+    if (window.FTTurnPanel) sprite.scale.set(onBoard ? 30 : 22, onBoard ? 30 : 22, 1);
   });
 }
+
+// Among the pegs that can leave holding now, where this one comes (0 for the lowest number).
+function _holdingRank(info) {
+  const s = window.FastTrackCore && window.FastTrackCore.state;
+  const p = s ? (s.players.get('list') || [])[info.playerIdx] : null;
+  if (!p) return 0;
+  let rank = 0;
+  for (let k = 0; k < info.pegIdx; k++) {
+    if (p.pegs[k] && p.pegs[k].holeId === 'holding' && _canLeaveHoldingNow({ playerIdx: info.playerIdx, pegIdx: k })) rank++;
+  }
+  return rank;
+}
+
+// Can this peg, waiting in holding, be brought onto the board with the current card by the player whose turn it is?
+function _canLeaveHoldingNow(info) {
+  const s = window.FastTrackCore && window.FastTrackCore.state;
+  if (!s || !info || info.playerIdx !== (s.players.get('current') || 0)) return false;
+  const moves = s.turn.get('validMoves') || [];
+  return moves.some(m => m && m.type === 'enter' && m.pegIdx === info.pegIdx);
+}
+window.refreshAlwaysOnPegNames = refreshAlwaysOnPegNames;
 
 // Raycast pegs ONLY. _pickTargetAtClient tests holes first and returns a hole
 // hit whenever the ray passes through one, so a peg standing on a hole can be

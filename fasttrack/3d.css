@@ -4299,38 +4299,7 @@ body.ft-turn-panel #ft-peg-confirm.is-undo {
   border-color: #ffd666;
 }
 
-#ft-seven-meter {
-  position: fixed;
-  left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: 70;
-  width: min(420px, calc(100vw - 24px));
-  padding: 12px 14px 14px;
-  border-radius: 14px;
-  background: rgba(8, 12, 26, 0.95);
-  border: 1px solid rgba(255, 214, 102, 0.6);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-  color: #f4f8ff;
-  font: 600 15px/1.3 system-ui, Arial, sans-serif;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-#ft-seven-meter[hidden] { display: none; }
-#ft-seven-meter .ft-sm-range { width: 100%; accent-color: #ffd666; height: 28px; }
-#ft-seven-meter .ft-sm-ticks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-#ft-seven-meter .ft-sm-ticks button {
-  min-height: 40px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08); color: #fff; font: 800 18px system-ui, Arial, sans-serif; cursor: pointer;
-}
-#ft-seven-meter .ft-sm-ticks button.on { background: #ffd666; color: #2a1600; border-color: #ffd666; }
-#ft-seven-meter .ft-sm-ticks button.illegal { opacity: 0.3; }
 body.ft-turn-panel #ft-peg-bar .peg-btn.dim { opacity: 0.28; filter: saturate(0.4); box-shadow: none; }
-#ft-seven-meter .ft-sm-go {
-  min-height: 44px; border-radius: 12px; border: 0; background: linear-gradient(180deg, #ffd666, #f2a93b);
-  color: #2a1600; font: 800 17px system-ui, Arial, sans-serif; cursor: pointer;
-}
 
 /* Turn panel on wider screens: a compact row in the middle of the footer, not stretched edge to edge. */
 @media (min-width: 761px) {
@@ -4346,3 +4315,36 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.dim { opacity: 0.28; filter: saturate(0.
 @media (max-width: 760px) {
   body.ft-turn-panel #ft-peg-help { bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important; }
 }
+
+/* Choosing a landing hole (Ken, 2026-11-05): the peg buttons become gold hole numbers, the chosen one green,
+   with a small back button to return to the pegs. A sixth button exists only during the rare 6-hole move. */
+body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn .peg-glyph { color: #2a1600 !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn.active { box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.6), 0 0 14px #ffd666; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn.selected { box-shadow: 0 0 0 4px #35ff7a, 0 0 18px #35ff7a; }
+#ft-peg-back {
+  min-width: 40px; min-height: 52px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1); color: #fff; font: 800 22px system-ui, Arial, sans-serif; cursor: pointer;
+}
+#ft-peg-back[hidden] { display: none; }
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-bar .peg-btn.extra-btn, body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn { min-width: 44px; }
+}
+
+/* The footer, final form (Ken, 2026-11-05): seven slots, numbered only when there is something to press; a blank
+   slot is dormant. Confirm replaces the numbers once the choice is complete and becomes Undo after it; the whole
+   bar hides on a bot's turn. */
+body.ft-turn-panel.ft-bar-idle #ft-peg-bar { display: none !important; }
+body.ft-turn-panel #ft-peg-buttons[hidden] { display: none !important; }
+body.ft-turn-panel #ft-peg-confirm[hidden] { display: none !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.dormant {
+  background: transparent !important; border: 1px dashed rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important; opacity: 1; filter: none; cursor: default;
+}
+body.ft-turn-panel #ft-peg-bar .peg-btn.count-btn .peg-glyph,
+body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn .peg-glyph { color: #1a1408 !important; }
+body.ft-turn-panel #ft-peg-confirm { min-width: 168px; min-height: 52px; font-size: 18px; }
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-bar #ft-peg-buttons { gap: 4px !important; }
+  body.ft-turn-panel #ft-peg-bar .peg-btn { min-width: 40px !important; width: 40px !important; padding: 0 !important; }
+}
+body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; border-radius: 14px; }
