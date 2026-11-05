@@ -4237,3 +4237,19 @@ canvas { touch-action: none; }
 #panel-action #current-card .card-face .cf-rank { font-size: calc(var(--ft-card-w) * 0.42) !important; }
 #panel-action #current-card .card-face .cf-suit { font-size: calc(var(--ft-card-w) * 0.32) !important; }
 #panel-action #current-card:has(.card-back)::after { font-size: calc(var(--ft-card-w) * 0.24); }
+
+/* ════════════════════════════════════════════════════════════════
+   PLAYER VIEW (Ken, 2026-11-05): the camera stays where the player puts it. When the
+   board has been turned or zoomed away from the player's own view, the camera buttons
+   glow so the way back is easy to find.
+   ════════════════════════════════════════════════════════════════ */
+body.ft-off-player-view #btn-camera-toggle {
+  color: #fff;
+  border-color: rgba(255, 214, 102, 0.9);
+  box-shadow: 0 0 0 3px rgba(255, 214, 102, 0.35), 0 0 14px rgba(255, 214, 102, 0.55);
+}
+body.ft-off-player-view #panel-cam .cam-btn,
+body.ft-off-player-view #hamburger-menu .hm-cam-btn {
+  border-color: rgba(255, 214, 102, 0.9);
+  color: #ffe9a8;
+}

@@ -428,14 +428,6 @@ function getHoleType(holeId) {
   return 'holding';
 }
 
-function getFastTrackBypassSegment(ftIdx) {
-  const segment = [];
-  for (let h = 4; h >= 1; h--) segment.push(`side-left-${ftIdx}-${h}`);
-  for (let h = 0; h < 4; h++) segment.push(`outer-${ftIdx}-${h}`);
-  segment.push(`home-${ftIdx}`);
-  for (let h = 1; h <= 4; h++) segment.push(`side-right-${ftIdx}-${h}`);
-  return segment;
-}
 
 function hasOwnPegOnHole(player, holeId, excludePegId = null) {
   if (!player || !Array.isArray(player.pegs)) return false;
@@ -1023,13 +1015,6 @@ function setMultiplayerClient(client) {
   // so we do not consume it for UX; we only read it for audit when needed.
 }
 
-// Map the local FastTrack player index to the kernel's playerId (= ws user_id).
-function _activePlayerKernelId() {
-  const players = state.players.get('list') || [];
-  const ci = state.players.get('current') || 0;
-  const p = players[ci];
-  return (p && p.userId != null) ? String(p.userId) : null;
-}
 
 function setMyUserId(userId) {
   state.meta.set('myUserId', userId || null);
@@ -2370,9 +2355,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function escapeAttr(value) {
-  return escapeHtml(value).replace(/`/g, '&#96;');
-}
 
 function summarizeMoveForHint(move, player, playerIdx) {
   if (!move) return 'Only one legal move — auto-playing';

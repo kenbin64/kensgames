@@ -484,19 +484,13 @@ const CameraDirector = {
       camera.lookAt(this._look);
     }
     if (controls) controls.target.copy(this._look);
-    // Mobile/small viewports default to 'auto' (camera follows the action) —
-    // the board is too small to navigate manually with a thumb. Desktop keeps
-    // 'manual' as canonical default. Either way, the user can switch from the
-    // hamburger camera row and a touch/drag yields immediate manual control
-    // (Catan-Universe style — auto resumes after a short idle).
-    const isSmallScreen = (typeof window !== 'undefined') &&
-      (window.matchMedia && window.matchMedia('(max-width: 760px), (pointer: coarse)').matches);
-    const startMode = isSmallScreen ? 'auto' : 'manual';
-    this.mode = startMode;
-    GameSettings.cameraMode = startMode;
-    this._mobileAutoResume = isSmallScreen;   // re-engage auto after idle
-    this._autoResumeMs = 6000;                // 6s of no touch = resume auto
+    // The player's view (Ken, 2026-11-05): no auto camera at all, on any screen. The camera starts at the
+    // player's eye view (toPlayerView) and moves only when the player moves it; the camera button brings it back.
+    this.mode = 'manual';
+    GameSettings.cameraMode = 'manual';
+    this._mobileAutoResume = false;
     this._autoResumeTimer = null;
+    this.toPlayerView();
 
     // When the user grabs the OrbitControls (pointerdown / wheel / touch),
     // any non-manual mode auto-switches to manual so the user has full
@@ -504,6 +498,7 @@ const CameraDirector = {
     // it does NOT fire from our internal camera writes.
     if (controls && !this._userInputBound) {
       controls.addEventListener('start', () => {
+        this._setAtPlayerView(false);           // the player has moved the board: offer the way back
         // Cutscenes lock the camera — never yield mid-cutscene.
         if (this._cutsceneLock) return;
         if (this.mode !== 'manual') {
@@ -538,6 +533,7 @@ const CameraDirector = {
   // Set which player is active (called from game-core)
   setActivePlayer(playerIdx) {
     this._activePlayerIdx = playerIdx;
+    if (!this._facedPlayer && this._humanHomeAngle() != null) { this._facedPlayer = true; this.toPlayerView(); }
     // In auto mode, immediately re-aim so the camera glides to the new player
     // section between turns instead of waiting for the next render frame.
     if (this.mode === 'auto' && this._followMode == null) {
@@ -758,7 +754,86 @@ const CameraDirector = {
     if (this._followMode == null) this._damping = 0.04;
   },
 
+  // ── The player's view (Ken, 2026-11-05) ──
+  // From the human player's own side of the board, their home area up front, looking down at a fixed 30 degrees,
+  // and far enough back that the whole board is on screen at any window shape. The player may then turn, tilt and
+  // zoom the board freely; nothing moves the camera on its own.
+  PLAYER_ELEVATION_DEG: 30,
+
+  // The compass angle (round the board's centre) of the human player's home hole, or null before the game exists.
+  _humanHomeAngle() {
+    const core = window.FastTrackCore;
+    const players = core && core.state && core.state.players ? (core.state.players.get('list') || []) : [];
+    const me = players.find(p => p && !p.isBot);
+    const home = me && holeRegistry.get(`home-${me.boardPosition}`);
+    const pos = home && (home.mesh ? home.mesh.position : home.position);
+    return pos && Math.hypot(pos.x, pos.z) > 1 ? Math.atan2(pos.z, pos.x) : null;
+  },
+
+  // Does the whole board (every point of its rim, and the pegs standing on it) land inside the screen, with a small
+  // margin, from distance d along a 30 degree line toward angle `ang`, with a lens of `fov` degrees?
+  _boardFits(ang, d, fov) {
+    const rim = BOARD_RADIUS + RAIL_WIDTH + 30, elev = this.PLAYER_ELEVATION_DEG * Math.PI / 180;
+    const probe = camera.clone(); probe.fov = fov;
+    probe.position.set(Math.cos(ang) * Math.cos(elev) * d, TABLE_HEIGHT + Math.sin(elev) * d, Math.sin(ang) * Math.cos(elev) * d);
+    probe.up.set(0, 1, 0); probe.lookAt(0, TABLE_HEIGHT, 0); probe.updateMatrixWorld(); probe.updateProjectionMatrix();
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      for (const h of [0, 45]) {
+        const s = new THREE.Vector3(Math.cos(a) * rim, TABLE_HEIGHT + h, Math.sin(a) * rim).project(probe);
+        if (!(Math.abs(s.x) <= 0.94 && Math.abs(s.y) <= 0.9 && s.z < 1)) return false;
+      }
+    }
+    return true;
+  },
+
+  // The farthest the camera may sit along that line: the render loop keeps it inside the room's box.
+  _maxDistance(ang) {
+    const elev = this.PLAYER_ELEVATION_DEG * Math.PI / 180, cx = Math.abs(Math.cos(ang) * Math.cos(elev)), cz = Math.abs(Math.sin(ang) * Math.cos(elev));
+    const hx = ROOM_WIDTH / 2 - 10, hz = ROOM_DEPTH / 2 - 10, hy = ROOM_HEIGHT + 80 - TABLE_HEIGHT;
+    return Math.min(cx > 1e-6 ? hx / cx : Infinity, cz > 1e-6 ? hz / cz : Infinity, hy / Math.sin(elev)) - 1;
+  },
+
+  // Distance and lens for the player's view: the nearest distance that fits the board; if the room's box stops the
+  // camera short of that, it stays at the box and the lens widens just enough instead. Both found by halving.
+  _fitView(ang) {
+    const fov = camera.fov, dMax = this._maxDistance(ang);
+    if (this._boardFits(ang, dMax, fov)) {
+      let lo = 150, hi = dMax;
+      for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (this._boardFits(ang, mid, fov)) hi = mid; else lo = mid; }
+      return { d: hi, fov };
+    }
+    let lo = fov, hi = 120;
+    for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (this._boardFits(ang, dMax, mid)) hi = mid; else lo = mid; }
+    return { d: dMax, fov: hi };
+  },
+
+  toPlayerView() {
+    if (!camera) return;
+    const ang = this._humanHomeAngle() ?? Math.PI / 2;            // before the game: the default front (+z)
+    fitVerticalFovToAspect(camera);                               // start from the screen's own lens, then fit
+    const view = this._fitView(ang), d = view.d, elev = this.PLAYER_ELEVATION_DEG * Math.PI / 180;
+    camera.fov = view.fov; camera.updateProjectionMatrix();
+    this.mode = 'manual'; GameSettings.cameraMode = 'manual';
+    this._followMode = null; this._followPegId = null; this._splitPegIds = null;
+    camera.up.set(0, 1, 0);
+    camera.position.set(Math.cos(ang) * Math.cos(elev) * d, TABLE_HEIGHT + Math.sin(elev) * d, Math.sin(ang) * Math.cos(elev) * d);
+    if (controls) { controls.target.set(0, TABLE_HEIGHT, 0); controls.update(); }
+    camera.lookAt(0, TABLE_HEIGHT, 0);
+    this._pos.copy(camera.position); this._tPos.copy(camera.position);
+    this._look.set(0, TABLE_HEIGHT, 0); this._tLook.copy(this._look);
+    this._setAtPlayerView(true);
+  },
+
+  // Whether the camera is at the player's view; the camera buttons light up when it is not.
+  _setAtPlayerView(at) {
+    this.atPlayerView = at;
+    if (typeof document !== 'undefined') document.body.classList.toggle('ft-off-player-view', !at);
+  },
+
   setMode(mode) {
+    // No auto, top or angle any more (Ken, 2026-11-05): every camera request is the player's view.
+    if (mode !== 'manual') { this.toPlayerView(); return; }
     // Sync our internal state with whatever the user / OrbitControls left the
     // camera at, so the lerp into the new mode starts smoothly from there.
     if (camera && controls) {
@@ -4515,10 +4590,12 @@ function onWindowResize() {
   camera.aspect = w / h;
   fitVerticalFovToAspect(camera);
   camera.updateProjectionMatrix();
+  if (CameraDirector.atPlayerView) CameraDirector.toPlayerView();   // the whole board stays on screen
 }
 
+// Every camera button now does one thing (Ken, 2026-11-05): back to the player's view.
 function setCameraView(mode) {
-  CameraDirector.setMode(mode);
+  CameraDirector.setMode(mode === 'manual' ? 'player' : mode);
 
   // Update button states — legacy on-board buttons …
   document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active'));
@@ -4551,18 +4628,6 @@ function _restoreBoostedHoles() {
   _boostedHoles.clear();
 }
 
-function _boostHoleEmissive(holeId, hexColor) {
-  const hole = holeRegistry.get(holeId);
-  if (!hole || !hole.mesh || !hole.mesh.material || !hole.mesh.material.emissive) return;
-  if (!_boostedHoles.has(holeId)) {
-    _boostedHoles.set(holeId, {
-      color: hole.mesh.material.emissive.clone(),
-      intensity: hole.mesh.material.emissiveIntensity
-    });
-  }
-  hole.mesh.material.emissive.set(hexColor);
-  hole.mesh.material.emissiveIntensity = 1.4;
-}
 
 // Free one object's GPU resources. Separate from the loop below because a
 // highlight is not always a single mesh: the split ghost peg is a cloned

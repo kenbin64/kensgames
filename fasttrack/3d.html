@@ -230,20 +230,10 @@
   <!-- ── Music toggle — always visible, top-right ── -->
   <button id="btn-music-toggle" onclick="toggleMusic()" title="Toggle Music" aria-label="Toggle Music">🎵</button>
 
-  <!-- ── Camera mode — round icon top-right, opens a small popup ── -->
-  <button id="btn-camera-toggle" type="button"
-    onclick="(function(){var p=document.getElementById('camera-panel');if(p){p.classList.toggle('open');}}).call(this)"
-    title="Camera" aria-label="Camera mode" aria-haspopup="true" aria-controls="camera-panel">🎥</button>
-  <div id="camera-panel" role="menu" aria-label="Camera mode">
-    <button type="button" role="menuitem" class="cam-pop-btn active" data-cam="manual"
-      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual'); document.getElementById('camera-panel').classList.remove('open');">Manual</button>
-    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="top"
-      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top'); document.getElementById('camera-panel').classList.remove('open');">Top</button>
-    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="angle"
-      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle'); document.getElementById('camera-panel').classList.remove('open');">Angle</button>
-    <button type="button" role="menuitem" class="cam-pop-btn" data-cam="auto"
-      onclick="document.querySelectorAll('#camera-panel .cam-pop-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto'); document.getElementById('camera-panel').classList.remove('open');">Auto</button>
-  </div>
+  <!-- ── Camera — round icon top-right (Ken, 2026-11-05): back to the player's view. It glows when the board has been
+       turned or zoomed away from that view. ── -->
+  <button id="btn-camera-toggle" type="button" onclick="setCameraView('player')"
+    title="Back to your view" aria-label="Back to your view of the board">🎥</button>
 
   <!-- ── Leave Game — always visible, top-right next to gear ── -->
   <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
@@ -258,14 +248,8 @@
   <div id="hamburger-menu" role="menu" aria-label="Game menu">
     <div class="hm-section-label">Camera</div>
     <div class="hm-cam-row">
-      <button type="button" role="menuitem" class="hm-cam-btn active" data-cam="manual"
-        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('manual');">Manual</button>
-      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="top"
-        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('top');">Top</button>
-      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="angle"
-        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('angle');">Angle</button>
-      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="auto"
-        onclick="document.querySelectorAll('#hamburger-menu .hm-cam-btn').forEach(b=>b.classList.toggle('active', b===this)); setCameraView('auto');">Auto</button>
+      <button type="button" role="menuitem" class="hm-cam-btn" data-cam="player"
+        onclick="setCameraView('player'); document.getElementById('hamburger-menu').classList.remove('open');">Back to your view</button>
     </div>
     <div class="hm-section-label">Graphics <span id="hm-q-tier" class="hm-q-tier"></span></div>
     <div class="hm-q-row">
@@ -354,10 +338,7 @@
 
   <!-- ── Camera controls — bottom-right ── -->
   <div id="panel-cam" class="glass-panel">
-    <button class="cam-btn active" onclick="setCameraView('manual')">Manual</button>
-    <button class="cam-btn" onclick="setCameraView('top')">Top</button>
-    <button class="cam-btn" onclick="setCameraView('angle')">Angle</button>
-    <button class="cam-btn" onclick="setCameraView('auto')">Auto</button>
+    <button class="cam-btn" onclick="setCameraView('player')">🎥 Back to your view</button>
   </div>
 
   <!-- ── Manifold Metrics — dev only (?dev in URL) ── -->
