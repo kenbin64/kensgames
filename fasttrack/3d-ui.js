@@ -815,9 +815,10 @@ if (location.search.includes('dev')) {
   }
 
   function bootPegBar() {
+    wireHelpPill();                                      // the help tip's close button works either way
+    _setHelpVisible(true);                               // and once closed it stays closed (remembered on this device)
     if (window.FTTurnPanel) return;                       // fasttrack-turn-panel.js drives the peg bar now (Ken, 2026-11-05)
     wirePegBar();
-    wireHelpPill();
     refreshPegBar();
     // Poll at 6 Hz — cheap, fires only when signature changes.
     setInterval(refreshPegBar, 160);
