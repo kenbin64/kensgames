@@ -4253,3 +4253,96 @@ body.ft-off-player-view #hamburger-menu .hm-cam-btn {
   border-color: rgba(255, 214, 102, 0.9);
   color: #ffe9a8;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   TURN PANEL (Ken, 2026-11-05): five numbered peg buttons in the footer, the 7 meter,
+   and Confirm that becomes Undo. fasttrack-turn-panel.js drives it; the old confirm
+   bar, split dial and undo pop-up stand down.
+   ════════════════════════════════════════════════════════════════ */
+body.ft-turn-panel #ft-confirm-bar,
+body.ft-turn-panel #ft-split-dial,
+body.ft-turn-panel #ft-undo-offer,
+body.ft-turn-panel #ft-move-choices { display: none !important; }
+
+/* The bar is the way to play on every screen now, so it shows on desktops too; older !important rules
+   that hid it there, and that sized the glyph and showed the nicknames, are overruled here. */
+body.ft-turn-panel #ft-peg-bar { display: flex !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn .peg-nickname { display: none !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn {
+  min-width: 52px; min-height: 52px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  transition: opacity 0.15s, box-shadow 0.15s, transform 0.08s;
+}
+body.ft-turn-panel #ft-peg-bar .peg-btn .peg-glyph {
+  font: 800 26px/1 system-ui, Arial, sans-serif !important;
+}
+body.ft-turn-panel #ft-peg-bar .peg-btn:disabled {
+  opacity: 0.28;
+  filter: saturate(0.4);
+  cursor: default;
+}
+body.ft-turn-panel #ft-peg-bar .peg-btn.active {
+  opacity: 1;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35), 0 0 16px var(--peg-color, #ffd666);
+  cursor: pointer;
+}
+body.ft-turn-panel #ft-peg-bar .peg-btn.selected {
+  border-color: #ffd666;
+  box-shadow: 0 0 0 4px #ffd666, 0 0 20px #ffd666;
+  transform: translateY(-3px);
+}
+body.ft-turn-panel #ft-peg-confirm.is-undo {
+  background: #2b3445;
+  color: #ffe9a8;
+  border-color: #ffd666;
+}
+
+#ft-seven-meter {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(420px, calc(100vw - 24px));
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  background: rgba(8, 12, 26, 0.95);
+  border: 1px solid rgba(255, 214, 102, 0.6);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  color: #f4f8ff;
+  font: 600 15px/1.3 system-ui, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#ft-seven-meter[hidden] { display: none; }
+#ft-seven-meter .ft-sm-range { width: 100%; accent-color: #ffd666; height: 28px; }
+#ft-seven-meter .ft-sm-ticks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+#ft-seven-meter .ft-sm-ticks button {
+  min-height: 40px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08); color: #fff; font: 800 18px system-ui, Arial, sans-serif; cursor: pointer;
+}
+#ft-seven-meter .ft-sm-ticks button.on { background: #ffd666; color: #2a1600; border-color: #ffd666; }
+#ft-seven-meter .ft-sm-ticks button.illegal { opacity: 0.3; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.dim { opacity: 0.28; filter: saturate(0.4); box-shadow: none; }
+#ft-seven-meter .ft-sm-go {
+  min-height: 44px; border-radius: 12px; border: 0; background: linear-gradient(180deg, #ffd666, #f2a93b);
+  color: #2a1600; font: 800 17px system-ui, Arial, sans-serif; cursor: pointer;
+}
+
+/* Turn panel on wider screens: a compact row in the middle of the footer, not stretched edge to edge. */
+@media (min-width: 761px) {
+  body.ft-turn-panel #ft-peg-bar {
+    left: 50% !important; right: auto !important; width: auto !important;
+    transform: translateX(-50%) !important;
+  }
+  body.ft-turn-panel #ft-peg-bar .peg-btn { flex: 0 0 auto !important; width: 64px !important; }
+  body.ft-turn-panel #ft-peg-bar #ft-peg-buttons { flex: 0 0 auto !important; width: auto !important; gap: 10px; }
+}
+
+/* On phones the help tip sits above the install pill and the portfolio label, not on them. */
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-help { bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important; }
+}

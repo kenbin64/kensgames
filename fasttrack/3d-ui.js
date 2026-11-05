@@ -815,6 +815,7 @@ if (location.search.includes('dev')) {
   }
 
   function bootPegBar() {
+    if (window.FTTurnPanel) return;                       // fasttrack-turn-panel.js drives the peg bar now (Ken, 2026-11-05)
     wirePegBar();
     wireHelpPill();
     refreshPegBar();

@@ -3185,6 +3185,25 @@ function blinkPlayerMarker(playerIdx, onDone) {
 // Which peg is currently showing its name because the pointer is over it.
 let _hoveredPegId = null;
 
+// A peg's number (Ken, 2026-11-05): a round badge in its owner's colour with the number in a contrasting shade.
+function createPegNumberSprite(number, colorHex) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath(); ctx.arc(64, 64, 54, 0, Math.PI * 2);
+  ctx.fillStyle = colorHex; ctx.fill();
+  ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)'; ctx.stroke();
+  ctx.font = '800 72px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = _yiqFg(colorHex);
+  ctx.fillText(number, 64, 68);
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(30, 30, 1);
+  sprite.renderOrder = 999;
+  return sprite;
+}
+
 function createPegNameSprite(name) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -3316,7 +3335,11 @@ function _ensurePegNameSprite(pegId) {
   if (!peg || !peg.mesh) return null;
   const info = _pegInfoById(pegId);
   if (!info) return null;
-  if (peg.nameSprite && peg._nameSpriteLabel === info.label) return peg.nameSprite;
+  // With the turn panel, the label is the peg's number (1 to 5) in its owner's colour, matching the footer buttons.
+  const players = (window.FastTrackCore && window.FastTrackCore.state) ? window.FastTrackCore.state.players.get('list') || [] : [];
+  const ownerColor = (players[info.playerIdx] && players[info.playerIdx].color) || '#ffffff';
+  const labelKey = window.FTTurnPanel ? `#${info.pegIdx + 1}:${ownerColor}` : info.label;
+  if (peg.nameSprite && peg._nameSpriteLabel === labelKey) return peg.nameSprite;
   if (peg.nameSprite) {
     peg.mesh.remove(peg.nameSprite);
     if (peg.nameSprite.material) {
@@ -3324,22 +3347,23 @@ function _ensurePegNameSprite(pegId) {
       peg.nameSprite.material.dispose();
     }
   }
-  const sprite = createPegNameSprite(info.label);
+  const sprite = window.FTTurnPanel ? createPegNumberSprite(String(info.pegIdx + 1), ownerColor) : createPegNameSprite(info.label);
   // One label at a time can afford to be big. Every peg wearing one at once,
   // on a phone, cannot: at the hover size they overlapped each other and ran
   // off the edge of the board.
-  if (_pegNamesAlwaysOn()) sprite.scale.set(56, 56, 1);
+  if (_pegNamesAlwaysOn() && !window.FTTurnPanel) sprite.scale.set(56, 56, 1);
   sprite.position.y = PEG_HEIGHT + 20;
   sprite.visible = false;
   peg.mesh.add(sprite);
   peg.nameSprite = sprite;
-  peg._nameSpriteLabel = info.label;
+  peg._nameSpriteLabel = labelKey;
   return sprite;
 }
 
 // A phone, or anything else without a pointer to hover with.
 function _pegNamesAlwaysOn() {
   if (typeof window === 'undefined') return false;
+  if (window.FTTurnPanel) return true;                       // every peg shows its number (Ken, 2026-11-05)
   if (window.FT_PEG_NAMES_ALWAYS === true) return true;   // escape hatch for testing
   try {
     if (window.matchMedia
@@ -5713,6 +5737,12 @@ function setupBoardPickHandler() {
     // used to take the name with it.
     _setHoveredPegName(_pegIdAtClient(e.clientX, e.clientY));
 
+    if (window.FTTurnPanel) {
+      const hit = _pickTargetAtClient(e.clientX, e.clientY);
+      dom.style.cursor = (hit && hit.kind === 'hole' && window.FTTurnPanel.isTargetHole(hit.holeId)) ? 'pointer' : '';
+      return;
+    }
+
     const idx = _refreshRouteIndex();
     if (idx.size === 0) { clearHover(); return; }
     const target = _pickTargetAtClient(e.clientX, e.clientY);
@@ -5772,6 +5802,14 @@ function setupBoardPickHandler() {
 
   function _handleBoardTap(clientX, clientY, pointerType) {
     if (artOverlayOpen()) return;
+    // The turn panel (fasttrack-turn-panel.js, Ken 2026-11-05) owns a person's turn: pegs are chosen with the
+    // numbered buttons, and a tap on the board only picks one of the glowing landing holes.
+    if (window.FTTurnPanel) {
+      const hit = _pickTargetAtClient(clientX, clientY, _isCoarsePointer(pointerType) ? TAP_PICK_SLOP : 0);
+      if (hit && hit.kind === 'hole' && window.FTTurnPanel.boardTap(hit.holeId)) return;
+      if (hit && hit.kind === 'peg') { _sayBoardHint('Use the numbered buttons below to choose a peg.'); return; }
+      return;
+    }
     const idx = _refreshRouteIndex();
     if (idx.size === 0) { _sayBoardHint(_whyNothingToPick()); return; }
     const slop = _isCoarsePointer(pointerType) ? TAP_PICK_SLOP : 0;
@@ -6165,6 +6203,7 @@ function _refreshInstructionBanner() {
       }
     }
   } catch (err) { /* never let UI hint code break the game loop */ }
+  if (visible && window.FTTurnPanel) { text = window.FTTurnPanel.instruction() || text; icon = '👉'; }
 
   if (visible) {
     if (textEl) textEl.textContent = text;
@@ -6197,7 +6236,7 @@ function _refreshConfirmBar() {
   // are a mouse idea: they exist so a pointer can cycle through moves it cannot
   // easily point at. A finger can point at the board directly, so the board is
   // the interface and the buttons are in the way of it.
-  const shouldShow = total > 0 && !_touchFirst();
+  const shouldShow = total > 0 && !_touchFirst() && !window.FTTurnPanel;
   if (shouldShow) {
     bar.removeAttribute('hidden');
     bar.hidden = false;
@@ -6285,6 +6324,7 @@ function _commitPendingEntry() {
   // _refreshRouteIndex() on the next tick will rebuild the cycle for the new state.
 }
 window._clearPendingEntry = () => _clearPendingEntry(true);
+window._refreshInstructionBanner = _refreshInstructionBanner;   // the turn panel asks for a new instruction when its step changes
 window._refreshFastTrackToolbar = () => {
   // A choice box left standing after the state moved on would offer moves that
   // no longer exist, so it goes whenever the toolbar is rebuilt.
@@ -6381,6 +6421,7 @@ function _splitDialSelection(vm) {
 function _refreshSplitDial() {
   const box = document.getElementById('ft-split-dial');
   if (!box) return;
+  if (window.FTTurnPanel) { box.hidden = true; return; }     // the turn panel's 7 meter replaces the dial
   const core = window.FastTrackCore;
   const vm = _currentValidMoves();
   const players = (core && core.state) ? (core.state.players.get('list') || []) : [];

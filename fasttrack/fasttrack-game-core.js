@@ -1388,6 +1388,7 @@ function drawCard() {
   // under the _applying guard. See _canDriveActiveSeat for the bot-skip bugfix.
   if (!_applying && _isMpMode() && !_canDriveActiveSeat()) return;
   dismissYourTurnPopup();
+  if (_undo) _endUndoOffer();                    // Undo never crosses a card draw: drawing closes it
 
   let deck = state.deck.get('cards') || [];
   if (deck.length === 0) {
@@ -3551,6 +3552,9 @@ function _armUndo() {
 function _undoHoldsTurn(epoch) {
   if (!_undo || _undo.epoch !== epoch) return false;
   if (_undo.requested) { _performUndo(); return true; }   // asked for mid-move; the pegs have now landed
+  // A replay card (Ken, 2026-11-05): Undo stays up until the next card is drawn. The turn does not wait;
+  // the same seat's draw opens at once, and drawing is what closes the offer (see drawCard).
+  if (!_undo.kept && _cardIsReplay(state.deck.get('currentCard'))) { _undo.untilDraw = true; return false; }
   if (!_undo.kept) {
     if (!_undo.offeredAt) {
       _undo.offeredAt = Date.now();
@@ -3659,6 +3663,8 @@ function resolveTurn(epoch, waitedMs) {
 // Replay: reopen the draw for the SAME seat as a fresh turn instance.
 function _replaySameSeat() {
   _turnEpoch++;                                  // new instance; the old move's resolve is now stale
+  // The Undo offer carries over into this draw (Ken, 2026-11-05); drawing the next card closes it.
+  if (_undo && _undo.untilDraw && !_undo.kept) { _undo.epoch = _turnEpoch; _showUndoOffer(0); }
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const cp = players[ci];
