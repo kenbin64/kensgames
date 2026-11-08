@@ -2,18 +2,25 @@
 // The turn panel (Ken, 2026-11-05): how a player makes a move, the same on a computer and a phone. Everything
 // happens in the footer, and only what can be pressed right now is shown.
 //
-//   The footer has seven slots. Only a slot with something to press has a number on it; the rest are blank.
-//   The slots mean whatever the current step needs:
-//     - which peg moves (1 to 5, the same numbers that float over the pegs on the board),
-//     - on a 7, how many hops the first peg takes (1 to 7, only counts that can be played),
-//     - which hole to land in, when a peg can land in more than one (each hole gets a number on the board;
-//       a peg on the fast track can have up to six, measured).
-//   Once the choice is complete, the numbers give way to a single Confirm button. After Confirm it becomes Undo,
-//   until the next card is drawn. Pressing Undo takes the move back and brings the numbers back to play it again.
+//   The footer has seven slots, never more. Only a slot with something to press has a label; the rest are blank.
+//   Numbers are pegs and letters are holes, so the two are never confused (Ken, 2026-11-06):
+//     - which peg moves: 1 to 5, the same numbers that float over the pegs on the board;
+//     - which hole to land in, when a peg can land in more than one: A, B, C ... nearest first, with the same
+//       letter floating over the hole on the board, above any peg already sitting there;
+//     - on a 7, where the first peg stops: every hole it can stop in lights up, labelled by route and hop count.
+//       A1 to A7 run along one route. Where the route branches (the bullseye, a fast-track exit), the other
+//       route's holes are B<n> from the branch on, so no hole carries two labels. A route ends at its last legal
+//       hole.
+//   A 7 can have more than seven stops (measured: about a quarter of the time on random boards, up to 33 across
+//   7 routes for a peg on the fast track). Then the player picks the route first (A, B, C ...), and the footer
+//   shows that route's stops (at most 7, since a 7 has 7 hops). Up to seven stops are shown in one step.
+//   Tapping a lit hole on the board always works too, at every step.
+//   Once the choice is complete, the labels give way to a single Confirm button. After Confirm it becomes Undo,
+//   until the next card is drawn. Pressing Undo takes the move back and brings the labels back to play it again.
 //   The ↩ button steps back one choice.
 //
-// A 7 is two small turns: the first peg and its hop count, then the peg that takes the rest. If only one play is
-// legal at all, the game makes it with no button pressed.
+// A 7 is two small turns: the first peg and where it stops, then the peg that takes the rest of the hops. If only
+// one play is legal at all, the game makes it with no button pressed.
 //
 // It invents nothing. Every choice is one of the moves the rules engine already listed (state.turn.validMoves);
 // a 7 split is one engine move, played whole on Confirm.
@@ -22,6 +29,7 @@
   'use strict';
 
   const SLOT_COUNT = 7;
+  const LETTERS = 'ABCDEFG';
   const PEG_COUNT = 5;
   const SEVEN = 7;
   const TICK_MS = 150;
@@ -80,16 +88,41 @@
       .map(({ move, moveIdx }) => plainOption(move, moveIdx));
   }
 
-  // On a 7: the hop counts this peg may take as the first half (7 means the whole card on one peg).
-  function sevenCountsFor(moves, pegIdx) {
-    const counts = new Set();
-    if (plainOptionsFor(moves, pegIdx).length) counts.add(SEVEN);
+  // On a 7: every hole this peg can stop in as the first half, as { steps, dest, path, from, moveIdx }. A stop at
+  // 7 hops is the whole card on this peg (a plain move, so it has a moveIdx); a shorter stop leaves the rest of the
+  // hops for another peg.
+  function sevenStopsFor(moves, pegIdx) {
+    const stops = new Map();
+    const add = (stop) => { const key = stop.steps + '>' + stop.dest; if (!stops.has(key)) stops.set(key, stop); };
+    plainOptionsFor(moves, pegIdx).forEach(option => add({ ...option, steps: SEVEN }));
     for (const move of moves) {
       if (!move || move.type !== 'split') continue;
-      if (move.pegIdx === pegIdx) counts.add(move.steps);
-      if (move.peg2Idx === pegIdx) counts.add(move.steps2);
+      if (move.pegIdx === pegIdx || move.peg2Idx === pegIdx) add({ ...legOf(move, pegIdx), moveIdx: null });
     }
-    return [...counts].sort((a, b) => a - b);
+    return [...stops.values()];
+  }
+
+  function startsWith(long, short) { return short.every((hole, i) => long[i] === hole); }
+
+  // Label each stop by its route and hop count. Longest paths first: a stop whose path begins a known route lies on
+  // that route; otherwise it starts a new one. A hole before a branch begins both routes, so it stays on the first
+  // (A) and the next route's labels (B ...) start only where it branches off.
+  function labelStops(stops) {
+    const routes = [];
+    const longestFirst = stops.slice()
+      .sort((a, b) => (b.steps - a.steps) || String(a.dest).localeCompare(String(b.dest)));
+    for (const stop of longestFirst) {
+      const path = stop.path || [stop.dest];
+      let route = routes.find(r => startsWith(r.path, path));
+      if (!route) { route = { path, stops: [] }; routes.push(route); }
+      route.stops.push(stop);
+    }
+    const labelled = [];
+    routes.slice(0, LETTERS.length).forEach((route, r) => {
+      route.stops.sort((a, b) => a.steps - b.steps)
+        .forEach(stop => labelled.push({ ...stop, route: LETTERS[r], label: LETTERS[r] + stop.steps }));
+    });
+    return labelled;
   }
 
   function uniqueDests(options) { return [...new Set(options.map(o => o.dest))]; }
@@ -108,17 +141,20 @@
 
   // ── The panel's state ───────────────────────────────────────────────────────────────────────
   //   stage: 'peg'    choose a peg
-  //          'count'  a 7: choose how many hops the first peg takes
-  //          'dest'   choose the hole the (first) peg lands in
+  //          'route'  a 7 with more than seven stops: choose the route first
+  //          'stop'   a 7: choose where the first peg stops
+  //          'dest'   choose the hole the peg lands in
   //          'peg2'   a 7 split: choose the peg for the rest of the hops
   //          'dest2'  a 7 split: choose the hole the second peg lands in
   //          'ready'  the choice is complete: Confirm plays it
+  //   options: what is lit on the board (and can be tapped); choices: what the footer offers, each
+  //   { dest, label, kind, words, act } where dest is the hole its label floats over.
   const pick = freshPick();
   const undo = { open: false, endsAt: 0 };
   let signature = '';
 
   function freshPick() {
-    return { stage: 'peg', peg: null, counts: [], steps: null, dest: null, firstLeg: null, peg2: null, moveIdx: null,
+    return { stage: 'peg', peg: null, stops: [], steps: null, dest: null, firstLeg: null, peg2: null, moveIdx: null,
       options: [], choices: [], history: [] };
   }
 
@@ -127,7 +163,7 @@
   // Before each choice the player makes, keep the step they were on, so ↩ can return to it.
   function remember() {
     const { history, ...step } = pick;
-    pick.history.push({ ...step, counts: step.counts.slice(), options: step.options.slice(), choices: step.choices.slice() });
+    pick.history.push({ ...step, stops: step.stops.slice(), options: step.options.slice(), choices: step.choices.slice() });
   }
 
   function goBack() {
@@ -150,19 +186,22 @@
     }
     const seven = isSevenCard();
     for (let i = 0; i < PEG_COUNT; i++) {
-      const has = seven ? sevenCountsFor(moves, i).length > 0 : plainOptionsFor(moves, i).length > 0;
+      const has = seven ? sevenStopsFor(moves, i).length > 0 : plainOptionsFor(moves, i).length > 0;
       if (has) active.add(i);
     }
     return active;
   }
 
-  // Number the landing holes nearest first; only when there is more than one.
-  function numberChoices(options) {
+  // Letter the landing holes nearest first; only when there is more than one.
+  function letterHoles(options) {
     const firstByDest = new Map();
     for (const o of options) if (!firstByDest.has(o.dest)) firstByDest.set(o.dest, o);
     const ordered = [...firstByDest.values()]
-      .sort((a, b) => ((a.path || []).length - (b.path || []).length) || String(a.dest).localeCompare(String(b.dest)));
-    pick.choices = ordered.length > 1 ? ordered.map(o => o.dest) : [];
+      .sort((a, b) => ((a.path || []).length - (b.path || []).length) || String(a.dest).localeCompare(String(b.dest)))
+      .slice(0, LETTERS.length);
+    pick.choices = ordered.length < 2 ? [] : ordered.map((o, i) => ({
+      dest: o.dest, label: LETTERS[i], kind: 'hole', words: `Hole ${LETTERS[i]}`, act: () => chooseHole(o.dest),
+    }));
   }
 
   // ── The steps of a turn (a choice the player makes calls remember first) ────────────────────
@@ -173,36 +212,64 @@
     pick.peg = pegIdx;
     const moves = readMoves();
     if (!isSevenCard()) { offerDests(plainOptionsFor(moves, pegIdx), 'dest'); return; }
-    const counts = sevenCountsFor(moves, pegIdx);
-    if (counts.length === 1) { takeCount(counts[0]); return; }
-    pick.stage = 'count';
-    pick.counts = counts;
-    paint([]);
+    offerStops(labelStops(sevenStopsFor(moves, pegIdx)));
   }
 
-  function chooseCount(steps) {
+  // A 7: one stop is taken for the player; up to seven are shown at once; more than seven, the routes come first.
+  function offerStops(stops) {
+    pick.stops = stops;
+    if (stops.length === 1) { takeStop(stops[0]); return; }
+    if (stops.length <= SLOT_COUNT) { showStops(stops); return; }
+    pick.stage = 'route';
+    pick.options = stops;
+    const routes = [...new Set(stops.map(s => s.route))];
+    pick.choices = routes.map(route => {
+      const onRoute = stops.filter(s => s.route === route);
+      const end = onRoute[onRoute.length - 1];
+      return { dest: end.dest, label: route, kind: 'route', words: `Route ${route}`, act: () => chooseRoute(route) };
+    });
+    paint(stops);
+  }
+
+  function showStops(stops) {
+    pick.stage = 'stop';
+    pick.options = stops;
+    pick.choices = stops.map(stop => ({
+      dest: stop.dest, label: stop.label, kind: 'stop', words: `Stop ${stop.label}: ${stop.steps} of 7 hops`,
+      act: () => chooseStop(stop),
+    }));
+    paint(stops);
+  }
+
+  function chooseRoute(route) {
     remember();
-    takeCount(steps);
+    const onRoute = pick.stops.filter(s => s.route === route);
+    if (onRoute.length === 1) takeStop(onRoute[0]);
+    else showStops(onRoute);
   }
 
-  function takeCount(steps) {
-    pick.steps = steps;
-    const moves = readMoves();
-    if (steps === SEVEN) { offerDests(plainOptionsFor(moves, pick.peg), 'dest'); return; }
-    const legs = splitsWith(moves, pick.peg, steps).map(({ move }) => legOf(move, pick.peg));
-    pick.stage = 'dest';
-    pick.options = legs;
-    numberChoices(legs);
-    paint(legs);
-    const dests = uniqueDests(legs);
-    if (dests.length === 1) takeFirstDest(dests[0]);
+  function chooseStop(stop) {
+    remember();
+    takeStop(stop);
   }
 
-  // A plain move (or the whole 7 on one peg): show its holes; a single hole is chosen for the player.
+  // All 7 hops on one peg is a whole move; fewer leaves the rest for a second peg.
+  function takeStop(stop) {
+    pick.steps = stop.steps;
+    if (stop.steps === SEVEN) { pick.options = [stop]; stageMove(stop.moveIdx); return; }
+    pick.dest = stop.dest;
+    pick.firstLeg = stop;
+    pick.stage = 'peg2';
+    pick.options = [];
+    pick.choices = [];
+    paint(firstLeg());
+  }
+
+  // A plain move or the second peg of a 7: show its holes; a single hole is chosen for the player.
   function offerDests(options, stage) {
     pick.stage = stage;
     pick.options = options;
-    numberChoices(options);
+    letterHoles(options);
     paint(options);
     const dests = uniqueDests(options);
     if (dests.length === 1) stageMove(options.find(o => o.dest === dests[0]).moveIdx);
@@ -212,17 +279,7 @@
     const match = pick.options.find(o => o.dest === dest);
     if (!match) return;
     remember();
-    if (pick.stage === 'dest' && pick.steps != null && pick.steps !== SEVEN) takeFirstDest(dest);
-    else stageMove(match.moveIdx);
-  }
-
-  function takeFirstDest(dest) {
-    pick.dest = dest;
-    pick.firstLeg = pick.options.find(o => o.dest === dest) || null;
-    pick.stage = 'peg2';
-    pick.options = [];
-    pick.choices = [];
-    paint(firstLeg());
+    stageMove(match.moveIdx);
   }
 
   function chooseSecondPeg(pegIdx) {
@@ -251,15 +308,24 @@
     render();
   }
 
-  // A tap on a glowing hole on the board does what pressing its number does. True when the panel used the tap.
+  // A tap on a lit hole does what pressing its label does. On a 7 any lit stop can be tapped, even while the
+  // footer is offering routes. True when the panel used the tap.
   function boardTap(holeId) {
     if (!isHumanTurn() || !holeId) return false;
-    if (pick.stage === 'dest' || pick.stage === 'dest2' || pick.stage === 'ready') { chooseHole(holeId); render(); }
+    if (pick.stage === 'route' || pick.stage === 'stop') {
+      const stop = pick.options.find(o => o.dest === holeId);
+      if (stop) chooseStop(stop);
+    } else if (pick.stage === 'dest' || pick.stage === 'dest2' || pick.stage === 'ready') {
+      const choice = pick.choices.find(c => c.dest === holeId);
+      if (choice) choice.act();
+    }
+    render();
     return true;
   }
 
   function isTargetHole(holeId) {
-    return (pick.stage === 'dest' || pick.stage === 'dest2' || pick.stage === 'ready') && pick.options.some(o => o.dest === holeId);
+    const tappable = ['route', 'stop', 'dest', 'dest2', 'ready'].includes(pick.stage);
+    return tappable && (pick.options.some(o => o.dest === holeId) || pick.choices.some(c => c.dest === holeId));
   }
 
   // ── Drawing on the board ────────────────────────────────────────────────────────────────────
@@ -268,14 +334,14 @@
 
   function paint(options) {
     if (drawPaths) drawPaths(options.map(o => ({ type: 'move', from: o.from, path: o.path, dest: o.dest })));
-    drawHoleNumbers();
+    drawHoleLabels();
   }
 
   // What the board should show for the current step.
   function repaint() {
     const chosen = pick.options.filter(o => o.moveIdx === pick.moveIdx).slice(0, 1);
-    const byStage = { peg: [], count: [], dest: pick.options, peg2: firstLeg(), dest2: firstLeg().concat(pick.options),
-      ready: firstLeg().concat(chosen) };
+    const byStage = { peg: [], route: pick.options, stop: pick.options, dest: pick.options, peg2: firstLeg(),
+      dest2: firstLeg().concat(pick.options), ready: firstLeg().concat(chosen) };
     paint(byStage[pick.stage] || []);
   }
 
@@ -287,32 +353,59 @@
     window.highlightSinglePath = function () {};
   }
 
-  function choosingHole() {
-    return pick.choices.length > 1 && (pick.stage === 'dest' || pick.stage === 'dest2' || pick.stage === 'ready');
+  function hasChoices() {
+    return pick.choices.length > 1 && ['route', 'stop', 'dest', 'dest2', 'ready'].includes(pick.stage);
   }
 
-  // A numbered square over each landing hole on offer; the chosen one turns green.
+  // A lettered square over each hole on offer; the chosen one turns green. Two labels on one hole stack upward.
   const holeBadges = [];
   let holeBadgeKey = '';
-  function drawHoleNumbers() {
+  function drawHoleLabels() {
     const chosen = pick.stage === 'ready' ? (pick.options.find(o => o.moveIdx === pick.moveIdx) || {}).dest : null;
-    const key = (choosingHole() ? pick.choices.join(',') : '') + '|' + (chosen || '');
+    const key = (hasChoices() ? pick.choices.map(c => c.label + '@' + c.dest).join(',') : '') + '|' + (chosen || '');
     if (key === holeBadgeKey) return;
     holeBadgeKey = key;
-    clearHoleNumbers();
-    if (!choosingHole() || typeof THREE === 'undefined' || typeof scene === 'undefined' || !scene) return;
-    pick.choices.forEach((dest, i) => {
-      const hole = window.holeRegistry && window.holeRegistry.get(dest);
-      const at = hole && (hole.mesh ? hole.mesh.position : hole.position);
-      if (!at) return;
-      const badge = holeBadge(String(i + 1), dest === chosen);
-      badge.position.set(at.x, at.y + 42, at.z);
+    clearHoleLabels();
+    if (!hasChoices() || typeof THREE === 'undefined' || typeof scene === 'undefined' || !scene) return;
+    const placed = pick.choices.map(choice => ({ choice, at: holePosition(choice.dest) })).filter(p => p.at);
+    const size = badgeSize(placed.map(p => p.at));
+    const perHole = new Map();
+    placed.forEach(({ choice, at }) => {
+      const stacked = perHole.get(choice.dest) || 0;
+      perHole.set(choice.dest, stacked + 1);
+      const isChosen = choice.dest === chosen;
+      const badge = holeBadge(choice.label, isChosen, isChosen ? size * 1.15 : size);
+      badge.position.set(at.x, at.y + size * 0.7 + 6 + stacked * size, at.z);
       scene.add(badge);
       holeBadges.push(badge);
     });
   }
 
-  function clearHoleNumbers() {
+  // Where the hole really is in the scene. The holes live in the raised board group, so their own position is
+  // 90 units low; the labels are added to the scene itself and need the world position.
+  function holePosition(holeId) {
+    const hole = window.holeRegistry && window.holeRegistry.get(holeId);
+    const mesh = hole && hole.mesh;
+    if (!mesh) return hole && hole.position ? hole.position : null;
+    return mesh.getWorldPosition(new THREE.Vector3());
+  }
+
+  // Labels as big as they can be without touching: a little under the gap between the two closest lit holes,
+  // never smaller than readable or larger than the old single-hole square.
+  const BADGE_MIN = 18;
+  const BADGE_MAX = 38;
+  function badgeSize(points) {
+    let gap = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const d = Math.hypot(points[i].x - points[j].x, points[i].z - points[j].z);
+        if (d > 0.01) gap = Math.min(gap, d);
+      }
+    }
+    return Math.max(BADGE_MIN, Math.min(BADGE_MAX, gap * 0.9));
+  }
+
+  function clearHoleLabels() {
     while (holeBadges.length) {
       const badge = holeBadges.pop();
       if (badge.parent) badge.parent.remove(badge);
@@ -320,8 +413,9 @@
     }
   }
 
-  // A hole's number: a dark square with a gold number (green when chosen), never mistaken for a peg's round badge.
-  function holeBadge(number, chosen) {
+  // A hole's label: a dark square with gold lettering (green when chosen), never mistaken for a peg's round number.
+  // Drawn last and through everything, so a peg sitting on the hole never hides it.
+  function holeBadge(label, chosen, size) {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
     const ctx = canvas.getContext('2d');
@@ -329,29 +423,28 @@
     ctx.fillStyle = 'rgba(10, 12, 24, 0.92)';
     ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(10, 10, 108, 108, 18); else ctx.rect(10, 10, 108, 108); ctx.fill();
     ctx.lineWidth = 9; ctx.strokeStyle = accent; ctx.stroke();
-    ctx.font = '900 78px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = accent; ctx.fillText(number, 64, 70);
-    const material = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false, transparent: true, toneMapped: false });
+    ctx.font = `900 ${label.length > 1 ? 60 : 78}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = accent; ctx.fillText(label, 64, 70);
+    const material = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false, depthWrite: false,
+      transparent: true, toneMapped: false });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(chosen ? 44 : 38, chosen ? 44 : 38, 1);
-    sprite.renderOrder = 1000;
+    sprite.scale.set(size, size, 1);
+    sprite.renderOrder = 2000;
     return sprite;
   }
 
   // ── The footer ──────────────────────────────────────────────────────────────────────────────
 
-  // What each of the seven slots offers now: { number, kind, chosen, press } or null for a blank slot.
+  // What each of the seven slots offers now: { label, kind, words, chosen, act } or null for a blank slot.
   function slotsNow() {
     const slots = new Array(SLOT_COUNT).fill(null);
     if (pick.stage === 'peg' || pick.stage === 'peg2') {
       const active = activePegs();
       for (let i = 0; i < PEG_COUNT; i++) {
-        if (active.has(i)) slots[i] = { number: i + 1, kind: 'peg', chosen: i === pick.peg, press: () => choosePeg(i) };
+        if (active.has(i)) slots[i] = { label: String(i + 1), kind: 'peg', words: `Peg ${i + 1}`, chosen: i === pick.peg, act: () => choosePeg(i) };
       }
-    } else if (pick.stage === 'count') {
-      for (const n of pick.counts) slots[n - 1] = { number: n, kind: 'count', chosen: false, press: () => chooseCount(n) };
-    } else if (choosingHole() && pick.stage !== 'ready') {
-      pick.choices.forEach((dest, i) => { slots[i] = { number: i + 1, kind: 'hole', chosen: false, press: () => chooseHole(dest) }; });
+    } else if (hasChoices() && pick.stage !== 'ready') {
+      pick.choices.slice(0, SLOT_COUNT).forEach((choice, i) => { slots[i] = { ...choice, chosen: false }; });
     }
     return slots;
   }
@@ -364,7 +457,7 @@
     const color = (player && player.color) || '#8899aa';
     const choosing = human && !undo.open && pick.stage !== 'ready';
     const slots = choosing ? slotsNow() : new Array(SLOT_COUNT).fill(null);
-    slotActions = slots.map(s => (s ? s.press : null));
+    slotActions = slots.map(s => (s ? s.act : null));
     slots.forEach((slot, i) => renderSlot(i, slot, color));
     showElement('ft-peg-buttons', choosing);
     showElement('ft-peg-back', human && !undo.open && pick.history.length > 0);
@@ -373,19 +466,22 @@
     refreshBanner();
   }
 
+  const SLOT_TINTS = { hole: '#ffd666', stop: '#ffd666', route: '#9fd3ff' };
+
   function renderSlot(i, slot, color) {
     const button = document.getElementById('peg-btn-' + i);
     if (!button) return;
     const glyph = button.querySelector('.peg-glyph');
-    if (glyph) glyph.textContent = slot ? String(slot.number) : '';
-    const tint = !slot ? '' : slot.kind === 'peg' ? color : slot.kind === 'hole' ? '#ffd666' : '#e9f2ff';
+    if (glyph) glyph.textContent = slot ? slot.label : '';
+    const tint = !slot ? '' : slot.kind === 'peg' ? color : SLOT_TINTS[slot.kind];
     button.style.backgroundColor = tint;
     button.style.setProperty('--peg-color', tint || 'transparent');
     button.disabled = !slot;
-    button.className = 'peg-btn' + (slot ? ` active ${slot.kind}-btn` : ' dormant') + (slot && slot.chosen ? ' selected' : '');
-    const words = !slot ? '' : slot.kind === 'peg' ? `Peg ${slot.number}` : slot.kind === 'hole' ? `Landing hole ${slot.number}` : `${slot.number} hops`;
-    button.title = words;
-    button.setAttribute('aria-label', words || 'Not in use');
+    const kindClass = slot ? (slot.kind === 'peg' ? ' peg-kind' : ' hole-btn') : '';
+    const longClass = slot && slot.label.length > 1 ? ' long-label' : '';
+    button.className = 'peg-btn' + (slot ? ' active' : ' dormant') + kindClass + longClass + (slot && slot.chosen ? ' selected' : '');
+    button.title = slot ? slot.words : '';
+    button.setAttribute('aria-label', slot ? slot.words : 'Not in use');
   }
 
   function showElement(id, show) {
@@ -485,7 +581,7 @@
     if (now !== signature) {
       signature = now;
       resetPick();
-      clearHoleNumbers(); holeBadgeKey = '';
+      clearHoleLabels(); holeBadgeKey = '';
       if (typeof window.refreshAlwaysOnPegNames === 'function') window.refreshAlwaysOnPegNames();   // pegs that can leave holding show their numbers
       if (isHumanTurn()) { paint([]); playIfOnlyOne(now); }
     }
@@ -495,21 +591,24 @@
   // The instruction banner (fasttrack-3d.js) asks this panel what to say; tell it when the step changes.
   let bannerKey = '';
   function refreshBanner() {
-    const key = pick.stage + ':' + signature + ':' + undo.open;
+    const key = pick.stage + ':' + signature + ':' + undo.open + ':' + pick.choices.length;
     if (key === bannerKey || typeof window._refreshInstructionBanner !== 'function') return;
     bannerKey = key;
     window._refreshInstructionBanner();
   }
 
+  // One short sentence per step: what to press, in the words on the buttons.
   function instruction() {
     if (undo.open) return 'Press Undo to take it back';
+    const peg = (pick.peg ?? 0) + 1;
     const rest = SEVEN - (pick.steps || 0);
     const texts = {
-      peg: isSevenCard() ? 'A 7: press the number of the first peg to move' : 'Press the number of a peg to move',
-      count: `How many hops for peg ${(pick.peg ?? 0) + 1}? The other peg takes the rest`,
-      dest: 'Press the number of the hole to land in',
-      peg2: `Now press the peg that takes the other ${rest}`,
-      dest2: 'Press the number of the hole for the second peg',
+      peg: isSevenCard() ? 'You have a 7. Pick the first peg to move' : 'Pick a peg to move',
+      route: `Peg ${peg} can go more than one way. Pick a route, or tap a lit hole`,
+      stop: `Pick where peg ${peg} stops. The number is how many hops it moves`,
+      dest: 'Pick the hole to land in, or tap it',
+      peg2: `Now pick the peg that moves the other ${rest}`,
+      dest2: 'Pick the hole for that peg, or tap it',
       ready: 'Press Confirm to play it',
     };
     return texts[pick.stage] || '';

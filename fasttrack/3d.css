@@ -4343,6 +4343,9 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.dormant {
 body.ft-turn-panel #ft-peg-bar .peg-btn.count-btn .peg-glyph,
 body.ft-turn-panel #ft-peg-bar .peg-btn.hole-btn .peg-glyph { color: #1a1408 !important; }
 body.ft-turn-panel #ft-peg-confirm { min-width: 168px; min-height: 52px; font-size: 18px; }
+/* Numbers are pegs, letters are holes (Ken, 2026-11-06). A two-character stop label such as A7 is set smaller so
+   it fits the narrow phone slot. */
+body.ft-turn-panel #ft-peg-bar .peg-btn.long-label .peg-glyph { font-size: 17px !important; letter-spacing: -0.5px; }
 @media (max-width: 760px) {
   body.ft-turn-panel #ft-peg-bar #ft-peg-buttons { gap: 4px !important; }
   body.ft-turn-panel #ft-peg-bar .peg-btn { min-width: 40px !important; width: 40px !important; padding: 0 !important; }
