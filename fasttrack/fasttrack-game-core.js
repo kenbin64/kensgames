@@ -622,6 +622,7 @@ function initGame(playerCount = 2, config = {}) {
         completedCircuit: false,
         fasttrackEntryHole: null,
         mustExitFasttrack: false,
+        backedOntoFt: false,
         // NPC personality & emotional state
         personality: assignPegPersonality(),
         mood: 'EAGER',
@@ -1512,7 +1513,9 @@ function getTrackSequence(peg, player, direction) {
   // (rather than the explicit `enterFastTrack` choice) had onFasttrack=false
   // and this branch was skipped, then perimeter lookup returned empty,
   // freezing all of that peg's future moves.
-  if (type === 'fasttrack') {
+  // A peg that backed onto an ft-* hole with a 4 has no fast-track status: it walks the
+  // outer track like any other peg (Ken, 2026-11-08). Its sequence is the perimeter one below.
+  if (type === 'fasttrack' && !peg.backedOntoFt) {
     // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0, user_directive_2026-05-20b)
     // The peg consumes the full card value. When the ring path crosses the
     // player's own ft-{bp}, the move continues through it into the home
@@ -1794,7 +1797,7 @@ function calculateValidMoves() {
       // D = (bp - X + 6) % 6 = ring distance from ft-X to own ft-{bp}.
       // The 1-hit bullseye jump (peg on foreign ft-*, card movement===1) is
       // still emitted separately below — independent of this enumeration.
-      const _ftForward = peg.holeId.startsWith('ft-') && dir === 'clockwise' && !rules.noFastTrack;
+      const _ftForward = peg.holeId.startsWith('ft-') && !peg.backedOntoFt && dir === 'clockwise' && !rules.noFastTrack;
 
       if (_ftForward) {
         const N = rules.movement;
@@ -1968,7 +1971,8 @@ function calculateValidMoves() {
     // half:
     //   - holding  → cannot move without an enter card (7 doesn't enter)  → out
     //   - bullseye → can only leave on J/Q/K, never on a 7 half           → out
-    //   - home-{bp}→ the winner hole; the 5th peg parks here              → out
+    //   - home-{bp}→ out only once the peg has come round (eligibleForSafeZone):
+    //                the 5th peg parks here. A starting or just-entered peg is in.
     //   - safezone → forward_only within the zone with exact landing
     //                (rules.json board.safe_zone) — a peg at safe-{bp}-k
     //                legally advances 1..(4-k) holes, so it IS eligible for
@@ -1981,7 +1985,10 @@ function calculateValidMoves() {
       const peg = player.pegs[pi];
       if (peg.holeType === 'holding') continue;
       if (peg.holeId === 'bullseye') continue;
-      if (peg.holeId === `home-${bp}`) continue;
+      // Only a peg that has come all the way round and parked on home is out. The
+      // starting peg and a peg that has just entered also sit on home-{bp}; they are
+      // on the track like any other and may take a split half (Ken, 2026-11-08).
+      if (peg.holeId === `home-${bp}` && peg.eligibleForSafeZone) continue;
       activePegs.push(pi);
     }
     if (activePegs.length >= 2) {
@@ -2024,10 +2031,11 @@ function calculateValidMoves() {
       //      on a foreign ft-* hole as its PENULTIMATE position, then hops to
       //      the center on the final step. Intermediate own pegs block, on
       //      ft-* holes too (MOV_NO_PASS_OWN, Ken 2026-11-07).
-      const _bullPath = (seq, n, fromHole) => {
+      const _bullPath = (seq, n, fromHole, peg) => {
         const _ownFtHole = `ft-${bp}`;
         if (n === 1) {
           if (!fromHole || !fromHole.startsWith('ft-')) return null;
+          if (peg && peg.backedOntoFt) return null;            // backed on with a 4: no status
           if (fromHole === _ownFtHole) return null;
           return ['bullseye'];
         }
@@ -2085,7 +2093,7 @@ function calculateValidMoves() {
       // clear it). Counting / gating on geometry keeps a flag-cleared ring
       // peg's bullseye 1-hit and ring moves from being wrongly dropped, and
       // matches rules.json's "geometrically on any ft-* hole" wording.
-      const _onRing = (p) => !!(p && p.holeId && p.holeId.startsWith('ft-'));
+      const _onRing = (p) => !!(p && p.holeId && p.holeId.startsWith('ft-') && !p.backedOntoFt);
       const _ftPegCount = player.pegs.filter(_onRing).length;
       const _ftRuleOK = (peg1, peg2) => {
         if (_ftPegCount === 0) return true;
@@ -2121,7 +2129,7 @@ function calculateValidMoves() {
       // Returns Array<{ path, dest }>. May be empty (blocked / unreachable).
       const _halfOptions = (peg, n) => {
         if (n < 1 || !peg || !peg.holeId) return [];
-        if (peg.holeId.startsWith('ft-')) {
+        if (peg.holeId.startsWith('ft-') && !peg.backedOntoFt) {
           return _enumerateFtExitOptions(peg, n);
         }
         const seq = getTrackSequence(peg, player, 'clockwise');
@@ -2145,8 +2153,8 @@ function calculateValidMoves() {
 
             const opts1 = _halfOptions(peg1, a);
             const opts2 = _halfOptions(peg2, b);
-            const path1Bull = _bullPath(seq1, a, peg1.holeId);
-            const path2Bull = _bullPath(seq2, b, peg2.holeId);
+            const path1Bull = _bullPath(seq1, a, peg1.holeId, peg1);
+            const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
             const bullOK = _bullFree();
 
             // VARIANT 1: STANDARD (rim/FT both halves — cartesian product of
@@ -2292,7 +2300,7 @@ function calculateValidMoves() {
     // after the split block already enumerated them on the same basis.
     const _moveOnRing = (idx) => {
       const p = player.pegs[idx];
-      return !!(p && p.holeId && p.holeId.startsWith('ft-'));
+      return !!(p && p.holeId && p.holeId.startsWith('ft-') && !p.backedOntoFt);
     };
     const ftMoves = moves.filter(m => {
       if (m.type === 'enterBullseye') return true;
@@ -2804,6 +2812,7 @@ function placePeg(peg, holeId, playerIdx) {
   bumpOccupant(holeId, playerIdx, peg);
   peg.holeId = holeId;
   peg.holeType = getHoleType(holeId);
+  peg.backedOntoFt = false;            // set again by executeMove only for a 4 onto an ft-* hole
   state.board.set(holeId, { playerIdx, pegId: peg.id });
 }
 
@@ -2830,6 +2839,7 @@ function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
     vPeg.lockedToSafeZone = false;
     vPeg.completedCircuit = false;
     vPeg.fasttrackEntryHole = null;
+    vPeg.backedOntoFt = false;
 
     // Send victim peg back — holding area has 4 slots max
     const pegsInHolding = victimPlayer.pegs.filter(p => p.holeId === 'holding').length;
@@ -2953,6 +2963,10 @@ function executeMove(moveIdx) {
             peg, playerColor: player.color, playerName: player.name, playerId: ci
           }]);
         }
+        // A 4 may land on an ft-* hole, but backing on is not entering the fast track:
+        // no status, and next turn the peg walks the outer track, never the ring or a
+        // one-hop bullseye (Ken, 2026-11-08).
+        if (getHoleType(move.dest) === 'fasttrack' && cardNoFT) peg.backedOntoFt = true;
       }
       log(`${getCurrentPlayerName()} moved ${move.steps} to ${move.dest}`);
       break;

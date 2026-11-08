@@ -332,6 +332,55 @@ section('Scenario 8: only one peg active → no splits, single 7-step move');
   ok(sevenMoves.length >= 1, 'single-peg: 7-step single move exists', `got ${sevenMoves.length}`);
 }
 
+// --- SCENARIO 8b: a peg on its home hole that has not come round (Ken, 2026-11-08) ---
+// The starting peg and a just-entered peg sit on home-{bp}. They are on the track and
+// take a split half like any other. Only a peg that has come all the way round (the
+// 5th peg, parked to win) is out. Before this fix a 7 with one peg out and one on home
+// offered no stops in between.
+section('Scenario 8b: a peg on home that has not come round can take part of a 7');
+{
+  setupTwoPlayer([
+    { hole: 'outer-0-0' }, { hole: 'home-0' },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  const splits = getSplits();
+  ok(splits.length > 0, 'home peg + track peg: the 7 can be split', `got ${splits.length}`);
+  ok(splits.some(m => (m.pegIdx === 1 && m.steps < 7) || (m.peg2Idx === 1 && m.steps2 < 7)),
+    'the peg on home takes a part of the 7');
+  setupTwoPlayer([
+    { hole: 'outer-0-0' }, { hole: 'home-0', eligibleForSafeZone: true },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  ok(getSplits().length === 0, 'a peg that came round and parked on home is out: no split');
+}
+// --- SCENARIO 8c: parts of a 7 into the safe zone, the bullseye and a fast-track hole ---
+section('Scenario 8c: a part of the 7 may end in the safe zone, the bullseye or on a fast-track hole');
+{
+  setupTwoPlayer([
+    { hole: 'outer-0-0', eligibleForSafeZone: true }, { hole: 'outer-1-1' },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  let s = getSplits();
+  ok([1, 2, 3, 4].every(k => s.some(m => m.pegIdx === 0 && m.dest === `safe-0-${k}`)),
+    'a peg that came round can stop in each safe hole and the other peg takes the rest');
+  setupTwoPlayer([
+    { hole: 'safe-0-1' }, { hole: 'outer-1-1' },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  s = getSplits();
+  ok([2, 3, 4].every(k => s.some(m => m.pegIdx === 0 && m.dest === `safe-0-${k}`)),
+    'a peg already in the safe zone moves 1 to 3 of the 7 inside it');
+  setupTwoPlayer([
+    { hole: 'side-right-1-2' }, { hole: 'outer-2-1' },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  s = getSplits();
+  ok(s.some(m => m.pegIdx === 0 && m.steps === 3 && m.dest === 'ft-2' && m.steps2 === 4),
+    'a part of the 7 lands on a fast-track hole (3) and the other peg moves 4');
+  ok(s.some(m => m.pegIdx === 0 && m.steps === 4 && m.dest === 'bullseye' && m.steps2 === 3),
+    'a part of the 7 enters the bullseye from a fast-track hole (4) and the other peg moves 3');
+}
+
 // ─── SCENARIO 9: No leapfrogging your own peg (Option A retired in v3.1.0) ──
 // An FT peg may NOT pass over an own peg on the ring. With peg0 at ft-1 and peg1 at
 // ft-3, a card-5 move whose path would cross ft-3 must NOT be generated.
