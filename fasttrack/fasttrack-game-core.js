@@ -1737,20 +1737,16 @@ function calculateValidMoves() {
       }
     }
 
-    // EXIT BULLSEYE (J, Q, K) — exit to player's own FT hole; if occupied, previous unoccupied FT hole
+    // EXIT BULLSEYE (J, Q, K). The peg may leave to ANY fast-track hole, not only its own (Ken,
+    // 2026-11-08): a strategic exit can land on another player's peg sitting on an ft hole and
+    // send it home. Only a hole holding one of this player's own pegs is closed. Own ft-{bp} is
+    // listed first, then the ring clockwise from it.
     if (peg.holeId === 'bullseye' && rules.canExitBullseye) {
-      let exitDest = null;
-      // Try player's own FT hole first, then search backward
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const ftHole = `ft-${(bp - attempt + 6) % 6}`;
+      for (let k = 0; k < 6; k++) {
+        const ftHole = `ft-${(bp + k) % 6}`;
         const occ = state.board.get(ftHole);
-        if (!occ || occ.playerIdx !== ci) {
-          exitDest = ftHole;
-          break;
-        }
-      }
-      if (exitDest) {
-        moves.push({ type: 'exitBullseye', pegIdx: pi, dest: exitDest });
+        if (occ && occ.playerIdx === ci) continue;
+        moves.push({ type: 'exitBullseye', pegIdx: pi, dest: ftHole, from: 'bullseye', path: [ftHole] });
       }
     }
 
@@ -2137,6 +2133,26 @@ function calculateValidMoves() {
         return [{ path: seq.slice(0, n), dest: seq[n - 1] }];
       };
 
+      // The two parts of a 7 are played IN ORDER (Ken, 2026-11-08): the first peg moves, then
+      // the second peg moves the rest, and each part must be legal on the board as it stands
+      // when it is played. So the second peg is checked with the first peg already moved: the
+      // hole the first peg left is free to pass, and the hole it landed in blocks like any own
+      // peg. Checking both against the starting board wrongly blocked the second peg on the
+      // hole the first had just left, which hid stops (a peg 3 behind another could not take
+      // 4 after the front peg moved first).
+      const _withFirstPegMoved = (peg, dest, fn) => {
+        const from = peg.holeId, fromType = peg.holeType;
+        const fromOcc = state.board.get(from), destOcc = state.board.get(dest);
+        state.board.set(from, null);
+        state.board.set(dest, { playerIdx: ci, pegId: peg.id });
+        peg.holeId = dest; peg.holeType = getHoleType(dest);
+        try { fn(); } finally {
+          peg.holeId = from; peg.holeType = fromType;
+          state.board.set(dest, destOcc === undefined ? null : destOcc);
+          state.board.set(from, fromOcc === undefined ? null : fromOcc);
+        }
+      };
+
       for (let a = 1; a <= 6; a++) {
         const b = 7 - a;
         for (let i = 0; i < activePegs.length; i++) {
@@ -2144,54 +2160,31 @@ function calculateValidMoves() {
             if (i === j) continue;
             const pi1 = activePegs[i], pi2 = activePegs[j];
             const peg1 = player.pegs[pi1], peg2 = player.pegs[pi2];
+            if (!_ftRuleOK(peg1, peg2)) continue;
+            const from1 = peg1.holeId;                 // read before the first peg is moved below
 
-            // Clockwise perimeter sequences feed the outer-approach bullseye
-            // route (route B), where a non-ring peg's penultimate hole must be
-            // a foreign ft-* hole.
+            // The first part, on the board as it is. The clockwise perimeter sequence feeds
+            // the outer-approach bullseye route, where the penultimate hole is a foreign ft-*.
             const seq1 = getTrackSequence(peg1, player, 'clockwise');
-            const seq2 = getTrackSequence(peg2, player, 'clockwise');
-
-            const opts1 = _halfOptions(peg1, a);
-            const opts2 = _halfOptions(peg2, b);
+            const firsts = _halfOptions(peg1, a).map(o => ({ dest: o.dest, path: o.path, tag: '@' + o.dest }));
             const path1Bull = _bullPath(seq1, a, peg1.holeId, peg1);
-            const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
-            const bullOK = _bullFree();
+            if (path1Bull && _bullFree()) firsts.push({ dest: 'bullseye', path: path1Bull, tag: 'B' });
 
-            // VARIANT 1: STANDARD (rim/FT both halves — cartesian product of
-            // per-half options so FT pegs surface every leave-at-k variant).
-            for (const o1 of opts1) {
-              for (const o2 of opts2) {
-                if (o1.dest === o2.dest) continue;
-                if (!_ftRuleOK(peg1, peg2)) continue;
-                _pushSplit(
-                  `${pi1}:${a}@${o1.dest}-${pi2}:${b}@${o2.dest}`,
-                  pi1, o1.dest, a, peg1.holeId, o1.path,
-                  pi2, o2.dest, b, peg2.holeId, o2.path);
-              }
-            }
-
-            // VARIANT 2: peg1 → bullseye, peg2 → rim/FT (any option)
-            if (path1Bull && bullOK) {
-              for (const o2 of opts2) {
-                if (o2.dest === 'bullseye') continue;
-                if (!_ftRuleOK(peg1, peg2)) continue;
-                _pushSplit(
-                  `${pi1}:${a}B-${pi2}:${b}@${o2.dest}`,
-                  pi1, 'bullseye', a, peg1.holeId, path1Bull,
-                  pi2, o2.dest, b, peg2.holeId, o2.path);
-              }
-            }
-
-            // VARIANT 3: peg1 → rim/FT (any option), peg2 → bullseye
-            if (path2Bull && bullOK) {
-              for (const o1 of opts1) {
-                if (o1.dest === 'bullseye') continue;
-                if (!_ftRuleOK(peg1, peg2)) continue;
-                _pushSplit(
-                  `${pi1}:${a}@${o1.dest}-${pi2}:${b}B`,
-                  pi1, o1.dest, a, peg1.holeId, o1.path,
-                  pi2, 'bullseye', b, peg2.holeId, path2Bull);
-              }
+            for (const f of firsts) {
+              // The second part, with the first peg already where it landed.
+              _withFirstPegMoved(peg1, f.dest, () => {
+                const seq2 = getTrackSequence(peg2, player, 'clockwise');
+                const seconds = _halfOptions(peg2, b).map(o => ({ dest: o.dest, path: o.path, tag: '@' + o.dest }));
+                const path2Bull = _bullPath(seq2, b, peg2.holeId, peg2);
+                if (path2Bull && _bullFree()) seconds.push({ dest: 'bullseye', path: path2Bull, tag: 'B' });
+                for (const s of seconds) {
+                  if (s.dest === f.dest) continue;
+                  _pushSplit(
+                    `${pi1}:${a}${f.tag}-${pi2}:${b}${s.tag}`,
+                    pi1, f.dest, a, from1, f.path,
+                    pi2, s.dest, b, peg2.holeId, s.path);
+                }
+              });
             }
           }
         }
@@ -3284,6 +3277,10 @@ function executeMove(moveIdx) {
   // only decides WHEN it runs. resolveTurn() drops the call if the turn has since
   // moved on (epoch changed) — a stale bot move can never advance the human.
   const _moveEpoch = _turnEpoch;
+  // The card this move was played with. By the time the table stops moving, a peer may already
+  // have applied the host's next snapshot, which clears the card. Deciding redraw-or-rotate from
+  // that cleared card lost every redraw in online play (Ken, 2026-11-08), so decide from this one.
+  const _moveCard = state.deck.get('currentCard');
   // The move is applied and the turn is resolving: publish the resulting state
   // so every seat converges on it. Peers defer APPLYING a snapshot until their
   // own hop animations drain (see the pending-snapshot buffer in
@@ -3316,14 +3313,14 @@ function executeMove(moveIdx) {
       // Both of these are only PROMPTS to try resolving. resolveTurn does the
       // waiting itself and drops any call whose epoch is stale, so whichever
       // arrives first wins and the rest are no-ops.
-      CutsceneManager.whenDrained(() => resolveTurn(_moveEpoch));
-      resolveTurn(_moveEpoch);
+      CutsceneManager.whenDrained(() => resolveTurn(_moveEpoch, 0, _moveCard));
+      resolveTurn(_moveEpoch, 0, _moveCard);
     });
     // waitForAnimations only fires its callback when the animation barrier
     // comes down. If that never happens the callback above is lost, so prompt
     // once from out here as well; resolveTurn waits for real motion to finish
     // regardless of which prompt reaches it.
-    resolveTurn(_moveEpoch);
+    resolveTurn(_moveEpoch, 0, _moveCard);
   };
   waitForAll();
 }
@@ -3652,8 +3649,11 @@ const TURN_SETTLE_CEILING_MS = 45000;
 // made; if the turn has already moved on this call is stale and is dropped.
 // `waitedMs` is internal: how long this particular resolve has already spent
 // waiting for the table to go quiet.
-function resolveTurn(epoch, waitedMs) {
+// `card` is the card being resolved. Callers that know it pass it; otherwise it is read on the
+// first call, before any waiting, and carried through the polls below.
+function resolveTurn(epoch, waitedMs, card) {
   if (epoch !== _turnEpoch) return;              // stopgap verifier: stale / duplicate
+  if (card === undefined) card = state.deck.get('currentCard') || null;
   if (state.meta.get('winner') !== null) { _endUndoOffer(); _resolveWinner(); return; }
 
   // -- THE RULE: no turn is relinquished while the table is still moving --
@@ -3663,7 +3663,7 @@ function resolveTurn(epoch, waitedMs) {
   if (_isTableBusy()) {
     const waited = waitedMs || 0;
     if (waited < TURN_SETTLE_CEILING_MS) {
-      setTimeout(() => resolveTurn(epoch, waited + TURN_SETTLE_POLL_MS), TURN_SETTLE_POLL_MS);
+      setTimeout(() => resolveTurn(epoch, waited + TURN_SETTLE_POLL_MS, card), TURN_SETTLE_POLL_MS);
       return;
     }
     console.warn('[TURN] settle ceiling reached after '
@@ -3672,16 +3672,24 @@ function resolveTurn(epoch, waitedMs) {
   }
   // -- UNDO GRACE: the move has landed; hold the turn briefly so it can be taken back --
   if (_undoHoldsTurn(epoch)) {
-    setTimeout(() => resolveTurn(epoch, waitedMs), TURN_SETTLE_POLL_MS);
+    setTimeout(() => resolveTurn(epoch, waitedMs, card), TURN_SETTLE_POLL_MS);
     return;
   }
-  const card = state.deck.get('currentCard');
-  if (_cardIsReplay(card)) _replaySameSeat();    // replay → same seat draws again
+  if (_cardIsReplay(card)) _replaySameSeat(card); // replay → same seat draws again
   else endTurn(epoch);                           // deterministic round-robin advance (epoch-verified)
 }
 
 // Replay: reopen the draw for the SAME seat as a fresh turn instance.
-function _replaySameSeat() {
+function _sameCard(a, b) {
+  return !!(a && b && a.value === b.value && a.suit === b.suit && a.display === b.display);
+}
+
+function _replaySameSeat(card) {
+  // Online, the player may already have drawn the redraw card on their own screen before this
+  // screen finished resolving the last move. Then the seat has a NEWER card in hand: leave it,
+  // and leave the epoch too, so that newer card's own move resolves as normal.
+  const inHand = state.deck.get('currentCard');
+  if (card && inHand && state.turn.get('phase') === 'move' && !_sameCard(inHand, card)) return;
   _turnEpoch++;                                  // new instance; the old move's resolve is now stale
   // The Undo offer carries over into this draw (Ken, 2026-11-05); drawing the next card closes it.
   if (_undo && _undo.untilDraw && !_undo.kept) { _undo.epoch = _turnEpoch; _showUndoOffer(0); }
@@ -4042,6 +4050,15 @@ function endTurn(epoch) {
       // the handler ignores it unless the reported seat is still the active
       // one, so a late or duplicate turn_done can never rotate twice.
       const _doneSeat = players[ci];
+      // Only the screen that owns this seat speaks for it. Every screen resolves every move, and
+      // the others used to send turn_done too, for the host's seat and the bots' seats as well.
+      // The host applies turn_done whenever that seat is still current, which is exactly the
+      // case after a redraw card, so a watching screen handed away other players' redraws
+      // (Ken, 2026-11-08).
+      if (!_doneSeat || _doneSeat.isBot || !_isMyTurn()) {
+        console.log('[TURN] non-host endTurn for a seat that is not ours; the host decides.');
+        return;
+      }
       _broadcast('turn_done', {
         seat: ci,
         seatId: _seatIdentity(_doneSeat),

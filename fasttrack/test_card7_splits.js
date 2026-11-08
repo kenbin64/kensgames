@@ -353,6 +353,31 @@ section('Scenario 8b: a peg on home that has not come round can take part of a 7
   ]);
   ok(getSplits().length === 0, 'a peg that came round and parked on home is out: no split');
 }
+// --- SCENARIO 8d: the two parts are played in order (Ken, 2026-11-08) ---
+// "the first peg can make 1-7 legal moves then the 2nd peg can move that many spaces in legal
+// moves to complete 7 holes ... both moves must be legal." The second peg is checked with the
+// first already moved: the hole it left is free, the hole it landed in blocks.
+section('Scenario 8d: the first peg moves, then the second completes the 7');
+{
+  // peg1 is 3 holes ahead of peg0 on the same stretch.
+  setupTwoPlayer([
+    { hole: 'side-left-0-4' }, { hole: 'side-left-0-1' },
+    { hole: 'holding' }, { hole: 'holding' }, { hole: 'holding' },
+  ]);
+  const s = getSplits();
+  const firstBack = s.filter(m => m.pegIdx === 0).map(m => m.steps);
+  ok([1, 2].every(k => firstBack.includes(k)) && !firstBack.some(k => k >= 3),
+    'moving first, the back peg can take 1 or 2 (the front peg still blocks at 3)', `got ${[...new Set(firstBack)]}`);
+  ok([3, 4, 5, 6].every(k => s.some(m => m.pegIdx === 1 && m.steps === k && m.peg2Idx === 0 && m.steps2 === 7 - k)),
+    'moving first, the front peg can take 3 to 6 and the back peg then takes 4 to 1, past the hole the front peg left');
+  ok(s.some(m => m.pegIdx === 1 && m.steps === 3 && m.peg2Idx === 0 && m.steps2 === 4 && m.path2.includes('side-left-0-1')),
+    'for example: front peg 3, then back peg 4 straight past side-left-0-1');
+  ok(!s.some(m => m.peg2Idx === 0 && m.path2.includes(m.dest)),
+    'the second peg never reaches or passes where the first peg landed');
+  ok(!s.some(m => m.pegIdx === 1 && m.steps <= 2 && m.peg2Idx === 0),
+    'front peg 1 or 2 first leaves the back peg no legal 6 or 5 (it would pass the front peg)');
+}
+
 // --- SCENARIO 8c: parts of a 7 into the safe zone, the bullseye and a fast-track hole ---
 section('Scenario 8c: a part of the 7 may end in the safe zone, the bullseye or on a fast-track hole');
 {

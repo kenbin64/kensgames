@@ -76,10 +76,11 @@
 
   function otherPeg(move, pegIdx) { return move.pegIdx === pegIdx ? move.peg2Idx : move.pegIdx; }
 
+  // The splits where this peg moves FIRST. The engine lists each split in the order it is played
+  // (pegIdx first, then peg2Idx), and the peg the player presses first is the one that moves first.
   function splitsWith(moves, pegIdx, steps) {
     return moves.map((move, moveIdx) => ({ move, moveIdx }))
-      .filter(({ move }) => move && move.type === 'split'
-        && ((move.pegIdx === pegIdx && move.steps === steps) || (move.peg2Idx === pegIdx && move.steps2 === steps)));
+      .filter(({ move }) => move && move.type === 'split' && move.pegIdx === pegIdx && move.steps === steps);
   }
 
   function plainOptionsFor(moves, pegIdx) {
@@ -88,7 +89,7 @@
       .map(({ move, moveIdx }) => plainOption(move, moveIdx));
   }
 
-  // On a 7: every hole this peg can stop in as the first half, as { steps, dest, path, from, moveIdx }. A stop at
+  // On a 7: every hole this peg can stop in as the first half (it moves first, the other peg after), as { steps, dest, path, from, moveIdx }. A stop at
   // 7 hops is the whole card on this peg (a plain move, so it has a moveIdx); a shorter stop leaves the rest of the
   // hops for another peg.
   function sevenStopsFor(moves, pegIdx) {
@@ -97,7 +98,7 @@
     plainOptionsFor(moves, pegIdx).forEach(option => add({ ...option, steps: SEVEN }));
     for (const move of moves) {
       if (!move || move.type !== 'split') continue;
-      if (move.pegIdx === pegIdx || move.peg2Idx === pegIdx) add({ ...legOf(move, pegIdx), moveIdx: null });
+      if (move.pegIdx === pegIdx) add({ ...legOf(move, pegIdx), moveIdx: null });
     }
     return [...stops.values()];
   }

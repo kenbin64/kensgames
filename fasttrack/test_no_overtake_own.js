@@ -117,9 +117,13 @@ section('7 split halves follow the same rule');
   const start = at(probe, ft, -2);
   const g = table([{ hole: start }, { hole: ft }]);
   const splits = movesFor(g, '7').filter(m => m && m.type === 'split');
-  const bad = splits.filter(m => (m.pegIdx === 0 && passes(m, ft)) || (m.peg2Idx === 0 && (m.path2 || []).slice(0, -1).includes(ft)));
+  // The two parts are played in order (Ken, 2026-11-08). Moving first, peg 0 must not pass its
+  // own peg on the ft hole. Moving second, the other peg has already left that hole, so passing
+  // it is fine; what peg 0 must not reach or pass is where the other peg LANDED.
+  const bad = splits.filter(m => (m.pegIdx === 0 && passes(m, ft))
+    || (m.peg2Idx === 0 && (m.path2 || []).includes(m.dest)));
   ok(splits.length > 0, 'the split is offered at all');
-  ok(bad.length === 0, `no split half from ${start} passes its own peg on ${ft}`, `${bad.length} bad`);
+  ok(bad.length === 0, `no split half from ${start} passes its own peg (on ${ft}, or where it landed)`, `${bad.length} bad`);
 }
 
 // ───────────────────────────────────────────────────────────

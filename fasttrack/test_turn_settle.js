@@ -132,7 +132,7 @@ console.log('='.repeat(62));
     ok(!/endTurn\(_botEpoch\)/.test(forfeit),
       'it no longer calls endTurn, which bypassed the animation check');
 
-    ok(/function resolveTurn\(epoch, waitedMs\)/.test(src),
+    ok(/function resolveTurn\(epoch, waitedMs(, card)?\)/.test(src),   // card: the card being resolved (2026-11-08)
       'resolveTurn is the place the waiting happens, so no caller can forget it');
     ok(/if \(_isTableBusy\(\)\) \{/.test(src),
       'and it actually consults the table before letting the turn go');
