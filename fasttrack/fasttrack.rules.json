@@ -371,8 +371,8 @@
       "y": 3,
       "z": 9,
       "category": "movement",
-      "desc": "A peg cannot pass over its own peg on the outer rim, cannot pass or land on its own peg while traversing the inner FT ring, and cannot pass or land on its own peg in the safe zone. EXCEPTION: an own peg merely occupying an ft gateway hole does not block a peg passing through that hole on the outer rim, because ft holes are shared rim/ring gateways (shipped, tested behavior).",
-      "assertion": "!ctx.pathBlockedByOwnPeg (intermediate ft-* gateway holes are exempt on a rim walk: an own peg on an ft hole does not block a rim pass-through; the inner ft ring still blocks own pegs)",
+      "desc": "A peg can never pass or land on its own peg: not on the outer rim, not on the inner FT ring, not in the safe zone. ft-* holes are ordinary outer-track holes (each is the first hole of a colour area), so an own peg on an ft hole blocks a rim walk like any other hole. The bullseye (hole 0, dead centre) is the only exception: a peg there is never on anyone's path. (Ken, 2026-11-07; retires the ft gateway pass-through exception.)",
+      "assertion": "!ctx.pathBlockedByOwnPeg (every intermediate hole, ft-* included; the bullseye is never on a path)",
       "provenance": [
         "unified_rules",
         "game_spec.json",
@@ -1075,11 +1075,12 @@
       "y": 9,
       "z": 72,
       "category": "fasttrack",
-      "desc": "FT-ring blocking (the 'Option A' relax was retired in v3.1.0). Own pegs block on the inner FT ring: a peg cannot pass OR land on another peg of its own color while traversing the ring. EXCEPTION (shipped, tested behavior, confirmed 2026-06): an own peg occupying an ft gateway hole does NOT block a peg passing through that hole on the OUTER RIM, since ft holes are shared rim/ring gateways. Only opponent pegs are passable on the ring (and cuttable on landing). The name is historical; this rule governs ring blocking, not a relax.",
-      "assertion": "(traversing the FT ring && pegOn(path_step).color === actingPeg.color) ==> illegal; (rim pass-through of an ft gateway hole occupied by an own peg) ==> allowed",
+      "desc": "FT-ring blocking, no overtaking own pegs (Ken, 2026-11-07). Each ft-* hole is the first hole of a colour area, and a ring hop from ft-X to ft-(X+1) jumps that whole colour area, so it overtakes every peg in it. A ring hop is blocked when an own peg sits on the next ft-* hole OR anywhere in the colour area being skipped. A peg whose ring is blocked must leave the ring at an earlier ft-* hole and walk the outer track (FT_EXIT_ANY_HOLE), where MOV_NO_PASS_OWN still applies. An own peg on an ft hole also blocks a peg walking the outer rim through it. Opponent pegs are passable (and cuttable on landing). The bullseye is the only hole that never blocks. The name is historical; this rule governs ring blocking, not a relax.",
+      "assertion": "ringHop(ft-X -> ft-Y) legal iff no own peg on ft-Y and no own peg on any outer-track hole strictly between ft-X and ft-Y; (rim pass-through of an ft hole occupied by an own peg) ==> illegal",
       "provenance": [
         "user_directive_2026-04-25.option_a_ft_passing_relax",
-        "user_directive_2026-05-20.option_a_retired_own_pegs_block_universally"
+        "user_directive_2026-05-20.option_a_retired_own_pegs_block_universally",
+        "user_directive_2026-11-07.no_overtaking_own_pegs_ft_holes_are_rim_holes"
       ]
     },
     {

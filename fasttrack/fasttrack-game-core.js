@@ -436,15 +436,31 @@ function hasOwnPegOnHole(player, holeId, excludePegId = null) {
 }
 
 function canAdvanceFastTrackStep(player, fromFtIdx, toFtIdx, movingPeg) {
-  // rules.json :: FT_RING_PASS_RELAX (z=72) — only the destination matters
-  // for FT-ring traversal. Own pegs sitting on the regular outer/home/side
-  // segment of any bypassed pocket do NOT block the FT step (they aren't on
-  // the FT path at all). Earlier guard here mistakenly inspected the bypass
-  // segment and silently suppressed legal FT moves; user_directive_2026-05-18.
-  if (hasOwnPegOnHole(player, `ft-${toFtIdx}`, movingPeg && movingPeg.id)) {
-    return false;
+  // rules.json :: MOV_NO_PASS_OWN (z=9), FT_NO_OVERTAKE_OWN (Ken, 2026-11-07).
+  // Each ft-* hole is the first hole of a colour area on the outer track. A ring
+  // hop from ft-{from} to ft-{to} jumps that whole colour area, so it overtakes
+  // every peg in it. The hop is blocked when an own peg sits on the next ft-*
+  // hole OR anywhere in the colour area being skipped. (Reverses the
+  // 2026-05-18 relax, which let the jump pass own pegs in the skipped area.)
+  const movingId = movingPeg && movingPeg.id;
+  if (hasOwnPegOnHole(player, `ft-${toFtIdx}`, movingId)) return false;
+  for (const hole of skippedColourArea(fromFtIdx, toFtIdx)) {
+    if (hasOwnPegOnHole(player, hole, movingId)) return false;
   }
   return true;
+}
+
+// The outer-track holes strictly between ft-{from} and ft-{to}, clockwise.
+function skippedColourArea(fromFtIdx, toFtIdx) {
+  const holes = [];
+  const start = CLOCKWISE_TRACK.indexOf(`ft-${fromFtIdx}`);
+  if (start < 0) return holes;
+  for (let s = 1; s < CLOCKWISE_TRACK.length; s++) {
+    const hole = CLOCKWISE_TRACK[(start + s) % CLOCKWISE_TRACK.length];
+    if (hole === `ft-${toFtIdx}`) break;
+    holes.push(hole);
+  }
+  return holes;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1540,8 +1556,8 @@ function getTrackSequence(peg, player, direction) {
           }
           break;
         }
-        // Own peg blocks further travel (MOV_NO_PASS_OWN); ft-* are passable.
-        if (hasOwnPegOnHole(player, hole, peg.id) && !hole.startsWith('ft-')) break;
+        // Own peg blocks further travel (MOV_NO_PASS_OWN), on ft-* holes too.
+        if (hasOwnPegOnHole(player, hole, peg.id)) break;
         seq.push(hole);
       }
     }
@@ -1802,9 +1818,9 @@ function calculateValidMoves() {
           for (let s = 0; s < steps; s++) {
             const h = trackSeq[s];
             const occ = state.board.get(h);
-            // rules.json :: MOV_NO_PASS_OWN (z=9) — cannot pass own peg
-            // rules.json :: FT_RING_PASS_RELAX (z=72) — `ft-*` intermediates exempt
-            if (occ && occ.playerIdx === ci && s < steps - 1 && !h.startsWith('ft-')) {
+            // rules.json :: MOV_NO_PASS_OWN (z=9) — cannot pass own peg, on any
+            // hole, ft-* included (Ken, 2026-11-07: ft holes are outer-track holes)
+            if (occ && occ.playerIdx === ci && s < steps - 1) {
               blocked = true; break;
             }
           }
@@ -1854,8 +1870,8 @@ function calculateValidMoves() {
         //               sitting on an ft-* hole may enter the bullseye.
         // rules.json :: BULL_NO_BACKWARD        (z=24) — `!rules.noFastTrack`.
         // rules.json :: BULL_MAX_ONE_PEG        (z=30) — bullseye occupancy check.
-        // rules.json :: FT_RING_PASS_RELAX      (z=72) — own pegs on `ft-*`
-        //               intermediates are passable; penult itself must be free.
+        // rules.json :: MOV_NO_PASS_OWN         (z=9)  — own pegs block on every
+        //               hole, ft-* included; penult itself must be free.
         // rules.json :: BULL_PENULT_REACHABLE   (user_directive_2026-05-09)
         //               bullseye divert may only be offered when the regular
         //               full-step continuation is ALSO reachable AND the
@@ -1876,11 +1892,7 @@ function calculateValidMoves() {
             for (let s = 0; s < steps - 1; s++) {
               const h = trackSeq[s];
               const occ = state.board.get(h);
-              if (occ && occ.playerIdx === ci) {
-                if (s === steps - 2 || !h.startsWith('ft-')) {
-                  bullPathBlocked = true; break;
-                }
-              }
+              if (occ && occ.playerIdx === ci) { bullPathBlocked = true; break; }
             }
             // Penultimate ft-* itself must be unoccupied by own peg
             // (so peg can pivot to bullseye from it). Opponent on penult is OK.
@@ -1942,7 +1954,7 @@ function calculateValidMoves() {
   // rules.json :: CARD_7_SPLIT       (z=38) — 2 pegs, a+b=7, both clockwise, both legal.
   // rules.json :: CARD_7_SOLO        (z=40) — 1 peg in play → single 7-step move.
   // rules.json :: CARD_7_FT_HANDOFF  (z=42) — FT-priority + on-ring constraint.
-  // rules.json :: FT_RING_PASS_RELAX (z=72) — own pegs on `ft-*` are passable.
+  // rules.json :: MOV_NO_PASS_OWN    (z=9)  — own pegs block on every hole, ft-* included.
   // Three variants per (a, b, pi1, pi2): STANDARD | BULL-LEFT | BULL-RIGHT.
   //
   // The caller already establishes that this is a 7 in classic mode. This guard
@@ -1976,17 +1988,13 @@ function calculateValidMoves() {
       const _ownFt = `ft-${bp}`;
 
       // Helper: is the rim half of length n (positions seq[0..n-1]) reachable?
-      // Cannot land on own peg. FT-ring relax (user_directive_2026-04-25):
-      // own pegs on `ft-*` intermediate holes do NOT block — pegs may pass each
-      // other on the ring; only the destination must be unoccupied by self.
+      // Cannot pass or land on own peg, on any hole, ft-* included
+      // (Ken, 2026-11-07; retires the 2026-04-25 ft-* pass relax).
       const _rimReachable = (seq, n) => {
         if (seq.length < n) return false;
         for (let s = 0; s < n; s++) {
-          const h = seq[s];
-          const o = state.board.get(h);
-          if (!o || o.playerIdx !== ci) continue;
-          if (s === n - 1) return false;
-          if (!h.startsWith('ft-')) return false;
+          const o = state.board.get(seq[s]);
+          if (o && o.playerIdx === ci) return false;
         }
         return true;
       };
@@ -2014,8 +2022,8 @@ function calculateValidMoves() {
       //      this is the ONLY route onto the bullseye (one hop, never multi).
       //   B) Outer approach: a peg NOT on the ring travels clockwise and lands
       //      on a foreign ft-* hole as its PENULTIMATE position, then hops to
-      //      the center on the final step. Intermediate own pegs block, except
-      //      passable own pegs sitting on ft-* holes (FT_RING_PASS_RELAX).
+      //      the center on the final step. Intermediate own pegs block, on
+      //      ft-* holes too (MOV_NO_PASS_OWN, Ken 2026-11-07).
       const _bullPath = (seq, n, fromHole) => {
         const _ownFtHole = `ft-${bp}`;
         if (n === 1) {
@@ -2032,8 +2040,7 @@ function calculateValidMoves() {
           const h = seq[s];
           const o = state.board.get(h);
           if (!o || o.playerIdx !== ci) continue;
-          if (s === n - 2) return null;            // cannot land penultimate on an own peg
-          if (!h.startsWith('ft-')) return null;   // own peg blocks unless passable on the ring
+          return null;                             // an own peg anywhere on the way blocks
         }
         return [...seq.slice(0, n - 1), 'bullseye'];
       };
@@ -2231,10 +2238,9 @@ function calculateValidMoves() {
 
   // ── FT OVERTAKE CHECK (removed) ──
   // Previously rewrote FT 'move' moves into forced exits when an own peg
-  // sat ahead on the ring. Under the FT-ring relax (user_directive_2026-04-25),
-  // pegs may PASS own pegs on `ft-*` holes — only landing is forbidden, and
-  // that's already enforced upstream in the move generator. Forced-exit
-  // alternatives are still surfaced by the FT EXIT OPTIONS block.
+  // sat ahead on the ring. Passing own pegs is now blocked upstream on every
+  // hole (MOV_NO_PASS_OWN, Ken 2026-11-07); a peg whose ring is blocked leaves
+  // at an earlier ft-* hole via the FT EXIT OPTIONS block.
 
   // ── WIN-HOLE OVERSHOOT GUARD ──
   // rules.json :: WIN_NO_OVERSHOOT (user_directive_2026-05-09)
