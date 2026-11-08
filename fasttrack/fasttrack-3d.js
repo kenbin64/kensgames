@@ -760,11 +760,11 @@ const CameraDirector = {
   // zoom the board freely; nothing moves the camera on its own.
   PLAYER_ELEVATION_DEG: 30,
 
-  // The compass angle (round the board's centre) of the human player's home hole, or null before the game exists.
+  // The compass angle (round the board's centre) of this screen's player's home hole, or null before the game exists.
   _humanHomeAngle() {
     const core = window.FastTrackCore;
     const players = core && core.state && core.state.players ? (core.state.players.get('list') || []) : [];
-    const me = players.find(p => p && !p.isBot);
+    const me = screenPlayer(players);
     const home = me && holeRegistry.get(`home-${me.boardPosition}`);
     const pos = home && (home.mesh ? home.mesh.position : home.position);
     return pos && Math.hypot(pos.x, pos.z) > 1 ? Math.atan2(pos.z, pos.x) : null;
@@ -6659,6 +6659,15 @@ function showNoGamePanel() {
   }
 }
 
+// The seat this screen belongs to. Playing with friends, every screen has its own seat: the one
+// carrying this browser's user id (Ken, 2026-11-07). Solo, it is the one person at the table.
+function screenPlayer(players) {
+  const core = window.FastTrackCore;
+  const me = core && core.state && core.state.meta ? core.state.meta.get('myUserId') : null;
+  return (me && players.find(p => p && p.userId != null && String(p.userId) === String(me)))
+    || players.find(p => p && !p.isBot) || null;
+}
+
 // ═
 // TURN MARQUEE — the seating order, always visible in the footer strip
 // ═
@@ -6676,6 +6685,7 @@ function renderTurnMarquee() {
   if (!track || !window.FastTrackCore) return;
   const players = window.FastTrackCore.state.players.get("list") || [];
   if (!players.length) { track.innerHTML = ""; return; }
+  const mine = screenPlayer(players);
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -6691,7 +6701,7 @@ function renderTurnMarquee() {
       const c = window.FastTrackCore.state.deck.get("currentCard");
       tag = c ? ("drew " + (c.display || c.value)) : "drawing...";
     } else {
-      tag = p.isBot ? "bot" : "you";
+      tag = p.isBot ? "bot" : (p === mine ? "you" : "player");
     }
     return '<span class="ft-mq-seat' + (active ? " is-turn" : "") + '"'
       + ' style="color:' + esc(active ? "#fff" : (p.color || "#9fb0c4")) + '">'
