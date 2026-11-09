@@ -429,6 +429,15 @@ function getHoleType(holeId) {
 }
 
 
+// Does this peg travel the fast-track ring? Only with fast-track STATUS (Ken, 2026-11-08):
+// status comes from entering going clockwise, it is kept while the peg stays on the ring, and
+// it ends when the peg reaches its own ft hole, leaves the ring, or the player moves another
+// peg. A peg sitting on an ft hole without status (backed on with a 4, left the bullseye, lost
+// its status) walks the outer track like any other peg.
+function _ridesRing(peg) {
+  return !!(peg && peg.holeId && peg.holeId.startsWith('ft-') && peg.onFasttrack && !peg.backedOntoFt);
+}
+
 function hasOwnPegOnHole(player, holeId, excludePegId = null) {
   if (!player || !Array.isArray(player.pegs)) return false;
   if (!holeId || holeId === 'bullseye') return false;
@@ -1190,6 +1199,17 @@ function _loneHuman() {
   return players.filter(p => p && !p.isBot).length <= 1;
 }
 
+// Is it THIS screen's player's turn? (Ken, 2026-11-08) Playing aids (footer buttons,
+// lit holes, hole letters, peg numbers) belong to the player whose turn it is and are
+// shown only on their own screen. Everyone else sees only the pegs and the moves made.
+// Solo: the person, never a bot. Online: the seat this screen owns.
+function isLocalTurn() {
+  const players = state.players.get('list') || [];
+  const cp = players[state.players.get('current') || 0];
+  if (!cp || cp.isBot) return false;
+  return !_isMpMode() || _isMyTurn();
+}
+
 function _isMyTurn() {
   if (!_isMpMode()) return true;
   // Single-human authority: the lone human is never "not my turn". This keeps
@@ -1493,6 +1513,7 @@ function drawCard() {
 function _drawCardCommit(card) {
   state.deck.set('currentCard', card);
   state.deck.set('spent', false);
+  state.turn.set('leaveFastTrack', false);         // every card starts by staying on the fast track
   state.turn.set('phase', 'move');
   _splitPegIdx = null;
   _splitStepChoice = null;
@@ -1583,6 +1604,13 @@ function renderCardTable() {
   if (old && !card && old.querySelector && old.querySelector('.card-face')) old.innerHTML = '<div class="card-back"></div>';
 }
 
+// "Leave fast track" / "Stay on fast track": turn the other options on or off for this card.
+function setLeaveFastTrack(on) {
+  state.turn.set('leaveFastTrack', !!on);
+  calculateValidMoves();
+  updateUI();
+}
+
 function getCardDescription(v) {
   return {
     A: 'Move 1 or enter', '2': 'Move 2', '3': 'Move 3', '4': 'Move 4 BACKWARD',
@@ -1638,7 +1666,7 @@ function getTrackSequence(peg, player, direction) {
   // freezing all of that peg's future moves.
   // A peg that backed onto an ft-* hole with a 4 has no fast-track status: it walks the
   // outer track like any other peg (Ken, 2026-11-08). Its sequence is the perimeter one below.
-  if (type === 'fasttrack' && !peg.backedOntoFt) {
+  if (type === 'fasttrack' && _ridesRing(peg)) {
     // rules.json :: FT_NO_PASS_OWN_FT (v3.2.0, user_directive_2026-05-20b)
     // The peg consumes the full card value. When the ring path crosses the
     // player's own ft-{bp}, the move continues through it into the home
@@ -1916,14 +1944,18 @@ function calculateValidMoves() {
       // D = (bp - X + 6) % 6 = ring distance from ft-X to own ft-{bp}.
       // The 1-hit bullseye jump (peg on foreign ft-*, card movement===1) is
       // still emitted separately below — independent of this enumeration.
-      const _ftForward = peg.holeId.startsWith('ft-') && !peg.backedOntoFt && dir === 'clockwise' && !rules.noFastTrack;
+      const _ftForward = _ridesRing(peg) && dir === 'clockwise' && !rules.noFastTrack;
 
       if (_ftForward) {
         const N = rules.movement;
         const _ftOpts = _enumerateFtExitOptions(peg, N);
         for (const opt of _ftOpts) {
+          // Every hop on the ring and not yet at its own ft hole: the peg is still on the fast
+          // track, so this is a plain move and keeps the status (Ken, 2026-11-08). Labelling it an
+          // exit dropped the status on, for example, a royal's single hop from ft-1 to ft-2.
+          const _staysOnRing = opt.path.every(h => h.startsWith('ft-')) && opt.dest !== `ft-${bp}`;
           moves.push({
-            type: 'exitFastTrack', pegIdx: pi, dest: opt.dest,
+            type: _staysOnRing ? 'move' : 'exitFastTrack', pegIdx: pi, dest: opt.dest,
             steps: N, from: peg.holeId,
             path: opt.path
           });
@@ -2154,7 +2186,7 @@ function calculateValidMoves() {
         const _ownFtHole = `ft-${bp}`;
         if (n === 1) {
           if (!fromHole || !fromHole.startsWith('ft-')) return null;
-          if (peg && peg.backedOntoFt) return null;            // backed on with a 4: no status
+          if (peg && !_ridesRing(peg)) return null;            // the one-hop needs fast-track status
           if (fromHole === _ownFtHole) return null;
           return ['bullseye'];
         }
@@ -2212,7 +2244,7 @@ function calculateValidMoves() {
       // clear it). Counting / gating on geometry keeps a flag-cleared ring
       // peg's bullseye 1-hit and ring moves from being wrongly dropped, and
       // matches rules.json's "geometrically on any ft-* hole" wording.
-      const _onRing = (p) => !!(p && p.holeId && p.holeId.startsWith('ft-') && !p.backedOntoFt);
+      const _onRing = (p) => _ridesRing(p);
       const _ftPegCount = player.pegs.filter(_onRing).length;
       const _ftRuleOK = (peg1, peg2) => {
         if (_ftPegCount === 0) return true;
@@ -2248,7 +2280,7 @@ function calculateValidMoves() {
       // Returns Array<{ path, dest }>. May be empty (blocked / unreachable).
       const _halfOptions = (peg, n) => {
         if (n < 1 || !peg || !peg.holeId) return [];
-        if (peg.holeId.startsWith('ft-') && !peg.backedOntoFt) {
+        if (_ridesRing(peg)) {
           return _enumerateFtExitOptions(peg, n);
         }
         const seq = getTrackSequence(peg, player, 'clockwise');
@@ -2404,11 +2436,53 @@ function calculateValidMoves() {
     }
   }
 
-  // ── FASTTRACK PRIORITY RULE ──
-  // If any of the player's pegs are on FastTrack, they MUST move a FT peg.
-  // If no FT moves are possible, all FT pegs lose their FastTrack status
-  // and drop to the regular track — then recalculate.
+  // ── FASTTRACK: STAY BY DEFAULT, LEAVE BY CHOICE (Ken, 2026-11-08) ──
+  // With one or more pegs on the fast track, the only options offered are to keep
+  // going on it toward completion: hops along the ring, reaching the player's own
+  // ft hole (and on into the home stretch), the one-hop into the bullseye. The
+  // player may press "Leave fast track" (setLeaveFastTrack); then every move is
+  // offered, ducking out early or playing another peg, and once that move is made
+  // the fast track is lost (the status rules in executeMove). Pressing it again
+  // goes back to staying. The choice is reset with every card drawn.
+  state.turn.set('canLeaveFastTrack', false);
   const pegsOnFT = player.pegs.filter(p => p.onFasttrack);
+  if (pegsOnFT.length > 0 && state.turn.get('leaveFastTrack') === true) {
+    state.turn.set('canLeaveFastTrack', true);       // so the button can be turned back off
+    state.turn.set('canChooseEntry', _entryChoice(moves));
+    state.turn.set('validMoves', moves);
+    showMoveHints();
+    return;
+  }
+  if (pegsOnFT.length > 0) {
+    // A part of a move that keeps to the fast track: ring holes only, up to the
+    // player's own ft hole; after that hole the rest may run into the home stretch.
+    const _ownFtHole = `ft-${bp}`;
+    const _staysOnFt = (path) => {
+      if (!Array.isArray(path) || !path.length) return false;
+      const k = path.indexOf(_ownFtHole);
+      const ring = k === -1 ? path : path.slice(0, k + 1);
+      return ring.every(h => typeof h === 'string' && h.startsWith('ft-'));
+    };
+    const _keepsFt = (m) => {
+      if (m.type === 'enterBullseye') return _ridesRing(player.pegs[m.pegIdx]);
+      if (m.type === 'split') {
+        const p1 = player.pegs[m.pegIdx], p2 = player.pegs[m.peg2Idx];
+        if (!_ridesRing(p1) && !_ridesRing(p2)) return false;
+        const ok1 = !_ridesRing(p1) || m.dest === 'bullseye' || _staysOnFt(m.path);
+        const ok2 = !_ridesRing(p2) || m.dest2 === 'bullseye' || _staysOnFt(m.path2);
+        return ok1 && ok2;
+      }
+      return _ridesRing(player.pegs[m.pegIdx]) && _staysOnFt(m.path);
+    };
+    const _stay = moves.filter(_keepsFt);
+    if (_stay.length > 0) {
+      state.turn.set('canLeaveFastTrack', _stay.length < moves.length);
+      state.turn.set('canChooseEntry', _entryChoice(_stay));
+      state.turn.set('validMoves', _stay);
+      showMoveHints();
+      return;
+    }
+  }
   if (pegsOnFT.length > 0) {
     // Geometry-authoritative keep: a move counts as "FT-related" when the
     // moving peg sits on an ft-* hole (regardless of its .onFasttrack flag),
@@ -2416,7 +2490,7 @@ function calculateValidMoves() {
     // after the split block already enumerated them on the same basis.
     const _moveOnRing = (idx) => {
       const p = player.pegs[idx];
-      return !!(p && p.holeId && p.holeId.startsWith('ft-') && !p.backedOntoFt);
+      return _ridesRing(p);
     };
     const ftMoves = moves.filter(m => {
       if (m.type === 'enterBullseye') return true;
@@ -2442,8 +2516,16 @@ function calculateValidMoves() {
     }
   }
 
+  state.turn.set('canChooseEntry', _entryChoice(moves));
   state.turn.set('validMoves', moves);
   showMoveHints();
+}
+
+// An Ace, 6 or Joker with a peg in holding AND a peg on the board that can move: the player
+// first chooses "New peg" or "Board peg" (Ken, 2026-11-08). The footer shows those two buttons.
+function _entryChoice(moves) {
+  const list = moves || [];
+  return list.some(m => m && m.type === 'enter') && list.some(m => m && m.type !== 'enter');
 }
 
 
@@ -5638,6 +5720,8 @@ window.FastTrackCore = {
   drawCard,
   _drawCardCommit, // exposed for headless tests: the real draw path that re-arms the turn guard
   loadDeckFor: _loadDeckFor, // put a seat's own deck on the table (tests stack a card on the drawer's deck)
+  isLocalTurn,                // is it this screen's player's turn (who may see the playing aids)
+  setLeaveFastTrack,          // the "Leave fast track" button
   executeMove,
   endTurn,
   botTurn,

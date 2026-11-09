@@ -3401,7 +3401,16 @@ function _hidePegNamesExceptHovered() {
 
 function refreshAlwaysOnPegNames() {
   if (!_pegNamesAlwaysOn()) return;
+  // Peg numbers match the footer buttons, so like them they are only for the player whose turn it
+  // is, on their own screen, over their own pegs (Ken, 2026-11-08).
+  const _core = window.FastTrackCore;
+  const _local = !!(_core && typeof _core.isLocalTurn === 'function' ? _core.isLocalTurn() : true);
+  const _cur = _core && _core.state ? (_core.state.players.get('current') || 0) : -1;
   pegRegistry.forEach((peg, id) => {
+    if (!_local || (_pegInfoById(id) || {}).playerIdx !== _cur) {
+      if (peg.nameSprite) peg.nameSprite.visible = false;
+      return;
+    }
     // Pegs waiting in holding are stacked on top of each other, so labelling
     // them produces a pile of overlapping pills that name nothing usefully.
     // They are already listed by name in the peg bar along the bottom.
@@ -5270,6 +5279,13 @@ function _refreshRouteIndex() {
   return _routeIndex;
 }
 
+function _singlePlayHeldBack() {
+  const C = window.FastTrackCore;
+  if (!C || !C.state) return false;
+  if (typeof C.isLocalTurn === 'function' && !C.isLocalTurn()) return true;
+  return !!(C.state.turn.get('canLeaveFastTrack') || C.state.turn.get('canChooseEntry'));
+}
+
 // Auto-commit when the move cycle collapses to a single legal entry. Guarded
 // with a re-entrancy flag so a chain of forced choices doesn't re-enter the
 // scheduler before the previous tick has flushed.
@@ -5277,6 +5293,9 @@ let _autoCommitScheduled = false;
 function _maybeAutoCommitSingle() {
   if (_autoCommitScheduled) return;
   if (!_moveCycle || _moveCycle.length !== 1) return;
+  // Not while the player still has a choice the cycle does not list ("Leave fast track" on offer),
+  // and only ever for this screen's own player (Ken, 2026-11-08).
+  if (_singlePlayHeldBack()) return;
   const targetEntry = _moveCycle[0];
   // user_directive_2026-05-19 — when there is only ONE legal play, just
   // execute it. Includes terminal moves (previous safeguard reverted per
@@ -5288,6 +5307,7 @@ function _maybeAutoCommitSingle() {
     // Verify the entry is still the sole option (state may have shifted).
     if (!_moveCycle || _moveCycle.length !== 1) return;
     if (_entryKey(_moveCycle[0]) !== _entryKey(targetEntry)) return;
+    if (_singlePlayHeldBack()) return;
     _commitEntry(targetEntry);
   });
 }

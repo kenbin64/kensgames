@@ -50,9 +50,13 @@
     return core ? (core.turn.get('validMoves') || []) : [];
   }
 
+  // A person's turn ON THIS SCREEN. Online, a friend's turn is not ours: their buttons, lit holes and
+  // letters stay on their screen (Ken, 2026-11-08).
   function isHumanTurn() {
     const player = readPlayer();
-    return !!(player && !player.isBot && readMoves().length > 0);
+    const core = window.FastTrackCore;
+    const local = !core || typeof core.isLocalTurn !== 'function' || core.isLocalTurn();
+    return !!(player && !player.isBot && local && readMoves().length > 0);
   }
 
   function isSevenCard() {
@@ -85,7 +89,8 @@
 
   function plainOptionsFor(moves, pegIdx) {
     return moves.map((move, moveIdx) => ({ move, moveIdx }))
-      .filter(({ move }) => move && move.type !== 'split' && move.pegIdx === pegIdx)
+      .filter(({ move }) => move && move.type !== 'split' && move.pegIdx === pegIdx
+        && !(pick.entry === 'board' && move.type === 'enter'))
       .map(({ move, moveIdx }) => plainOption(move, moveIdx));
   }
 
@@ -156,7 +161,7 @@
 
   function freshPick() {
     return { stage: 'peg', peg: null, stops: [], steps: null, dest: null, firstLeg: null, peg2: null, moveIdx: null,
-      options: [], choices: [], history: [] };
+      entry: null, options: [], choices: [], history: [] };
   }
 
   function resetPick() { Object.assign(pick, freshPick()); }
@@ -197,8 +202,13 @@
   function letterHoles(options) {
     const firstByDest = new Map();
     for (const o of options) if (!firstByDest.has(o.dest)) firstByDest.set(o.dest, o);
+    // Nearest first. Equal distances (a peg on the fast track: every option is the card's full count)
+    // go by how far each stays on the ring, most first, so A keeps the fast track longest (Ken, 2026-11-08);
+    // only then by hole name.
+    const ringHops = (o) => (o.path || []).filter(h => String(h).startsWith('ft-')).length;
     const ordered = [...firstByDest.values()]
-      .sort((a, b) => ((a.path || []).length - (b.path || []).length) || String(a.dest).localeCompare(String(b.dest)))
+      .sort((a, b) => ((a.path || []).length - (b.path || []).length) || (ringHops(b) - ringHops(a))
+        || String(a.dest).localeCompare(String(b.dest)))
       .slice(0, LETTERS.length);
     pick.choices = ordered.length < 2 ? [] : ordered.map((o, i) => ({
       dest: o.dest, label: LETTERS[i], kind: 'hole', words: `Hole ${LETTERS[i]}`, act: () => chooseHole(o.dest),
@@ -346,11 +356,12 @@
     paint(byStage[pick.stage] || []);
   }
 
-  // While it is a person's turn, only the panel draws move highlights.
+  // Only the panel draws move highlights, and only on this screen's player's turn. On anyone else's
+  // turn (a friend, a bot) the board shows no possible moves at all, only the move when it is made.
   function takeOverHighlights() {
     if (drawPaths || typeof window.highlightMovePaths !== 'function') return;
     drawPaths = window.highlightMovePaths;
-    window.highlightMovePaths = function (moves) { if (!isHumanTurn()) drawPaths(moves); };
+    window.highlightMovePaths = function () { if (!isHumanTurn()) drawPaths([]); };
     window.highlightSinglePath = function () {};
   }
 
@@ -456,13 +467,15 @@
     const human = isHumanTurn();
     const player = readPlayer();
     const color = (player && player.color) || '#8899aa';
-    const choosing = human && !undo.open && pick.stage !== 'ready';
+    const choosing = human && !undo.open && pick.stage !== 'ready' && !entryPending(human);
     const slots = choosing ? slotsNow() : new Array(SLOT_COUNT).fill(null);
     slotActions = slots.map(s => (s ? s.act : null));
     slots.forEach((slot, i) => renderSlot(i, slot, color));
     showElement('ft-peg-buttons', choosing);
     showElement('ft-peg-back', human && !undo.open && pick.history.length > 0);
     renderConfirm(human);
+    renderLeaveFastTrack(human);
+    renderEntry(human);
     document.body.classList.toggle('ft-bar-idle', !human && !undo.open);
     refreshBanner();
   }
@@ -525,8 +538,83 @@
       back.addEventListener('click', goBack);
       row.parentNode.insertBefore(back, row);
     }
+    if (!document.getElementById('ft-entry-new')) {
+      const add = (id, text, title, act) => {
+        const button = document.createElement('button');
+        button.type = 'button'; button.id = id; button.className = 'ft-entry-btn'; button.hidden = true;
+        button.textContent = text; button.title = title; button.addEventListener('click', act);
+        row.parentNode.insertBefore(button, row);
+      };
+      add('ft-entry-new', 'New peg', 'Bring a peg out of holding onto your home hole', chooseNewPeg);
+      add('ft-entry-board', 'Board peg', 'Move one of your pegs already on the board', chooseBoardPeg);
+    }
+    if (!document.getElementById('ft-leave-ft')) {
+      const leave = document.createElement('button');
+      leave.type = 'button'; leave.id = 'ft-leave-ft'; leave.hidden = true;
+      leave.addEventListener('click', toggleLeaveFastTrack);
+      row.parentNode.insertBefore(leave, row);
+    }
     const confirm = document.getElementById('ft-peg-confirm');
     if (confirm && !confirm._turnPanel) { confirm._turnPanel = true; confirm.addEventListener('click', confirmMove); }
+  }
+
+  // "New peg" / "Board peg" (Ken, 2026-11-08): an Ace, 6 or Joker with a peg in holding and a peg on the board
+  // that can move. "New peg" brings a peg out of holding onto the home hole at once; "Board peg" goes on to the
+  // usual choice among the pegs on the board (↩ comes back here).
+  function entryPending(human) {
+    const core = readCore();
+    return !!(human && !undo.open && pick.stage === 'peg' && pick.entry == null && core && core.turn.get('canChooseEntry'));
+  }
+
+  function chooseNewPeg() {
+    if (!isHumanTurn() || undo.open) return;
+    const moves = readMoves();
+    let best = -1;
+    moves.forEach((m, i) => { if (m && m.type === 'enter' && (best < 0 || m.pegIdx < moves[best].pegIdx)) best = i; });
+    if (best < 0) return;
+    remember();
+    pick.moveIdx = best;
+    pick.stage = 'ready';
+    confirmMove();
+  }
+
+  function chooseBoardPeg() {
+    if (!isHumanTurn() || undo.open) return;
+    remember();
+    pick.entry = 'board';
+    render();
+  }
+
+  function renderEntry(human) {
+    const show = entryPending(human);
+    showElement('ft-entry-new', show);
+    showElement('ft-entry-board', show);
+  }
+
+  // "Leave fast track" (Ken, 2026-11-08): by default a player with pegs on the fast track is only offered
+  // moves that keep going on it. This button turns the other options on (duck out early, play another peg);
+  // pressed again, "Stay on fast track" turns them off. Either way the choice starts over.
+  function toggleLeaveFastTrack() {
+    const core = window.FastTrackCore;
+    if (!core || typeof core.setLeaveFastTrack !== 'function' || undo.open || !isHumanTurn()) return;
+    const leaving = core.state.turn.get('leaveFastTrack') === true;
+    resetPick();
+    core.setLeaveFastTrack(!leaving);
+    signature = '';
+    render();
+  }
+
+  function renderLeaveFastTrack(human) {
+    const button = document.getElementById('ft-leave-ft');
+    const core = readCore();
+    if (!button) return;
+    const offered = !!(human && !undo.open && core && core.turn.get('canLeaveFastTrack'));
+    const leaving = !!(core && core.turn.get('leaveFastTrack') === true);
+    button.hidden = !offered;
+    button.textContent = leaving ? 'Stay on fast track' : 'Leave fast track';
+    button.classList.toggle('is-leaving', leaving);
+    button.title = leaving ? 'Back to moves that keep going on the fast track'
+      : 'Show every other move: leave the fast track early or play another peg. Making one of those moves loses the fast track.';
   }
 
   function pressSlot(i) {
@@ -557,12 +645,15 @@
 
   // ── Only one legal play: the game makes it, no button pressed ───────────────────────────────
 
+  // Not when "Leave fast track" is on offer: the player still has a choice to make (Ken, 2026-11-08).
+  function leaveOffered() { const core = readCore(); return !!(core && (core.turn.get('canLeaveFastTrack') || core.turn.get('canChooseEntry'))); }
+
   function playIfOnlyOne(expected) {
-    if (distinctPlays(readMoves()).length !== 1) return;
+    if (distinctPlays(readMoves()).length !== 1 || leaveOffered()) return;
     setTimeout(() => {
       if (signatureNow() !== expected || !isHumanTurn() || undo.open) return;
       const plays = distinctPlays(readMoves());
-      if (plays.length === 1 && typeof window.executeMove === 'function') window.executeMove(plays[0]);
+      if (plays.length === 1 && !leaveOffered() && typeof window.executeMove === 'function') window.executeMove(plays[0]);
     }, ONE_PLAY_DELAY_MS);
   }
 
@@ -592,7 +683,7 @@
   // The instruction banner (fasttrack-3d.js) asks this panel what to say; tell it when the step changes.
   let bannerKey = '';
   function refreshBanner() {
-    const key = pick.stage + ':' + signature + ':' + undo.open + ':' + pick.choices.length;
+    const key = pick.stage + ':' + signature + ':' + undo.open + ':' + pick.choices.length + ':' + pick.entry;
     if (key === bannerKey || typeof window._refreshInstructionBanner !== 'function') return;
     bannerKey = key;
     window._refreshInstructionBanner();
@@ -601,6 +692,7 @@
   // One short sentence per step: what to press, in the words on the buttons.
   function instruction() {
     if (undo.open) return 'Press Undo to take it back';
+    if (entryPending(isHumanTurn())) return 'New peg brings one out of holding. Board peg moves one already out';
     const peg = (pick.peg ?? 0) + 1;
     const rest = SEVEN - (pick.steps || 0);
     const texts = {
