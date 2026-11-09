@@ -741,8 +741,8 @@ function initGame(playerCount = 2, config = {}) {
   try { TurnManager._history.push({ from: -1, to: TurnManager.current(), reason: 'restore', at: Date.now(), seats: TurnManager.count() }); } catch (_) {}
   syncPegMatrix();
 
-  // Deck
-  shuffleDeck();
+  // Decks: one real deck per player (Ken, 2026-11-08)
+  _dealDecks();
   log('Game started with ' + effectiveCount + ' players');
 
   // Disable draw until camera + avatar blink are done
@@ -845,6 +845,53 @@ function createDeck() {
   return deck;
 }
 
+// -- ONE DECK PER PLAYER (Ken, 2026-11-08) ------------------------------------
+// Every player has their own real deck of 54 (52 and two jokers). It runs down
+// card by card, every card drawn goes to that player's discard pile whatever
+// happens to it (played, no legal move, passed, a redraw), and only when the
+// deck is empty is that discard pile shuffled back into it.
+//
+// state.deck 'decks' holds each seat's { cards, discard, shuffles }. The deck
+// of the seat drawing is LOADED into state.deck 'cards' / 'discard', so the draw
+// and reshuffle code works on "the deck on the table"; 'activeSeat' says whose
+// it is. Loading is lazy (at the draw) and idempotent, so a snapshot or a turn
+// message arriving in either order can never mix two players' cards.
+function _dealDecks() {
+  const players = state.players.get('list') || [];
+  const decks = players.map(() => ({ cards: createDeck(), discard: [], shuffles: 0 }));
+  state.deck.set('decks', decks);
+  state.deck.set('activeSeat', null);
+  state.deck.set('spent', true);
+  decks.forEach((_, seat) => { _loadDeckFor(seat); shuffleDeck(); });
+  _loadDeckFor(state.players.get('current') || 0);
+}
+
+function _loadDeckFor(seat) {
+  const decks = state.deck.get('decks');
+  if (!Array.isArray(decks) || !decks[seat]) return false;   // a bare harness with one shared deck
+  const active = state.deck.get('activeSeat');
+  if (active === seat) return true;
+  if (active != null && decks[active]) {
+    decks[active] = { ...decks[active], cards: state.deck.get('cards') || [], discard: state.deck.get('discard') || [] };
+  }
+  state.deck.set('cards', (decks[seat].cards || []).slice());
+  state.deck.set('discard', (decks[seat].discard || []).slice());
+  state.deck.set('activeSeat', seat);
+  state.deck.set('decks', decks);
+  return true;
+}
+
+// The card in hand is finished with: it goes on its owner's discard pile, once.
+// Called wherever the current card is cleared, so no card ever leaves the deck.
+function _spendCurrentCard() {
+  const card = state.deck.get('currentCard');
+  if (!card || state.deck.get('spent')) return;
+  const discard = state.deck.get('discard') || [];
+  discard.push(card);
+  state.deck.set('discard', discard);
+  state.deck.set('spent', true);
+}
+
 function shuffleDeck() {
   const deck = state.deck.get('cards') || [];
   // Deterministic, seed-derived order (manifold-first, Phase 1): every client
@@ -858,6 +905,15 @@ function shuffleDeck() {
     || (typeof globalThis !== 'undefined' && globalThis.ManifoldCodec)
     || null;
   if (seed != null && codec && typeof codec.seededShuffle === 'function') {
+    // Each player's deck has its own stream: the seat, and how many times it has been shuffled.
+    const decks = state.deck.get('decks'), seat = state.deck.get('activeSeat');
+    if (Array.isArray(decks) && seat != null && decks[seat]) {
+      const n = decks[seat].shuffles || 0;
+      state.deck.set('cards', codec.seededShuffle(deck, `${seed}:p${seat}:${n}`));
+      decks[seat] = { ...decks[seat], shuffles: n + 1 };
+      state.deck.set('decks', decks);
+      return;
+    }
     const rc = state.meta.get('reshuffleCount') || 0;
     const shuffled = codec.seededShuffle(deck, `${seed}:${rc}`);
     state.meta.set('reshuffleCount', rc + 1);
@@ -1265,6 +1321,8 @@ function applyRemoteAction(action, payload) {
         // Inject the card the host actually drew so deck order matches.
         const card = payload && payload.card;
         if (!card) break;
+        _spendCurrentCard();
+        _loadDeckFor(state.players.get('current') || 0);
         const deck = state.deck.get('cards') || [];
         // Remove one matching card from local deck (by display) so the local
         // deck stays in sync with the broadcaster's. If not found we still
@@ -1312,6 +1370,7 @@ function applyRemoteAction(action, payload) {
       case 'reshuffle': {
         const cards = payload && Array.isArray(payload.cards) ? payload.cards : null;
         if (!cards) break;
+        _loadDeckFor(state.players.get('current') || 0);
         state.deck.set('cards', cards.slice());
         state.deck.set('discard', []);
         break;
@@ -1406,6 +1465,8 @@ function drawCard() {
   if (!_applying && _isMpMode() && !_canDriveActiveSeat()) return;
   dismissYourTurnPopup();
   if (_undo) _endUndoOffer();                    // Undo never crosses a card draw: drawing closes it
+  _spendCurrentCard();                           // (normally nothing: the last card was spent when its turn ended)
+  _loadDeckFor(state.players.get('current') || 0); // this player's own deck
 
   let deck = state.deck.get('cards') || [];
   if (deck.length === 0) {
@@ -1414,7 +1475,7 @@ function drawCard() {
     state.deck.set('cards', deck);
     shuffleDeck();
     deck = state.deck.get('cards');
-    log('Deck reshuffled');
+    log(getCurrentPlayerName() + ': deck ran out, discard pile reshuffled');
     // Tell peers the post-shuffle deck order so their next remote draw matches.
     if (!_applying && _isHost()) _broadcast('reshuffle', { cards: deck.slice() });
   }
@@ -1431,6 +1492,7 @@ function drawCard() {
 // and applyRemoteAction (peer) so visual side-effects stay consistent.
 function _drawCardCommit(card) {
   state.deck.set('currentCard', card);
+  state.deck.set('spent', false);
   state.turn.set('phase', 'move');
   _splitPegIdx = null;
   _splitStepChoice = null;
@@ -1450,6 +1512,7 @@ function _drawCardCommit(card) {
   const infoEl = document.getElementById('card-info');
   if (infoEl) infoEl.textContent = getCardDescription(card.value);
 
+  try { renderCardTable(); } catch (_) { /* the table must never stop a draw */ }
   log(`${getCurrentPlayerName()} drew ${card.display}`);
   if (window.ManifoldAudio) ManifoldAudio.playCardDraw();
   _manifoldEmit('card', { deckSize: state.turn.get('deck')?.length || 0 });
@@ -1458,6 +1521,66 @@ function _drawCardCommit(card) {
   calculateValidMoves();
   updateUI();
   _commitState('draw');
+}
+
+// -- THE CARD TABLE (Ken, 2026-11-08) -------------------------------------------
+// Two piles side by side for the player whose turn it is: their own draw deck,
+// face down with the cards left, and the card they drew this turn, face up with
+// their picture on it so everyone can see what another player drew. When the
+// turn ends the drawn slot empties again: the next player starts from their deck.
+// Rebuilt from state on every UI update, so it can never be left showing an old card.
+function _cardFaceParts(card) {
+  const disp = String(card.display || card.value || '');
+  const m = disp.match(/([\u2660\u2665\u2666\u2663])/);
+  const suit = m ? m[1] : '';
+  return { suit, rank: suit ? disp.replace(suit, '') : disp, red: suit === '\u2665' || suit === '\u2666' };
+}
+
+function renderCardTable() {
+  if (typeof document === 'undefined') return;
+  const area = document.getElementById('card-area');
+  if (!area || typeof area.appendChild !== 'function') return;
+  const players = state.players.get('list') || [];
+  const ci = state.players.get('current') || 0;
+  const cp = players[ci];
+  if (!cp) return;
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // Cards left in this player's own deck (the loaded one is on the table).
+  const decks = state.deck.get('decks');
+  const left = (Array.isArray(decks) && decks[ci] && state.deck.get('activeSeat') !== ci)
+    ? (decks[ci].cards || []).length
+    : (state.deck.get('cards') || []).length;
+  const card = state.deck.get('currentCard');
+  const mine = _isMpMode() ? (!cp.isBot && _isMyTurn()) : !cp.isBot;
+  const canDraw = mine && state.turn.get('phase') === 'draw' && state.meta.get('winner') === null;
+  const color = cp.color || '#9fb0c4';
+  const pic = cp.avatar || (cp.isBot ? '\u{1F916}' : '\u{1F3AE}');
+  const name = String(cp.name || 'Player').replace(/^\u{1F916}\s*/u, '');
+
+  const drawn = card
+    ? (() => { const f = _cardFaceParts(card); return `<div class="ftt-pile ftt-face ${f.red ? 'red' : 'black'}" title="${esc(name)} drew ${esc(card.display)}">`
+      + `<span class="ftt-rank">${esc(f.rank)}</span><span class="ftt-suit">${esc(f.suit)}</span>`
+      + `<span class="ftt-pic" style="border-color:${esc(color)}">${esc(pic)}</span></div>`; })()
+    : `<div class="ftt-pile ftt-empty" title="The card drawn this turn shows here">drawn</div>`;
+  const html = `<div class="ftt-owner" style="border-color:${esc(color)}">`
+    + `<span class="ftt-owner-pic">${esc(pic)}</span><span class="ftt-owner-name">${mine ? 'Your deck' : esc(name) + '\u2019s deck'}</span></div>`
+    + `<div class="ftt-piles">`
+    + `<div class="ftt-pile ftt-back${canDraw ? ' can-draw' : ''}" title="${esc(name)}'s draw deck: ${left} cards left">`
+    + (canDraw ? '<span class="ftt-draw">DRAW</span>' : '') + `<span class="ftt-count">${left}</span></div>`
+    + drawn + `</div>`;
+
+  let table = document.getElementById('ft-card-table');
+  if (!table) {
+    table = document.createElement('div');
+    table.id = 'ft-card-table';
+    area.appendChild(table);
+  }
+  if (table.innerHTML !== html) table.innerHTML = html;
+
+  // The old single card: back up whenever no card is in play (it is hidden, but kept in step).
+  const old = document.getElementById('current-card');
+  if (old && !card && old.querySelector && old.querySelector('.card-face')) old.innerHTML = '<div class="card-back"></div>';
 }
 
 function getCardDescription(v) {
@@ -3240,11 +3363,9 @@ function executeMove(moveIdx) {
 
   state.players.set('list', players);
 
-  // Discard card
+  // Discard card (onto this player's own discard pile)
   const card = state.deck.get('currentCard');
-  const discard = state.deck.get('discard') || [];
-  discard.push(card);
-  state.deck.set('discard', discard);
+  _spendCurrentCard();
 
   // Store pending hop animation for the 3D renderer
   if (move.type === 'split') {
@@ -3698,6 +3819,7 @@ function _replaySameSeat(card) {
   const cp = players[ci];
   log(`${getCurrentPlayerName()} gets another turn!`);
   try { showRedrawToast(cp && cp.name, cp && cp.color); } catch (_) { /* ignore */ }
+  _spendCurrentCard();
   state.deck.set('currentCard', null);
   state.turn.set('phase', 'draw');
   updateUI();
@@ -3768,7 +3890,7 @@ function passTurn(reason) {
     _lastNoLegalMoveTurnStamp = null;
     // Clear the in-progress card and validMoves so endTurn / next-player UI
     // is reset and no stale move can be replayed.
-    try { state.deck.set('currentCard', null); } catch (_) { }
+    try { _spendCurrentCard(); state.deck.set('currentCard', null); } catch (_) { }
     try { state.turn.set('validMoves', []); } catch (_) { }
     try { state.turn.set('phase', 'draw'); } catch (_) { }
     const players = state.players.get('list') || [];
@@ -4077,6 +4199,7 @@ function endTurn(epoch) {
 // touching state.players.current. Used by non-host peers in endTurn().
 function _localTurnUiCleanup() {
   _clearNoMoveAutoTimer();
+  _spendCurrentCard();
   state.deck.set('currentCard', null);
   state.turn.set('phase', 'draw');
   state.turn.set('validMoves', []);
@@ -4104,6 +4227,7 @@ function _applyTurnAdvance(fromCi, next, seq) {
   }
   console.log('[TURN] _applyTurnAdvance called. fromCi:', fromCi, 'next:', next, 'seq:', seq, 'players:', players.map(p => p && p.name));
 
+  _spendCurrentCard();
   state.deck.set('currentCard', null);
   // Through the manager so a jump that is not exactly +1 is recorded with a
   // stack trace instead of vanishing.
@@ -4896,6 +5020,7 @@ function updateUI() {
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const phase = state.turn.get('phase');
+  try { renderCardTable(); } catch (_) { /* the table must never stop the UI */ }
 
   // Ensure the DRAW CARD prompt and Draw button are correctly armed whenever
   // it's the local human's draw phase. Safety net for code paths (extra-turn
@@ -5512,6 +5637,7 @@ window.FastTrackCore = {
   initGame,
   drawCard,
   _drawCardCommit, // exposed for headless tests: the real draw path that re-arms the turn guard
+  loadDeckFor: _loadDeckFor, // put a seat's own deck on the table (tests stack a card on the drawer's deck)
   executeMove,
   endTurn,
   botTurn,

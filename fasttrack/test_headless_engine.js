@@ -198,7 +198,12 @@ c.initGame(2);
       else if (t.state.turn.get('phase') === 'draw' && t.state.deck.get('currentCard') == null) how = 'replay';
       else { await wait(20); w += 20; }
     }
-    slowest = Math.max(slowest, Date.now() - t0);
+    // A landing that plays a cutscene (fast track, bullseye, safe zone) is meant to hold the turn
+    // until the scene ends, so it is not timed here. With one deck per player (2026-11-08) this
+    // seed now deals an Ace onto a fast-track hole, which the old shared deck never did.
+    const _dest = vm.length ? String(vm[0].dest || '') : '';
+    const _scene = /^(ft-|safe-)|^bullseye$/.test(_dest);
+    if (!_scene) slowest = Math.max(slowest, Date.now() - t0);
     if (how) {
       resolved++;
       if (how !== (REPLAY.has(rank) ? 'replay' : 'advanced')) mismatched++;
