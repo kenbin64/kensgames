@@ -109,15 +109,31 @@ function _ensureCenterToastEl() {
     zIndex: '9000',
     opacity: '0',
     transition: 'opacity 180ms ease, transform 180ms ease',
-    whiteSpace: 'nowrap',
+    // Wrap rather than cut the message off with "..." on a narrow phone.
+    whiteSpace: 'normal',
+    textAlign: 'center',
+    width: 'max-content',
     maxWidth: '90vw',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    boxSizing: 'border-box',
     fontFamily: 'inherit'
   });
   document.body.appendChild(el);
   _centerToastEl = el;
   return el;
+}
+
+// The toast must never cover the card table: the drawn card has to stay readable while
+// "No legal move" is shown (tester report 2026-11-09). On a wide screen the toast sits clear
+// of it at 14% from the top; on a phone the two overlap, so the toast drops just below it.
+function _keepToastOffCardTable(el) {
+  el.style.top = '14%';
+  const table = document.getElementById('ft-card-table') || document.getElementById('card-area');
+  if (!table) return;
+  const t = table.getBoundingClientRect();
+  if (!t.width) return;
+  const r = el.getBoundingClientRect();
+  const overlaps = r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top;
+  if (overlaps) el.style.top = `${Math.round(t.bottom + 10)}px`;
 }
 
 function showCenterToast(text, accentColor, durationMs) {
@@ -131,6 +147,7 @@ function showCenterToast(text, accentColor, durationMs) {
   }
   // Force a reflow so the transition runs even on rapid successive toasts.
   // (Reading offsetWidth is the canonical reflow trigger.)
+  _keepToastOffCardTable(el);
   void el.offsetWidth;
   el.style.opacity = '1';
   el.style.transform = 'translate(-50%, 0) scale(1)';
@@ -3014,6 +3031,8 @@ function placePeg(peg, holeId, playerIdx) {
   state.board.set(holeId, { playerIdx, pegId: peg.id });
 }
 
+let _pendingCutScenes = [];   // cuts made by the move being executed; see executeMove
+
 function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
   const occ = state.board.get(holeId);
   if (!occ || occ.playerIdx === currentPlayerIdx) return;
@@ -3065,13 +3084,15 @@ function bumpOccupant(holeId, currentPlayerIdx, attackerPeg) {
     }
     log(`${victimPlayer.name}'s ${vPeg.nickname || vPeg.id} bumped back to home!`);
 
-    // Fire cut cutscene — victor and victim react with personality
-    CutsceneManager.queueCutscene('cut', {
+    // The cut cutscene waits until the pegs have finished moving: the attacker reaches the
+    // cut peg, the cut peg travels home, then the CUT graphic (tester report 2026-11-09).
+    // executeMove moves these into its deferred cutscenes.
+    _pendingCutScenes.push(['cut', {
       victorPeg: attackerPeg || { personality: 'CHEERFUL' },
       victimPeg: vPeg,
       victorPlayer,
       victimPlayer
-    });
+    }]);
   }
   state.board.set(holeId, null);
 }
@@ -3110,6 +3131,8 @@ function executeMove(moveIdx) {
 
   // ── DEFERRED CUTSCENES: collect here, fire AFTER peg animation lands ──
   const _deferredCutscenes = [];
+  const _splitEnteredFt = new Set();   // pegs that entered the fast track as a half of a 7
+  _pendingCutScenes = [];
 
   switch (move.type) {
     case 'enter':
@@ -3249,13 +3272,23 @@ function executeMove(moveIdx) {
       break;
 
     case 'split': {
+      // A half of a 7 that lands on an ft-* hole enters the fast track, the same as a
+      // normal clockwise move (tester report 2026-11-09: a 7 onto an ft hole gave no status).
+      const _enterFtBySplit = (p, dest) => {
+        if (getHoleType(dest) !== 'fasttrack' || p.onFasttrack || p.mustExitFasttrack) return false;
+        p.onFasttrack = true;
+        _deferredCutscenes.push(['fasttrack', { peg: p, playerColor: player.color, playerName: player.name, playerId: ci }]);
+        return true;
+      };
       // First peg moves
       const bp = player.boardPosition;
       const safeEntry = `outer-${bp}-2`;   // safe-zone entrance (was stale -8)
       if (!peg.eligibleForSafeZone && move.path && move.path.includes(safeEntry)) {
         peg.eligibleForSafeZone = true;
       }
+      const _fromHole1 = peg.holeId;
       placePeg(peg, move.dest, ci);
+      if (_enterFtBySplit(peg, move.dest)) { peg.fasttrackEntryHole = _fromHole1; _splitEnteredFt.add(peg); }
       if (getHoleType(move.dest) === 'safezone') {
         peg.lockedToSafeZone = true;
         peg.mood = 'RELAXED';
@@ -3271,7 +3304,9 @@ function executeMove(moveIdx) {
       if (!peg2.eligibleForSafeZone && move.path2 && move.path2.includes(safeEntry)) {
         peg2.eligibleForSafeZone = true;
       }
+      const _fromHole2 = peg2.holeId;
       placePeg(peg2, move.dest2, ci);
+      if (_enterFtBySplit(peg2, move.dest2)) { peg2.fasttrackEntryHole = _fromHole2; _splitEnteredFt.add(peg2); }
       if (getHoleType(move.dest2) === 'safezone') {
         peg2.lockedToSafeZone = true;
         peg2.mood = 'RELAXED';
@@ -3286,6 +3321,10 @@ function executeMove(moveIdx) {
       break;
     }
   }
+
+  // A cut is shown first, once the pegs have landed, then any other fanfare of the move.
+  _deferredCutscenes.unshift(..._pendingCutScenes);
+  _pendingCutScenes = [];
 
   // ── CIRCUIT COMPLETION (universal, all move types) ──
   // Two ways to complete a circuit:
@@ -3347,8 +3386,9 @@ function executeMove(moveIdx) {
     const _path2 = move.path2 || [];
     const _isAllFT = (path) =>
       Array.isArray(path) && path.every(h => typeof h === 'string' && h.startsWith('ft-'));
-    const _peg1OK = !peg.onFasttrack || _isAllFT(_path1);
-    const _peg2OK = !_splitPeg2 || !_splitPeg2.onFasttrack || _isAllFT(_path2);
+    // A peg that just entered the fast track with this split did not leave it.
+    const _peg1OK = !peg.onFasttrack || _splitEnteredFt.has(peg) || _isAllFT(_path1);
+    const _peg2OK = !_splitPeg2 || !_splitPeg2.onFasttrack || _splitEnteredFt.has(_splitPeg2) || _isAllFT(_path2);
     _splitPreservesFT = _peg1OK && _peg2OK;
   }
 
@@ -5359,8 +5399,14 @@ const CutsceneManager = {
       });
     }
 
-    // Victim protest — immediate
-    this.showCelebrationGraphic('⚔️💥 CUT! 💥⚔️', victorPlayer.color, true);
+    // Victim protest. Name whose peg went home, in that player's color, so nobody has to
+    // search the holding areas to find out (tester report 2026-11-09). Names come from
+    // players online, so they are escaped before going into the HTML.
+    const glow = victimPlayer.color || '#fff';
+    const sentHome = `<div style="font-size:1.6rem;margin-top:10px;color:#fff;` +
+      `text-shadow:0 0 12px ${glow},0 0 4px ${glow},0 2px 6px rgba(0,0,0,0.9);-webkit-text-stroke:0">` +
+      `${escapeHtml(victimPlayer.name || 'A player')}'s peg sent home</div>`;
+    this.showCelebrationGraphic(`⚔️💥 CUT! 💥⚔️${sentHome}`, victorPlayer.color, true);
     this.showPegReaction(victimReaction, victimPlayer.color);
     this.spawnFloatingEmojis(['⚔️', '💥', '🔥'], 6);
 

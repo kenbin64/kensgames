@@ -4122,7 +4122,7 @@ function renderBoard3D() {
                 );
                 existing.mesh.visible = true;
                 _animatingPegs.add(pegId);
-                _deferredAnims.push({ pegId, path: null, existing, holeId: holdHoleId });
+                _deferredAnims.push({ pegId, path: null, existing, holeId: holdHoleId, cut: true });
               } else {
                 existing.mesh.position.set(hole.position.x, boardY + LINE_HEIGHT + 1, hole.position.z);
                 existing.mesh.visible = true;
@@ -4179,15 +4179,15 @@ function renderBoard3D() {
     const startAllAnims = () => {
       _deferredAnimPending = false;
 
-      // Everything runs together EXCEPT the second leg of a Card 7 split,
-      // which waits for the first leg to land. Two pegs setting off at the
-      // same instant is what made a split unreadable: you could see seven
-      // holes worth of movement happen and not know which peg took which
-      // half. A cut peg heading home still runs alongside leg 1, because
-      // that is one event (a peg was knocked off) rather than two choices.
-      const legOf = (da) => (da && da.leg === 1) ? 1 : 0;
-      const firstLeg = _deferredAnims.filter(da => legOf(da) === 0);
-      const secondLeg = _deferredAnims.filter(da => legOf(da) === 1);
+      // The animations run in three groups, each waiting for the one before to land:
+      //   1. the moving peg (or the first leg of a Card 7 split),
+      //   2. the second leg of a split, so you can see which peg took which half,
+      //   3. any peg that was cut. It stays put until the attacker reaches it, then
+      //      travels home; the CUT graphic follows once it is there (tester report
+      //      2026-11-09: "Let the peg make it to the cut peg before it gets sent back").
+      const firstLeg = _deferredAnims.filter(da => !da.cut && da.leg !== 1);
+      const secondLeg = _deferredAnims.filter(da => !da.cut && da.leg === 1);
+      const cutPegs = _deferredAnims.filter(da => da.cut);
 
       const runOne = (da, after) => {
         const onDone = () => {
@@ -4207,27 +4207,21 @@ function renderBoard3D() {
         }
       };
 
-      // The second leg is held until every animation in the first has landed.
-      // Counted rather than hung off one callback, because the first group can
-      // hold both the moving peg and a peg it just cut.
-      let remaining = firstLeg.length;
-      const startSecondLeg = () => {
-        if (--remaining > 0) return;
-        for (const da of secondLeg) {
-          CameraDirector.followPeg(da.pegId);
-          runOne(da, null);
+      // Run the groups in order. A group starts once every animation in the one before
+      // has landed (counted, since a group can hold more than one peg). Empty groups
+      // are skipped, so nothing ever waits on a group that has no animation.
+      const groups = [firstLeg, secondLeg, cutPegs].filter(g => g.length > 0);
+      const runGroup = (gi) => {
+        const group = groups[gi];
+        if (!group) return;
+        let remaining = group.length;
+        const next = () => { if (--remaining === 0) runGroup(gi + 1); };
+        for (const da of group) {
+          if (gi > 0) CameraDirector.followPeg(da.pegId);
+          runOne(da, next);
         }
       };
-
-      if (firstLeg.length === 0) {
-        // Nothing to wait for. Should not happen for a real split, but a
-        // second leg with no first must still move rather than stall the turn.
-        for (const da of secondLeg) runOne(da, null);
-        return;
-      }
-      for (const da of firstLeg) {
-        runOne(da, secondLeg.length ? startSecondLeg : null);
-      }
+      runGroup(0);
     };
     // Wait for camera to smoothly arrive, then start hopping
     CameraDirector.whenSettled(startAllAnims);

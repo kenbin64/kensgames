@@ -227,5 +227,25 @@ section('No status: an ft hole is just a hole on the outer track');
   ok(!movesNow().some(x => x.type === 'enterBullseye'), 'and a royal does not hop it into the bullseye');
 }
 
+// Tester report, 2026-11-09: "It didn't activate my fast track when I landed on it. But it activated the
+// fast track when the bot landed on it." A half of a 7 that landed on an ft hole gave no status.
+section('A 7 split that lands on an ft hole enters the fast track');
+{
+  const players = setupTwoPlayer([{ hole: 'outer-0-3' }, { hole: 'outer-2-0' }, ...REST.slice(0, 3)]);
+  card('7');
+  const m = play(x => x.type === 'split' && x.pegIdx === 0 && x.dest === 'ft-1');
+  ok(!!m, 'a split puts peg 1 on ft-1', m ? `${m.dest} + ${m.dest2}` : 'not offered');
+  ok(players[0].pegs[0].onFasttrack === true, 'and peg 1 has fast-track status');
+}
+{
+  const players = setupTwoPlayer([{ hole: 'ft-3', onFasttrack: true }, { hole: 'outer-0-3' }, ...REST.slice(0, 3)]);
+  card('7');
+  const m = play(x => x.type === 'split' && x.pegIdx === 0 && (x.path || []).every(h => /^ft-/.test(h))
+    && x.peg2Idx === 1 && x.dest2 === 'ft-1');
+  ok(!!m, 'riding peg stays on the ring while the other half lands on ft-1', m ? `${m.dest} + ${m.dest2}` : 'not offered');
+  ok(!!m && players[0].pegs[0].onFasttrack === true && players[0].pegs[1].onFasttrack === true,
+    'both pegs have fast-track status afterwards');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

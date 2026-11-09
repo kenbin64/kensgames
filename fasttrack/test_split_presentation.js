@@ -50,13 +50,16 @@ section('1. The two legs are handed over as leg 1 and leg 2, not as a batch');
     'the second peg of a split is tagged as leg 1 rather than left anonymous');
   ok(/_deferredAnims\.push\(\{ pegId, path: anim\.path, existing, holeId, leg \}\)/.test(threed),
     'the tag travels with the queued animation');
-  ok(/const firstLeg = _deferredAnims\.filter\(da => legOf\(da\) === 0\);/.test(threed)
-    && /const secondLeg = _deferredAnims\.filter\(da => legOf\(da\) === 1\);/.test(threed),
+  ok(/const firstLeg = _deferredAnims\.filter\(da => !da\.cut && da\.leg !== 1\);/.test(threed)
+    && /const secondLeg = _deferredAnims\.filter\(da => !da\.cut && da\.leg === 1\);/.test(threed),
     'the animator separates the two legs');
-  ok(/if \(--remaining > 0\) return;/.test(threed),
+  ok(/if \(--remaining === 0\) runGroup\(gi \+ 1\)/.test(threed),
     'leg 2 waits for EVERY animation in leg 1, not just one of them');
-  ok(/for \(const da of secondLeg\) runOne\(da, null\);/.test(threed),
+  ok(/\.filter\(g => g\.length > 0\)/.test(threed),
     'a second leg with no first still moves rather than stalling the turn');
+  // Tester report 2026-11-09: the cut peg must wait for the attacker to reach it.
+  ok(/\[firstLeg, secondLeg, cutPegs\]/.test(threed) && /holeId: holdHoleId, cut: true/.test(threed),
+    'a cut peg travels home only after the moving peg (and both legs of a 7) have landed');
 }
 
 // ───────────────────────────────────────────────────────────
