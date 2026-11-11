@@ -4836,11 +4836,21 @@ function botTurn() {
         else if (m.type === 'exitFastTrack') score += 20;
         else if (m.type === 'enter') score += 30;
         else if (m.type === 'exitBullseye') {
-          // user_directive_2026-05-18 — exiting the bullseye is almost
-          // always a regression: the peg is already "scored" and safe.
-          // Penalize heavily so the bot only chooses this when no other
-          // legal move exists with the J/Q/K (forced play).
-          score -= 80;
+          // Ken, 2026-11-11: bots must LEAVE the bullseye on a J, Q or K. The
+          // old -80 (2026-05-18, "the peg is already scored") was wrong: a peg
+          // in the bullseye is not home, it can only go home by leaving, and a
+          // face card is the only way out. Every face card is also "move 1"
+          // for the other pegs, so the -80 meant some other move always won
+          // and bots sat in the bullseye for the rest of the game.
+          //   own ft-{bp}: leads straight to the home stretch, the best exit
+          //   another player's peg on an ft hole: a cut, scored like any cut
+          //   any other empty ft hole: no gain, the peg has to go round again
+          if (m.dest === _ownFTForBot) score += 100 + w.fasttrack;
+          const _exitOcc = state.board.get(m.dest);
+          if (_exitOcc && _exitOcc.playerIdx !== ci) {
+            score += 100 + w.capture;
+            m.captures = true;
+          }
         }
         else if (m.type === 'move') {
           // Check if destination has an opponent (capture opportunity)
