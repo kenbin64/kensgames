@@ -1360,6 +1360,7 @@ function applyRemoteAction(action, payload) {
         if (!card) break;
         _spendCurrentCard();
         _loadDeckFor(state.players.get('current') || 0);
+        _refillDeckIfEmpty();   // the drawer's deck ran out: refill it here too, the same way
         const deck = state.deck.get('cards') || [];
         // Remove one matching card from local deck (by display) so the local
         // deck stays in sync with the broadcaster's. If not found we still
@@ -1410,6 +1411,12 @@ function applyRemoteAction(action, payload) {
         _loadDeckFor(state.players.get('current') || 0);
         state.deck.set('cards', cards.slice());
         state.deck.set('discard', []);
+        // Count the shuffle here too, so this screen's next reshuffle of that deck uses the same seed as the host's.
+        const decks = state.deck.get('decks'), seat = state.deck.get('activeSeat');
+        if (Array.isArray(decks) && seat != null && decks[seat]) {
+          decks[seat] = { ...decks[seat], shuffles: (decks[seat].shuffles || 0) + 1 };
+          state.deck.set('decks', decks);
+        }
         break;
       }
       case 'turn_advance': {
@@ -1505,24 +1512,34 @@ function drawCard() {
   _spendCurrentCard();                           // (normally nothing: the last card was spent when its turn ended)
   _loadDeckFor(state.players.get('current') || 0); // this player's own deck
 
-  let deck = state.deck.get('cards') || [];
-  if (deck.length === 0) {
-    deck = [...(state.deck.get('discard') || [])];
-    state.deck.set('discard', []);
-    state.deck.set('cards', deck);
-    shuffleDeck();
-    deck = state.deck.get('cards');
-    log(getCurrentPlayerName() + ': deck ran out, discard pile reshuffled');
+  if (_refillDeckIfEmpty()) {
     // Tell peers the post-shuffle deck order so their next remote draw matches.
-    if (!_applying && _isHost()) _broadcast('reshuffle', { cards: deck.slice() });
+    if (!_applying && _isHost()) _broadcast('reshuffle', { cards: (state.deck.get('cards') || []).slice() });
   }
 
+  const deck = state.deck.get('cards') || [];
   const card = deck.pop();
   state.deck.set('cards', deck);
   _drawCardCommit(card);
 
   // Broadcast the actual card we drew so all peers replay the same value.
   if (!_applying) _broadcast('draw', { card });
+}
+
+// A deck that has run out is refilled from its own discard pile and shuffled.
+// EVERY screen must do this at the same draw: the drawer in drawCard, and every
+// other screen when it replays that draw (applyRemoteAction 'draw'). When only
+// the drawer did it, the host kept the guest's deck empty and published that
+// back after the draw, so the guest reshuffled the same pile with the same seed
+// on every draw and saw the same card again (Ken, 2026-11-10).
+// Returns true when it refilled the deck.
+function _refillDeckIfEmpty() {
+  if ((state.deck.get('cards') || []).length > 0) return false;
+  state.deck.set('cards', [...(state.deck.get('discard') || [])]);
+  state.deck.set('discard', []);
+  shuffleDeck();
+  log(getCurrentPlayerName() + ': deck ran out, discard pile reshuffled');
+  return true;
 }
 
 // Commit a drawn card into local state + UI. Shared by drawCard (local actor)
