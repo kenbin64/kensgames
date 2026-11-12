@@ -4420,3 +4420,20 @@ body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; b
 }
 #ft-entry-board { border-color: #9fd3ff; color: #cfeaff; }
 .ft-entry-btn:hover { filter: brightness(1.15); }
+
+/* Phones (Ken, 2026-11-11: "Leave fast track" missing on a smartphone, and the 7th button cut in half).
+   Seven 52px slots plus ↩ plus "Leave fast track" are wider than a phone, and the bar is centred, so the
+   overflow was cut off at BOTH ends: measured at 360px, slots 4 to 7 were off screen with the toggle up.
+   On phones the bar wraps: the extra buttons (↩, Leave fast track, New peg / Board peg) take a row of
+   their own on top, and the seven slots share the full width below, shrinking to fit. */
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-bar { flex-wrap: wrap !important; justify-content: center !important; row-gap: 6px; }
+  body.ft-turn-panel #ft-peg-bar #ft-peg-buttons {
+    order: 2; flex: 1 1 100% !important; width: auto !important; min-width: 0;
+    gap: 4px; justify-content: center;
+  }
+  body.ft-turn-panel #ft-peg-bar .peg-btn { flex: 1 1 0 !important; min-width: 0 !important; max-width: 52px; width: auto !important; }
+  body.ft-turn-panel #ft-peg-confirm { order: 3; }
+  body.ft-turn-panel #ft-peg-back, #ft-leave-ft, .ft-entry-btn { order: 1; margin: 0; }
+  body.ft-turn-panel #ft-peg-back { min-height: 36px; }
+}
