@@ -1773,11 +1773,22 @@ function getTrackSequence(peg, player, direction) {
     return seq;
   }
 
+  // Ken, 2026-11-11: going CLOCKWISE, a peg that has come round may never pass its own
+  // safe-zone entrance; only the final peg, once the safe zone is full, goes on to the
+  // winning hole. (Counterclockwise, a 4, may pass it.) Passing its own ft-{bp} completes
+  // the circuit, but the stored flag is only set after the move, so a big card that
+  // carried a peg past ft-{bp} AND the entrance in one move used the stale flag and
+  // walked straight past the entrance (1 before ft-{bp} with a 9 landed on outer-{bp}-3).
+  // The eligibility therefore switches on mid-walk, at ft-{bp}.
+  const ownFtHole = `ft-${bp}`;
+  let eligible = peg.eligibleForSafeZone || peg.lockedToSafeZone;
+
   for (let i = 1; i <= 30; i++) {
     const ni = fwd ? (idx + i) % len : (idx - i + len) % len;
     const holeId = CLOCKWISE_TRACK[ni];
+    if (fwd && holeId === ownFtHole) eligible = true;
 
-    if (holeId === safeEntry && fwd && (peg.eligibleForSafeZone || peg.lockedToSafeZone)) {
+    if (holeId === safeEntry && fwd && eligible) {
       seq.push(holeId);
       if (!safeZoneFull) {
         for (let h = 1; h <= SAFE_ZONE_SIZE; h++) seq.push(`safe-${bp}-${h}`);
