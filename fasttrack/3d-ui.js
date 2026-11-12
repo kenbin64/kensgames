@@ -320,13 +320,12 @@ function clearTransientIdentity() {
   } catch (_) { /* ignore */ }
 }
 
-// Replay button. In single-player just reloads. In multiplayer the host
-// asks the server to recycle the session; guests wait for the server
-// broadcast and reload to pick up the fresh game state.
-function playAgain() {
-  // user_directive_2026-05-18: winner of this game opens the next one.
-  // Stash the winner's display name; fasttrack-game-core.initGame()
-  // reads (and clears) this key when seeding state.players.current.
+// user_directive_2026-05-18: winner of this game opens the next one.
+// Stash the winner's display name; fasttrack-game-core.initGame()
+// reads (and clears) this key when seeding state.players.current.
+// Every screen stashes it (the host on Play again, the others when the
+// replay arrives), so the next game starts with the same seat everywhere.
+function stashRematchWinner() {
   try {
     const core = window.FastTrackCore;
     if (core && core.state) {
@@ -337,7 +336,13 @@ function playAgain() {
       }
     }
   } catch (e) { console.warn('rematch winner stash failed', e); }
+}
 
+// Replay button. In single-player just reloads. In multiplayer the host
+// asks the server to recycle the session; guests wait for the server
+// broadcast and reload to pick up the fresh game state.
+function playAgain() {
+  stashRematchWinner();
   const mp = window.__FT_MP__ || null;
   const isMp = !!(mp && mp.connected && mp.session);
   const isHost = !!(isMp && mp.isHost);
@@ -383,6 +388,82 @@ function hideReplayPrompt() {
   if (overlay) overlay.classList.remove('open');
 }
 
+// ── The win celebration (Ken, 2026-11-11) ──────────────────────────────────────────────────────
+// Shown on every screen once the winning peg is in the winning hole and wearing the crown: the
+// winner's name in their colour, confetti and balloons that keep going, and, while it is still
+// going, the buttons: the host gets Play again and Leave game, everyone else gets Leave game.
+// Players who did not win also read "Better luck next time!".
+//   opts: { winnerName, winnerColor, winnerAvatar, localWon, isHost, colors }
+const WIN_BUTTONS_DELAY_MS = 1800;
+
+function showWinCelebration(opts) {
+  const o = opts || {};
+  if (document.getElementById('ft-win')) return;          // once per game
+  hideReplayPrompt();
+  const name = String(o.winnerName || 'A player');
+  const color = o.winnerColor || '#ffd76b';
+  const palette = (o.colors && o.colors.length ? o.colors : []).concat(['#ffd76b', '#ff5e8a', '#5ee0ff', '#7dff8a', '#c58bff']);
+
+  const root = document.createElement('div');
+  root.id = 'ft-win';
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-live', 'assertive');
+  root.style.setProperty('--win-color', color);
+
+  const sky = document.createElement('div');
+  sky.className = 'ftw-sky';
+  for (let i = 0; i < 70; i++) {                          // confetti, falling on a loop
+    const c = document.createElement('i');
+    c.className = 'ftw-confetti';
+    c.style.left = (Math.random() * 100) + '%';
+    c.style.background = palette[i % palette.length];
+    c.style.animationDelay = (-Math.random() * 4) + 's';
+    c.style.animationDuration = (3 + Math.random() * 3) + 's';
+    c.style.setProperty('--spin', (Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 720) + 'deg');
+    sky.appendChild(c);
+  }
+  for (let i = 0; i < 14; i++) {                          // balloons, rising on a loop
+    const b = document.createElement('i');
+    b.className = 'ftw-balloon';
+    b.style.left = (4 + Math.random() * 90) + '%';
+    b.style.setProperty('--balloon', palette[(i * 3) % palette.length]);
+    b.style.animationDelay = (-Math.random() * 9) + 's';
+    b.style.animationDuration = (7 + Math.random() * 5) + 's';
+    sky.appendChild(b);
+  }
+  root.appendChild(sky);
+
+  const panel = document.createElement('div');
+  panel.className = 'ftw-panel';
+  const crown = document.createElement('div');
+  crown.className = 'ftw-crown'; crown.textContent = '👑';
+  const title = document.createElement('h2');
+  title.className = 'ftw-title';
+  title.textContent = name === 'You' ? 'You win!' : `${name} wins!`;   // textContent: names come from players
+  const sub = document.createElement('p');
+  sub.className = 'ftw-sub';
+  sub.textContent = o.localWon ? 'Congratulations!' : 'Better luck next time!';
+  const buttons = document.createElement('div');
+  buttons.className = 'ftw-buttons';
+  buttons.hidden = true;
+  const add = (text, cls, act) => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'ftw-btn ' + cls; btn.textContent = text;
+    btn.addEventListener('click', act);
+    buttons.appendChild(btn);
+    return btn;
+  };
+  if (o.isHost) {
+    const again = add('↻ Play again', 'ftw-again', () => { again.disabled = true; again.textContent = 'Starting…'; playAgain(); });
+  }
+  add('✕ Leave game', 'ftw-leave', leaveFromReplay);
+  panel.append(crown, title, sub, buttons);
+  root.appendChild(panel);
+  document.body.appendChild(root);
+  setTimeout(() => { buttons.hidden = false; }, WIN_BUTTONS_DELAY_MS);
+}
+window.showWinCelebration = showWinCelebration;
+
 // Listen for server fork denials (double-click protection) and replay
 // broadcasts. Re-armed every time the page wires up multiplayer.
 function bindReplayServerEvents() {
@@ -399,12 +480,14 @@ function bindReplayServerEvents() {
       showFlash(data.message || `Another ${data.fork} request is in flight.`);
     }
   });
-  mp.on('replay_started', () => {
+  mp.on('replay_started', (data) => {
     // Server has reset the session in place. Reload so all clients pick
-    // up the fresh game state with the same seats.
+    // up the fresh game state with the same seats (at data.url when the
+    // server names one, e.g. with the next round number).
+    stashRematchWinner();
     hideReplayPrompt();
     window._replayPromptShown = false;
-    setTimeout(() => window.location.reload(), 200);
+    setTimeout(() => { if (data && data.url) window.location.replace(data.url); else window.location.reload(); }, 200);
   });
 }
 function showFlash(msg) {

@@ -1266,6 +1266,20 @@ function _isMyTurn() {
   return false;
 }
 
+// Does seat `idx` belong to the person at THIS screen? Solo: any seat that is not a bot. Online:
+// the seat whose userId is ours (by name when no id has resolved). Used for "Better luck next time".
+function isLocalSeat(idx) {
+  const players = state.players.get('list') || [];
+  const p = players[idx];
+  if (!p || p.isBot) return false;
+  if (!_isMpMode() || _loneHuman()) return true;
+  const me = _myUserId();
+  if (me && p.userId) return String(me) === String(p.userId);
+  let myName = '';
+  try { myName = (typeof localStorage !== 'undefined' && localStorage.getItem('username')) || ''; } catch (_) { }
+  return !!(myName && p.name && myName.trim() === String(p.name).trim());
+}
+
 function _isHost() {
   if (!_mpClient) return true;
   // Lone-client authority (user_directive_2026-06-06: "single games must be
@@ -3925,7 +3939,18 @@ const TURN_SETTLE_CEILING_MS = 45000;
 function resolveTurn(epoch, waitedMs, card) {
   if (epoch !== _turnEpoch) return;              // stopgap verifier: stale / duplicate
   if (card === undefined) card = state.deck.get('currentCard') || null;
-  if (state.meta.get('winner') !== null) { _endUndoOffer(); _resolveWinner(); return; }
+  // A win is announced only once the table is still (Ken, 2026-11-11: "the winning fanfare should
+  // wait till the winning peg enters the final winning hole"). This check used to come before the
+  // wait below, and the move's first resolveTurn prompt arrives while the peg is still hopping, so
+  // the game was declared over mid-hop.
+  if (state.meta.get('winner') !== null) {
+    const waited = waitedMs || 0;
+    if (_isTableBusy() && waited < TURN_SETTLE_CEILING_MS) {
+      setTimeout(() => resolveTurn(epoch, waited + TURN_SETTLE_POLL_MS, card), TURN_SETTLE_POLL_MS);
+      return;
+    }
+    _endUndoOffer(); _resolveWinner(); return;
+  }
 
   // -- THE RULE: no turn is relinquished while the table is still moving --
   // Poll rather than subscribe, because the things being waited on are several
@@ -3988,6 +4013,9 @@ function _resolveWinner() {
   if (gs) gs.textContent = `🏆 ${winnerName} WINS!`;
   try { if (typeof window !== 'undefined' && window.KGGameCache) window.KGGameCache.purgeRuntime('game_winner'); } catch (_) { /* ignore */ }
   try { if (_mpClient && typeof _mpClient.sendGameOver === 'function' && _isHost()) _mpClient.sendGameOver('win', winnerName, null, `${winnerName} wins!`); } catch (_) { /* ignore */ }
+  // The win celebration (playWinCutscene) carries its own Play again / Leave game buttons; the old
+  // prompt is only the fallback for a page without it.
+  if (typeof window !== 'undefined' && window.showWinCelebration) return;
   if (typeof window !== 'undefined' && window.showReplayPrompt && !window._replayPromptShown) {
     window._replayPromptShown = true;
     setTimeout(() => window.showReplayPrompt(winnerName), 1200); // let the last animation play
@@ -5552,21 +5580,33 @@ const CutsceneManager = {
     const pegName = peg.nickname || `Peg ${peg.id || ''}`;
     const avatar = playerAvatar || '🎮';
 
-    // Grand celebration with player identity
-    this.showCelebrationGraphic(`👑 ${playerName} WINS! 👑`, playerColor, true);
-
-    // Second line with peg identity after short delay
-    setTimeout(() => {
-      this.showCelebrationGraphic(`${avatar} ${pegName}: "${reaction}"`, playerColor, false);
-    }, 800);
-
-    this.showPegReaction(reaction, playerColor);
-    this.spawnFloatingEmojis(['🏆', '👑', '🎉', '🎊', '✨', '🥇'], 30);
-
-    // Trigger crown + victory pose in 3D
+    // Ken, 2026-11-11: the winning peg is in the winning hole (this scene is deferred until the
+    // hops land), so the crown goes on it first; then every screen shows the winner's name with
+    // confetti and balloons, and its Play again / Leave game buttons (window.showWinCelebration,
+    // 3d-ui.js). This runs on every screen, because every screen plays the winning move.
     const pegId = peg.id || `peg-${playerColor}-0`;
     if (window.triggerPegPose) window.triggerPegPose(pegId, 'victory');
     if (window.triggerWinCrown) window.triggerWinCrown(pegId);
+
+    if (typeof window.showWinCelebration === 'function') {
+      const winnerIdx = data.playerId;
+      setTimeout(() => {
+        try {
+          window.showWinCelebration({
+            winnerName: playerName, winnerColor: playerColor, winnerAvatar: avatar,
+            localWon: isLocalSeat(winnerIdx), isHost: _isHost(),
+            colors: (state.players.get('list') || []).map(p => p && p.color).filter(Boolean),
+          });
+        } catch (e) { console.warn('[WIN] celebration failed', e); }
+      }, 700);   // a moment for the crown to land first
+    } else {
+      this.showCelebrationGraphic(`👑 ${playerName} WINS! 👑`, playerColor, true);
+      setTimeout(() => {
+        this.showCelebrationGraphic(`${avatar} ${pegName}: "${reaction}"`, playerColor, false);
+      }, 800);
+      this.spawnFloatingEmojis(['🏆', '👑', '🎉', '🎊', '✨', '🥇'], 30);
+    }
+    this.showPegReaction(reaction, playerColor);
 
     // ── Victory blink — color bars & safe zone indicators cycle random colors ──
     const celebrationColors = [
@@ -5806,6 +5846,7 @@ window.FastTrackCore = {
   loadDeckFor: _loadDeckFor, // put a seat's own deck on the table (tests stack a card on the drawer's deck)
   isLocalTurn,                // is it this screen's player's turn (who may see the playing aids)
   setLeaveFastTrack,          // the "Leave fast track" button
+  isLocalSeat,                // does this seat belong to the person at this screen (the win screen)
   executeMove,
   endTurn,
   botTurn,

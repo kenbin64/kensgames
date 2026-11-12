@@ -1286,7 +1286,10 @@ async function init3D() {
         || (sessionCache && sessionCache.session_id)
         || (runtimeCache && runtimeCache.session && runtimeCache.session.session_id)
         || '';
-      initConfig.sessionSeed = _seed ? String(_seed) : null;
+      // A rematch at the same table (Play again) carries ?round=N, so each round deals a new
+      // deck while every screen still derives the same one.
+      const _round = usp.get('round');
+      initConfig.sessionSeed = _seed ? String(_seed) + (_round ? ':r' + _round : '') : null;
     }
 
     const isDevObserver = usp.get('dev_observer') === '1' || kgGame?.devObserver === true;
