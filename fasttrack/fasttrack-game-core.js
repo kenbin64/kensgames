@@ -1048,7 +1048,39 @@ function applyStateSnapshot(snapshot) {
   syncPegMatrix();
   updateUI();
   renderBoard();
+  if (state.meta.get('winner') !== null && !_winScenePlayed) _winSceneFallback();
   return true;
+}
+
+// Every screen must see the win (Ken, 2026-11-11). Normally a guest plays the winning move itself and
+// its own win scene runs. If a snapshot says the game is won and, once the table is still, no win
+// scene has run here (the move never arrived, or arrived while this screen was reloading), play it
+// from the snapshot: the winner and the peg in their winning hole.
+let _winScenePlayed = false;
+let _winFallbackTimer = null;
+const WIN_FALLBACK_WAIT_MS = 2500;
+function _winSceneFallback() {
+  if (_winFallbackTimer) return;
+  const startedAt = Date.now();
+  const check = () => {
+    _winFallbackTimer = null;
+    if (_winScenePlayed) return;
+    const winnerIdx = state.meta.get('winner');
+    if (winnerIdx === null || winnerIdx === undefined) return;
+    if (Date.now() - startedAt < WIN_FALLBACK_WAIT_MS || _isTableBusy()) {
+      _winFallbackTimer = setTimeout(check, 250);
+      return;
+    }
+    const players = state.players.get('list') || [];
+    const winner = players[winnerIdx];
+    if (!winner) return;
+    const peg = winner.pegs.find(p => p.holeId === `home-${winner.boardPosition}`) || winner.pegs[0];
+    CutsceneManager.queueCutscene('win', {
+      peg, playerColor: winner.color, playerName: winner.name,
+      playerAvatar: winner.avatar || '🎮', playerId: winnerIdx
+    });
+  };
+  _winFallbackTimer = setTimeout(check, 250);
 }
 
 // ── STATE COMMIT HOOK ──────────────────────────────────────────────────────
@@ -5569,6 +5601,8 @@ const CutsceneManager = {
   },
 
   playWinCutscene(data) {
+    if (_winScenePlayed) { this.finishCutscene(); return; }   // once per game on each screen
+    _winScenePlayed = true;
     const { playerName, playerColor, peg, playerAvatar } = data;
     const duration = this.config.cutsceneDuration.win;
 

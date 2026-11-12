@@ -3737,14 +3737,24 @@ function movePegAlongPath(pegId, path, onComplete) {
 
 // Track which pegs are currently animating (skip teleport for them)
 const _animatingPegs = new Set();
-let _onAnimsDone = null;
+// Everything waiting for the pegs to stop, in the order it asked. This was ONE slot, so a second
+// waiter replaced the first (Ken, 2026-11-11: "All players did not get the winning fanfare, just me
+// the host"). On a guest's screen the winning move waits here to play its cut scenes, then the
+// host's next snapshot arrives mid-hop and waits here too, and the cut scenes were thrown away.
+// The host never receives snapshots, so only the host saw them. Now every waiter runs.
+const _onAnimsDone = [];
 let _moveBarrier = false; // Set true before renderBoard, cleared when all anims done
 let _deferredAnimPending = false; // True when animations are deferred via CameraDirector.whenSettled
 
-function _checkAnimsDone() {
-  if (_animatingPegs.size === 0 && !_moveBarrier && !_deferredAnimPending) {
-    if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
+function _fireAnimsDone() {
+  const waiting = _onAnimsDone.splice(0);
+  for (const cb of waiting) {
+    try { cb(); } catch (e) { console.warn('[ANIM] a callback waiting for the pegs failed', e); }
   }
+}
+
+function _checkAnimsDone() {
+  if (_animatingPegs.size === 0 && !_moveBarrier && !_deferredAnimPending) _fireAnimsDone();
 }
 
 // Game-core calls this BEFORE renderBoard to raise the barrier
@@ -3771,7 +3781,7 @@ function _scheduleAnimSafetyTimeout(callback) {
     _deferredAnimPending = false;
     _moveBarrier = false;
     console.warn('[SAFETY] Animation barrier timed out — force-advancing turn.');
-    if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
+    _fireAnimsDone();
   }, 15000);
 }
 function _clearAnimSafetyTimeout() {
@@ -3786,7 +3796,7 @@ window.waitForAnimations = function (callback) {
     callback();
     return;
   }
-  _onAnimsDone = callback;
+  _onAnimsDone.push(callback);
   _scheduleAnimSafetyTimeout(callback);
 };
 
@@ -4200,7 +4210,7 @@ function renderBoard3D() {
           if (after) after();
           if (_animatingPegs.size === 0) {
             CameraDirector.unlockCutscene();
-            if (_onAnimsDone) { const cb = _onAnimsDone; _onAnimsDone = null; cb(); }
+            _fireAnimsDone();
           }
         };
         if (da.path) {
