@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { loadRules } from '../logic/rules.js';
-import { createState, pegByPlayerN } from '../logic/state.js';
+import { createState } from '../logic/state.js';
 import { drawCard, playMove, forfeit, step } from '../logic/turn.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

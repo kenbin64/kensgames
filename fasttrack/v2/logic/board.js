@@ -12,7 +12,6 @@
 export const WEDGES = 6;
 export const SAFE_SIZE = 4;
 export const HOLDING_SIZE = 4;
-export const HOLES_PER_WEDGE = 14;
 
 // ── hole id builders ────────────────────────────────────────────────────────
 export const ftId = (p) => `ft-${p}`;

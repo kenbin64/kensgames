@@ -10,7 +10,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { loadRules } from '../logic/rules.js';
-import { createState, pegByPlayerN, occupantOf, pegsOf } from '../logic/state.js';
+import { createState, pegByPlayerN } from '../logic/state.js';
 import { calculateValidMoves } from '../logic/moves.js';
 import { applyMove } from '../logic/apply.js';
 

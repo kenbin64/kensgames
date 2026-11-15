@@ -48,5 +48,4 @@ export function createState({ rules, players, seed = 1, firstPlayer = 0 }) {
 // ---- query helpers (single source of truth is the peg list) ----
 export function pegsOf(state, player) { return state.pegs.filter((pg) => pg.player === player); }
 export function occupantOf(state, holeId) { return state.pegs.find((pg) => pg.location === holeId) || null; }
-export function isCenterOccupied(state) { return state.pegs.some((pg) => pg.location === CENTER); }
 export function pegByPlayerN(state, player, n) { return state.pegs.find((pg) => pg.player === player && pg.n === n) || null; }

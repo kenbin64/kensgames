@@ -18,7 +18,7 @@ import { createState, occupantOf } from '../logic/state.js';
 import { crownPresent } from '../logic/apply.js';
 import { drawCard as engineDraw, legalMoves, playMove, forfeit } from '../logic/turn.js';
 import { buildPlayersList, buildBoardEntries, translateMoves, hopHints } from './project.js';
-import { cardFace, cardDescription, toRenderHole } from './holemap.js';
+import { cardFace, cardDescription } from './holemap.js';
 
 // ── RepresentationTable: the exact same tiny named-Map the renderer reads via .get() ──────────────
 class RepresentationTable {
