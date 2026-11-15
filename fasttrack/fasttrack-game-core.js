@@ -2574,37 +2574,19 @@ function calculateValidMoves() {
       return;
     }
   }
-  if (pegsOnFT.length > 0) {
-    // Geometry-authoritative keep: a move counts as "FT-related" when the
-    // moving peg sits on an ft-* hole (regardless of its .onFasttrack flag),
-    // so geometry-generated ring / bullseye split halves are not dropped here
-    // after the split block already enumerated them on the same basis.
-    const _moveOnRing = (idx) => {
-      const p = player.pegs[idx];
-      return _ridesRing(p);
-    };
-    const ftMoves = moves.filter(m => {
-      if (m.type === 'enterBullseye') return true;
-      if (_moveOnRing(m.pegIdx)) return true;
-      // For splits, also keep if the second peg is on the ring.
-      if (m.type === 'split' && _moveOnRing(m.peg2Idx)) return true;
-      return false;
-    });
-    if (ftMoves.length > 0) {
-      // Only allow FT-related moves
-      moves = ftMoves;
-    } else {
-      // No legal FT moves — all FT pegs lose FastTrack status
-      for (const p of pegsOnFT) {
-        p.onFasttrack = false;
-        p.fasttrackEntryHole = null;
-        p.mustExitFasttrack = false;
-      }
-      log(`⚠️ ${getCurrentPlayerName()} lost FastTrack — no legal FT moves!`);
-      syncPegMatrix();
-      // Recalculate moves from scratch without FT pegs
-      return calculateValidMoves();
+  // No move keeps to the fast track (a 4 backward, for one): every legal move
+  // of EVERY peg is offered, not only the fast-track peg's (Ken, 2026-11-14).
+  // Whichever peg moves, the fast-track status is lost by the status rules in
+  // executeMove. Only when there is no legal move at all is the status dropped here.
+  if (pegsOnFT.length > 0 && moves.length === 0) {
+    for (const p of pegsOnFT) {
+      p.onFasttrack = false;
+      p.fasttrackEntryHole = null;
+      p.mustExitFasttrack = false;
     }
+    log(`⚠️ ${getCurrentPlayerName()} lost FastTrack — no legal moves!`);
+    syncPegMatrix();
+    return calculateValidMoves();
   }
 
   state.turn.set('canChooseEntry', _entryChoice(moves));
