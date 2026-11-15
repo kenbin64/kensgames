@@ -28,8 +28,27 @@ const path = require('path');
 
 // ── Constants (overridable via constructor opts for testing) ─────────────────
 const DEFAULTS = {
-  connectRetryDelay: 500,   // ms between connection-verification retries
-  connectMaxRetries: 3,     // cancel after this many failed attempts
+  // Connection-verification window: connectRetryDelay * connectMaxRetries.
+  //
+  // This was 500ms x 3 = 1.5 SECONDS, which contradicted the comment on
+  // disconnectGraceMs twelve lines below stating that the 3D page "can easily
+  // need 10-20 s on cold load". Both windows cover the same event, a player
+  // navigating from the lobby to the game page, and they disagreed by a factor
+  // of thirty.
+  //
+  // The observable symptom: the host creates a room and moves to the 3D page,
+  // that navigation closes the lobby socket, the PlayerManager cannot see them
+  // for 1.5 seconds and cancels the whole session. The second player then
+  // arrives at a room whose status is already 'cancelled' and is refused with
+  // "Game already started". In the production log this is
+  //   [joinExisting] ERROR: Game not waiting, status: cancelled
+  // immediately after a disconnect, over and over.
+  //
+  // 1000ms x 30 gives a 30 second window, which covers the documented 10-20 s
+  // cold load with room for a slow connection, and is still well inside the
+  // 45 s disconnect grace so the two no longer contradict each other.
+  connectRetryDelay: 1000,  // ms between connection-verification retries
+  connectMaxRetries: 30,    // 30 x 1000ms = 30s to get everybody connected
   ackTimeout: 5000,  // ms for all humans to ack a turn broadcast
   healTimeout: 8000,  // ms to wait during heal before cancelling
   syncProbeTimeout: 5000, // ms to wait for sync probe reports
@@ -596,15 +615,52 @@ class PlayerManager {
 
     if (attempt >= this._cfg.connectMaxRetries - 1) {
       const names = missing.map(p => p.username).join(', ');
+
+      // Do NOT cancel the session because one player was slow to connect.
+      //
+      // Cancelling destroys the room for everybody, including the players who
+      // DID connect, and it leaves the session in a state that permanently
+      // refuses new joins. One slow phone on a hotel wifi should not end the
+      // game for the other five people.
+      //
+      // The same problem already has an answer elsewhere in this file: a human
+      // who drops mid-game is replaced by a bot that inherits their seat, and
+      // the session only ends when no humans remain at all. That is the right
+      // behaviour here too, so it is reused rather than reinvented.
+      //
+      // replacePlayerWithBot() itself calls _cancelAndBroadcast when the last
+      // human is replaced, so the "everybody failed to connect" case is still
+      // handled and still ends the session.
+      if (!ms.botFallbackUsed) {
+        ms.botFallbackUsed = true;
+        writeLog({
+          level: 'warn',
+          event: 'connect_bot_fallback',
+          sessionId,
+          message: `Not connected after ${this._cfg.connectMaxRetries} attempts, `
+                 + `replacing with bots instead of cancelling: ${names}`,
+        });
+        for (const p of missing) {
+          this.replacePlayerWithBot(sessionId, p.user_id, 'did not connect in time');
+        }
+        // The session may have ended inside replacePlayerWithBot if that was
+        // the last human. Check before continuing.
+        if (ms.status === 'cancelled') return;
+        // humanPlayers has shrunk, so the next pass finds nothing missing and
+        // takes the normal launch path. The fallback flag stops this looping.
+        this._verifyConnections(sessionId, 0);
+        return;
+      }
+
       writeLog({
         level: 'error',
         event: 'connect_failed',
         sessionId,
-        message: `Players not connected after ${this._cfg.connectMaxRetries} attempts: ${names}`,
+        message: `Players not connected after bot fallback: ${names}`,
       });
       this._cancelAndBroadcast(sessionId,
-        `Could not connect all players after ${this._cfg.connectMaxRetries} attempts. `
-        + `Missing: ${names}`);
+        `Could not connect all players after ${this._cfg.connectMaxRetries} attempts `
+        + `and a bot fallback. Missing: ${names}`);
       return;
     }
 
