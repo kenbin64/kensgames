@@ -1130,9 +1130,12 @@ async function init3D() {
     if (ManifoldAudio.ctx && ManifoldAudio.ctx.state === 'suspended') {
       ManifoldAudio.ctx.resume();
     }
-    if (GameSettings.musicEnabled) ManifoldAudio.startMusic();
-    // Ragtime ambience is ambient room sound — always starts regardless of music toggle
-    ManifoldAudio.startRagtimeAmbience();
+    // Music off (the in-game toggle, or "No music" on the setup page) means no music at all:
+    // the ragtime pad is musical too, and the toggle already stops both (Ken, 2026-11-15).
+    if (GameSettings.musicEnabled) {
+      ManifoldAudio.startMusic();
+      ManifoldAudio.startRagtimeAmbience();
+    }
   };
   document.addEventListener('click', resumeAudio, { once: true });
 
@@ -1265,9 +1268,12 @@ async function init3D() {
           level: (p.is_ai || p.isAI || p.is_bot)
             ? (p.level || p.aiDifficulty || p.difficulty || null)
             : null,
+          // The color this player picked at the table (0-5, an index into PLAYER_COLORS), or null.
+          color: Number.isInteger(p.color) ? p.color : null,
         })),
       }
-      : { humanName, humanAvatar, aiDifficulty, launchMode: gameMode };
+      // Solo: the color picked on the front page comes in the address (?color=0-5).
+      : { humanName, humanAvatar, aiDifficulty, launchMode: gameMode, humanColor: /^[0-5]$/.test(usp.get('color') || '') ? Number(usp.get('color')) : null };
 
     // Merge dimensional config if present
     if (dimensionalConfig) {
@@ -5863,7 +5869,13 @@ function setupBoardPickHandler() {
     if (window.FTTurnPanel) {
       const hit = _pickTargetAtClient(clientX, clientY, _isCoarsePointer(pointerType) ? TAP_PICK_SLOP : 0);
       if (hit && hit.kind === 'hole' && window.FTTurnPanel.boardTap(hit.holeId)) return;
-      if (hit && hit.kind === 'peg') { _sayBoardHint('Use the numbered buttons below to choose a peg.'); return; }
+      // Nothing was played, so say why (2026-11-15): a tap that does nothing and says nothing reads as
+      // a broken game. No move at all (a bot's turn, no card yet, no legal move) gets the reason;
+      // otherwise point at what does work.
+      if (_refreshRouteIndex().size === 0) { _sayBoardHint(_whyNothingToPick()); return; }
+      _sayBoardHint(hit && hit.kind === 'peg'
+        ? 'Use the numbered buttons below to choose a peg.'
+        : 'Tap a glowing hole, or use the numbered buttons below.');
       return;
     }
     const idx = _refreshRouteIndex();

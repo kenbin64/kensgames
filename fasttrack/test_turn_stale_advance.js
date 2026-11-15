@@ -10,9 +10,17 @@
  * seat including the human, over and over ("still not relinquishing the correct
  * turns", the human never got to play).
  *
- * Fix: waitForAll captures _turnSeq for the move; advanceOnce drops the advance if
- * the sequence has moved on. This test defers a move's advance, rotates the turn
- * by another path, THEN fires the stale callback and asserts it is ignored.
+ * Fix: the move captures the turn epoch; resolveTurn drops any call whose epoch
+ * has moved on. This test holds a move's advance, rotates the turn by another
+ * path, THEN fires the stale callback and asserts it is ignored.
+ *
+ * Updated 2026-11-15. Since a18b6ec (2026-09-06, "a turn is not relinquished until
+ * the player has stopped moving") what holds a turn is REAL MOTION (_isTableBusy,
+ * fed by window.isPlayResolving), not the waitForAnimations callback, which is now
+ * only a prompt. The test used to hold the callback while reporting the table idle,
+ * so the move's own prompt rightly ended the turn at once and four checks failed on
+ * a design that was working. It now holds the advance the way the game does: a peg
+ * still travelling (isPlayResolving true), then landing.
  *
  * Run: node fasttrack/test_turn_stale_advance.js
  */
@@ -37,7 +45,16 @@ global.requestAnimationFrame=global.window.requestAnimationFrame;global.cancelAn
 const coreSrc=fs.readFileSync(path.join(__dirname,'fasttrack-game-core.js'),'utf8').replace(/window\.FastTrackCore\s*=/,'globalThis.__core =');
 eval(coreSrc);
 const _core=globalThis.__core, state=_core.state;
-global.window.isPlayResolving=()=>false;
+// The table is "moving" while this is true, exactly as the 3D layer reports a hopping peg.
+let moving=false;
+global.window.isPlayResolving=()=>moving;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const SETTLE_MS=400;   // a few of resolveTurn's 120 ms polls
+// Count every turn change. Checking only whose turn it is can be fooled: with 3 seats,
+// three runaway advances wrap 1 -> 2 -> 0 -> 1 and land back on the "right" seat.
+let advances=0;
+const _log=console.log;
+console.log=(...a)=>{ if(String(a[0]).startsWith('[TURN] _applyTurnAdvance called')){ advances++; return; } _log(...a); };
 
 const PEGS=_core.PEGS_PER_PLAYER||5;
 const mkPeg=(i,p)=>({id:`p${i}-peg${p}`,holeId:'holding',holeType:'holding',nickname:'Peg',onFasttrack:false,eligibleForSafeZone:false,lockedToSafeZone:false,completedCircuit:false,fasttrackEntryHole:null,mustExitFasttrack:false,personality:'CHEERFUL',mood:'EAGER',captureCount:0,timesCaptured:0,rivalPegId:null});
@@ -60,25 +77,32 @@ function setup(n){ buildCardMatrix();
 const cur=()=>state.players.get('current');
 const N=3;
 
+(async () => {
 console.log('\n── a DELAYED move-advance that fires after the turn moved on is DROPPED ──');
 {
   setup(N);
-  // Defer P0's move-advance: capture the animation-done callback instead of firing it.
+  // Hold P0's move-advance: the peg is still travelling, and the animation-done
+  // callback is captured instead of fired.
   let captured=null;
   global.window.waitForAnimations=(cb)=>{ captured=cb; };
-  // P0 plays a move — the advance is now pending (gated on `captured`).
+  moving=true;
   _core._drawCardCommit({id:'c-2-p0',value:'2',display:'2♠'});
   if((state.turn.get('validMoves')||[]).length>0) _core.executeMove(0);
-  ok(cur()===0, `P0's move made; advance still pending (current=${cur()})`);
+  await sleep(SETTLE_MS);
+  ok(cur()===0, `P0's move made; advance still pending while the peg moves (current=${cur()})`);
 
   // Meanwhile the turn rotates on by another path (as the real cascade does).
-  delete global.window.waitForAnimations;   // let the direct endTurn resolve normally
+  delete global.window.waitForAnimations;
+  moving=false;
+  advances=0;
   _core.endTurn();                          // P0 -> P1
   ok(cur()===1, `turn rotated by another path: P0 -> ${cur()}`);
 
-  // NOW the stale P0 callback finally fires. It must NOT advance P1.
+  // NOW the stale P0 callback finally fires, and its polling resolves get their
+  // chance too. None of them may advance P1.
   if(captured) captured();
-  ok(cur()===1, `stale P0 advance fired late -> current STILL ${cur()} (not skipped to 2)`);
+  await sleep(SETTLE_MS);
+  ok(cur()===1 && advances===1, `stale P0 advance fired late -> current STILL ${cur()}, ${advances} turn change(s) in all (want 1)`);
 }
 
 console.log('\n── a NON-stale deferred advance still works (no false rejection) ──');
@@ -86,14 +110,19 @@ console.log('\n── a NON-stale deferred advance still works (no false rejecti
   setup(N);
   let captured=null;
   global.window.waitForAnimations=(cb)=>{ captured=cb; };
+  moving=true;
   _core._drawCardCommit({id:'c-2-p0b',value:'2',display:'2♠'});
   if((state.turn.get('validMoves')||[]).length>0) _core.executeMove(0);
-  ok(cur()===0, `P0's move made; advance pending (current=${cur()})`);
-  // Fire the callback normally (turn has NOT moved on) — it should advance P0 -> P1.
-  _core.CutsceneManager.queueCutscene=function(){};
+  await sleep(SETTLE_MS);
+  ok(cur()===0, `P0's move made; advance pending while the peg moves (current=${cur()})`);
+  // The peg lands and the callback fires normally (turn has NOT moved on): P0 -> P1.
+  moving=false;
+  advances=0;
   if(captured) captured();
-  ok(cur()===1, `deferred advance fired in-order -> P0 -> ${cur()} (+1, not dropped)`);
+  await sleep(SETTLE_MS);
+  ok(cur()===1 && advances===1, `deferred advance fired in-order -> P0 -> ${cur()}, ${advances} turn change(s) (want exactly 1)`);
 }
 
 console.log(`\n══════════════════════\n  ${pass} passed, ${fail} failed\n══════════════════════\n`);
 process.exit(fail?1:0);
+})();

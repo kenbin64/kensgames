@@ -201,6 +201,58 @@ function getBalancedBoardPosition(idx, count) {
   return idx;
 }
 
+// ── Chosen colors (Ken, 2026-11-15) ──────────────────────────────────────────
+// A color IS a board position: PLAYER_COLORS[bp]. choices[i] is the position seat i
+// picked (0-5) or null. Rules:
+//   - nobody picked: the usual balanced layout, exactly as before
+//   - a picked color is that seat's; a color can be held only once (first seat keeps it)
+//   - everyone else fills in around the picks: the usual layout is turned to the
+//     rotation that keeps the most picks, so three players still sit one color apart
+//     (a pick of Blue gives Blue, Purple, Green); when picks break the pattern, each
+//     remaining seat takes the free spot farthest from the colors already taken.
+// Returns one board position per seat, all different.
+function assignBoardPositions(choices, count) {
+  const want = Array.from({ length: count }, (_, i) => {
+    const c = choices ? choices[i] : null;
+    return Number.isInteger(c) && c >= 0 && c < 6 ? c : null;
+  });
+  const taken = new Set();
+  want.forEach((c, i) => {
+    if (c === null) return;
+    if (taken.has(c)) want[i] = null; else taken.add(c);
+  });
+  const base = Array.from({ length: count }, (_, i) => getBalancedBoardPosition(i, count));
+  if (!taken.size) return base;
+
+  // The rotation of the usual layout that holds the most picked colors (the first wins a tie).
+  let layout = base, hits = -1;
+  for (let r = 0; r < 6; r++) {
+    const turned = base.map(bp => (bp + r) % 6);
+    const n = turned.filter(bp => taken.has(bp)).length;
+    if (n > hits) { layout = turned; hits = n; }
+  }
+
+  const apart = (a, b) => { const d = Math.abs(a - b); return Math.min(d, 6 - d); };
+  const room = (bp) => Math.min(...[...taken].map(t => apart(bp, t)));
+  return want.map((c) => {
+    if (c !== null) return c;
+    const inLayout = layout.filter(bp => !taken.has(bp));
+    const pool = inLayout.length ? inLayout : [0, 1, 2, 3, 4, 5].filter(bp => !taken.has(bp));
+    let pick = pool[0];
+    for (const bp of pool) if (room(bp) > room(pick) || (room(bp) === room(pick) && bp < pick)) pick = bp;
+    taken.add(pick);
+    return pick;
+  });
+}
+
+// Play goes around the board in position order. Seat 0 stays first in the list (the solo
+// human, the table's first seat); the rest follow round the board from there.
+function seatsInBoardOrder(positions) {
+  const order = positions.map((_, seat) => seat).sort((a, b) => positions[a] - positions[b]);
+  const at = order.indexOf(0);
+  return order.slice(at).concat(order.slice(0, at));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PEG NICKNAME SYSTEM — Funny names assigned when pegs enter play
 // ═══════════════════════════════════════════════════════════════════════════
@@ -607,16 +659,28 @@ function initGame(playerCount = 2, config = {}) {
     })
     : null;
 
+  // Colors: each seat's pick (a table player's `color`, or the solo human's humanColor),
+  // turned into one board position per seat; then the players are listed round the board.
+  const colorChoices = Array.from({ length: effectiveCount }, (_, seat) => {
+    const raw = sessionBackedPlayers
+      ? (sessionBackedPlayers[seat] && sessionBackedPlayers[seat].color)
+      : (seat === 0 ? config.humanColor : null);
+    return raw === null || raw === undefined || raw === '' ? null : Number(raw);
+  });
+  const seatPositions = assignBoardPositions(colorChoices, effectiveCount);
+  const seatOrder = seatsInBoardOrder(seatPositions);
+
   for (let i = 0; i < effectiveCount; i++) {
-    const bp = getBalancedBoardPosition(i, effectiveCount);
-    const sp = sessionBackedPlayers ? sessionBackedPlayers[i] : null;
-    const isBot = sp ? !!sp.is_ai : i > 0;
+    const seat = seatOrder[i];
+    const bp = seatPositions[seat];
+    const sp = sessionBackedPlayers ? sessionBackedPlayers[seat] : null;
+    const isBot = sp ? !!sp.is_ai : seat > 0;
     const name = sp
-      ? (sp.username || (isBot ? `🤖 Bot "${assignBotName()}"` : `Player ${i + 1}`))
-      : (i === 0 ? humanName : `🤖 Bot "${assignBotName()}"`);
+      ? (sp.username || (isBot ? `🤖 Bot "${assignBotName()}"` : `Player ${seat + 1}`))
+      : (seat === 0 ? humanName : `🤖 Bot "${assignBotName()}"`);
     const avatar = sp
       ? ((sp.avatar && (sp.avatar.emoji || sp.avatar)) || (isBot ? '🤖' : '🎮'))
-      : (i === 0 ? humanAvatar : '🤖');
+      : (seat === 0 ? humanAvatar : '🤖');
 
     const player = {
       index: i,
@@ -5379,11 +5443,14 @@ const CutsceneManager = {
       fasttrack: 1800, fasttrackShort: 600,
       bullseye: 1500, bullseyeShort: 500,
       cut: 2000, cutShort: 800,
-      safeZone: 1200, safeZoneShort: 0,
+      safeZone: 1200, safeZoneShort: 600,
       win: 4000, crown: 800
     },
+    // 0 = never skipped. FastTrack, bullseye and safe are announced every time they happen
+    // (Ken, 2026-11-15): the full show the first time for each player, a smaller banner with
+    // no extras after that.
     skipAfterCount: {
-      fasttrack: 0, bullseye: 3, cut: 0, safeZone: 1, win: 0, crown: 0
+      fasttrack: 0, bullseye: 0, cut: 0, safeZone: 0, win: 0, crown: 0
     }
   },
 
@@ -5483,7 +5550,7 @@ const CutsceneManager = {
     // search the holding areas to find out (tester report 2026-11-09). Names come from
     // players online, so they are escaped before going into the HTML.
     const glow = victimPlayer.color || '#fff';
-    const sentHome = `<div style="font-size:1.6rem;margin-top:10px;color:#fff;` +
+    const sentHome = `<div style="font-size:clamp(1rem, 4.5vw, 1.6rem);margin-top:10px;color:#fff;` +
       `text-shadow:0 0 12px ${glow},0 0 4px ${glow},0 2px 6px rgba(0,0,0,0.9);-webkit-text-stroke:0">` +
       `${escapeHtml(victimPlayer.name || 'A player')}'s peg sent home</div>`;
     this.showCelebrationGraphic(`⚔️💥 CUT! 💥⚔️${sentHome}`, victorPlayer.color, true);
@@ -5509,7 +5576,7 @@ const CutsceneManager = {
     const duration = this.getDuration('fasttrack', playerId);
     this.markSeen('fasttrack', playerId);
 
-    if (window.ManifoldAudio) { ManifoldAudio.playFastTrack(); ManifoldAudio.playFanfare('fasttrack'); }
+    if (window.ManifoldAudio) { ManifoldAudio.playFastTrack(); if (isFirst) ManifoldAudio.playFanfare('fasttrack'); }
     _manifoldEmit('fasttrack', { pegId: data.pegId, boardPos: data.boardPos || 0 });
     _manifoldStateUpdate();
 
@@ -5523,7 +5590,7 @@ const CutsceneManager = {
       this.spawnFloatingEmojis(['⚡', '🏎️', '💨'], 7);
       log(`⚡ ${playerName}'s peg: "${reaction}"`);
     } else {
-      this.showPegReaction('⚡', playerColor);
+      this.showCelebrationGraphic('⚡ FASTTRACK', playerColor, false);   // repeat: smaller, no extras
     }
     setTimeout(() => this.finishCutscene(), duration);
   },
@@ -5534,7 +5601,7 @@ const CutsceneManager = {
     const duration = this.getDuration('bullseye', playerId);
     this.markSeen('bullseye', playerId);
 
-    if (window.ManifoldAudio) { ManifoldAudio.playBullseye(); ManifoldAudio.playFanfare('bullseye'); }
+    if (window.ManifoldAudio) { ManifoldAudio.playBullseye(); if (isFirst) ManifoldAudio.playFanfare('bullseye'); }
     _manifoldEmit('bullseye', { pegId: data.pegId, boardPos: 0 });
 
     // Bullseye is the highest reward — celebrate (jumping + spin)
@@ -5546,27 +5613,33 @@ const CutsceneManager = {
       this.showPegReaction(reaction, playerColor);
       this.spawnFloatingEmojis(['🎯', '🎈', '✨'], 8);
       log(`🎯 ${playerName}'s peg: "${reaction}"`);
+    } else {
+      this.showCelebrationGraphic('🎯 BULLSEYE', playerColor, false);    // repeat: smaller, no extras
     }
     setTimeout(() => this.finishCutscene(), duration);
   },
 
   playSafeZoneCutscene(data) {
     const { peg, playerColor, playerName, playerId } = data;
-    if (this.shouldSkip('safeZone', playerId)) { this.finishCutscene(); return; }
-    this.markSeen('safeZone', playerId);
+    const isFirst = this.isFirstTime('safeZone', playerId);
     const duration = this.getDuration('safeZone', playerId);
+    this.markSeen('safeZone', playerId);
 
-    if (window.ManifoldAudio) { ManifoldAudio.playSafeZone(); ManifoldAudio.playFanfare('safeZone'); }
+    if (window.ManifoldAudio) { ManifoldAudio.playSafeZone(); if (isFirst) ManifoldAudio.playFanfare('safeZone'); }
     _manifoldEmit('safezone', { pegId: data.pegId, boardPos: data.boardPos || 0 });
     _manifoldStateUpdate();
 
     // Peg dances on safe-zone arrival
     if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'dance');
 
-    const reaction = getPegReaction(peg, 'onEnterSafeZone') || '🛡️';
-    this.showCelebrationGraphic('🛡️ SAFE!', playerColor, true);
-    this.showPegReaction(reaction, playerColor);
-    log(`🛡️ ${playerName}'s peg: "${reaction}"`);
+    if (isFirst) {
+      const reaction = getPegReaction(peg, 'onEnterSafeZone') || '🛡️';
+      this.showCelebrationGraphic('🛡️ SAFE!', playerColor, true);
+      this.showPegReaction(reaction, playerColor);
+      log(`🛡️ ${playerName}'s peg: "${reaction}"`);
+    } else {
+      this.showCelebrationGraphic('🛡️ SAFE', playerColor, false);        // repeat: smaller, no extras
+    }
     setTimeout(() => this.finishCutscene(), duration);
   },
 
@@ -5667,7 +5740,11 @@ const CutsceneManager = {
   showCelebrationGraphic(text, color, bold = false) {
     const overlay = document.createElement('div');
     overlay.innerHTML = text;
-    const size = bold ? '6rem' : '4rem';
+    // Sized to the screen so it never runs off a phone (Ken, 2026-11-15: fanfare text was cut
+    // off on smart phones). The font follows the narrower of width and height, the box is held
+    // to 80% of the screen width (the pop animation peaks at 120%, so 96% at most), and long
+    // words or names wrap instead of overflowing.
+    const size = bold ? 'clamp(1.75rem, min(10vw, 16vh), 6rem)' : 'clamp(1.25rem, min(7vw, 11vh), 4rem)';
     const shadow = bold
       ? `0 0 40px ${color || '#FFD700'}, 0 0 80px ${color || '#FFD700'}, 0 6px 12px rgba(0,0,0,0.7)`
       : `0 0 20px ${color || '#FFD700'}, 0 4px 8px rgba(0,0,0,0.5)`;
@@ -5675,7 +5752,9 @@ const CutsceneManager = {
     overlay.style.cssText = `
       position:fixed; top:50%; left:50%;
       transform:translate(-50%,-50%) scale(0);
-      font-size:${size}; font-weight:900;
+      font-size:${size}; font-weight:900; line-height:1.1;
+      width:max-content; max-width:80vw; box-sizing:border-box;
+      text-align:center; overflow-wrap:anywhere;
       color:${color || '#FFD700'};
       text-shadow:${shadow};
       z-index:10000; pointer-events:none;
@@ -5704,7 +5783,8 @@ const CutsceneManager = {
       border-radius:24px; font-size:1.2rem;
       z-index:10001; pointer-events:none;
       animation:bubbleFloat 2.5s ease-out forwards;
-      white-space:nowrap; font-weight:bold;
+      width:max-content; max-width:90vw; box-sizing:border-box;
+      text-align:center; overflow-wrap:anywhere; font-weight:bold;
     `;
     document.body.appendChild(bubble);
     setTimeout(() => bubble.remove(), 2500);
@@ -5881,6 +5961,8 @@ window.FastTrackCore = {
   PLAYER_COLORS,
   PLAYER_NAMES,
   getBalancedBoardPosition,
+  assignBoardPositions,
+  seatsInBoardOrder,
   getCurrentPlayerName,
   log,
   updateUI,

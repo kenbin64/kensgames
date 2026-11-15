@@ -136,7 +136,10 @@ section('6. The two sharing bugs this feature can cause');
 
   // Creating the sprite on every pointer move would rebuild a canvas and a
   // GPU texture per frame of mouse movement.
-  ok(/if \(peg\.nameSprite && peg\._nameSpriteLabel === info\.label\) return peg\.nameSprite;/.test(src),
+  // Since the turn panel (2026-11-05) the cache key is labelKey, which is the name, or the peg
+  // number and colour when the panel shows numbered tags. Either way it must be checked AND stored.
+  ok(/if \(peg\.nameSprite && peg\._nameSpriteLabel === (info\.label|labelKey)\) return peg\.nameSprite;/.test(src) &&
+     /peg\._nameSpriteLabel = (info\.label|labelKey);/.test(src),
     'a name sprite is built once per peg and reused, not rebuilt per hover');
 }
 
