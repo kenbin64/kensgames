@@ -11,9 +11,9 @@
 //       A1 to A7 run along one route. Where the route branches (the bullseye, a fast-track exit), the other
 //       route's holes are B<n> from the branch on, so no hole carries two labels. A route ends at its last legal
 //       hole.
-//   A 7 can have more than seven stops (measured: about a quarter of the time on random boards, up to 33 across
-//   7 routes for a peg on the fast track). Then the player picks the route first (A, B, C ...), and the footer
-//   shows that route's stops (at most 7, since a 7 has 7 hops). Up to seven stops are shown in one step.
+//   When the first peg of a 7 can go more than one way, the player picks the route first (A, B, C ...), and the
+//   footer then shows a button for each stop on that route (at most 7, since a 7 has 7 hops). With a single
+//   route its stops are shown straight away (Ken, 2026-11-15; routes used to come first only past 7 stops).
 //   Tapping a lit hole on the board always works too, at every step.
 //   Once the choice is complete, the labels give way to a single Confirm button. After Confirm it becomes Undo,
 //   until the next card is drawn. Pressing Undo takes the move back and brings the labels back to play it again.
@@ -226,11 +226,14 @@
     offerStops(labelStops(sevenStopsFor(moves, pegIdx)));
   }
 
-  // A 7: one stop is taken for the player; up to seven are shown at once; more than seven, the routes come first.
+  // A 7: one stop is taken for the player. One route: a button for each of its stops. More than one route
+  // (Ken, 2026-11-15): the routes come first, A, B ..., then a button for each hole on the chosen route.
+  // (It used to show every stop of every route at once whenever they fitted in seven slots.)
   function offerStops(stops) {
     pick.stops = stops;
     if (stops.length === 1) { takeStop(stops[0]); return; }
-    if (stops.length <= SLOT_COUNT) { showStops(stops); return; }
+    const routeCount = new Set(stops.map(s => s.route)).size;
+    if (routeCount === 1) { showStops(stops); return; }
     pick.stage = 'route';
     pick.options = stops;
     const routes = [...new Set(stops.map(s => s.route))];
