@@ -2241,12 +2241,12 @@ function calculateValidMoves() {
     // and ONLY when the peg is currently sitting on an ft-* hole.
     // Traversing the fast track does NOT grant a free jump to bullseye; the peg
     // must stop on an ft-* hole and then draw a 1-move card.
-    // rules.json :: BULL_NO_FROM_OWN_FT (user_directive_2026-05-09) — entering
-    //               bullseye from the player's own-color ft-{bp} hole is
-    //               considered backward and is not allowed; only foreign ft-*
-    //               holes count as a forward bullseye entry.
-    if (peg.onFasttrack && peg.holeId.startsWith('ft-') && rules.movement === 1 &&
-      peg.holeId !== `ft-${bp}`) {
+    // Any ft-* hole counts, the player's own colour included (Ken, 2026-11-15: "any time you are on
+    // fast track a single move card can put you on the bullseye"). This retires BULL_NO_FROM_OWN_FT
+    // (2026-05-09) and the 2026-06-06 "own ft means complete" reading for the one-hop. The
+    // exit-bullseye -> own ft -> straight back in loop that rule guarded is still impossible: leaving
+    // the bullseye clears onFasttrack and sets mustExitFasttrack (see executeMove, exitBullseye).
+    if (peg.onFasttrack && peg.holeId.startsWith('ft-') && rules.movement === 1) {
       const occ = state.board.get('bullseye');
       if (!occ || occ.playerIdx !== ci) {
         moves.push({ type: 'enterBullseye', pegIdx: pi, dest: 'bullseye', from: peg.holeId, path: ['bullseye'] });
@@ -2330,9 +2330,11 @@ function calculateValidMoves() {
       // ft means fast track is already COMPLETE, so the peg diverts into its
       // home stretch and can no longer take the center). Geometry (holeId),
       // not the .onFasttrack flag, is authoritative.
-      //   A) On-ring 1-hit: a peg ALREADY sitting on a foreign ft-* hole hops
-      //      straight to the center with a single step. For a peg on the ring
-      //      this is the ONLY route onto the bullseye (one hop, never multi).
+      //   A) On-ring 1-hit: a peg ALREADY sitting on an ft-* hole with fast-track
+      //      status hops straight to the center with a single step. Since
+      //      2026-11-15 that includes its own ft-{bp} (Ken: "any time you are on
+      //      fast track a single move card can put you on the bullseye"). For a
+      //      peg on the ring this is the ONLY route onto the bullseye.
       //   B) Outer approach: a peg NOT on the ring travels clockwise and lands
       //      on a foreign ft-* hole as its PENULTIMATE position, then hops to
       //      the center on the final step. Intermediate own pegs block, on
@@ -2342,8 +2344,7 @@ function calculateValidMoves() {
         if (n === 1) {
           if (!fromHole || !fromHole.startsWith('ft-')) return null;
           if (peg && !_ridesRing(peg)) return null;            // the one-hop needs fast-track status
-          if (fromHole === _ownFtHole) return null;
-          return ['bullseye'];
+          return ['bullseye'];                                 // from any ft hole, own colour included (Ken, 2026-11-15)
         }
         if (n < 2 || seq.length < n) return null;
         if (fromHole && fromHole.startsWith('ft-')) return null; // ring pegs: route A only
@@ -2612,7 +2613,12 @@ function calculateValidMoves() {
     // A part of a move that keeps to the fast track: ring holes only, up to the
     // player's own ft hole; after that hole the rest may run into the home stretch.
     const _ownFtHole = `ft-${bp}`;
-    const _staysOnFt = (path) => {
+    // `from` is where the peg starts. A peg already ON its own ft hole has finished the ring, so its
+    // walk on into the home stretch is completing the fast track, not leaving it (2026-11-15: with
+    // the bullseye now offered from the own ft hole, that walk was being filtered out and the
+    // bullseye became the only move shown).
+    const _staysOnFt = (path, from) => {
+      if (from === _ownFtHole) return true;
       if (!Array.isArray(path) || !path.length) return false;
       const k = path.indexOf(_ownFtHole);
       const ring = k === -1 ? path : path.slice(0, k + 1);
@@ -2623,11 +2629,12 @@ function calculateValidMoves() {
       if (m.type === 'split') {
         const p1 = player.pegs[m.pegIdx], p2 = player.pegs[m.peg2Idx];
         if (!_ridesRing(p1) && !_ridesRing(p2)) return false;
-        const ok1 = !_ridesRing(p1) || m.dest === 'bullseye' || _staysOnFt(m.path);
-        const ok2 = !_ridesRing(p2) || m.dest2 === 'bullseye' || _staysOnFt(m.path2);
+        const ok1 = !_ridesRing(p1) || m.dest === 'bullseye' || _staysOnFt(m.path, m.from || p1.holeId);
+        const ok2 = !_ridesRing(p2) || m.dest2 === 'bullseye' || _staysOnFt(m.path2, m.from2 || p2.holeId);
         return ok1 && ok2;
       }
-      return _ridesRing(player.pegs[m.pegIdx]) && _staysOnFt(m.path);
+      const _mover = player.pegs[m.pegIdx];
+      return _ridesRing(_mover) && _staysOnFt(m.path, m.from || (_mover && _mover.holeId));
     };
     const _stay = moves.filter(_keepsFt);
     if (_stay.length > 0) {
@@ -4948,6 +4955,19 @@ function botTurn() {
           const _bullOcc = state.board.get('bullseye');
           const _isCut = _bullOcc && _bullOcc.playerIdx !== ci;
           if (_enterPeg && _enterPeg.onFasttrack && !_isCut) score -= 60;
+          // From its OWN ft hole the peg is one step from its home stretch, so going into the
+          // bullseye throws that away. Ken, 2026-11-15: worth it only when it stops a win, that is
+          // when the peg in the bullseye is its owner's last one out (their safe zone is full, so
+          // leaving the bullseye takes it straight home). A cut for its own sake loses to heading
+          // for the safe zone.
+          if (_enterPeg && m.from === _ownFTForBot) {
+            const _owner = _isCut ? players[_bullOcc.playerIdx] : null;
+            const _ownerSafe = _owner ? _owner.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length : 0;
+            const _stopsAWin = _ownerSafe >= SAFE_ZONE_SIZE;
+            // Not stopping a win: only if nothing else is playable (an own peg blocking the home
+            // stretch). A plain number here lost to hard and expert's cut bonuses further down.
+            if (!_stopsAWin) score -= LAST_RESORT_CUT_PENALTY;
+          }
           if (_isCut) { score += w.capture; m.captures = true; }
         }
         else if (m.type === 'exitFastTrack') score += 20;

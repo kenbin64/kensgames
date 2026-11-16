@@ -108,12 +108,12 @@ function legalityErrors(s) {
   if (s.pegIdx === s.peg2Idx) e.push('same peg');
   if (s.dest === s.dest2) e.push(`collision ${s.dest}`);
   if ((s.steps || 0) + (s.steps2 || 0) !== 7) e.push(`sum!=7 (${s.steps}+${s.steps2})`);
-  // Any bullseye terminal must be reached via a foreign ft-* hole: either the
-  // half is a 1-hit from an ft-* hole, or its path's penultimate hole is ft-*
-  // (outer approach). Own ft-0 is never a valid launch.
+  // Any bullseye terminal is either a 1-hit from an ft-* hole (any one, own ft-0
+  // included since Ken 2026-11-15), or an outer approach whose penultimate hole
+  // is a FOREIGN ft-* (own ft-0 is still never the penultimate of a multi-hop).
   const bullOK = (path, from) => {
     if (!Array.isArray(path) || path[path.length - 1] !== 'bullseye') return false;
-    if (path.length === 1) return typeof from === 'string' && from.startsWith('ft-') && from !== 'ft-0';
+    if (path.length === 1) return typeof from === 'string' && from.startsWith('ft-');
     const penult = path[path.length - 2];
     return typeof penult === 'string' && penult.startsWith('ft-') && penult !== 'ft-0';
   };
@@ -172,10 +172,12 @@ section('Bullseye offered as a split half from a foreign ft hole');
   ok(bullSteps, 'bull-foreign: every bullseye terminal is a 1-step jump');
 }
 
-// ── 3. OWN ft-{bp} GETS NO BULLSEYE ENTRY ───────────────────
-section('Own ft-{bp} is outer-rim semantics — no bullseye');
+// ── 3. OWN ft-{bp} GETS THE ONE-HOP BULLSEYE TOO ────────────
+// Ken, 2026-11-15: "any time you are on fast track a single move card can put you on the
+// bullseye." This section used to assert the opposite (the retired BULL_NO_FROM_OWN_FT).
+section('Own ft-{bp} with fast-track status — one-hop bullseye allowed, never multi-hop');
 {
-  // peg0 on own ft-0, peg1 on foreign ft-2. Only peg1 may bullseye; peg0 must not.
+  // peg0 on own ft-0, peg1 on foreign ft-2. Both may take a 1-step half into the bullseye.
   setup([
     { hole: 'ft-0', onFasttrack: true },
     { hole: 'ft-2', onFasttrack: true },
@@ -183,9 +185,11 @@ section('Own ft-{bp} is outer-rim semantics — no bullseye');
   ]);
   const ss = splits();
   allLegal(ss, 'own-ft');
-  const peg0Bull = ss.some(m =>
+  const peg0Bull = ss.filter(m =>
     (m.pegIdx === 0 && m.dest === 'bullseye') || (m.peg2Idx === 0 && m.dest2 === 'bullseye'));
-  ok(!peg0Bull, 'own-ft: peg on own ft-0 never routes to bullseye');
+  ok(peg0Bull.length > 0, 'own-ft: peg on own ft-0 can take a 1-step half into the bullseye');
+  ok(peg0Bull.every(m => (m.pegIdx === 0 && m.dest === 'bullseye' ? m.steps : m.steps2) === 1),
+    'own-ft: and only as a 1-step half, never a multi-hop');
 }
 
 // ── 4. OCCUPIED BULLSEYE BLOCKS THE VARIANT ─────────────────
