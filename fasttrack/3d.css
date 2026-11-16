@@ -4372,10 +4372,13 @@ body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; b
   position: relative; box-sizing: border-box; width: var(--ft-card-w); height: var(--ft-card-h);
   border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
+/* The back is the deck owner's colour (set inline from the player, Ken 2026-11-15), so the deck on
+   the table shows whose turn it is. White border and white lattice read on every player colour,
+   the yellow included; #1b2a6b is only the fallback when no colour is known. */
 #ft-card-table .ftt-back {
-  border: 2px solid #f4d27a; background-color: #1b2a6b;
-  background-image: repeating-linear-gradient(45deg, rgba(244, 210, 122, 0.22) 0 4px, transparent 4px 9px),
-    repeating-linear-gradient(-45deg, rgba(244, 210, 122, 0.22) 0 4px, transparent 4px 9px);
+  border: 2px solid rgba(255, 255, 255, 0.9); background-color: #1b2a6b;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.24) 0 4px, transparent 4px 9px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.24) 0 4px, transparent 4px 9px);
   box-shadow: 2px 2px 0 #0d1640, 4px 4px 0 rgba(13, 22, 64, 0.6);   /* a stack, not one card */
 }
 #ft-card-table .ftt-back.can-draw { animation: ftt-pulse 1.4s ease-in-out infinite; }

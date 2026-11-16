@@ -1731,7 +1731,8 @@ function renderCardTable() {
   const html = `<div class="ftt-owner" style="border-color:${esc(color)}">`
     + `<span class="ftt-owner-pic">${esc(pic)}</span><span class="ftt-owner-name">${mine ? 'Your deck' : esc(name) + '\u2019s deck'}</span></div>`
     + `<div class="ftt-piles">`
-    + `<div class="ftt-pile ftt-back${canDraw ? ' can-draw' : ''}" title="${esc(name)}'s draw deck: ${left} cards left">`
+    // The back is the owner's colour (Ken, 2026-11-15), a cue for whose turn it is.
+    + `<div class="ftt-pile ftt-back${canDraw ? ' can-draw' : ''}" style="background-color:${esc(color)}" title="${esc(name)}'s draw deck: ${left} cards left">`
     + (canDraw ? '<span class="ftt-draw">DRAW</span>' : '') + `<span class="ftt-count">${left}</span></div>`
     + drawn + `</div>`;
 

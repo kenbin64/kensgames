@@ -114,5 +114,53 @@ const all = e => JSON.stringify([0, 1, 2].map(s => (e.state.deck.get('activeSeat
 ok(all(g2) === all(g3), 'same seed: identical decks');
 ok(all(g2) !== all(g4), 'different seed: different decks');
 
+// Ken, 2026-11-15: "verify that every deck has all cards including aces and jokers", "no
+// duplicates", "shuffled at beginning of game and when deck is depleted".
+section('6. Every player count, every deck: all 54, the aces and jokers, no duplicates, shuffled');
+const SUITS = ['♠', '♥', '♦', '♣'];
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const factoryOrder = JSON.stringify(g.sandbox.createDeck().map(c => c.display));
+const deckOf = (e, s) => (e.state.deck.get('activeSeat') === s ? e.state.deck.get('cards') : e.state.deck.get('decks')[s].cards) || [];
+let countProblem = '', shuffleProblem = '';
+for (let players = 2; players <= 6; players++) {
+  const e = createEngine();
+  e.initGame(players, { sessionSeed: `deck-count-${players}` });
+  for (let s = 0; s < players; s++) {
+    const cards = deckOf(e, s);
+    const where = `${players} players, seat ${s}`;
+    const aces = cards.filter(c => c.value === 'A');
+    const jokers = cards.filter(c => c.value === 'JOKER');
+    const suited = cards.filter(c => c.value !== 'JOKER').map(c => c.value + c.suit);
+    const missing = [];
+    for (const r of RANKS) for (const su of SUITS) if (!suited.includes(r + su)) missing.push(r + su);
+    if (!countProblem && cards.length !== 54) countProblem = `${where}: ${cards.length} cards`;
+    if (!countProblem && (aces.length !== 4 || new Set(aces.map(c => c.suit)).size !== 4)) countProblem = `${where}: ${aces.length} aces`;
+    if (!countProblem && jokers.length !== 2) countProblem = `${where}: ${jokers.length} jokers`;
+    if (!countProblem && missing.length) countProblem = `${where}: missing ${missing.join(' ')}`;
+    if (!countProblem && new Set(suited).size !== 52) countProblem = `${where}: a duplicate card`;
+    if (!shuffleProblem && JSON.stringify(cards.map(c => c.display)) === factoryOrder) shuffleProblem = `${where}: still in factory order`;
+  }
+}
+ok(!countProblem, 'each deck has 54: all 13 ranks in all 4 suits, 4 aces, 2 jokers, no duplicates (2 to 6 players)', countProblem);
+ok(!shuffleProblem, 'each deck is shuffled at the start, never left in factory order (2 to 6 players)', shuffleProblem);
+
+section('7. A depleted deck is really reshuffled, not put back in the order it was played');
+{
+  const e = createEngine();
+  e.initGame(2, { sessionSeed: 'deck-reshuffle-order' });
+  const d = e.state.deck;
+  const seat = d.get('activeSeat');
+  const played = [...deckOf(e, seat)];       // pretend every card was drawn and discarded in this order
+  d.set('cards', []);
+  d.set('discard', played.slice());
+  const refilled = e.sandbox._refillDeckIfEmpty();
+  const after = d.get('cards') || [];
+  ok(refilled === true && (d.get('discard') || []).length === 0, 'an empty deck takes its whole discard pile back');
+  ok(tally(after) === FULL, 'the reshuffled deck is still exactly one full deck');
+  const same = JSON.stringify(after.map(c => c.display)) === JSON.stringify(played.map(c => c.display));
+  const reversed = JSON.stringify(after.map(c => c.display)) === JSON.stringify(played.slice().reverse().map(c => c.display));
+  ok(!same && !reversed, 'and its order is new: not the discard order, not that order reversed');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
