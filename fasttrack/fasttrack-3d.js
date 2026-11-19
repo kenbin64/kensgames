@@ -4162,7 +4162,16 @@ function renderBoard3D() {
         if (!hole) return;
 
         if (existing) {
-          if (existing.holeId !== holeId) {
+          if (peg._cutFromHole && existing.holeId !== holeId && !_animatingPegs.has(pegId)) {
+            // Cut victim sent to its HOME hole (its holding area was full, see bumpOccupant). It
+            // waits at the cut hole like any cut peg, and leaves only once the attacker has landed
+            // on it (Ken, 2026-11-18: it used to set off at the same time as the attacker).
+            const fromHole = holeRegistry.get(peg._cutFromHole);
+            if (fromHole) existing.mesh.position.set(fromHole.position.x, boardY + LINE_HEIGHT + 1, fromHole.position.z);
+            _animatingPegs.add(pegId);
+            _deferredAnims.push({ pegId, path: null, existing, holeId, cut: true });
+            delete peg._cutFromHole;
+          } else if (existing.holeId !== holeId) {
             // Check if this peg has a pending hop animation
             const anim = (pendingAnim && pendingAnim.pegId === pegId) ? pendingAnim
               : (pendingAnim2 && pendingAnim2.pegId === pegId) ? pendingAnim2

@@ -5615,9 +5615,8 @@ const CutsceneManager = {
     this.showPegReaction(victimReaction, victimPlayer.color);
     this.spawnFloatingEmojis(['⚔️', '💥', '🔥'], 6);
 
-    // Trigger victim protest animation in 3D
-    const victimId = victimPeg.id || `peg-${victimPlayer.color}-0`;
-    if (window.triggerPegPose) window.triggerPegPose(victimId, 'protest');
+    // No 'protest' shake here (Ken, 2026-11-18): it ran on top of the 'shame' bow above and both
+    // drive the same rotations, so the head-hung nod was lost. The vanquished peg just hangs its head.
 
     log(`⚔️ ${victorPlayer.name}'s ${victorPeg.nickname || 'peg'}: "${victorReaction}"`);
     log(`😢 ${victimPlayer.name}'s ${victimPeg.nickname || 'peg'}: "${victimReaction}"`);
