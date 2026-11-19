@@ -243,7 +243,7 @@
   //   Leave 🎯   from the bullseye, straight to the player's own fast-track hole (with "Pick 🏁" for any hole)
   //   Traverse   a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
   //              hole), then on along the track for the rest of the card
-  //   Leave 🏁   a peg riding the fast track: choose where to get off (the move loses the fast track)
+  //   🪂         bail out: a peg riding the fast track: choose where to get off (the move loses the fast track)
   //   Other      everything else (one landing: straight there; several: the usual letters)
   // A peg whose landings are all one kind gets the letters as before, and a single landing is still chosen for
   // the player. Every button leads to moves the engine listed; nothing new is invented.
@@ -283,7 +283,7 @@
       if (bull.length) buttons.push(straightTo(bull[0], '🎯', 'Jump to the bullseye'));
       if (bull.length && canLeave) buttons.push(button('🐔', 'Wimp out: stay on the main track instead of the bullseye', null, () => leaveFastTrackFor(pegIdx, true)));
       const otherRides = rides.filter(o => o.dest !== (rides[0] && rides[0].dest));
-      if (canLeave) buttons.push(button('Leave 🏁', 'Leave the fast track: choose where to get off (this loses the fast track)', null, () => leaveFastTrackFor(pegIdx)));
+      if (canLeave) buttons.push(button('🪂', 'Bail out: jump off the fast track early and choose where to get off (this loses the fast track)', null, () => leaveFastTrackFor(pegIdx)));
       else if (otherRides.length) buttons.push(group(otherRides, 'Other', 'Other landings'));
       return buttons.length > 1 || canLeave ? buttons : null;
     }
@@ -308,7 +308,7 @@
     return buttons;
   }
 
-  // "Leave 🏁" (and 🐔): turn on the engine's leave-fast-track moves, then offer this peg's ways off the ring.
+  // 🪂 (and 🐔): turn on the engine's leave-fast-track moves, then offer this peg's ways off the ring.
   // mainTrackOnly (🐔): only the landings on the main track, so a single one is lit and chosen at once.
   function leaveFastTrackFor(pegIdx, mainTrackOnly = false) {
     const core = window.FastTrackCore;

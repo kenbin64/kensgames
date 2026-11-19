@@ -1380,14 +1380,14 @@ textarea,
 }
 
 #emoji-panel {
-  width: min(280px, 82vw);
+  width: min(340px, 92vw);
   background: rgba(8, 10, 24, 0.94);
   border: 1px solid rgba(80, 220, 255, 0.28);
   border-radius: 12px;
   padding: 10px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
   display: none;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));   /* 22 reactions: four across keeps the tray short */
   gap: 8px;
 }
 
@@ -1472,7 +1472,7 @@ textarea,
 }
 
 .emoji-balloon-glyph {
-  font-size: clamp(88px, 17vw, 148px);
+  font-size: clamp(120px, 24vw, 200px);   /* bigger (Ken, 2026-11-18); was clamp(88px, 17vw, 148px) */
   line-height: 1;
   text-shadow: 0 0 26px rgba(80, 220, 255, 0.35);
 }
@@ -2766,7 +2766,8 @@ textarea,
 
 @media (max-width: 760px) {
 
-  /* Show the hamburger; hide the individual top-right icons + emoji UI. */
+  /* Show the hamburger; hide the individual top-right icons and the emoji toggle. The emoji container stays, so
+     the hamburger's "Emoji" item can still open the tray (2026-11-18: hiding #emoji-ui made it unreachable). */
   #btn-hamburger {
     display: flex;
     align-items: center;
@@ -2776,8 +2777,13 @@ textarea,
   #btn-music-toggle,
   #btn-leave-game,
   #btn-settings,
-  #emoji-ui {
+  #btn-emoji-toggle {
     display: none !important;
+  }
+
+  /* The open tray sits over the card table, not under it. */
+  #emoji-ui {
+    z-index: 400;
   }
 
   /* Keep the top-left player strip from colliding with the hamburger. */
@@ -4310,7 +4316,7 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.long-label .peg-glyph { font-size: 17px 
   body.ft-turn-panel #ft-peg-bar #ft-peg-buttons { gap: 4px !important; }
   body.ft-turn-panel #ft-peg-bar .peg-btn { min-width: 40px !important; width: 40px !important; padding: 0 !important; }
 }
-/* Shortcut buttons (Ken, 2026-11-18): a word such as Traverse or "Leave 🏁" gets a button that grows to fit it,
+/* Shortcut buttons (Ken, 2026-11-18): a word such as Traverse or Other gets a button that grows to fit it,
    on a phone too; the dark text reads on the mint tint. */
 body.ft-turn-panel #ft-peg-bar .peg-btn.word-label { width: auto !important; min-width: 56px !important; max-width: none !important; padding: 0 10px !important; flex: 0 0 auto !important; }
 body.ft-turn-panel #ft-peg-bar .peg-btn.word-label .peg-glyph { font-size: 15px !important; white-space: nowrap; color: #08261a !important; }

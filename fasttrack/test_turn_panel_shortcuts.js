@@ -5,7 +5,7 @@
  *   "two new buttons whenever fast track hole is a legal last hop ... whenever bullseye is a legal move for
  *    final hop that appears then other button will take them to the alternative routes"
  *   On the bullseye with a royal: "Leave 🎯" goes straight to the player's own fast-track hole; "Pick 🏁" opens
- *   every fast-track hole. Riding the fast track: "Traverse" and "Leave 🏁". 🏁 stands for the fast track.
+ *   every fast-track hole. Riding the fast track: "Traverse" and 🪂 (bail out). 🏁 stands for the fast track.
  *   "add a wimp button when someone chooses to stay on the main track instead of risking the bullseye ...
  *    it will highlight the main track hole to the right of the fast track hole."
  *
@@ -93,7 +93,7 @@ function table(hole, card, { onFasttrack = false } = {}) {
 
 const nextOnTrack = (game, hole) => game.CLOCKWISE_TRACK[(game.CLOCKWISE_TRACK.indexOf(hole) + 1) % game.CLOCKWISE_TRACK.length];
 
-section('Riding the fast track with a one-hop card: Traverse, 🎯, 🐔 and Leave 🏁');
+section('Riding the fast track with a one-hop card: Traverse, 🎯, 🐔 and 🪂');
 {
   // A peg on another player's fast-track hole, riding the ring, with an Ace (one hop).
   const t = table('ft-3', 'A', { onFasttrack: true });
@@ -102,7 +102,7 @@ section('Riding the fast track with a one-hop card: Traverse, 🎯, 🐔 and Lea
   ok(labels.includes('🎯'), 'the bullseye jump has its own button', labels.join(' '));
   ok(labels.includes('Traverse'), 'Traverse stays on the ring', labels.join(' '));
   ok(labels.includes('🐔'), 'the wimp button is offered while the bullseye is on offer', labels.join(' '));
-  ok(labels.includes('Leave 🏁'), 'Leave 🏁 lets the peg get off the ring', labels.join(' '));
+  ok(labels.includes('🪂'), '🪂 (bail out) lets the peg get off the ring', labels.join(' '));
   ok(labels.every(l => !/^[A-G]$/.test(l)), 'no hole letters at this step: buttons instead', labels.join(' '));
   t.press('🐔');
   const main = nextOnTrack(t.game, 'ft-3');

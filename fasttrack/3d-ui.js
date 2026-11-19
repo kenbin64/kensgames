@@ -16,7 +16,26 @@ const EMOJI_REACTIONS = [
   { id: 'high_five', label: 'High Five', emoji: '🖐️' },
   { id: 'swearing_cloud', label: 'Swearing', emoji: '🤬' },
   { id: 'lightning', label: 'Lightning', emoji: '⚡' },
+  // Added 2026-11-18 (Ken): the crying baby, smirk, glasses, drama masks, poop and justice, plus the game's own
+  // symbols from the turn buttons: the wimp-out chicken, the fast track flag and the bullseye.
+  { id: 'waah', label: 'Waah!', emoji: '👶' },
+  { id: 'smirk', label: 'Smirk', emoji: '😏' },
+  { id: 'glasses', label: 'Glasses', emoji: '🤓' },
+  { id: 'drama', label: 'Drama', emoji: '🎭' },
+  { id: 'poop', label: 'Poop', emoji: '💩' },
+  { id: 'justice', label: 'Justice', emoji: '⚖️' },
+  { id: 'wimp', label: 'Wimp', emoji: '🐔' },
+  { id: 'fast_track', label: 'Fast track', emoji: '🏁' },
+  { id: 'bullseye', label: 'Bullseye', emoji: '🎯' },
+  { id: 'heart', label: 'Heart', emoji: '❤️' },
+  { id: 'facepalm', label: 'Face palm', emoji: '🤦' },
 ];
+// How long a reaction stays up (Ken, 2026-11-18: one second longer, and bigger). The balloon rises for 1.1 s,
+// holds, then pops; the line in the feed fades later.
+const BALLOON_HOLD_MS = 2100;     // was 1100: pop one second later
+const BALLOON_POP_MS = 320;
+const TOAST_FADE_MS = 4600;       // was 3600
+const TOAST_GONE_MS = 4950;       // was 3950
 
 let reactionClient = null;
 let reactionClientReady = false;
@@ -72,10 +91,10 @@ function showEmojiReactionToast(payload) {
     feed.removeChild(feed.lastElementChild);
   }
 
-  setTimeout(() => node.classList.add('fade'), 3600);
+  setTimeout(() => node.classList.add('fade'), TOAST_FADE_MS);
   setTimeout(() => {
     if (node.parentNode) node.parentNode.removeChild(node);
-  }, 3950);
+  }, TOAST_GONE_MS);
 
   const balloon = document.createElement('div');
   balloon.className = 'emoji-balloon';
@@ -87,10 +106,10 @@ function showEmojiReactionToast(payload) {
 
   setTimeout(() => {
     balloon.classList.add('pop');
-  }, 1100);
+  }, BALLOON_HOLD_MS);
   setTimeout(() => {
     if (balloon.parentNode) balloon.parentNode.removeChild(balloon);
-  }, 1420);
+  }, BALLOON_HOLD_MS + BALLOON_POP_MS);
 }
 
 function ensureReactionClient() {
@@ -534,7 +553,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const panel = document.getElementById('emoji-panel');
     const ui = document.getElementById('emoji-ui');
     if (!panel || !ui || !panel.classList.contains('open')) return;
-    if (!ui.contains(ev.target)) panel.classList.remove('open');
+    // The phone launchers (the hamburger's Emoji item, the settings Emoji button) sit outside #emoji-ui; without
+    // this, the same tap that opens the tray would bubble here and close it again at once (fixed 2026-11-18).
+    const launcher = ev.target.closest && ev.target.closest('#hamburger-menu, #settings-emoji-launch');
+    if (!ui.contains(ev.target) && !launcher) panel.classList.remove('open');
   });
 });
 
