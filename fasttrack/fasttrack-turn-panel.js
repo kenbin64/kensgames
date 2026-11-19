@@ -160,8 +160,9 @@
   let signature = '';
 
   function freshPick() {
+    // leaving: this step was shown with the engine's "leave fast track" moves turned on (↩ restores the engine to match).
     return { stage: 'peg', peg: null, stops: [], steps: null, dest: null, firstLeg: null, peg2: null, moveIdx: null,
-      entry: null, options: [], choices: [], history: [] };
+      entry: null, leaving: false, options: [], choices: [], history: [] };
   }
 
   function resetPick() { Object.assign(pick, freshPick()); }
@@ -176,6 +177,12 @@
     const step = pick.history.pop();
     if (!step) return;
     Object.assign(pick, step);
+    // Going back past "Leave FT" turns the engine's leave mode off again, so the move list matches this step.
+    const core = window.FastTrackCore;
+    if (core && typeof core.setLeaveFastTrack === 'function' && (core.state.turn.get('leaveFastTrack') === true) !== !!pick.leaving) {
+      core.setLeaveFastTrack(!!pick.leaving);
+      signature = signatureNow();     // changed by the panel itself, so the heartbeat does not start the turn over
+    }
     repaint();
     render();
   }
@@ -222,8 +229,98 @@
     remember();
     pick.peg = pegIdx;
     const moves = readMoves();
-    if (!isSevenCard()) { offerDests(plainOptionsFor(moves, pegIdx), 'dest'); return; }
+    if (!isSevenCard()) { offerPegMoves(pegIdx, plainOptionsFor(moves, pegIdx)); return; }
     offerStops(labelStops(sevenStopsFor(moves, pegIdx)));
+  }
+
+  // ── Shortcut buttons (Ken, 2026-11-18): fewer letters, plainer choices ──────────────────────
+  // When a peg's landings are of more than one kind, the footer first offers one button per kind
+  // (🏁 is the fast track, so the buttons need not spell it out):
+  //   🎯         a landing on the bullseye (the one-hop jump)
+  //   🐔         wimp out: whenever 🎯 is on offer, stay on the main track instead (it lights the main-track hole
+  //              after the fast-track hole, or letters the main-track landings when there are several)
+  //   🏁         a landing on a fast-track hole (one hole: straight there; several: "Pick 🏁" letters them)
+  //   Leave 🎯   from the bullseye, straight to the player's own fast-track hole (with "Pick 🏁" for any hole)
+  //   Traverse   a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
+  //              hole), then on along the track for the rest of the card
+  //   Leave 🏁   a peg riding the fast track: choose where to get off (the move loses the fast track)
+  //   Other      everything else (one landing: straight there; several: the usual letters)
+  // A peg whose landings are all one kind gets the letters as before, and a single landing is still chosen for
+  // the player. Every button leads to moves the engine listed; nothing new is invented.
+  const isBullseye = (hole) => hole === 'bullseye';
+  const isFtHole = (hole) => typeof hole === 'string' && hole.startsWith('ft-');
+  const ringHopsOf = (o) => (o.path || []).filter(isFtHole).length;
+
+  function offerPegMoves(pegIdx, options) {
+    const buttons = shortcutButtons(pegIdx, options);
+    if (!buttons) { offerDests(options, 'dest'); return; }
+    pick.stage = 'dest';
+    pick.options = options;
+    pick.choices = buttons;
+    paint(options);
+  }
+
+  // The buttons for this peg, or null when the plain letters are the clearer choice.
+  function shortcutButtons(pegIdx, options) {
+    const player = readPlayer();
+    const peg = player && player.pegs ? player.pegs[pegIdx] : null;
+    if (!peg || uniqueDests(options).length === 0) return null;
+    const core = readCore();
+    const own = `ft-${player.boardPosition}`;
+    const bull = options.filter(o => isBullseye(o.dest));
+    const button = (label, words, dest, act) => ({ dest, label, kind: 'action', words, act });
+    const straightTo = (o, label, words) => button(label, words, o.dest, () => chooseHole(o.dest));
+    const group = (opts, label, words) => uniqueDests(opts).length === 1 ? straightTo(opts[0], label, words)
+      : button(label, words, null, () => { remember(); offerDests(opts, 'dest'); });
+    const buttons = [];
+
+    if (peg.onFasttrack && peg.holeId !== 'bullseye') {
+      // Riding the fast track: Traverse is the landing that stays on the ring the longest (then nearest).
+      const rides = options.filter(o => !isBullseye(o.dest))
+        .sort((a, b) => (ringHopsOf(b) - ringHopsOf(a)) || ((a.path || []).length - (b.path || []).length));
+      const canLeave = !!(core && core.turn.get('canLeaveFastTrack')) && core.turn.get('leaveFastTrack') !== true;
+      if (rides.length) buttons.push(straightTo(rides[0], 'Traverse', 'Traverse: ride the fast track as far as it goes, then on along the track'));
+      if (bull.length) buttons.push(straightTo(bull[0], '🎯', 'Jump to the bullseye'));
+      if (bull.length && canLeave) buttons.push(button('🐔', 'Wimp out: stay on the main track instead of the bullseye', null, () => leaveFastTrackFor(pegIdx, true)));
+      const otherRides = rides.filter(o => o.dest !== (rides[0] && rides[0].dest));
+      if (canLeave) buttons.push(button('Leave 🏁', 'Leave the fast track: choose where to get off (this loses the fast track)', null, () => leaveFastTrackFor(pegIdx)));
+      else if (otherRides.length) buttons.push(group(otherRides, 'Other', 'Other landings'));
+      return buttons.length > 1 || canLeave ? buttons : null;
+    }
+
+    const ft = options.filter(o => isFtHole(o.dest));
+    const rest = options.filter(o => !isBullseye(o.dest) && !isFtHole(o.dest));
+    const kinds = [bull, ft, rest].filter(k => k.length).length;
+    if (peg.holeId === 'bullseye' && ft.length) {
+      const home = ft.find(o => o.dest === own);
+      if (home) buttons.push(straightTo(home, 'Leave 🎯', 'Leave the bullseye for your own fast-track hole'));
+      if (uniqueDests(ft).length > (home ? 1 : 0)) buttons.push(group(ft, 'Pick 🏁', 'Pick the fast-track hole to leave the bullseye for'));
+      if (rest.length) buttons.push(group(rest, 'Other', 'Other landings'));
+      return buttons.length > 1 ? buttons : null;
+    }
+    if (kinds < 2) return null;                                  // all one kind: the letters are clearer
+    if (bull.length) buttons.push(straightTo(bull[0], '🎯', 'Jump to the bullseye'));
+    if (ft.length) buttons.push(group(ft, uniqueDests(ft).length === 1 ? '🏁' : 'Pick 🏁',
+      uniqueDests(ft).length === 1 ? 'Land on the fast-track hole' : 'Pick the fast-track hole to land on'));
+    // With the bullseye on offer, staying on the main track is wimping out.
+    if (rest.length) buttons.push(bull.length ? group(rest, '🐔', 'Wimp out: stay on the main track instead of the bullseye')
+      : group(rest, 'Other', uniqueDests(rest).length === 1 ? 'The other landing' : 'Other landings'));
+    return buttons;
+  }
+
+  // "Leave 🏁" (and 🐔): turn on the engine's leave-fast-track moves, then offer this peg's ways off the ring.
+  // mainTrackOnly (🐔): only the landings on the main track, so a single one is lit and chosen at once.
+  function leaveFastTrackFor(pegIdx, mainTrackOnly = false) {
+    const core = window.FastTrackCore;
+    if (!core || typeof core.setLeaveFastTrack !== 'function') return;
+    remember();
+    core.setLeaveFastTrack(true);
+    signature = signatureNow();       // the panel changed the move list itself: not a new turn, keep this choice going
+    pick.leaving = true;
+    const stays = new Set(pick.options.map(o => o.dest));      // the landings already offered while staying
+    const all = plainOptionsFor(readMoves(), pegIdx);
+    const off = all.filter(o => !stays.has(o.dest) && (!mainTrackOnly || (!isFtHole(o.dest) && !isBullseye(o.dest))));
+    offerDests(off.length ? off : all, 'dest');
   }
 
   // A 7: one stop is taken for the player. One route: a button for each of its stops. More than one route
@@ -331,7 +428,9 @@
       if (stop) chooseStop(stop);
     } else if (pick.stage === 'dest' || pick.stage === 'dest2' || pick.stage === 'ready') {
       const choice = pick.choices.find(c => c.dest === holeId);
+      // A lit hole behind a group button ("Other", "Pick FT") has no label of its own; tapping it still works.
       if (choice) choice.act();
+      else if (pick.options.some(o => o.dest === holeId)) chooseHole(holeId);
     }
     render();
     return true;
@@ -382,7 +481,9 @@
     holeBadgeKey = key;
     clearHoleLabels();
     if (!hasChoices() || typeof THREE === 'undefined' || typeof scene === 'undefined' || !scene) return;
-    const placed = pick.choices.map(choice => ({ choice, at: holePosition(choice.dest) })).filter(p => p.at);
+    // Letters and stops float over their holes; the shortcut buttons (Traverse, 🎯, 🐔 ...) do not, the lit path shows them.
+    const placed = pick.choices.filter(choice => choice.kind !== 'action')
+      .map(choice => ({ choice, at: holePosition(choice.dest) })).filter(p => p.at);
     const size = badgeSize(placed.map(p => p.at));
     const perHole = new Map();
     placed.forEach(({ choice, at }) => {
@@ -483,7 +584,7 @@
     refreshBanner();
   }
 
-  const SLOT_TINTS = { hole: '#ffd666', stop: '#ffd666', route: '#9fd3ff' };
+  const SLOT_TINTS = { hole: '#ffd666', stop: '#ffd666', route: '#9fd3ff', action: '#8ff0c8' };
 
   function renderSlot(i, slot, color) {
     const button = document.getElementById('peg-btn-' + i);
@@ -495,7 +596,10 @@
     button.style.setProperty('--peg-color', tint || 'transparent');
     button.disabled = !slot;
     const kindClass = slot ? (slot.kind === 'peg' ? ' peg-kind' : ' hole-btn') : '';
-    const longClass = slot && slot.label.length > 1 ? ' long-label' : '';
+    // A word ("Traverse", "Other") gets a button that grows to fit it; a letter, number or the 🎯 stays square.
+    const isWord = !!slot && /[A-Za-z]{2,}/.test(slot.label);
+    const isEmoji = !!slot && /^\p{Extended_Pictographic}$/u.test(slot.label);
+    const longClass = !slot ? '' : isWord ? ' word-label' : isEmoji ? ' emoji-label' : slot.label.length > 1 ? ' long-label' : '';
     button.className = 'peg-btn' + (slot ? ' active' : ' dormant') + kindClass + longClass + (slot && slot.chosen ? ' selected' : '');
     button.title = slot ? slot.words : '';
     button.setAttribute('aria-label', slot ? slot.words : 'Not in use');
@@ -611,7 +715,9 @@
     const button = document.getElementById('ft-leave-ft');
     const core = readCore();
     if (!button) return;
-    const offered = !!(human && !undo.open && core && core.turn.get('canLeaveFastTrack'));
+    // Shown while choosing a peg (it also lets another peg move). Once a fast-track peg is chosen, its own
+    // "Leave FT" button in the footer does this, so the bar does not show the same choice twice.
+    const offered = !!(human && !undo.open && core && core.turn.get('canLeaveFastTrack')) && pick.stage === 'peg';
     const leaving = !!(core && core.turn.get('leaveFastTrack') === true);
     button.hidden = !offered;
     button.textContent = leaving ? 'Stay on fast track' : 'Leave fast track';

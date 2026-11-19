@@ -4310,6 +4310,17 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.long-label .peg-glyph { font-size: 17px 
   body.ft-turn-panel #ft-peg-bar #ft-peg-buttons { gap: 4px !important; }
   body.ft-turn-panel #ft-peg-bar .peg-btn { min-width: 40px !important; width: 40px !important; padding: 0 !important; }
 }
+/* Shortcut buttons (Ken, 2026-11-18): a word such as Traverse or "Leave 🏁" gets a button that grows to fit it,
+   on a phone too; the dark text reads on the mint tint. */
+body.ft-turn-panel #ft-peg-bar .peg-btn.word-label { width: auto !important; min-width: 56px !important; max-width: none !important; padding: 0 10px !important; flex: 0 0 auto !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.word-label .peg-glyph { font-size: 15px !important; white-space: nowrap; color: #08261a !important; }
+/* A single symbol (🎯 🐔 🏁) keeps a full square so the picture is not squeezed when words share the row. */
+body.ft-turn-panel #ft-peg-bar .peg-btn.emoji-label { flex: 0 0 auto !important; min-width: 48px !important; }
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-bar .peg-btn.emoji-label { width: 44px !important; min-width: 44px !important; }
+  body.ft-turn-panel #ft-peg-bar .peg-btn.word-label { padding: 0 8px !important; }
+  body.ft-turn-panel #ft-peg-bar .peg-btn.word-label .peg-glyph { font-size: 13px !important; letter-spacing: 0; }
+}
 body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; border-radius: 14px; }
 
 /* -- The card table (Ken, 2026-11-08) -----------------------------------------------
