@@ -497,6 +497,36 @@ function getHoleType(holeId) {
   return 'holding';
 }
 
+// ── HOME-STRETCH CROWN (Ken, 2026-11-18) ──────────────────────────────────
+// The crown floats over the winning hole home-{bp} ONLY while:
+//   1. all four of the player's safe holes are filled, and
+//   2. their last peg is on the home stretch: it has reached or passed its own fast-track hole
+//      going clockwise, or landed on the safe-zone entrance (outer-{bp}-2) going back on a 4.
+// The home stretch is ft-{bp}, down side-left-{bp}-4..1, along outer-{bp}-0..3 (through the
+// safe-zone entrance outer-{bp}-2) to home-{bp}; the crown stays on all the way along it.
+// "Reached or passed" is the peg's eligibleForSafeZone flag (set by passing ft-{bp} or the
+// entrance); it is what stops a peg that has just ENTERED the board on home-{bp} from counting.
+// Worked out fresh from the board after every move, so a cut removes the crown at once.
+function homeStretchHoles(bp) {
+  return [`ft-${bp}`, `side-left-${bp}-4`, `side-left-${bp}-3`, `side-left-${bp}-2`, `side-left-${bp}-1`,
+    `outer-${bp}-0`, `outer-${bp}-1`, `outer-${bp}-2`, `outer-${bp}-3`, `home-${bp}`];
+}
+
+function crownPresentFor(player) {
+  const pegs = player.pegs || [];
+  if (pegs.filter(p => getHoleType(p.holeId) === 'safezone').length < SAFE_ZONE_SIZE) return false;
+  const stretch = new Set(homeStretchHoles(player.boardPosition));
+  return pegs.some(p => p.eligibleForSafeZone && stretch.has(p.holeId));
+}
+
+// Every player's crown, indexed by board position (the 3D board draws crowns[bp] over home-{bp}).
+function refreshCrowns() {
+  const crowns = [];
+  for (const player of state.players.get('list') || []) crowns[player.boardPosition] = crownPresentFor(player);
+  state.meta.set('crowns', crowns);
+  return crowns;
+}
+
 
 // Does this peg travel the fast-track ring? Only with fast-track STATUS (Ken, 2026-11-08):
 // status comes from entering going clockwise, it is kept while the peg stays on the ring, and
@@ -633,6 +663,7 @@ function initGame(playerCount = 2, config = {}) {
 
   // Meta
   state.meta.set('winner', null);
+  state.meta.set('crowns', []);   // no crowns at the start: no one has a full safe zone
   // ── Shared deterministic seed (manifold-first, Phase 1) ────────────────────
   // The deck (and any future RNG) blooms from ONE seed that is identical for
   // every client in a session, instead of each client running a private
@@ -1110,6 +1141,7 @@ function applyStateSnapshot(snapshot) {
   if (localGameMode != null) state.meta.set('gameMode', localGameMode);
   console.log('[SYNC] Local myUserId after:', state.meta.get('myUserId'), 'gameMode:', state.meta.get('gameMode'));
   syncPegMatrix();
+  refreshCrowns();   // crowns follow the board as it now is (undo, or a snapshot from the host)
   updateUI();
   renderBoard();
   if (state.meta.get('winner') !== null && !_winScenePlayed) _winSceneFallback();
@@ -3592,23 +3624,18 @@ function executeMove(moveIdx) {
     }]);
   }
 
-  // Golden Crown — check if player filled safe zone and has a peg on home/FT
-  if (inSafe >= SAFE_ZONE_SIZE && !onHome) {
-    // Safe zone full but no peg on home yet — check if any peg is on
-    // home stretch (own FT hole or regular track approaching home)
-    const hasHomeStretchPeg = player.pegs.some(p =>
-      p.holeId === `ft-${player.boardPosition}` ||
-      p.holeId === `home-${player.boardPosition}` ||
-      (p.onFasttrack && p.holeId !== 'holding')
-    );
-    if (hasHomeStretchPeg && !player._goldenCrownShown) {
-      player._goldenCrownShown = true;
-      log(`👑 ${player.name} has filled the safe zone! Golden Crown on home hole!`);
-      if (window.showGoldenCrown) window.showGoldenCrown(player.boardPosition, player.color);
-      _deferredCutscenes.push(['crown', {
-        playerName: player.name, playerColor: player.color, playerId: ci
-      }]);
-    }
+  // Home-stretch crowns: recomputed for EVERY player after every move, because this move may have
+  // put the mover's last peg on the stretch, or cut another player's last peg off theirs.
+  // The fanfare plays only when a crown newly appears; a crown that is cut away simply goes.
+  // (Replaces a one-off crown that counted a peg just entering the board on home-{bp}, and any
+  // fast-track peg anywhere, as "on the home stretch", and was never removed when cut.)
+  const crownsBefore = (state.meta.get('crowns') || []).slice();
+  const crownsNow = refreshCrowns();
+  if (crownsNow[player.boardPosition] && !crownsBefore[player.boardPosition] && !(inSafe >= SAFE_ZONE_SIZE && onHome)) {
+    log(`👑 ${player.name} is on the home stretch: crown on the winning hole!`);
+    _deferredCutscenes.push(['crown', {
+      playerName: player.name, playerColor: player.color, playerId: ci
+    }]);
   }
 
   state.players.set('list', players);
