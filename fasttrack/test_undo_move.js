@@ -34,9 +34,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // A game where every seat is human, with a stand-in for the screen's Undo
 // button so the engine opens the window. Returns the offer's visible state too.
-function newGame(seed, { withScreen = true, bots = false } = {}) {
+// Undo is for same-screen play only (Ken, 2026-11-18), so games start in that mode unless told otherwise.
+function newGame(seed, { withScreen = true, bots = false, mode = 'same-screen' } = {}) {
   const g = createEngine();
-  g.initGame(3, { sessionSeed: seed });
+  g.initGame(3, { sessionSeed: seed, launchMode: mode });
   const S = g.sandbox;
   S.window.isPlayResolving = () => false;
   const players = g.state.players.get('list');
@@ -208,6 +209,18 @@ function picture(g) {
     // Bots play by themselves; just confirm none of their moves ever opened an offer.
     await sleep(3000);
     ok(b.screen.shown === 0, 'bots never get an undo window', `shown ${b.screen.shown} times`);
+  }
+
+  section('7. Solo: no undo, the move is final at once (Ken, 2026-11-18)');
+  {
+    const s = newGame('undo-7', { mode: 'solo' });
+    await drawUntilMove(s.g);
+    const epoch = s.S._getTurnEpoch();
+    s.g.executeMove(0);
+    ok(s.S.canUndoMove() === false && s.screen.shown === 0, 'solo: no Undo button, nothing armed', `shown ${s.screen.shown}`);
+    for (let w = 0; w < 30000 && s.S.isTableBusy(); w += 100) await sleep(100);
+    await sleep(500);
+    ok(s.S._getTurnEpoch() !== epoch, 'solo: the turn passes as soon as the table is quiet, no 4-second hold');
   }
 
   console.log(NL + '='.repeat(62));

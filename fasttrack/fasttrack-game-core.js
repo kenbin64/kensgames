@@ -3945,7 +3945,8 @@ function _isTableBusy() {
 //     (A, 6, J, Q, K, Joker) reopens the draw, so it cannot be used to peek.
 //   - A Card 7 split is one move, so it is taken back whole.
 //   - A winning move is final.
-//   - Solo and local play only. Online, the host would have to hold the move
+//   - Local (same-screen) play only. Not in solo (Ken, 2026-11-18: it slowed the
+//     game down). Online, the host would have to hold the move
 //     before announcing it; that belongs with the multiplayer work.
 //   - Bots do not get one, and no one waits on a bot's turn.
 //   - With no screen to show the button (server, headless tests) there is no window.
@@ -3959,6 +3960,9 @@ let _undo = null;   // { epoch, snapshot, offeredAt }  offeredAt = 0 until the p
 function _armUndo() {
   _undo = null;
   if (_applying || _isMpMode()) return;
+  // Same-screen play only (Ken, 2026-11-18): in solo the 4-second hold after every move slowed the game
+  // and bugged him, so solo moves are final at once.
+  if (!_sameScreen()) return;
   // No screen to show the button on (a server room, a headless test): there is
   // nobody to offer it to, so do not hold the turn for it.
   if (typeof window === 'undefined' || typeof window.showUndoOffer !== 'function') return;
