@@ -5097,6 +5097,13 @@ function highlightMovePaths(moves) {
         mesh.material.opacity = 0.85 + Math.sin(t * 2.4) * 0.15;
         const baseY = mesh.userData.baseY != null ? mesh.userData.baseY : mesh.position.y;
         mesh.position.y = baseY + Math.sin(t * 2.4) * 5;
+      } else if (mesh.userData.isLanding) {
+        // The staged landing hole (Ken, 2026-11-18): a ring in the player's colour that ripples
+        // outward from the hole and fades, again and again, until the move is confirmed.
+        const phase = (t * 0.32) % 1;
+        mesh.material.opacity = 0.95 * (1 - phase);
+        const scale = 0.85 + phase * 1.1;
+        mesh.scale.set(scale, 1, scale);
       } else if (mesh.userData.isDisc) {
         mesh.material.opacity = mesh.userData.isDestination
           ? 0.22 + Math.sin(t * 2.1) * 0.16
@@ -5117,6 +5124,25 @@ function highlightMovePaths(moves) {
   }
   pulseHighlights();
 }
+
+// The hole a staged move lands on (both holes for a 7 split) gets a rippling ring in the moving
+// player's colour, drawn on top of the usual highlight and cleared with it. Called by the turn panel
+// once a choice is complete and the ✓ is showing (Ken, 2026-11-18).
+function pulseLandingHoles(holeIds) {
+  const color = _activePlayerColorInt();
+  for (const holeId of new Set(holeIds || [])) {
+    const ring = createGlowRing(holeId, color, true, { pulsing: true });
+    if (!ring) continue;
+    ring.userData.isLanding = true;
+    ring.userData.isDestination = false;
+    // createGlowRing also adds a faint disc; the ripple alone is the cue, so drop that disc.
+    const disc = highlightMeshes[highlightMeshes.length - 1];
+    if (disc && disc.userData.isDisc) { boardGroup.remove(disc); _disposeHighlightObject(disc); highlightMeshes.pop(); }
+  }
+}
+window.pulseLandingHoles = pulseLandingHoles;
+// For tests and debugging: the holes currently rippling.
+window.landingHolesShown = () => highlightMeshes.filter(m => m.userData.isLanding).length;
 
 function highlightSinglePath(moveIdx) {
   const vm = window.FastTrackCore && window.FastTrackCore.state

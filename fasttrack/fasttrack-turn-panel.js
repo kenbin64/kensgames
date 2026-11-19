@@ -15,7 +15,8 @@
 //   footer then shows a button for each stop on that route (at most 7, since a 7 has 7 hops). With a single
 //   route its stops are shown straight away (Ken, 2026-11-15; routes used to come first only past 7 stops).
 //   Tapping a lit hole on the board always works too, at every step.
-//   Once the choice is complete, the labels give way to a single Confirm button. After Confirm it becomes Undo,
+//   Once the choice is complete, the button pressed turns into ✓ and the others disappear (Ken, 2026-11-18); the
+//   landing hole ripples in the player's colour. In same-screen play the separate button then shows Undo,
 //   until the next card is drawn. Pressing Undo takes the move back and brings the labels back to play it again.
 //   The ↩ button steps back one choice.
 //
@@ -162,7 +163,7 @@
   function freshPick() {
     // leaving: this step was shown with the engine's "leave fast track" moves turned on (↩ restores the engine to match).
     return { stage: 'peg', peg: null, stops: [], steps: null, dest: null, firstLeg: null, peg2: null, moveIdx: null,
-      entry: null, leaving: false, options: [], choices: [], history: [] };
+      entry: null, leaving: false, pressed: null, options: [], choices: [], history: [] };
   }
 
   function resetPick() { Object.assign(pick, freshPick()); }
@@ -241,7 +242,7 @@
   //              after the fast-track hole, or letters the main-track landings when there are several)
   //   🏁         a landing on a fast-track hole (one hole: straight there; several: "Pick 🏁" letters them)
   //   Leave 🎯   from the bullseye, straight to the player's own fast-track hole (with "Pick 🏁" for any hole)
-  //   Traverse   a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
+  //   🏁         (Traverse) a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
   //              hole), then on along the track for the rest of the card
   //   🪂         bail out: a peg riding the fast track: choose where to get off (the move loses the fast track)
   //   Other      everything else (one landing: straight there; several: the usual letters)
@@ -279,7 +280,7 @@
       const rides = options.filter(o => !isBullseye(o.dest))
         .sort((a, b) => (ringHopsOf(b) - ringHopsOf(a)) || ((a.path || []).length - (b.path || []).length));
       const canLeave = !!(core && core.turn.get('canLeaveFastTrack')) && core.turn.get('leaveFastTrack') !== true;
-      if (rides.length) buttons.push(straightTo(rides[0], 'Traverse', 'Traverse: ride the fast track as far as it goes, then on along the track'));
+      if (rides.length) buttons.push(straightTo(rides[0], '🏁', 'Traverse: ride the fast track as far as it goes, then on along the track'));
       if (bull.length) buttons.push(straightTo(bull[0], '🎯', 'Jump to the bullseye'));
       if (bull.length && canLeave) buttons.push(button('🐔', 'Wimp out: stay on the main track instead of the bullseye', null, () => leaveFastTrackFor(pegIdx, true)));
       const otherRides = rides.filter(o => o.dest !== (rides[0] && rides[0].dest));
@@ -407,6 +408,7 @@
   function stageMove(moveIdx) {
     pick.moveIdx = moveIdx;
     pick.stage = 'ready';
+    pick.pressed = null;              // pressSlot records which button got here; a board tap leaves it empty
     repaint();
   }
 
@@ -456,6 +458,10 @@
     const byStage = { peg: [], route: pick.options, stop: pick.options, dest: pick.options, peg2: firstLeg(),
       dest2: firstLeg().concat(pick.options), ready: firstLeg().concat(chosen) };
     paint(byStage[pick.stage] || []);
+    // A complete choice: the landing hole(s) ripple in the player's colour while the ✓ waits.
+    if (pick.stage === 'ready' && typeof window.pulseLandingHoles === 'function') {
+      window.pulseLandingHoles(byStage.ready.map(o => o.dest).filter(Boolean));
+    }
   }
 
   // Only the panel draws move highlights, and only on this screen's player's turn. On anyone else's
@@ -559,7 +565,15 @@
       for (let i = 0; i < PEG_COUNT; i++) {
         if (active.has(i)) slots[i] = { label: String(i + 1), kind: 'peg', words: `Peg ${i + 1}`, chosen: i === pick.peg, act: () => choosePeg(i) };
       }
-    } else if (hasChoices() && pick.stage !== 'ready') {
+    } else if (pick.stage === 'ready') {
+      // Ken, 2026-11-18: no separate Confirm. The button just pressed turns into ✓ and the others go; pressing
+      // the ✓ makes the move (↩ still steps back). Chosen by a board tap: the ✓ sits on the matching button,
+      // or in the first slot.
+      const dest = (pick.options.find(o => o.moveIdx === pick.moveIdx) || {}).dest;
+      const match = pick.choices.findIndex(c => c.dest && c.dest === dest);
+      const at = pick.pressed != null ? pick.pressed : match >= 0 && match < SLOT_COUNT ? match : 0;
+      slots[at] = { label: '✓', kind: 'confirm', words: 'Confirm move', chosen: true, act: confirmMove };
+    } else if (hasChoices()) {
       pick.choices.slice(0, SLOT_COUNT).forEach((choice, i) => { slots[i] = { ...choice, chosen: false }; });
     }
     return slots;
@@ -571,7 +585,7 @@
     const human = isHumanTurn();
     const player = readPlayer();
     const color = (player && player.color) || '#8899aa';
-    const choosing = human && !undo.open && pick.stage !== 'ready' && !entryPending(human);
+    const choosing = human && !undo.open && !entryPending(human);   // includes 'ready': the ✓ is a slot
     const slots = choosing ? slotsNow() : new Array(SLOT_COUNT).fill(null);
     slotActions = slots.map(s => (s ? s.act : null));
     slots.forEach((slot, i) => renderSlot(i, slot, color));
@@ -581,10 +595,11 @@
     renderLeaveFastTrack(human);
     renderEntry(human);
     document.body.classList.toggle('ft-bar-idle', !human && !undo.open);
+    document.body.classList.toggle('ft-bar-ready', choosing && pick.stage === 'ready');   // 3d.css hides the empty slots
     refreshBanner();
   }
 
-  const SLOT_TINTS = { hole: '#ffd666', stop: '#ffd666', route: '#9fd3ff', action: '#8ff0c8' };
+  const SLOT_TINTS = { hole: '#ffd666', stop: '#ffd666', route: '#9fd3ff', action: '#8ff0c8', confirm: '#35ff7a' };
 
   function renderSlot(i, slot, color) {
     const button = document.getElementById('peg-btn-' + i);
@@ -619,7 +634,7 @@
     if (label) label.textContent = undo.open ? (seconds ? `Undo ${seconds}` : 'Undo') : 'Confirm';
     if (check) check.textContent = undo.open ? '↶' : '✔';
     button.classList.toggle('is-undo', undo.open);
-    button.hidden = !(undo.open || (human && pick.stage === 'ready'));
+    button.hidden = !undo.open;       // only as Undo (same-screen play); confirming is the ✓ slot now
     button.disabled = false;
     button.setAttribute('aria-label', undo.open ? 'Undo your move' : 'Confirm move');
   }
@@ -730,6 +745,7 @@
     const action = slotActions[i];
     if (!action || undo.open || !isHumanTurn()) return;
     action();
+    if (pick.stage === 'ready' && pick.pressed == null) pick.pressed = i;   // this button becomes the ✓
     render();
   }
 
@@ -811,7 +827,7 @@
       dest: 'Pick the hole to land in, or tap it',
       peg2: `Now pick the peg that moves the other ${rest}`,
       dest2: 'Pick the hole for that peg, or tap it',
-      ready: 'Press Confirm to play it',
+      ready: 'Press ✓ to play it',
     };
     return texts[pick.stage] || '';
   }

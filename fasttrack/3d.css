@@ -4328,6 +4328,10 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.emoji-label { flex: 0 0 auto !important;
   body.ft-turn-panel #ft-peg-bar .peg-btn.word-label .peg-glyph { font-size: 13px !important; letter-spacing: 0; }
 }
 body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; border-radius: 14px; }
+/* The ✓ step (Ken, 2026-11-18): every other slot disappears; hidden, not removed, so the ✓ stays where the
+   pressed button was. */
+body.ft-turn-panel.ft-bar-ready #ft-peg-bar .peg-btn.dormant { visibility: hidden !important; }
+body.ft-turn-panel #ft-peg-bar .peg-btn.selected .peg-glyph { font-weight: 900; }
 
 /* -- The card table (Ken, 2026-11-08) -----------------------------------------------
    The player whose turn it is, then two piles side by side: their own draw deck (face
