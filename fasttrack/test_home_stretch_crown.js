@@ -131,19 +131,34 @@ section('2. It shows once the last peg is on the home stretch');
     ok(crownOn(), `last peg (come round) on ${hole}: crown on`);
   }
 
-  // Backing up 4 onto the safe-zone entrance from side-right-0-2 passes home-0. With the safe zone FULL
-  // that is refused by the engine's WIN_NO_OVERSHOOT rule (the last peg may never pass the winning hole),
-  // so the real sequence is: back onto the entrance while the safe zone still has room, then the fourth
-  // safe peg arrives and the crown appears.
-  setup([{ hole: 'safe-0-1' }, { hole: 'safe-0-2' }, { hole: 'safe-0-3' }, { hole: 'outer-0-1', elig: true }, { hole: 'side-right-0-2' }]);
+  // Ken, 2026-11-18: the safe-zone entrance (outer-0-2) is on the main track, the hole leading up to the
+  // safe zone. A backward 4 that lands on it or passes it counts as the circuit, so the last peg is on the
+  // home stretch and the crown shows. Going back past the winning hole is not an overshoot.
+  setup([...SAFE4, { hole: 'side-right-0-2' }]);
+  ok(!crownOn(), 'last peg just past home, not come round: no crown');
   card('4');
   const back = play(0, mv => mv.pegIdx === 4);
-  ok(back && back.dest === 'outer-0-2', 'backing up 4 from side-right-0-2 lands on the safe-zone entrance', `landed ${back && back.dest}`);
-  ok(!crownOn(), 'three in the safe zone: no crown yet');
-  ok(pegAt('outer-0-2') && pegAt('outer-0-2').eligibleForSafeZone === true,
-    'the backward 4 onto the entrance marks the peg as come round, which is what the crown checks');
-  // With the safe zone full the same backward 4 is refused (WIN_NO_OVERSHOOT), and with a peg on the entrance
-  // the fourth safe peg cannot pass it (MOV_NO_PASS_OWN): an open rules question for Ken, not a crown bug.
+  ok(back && back.dest === 'outer-0-2', 'safe zone full: backing up 4 from side-right-0-2 lands on the entrance', `landed ${back && back.dest}`);
+  ok(crownOn(), 'landing on the entrance going backward: crown on');
+
+  setup([...SAFE4, { hole: 'side-right-0-1' }]);
+  card('4');
+  const past = play(0, mv => mv.pegIdx === 4);
+  ok(past && past.dest === 'outer-0-1', 'safe zone full: backing up 4 from side-right-0-1 goes past the entrance', `landed ${past && past.dest}`);
+  ok(crownOn(), 'passing the entrance going backward: crown on');
+}
+
+// ─── 2b. Backing out of the home stretch ──────────────────────
+section('2b. Backward 4s take the crown away only once the peg is past its own fast-track hole');
+{
+  setup([...SAFE4, { hole: 'outer-0-0', elig: true }]);
+  card('4');
+  const inside = play(0, mv => mv.pegIdx === 4);
+  ok(inside && inside.dest === 'side-left-0-4' && crownOn(), 'back 4 to side-left-0-4, still on the stretch: crown stays', `landed ${inside && inside.dest}`);
+  card('4');
+  const out = play(0, mv => mv.pegIdx === 4);
+  ok(out && !homeStretchHoles(0).includes(out.dest), 'the next back 4 goes past ft-0 counter-clockwise', `landed ${out && out.dest}`);
+  ok(!crownOn(), 'past its own fast-track hole going counter-clockwise: crown removed');
 }
 
 // ─── 3. It stays on to the winning hole ───────────────────────

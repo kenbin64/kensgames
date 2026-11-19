@@ -2597,8 +2597,9 @@ function calculateValidMoves() {
   // (home-{bp}) — including a Card 4 backward that lands one hole away from
   // safe entry — is NOT a traversal. Without traversal the peg cannot land
   // on the winning hole; it must lap forward to safe entry first.
-  // It is never legal for the last peg to traverse past the winning hole —
-  // no lapping, no skipping past home-{bp}.
+  // It is never legal for the last peg to traverse past the winning hole going
+  // forward: no lapping, no skipping past home-{bp}. Going BACKWARD past it on a 4
+  // is allowed (Ken, 2026-11-18): that is how the peg backs onto the entrance.
   {
     const _bp = player.boardPosition;
     const _inSafe = player.pegs.filter(p => getHoleType(p.holeId) === 'safezone').length;
@@ -2614,6 +2615,11 @@ function calculateValidMoves() {
         const _hits = _p.indexOf(_winHole);
         // path doesn't touch winning hole → fine (peg is mid-lap)
         if (_hits === -1) return true;
+        // A backward 4 that goes back PAST the winning hole is not an overshoot: the rule is
+        // "movingTowardHome && overshoots" (rules.json). Backing onto or past the safe-zone
+        // entrance this way counts as the circuit (Ken, 2026-11-18), so the peg is on the home
+        // stretch and the crown shows. Landing exactly on the winning hole still needs the circuit.
+        if (rules.direction === 'backward' && _hits !== _p.length - 1) return true;
         // path lands EXACTLY on winning hole as final step → legal only if
         // the moving peg has officially traversed the track
         if (_hits === _p.length - 1 && m.dest === _winHole) {
