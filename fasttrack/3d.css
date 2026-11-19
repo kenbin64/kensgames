@@ -274,7 +274,6 @@ textarea,
 .player-row.active {
   background: rgba(0, 180, 255, 0.1);
   border-left: 2px solid rgba(0, 180, 255, 0.7);
-  box-shadow: inset 0 0 12px rgba(0, 180, 255, 0.06), 0 2px 8px rgba(0, 180, 255, 0.15);
   transform: perspective(600px) rotateY(0deg) translateX(3px) scale(1.02);
   outline: 2px solid rgba(255, 224, 51, 0.9);
   box-shadow: inset 0 0 16px rgba(0, 180, 255, 0.22), 0 0 14px rgba(255, 224, 51, 0.75), 0 2px 8px rgba(0, 180, 255, 0.2);
@@ -1159,7 +1158,6 @@ textarea,
     border-bottom: none;
     margin: 0;
     padding: 0;
-    font-size: 1.05em;
     color: #ffe033;
     white-space: nowrap;
     overflow: hidden;
@@ -1295,7 +1293,6 @@ textarea,
   }
 
   #panel-cam {
-    bottom: auto;
     top: auto;
     right: 6px;
     bottom: 60px;
@@ -2197,25 +2194,6 @@ textarea,
 }
 
 @media (max-width: 760px) {
-  #ft-peg-bar {
-    /* user_directive_2026-05-19 — on phones the bar becomes a full-width
-       docked tab panel pinned to the bottom edge. Holes are too small to
-       reliably tap, so buttons stay primary input here. */
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transform: none;
-    border-radius: 16px 16px 0 0;
-    border-left: 0;
-    border-right: 0;
-    border-bottom: 0;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0));
-    gap: 6px;
-    max-width: none;
-    width: 100vw;
-    justify-content: space-between;
-    box-sizing: border-box;
-  }
 
   #ft-peg-buttons {
     flex: 1 1 auto;
@@ -2289,6 +2267,13 @@ textarea,
   /* Peg bar — own row, full-width, slim. Confirm collapses to ✔ only
      (peg-confirm-label already hidden on small screens above). */
   #ft-peg-bar {
+    /* user_directive_2026-05-19 — on phones the bar becomes a full-width
+       docked tab panel pinned to the bottom edge. Holes are too small to
+       reliably tap, so buttons stay primary input here. */
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-sizing: border-box;
     left: 4px;
     right: 4px;
     bottom: 0;
@@ -2891,15 +2876,6 @@ textarea,
 /* ════════════════════════════════════════════════════════════════
    Card panel — larger so the drawn card is easy to read.
    ════════════════════════════════════════════════════════════════ */
-#panel-action {
-  padding: 6px 8px;
-  gap: 8px;
-}
-
-#panel-action #card-area {
-  padding: 8px 12px;
-  gap: 10px;
-}
 
 #panel-action #current-card {
   width: 44px;
@@ -3021,10 +2997,6 @@ textarea,
   border-radius: 8px;
 }
 
-#panel-action #card-area {
-  padding: 8px 14px;
-}
-
 #panel-action #card-info {
   font-size: 18px;
   max-width: 260px;
@@ -3085,6 +3057,7 @@ textarea,
 }
 
 #panel-action #card-area {
+  gap: 10px;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -3623,9 +3596,6 @@ textarea,
 }
 
 /* The old on-board camera panel must NEVER cover the board. */
-#panel-cam {
-  display: none !important;
-}
 
 /* ════════════════════════════════════════════════════════════════
    PEG-BUTTON ACTIVATION COLORS
@@ -3720,9 +3690,6 @@ textarea,
 
 /* Footer band stays fully hidden — buttons float directly on the
    board, no rail, no border, no void. */
-#ft-footer-bg {
-  display: none !important;
-}
 
 /* Disabled peg buttons stay tinted with the owner's peg color so the
    player can still read the roster — they're just dimmed to communicate
@@ -3889,26 +3856,6 @@ textarea,
 
 /* "DRAW" label PAINTED ON the card back (only while the card back
    is showing, i.e. before a card is drawn this turn). Centered. */
-#panel-action #card-area {
-  position: relative !important;
-}
-
-#panel-action #current-card:has(.card-back)::after {
-  content: "DRAW";
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-  font-weight: 800;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: #fff8d8;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(255, 214, 51, 0.55);
-  pointer-events: none;
-  text-transform: uppercase;
-}
 
 /* ────────────────────────────────────────────────────────────────
    TEXT-FREE GAMEPLAY MODE (user_directive_2026-05-18)
@@ -4023,7 +3970,6 @@ textarea,
    board hole (the reason phones were unplayable). This block is intentionally last so
    it wins the cascade over the older float-over-the-peripheries rules above.
    =========================================================================== */
-:root { --ft-header-h: 66px; --ft-footer-h: 62px; }
 
 #container { inset: auto; top: var(--ft-header-h); bottom: var(--ft-footer-h); left: 0; right: 0; }
 
@@ -4034,6 +3980,7 @@ textarea,
   border-bottom: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 #ft-footer-bg {
+  display: none !important;
   position: fixed; top: auto; left: 0; right: 0; bottom: 0; height: var(--ft-footer-h); z-index: 10;
   pointer-events: none; background: rgba(8, 16, 30, 0.6);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
@@ -4059,10 +4006,8 @@ textarea,
 
 /* keep the move-choices panel and camera buttons out of the board, tucked just above the footer */
 #panel-options { bottom: calc(var(--ft-footer-h) + 6px); left: 8px; max-height: 38vh; transform: none; }
-#panel-cam { bottom: calc(var(--ft-footer-h) + 6px); right: 8px; top: auto; transform: none; }
-
-/* narrower phones: the peg bar wraps to two rows, so the footer band grows */
-@media (max-width: 560px) { :root { --ft-header-h: 58px; --ft-footer-h: 94px; } }
+#panel-cam {
+  display: none !important; bottom: calc(var(--ft-footer-h) + 6px); right: 8px; top: auto; transform: none; }
 
 /* ── TURN MARQUEE — seating order scrolling across the footer strip ── */
 /* Sits above #ft-footer-bg (z-index 10) but below the controls, and never
@@ -4214,8 +4159,10 @@ canvas { touch-action: none; }
    Testers wanted the draw card bigger and not jammed against the edge. These
    three numbers are the only place its size and inset are set; the rules below
    apply them over the older fixed 40 x 56 sizing. Rank and suit scale with it. */
-:root { --ft-card-w: 64px; --ft-card-h: 90px; --ft-card-inset: 24px; }
-@media (max-width: 560px) { :root { --ft-card-w: 52px; --ft-card-h: 73px; --ft-card-inset: 14px; } }
+:root { --ft-header-h: 66px; --ft-footer-h: 62px; --ft-card-w: 64px; --ft-card-h: 90px; --ft-card-inset: 24px; }
+
+/* narrower phones: the peg bar wraps to two rows, so the footer band grows */
+@media (max-width: 560px) { :root { --ft-header-h: 58px; --ft-footer-h: 94px; --ft-card-w: 52px; --ft-card-h: 73px; --ft-card-inset: 14px; } }
 
 /* right: auto lets the panel shrink to the card, so it does not lie across the board. */
 #panel-action { height: auto !important; max-width: none !important; right: auto !important; }
@@ -4236,7 +4183,20 @@ canvas { touch-action: none; }
 }
 #panel-action #current-card .card-face .cf-rank { font-size: calc(var(--ft-card-w) * 0.42) !important; }
 #panel-action #current-card .card-face .cf-suit { font-size: calc(var(--ft-card-w) * 0.32) !important; }
-#panel-action #current-card:has(.card-back)::after { font-size: calc(var(--ft-card-w) * 0.24); }
+#panel-action #current-card:has(.card-back)::after {
+  content: "DRAW";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff8d8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(255, 214, 51, 0.55);
+  pointer-events: none;
+  text-transform: uppercase; font-size: calc(var(--ft-card-w) * 0.24); }
 
 /* ════════════════════════════════════════════════════════════════
    PLAYER VIEW (Ken, 2026-11-05): the camera stays where the player puts it. When the
@@ -4356,7 +4316,8 @@ body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; b
    The player whose turn it is, then two piles side by side: their own draw deck (face
    down, cards left) and the card drawn this turn (face up, with the drawer's picture).
    Built by renderCardTable() in fasttrack-game-core.js. The old single card is hidden. */
-#panel-action #card-area { width: auto !important; height: auto !important; cursor: pointer; }
+#panel-action #card-area {
+  position: relative !important; width: auto !important; height: auto !important; cursor: pointer; }
 #panel-action #card-area #current-card { display: none !important; }
 #ft-card-table { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
 #ft-card-table .ftt-owner {
