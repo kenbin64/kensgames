@@ -242,12 +242,24 @@
   //              after the fast-track hole, or letters the main-track landings when there are several)
   //   🏁         a landing on a fast-track hole (one hole: straight there; several: "Pick 🏁" letters them)
   //   Leave 🎯   from the bullseye, straight to the player's own fast-track hole (with "Pick 🏁" for any hole)
-  //   🏁         (Traverse) a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
+  //   🏁↻        (Traverse) a peg riding the fast track: ride it as far as the rules allow (to its own hole, or the last legal
   //              hole), then on along the track for the rest of the card
-  //   🪂         bail out: a peg riding the fast track: choose where to get off (the move loses the fast track)
+  //   🪂↪        bail out: a peg riding the fast track: choose where to get off (the move loses the fast track)
   //   Other      everything else (one landing: straight there; several: the usual letters)
   // A peg whose landings are all one kind gets the letters as before, and a single landing is still chosen for
   // the player. Every button leads to moves the engine listed; nothing new is invented.
+  // Traverse = the flag and a clockwise circular arrow: go round the fast track (Ken, 2026-11-18). The plain 🏁
+  // stays "land on a fast-track hole".
+  const TRAVERSE = '🏁↻';
+  // Bail out = the parachute and an arrow curving off the circle (Ken, 2026-11-18).
+  const BAIL_OUT = '🪂↪';
+  // Leaving holding: a jail cell (frame, four bars, a cross rail) and a right arrow, drawn in the button's colour.
+  const JAIL_BREAK_ICON =
+    '<svg viewBox="0 0 64 32" width="56" height="28" aria-hidden="true" style="display:block" fill="none" stroke="currentColor" stroke-linecap="round">' +
+    '<rect x="2" y="3" width="26" height="26" rx="2" stroke-width="3"/>' +
+    '<path d="M9 4v24M15 4v24M21 4v24M2 16h26" stroke-width="2.5"/>' +
+    '<path d="M34 16h24M50 8l8 8-8 8" stroke-width="4" stroke-linejoin="round"/>' +
+    '</svg>';
   const isBullseye = (hole) => hole === 'bullseye';
   const isFtHole = (hole) => typeof hole === 'string' && hole.startsWith('ft-');
   const ringHopsOf = (o) => (o.path || []).filter(isFtHole).length;
@@ -280,11 +292,11 @@
       const rides = options.filter(o => !isBullseye(o.dest))
         .sort((a, b) => (ringHopsOf(b) - ringHopsOf(a)) || ((a.path || []).length - (b.path || []).length));
       const canLeave = !!(core && core.turn.get('canLeaveFastTrack')) && core.turn.get('leaveFastTrack') !== true;
-      if (rides.length) buttons.push(straightTo(rides[0], '🏁', 'Traverse: ride the fast track as far as it goes, then on along the track'));
+      if (rides.length) buttons.push(straightTo(rides[0], TRAVERSE, 'Traverse: ride the fast track as far as it goes, then on along the track'));
       if (bull.length) buttons.push(straightTo(bull[0], '🎯', 'Jump to the bullseye'));
       if (bull.length && canLeave) buttons.push(button('🐔', 'Wimp out: stay on the main track instead of the bullseye', null, () => leaveFastTrackFor(pegIdx, true)));
       const otherRides = rides.filter(o => o.dest !== (rides[0] && rides[0].dest));
-      if (canLeave) buttons.push(button('🪂', 'Bail out: jump off the fast track early and choose where to get off (this loses the fast track)', null, () => leaveFastTrackFor(pegIdx)));
+      if (canLeave) buttons.push(button(BAIL_OUT, 'Bail out: jump off the fast track early and choose where to get off (this loses the fast track)', null, () => leaveFastTrackFor(pegIdx)));
       else if (otherRides.length) buttons.push(group(otherRides, 'Other', 'Other landings'));
       return buttons.length > 1 || canLeave ? buttons : null;
     }
@@ -612,9 +624,10 @@
     button.disabled = !slot;
     const kindClass = slot ? (slot.kind === 'peg' ? ' peg-kind' : ' hole-btn') : '';
     // A word ("Traverse", "Other") gets a button that grows to fit it; a letter, number or the 🎯 stays square.
-    const isWord = !!slot && /[A-Za-z]{2,}/.test(slot.label);
+    const isWord = !!slot && (/[A-Za-z]{2,}/.test(slot.label) || slot.label === TRAVERSE || slot.label === BAIL_OUT);   // two symbols need room
     const isEmoji = !!slot && /^\p{Extended_Pictographic}$/u.test(slot.label);
-    const longClass = !slot ? '' : isWord ? ' word-label' : isEmoji ? ' emoji-label' : slot.label.length > 1 ? ' long-label' : '';
+    const isPair = !!slot && (slot.label === TRAVERSE || slot.label === BAIL_OUT);
+    const longClass = !slot ? '' : isWord ? ' word-label' + (isPair ? ' pair-label' : '') : isEmoji ? ' emoji-label' : slot.label.length > 1 ? ' long-label' : '';
     button.className = 'peg-btn' + (slot ? ' active' : ' dormant') + kindClass + longClass + (slot && slot.chosen ? ' selected' : '');
     button.title = slot ? slot.words : '';
     button.setAttribute('aria-label', slot ? slot.words : 'Not in use');
@@ -667,7 +680,14 @@
         button.textContent = text; button.title = title; button.addEventListener('click', act);
         row.parentNode.insertBefore(button, row);
       };
-      add('ft-entry-new', 'New peg', 'Bring a peg out of holding onto your home hole', chooseNewPeg);
+      // Out of holding: a jail cell with bars and a right arrow (Ken, 2026-11-18). No emoji has bars, so it is
+      // drawn; the words stay on the tooltip and for screen readers.
+      add('ft-entry-new', '', 'New peg: bring a peg out of holding onto your home hole', chooseNewPeg);
+      const jail = document.getElementById('ft-entry-new');
+      if (jail) {
+        jail.innerHTML = JAIL_BREAK_ICON;
+        jail.setAttribute('aria-label', 'New peg: bring a peg out of holding');
+      }
       add('ft-entry-board', 'Board peg', 'Move one of your pegs already on the board', chooseBoardPeg);
     }
     if (!document.getElementById('ft-leave-ft')) {
@@ -817,7 +837,7 @@
   // One short sentence per step: what to press, in the words on the buttons.
   function instruction() {
     if (undo.open) return 'Press Undo to take it back';
-    if (entryPending(isHumanTurn())) return 'New peg brings one out of holding. Board peg moves one already out';
+    if (entryPending(isHumanTurn())) return 'The jail button brings one out of holding. Board peg moves one already out';
     const peg = (pick.peg ?? 0) + 1;
     const rest = SEVEN - (pick.steps || 0);
     const texts = {

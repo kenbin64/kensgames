@@ -4330,6 +4330,11 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.emoji-label { flex: 0 0 auto !important;
 body.ft-turn-panel #ft-peg-bar { background: rgba(8, 16, 30, 0.94) !important; border-radius: 14px; }
 /* The ✓ step (Ken, 2026-11-18): every other slot disappears; hidden, not removed, so the ✓ stays where the
    pressed button was. */
+/* Two-symbol buttons (🏁↻ traverse, 🪂↪ bail out): picture-sized, not word-sized (Ken, 2026-11-18). */
+body.ft-turn-panel #ft-peg-bar .peg-btn.word-label.pair-label .peg-glyph { font-size: 26px !important; letter-spacing: 1px; }
+@media (max-width: 760px) {
+  body.ft-turn-panel #ft-peg-bar .peg-btn.word-label.pair-label .peg-glyph { font-size: 22px !important; }
+}
 body.ft-turn-panel.ft-bar-ready #ft-peg-bar .peg-btn.dormant { visibility: hidden !important; }
 body.ft-turn-panel #ft-peg-bar .peg-btn.selected .peg-glyph { font-weight: 900; }
 
@@ -4404,6 +4409,8 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.selected .peg-glyph { font-weight: 900; 
   font: 800 13px/1 system-ui, sans-serif; align-self: center;
 }
 #ft-entry-board { border-color: #9fd3ff; color: #cfeaff; }
+/* Out of holding = a drawn jail cell with bars and a right arrow (Ken, 2026-11-18). */
+#ft-entry-new { padding: 5px 12px; line-height: 0; }
 .ft-entry-btn:hover { filter: brightness(1.15); }
 
 /* Phones (Ken, 2026-11-11: "Leave fast track" missing on a smartphone, and the 7th button cut in half).

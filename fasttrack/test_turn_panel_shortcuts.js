@@ -5,7 +5,7 @@
  *   "two new buttons whenever fast track hole is a legal last hop ... whenever bullseye is a legal move for
  *    final hop that appears then other button will take them to the alternative routes"
  *   On the bullseye with a royal: "Leave 🎯" goes straight to the player's own fast-track hole; "Pick 🏁" opens
- *   every fast-track hole. Riding the fast track: 🏁 (Traverse) and 🪂 (bail out). 🏁 stands for the fast track.
+ *   every fast-track hole. Riding the fast track: 🏁↻ (Traverse) and 🪂↪ (bail out). 🏁 stands for the fast track.
  *   "add a wimp button when someone chooses to stay on the main track instead of risking the bullseye ...
  *    it will highlight the main track hole to the right of the fast track hole."
  *
@@ -93,16 +93,16 @@ function table(hole, card, { onFasttrack = false } = {}) {
 
 const nextOnTrack = (game, hole) => game.CLOCKWISE_TRACK[(game.CLOCKWISE_TRACK.indexOf(hole) + 1) % game.CLOCKWISE_TRACK.length];
 
-section('Riding the fast track with a one-hop card: 🏁 Traverse, 🎯, 🐔 and 🪂');
+section('Riding the fast track with a one-hop card: 🏁↻ Traverse, 🎯, 🐔 and 🪂↪');
 {
   // A peg on another player's fast-track hole, riding the ring, with an Ace (one hop).
   const t = table('ft-3', 'A', { onFasttrack: true });
   t.press('1');                                               // choose the peg
   const labels = t.labels();
   ok(labels.includes('🎯'), 'the bullseye jump has its own button', labels.join(' '));
-  ok(labels.includes('🏁'), 'Traverse stays on the ring', labels.join(' '));
+  ok(labels.includes('🏁↻'), 'Traverse stays on the ring', labels.join(' '));
   ok(labels.includes('🐔'), 'the wimp button is offered while the bullseye is on offer', labels.join(' '));
-  ok(labels.includes('🪂'), '🪂 (bail out) lets the peg get off the ring', labels.join(' '));
+  ok(labels.includes('🪂↪'), '🪂↪ (bail out) lets the peg get off the ring', labels.join(' '));
   ok(labels.every(l => !/^[A-G]$/.test(l)), 'no hole letters at this step: buttons instead', labels.join(' '));
   t.press('🐔');
   const main = nextOnTrack(t.game, 'ft-3');
@@ -115,12 +115,12 @@ section('Riding the fast track with a one-hop card: 🏁 Traverse, 🎯, 🐔 an
   ok(t.staged() === 'bullseye', '🎯 picks the bullseye', `staged ${t.staged()}`);
 }
 
-section('🏁 Traverse rides the ring');
+section('🏁↻ Traverse rides the ring');
 {
   const t = table('ft-3', '5', { onFasttrack: true });
   t.press('1');
-  ok(t.labels().includes('🏁'), 'Traverse is offered on a longer card', t.labels().join(' '));
-  if (t.press('🏁')) {
+  ok(t.labels().includes('🏁↻'), 'Traverse is offered on a longer card', t.labels().join(' '));
+  if (t.press('🏁↻')) {
     const dest = t.staged();
     ok(dest && dest.startsWith('ft-') || /side-left|outer|home/.test(String(dest)), 'Traverse lands on the ring or on the home stretch past its own hole', `staged ${dest}`);
   }
