@@ -1254,6 +1254,8 @@ async function init3D() {
         aiDifficulty,
         launchMode: gameMode,
         myUserId: (sessionCache && sessionCache.my_user_id) || (runtimeCache && runtimeCache.session && runtimeCache.session.my_user_id),
+        // The table's time limit, chosen by the host (Ken, 2026-11-20). Off unless the host turned it on.
+        timeLimit: !!(sessionCache && sessionCache.time_limit === true),
         sessionPlayers: rosterPlayers.map((p) => ({
           user_id: p.user_id || p.id,
           username: p.username || p.name || 'Player',

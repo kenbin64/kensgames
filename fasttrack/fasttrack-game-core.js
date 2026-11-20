@@ -679,6 +679,9 @@ function initGame(playerCount = 2, config = {}) {
   state.meta.set('reshuffleCount', 0);
   state.meta.set('myUserId', config.myUserId || null);
   state.meta.set('gameMode', config.launchMode || 'solo');  // 'solo', 'private', 'same-screen'
+  // Ken, 2026-11-20: "default no time limit. have button to turn on time limit". Off unless the host
+  // turned it on when creating the table: no idle warning, and no bot ever takes a person's seat.
+  state.meta.set('timeLimit', config.timeLimit === true);
 
   // Players — each gets 5 pegs: 4 in holding, 1 on home hole
   const players = [];
@@ -1619,7 +1622,8 @@ function applyRemoteAction(action, payload) {
         let seat = seatRaw;
         if (id) { const byId = list.findIndex(p => _seatIdentity(p) === id); if (byId >= 0) seat = byId; }
         const cp = (seat != null) ? list[seat] : null;
-        if (cp && !cp.isBot) {
+        // With no time limit (the default) no seat is ever handed to a bot, whatever another screen sends.
+        if (cp && !cp.isBot && state.meta.get('timeLimit') === true) {
           _AFK.away.set(seat, { name: cp.name, avatar: cp.avatar, isBot: cp.isBot, userId: cp.userId, reason: 'host-relinquish', at: Date.now() });
           cp.name = `${(payload && payload.name) || cp.name} (bot)`;
           cp.avatar = '🤖';
@@ -4312,6 +4316,9 @@ function _canRelinquishCurrent() {
 }
 
 function _idleRelevant() {
+  // No time limit unless the host turned it on at the table (Ken, 2026-11-20): with it off there is no
+  // idle clock, no warning, and no hand-off to a bot, however long a turn takes.
+  if (state.meta.get('timeLimit') !== true) return false;
   const players = state.players.get('list') || [];
   const ci = state.players.get('current') || 0;
   const cur = players[ci];
