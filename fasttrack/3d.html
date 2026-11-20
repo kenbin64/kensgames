@@ -125,7 +125,7 @@
        Sits clear of the peg buttons. Dismissible (✕) and remembered in
        localStorage. ── -->
   <div id="ft-peg-help" role="note" aria-label="How to play">
-    <span class="ft-peg-help-text"><b>Numbers</b> are your pegs, <b>letters</b> are holes. Pick a peg, then a hole (or tap a lit hole), then <b>✓</b>. On a 7, <b>A3</b> means stop after 3 hops.</span>
+    <span class="ft-peg-help-text"><b>Numbers</b> are your pegs, <b>letters</b> are holes. Pick a peg, then a hole (or tap a lit hole), then <b>✓</b>. On a 7, <b>A3</b> means stop after 3 hops. <a class="ft-peg-help-link" href="help.html" target="_blank" rel="noopener">Full rules</a></span>
     <button type="button" id="ft-peg-help-close" aria-label="Dismiss help">✕</button>
   </div>
 
@@ -235,6 +235,11 @@
   <button id="btn-camera-toggle" type="button" onclick="setCameraView('player')"
     title="Back to your view" aria-label="Back to your view of the board">🎥</button>
 
+  <!-- ── Rules and help (Ken, 2026-11-20): a ? that opens help.html in a new browser tab, so the game keeps
+       running and the rules can be linked to section by section. On phones it is in the ☰ menu. ── -->
+  <a id="btn-help" href="help.html" target="_blank" rel="noopener" title="Rules and help"
+    aria-label="Rules and help (opens in a new tab)">?</a>
+
   <!-- ── Leave Game — always visible, top-right next to gear ── -->
   <button id="btn-leave-game" onclick="exitGame()" title="Leave Game" aria-label="Leave Game">✕</button>
 
@@ -265,6 +270,10 @@
         onclick="ftSetQuality(this,'ultra')">Ultra</button>
     </div>
     <div class="hm-divider"></div>
+    <a role="menuitem" id="hm-help" class="hm-link" href="help.html" target="_blank" rel="noopener"
+      onclick="document.getElementById('hamburger-menu').classList.remove('open');">
+      <span class="hm-icon">?</span><span class="hm-label">Rules &amp; help</span>
+    </a>
     <button type="button" role="menuitem" id="hm-break"
       onclick="var b=document.getElementById('btn-break'); if(b){document.getElementById('hamburger-menu').classList.remove('open'); b.click();}">
       <span class="hm-icon">☕</span><span class="hm-label">Break</span>

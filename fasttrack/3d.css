@@ -4494,3 +4494,57 @@ body.ft-won #emoji-ui,
 body.ft-won #emoji-feed,
 body.ft-won .emoji-balloon { z-index: 100002 !important; }
 body.ft-won #emoji-ui { display: flex !important; }
+
+/* ── Rules and help (Ken, 2026-11-20): the ? in the top-right row opens help.html in a new tab. It sits left of
+   the camera button (settings 12, leave 56, music 100, camera 144, help 188). On phones the row collapses into
+   the ☰ menu, which has its own "Rules & help" item. ── */
+#btn-help {
+  position: fixed;
+  top: 12px;
+  right: 188px;
+  z-index: 50;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(8, 20, 30, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 214, 102, 0.45);
+  color: #ffd76b;
+  font: 800 19px/1 system-ui, sans-serif;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  user-select: none;
+}
+#btn-help:hover,
+#btn-help:focus-visible {
+  background: rgba(90, 70, 10, 0.6);
+  color: #fff;
+  border-color: rgba(255, 214, 102, 0.9);
+  transform: scale(1.06);
+}
+@media (max-width: 760px) {
+  #btn-help { display: none !important; }
+}
+/* The menu's help item is a link, drawn like the menu's buttons. */
+#hamburger-menu a.hm-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 102, 0.4);
+  border-radius: 8px;
+  background: rgba(20, 30, 50, 0.6);
+  color: #ffd76b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+#hamburger-menu a.hm-link:hover { background: rgba(60, 50, 20, 0.7); }
+#hamburger-menu a.hm-link .hm-icon { font-weight: 800; }
+/* The first-move tip links to the full rules; the tip itself may ignore taps, the link must not. */
+#ft-peg-help .ft-peg-help-link { color: #8fd3ff; font-weight: 700; pointer-events: auto; white-space: nowrap; }
