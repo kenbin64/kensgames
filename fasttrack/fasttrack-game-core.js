@@ -784,8 +784,8 @@ function initGame(playerCount = 2, config = {}) {
   // ── Starting-player selection (user_directive_2026-05-18) ──────────
   // Priority:
   //   1. Explicit override via config.startingPlayer (host-authoritative MP).
-  //   2. `ft.rematchWinnerName` written by Play-Again — winner of the
-  //      previous game opens the next one. One-shot, cleared on use.
+  //   2. Play again: the round's winner opens the next round, named in the address
+  //      (?first= seat id at a table, ?firstPos= board position in solo). Ken, 2026-11-20.
   //   3. Solo (exactly one human seat): that human ALWAYS goes first
   //      (deterministic). The original randomisation was for multi-human
   //      games; in solo it just made the human wait through 0..N-1 bot
@@ -804,18 +804,22 @@ function initGame(playerCount = 2, config = {}) {
     if (explicit >= 0 && explicit < effectiveCount) {
       startingIdx = explicit;
     } else {
-      let rematchName = null;
-      try { rematchName = localStorage.getItem('ft.rematchWinnerName'); } catch (_) { /* ignore */ }
+      // Ken, 2026-11-20: "winner goes first". Play again names the round's winner: at a table by seat id
+      // (?first=, sent by the host through the table, so every screen gets the same one), in solo by board
+      // position (?firstPos=). Only the round just played counts: nothing is remembered in the browser, so
+      // an older winner can never open. The old localStorage key is cleared so it cannot pick the seat.
       try { localStorage.removeItem('ft.rematchWinnerName'); } catch (_) { /* ignore */ }
-      if (rematchName) {
-        const target = String(rematchName).trim().toLowerCase();
-        for (let i = 0; i < players.length; i++) {
-          if (String(players[i].name || '').trim().toLowerCase() === target) {
-            startingIdx = i;
-            break;
-          }
-        }
+      if (config.startingUserId) {
+        startingIdx = players.findIndex(p => p.userId != null && String(p.userId) === String(config.startingUserId));
+      } else if (Number.isInteger(config.startingBoardPosition)) {
+        startingIdx = players.findIndex(p => p.boardPosition === config.startingBoardPosition);
       }
+      // Without a named winner (round 1, or a replay that named none): a random seat from the shared
+      // seed, moved one seat on per round so a winner-less replay still changes who starts.
+      const _seedText = String(state.meta.get('seed') || '');
+      const _roundMatch = _seedText.match(/^(.*):r(\d+)$/);
+      const _round = _roundMatch ? Number(_roundMatch[2]) : 0;
+      const _baseSeed = _roundMatch ? _roundMatch[1] : _seedText;
       if (startingIdx < 0) {
         // user_directive_2026-07-18d: the FIRST game of a session opens on a
         // uniformly random seat among ALL players; the randomiser is used ONLY
@@ -833,13 +837,13 @@ function initGame(playerCount = 2, config = {}) {
         //
         // The seat now blooms from the SAME shared seed as the deck, using a
         // distinct sub-stream so it does not consume the deck's randomness.
-        const _seed = state.meta.get('seed');
+        const _seed = _baseSeed || state.meta.get('seed');     // the table's seed without the round: round 1's seat
         const _codec = (typeof ManifoldCodec !== 'undefined' && ManifoldCodec)
           || (typeof window !== 'undefined' && window.ManifoldCodec)
           || (typeof globalThis !== 'undefined' && globalThis.ManifoldCodec)
           || null;
         if (_seed != null && _codec && typeof _codec.prng === 'function') {
-          startingIdx = Math.floor(_codec.prng(`${_seed}:startingSeat`)() * effectiveCount);
+          startingIdx = (Math.floor(_codec.prng(`${_seed}:startingSeat`)() * effectiveCount) + _round) % effectiveCount;
         } else {
           // Loud on purpose. A silent fallback here is what let the original
           // divergence hide: the game looks fine locally and only breaks when a

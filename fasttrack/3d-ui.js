@@ -392,34 +392,28 @@ function clearTransientIdentity() {
   } catch (_) { /* ignore */ }
 }
 
-// user_directive_2026-05-18: winner of this game opens the next one.
-// Stash the winner's display name; fasttrack-game-core.initGame()
-// reads (and clears) this key when seeding state.players.current.
-// Every screen stashes it (the host on Play again, the others when the
-// replay arrives), so the next game starts with the same seat everywhere.
-function stashRematchWinner() {
-  try {
-    const core = window.FastTrackCore;
-    if (core && core.state) {
-      const winnerIdx = core.state.meta.get('winner');
-      const list = core.state.players.get('list') || [];
-      if (Number.isInteger(winnerIdx) && list[winnerIdx] && list[winnerIdx].name) {
-        localStorage.setItem('ft.rematchWinnerName', list[winnerIdx].name);
-      }
-    }
-  } catch (e) { console.warn('rematch winner stash failed', e); }
-}
-
 // Replay button. In single-player just reloads. In multiplayer the host
 // asks the server to recycle the session; guests wait for the server
 // broadcast and reload to pick up the fresh game state.
+// The winner of the round just played, who opens the next one (Ken, 2026-11-20: "winner goes first").
+function roundWinner() {
+  try {
+    const s = window.FastTrackCore && window.FastTrackCore.state, idx = s && s.meta.get('winner');
+    const p = s && Number.isInteger(idx) ? (s.players.get('list') || [])[idx] : null;
+    return p ? { userId: p.userId || null, boardPosition: p.boardPosition } : null;
+  } catch (_) { return null; }
+}
+
 function playAgain() {
-  stashRematchWinner();
   const mp = window.__FT_MP__ || null;
   const isMp = !!(mp && mp.connected && mp.session);
   const isHost = !!(isMp && mp.isHost);
+  const winner = roundWinner();
   if (!isMp) {
-    window.location.reload();
+    // Solo: the same seats come back in the same board positions, so the winner is named by position.
+    const url = new URL(window.location.href);
+    if (winner && Number.isInteger(winner.boardPosition)) url.searchParams.set('firstPos', String(winner.boardPosition)); else url.searchParams.delete('firstPos');
+    window.location.replace(url.toString());
     return;
   }
   if (!isHost) {
@@ -428,7 +422,7 @@ function playAgain() {
   }
   const btn = document.getElementById('btn-replay-again');
   if (btn) { btn.disabled = true; btn.textContent = 'Restarting…'; }
-  try { mp.sendReplayRequest(); } catch (e) { console.warn('replay send failed', e); }
+  try { mp.sendReplayRequest(winner && winner.userId); } catch (e) { console.warn('replay send failed', e); }
 }
 
 function showReplayPrompt(winnerName) {
@@ -556,7 +550,6 @@ function bindReplayServerEvents() {
     // Server has reset the session in place. Reload so all clients pick
     // up the fresh game state with the same seats (at data.url when the
     // server names one, e.g. with the next round number).
-    stashRematchWinner();
     hideReplayPrompt();
     window._replayPromptShown = false;
     setTimeout(() => { if (data && data.url) window.location.replace(data.url); else window.location.reload(); }, 200);

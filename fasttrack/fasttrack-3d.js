@@ -1281,6 +1281,8 @@ async function init3D() {
     if (dimensionalConfig) {
       Object.assign(initConfig, dimensionalConfig);
     }
+    // Solo Play again names the winner by board position (?firstPos=0-5), who opens the next game.
+    if (/^[0-5]$/.test(usp.get('firstPos') || '')) initConfig.startingBoardPosition = Number(usp.get('firstPos'));
 
     // ── Shared deterministic seed (manifold-first, Phase 1) ──────────────────
     // Hand the game the ONE identifier every client in this session already
@@ -1298,6 +1300,8 @@ async function init3D() {
       // deck while every screen still derives the same one.
       const _round = usp.get('round');
       initConfig.sessionSeed = _seed ? String(_seed) + (_round ? ':r' + _round : '') : null;
+      // Play again names the last round's winner (?first=<seat id>), who opens this round.
+      if (usp.get('first')) initConfig.startingUserId = String(usp.get('first'));
     }
 
     const isDevObserver = usp.get('dev_observer') === '1' || kgGame?.devObserver === true;
