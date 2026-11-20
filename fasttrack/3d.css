@@ -4486,3 +4486,11 @@ body.ft-turn-panel #ft-peg-bar .peg-btn.selected .peg-glyph { font-weight: 900; 
 @media (prefers-reduced-motion: reduce) {
   #ft-win .ftw-confetti, #ft-win .ftw-balloon { animation-duration: 20s !important; }
 }
+
+/* Reactions stay live after a win (Ken, 2026-11-20): the win screen (#ft-win, z-index 100000) covers the page,
+   so once it is up the emoji tray, the reaction feed and the balloons are lifted above it. The tray opens from
+   the win screen's "React" button (3d-ui.js showWinCelebration). */
+body.ft-won #emoji-ui,
+body.ft-won #emoji-feed,
+body.ft-won .emoji-balloon { z-index: 100002 !important; }
+body.ft-won #emoji-ui { display: flex !important; }

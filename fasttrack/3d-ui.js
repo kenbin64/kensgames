@@ -29,6 +29,12 @@ const EMOJI_REACTIONS = [
   { id: 'bullseye', label: 'Bullseye', emoji: '🎯' },
   { id: 'heart', label: 'Heart', emoji: '❤️' },
   { id: 'facepalm', label: 'Face palm', emoji: '🤦' },
+  // Added 2026-11-20 (Ken): face with sunglasses, clock, embarrassed, crazy, sorry.
+  { id: 'cool', label: 'Cool', emoji: '😎' },
+  { id: 'clock', label: 'Clock', emoji: '⏰' },
+  { id: 'embarrassed', label: 'Embarrassed', emoji: '😳' },
+  { id: 'crazy', label: 'Crazy', emoji: '🤪' },
+  { id: 'sorry', label: 'Sorry', emoji: '🙏' },
 ];
 // How long a reaction stays up (Ken, 2026-11-18: one second longer, and bigger). The balloon rises for 1.1 s,
 // holds, then pops; the line in the feed fades later.
@@ -123,8 +129,8 @@ function showEmojiReactionToast(payload) {
 // the event, the bot and the game state (the seed), so every screen in an online game shows the same
 // reaction from the same bot without sending anything. Ids are from EMOJI_REACTIONS.
 const BOT_REACTIONS = {
-  cutOther: { chance: 0.7, ids: ['smirk', 'excited', 'hurray', 'joyful', 'lightning', 'high_five'] },
-  gotCut: { chance: 0.8, ids: ['mad', 'swearing_cloud', 'waah', 'facepalm', 'boo', 'drama'] },
+  cutOther: { chance: 0.7, ids: ['smirk', 'excited', 'hurray', 'joyful', 'lightning', 'high_five', 'cool', 'crazy'] },
+  gotCut: { chance: 0.8, ids: ['mad', 'swearing_cloud', 'waah', 'facepalm', 'boo', 'drama', 'embarrassed'] },
   bullseye: { chance: 0.6, ids: ['bullseye', 'excited', 'hurray'] },
   fastTrack: { chance: 0.4, ids: ['fast_track', 'excited', 'joyful'] },
   safeZone: { chance: 0.35, ids: ['happy', 'thumbs_up', 'joyful'] },
@@ -522,6 +528,10 @@ function showWinCelebration(opts) {
   if (o.isHost) {
     const again = add('↻ Play again', 'ftw-again', () => { again.disabled = true; again.textContent = 'Starting…'; playAgain(); });
   }
+  // Reactions stay live after a win (Ken, 2026-11-20): everyone can open the emoji tray from here, and the
+  // tray, the feed and the balloons are lifted above this screen (body.ft-won in 3d.css).
+  add('😀 React', 'ftw-react', () => { renderEmojiPanel(); toggleEmojiPanel(); });
+  document.body.classList.add('ft-won');
   add('✕ Leave game', 'ftw-leave', leaveFromReplay);
   panel.append(crown, title, sub, buttons);
   root.appendChild(panel);
@@ -601,7 +611,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!panel || !ui || !panel.classList.contains('open')) return;
     // The phone launchers (the hamburger's Emoji item, the settings Emoji button) sit outside #emoji-ui; without
     // this, the same tap that opens the tray would bubble here and close it again at once (fixed 2026-11-18).
-    const launcher = ev.target.closest && ev.target.closest('#hamburger-menu, #settings-emoji-launch');
+    // The win screen's React button is a launcher too (2026-11-20).
+    const launcher = ev.target.closest && ev.target.closest('#hamburger-menu, #settings-emoji-launch, .ftw-react');
     if (!ui.contains(ev.target) && !launcher) panel.classList.remove('open');
   });
 });
