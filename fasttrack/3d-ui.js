@@ -96,12 +96,17 @@ function showEmojiReactionToast(payload) {
     if (node.parentNode) node.parentNode.removeChild(node);
   }, TOAST_GONE_MS);
 
+  // Built with textContent, not innerHTML: a sender name can come from another player online.
   const balloon = document.createElement('div');
   balloon.className = 'emoji-balloon';
-  balloon.innerHTML = `
-        <div class="emoji-balloon-glyph">${emoji}</div>
-        <div class="emoji-balloon-sender">${sender}</div>
-      `;
+  const glyph = document.createElement('div');
+  glyph.className = 'emoji-balloon-glyph';
+  glyph.textContent = emoji;
+  const who = document.createElement('div');
+  who.className = 'emoji-balloon-sender';
+  who.textContent = sender;
+  balloon.appendChild(glyph);
+  balloon.appendChild(who);
   document.body.appendChild(balloon);
 
   setTimeout(() => {
@@ -111,6 +116,54 @@ function showEmojiReactionToast(payload) {
     if (balloon.parentNode) balloon.parentNode.removeChild(balloon);
   }, BALLOON_HOLD_MS + BALLOON_POP_MS);
 }
+
+// ── Bots react too (Ken, 2026-11-18) ─────────────────────────────────────────────────────────
+// The game's cut scenes call botReact when something happens to a bot's peg. Not every time: each
+// event has a chance, and a bot that just reacted waits a few seconds. The pick comes from a hash of
+// the event, the bot and the game state (the seed), so every screen in an online game shows the same
+// reaction from the same bot without sending anything. Ids are from EMOJI_REACTIONS.
+const BOT_REACTIONS = {
+  cutOther: { chance: 0.7, ids: ['smirk', 'excited', 'hurray', 'joyful', 'lightning', 'high_five'] },
+  gotCut: { chance: 0.8, ids: ['mad', 'swearing_cloud', 'waah', 'facepalm', 'boo', 'drama'] },
+  bullseye: { chance: 0.6, ids: ['bullseye', 'excited', 'hurray'] },
+  fastTrack: { chance: 0.4, ids: ['fast_track', 'excited', 'joyful'] },
+  safeZone: { chance: 0.35, ids: ['happy', 'thumbs_up', 'joyful'] },
+  crown: { chance: 0.6, ids: ['excited', 'hurray', 'smirk'] },
+  win: { chance: 1, ids: ['hurray', 'excited', 'joyful'] },
+  otherWon: { chance: 0.6, ids: ['clap', 'thumbs_up', 'heart', 'facepalm'] },
+};
+const BOT_REACT_COOLDOWN_MS = 5000;
+const _botLastReact = new Map();     // bot name -> when it last reacted
+
+function _stableHash(text) {        // FNV-1a: the same text gives the same number on every screen
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+// The decision alone: which reaction (and after how long) this bot gives, or null for none. `lastAt` is
+// when this bot last reacted. Pure, so it can be tested without waiting on timers.
+function botReactionFor(event, player, seed, now, lastAt) {
+  const kind = BOT_REACTIONS[event];
+  if (!kind || !player || !player.isBot) return null;
+  const h = _stableHash(`${event}|${player.name || 'Bot'}|${seed}`);
+  if ((h % 1000) / 1000 >= kind.chance) return null;
+  if (event !== 'win' && now - (lastAt || 0) < BOT_REACT_COOLDOWN_MS) return null;
+  const reaction = EMOJI_REACTIONS.find(r => r.id === kind.ids[(h >>> 10) % kind.ids.length]);
+  if (!reaction) return null;
+  return { reaction, delay: 500 + ((h >>> 20) % 900) };   // a beat after the moment, like a person reacting
+}
+
+function botReact(event, player, seed) {
+  const name = (player && player.name) || 'Bot';
+  const now = Date.now();
+  const pick = botReactionFor(event, player, seed, now, _botLastReact.get(name));
+  if (!pick) return;
+  _botLastReact.set(name, now);
+  setTimeout(() => showEmojiReactionToast({ emoji: pick.reaction.emoji, label: pick.reaction.label, sender: name }), pick.delay);
+}
+window.botReact = botReact;
+window.botReactionFor = botReactionFor;
 
 function ensureReactionClient() {
   if (reactionClient || typeof KGMultiplayer === 'undefined') return;

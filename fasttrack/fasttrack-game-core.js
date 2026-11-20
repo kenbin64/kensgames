@@ -5575,6 +5575,18 @@ const CutsceneManager = {
 
   // ── Cutscene Implementations ──────────────────────────────────────────
 
+  // Bots react with an emoji (3d-ui.js botReact; Ken, 2026-11-18). The seed is game state every screen
+  // shares, so an online table sees the same reaction from the same bot.
+  botReact(event, player) {
+    if (typeof window === 'undefined' || typeof window.botReact !== 'function' || !player) return;
+    const card = state.deck.get('currentCard');
+    const seed = [state.players.get('current'), (state.deck.get('cards') || []).length,
+      (state.deck.get('discard') || []).length, card ? (card.display || card.value) : ''].join(':');
+    try { window.botReact(event, player, seed); } catch (_) { /* a reaction is decoration; never stop the game */ }
+  },
+
+  seat(playerId) { return (state.players.get('list') || [])[playerId]; },
+
   playCutCutscene(data) {
     const { victorPeg, victimPeg, victorPlayer, victimPlayer } = data;
     const duration = this.getDuration('cut');
@@ -5615,6 +5627,9 @@ const CutsceneManager = {
     this.showPegReaction(victimReaction, victimPlayer.color);
     this.spawnFloatingEmojis(['⚔️', '💥', '🔥'], 6);
 
+    this.botReact('cutOther', victorPlayer);
+    this.botReact('gotCut', victimPlayer);
+
     // No 'protest' shake here (Ken, 2026-11-18): it ran on top of the 'shame' bow above and both
     // drive the same rotations, so the head-hung nod was lost. The vanquished peg just hangs its head.
 
@@ -5639,6 +5654,7 @@ const CutsceneManager = {
 
     // Peg dances on the FT ring entry
     if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'dance');
+    this.botReact('fastTrack', this.seat(playerId));
 
     if (isFirst) {
       const reaction = getPegReaction(peg, 'onEnterFastTrack') || '⚡';
@@ -5663,6 +5679,7 @@ const CutsceneManager = {
 
     // Bullseye is the highest reward — celebrate (jumping + spin)
     if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'celebrate');
+    this.botReact('bullseye', this.seat(playerId));
 
     if (isFirst) {
       const reaction = getPegReaction(peg, 'onEnterBullseye') || '🎯';
@@ -5688,6 +5705,7 @@ const CutsceneManager = {
 
     // Peg dances on safe-zone arrival
     if (window.triggerPegPose && peg && peg.id) window.triggerPegPose(peg.id, 'dance');
+    this.botReact('safeZone', this.seat(playerId));
 
     if (isFirst) {
       const reaction = getPegReaction(peg, 'onEnterSafeZone') || '🛡️';
@@ -5707,6 +5725,7 @@ const CutsceneManager = {
     if (window.ManifoldAudio) ManifoldAudio.playFanfare('crown');
 
     this.showCelebrationGraphic('👑 HOME STRETCH! 👑', playerColor, true);
+    this.botReact('crown', this.seat(playerId));
     this.spawnFloatingEmojis(['👑', '✨', '🏠'], 8);
     log(`👑 ${playerName}'s safe zone is FULL! Crown appears on home hole!`);
     setTimeout(() => this.finishCutscene(), duration);
@@ -5732,6 +5751,8 @@ const CutsceneManager = {
     // 3d-ui.js). This runs on every screen, because every screen plays the winning move.
     const pegId = peg.id || `peg-${playerColor}-0`;
     if (window.triggerPegPose) window.triggerPegPose(pegId, 'victory');
+    // The winner, if a bot, cheers; the other bots clap (or face-palm).
+    (state.players.get('list') || []).forEach((p, i) => this.botReact(i === data.playerId ? 'win' : 'otherWon', p));
     if (window.triggerWinCrown) window.triggerWinCrown(pegId);
 
     if (typeof window.showWinCelebration === 'function') {
